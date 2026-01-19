@@ -1,0 +1,104 @@
+.heroCard {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #1a1a1a 0%,
+    #2a2a2a 50%,
+    #1a1a1a 100%
+  );
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  overflow: hidden;
+}
+
+/* Gold border glow */
+.heroCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  padding: 2px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 215, 0, 0.6) 0%,
+    rgba(255, 165, 0, 0.3) 50%,
+    rgba(255, 215, 0, 0.6) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Gold foil shimmer effect */
+.shimmer {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 215, 0, 0.1) 25%,
+    rgba(255, 215, 0, 0.3) 50%,
+    rgba(255, 215, 0, 0.1) 75%,
+    transparent 100%
+  );
+  animation: shimmer 3s ease-in-out infinite;
+  animation-delay: 2.5s;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(50%);
+  }
+}
+
+.content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  z-index: 1;
+}
+
+.icon {
+  font-size: 3rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-black);
+  background: linear-gradient(
+    135deg,
+    #FFD700 0%,
+    #FFA500 50%,
+    #FFD700 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 var(--space-1) 0;
+  line-height: var(--leading-tight);
+}
+
+.subtitle {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: var(--leading-snug);
+}

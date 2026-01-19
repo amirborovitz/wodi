@@ -1,0 +1,119 @@
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+/* Mesh gradient background */
+.meshBackground {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 80% 60% at 20% 30%,
+      var(--mesh-c1) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 70% 80% at 85% 75%,
+      var(--mesh-c2) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 50% 50%,
+      var(--mesh-c3) 0%,
+      transparent 60%
+    ),
+    var(--color-surface);
+  opacity: 0.7;
+  filter: blur(40px);
+  animation: meshFloat 8s ease-in-out infinite;
+}
+
+@keyframes meshFloat {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+  }
+  33% {
+    transform: scale(1.05) translate(2%, -2%);
+  }
+  66% {
+    transform: scale(0.98) translate(-2%, 2%);
+  }
+}
+
+/* Glass overlay for depth */
+.glassOverlay {
+  position: absolute;
+  inset: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+}
+
+/* Content */
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  gap: var(--space-3);
+}
+
+/* Camera icon container */
+.iconContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-2);
+}
+
+.cameraIcon {
+  width: 36px;
+  height: 36px;
+  color: var(--color-text);
+}
+
+/* Title */
+.title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+/* Subtitle */
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  max-width: 240px;
+}
+
+/* Buttons */
+.buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 240px;
+  margin-top: var(--space-2);
+}
+
+.buttons button {
+  width: 100%;
+}

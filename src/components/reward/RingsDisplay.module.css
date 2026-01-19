@@ -1,0 +1,13 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding: var(--space-4) 0;
+}
+
+@media (max-width: 400px) {
+  .container {
+    gap: var(--space-4);
+  }
+}
