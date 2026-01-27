@@ -3,7 +3,7 @@
   min-height: 100dvh;
   padding: var(--space-4);
   padding-top: calc(var(--space-4) + var(--safe-top));
-  padding-bottom: calc(120px + var(--safe-bottom));
+  padding-bottom: calc(96px + var(--safe-bottom));
   background: var(--color-bg);
   max-width: 500px;
   margin: 0 auto;

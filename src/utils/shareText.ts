@@ -12,35 +12,35 @@ export function getVolumeMessage(kg: number): string {
   if (tons >= 1) return `${tons.toFixed(1)} tons of iron moved!`;
   if (kg >= 500) return `${Math.round(kg)}kg lifted! Strong work!`;
   if (kg >= 100) return `${Math.round(kg)}kg moved! Keep pushing!`;
-  return `Every rep counts!`;
+  return 'Every rep counts!';
 }
 
 /**
- * Get celebration emoji based on achievement type
+ * Get a short celebration tag based on achievement type
  */
 export function getCelebrationEmoji(type?: Achievement['type']): string {
-  const emojiMap: Record<string, string> = {
-    pr: '🏆',
-    benchmark: '⭐',
-    streak: '🔥',
-    milestone: '🎯',
-    generic: '💪',
+  const tagMap: Record<string, string> = {
+    pr: 'PR',
+    benchmark: 'BM',
+    streak: 'STREAK',
+    milestone: 'MILE',
+    generic: 'NICE',
   };
-  return emojiMap[type || 'generic'] || '💪';
+  return tagMap[type || 'generic'] || 'NICE';
 }
 
 /**
- * Get icon emoji for achievement display
+ * Get icon tag for achievement display
  */
 export function getAchievementIconEmoji(icon?: string): string {
   const iconMap: Record<string, string> = {
-    trophy: '🏆',
-    fire: '🔥',
-    star: '⭐',
-    medal: '🥇',
-    crown: '👑',
+    trophy: 'TROPHY',
+    fire: 'FIRE',
+    star: 'STAR',
+    medal: 'MEDAL',
+    crown: 'CROWN',
   };
-  return iconMap[icon || 'trophy'] || '🏆';
+  return iconMap[icon || 'trophy'] || 'TROPHY';
 }
 
 /**
@@ -103,16 +103,16 @@ export function formatShareDate(date: Date): string {
 }
 
 /**
- * Get workout type emoji
+ * Get workout type tag
  */
 export function getWorkoutTypeEmoji(type: string): string {
-  const typeEmojis: Record<string, string> = {
-    strength: '🏋️',
-    metcon: '⚡',
-    emom: '⏱️',
-    amrap: '🔄',
-    for_time: '🏃',
-    mixed: '💥',
+  const typeTags: Record<string, string> = {
+    strength: 'STR',
+    metcon: 'MET',
+    emom: 'EMOM',
+    amrap: 'AMRAP',
+    for_time: 'FT',
+    mixed: 'MIX',
   };
-  return typeEmojis[type] || '💪';
+  return typeTags[type] || 'WOD';
 }

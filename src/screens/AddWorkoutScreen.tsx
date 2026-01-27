@@ -1,20 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
-import { parseWorkoutImage } from '../services/openai';
+import { parseWorkoutImage, refineParsedWorkout } from '../services/openai';
+import { assignMovementColors } from '../services/workloadCalculation';
+import { smartClassifyExercise } from '../services/exerciseClassification';
+import type { ExerciseMetricType } from '../services/exerciseClassification';
 import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useRewardData } from '../hooks/useRewardData';
+import { useWorkouts } from '../hooks/useWorkouts';
 import { RewardScreen } from './RewardScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, RxWeights } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, RxWeights, WorkloadBreakdown, MovementTotal } from '../types';
 import styles from './AddWorkoutScreen.module.css';
+
+const BackIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 interface AddWorkoutScreenProps {
   onBack: () => void;
   onWorkoutCreated: () => void;
   initialImage?: File | null;
+  editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
 }
 
 type Step = 'capture' | 'processing' | 'preview' | 'log-results' | 'saving' | 'reward';
@@ -24,6 +35,170 @@ interface ExerciseResult {
   sets: ExerciseSet[];
   completionTime?: number; // seconds - for "for time" workouts
   notes?: string;
+  movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
+  rounds?: number; // Number of rounds completed (for multi-movement WODs)
+  // Cardio tracking (calories)
+  cardioTurns?: number; // Number of turns/intervals on cardio machine
+  cardioCaloriesPerTurn?: number; // Avg calories per turn
+  totalCalories?: number; // Total calories (turns × calories per turn)
+  // Cardio tracking (distance)
+  distanceTurns?: number; // Number of turns/intervals for distance cardio
+  distancePerTurn?: number; // Distance per turn (in meters)
+  totalDistance?: number; // Total distance (turns × distance per turn)
+  distanceUnit?: 'm' | 'km' | 'mi'; // Unit for distance
+}
+
+const CINDY_MOVEMENTS = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat'];
+const DT_MOVEMENTS = ['deadlift', 'hang clean', 'hang power clean', 'shoulder to overhead', 'push jerk'];
+
+function parseCindyDtRounds(text?: string): { cindyRounds: number; dtRounds: number } | null {
+  if (!text) return null;
+  const cindyMatches = [...text.matchAll(/(\d+)\s*rounds?\s*of\s*['"]?cindy['"]?/gi)];
+  const dtMatches = [...text.matchAll(/(\d+)\s*rounds?\s*of\s*(?:lightweight\s*)?['"]?dt['"]?/gi)];
+  const cindyRounds = cindyMatches.reduce((sum, match) => sum + parseInt(match[1], 10), 0);
+  const dtRounds = dtMatches.reduce((sum, match) => sum + parseInt(match[1], 10), 0);
+  if (cindyRounds === 0 && dtRounds === 0) return null;
+  return { cindyRounds, dtRounds };
+}
+
+function buildWorkloadBreakdownFromResults(
+  results: ExerciseResult[],
+  parsedWorkout?: ParsedWorkout,
+  partnerFactor: number = 1
+): WorkloadBreakdown {
+  const movementMap = new Map<string, MovementTotal>();
+  let grandTotalReps = 0;
+  let grandTotalVolume = 0;
+  const roundOverrides = parseCindyDtRounds(
+    parsedWorkout?.rawText || results.map((result) => result.exercise.prescription).join(' ')
+  );
+
+  results.forEach((result) => {
+    const movements = result.exercise.movements;
+    const setWeights = result.sets
+      .map(set => set.weight)
+      .filter((weight): weight is number => typeof weight === 'number' && weight > 0);
+    const weightFromSets = setWeights.length > 0
+      ? Math.round(setWeights.reduce((sum, weight) => sum + weight, 0) / setWeights.length)
+      : undefined;
+    if (movements && movements.length > 0) {
+      const repsPerRound = movements.reduce((sum, mov) => sum + (mov.reps || 0), 0);
+      const explicitRounds = result.rounds || result.sets.length || 1;
+      let totalRounds = explicitRounds;
+
+      if (!result.rounds && repsPerRound > 0) {
+        const roundCountsFromSets: number[] = [];
+        result.sets.forEach((set) => {
+          if (set.actualReps && set.actualReps > 0) {
+            roundCountsFromSets.push(set.actualReps / repsPerRound);
+          }
+        });
+        if (roundCountsFromSets.length > 0) {
+          totalRounds = roundCountsFromSets.reduce((sum, rounds) => sum + rounds, 0);
+        }
+      }
+
+      movements.forEach((mov) => {
+        const perRound = mov.reps || 0;
+        if (perRound <= 0) return;
+
+        const lowerName = mov.name.toLowerCase();
+        let movementRounds = totalRounds;
+        if (roundOverrides) {
+          if (CINDY_MOVEMENTS.some((name) => lowerName.includes(name))) {
+            movementRounds = roundOverrides.cindyRounds || totalRounds;
+          } else if (DT_MOVEMENTS.some((name) => lowerName.includes(name))) {
+            movementRounds = roundOverrides.dtRounds || totalRounds;
+          }
+        }
+        const movementReps = perRound * movementRounds;
+        if (movementReps <= 0) return;
+
+        const weight = result.movementWeights?.[mov.name]
+          ?? mov.rxWeights?.male
+          ?? mov.rxWeights?.female
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
+        const unit = weight ? (mov.rxWeights?.unit || 'kg') : undefined;
+        const key = mov.name.toLowerCase();
+        const existing = movementMap.get(key);
+
+        if (existing) {
+          movementMap.set(key, {
+            ...existing,
+            totalReps: (existing.totalReps || 0) + movementReps,
+            weight: existing.weight || weight,
+            unit: existing.unit || unit,
+          });
+        } else {
+          movementMap.set(key, {
+            name: mov.name,
+            totalReps: movementReps,
+            weight,
+            unit,
+          });
+        }
+
+        grandTotalReps += movementReps;
+        if (weight) {
+          grandTotalVolume += weight * movementReps;
+        }
+      });
+
+      return;
+    }
+
+    let exerciseReps = 0;
+    let exerciseVolume = 0;
+    let exerciseWeight: number | undefined;
+
+    result.sets.forEach((set) => {
+      if (set.actualReps && set.actualReps > 0) {
+        exerciseReps += set.actualReps;
+        if (set.weight) {
+          exerciseVolume += set.weight * set.actualReps;
+          if (!exerciseWeight) {
+            exerciseWeight = set.weight;
+          }
+        }
+      }
+    });
+
+    if (exerciseReps > 0) {
+      const key = result.exercise.name.toLowerCase();
+      const existing = movementMap.get(key);
+      if (existing) {
+        movementMap.set(key, {
+          ...existing,
+          totalReps: (existing.totalReps || 0) + exerciseReps,
+          weight: existing.weight || exerciseWeight,
+        });
+      } else {
+        movementMap.set(key, {
+          name: result.exercise.name,
+          totalReps: exerciseReps,
+          weight: exerciseWeight,
+          unit: exerciseWeight ? 'kg' : undefined,
+        });
+      }
+
+      grandTotalReps += exerciseReps;
+      grandTotalVolume += exerciseVolume;
+    }
+  });
+
+  const factor = partnerFactor || 1;
+  const movements = Array.from(movementMap.values())
+    .filter(m => m.totalReps && m.totalReps > 0)
+    .map(m => ({ ...m, totalReps: Math.round((m.totalReps || 0) * factor) }))
+    .sort((a, b) => (b.totalReps || 0) - (a.totalReps || 0));
+
+  return {
+    movements,
+    grandTotalReps: Math.round(grandTotalReps * factor),
+    grandTotalVolume: Math.round(grandTotalVolume * factor),
+    containerRounds: parsedWorkout?.containerRounds,
+    benchmarkName: parsedWorkout?.benchmarkName,
+  };
 }
 
 interface SavedWorkout {
@@ -147,6 +322,25 @@ function isAerobicMovement(movement: ParsedMovement): boolean {
   return Boolean(movement.distance || movement.calories || movement.time);
 }
 
+// Check if a movement requires weight input (barbell/KB/DB movements)
+function isWeightedMovement(movement: ParsedMovement): boolean {
+  if (movement.rxWeights) return true;
+
+  const name = movement.name.toLowerCase();
+  const weightedPatterns = [
+    'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
+    'row', 'swing', 'lunge', 'curl', 'extension', 'pullover',
+    'kettlebell', 'kb', 'dumbbell', 'db', 'barbell', 'bb',
+    'goblet', 'sumo', 'rdl', 'romanian', 'front rack', 'overhead'
+  ];
+
+  // Exclude bodyweight or cardio movements that might match
+  const excludePatterns = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat', 'pistol', 'burpee', 'ring row'];
+  if (excludePatterns.some(p => name.includes(p))) return false;
+
+  return weightedPatterns.some(p => name.includes(p));
+}
+
 function getWeightTarget(exercise?: ParsedExercise): { name: string; rxWeights?: RxWeights } | null {
   if (!exercise) return null;
 
@@ -167,14 +361,206 @@ function getWeightTarget(exercise?: ParsedExercise): { name: string; rxWeights?:
   return null;
 }
 
+// ============================================
+// EXERCISE CLASSIFICATION SYSTEM
+// ============================================
+
+// Metric type for exercises
+type ExerciseMetric = 'weight_reps' | 'reps_only' | 'calories' | 'distance' | 'time';
+
+interface ExerciseClassification {
+  inputType: ExerciseInputType;
+  metric: ExerciseMetric;
+  confidence: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+// Explicit metric indicators in workout text (highest priority)
+const EXPLICIT_CALORIE_PATTERNS = [
+  /max\s*cal/i, /for\s*cal/i, /\d+\s*cal\b/i, /calories/i,
+];
+
+const EXPLICIT_DISTANCE_PATTERNS = [
+  /\d+\s*m\b/, /\d+\s*meter/i, /\d+\s*metre/i,
+  /\d+\s*km\b/i, /\d+\s*mile/i, /\d+\s*mi\b/,
+  /\d+\s*yard/i, /\d+\s*yd\b/i,
+  /\d+\s*ft\b/, /\d+\s*feet/i,
+  /for distance/i, /max distance/i,
+];
+
+// (unused) EXPLICIT_TIME_PATTERNS removed
+
+// Cardio machines - can track calories OR distance depending on workout text
+const CARDIO_MACHINE_PATTERNS = [
+  'echo bike', 'ecobike', 'assault bike', 'air bike', 'airbike', 'airdyne',
+  'ski erg', 'skierg', 'ski-erg',
+  'rower', 'rowing', 'row erg', 'rowerg', 'row',
+  'bike erg', 'bikeerg',
+];
+
+// Distance-based cardio - typically track distance
+const DISTANCE_CARDIO_PATTERNS = [
+  'run', 'running', 'sprint',
+  'swim', 'swimming',
+  'walk', 'walking', 'hike',
+  'sled push', 'sled pull', 'sled drag',
+  'farmer carry', 'farmers carry', 'farmer walk',
+  'yoke carry', 'yoke walk',
+];
+
+// Bodyweight exercises - track reps only, no weight (unless explicitly weighted)
+const BODYWEIGHT_PATTERNS = [
+  'pull-up', 'pullup', 'pull up',
+  'push-up', 'pushup', 'push up',
+  'burpee', 'burpees',
+  'air squat', 'airsquat',
+  'sit-up', 'situp', 'sit up',
+  'v-up', 'vup', 'v up',
+  'toes to bar', 't2b', 'ttb',
+  'knees to elbow', 'k2e', 'kte',
+  'muscle-up', 'muscleup', 'muscle up',
+  'handstand push-up', 'hspu',
+  'handstand walk', 'hs walk',
+  'pistol', 'pistols',
+  'lunge', 'lunges', // unless weighted
+  'box jump', 'box step',
+  'double under', 'du', 'single under', 'su',
+  'rope climb',
+];
+
+type ExerciseInputType = 'weighted' | 'bodyweight' | 'cardio_calories' | 'cardio_distance';
+
+// Analyze workout text to determine what metric to track
+function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification {
+  const text = `${exercise.name} ${exercise.prescription}`.toLowerCase();
+
+  // 1. Check for EXPLICIT metric indicators in the text (highest confidence)
+
+  // Explicit calories mentioned
+  if (EXPLICIT_CALORIE_PATTERNS.some(p => p.test(text))) {
+    return {
+      inputType: 'cardio_calories',
+      metric: 'calories',
+      confidence: 'high',
+      reason: 'Explicit calorie target in workout text',
+    };
+  }
+
+  // Explicit distance mentioned
+  if (EXPLICIT_DISTANCE_PATTERNS.some(p => p.test(text))) {
+    return {
+      inputType: 'cardio_distance',
+      metric: 'distance',
+      confidence: 'high',
+      reason: 'Explicit distance target in workout text',
+    };
+  }
+
+  // 2. Check for cardio machines - need to infer metric
+  const isCardioMachine = CARDIO_MACHINE_PATTERNS.some(p => text.includes(p));
+  if (isCardioMachine) {
+    // Default to calories for machines if no explicit metric
+    return {
+      inputType: 'cardio_calories',
+      metric: 'calories',
+      confidence: 'medium',
+      reason: 'Cardio machine detected, defaulting to calories (no explicit metric)',
+    };
+  }
+
+  // 3. Check for distance exercises (run, swim, etc.)
+  const isDistanceExercise = DISTANCE_CARDIO_PATTERNS.some(p => text.includes(p));
+  if (isDistanceExercise) {
+    return {
+      inputType: 'cardio_distance',
+      metric: 'distance',
+      confidence: 'medium',
+      reason: 'Distance-based exercise detected',
+    };
+  }
+
+  // 4. Check for explicit cardio type from parser
+  if (exercise.type === 'cardio') {
+    return {
+      inputType: 'cardio_calories',
+      metric: 'calories',
+      confidence: 'low',
+      reason: 'Exercise type is cardio, defaulting to calories',
+    };
+  }
+
+  // 5. Check for bodyweight exercises
+  const isBodyweight = BODYWEIGHT_PATTERNS.some(p => text.includes(p));
+  const hasWeight = exercise.rxWeights ||
+                    /\d+\s*(kg|lb|pound)/i.test(text) ||
+                    text.includes('weighted');
+  const weightedImplementPatterns = [
+    'goblet', 'kettlebell', 'kb', 'dumbbell', 'db', 'barbell', 'bb',
+    'press', 'deadlift', 'clean', 'snatch', 'thruster', 'front rack', 'overhead',
+    'back squat', 'front squat', 'squat'
+  ];
+  const hasWeightedImplement = weightedImplementPatterns.some(p => text.includes(p));
+
+  if (!hasWeight && hasWeightedImplement && !isBodyweight) {
+    return {
+      inputType: 'weighted',
+      metric: 'weight_reps',
+      confidence: 'medium',
+      reason: 'Weighted movement keyword detected without explicit load',
+    };
+  }
+
+  if (isBodyweight && !hasWeight && !hasWeightedImplement) {
+    return {
+      inputType: 'bodyweight',
+      metric: 'reps_only',
+      confidence: 'high',
+      reason: 'Bodyweight exercise without weight specification',
+    };
+  }
+
+  // 6. Default to weighted
+  return {
+    inputType: 'weighted',
+    metric: 'weight_reps',
+    confidence: 'high',
+    reason: 'Standard weighted exercise',
+  };
+}
+
+function classifyExercise(exercise: ParsedExercise): ExerciseInputType {
+  return analyzeExerciseMetric(exercise).inputType;
+}
+
+// Determine if exercise needs weight input
+function exerciseNeedsWeight(exercise: ParsedExercise): boolean {
+  return classifyExercise(exercise) === 'weighted';
+}
+
 // Determine the logging mode for each exercise
-type ExerciseLoggingMode = 'strength' | 'intervals' | 'amrap_intervals' | 'for_time' | 'sets';
+type ExerciseLoggingMode = 'strength' | 'intervals' | 'amrap_intervals' | 'for_time' | 'sets' | 'cardio' | 'cardio_distance' | 'bodyweight';
 
 function getExerciseLoggingMode(exercise: ParsedExercise, workoutFormat?: string): ExerciseLoggingMode {
   const name = exercise.name.toLowerCase();
   const prescription = exercise.prescription.toLowerCase();
+  const classification = classifyExercise(exercise);
 
-  // Strength exercises always use weight/reps per set
+  // Cardio exercises (calories-based) always use cardio mode regardless of workout format
+  if (classification === 'cardio_calories') {
+    return 'cardio';
+  }
+
+  // Distance-based cardio (running, swimming, etc.)
+  if (classification === 'cardio_distance') {
+    return 'cardio_distance';
+  }
+
+  // Bodyweight exercises use bodyweight mode (reps only)
+  if (classification === 'bodyweight') {
+    return 'bodyweight';
+  }
+
+  // Strength exercises use weight/reps per set
   if (exercise.type === 'strength') {
     return 'strength';
   }
@@ -186,7 +572,6 @@ function getExerciseLoggingMode(exercise: ParsedExercise, workoutFormat?: string
   }
 
   // "X sets for time" = do all sets continuously, record ONE total time
-  // This is for_time mode, NOT intervals (which would record time per set)
   if (name.includes('sets for time') ||
       prescription.includes('sets for time') ||
       /^\d+\s*sets?\s*(for time|ft)/i.test(name) ||
@@ -224,9 +609,132 @@ function isForTimeWorkout(exercise: ParsedExercise, _workoutType: string, workou
   return mode === 'for_time';
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: AddWorkoutScreenProps) {
+function analyzeRefineNeed(parsed: ParsedWorkout): { shouldRefine: boolean; reasons: string[]; rawText: string } {
+  const rawText = [
+    parsed.rawText,
+    parsed.title,
+    ...parsed.exercises.map((exercise) => `${exercise.name} ${exercise.prescription}`),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const text = rawText.toLowerCase();
+  const reasons: string[] = [];
+
+  const roundMatches = [...text.matchAll(/(\d+)\s*rounds?\s*of/gi)];
+  const benchmarkMatches = text.match(/\b(cindy|dt|fran|grace|helen|diane|jackie|karen|annie|mary)\b/gi);
+  const hasMixedBlocks = text.includes('+') || text.includes(' then ');
+  const hasStructuredBlocks = /superset|cycle|metcon|interval|teams? of|cash[- ]?out|finisher/i.test(text);
+  const duplicateExercises = parsed.exercises.some((exercise, index) => {
+    if (index === 0) return false;
+    const prev = parsed.exercises[index - 1];
+    return exercise.name === prev.name && exercise.prescription === prev.prescription;
+  });
+
+  // New triggers for multi-block workouts
+  const hasMultipleBlocks = parsed.exercises.length >= 2;
+  const hasMixedTypes = new Set(parsed.exercises.map(e => e.type)).size > 1;
+
+  // Count block keywords in raw text to detect potentially missing blocks
+  const blockKeywords = text.match(/superset|metcon|finisher|cash[- ]?out|cycle|interval|amrap|emom|strength|warmup|warm[- ]?up/gi) || [];
+  const numberedItems = text.match(/^\s*\d+\.\s+/gm) || [];
+  const expectedBlockCount = Math.max(blockKeywords.length, numberedItems.length);
+  const rawTextHasMoreBlocks = expectedBlockCount > parsed.exercises.length;
+
+  if (roundMatches.length >= 2) reasons.push('multiple_round_blocks');
+  if (benchmarkMatches && benchmarkMatches.length >= 2) reasons.push('multiple_benchmarks');
+  if (hasMixedBlocks && roundMatches.length > 0) reasons.push('mixed_blocks_with_rounds');
+  if (hasStructuredBlocks) reasons.push('structured_blocks');
+  if (duplicateExercises) reasons.push('duplicate_exercises');
+  if (hasMultipleBlocks && hasMixedTypes) reasons.push('mixed_exercise_types');
+  if (rawTextHasMoreBlocks) reasons.push('potentially_missing_blocks');
+
+  return { shouldRefine: reasons.length > 0, reasons, rawText };
+}
+
+function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
+  const normalizedExercises = parsed.exercises.map((exercise) => {
+    const combined = `${exercise.name} ${exercise.prescription}`;
+    const setsRepsMatch = combined.match(/(\d+)\s*[x]\s*(\d+)/i)
+      || combined.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+    if (!setsRepsMatch) return exercise;
+
+    const parsedSets = parseInt(setsRepsMatch[1], 10);
+    const parsedReps = parseInt(setsRepsMatch[2], 10);
+    if (Number.isNaN(parsedSets) || Number.isNaN(parsedReps)) return exercise;
+
+    return {
+      ...exercise,
+      suggestedSets: parsedSets,
+      suggestedReps: parsedReps,
+    };
+  });
+
+  const hasStructuredBlocks = normalizedExercises.some(ex =>
+    /superset|cycle|metcon|interval/i.test(`${ex.name} ${ex.prescription}`)
+  );
+  const dedupedExercises = normalizedExercises.filter((exercise, index) => {
+    if (index === 0) return true;
+    const prev = normalizedExercises[index - 1];
+    const sameMovements = JSON.stringify(exercise.movements || []) === JSON.stringify(prev.movements || []);
+    const isDuplicate = exercise.name === prev.name
+      && exercise.prescription === prev.prescription
+      && exercise.suggestedSets === prev.suggestedSets
+      && exercise.suggestedReps === prev.suggestedReps
+      && sameMovements;
+    return !(hasStructuredBlocks && isDuplicate);
+  });
+
+  return {
+    ...parsed,
+    exercises: dedupedExercises,
+  };
+}
+
+async function refineWorkoutIfNeeded(
+  parsed: ParsedWorkout,
+  userId?: string
+): Promise<ParsedWorkout> {
+  const analysis = analyzeRefineNeed(parsed);
+
+  console.log('[Refine] Initial parse:', {
+    exerciseCount: parsed.exercises.length,
+    exercises: parsed.exercises.map(e => ({ name: e.name, type: e.type })),
+    rawText: parsed.rawText?.substring(0, 200),
+  });
+  console.log('[Refine] Analysis:', analysis.reasons, 'shouldRefine:', analysis.shouldRefine);
+
+  if (!analysis.shouldRefine) return parsed;
+
+  try {
+    const refined = await refineParsedWorkout(parsed, analysis.rawText);
+    console.log('[Refine] Refined result:', {
+      exerciseCount: refined.exercises.length,
+      exercises: refined.exercises.map(e => ({ name: e.name, type: e.type })),
+    });
+    if (userId) {
+      await addDoc(
+        collection(db, 'workoutParseRefinements'),
+        removeUndefined({
+          userId,
+          createdAt: serverTimestamp(),
+          reasons: analysis.reasons,
+          rawText: analysis.rawText,
+          parsed,
+          refined,
+        })
+      );
+    }
+    return refined;
+  } catch (error) {
+    console.warn('Failed to refine workout parse, using original:', error);
+    return parsed;
+  }
+}
+
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const { calculateRewardData } = useRewardData();
+  const { workouts: recentWorkouts } = useWorkouts(10); // For dev mode
   const [step, setStep] = useState<Step>('capture');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
@@ -234,12 +742,24 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // DEV MODE - temporary for testing
+  const [showDevWorkouts, setShowDevWorkouts] = useState(false);
+
   // Wizard state
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [exerciseResults, setExerciseResults] = useState<ExerciseResult[]>([]);
   const [currentSets, setCurrentSets] = useState<ExerciseSet[]>([]);
   const [completionMinutes, setCompletionMinutes] = useState<string>('');
   const [completionSeconds, setCompletionSeconds] = useState<string>('');
+
+  // Cardio exercise state (calories)
+  const [cardioTurns, setCardioTurns] = useState<string>('');
+  const [cardioCaloriesPerTurn, setCardioCaloriesPerTurn] = useState<string>('');
+
+  // Cardio exercise state (distance)
+  const [cardioDistanceTurns, setCardioDistanceTurns] = useState<string>('');
+  const [cardioDistancePerTurn, setCardioDistancePerTurn] = useState<string>('');
+  const [cardioDistanceUnit, setCardioDistanceUnit] = useState<'m' | 'km' | 'mi'>('m');
 
   // Interval workout state (for "intervals" format with time_per_set scoring)
   const [currentIntervalSet, setCurrentIntervalSet] = useState(1);
@@ -255,9 +775,35 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
   // Custom distances for alternatives (maps movement name to user-edited distance)
   const [customDistances, setCustomDistances] = useState<Record<string, number>>({});
 
+  // Per-movement weight tracking (maps movement name to weight)
+  const [movementWeights, setMovementWeights] = useState<Record<string, number>>({});
+  // Track which weight fields were manually edited
+  const [manuallyEditedWeights, setManuallyEditedWeights] = useState<Set<string>>(new Set());
+  const [useSingleWeightForMovements, setUseSingleWeightForMovements] = useState(true);
+  const [sharedMovementWeight, setSharedMovementWeight] = useState<string>('');
+
+  // Smart classification cache (maps exercise index to AI classification result)
+  const [smartClassifications, setSmartClassifications] = useState<Record<number, {
+    inputType: ExerciseInputType;
+    metric: ExerciseMetricType;
+    confidence: number;
+    source: 'rule' | 'learned' | 'ai';
+    reason: string;
+  }>>({});
+
   // Reward screen state
   const [rewardData, setRewardData] = useState<RewardData | null>(null);
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
+  const [savedWorkoutMeta, setSavedWorkoutMeta] = useState<{ id: string; totalVolume: number; date: Date } | null>(null);
+  const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
+  const isPartnerWorkout = Boolean(
+    parsedWorkout?.rawText?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of 2\b|\b2[- ]person\b/i) ||
+    parsedWorkout?.title?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of 2\b|\b2[- ]person\b/i) ||
+    parsedWorkout?.exercises?.some(exercise =>
+      /with a partner|partner workout|in pairs|pairs|team of 2|2[- ]person/i.test(`${exercise.name} ${exercise.prescription}`)
+    )
+  );
+  const partnerFactor = isPartnerWorkout ? 0.5 : 1;
 
   useEffect(() => {
     setSavedWorkouts(readSavedWorkouts());
@@ -276,8 +822,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       try {
         const base64 = await fileToBase64(initialImage);
         const workout = await parseWorkoutImage(base64);
-        setParsedWorkout(workout);
-        addSavedWorkout(workout);
+        const refined = await refineWorkoutIfNeeded(workout, user?.id);
+        setParsedWorkout(refined);
+        addSavedWorkout(refined);
         setStep('preview');
       } catch (err) {
         console.error('Error parsing workout:', err);
@@ -289,6 +836,96 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     processInitialImage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialImage]);
+
+  // Handle edit workout - skip directly to log-results with workout data
+  useEffect(() => {
+    if (!editWorkout) return;
+
+    // Convert WorkoutWithStats to ParsedWorkout format
+    const editParsedWorkout: ParsedWorkout = {
+      title: editWorkout.title,
+      type: editWorkout.type,
+      format: editWorkout.type === 'strength' ? 'strength' : 'for_time',
+      scoreType: editWorkout.type === 'strength' ? 'load' : 'time',
+      exercises: editWorkout.exercises.map(ex => ({
+        name: ex.name,
+        type: ex.type,
+        prescription: ex.prescription,
+        suggestedSets: ex.sets.length || 3,
+        suggestedReps: ex.sets[0]?.targetReps || ex.sets[0]?.actualReps,
+        suggestedWeight: ex.sets[0]?.weight,
+      })),
+    };
+
+    // Set up the workout and skip directly to preview (so user can confirm before logging)
+    setParsedWorkout(editParsedWorkout);
+    setImageUrl(editWorkout.imageUrl || null);
+    setError(null);
+    setStep('preview');
+  }, [editWorkout]);
+
+  // Run smart classification for exercises with low confidence when entering log-results
+  useEffect(() => {
+    if (step !== 'log-results' || !parsedWorkout) return;
+
+    const runSmartClassification = async () => {
+      const exercise = parsedWorkout.exercises[currentExerciseIndex];
+      if (!exercise) return;
+
+      // Check if we already have a smart classification for this exercise
+      if (smartClassifications[currentExerciseIndex]) {
+        console.log('[SmartClassification] Using cached result for exercise', currentExerciseIndex);
+        return;
+      }
+
+      // Analyze with local rules first
+      const localAnalysis = analyzeExerciseMetric(exercise);
+
+      // If local analysis has low confidence, use AI
+      if (localAnalysis.confidence === 'low' || localAnalysis.confidence === 'medium') {
+        console.log('[SmartClassification] Low confidence, calling AI for:', exercise.name);
+        try {
+          const result = await smartClassifyExercise(
+            exercise.name,
+            exercise.prescription,
+            parsedWorkout.rawText
+          );
+
+          setSmartClassifications(prev => ({
+            ...prev,
+            [currentExerciseIndex]: {
+              inputType: result.inputType,
+              metric: result.metricType,
+              confidence: result.confidence,
+              source: result.source,
+              reason: result.reason,
+            },
+          }));
+
+          console.log('[SmartClassification] AI result:', result);
+        } catch (error) {
+          console.warn('[SmartClassification] AI failed, using local analysis:', error);
+        }
+      } else {
+        // Save local high-confidence classification
+        setSmartClassifications(prev => ({
+          ...prev,
+          [currentExerciseIndex]: {
+            inputType: localAnalysis.inputType,
+            metric: localAnalysis.metric === 'calories' ? 'calories'
+              : localAnalysis.metric === 'distance' ? 'distance'
+              : localAnalysis.inputType === 'bodyweight' ? 'reps_only'
+              : 'weight_reps',
+            confidence: 1,
+            source: 'rule',
+            reason: localAnalysis.reason,
+          },
+        }));
+      }
+    };
+
+    runSmartClassification();
+  }, [step, currentExerciseIndex, parsedWorkout, smartClassifications]);
 
   const persistSavedWorkouts = (next: SavedWorkout[]) => {
     setSavedWorkouts(next);
@@ -328,7 +965,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
   };
 
   const handleSelectSavedWorkout = (saved: SavedWorkout) => {
-    setParsedWorkout(saved.workout);
+    setParsedWorkout(normalizeParsedWorkout(saved.workout));
     setImageUrl(null);
     setError(null);
     setStep('preview');
@@ -341,6 +978,28 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
 
   const handleClearSavedWorkouts = () => {
     persistSavedWorkouts([]);
+  };
+
+  // DEV MODE: Convert a recent workout back to ParsedWorkout format for quick testing
+  const handleSelectDevWorkout = (workout: typeof recentWorkouts[0]) => {
+    const devParsedWorkout: ParsedWorkout = {
+      title: workout.title,
+      type: workout.type,
+      format: workout.type === 'strength' ? 'strength' : 'for_time',
+      scoreType: workout.type === 'strength' ? 'load' : 'time',
+      exercises: workout.exercises.map(ex => ({
+        name: ex.name,
+        type: ex.type,
+        prescription: ex.prescription,
+        suggestedSets: ex.sets.length || 3,
+        suggestedReps: ex.sets[0]?.targetReps || ex.sets[0]?.actualReps,
+        suggestedWeight: ex.sets[0]?.weight,
+      })),
+    };
+    setParsedWorkout(devParsedWorkout);
+    setImageUrl(null);
+    setError(null);
+    setStep('preview');
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,8 +1019,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       // Convert to base64 for API
       const base64 = await fileToBase64(file);
       const workout = await parseWorkoutImage(base64);
-      setParsedWorkout(workout);
-      addSavedWorkout(workout);
+      const refined = await refineWorkoutIfNeeded(workout, user?.id);
+      setParsedWorkout(refined);
+      addSavedWorkout(refined);
       setStep('preview');
     } catch (err) {
       console.error('Error parsing workout:', err);
@@ -406,17 +1066,27 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
 
     // Reset interval state
     setCurrentIntervalSet(1);
-    setIntervalSplitTimes([]);
     setIntervalRounds([]);
     setCurrentRounds('');
     setWorkoutWeight('');
     setCompletionMinutes('');
     setCompletionSeconds('');
+    setCardioTurns('');
+    setCardioCaloriesPerTurn('');
+    setCardioDistanceTurns('');
+    setCardioDistancePerTurn('');
     setSelectedAlternatives({});
     setCustomDistances({});
+    setMovementWeights({});
+    setManuallyEditedWeights(new Set());
 
     // Create initial sets for first exercise
     const firstExercise = parsedWorkout.exercises[0];
+
+    // Initialize interval split times array for all sets
+    const numSets = firstExercise.suggestedSets || parsedWorkout.sets || 1;
+    setIntervalSplitTimes(Array(numSets).fill(0));
+
     initializeSetsForExercise(firstExercise);
 
     setStep('log-results');
@@ -424,8 +1094,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
 
   // Get the current exercise and its logging mode
   const currentExercise = parsedWorkout?.exercises[currentExerciseIndex];
+
+  // Use smart classification if available, otherwise fall back to local rules
+  const smartClassification = smartClassifications[currentExerciseIndex];
   const currentExerciseMode = currentExercise
-    ? getExerciseLoggingMode(currentExercise, parsedWorkout?.format)
+    ? (smartClassification?.inputType === 'cardio_calories' ? 'cardio'
+      : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
+      : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
+      : getExerciseLoggingMode(currentExercise, parsedWorkout?.format))
     : 'sets';
 
   // Per-exercise checks based on logging mode
@@ -433,6 +1109,40 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
   const isCurrentExerciseAmrapInterval = currentExerciseMode === 'amrap_intervals';
   const isCurrentExerciseForTime = currentExerciseMode === 'for_time';
   const isCurrentExerciseStrength = currentExerciseMode === 'strength' || currentExerciseMode === 'sets';
+  const isCurrentExerciseCardio = currentExerciseMode === 'cardio';
+  const isCurrentExerciseCardioDistance = currentExerciseMode === 'cardio_distance';
+  const isCurrentExerciseBodyweight = currentExerciseMode === 'bodyweight';
+
+  // Check if current exercise needs weight input (used for strength exercises)
+  const currentExerciseNeedsWeight = currentExercise
+    ? (smartClassification?.inputType === 'weighted' || (!smartClassification && exerciseNeedsWeight(currentExercise)))
+    : true;
+
+  const weightedMovements = currentExercise ? getWeightedMovements(currentExercise) : [];
+  const hasMixedMovementWeights = Boolean(
+    currentExercise?.movements &&
+    weightedMovements.length > 0 &&
+    weightedMovements.length < currentExercise.movements.length
+  );
+
+  // Debug: log exercise classification when in log-results step
+  if (currentExercise && step === 'log-results') {
+    const localAnalysis = analyzeExerciseMetric(currentExercise);
+    console.log('[Exercise Classification]', {
+      name: currentExercise.name,
+      prescription: currentExercise.prescription,
+      type: currentExercise.type,
+      localAnalysis: {
+        inputType: localAnalysis.inputType,
+        metric: localAnalysis.metric,
+        confidence: localAnalysis.confidence,
+        reason: localAnalysis.reason,
+      },
+      smartClassification: smartClassification || 'not yet loaded',
+      finalLoggingMode: currentExerciseMode,
+      needsWeight: currentExerciseNeedsWeight,
+    });
+  }
 
   // Get total sets for interval exercises
   const totalIntervalSets = currentExercise?.suggestedSets || parsedWorkout?.sets || 1;
@@ -486,27 +1196,88 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     }));
   };
 
-  // Handle recording a single interval split time
-  const handleRecordIntervalSplit = () => {
-    const mins = parseInt(completionMinutes) || 0;
-    const secs = parseInt(completionSeconds) || 0;
-    const splitTime = mins * 60 + secs;
+  // Get all weighted movements for the current exercise
+  function getWeightedMovements(exercise: ParsedExercise | undefined): ParsedMovement[] {
+    if (!exercise?.movements) return [];
+    return exercise.movements.filter(isWeightedMovement);
+  }
 
-    if (splitTime > 0) {
-      const newSplits = [...intervalSplitTimes, splitTime];
-      setIntervalSplitTimes(newSplits);
+  // Handle weight change for a specific movement (with auto-fill logic)
+  // handleMovementWeightChange removed (unused)
 
-      // Check if this was the last set for this exercise
-      if (currentIntervalSet >= totalIntervalSets) {
-        // Save this exercise's results and move to next exercise (or save workout)
-        finishIntervalExercise(newSplits);
-      } else {
-        // Move to next set
-        setCurrentIntervalSet(prev => prev + 1);
-        setCompletionMinutes('');
-        setCompletionSeconds('');
+  // Handle blur on weight input - trigger auto-fill if this is the first entry
+  const applySharedMovementWeight = (weight: number) => {
+    if (!currentExercise || weightedMovements.length === 0 || weight <= 0) return;
+    const next: Record<string, number> = {};
+    weightedMovements.forEach((mov) => {
+      next[mov.name] = weight;
+    });
+    setMovementWeights(next);
+    setManuallyEditedWeights(new Set(weightedMovements.map((mov) => mov.name)));
+  };
+
+  // Mark a weight field as manually edited (user explicitly changed it)
+  const handleMovementWeightManualEdit = (movementName: string, weight: number) => {
+    setManuallyEditedWeights((prev: Set<string>) => new Set(prev).add(movementName));
+    setMovementWeights(prev => ({ ...prev, [movementName]: weight }));
+  };
+
+  // Track which interval sets have been manually edited
+  const [manuallyEditedIntervalSets, setManuallyEditedIntervalSets] = useState<Set<number>>(new Set());
+
+  // Handle changing a specific set's time (just update that set)
+  // If editing first set, auto-fill to other sets that haven't been manually edited
+  const handleSetTimeChange = (setIndex: number, minutes: number, seconds: number) => {
+    const timeInSeconds = minutes * 60 + seconds;
+
+    // Mark this set as manually edited (unless it's the first set)
+    if (setIndex > 0) {
+      setManuallyEditedIntervalSets(prev => new Set(prev).add(setIndex));
+    }
+
+    setIntervalSplitTimes(prev =>
+      prev.map((time, index) => {
+        // Always update the target set
+        if (index === setIndex) return timeInSeconds;
+        // If editing first set, auto-fill to sets that haven't been manually edited
+        if (setIndex === 0 && !manuallyEditedIntervalSets.has(index)) {
+          return timeInSeconds;
+        }
+        return time;
+      })
+    );
+  };
+
+  // Handle blur - if all other sets are 0, fill them with this set's value
+  const handleSetTimeBlur = (setIndex: number) => {
+    const currentValue = intervalSplitTimes[setIndex];
+    if (currentValue > 0) {
+      const allOthersZero = intervalSplitTimes.every((t, i) => i === setIndex || t === 0);
+      if (allOthersZero) {
+        setIntervalSplitTimes(prev => prev.map(() => currentValue));
       }
     }
+  };
+
+  // Handle finishing the interval workout (all sets on one screen)
+  const handleFinishAllIntervals = () => {
+    // Check if at least one set has a time
+    const hasValidTime = intervalSplitTimes.some(t => t > 0);
+    if (!hasValidTime) return;
+
+    finishIntervalExercise(intervalSplitTimes);
+  };
+
+  const upsertExerciseResult = (result: ExerciseResult) => {
+    if (isEditingAfterSave && exerciseResults.length > currentExerciseIndex) {
+      const next = [...exerciseResults];
+      next[currentExerciseIndex] = result;
+      setExerciseResults(next);
+      return next;
+    }
+    const next = [...exerciseResults, result];
+    setExerciseResults(next);
+    return next;
   };
 
   // Finish interval exercise and move to next or save
@@ -515,12 +1286,16 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
 
     const weight = parseFloat(workoutWeight) || undefined;
 
+    // Calculate total reps per set from movements (for volume calculation)
+    const repsPerSet = currentExercise.movements?.reduce((sum, mov) => sum + (mov.reps || 0), 0) || 0;
+
     // Build sets array with split times
     const sets: ExerciseSet[] = splitTimes.map((time, i) => ({
       id: `set-${i}`,
       setNumber: i + 1,
       time,
       weight,
+      actualReps: repsPerSet > 0 ? repsPerSet : undefined, // Store reps for volume calculation
       completed: true,
     }));
 
@@ -531,8 +1306,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       completionTime: splitTimes.reduce((sum, t) => sum + t, 0),
     };
 
-    const newResults = [...exerciseResults, result];
-    setExerciseResults(newResults);
+    const newResults = upsertExerciseResult(result);
 
     // Check if this was the last exercise
     if (currentExerciseIndex >= parsedWorkout.exercises.length - 1) {
@@ -541,16 +1315,25 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     } else {
       // Move to next exercise
       const nextIndex = currentExerciseIndex + 1;
-      setCurrentExerciseIndex(nextIndex);
-      const nextExercise = parsedWorkout.exercises[nextIndex];
-      initializeSetsForExercise(nextExercise);
+      if (isEditingAfterSave && newResults[nextIndex]) {
+        hydrateExerciseState(nextIndex, newResults);
+      } else {
+        setCurrentExerciseIndex(nextIndex);
+        const nextExercise = parsedWorkout.exercises[nextIndex];
+        initializeSetsForExercise(nextExercise);
 
-      // Reset interval state for next exercise
-      setCurrentIntervalSet(1);
-      setIntervalSplitTimes([]);
-      setWorkoutWeight('');
-      setCompletionMinutes('');
-      setCompletionSeconds('');
+        // Reset interval state for next exercise
+        setCurrentIntervalSet(1);
+        setIntervalSplitTimes([]);
+        setManuallyEditedIntervalSets(new Set());
+        setWorkoutWeight('');
+        setCompletionMinutes('');
+        setCompletionSeconds('');
+        setCardioTurns('');
+        setCardioCaloriesPerTurn('');
+        setCardioDistanceTurns('');
+        setCardioDistancePerTurn('');
+      }
     }
   };
 
@@ -580,11 +1363,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
 
     const weight = parseFloat(workoutWeight) || undefined;
 
-    // Build sets array with rounds
+    // Calculate reps per round from movements (for volume calculation)
+    const repsPerRound = currentExercise.movements?.reduce((sum, mov) => sum + (mov.reps || 0), 0) || 1;
+
+    // Build sets array with rounds - actualReps = rounds × reps_per_round for volume
     const sets: ExerciseSet[] = rounds.map((roundCount, i) => ({
       id: `set-${i}`,
       setNumber: i + 1,
-      actualReps: roundCount, // Using actualReps to store rounds
+      actualReps: Math.round(roundCount * repsPerRound), // Total reps = rounds × reps per round
       weight,
       completed: true,
     }));
@@ -595,8 +1381,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       sets,
     };
 
-    const newResults = [...exerciseResults, result];
-    setExerciseResults(newResults);
+    const newResults = upsertExerciseResult(result);
 
     // Check if this was the last exercise
     if (currentExerciseIndex >= parsedWorkout.exercises.length - 1) {
@@ -605,15 +1390,23 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     } else {
       // Move to next exercise
       const nextIndex = currentExerciseIndex + 1;
-      setCurrentExerciseIndex(nextIndex);
-      const nextExercise = parsedWorkout.exercises[nextIndex];
-      initializeSetsForExercise(nextExercise);
+      if (isEditingAfterSave && newResults[nextIndex]) {
+        hydrateExerciseState(nextIndex, newResults);
+      } else {
+        setCurrentExerciseIndex(nextIndex);
+        const nextExercise = parsedWorkout.exercises[nextIndex];
+        initializeSetsForExercise(nextExercise);
 
-      // Reset interval state for next exercise
-      setCurrentIntervalSet(1);
-      setIntervalRounds([]);
-      setCurrentRounds('');
-      setWorkoutWeight('');
+        // Reset interval state for next exercise
+        setCurrentIntervalSet(1);
+        setIntervalRounds([]);
+        setCurrentRounds('');
+        setWorkoutWeight('');
+        setCardioTurns('');
+        setCardioCaloriesPerTurn('');
+        setCardioDistanceTurns('');
+        setCardioDistancePerTurn('');
+      }
     }
   };
 
@@ -623,24 +1416,125 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       id: `set-${i}`,
       setNumber: i + 1,
       targetReps: exercise.suggestedReps,
-      actualReps: undefined,
+      actualReps: exercise.suggestedReps,
       weight: exercise.suggestedWeight,
       completed: false,
     }));
     setCurrentSets(sets);
+    setManuallyEditedSets(new Set()); // Reset manual edits for new exercise
   };
 
+  const hydrateExerciseState = (index: number, results: ExerciseResult[]) => {
+    if (!parsedWorkout) return;
+    const exercise = parsedWorkout.exercises[index];
+    const existing = results[index];
+    const weightedMovements = getWeightedMovements(exercise);
+    const isMixedMovements = Boolean(
+      exercise.movements &&
+      weightedMovements.length > 0 &&
+      weightedMovements.length < exercise.movements.length
+    );
+
+    setCurrentExerciseIndex(index);
+
+    if (isEditingAfterSave && existing) {
+      setCurrentSets(existing.sets);
+      if (existing.completionTime) {
+        const totalSeconds = existing.completionTime;
+        setCompletionMinutes(Math.floor(totalSeconds / 60).toString());
+        setCompletionSeconds((totalSeconds % 60).toString());
+      } else {
+        setCompletionMinutes('');
+        setCompletionSeconds('');
+      }
+      // Restore cardio state (calories)
+      if (existing.cardioTurns) {
+        setCardioTurns(existing.cardioTurns.toString());
+        setCardioCaloriesPerTurn(existing.cardioCaloriesPerTurn?.toString() || '');
+      } else {
+        setCardioTurns('');
+        setCardioCaloriesPerTurn('');
+      }
+      // Restore cardio state (distance)
+      if (existing.distanceTurns) {
+        setCardioDistanceTurns(existing.distanceTurns.toString());
+        setCardioDistancePerTurn(existing.distancePerTurn?.toString() || '');
+        setCardioDistanceUnit(existing.distanceUnit || 'm');
+      } else {
+        setCardioDistanceTurns('');
+        setCardioDistancePerTurn('');
+      }
+      setMovementWeights(existing.movementWeights || {});
+      setManuallyEditedWeights(new Set(Object.keys(existing.movementWeights || {})));
+      if (existing.movementWeights && Object.keys(existing.movementWeights).length > 0) {
+        const weights = Object.values(existing.movementWeights).filter((weight) => weight > 0);
+        const allSame = weights.length > 0 && weights.every((weight) => weight === weights[0]);
+        setUseSingleWeightForMovements(allSame || !isMixedMovements);
+        setSharedMovementWeight(allSame ? weights[0].toString() : '');
+      } else {
+        setUseSingleWeightForMovements(!isMixedMovements);
+        setSharedMovementWeight('');
+      }
+      setWorkoutWeight(
+        existing.sets?.[0]?.weight !== undefined
+          ? existing.sets[0].weight.toString()
+          : ''
+      );
+    } else {
+      initializeSetsForExercise(exercise);
+      setCompletionMinutes('');
+      setCompletionSeconds('');
+      setMovementWeights({});
+      setManuallyEditedWeights(new Set());
+      setUseSingleWeightForMovements(!isMixedMovements);
+      setSharedMovementWeight('');
+      setWorkoutWeight('');
+      setCardioDistanceTurns('');
+      setCardioDistancePerTurn('');
+    }
+
+    // Reset interval-specific state on entry
+    setCurrentIntervalSet(1);
+    setIntervalSplitTimes([]);
+    setManuallyEditedIntervalSets(new Set());
+    setIntervalRounds([]);
+    setCurrentRounds('');
+  };
+
+  // Track which sets have been manually edited (not auto-filled from first set)
+  const [manuallyEditedSets, setManuallyEditedSets] = useState<Set<string>>(new Set());
+
   const updateSet = (setIndex: number, field: keyof ExerciseSet, value: number | undefined) => {
-    setCurrentSets(prev => prev.map((set, i) =>
+    // Mark this set as manually edited (unless it's the first set)
+    if (setIndex > 0) {
+      setManuallyEditedSets(prev => new Set(prev).add(`${setIndex}-${field}`));
+    }
+
+    setCurrentSets(prev => prev.map((set, i) => (
       i === setIndex ? { ...set, [field]: value, completed: true } : set
-    ));
+    )));
+  };
+
+  const applySetAutofillFromFirst = (field: keyof ExerciseSet) => {
+    setCurrentSets(prev => {
+      const firstValue = prev[0]?.[field];
+      if (firstValue === undefined || firstValue === null || firstValue === 0) return prev;
+      return prev.map((set, i) => {
+        if (i === 0) return set;
+        if (manuallyEditedSets.has(`${i}-${field}`)) return set;
+        return { ...set, [field]: firstValue, completed: true };
+      });
+    });
   };
 
   const handleNextExercise = () => {
     if (!parsedWorkout) return;
 
     const currentExercise = parsedWorkout.exercises[currentExerciseIndex];
+    const exerciseMode = getExerciseLoggingMode(currentExercise, parsedWorkout.format);
     const isForTime = isForTimeWorkout(currentExercise, parsedWorkout.type, parsedWorkout.format);
+    const isCardioCalories = exerciseMode === 'cardio';
+    const isCardioDistance = exerciseMode === 'cardio_distance';
 
     // Calculate completion time in seconds
     let completionTime: number | undefined;
@@ -650,15 +1544,67 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
       completionTime = mins * 60 + secs;
     }
 
-    // Save current exercise results
+    // Extract rounds from exercise name/prescription (e.g., "7 rounds" or "14 rounds of Cindy")
+    let rounds: number | undefined;
+    const roundsMatch = currentExercise.name.match(/(\d+)\s*rounds?/i) ||
+                        currentExercise.prescription.match(/(\d+)\s*rounds?/i);
+    if (roundsMatch) {
+      rounds = parseInt(roundsMatch[1]);
+    } else if (currentExercise.suggestedSets) {
+      rounds = currentExercise.suggestedSets;
+    }
+
+    // Calculate cardio data (calories)
+    let cardioData: Pick<ExerciseResult, 'cardioTurns' | 'cardioCaloriesPerTurn' | 'totalCalories'> = {};
+    if (isCardioCalories && (cardioTurns || cardioCaloriesPerTurn)) {
+      const turns = parseInt(cardioTurns) || 0;
+      const calsPerTurn = parseInt(cardioCaloriesPerTurn) || 0;
+      cardioData = {
+        cardioTurns: turns,
+        cardioCaloriesPerTurn: calsPerTurn,
+        totalCalories: turns * calsPerTurn,
+      };
+    }
+
+    // Calculate cardio data (distance)
+    let distanceData: Pick<ExerciseResult, 'distanceTurns' | 'distancePerTurn' | 'totalDistance' | 'distanceUnit'> = {};
+    if (isCardioDistance && (cardioDistanceTurns || cardioDistancePerTurn)) {
+      const turns = parseInt(cardioDistanceTurns) || 0;
+      const distPerTurn = parseInt(cardioDistancePerTurn) || 0;
+      distanceData = {
+        distanceTurns: turns,
+        distancePerTurn: distPerTurn,
+        totalDistance: turns * distPerTurn,
+        distanceUnit: cardioDistanceUnit,
+      };
+    }
+
+    // Save current exercise results with per-movement weights
+    const effectiveMovementWeights = (() => {
+      if (Object.keys(movementWeights).length > 0) return { ...movementWeights };
+      if (useSingleWeightForMovements) {
+        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
+        if (sharedWeight > 0 && weightedMovements.length > 0) {
+          return weightedMovements.reduce<Record<string, number>>((acc, mov) => {
+            acc[mov.name] = sharedWeight;
+            return acc;
+          }, {});
+        }
+      }
+      return undefined;
+    })();
+
     const result: ExerciseResult = {
       exercise: currentExercise,
       sets: currentSets,
       completionTime,
+      movementWeights: effectiveMovementWeights,
+      rounds,
+      ...cardioData,
+      ...distanceData,
     };
 
-    const newResults = [...exerciseResults, result];
-    setExerciseResults(newResults);
+    const newResults = upsertExerciseResult(result);
 
     // Check if this was the last exercise
     if (currentExerciseIndex >= parsedWorkout.exercises.length - 1) {
@@ -667,11 +1613,21 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     } else {
       // Move to next exercise
       const nextIndex = currentExerciseIndex + 1;
-      setCurrentExerciseIndex(nextIndex);
-      initializeSetsForExercise(parsedWorkout.exercises[nextIndex]);
-      // Reset time fields for next exercise
-      setCompletionMinutes('');
-      setCompletionSeconds('');
+      if (isEditingAfterSave && newResults[nextIndex]) {
+        hydrateExerciseState(nextIndex, newResults);
+      } else {
+        setCurrentExerciseIndex(nextIndex);
+        initializeSetsForExercise(parsedWorkout.exercises[nextIndex]);
+        // Reset for next exercise
+        setCompletionMinutes('');
+        setCompletionSeconds('');
+        setMovementWeights({});
+        setManuallyEditedWeights(new Set());
+        setCardioTurns('');
+        setCardioCaloriesPerTurn('');
+        setCardioDistanceTurns('');
+        setCardioDistancePerTurn('');
+      }
     }
   };
 
@@ -685,6 +1641,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     // Restore previous exercise's sets if we have results
     if (exerciseResults[prevIndex]) {
       setCurrentSets(exerciseResults[prevIndex].sets);
+      if (exerciseResults[prevIndex].movementWeights) {
+        setMovementWeights(exerciseResults[prevIndex].movementWeights);
+        setManuallyEditedWeights(new Set(Object.keys(exerciseResults[prevIndex].movementWeights)));
+      } else {
+        setMovementWeights({});
+        setManuallyEditedWeights(new Set());
+      }
       // Restore time if it was a for-time workout
       if (exerciseResults[prevIndex].completionTime) {
         const totalSeconds = exerciseResults[prevIndex].completionTime!;
@@ -694,13 +1657,76 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
         setCompletionMinutes('');
         setCompletionSeconds('');
       }
-      // Remove the last result since we're going back
-      setExerciseResults(prev => prev.slice(0, -1));
+      // Restore cardio data (calories) if it was a cardio exercise
+      if (exerciseResults[prevIndex].cardioTurns) {
+        setCardioTurns(exerciseResults[prevIndex].cardioTurns!.toString());
+        setCardioCaloriesPerTurn(exerciseResults[prevIndex].cardioCaloriesPerTurn?.toString() || '');
+      } else {
+        setCardioTurns('');
+        setCardioCaloriesPerTurn('');
+      }
+      // Restore cardio data (distance) if it was a distance exercise
+      if (exerciseResults[prevIndex].distanceTurns) {
+        setCardioDistanceTurns(exerciseResults[prevIndex].distanceTurns!.toString());
+        setCardioDistancePerTurn(exerciseResults[prevIndex].distancePerTurn?.toString() || '');
+        setCardioDistanceUnit(exerciseResults[prevIndex].distanceUnit || 'm');
+      } else {
+        setCardioDistanceTurns('');
+        setCardioDistancePerTurn('');
+      }
+      // Remove the last result since we're going back (skip when editing existing results)
+      if (!isEditingAfterSave) {
+        setExerciseResults(prev => prev.slice(0, -1));
+      }
     } else {
       initializeSetsForExercise(parsedWorkout.exercises[prevIndex]);
       setCompletionMinutes('');
       setCompletionSeconds('');
+      setCardioTurns('');
+      setCardioCaloriesPerTurn('');
+      setCardioDistanceTurns('');
+      setCardioDistancePerTurn('');
     }
+  };
+
+  const handleHeaderBack = () => {
+    if (editWorkout) {
+      if (step === 'log-results') {
+        if (currentExerciseIndex > 0) {
+          handlePreviousExercise();
+          return;
+        }
+      }
+      onBack();
+      return;
+    }
+
+    if (step === 'log-results') {
+      if (currentExerciseIndex > 0) {
+        handlePreviousExercise();
+        return;
+      }
+      if (isEditingAfterSave) {
+        setIsEditingAfterSave(false);
+      }
+      setStep('preview');
+      return;
+    }
+
+    if (step === 'preview' || step === 'processing') {
+      setStep('capture');
+      return;
+    }
+
+    onBack();
+  };
+
+  const handleEditFromReward = () => {
+    if (!parsedWorkout) return;
+    setIsEditingAfterSave(true);
+    const lastIndex = Math.max(0, exerciseResults.length - 1);
+    hydrateExerciseState(lastIndex, exerciseResults);
+    setStep('log-results');
   };
 
   const saveWorkout = async (results: ExerciseResult[]) => {
@@ -709,31 +1735,109 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     setStep('saving');
 
     try {
-      // Calculate total volume, duration, and reps
-      let totalVolume = 0;
-      let totalReps = 0;
+      const skipPersistence = isEditingAfterSave;
+      // Calculate total duration (totals computed after exercises map)
       let totalDuration = 0; // in seconds
       const exercises: Exercise[] = results.map((result, index) => {
-        const sets = result.sets.map(set => {
-          if (set.weight && set.actualReps) {
-            totalVolume += set.weight * set.actualReps;
+        const rounds = result.rounds || 1;
+        const movements = result.exercise.movements;
+        let repsFromMovements = 0;
+
+        // Calculate volume from per-movement weights if available
+        if (movements && movements.length > 0) {
+          const repsPerRound = movements.reduce((sum, mov) => sum + (mov.reps || 0), 0);
+          const roundCountsFromSets: number[] = [];
+
+          if (repsPerRound > 0) {
+            result.sets.forEach((set) => {
+              if (set.actualReps && set.actualReps > 0) {
+                roundCountsFromSets.push(set.actualReps / repsPerRound);
+              }
+            });
           }
-          if (set.actualReps) {
-            totalReps += set.actualReps;
+
+          const roundCounts = roundCountsFromSets.length > 0
+            ? roundCountsFromSets
+            : [rounds];
+          const totalRounds = roundCounts.reduce((sum, value) => sum + value, 0);
+
+          movements.forEach((mov) => {
+            const perRound = mov.reps || 0;
+            if (perRound > 0) {
+              repsFromMovements += perRound * totalRounds;
+            }
+          });
+        }
+
+        let sets: ExerciseSet[];
+
+        // For cardio exercises, create sets with calories data
+        if (result.totalCalories !== undefined && result.totalCalories > 0) {
+          const turns = result.cardioTurns || 1;
+          const totalCals = result.totalCalories;
+          sets = Array.from({ length: turns }, (_, i) => ({
+            id: `set-${i}`,
+            setNumber: i + 1,
+            completed: true,
+            calories: result.cardioCaloriesPerTurn || Math.round(totalCals / turns),
+          }));
+        }
+        // For distance cardio exercises, create sets with distance data
+        else if (result.totalDistance !== undefined && result.totalDistance > 0) {
+          const turns = result.distanceTurns || 1;
+          const totalDist = result.totalDistance;
+          sets = Array.from({ length: turns }, (_, i) => ({
+            id: `set-${i}`,
+            setNumber: i + 1,
+            completed: true,
+            distance: result.distancePerTurn || Math.round(totalDist / turns),
+          }));
+        }
+        // For movements with per-movement weights, create a summary set for display
+        else if (result.movementWeights && Object.keys(result.movementWeights).length > 0) {
+          // Calculate average weight across movements for display
+          const weights = Object.values(result.movementWeights).filter(w => w > 0);
+          const avgWeight = weights.length > 0
+            ? Math.round(weights.reduce((a, b) => a + b, 0) / weights.length)
+            : undefined;
+
+          sets = [{
+            id: 'set-summary',
+            setNumber: 1,
+            completed: true,
+            actualReps: Math.round(repsFromMovements),
+            weight: avgWeight,
+            ...(result.completionTime !== undefined && { time: result.completionTime }),
+          }];
+        } else {
+          // Standard sets processing
+          sets = result.sets.map(set => {
+            // Remove undefined values - Firestore doesn't accept them
+            const cleanSet: ExerciseSet = {
+              id: set.id,
+              setNumber: set.setNumber,
+              completed: set.completed,
+              ...(set.targetReps !== undefined && { targetReps: set.targetReps }),
+              ...(set.actualReps !== undefined && { actualReps: set.actualReps }),
+              ...(set.weight !== undefined && { weight: set.weight }),
+              ...(set.time !== undefined && { time: set.time }),
+              ...(set.distance !== undefined && { distance: set.distance }),
+              ...(set.calories !== undefined && { calories: set.calories }),
+            };
+            return cleanSet;
+          });
+
+          const hasReps = sets.some(set => (set.actualReps || 0) > 0);
+          if (!hasReps && repsFromMovements > 0) {
+            sets = [{
+              id: 'set-summary',
+              setNumber: 1,
+              completed: true,
+              actualReps: Math.round(repsFromMovements),
+              ...(result.completionTime !== undefined && { time: result.completionTime }),
+            }];
           }
-          // Remove undefined values - Firestore doesn't accept them
-          const cleanSet: ExerciseSet = {
-            id: set.id,
-            setNumber: set.setNumber,
-            completed: set.completed,
-            ...(set.targetReps !== undefined && { targetReps: set.targetReps }),
-            ...(set.actualReps !== undefined && { actualReps: set.actualReps }),
-            ...(set.weight !== undefined && { weight: set.weight }),
-            ...(set.time !== undefined && { time: set.time }),
-            ...(set.distance !== undefined && { distance: set.distance }),
-          };
-          return cleanSet;
-        });
+        }
 
         // Add completion time to total duration
         if (result.completionTime) {
@@ -744,39 +1848,69 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
           id: `exercise-${index}`,
           name: result.exercise.name,
           type: result.exercise.type,
-          prescription: result.exercise.prescription,
+          prescription: `${rounds > 1 ? `${rounds} rounds` : result.exercise.prescription}`,
           sets,
         };
       });
 
+      const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
+      breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);
+      const totalVolume = breakdownFromResults.grandTotalVolume;
+      const totalReps = breakdownFromResults.grandTotalReps;
+
       const workoutTitle = parsedWorkout.title || "Today's Workout";
       const durationMinutes = totalDuration > 0 ? totalDuration / 60 : 0;
 
+      const workoutDate = savedWorkoutMeta?.date || new Date();
+
       // Create workout document
-      const workoutData = {
+      const workoutBase = {
         userId: user.id,
-        date: new Date(),
+        date: workoutDate,
         title: workoutTitle,
         type: parsedWorkout.type,
+        partnerWorkout: isPartnerWorkout,
+        partnerFactor,
+        workloadBreakdown: breakdownFromResults,
         status: 'completed',
         exercises,
         duration: totalDuration > 0 ? Math.round(totalDuration / 60) : null,
         durationSeconds: totalDuration > 0 ? totalDuration : null,
         notes: null,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'workouts'), removeUndefined(workoutData));
+      const workoutCreateData = {
+        ...workoutBase,
+        createdAt: serverTimestamp(),
+      };
 
-      // Update user stats
-      const userRef = doc(db, 'users', user.id);
-      await setDoc(userRef, {
-        stats: {
-          totalWorkouts: increment(1),
-          totalVolume: increment(totalVolume),
-        },
-      }, { merge: true });
+      if (!skipPersistence) {
+        const docRef = await addDoc(collection(db, 'workouts'), removeUndefined(workoutCreateData));
+
+        // Update user stats
+        const userRef = doc(db, 'users', user.id);
+        await setDoc(userRef, {
+          stats: {
+            totalWorkouts: increment(1),
+            totalVolume: increment(totalVolume),
+          },
+        }, { merge: true });
+        setSavedWorkoutMeta({ id: docRef.id, totalVolume, date: workoutDate });
+      } else if (savedWorkoutMeta?.id) {
+        const workoutRef = doc(db, 'workouts', savedWorkoutMeta.id);
+        await setDoc(workoutRef, removeUndefined(workoutBase), { merge: true });
+        const volumeDelta = totalVolume - (savedWorkoutMeta.totalVolume || 0);
+        if (volumeDelta !== 0) {
+          const userRef = doc(db, 'users', user.id);
+          await setDoc(userRef, {
+            stats: {
+              totalVolume: increment(volumeDelta),
+            },
+          }, { merge: true });
+        }
+        setSavedWorkoutMeta({ ...savedWorkoutMeta, totalVolume });
+      }
 
       // Calculate muscle groups from exercise names
       const exerciseNames = exercises.map(e => e.name);
@@ -787,7 +1921,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
         summary: getMuscleGroupSummary(exerciseNames),
       };
 
+      const workloadBreakdown: WorkloadBreakdown | undefined = breakdownFromResults;
+
+      const formatLabelMap: Record<string, string> = {
+        for_time: 'For Time',
+        amrap: 'AMRAP',
+        emom: 'EMOM',
+        strength: 'Strength',
+        intervals: 'Intervals',
+        amrap_intervals: 'AMRAP',
+        tabata: 'Tabata',
+      };
+      const formatLabel = formatLabelMap[parsedWorkout.format] || parsedWorkout.format;
+      const rounds = parsedWorkout.containerRounds || parsedWorkout.sets;
+      const workoutContext = [
+        formatLabel,
+        isPartnerWorkout ? 'with a Partner' : null,
+      ].filter(Boolean).join(' ');
+      const workoutContextLine = rounds && rounds > 1
+        ? `${workoutContext} / ${rounds} rounds`
+        : workoutContext;
+
       // Calculate reward data and show reward screen
+      const totalWorkoutsForReward = (user.stats?.totalWorkouts || 0) + (skipPersistence ? 0 : 1);
       const reward = await calculateRewardData(
         user.id,
         {
@@ -801,10 +1957,18 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
           muscleGroups,
         },
         user.stats?.currentStreak || 0,
-        (user.stats?.totalWorkouts || 0) + 1
+        totalWorkoutsForReward
       );
 
-      setRewardData(reward);
+      // Add workload breakdown to reward data
+      setRewardData({
+        ...reward,
+        workloadBreakdown,
+        workoutContext: workoutContextLine || undefined,
+      });
+      if (skipPersistence) {
+        setIsEditingAfterSave(false);
+      }
 
       // Brief pause for saving animation, then show reward
       setTimeout(() => {
@@ -821,11 +1985,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
     <div className={styles.container}>
       {/* Header */}
       <header className={styles.header}>
-        <button className={styles.backButton} onClick={onBack}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleHeaderBack}
+          icon={<BackIcon />}
+          className={styles.backButton}
+        >
+          Back
+        </Button>
         <h1 className={styles.title}>Add Workout</h1>
         <div className={styles.spacer} />
       </header>
@@ -949,6 +2117,34 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
             </div>
           )}
 
+          {/* DEV MODE - Recent workouts for quick testing (TEMPORARY) */}
+          <button
+            className={styles.devModeToggle}
+            onClick={() => setShowDevWorkouts(!showDevWorkouts)}
+          >
+            {showDevWorkouts ? 'Hide' : 'Show'} Recent WODs (Dev)
+          </button>
+
+          {showDevWorkouts && recentWorkouts.length > 0 && (
+            <div className={styles.devSection}>
+              <h3 className={styles.devTitle}>Recent WODs (Dev Mode)</h3>
+              <div className={styles.devList}>
+                {recentWorkouts.map((workout) => (
+                  <button
+                    key={workout.id}
+                    className={styles.devItem}
+                    onClick={() => handleSelectDevWorkout(workout)}
+                  >
+                    <span className={styles.devItemTitle}>{workout.title}</span>
+                    <span className={styles.devItemMeta}>
+                      {workout.type} - {workout.exercises.length} exercises
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Manual entry option */}
           <button className={styles.manualLink}>
             Or enter manually
@@ -996,6 +2192,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
             <div className={styles.previewTypes}>
               <span className={styles.previewType}>{parsedWorkout.type}</span>
               <span className={styles.previewFormat}>{parsedWorkout.format}</span>
+              {parsedWorkout.sets && parsedWorkout.sets > 1 && (
+                <span className={styles.previewFormat}>{parsedWorkout.sets} sets</span>
+              )}
             </div>
 
             <div className={styles.exerciseList}>
@@ -1095,35 +2294,32 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
                   return (
                     <div key={mov.name} className={styles.alternativeGroup}>
                       <div className={styles.alternativeRow}>
-                        <span className={styles.alternativeOriginal}>
-                          {mov.distance && `${mov.distance}m `}{mov.name}
-                        </span>
                         <select
                           className={styles.alternativeSelect}
                           value={selectedAlt || ''}
                           onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
                         >
-                          <option value="">Original</option>
+                          <option value="">{mov.name}</option>
                           {mov.alternatives.map((alt) => (
                             <option key={alt.name} value={alt.name}>
                               {alt.name}
                             </option>
                           ))}
                         </select>
+                        {mov.distance && (
+                          <div className={styles.distanceEditRow}>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={customDistances[mov.name] || mov.distance || ''}
+                              onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
+                              className={styles.distanceInput}
+                              min="0"
+                            />
+                            <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
+                          </div>
+                        )}
                       </div>
-                      {selectedAlt && mov.distance && (
-                        <div className={styles.distanceEditRow}>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            value={customDistances[mov.name] || ''}
-                            onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                            className={styles.distanceInput}
-                            min="0"
-                          />
-                          <span className={styles.distanceUnit}>m</span>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -1185,10 +2381,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
           <div className={styles.wizardActions}>
             <Button
               variant="secondary"
-              onClick={onBack}
+              onClick={handleHeaderBack}
               size="lg"
+              icon={<BackIcon />}
             >
-              Cancel
+              Back
             </Button>
             <Button
               onClick={handleRecordAmrapRounds}
@@ -1201,29 +2398,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
         </motion.div>
       )}
 
-      {/* Time-based Intervals - time per set */}
+      {/* Time-based Intervals - ALL SETS ON ONE SCREEN */}
       {step === 'log-results' && parsedWorkout && isCurrentExerciseInterval && (
         <motion.div
           className={styles.wizardContainer}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          key={`interval-${currentIntervalSet}`}
+          key="interval-all-sets"
         >
-          {/* Progress indicator for intervals */}
-          <div className={styles.progressBar}>
-            <div className={styles.progressText}>
-              Set {currentIntervalSet} of {totalIntervalSets}
-            </div>
-            <div className={styles.progressTrack}>
-              <div
-                className={styles.progressFill}
-                style={{
-                  width: `${(currentIntervalSet / totalIntervalSets) * 100}%`
-                }}
-              />
-            </div>
-          </div>
-
           {/* Workout details */}
           <Card padding="lg" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
@@ -1238,7 +2420,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
               <div className={styles.movementsList}>
                 {parsedWorkout.exercises[0].movements.map((mov, i) => {
                   const selectedAlt = selectedAlternatives[mov.name];
-                  // Use custom distance if set, otherwise fall back to original
                   const displayDistance = selectedAlt && customDistances[mov.name] !== undefined
                     ? customDistances[mov.name]
                     : mov.distance;
@@ -1259,8 +2440,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
               </div>
             )}
 
-            {/* Movement alternatives (shown on first set only) */}
-            {currentIntervalSet === 1 && movementsWithAlternatives.length > 0 && (
+            {/* Movement alternatives */}
+            {movementsWithAlternatives.length > 0 && (
               <div className={styles.alternativesSection}>
                 <label className={styles.alternativesLabel}>Substitutions</label>
                 {movementsWithAlternatives.map((mov) => {
@@ -1268,76 +2449,40 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
                   return (
                     <div key={mov.name} className={styles.alternativeGroup}>
                       <div className={styles.alternativeRow}>
-                        <span className={styles.alternativeOriginal}>
-                          {mov.distance && `${mov.distance}m `}{mov.name}
-                        </span>
                         <select
                           className={styles.alternativeSelect}
                           value={selectedAlt || ''}
                           onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
                         >
-                          <option value="">Original</option>
+                          <option value="">{mov.name}</option>
                           {mov.alternatives.map((alt) => (
                             <option key={alt.name} value={alt.name}>
                               {alt.name}
                             </option>
                           ))}
                         </select>
+                        {mov.distance && (
+                          <div className={styles.distanceEditRow}>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={customDistances[mov.name] || mov.distance || ''}
+                              onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
+                              className={styles.distanceInput}
+                              min="0"
+                            />
+                            <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
+                          </div>
+                        )}
                       </div>
-                      {selectedAlt && mov.distance && (
-                        <div className={styles.distanceEditRow}>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            value={customDistances[mov.name] || ''}
-                            onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                            className={styles.distanceInput}
-                            min="0"
-                          />
-                          <span className={styles.distanceUnit}>m</span>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Time input for this set */}
-            <div className={styles.timeInputContainer}>
-              <label className={styles.timeLabel}>Set {currentIntervalSet} Time</label>
-              <div className={styles.timeInputs}>
-                <div className={styles.timeInputGroup}>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={completionMinutes}
-                    onChange={(e) => setCompletionMinutes(e.target.value)}
-                    placeholder="00"
-                    className={styles.timeInput}
-                    min="0"
-                  />
-                  <span className={styles.timeUnit}>min</span>
-                </div>
-                <span className={styles.timeSeparator}>:</span>
-                <div className={styles.timeInputGroup}>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={completionSeconds}
-                    onChange={(e) => setCompletionSeconds(e.target.value)}
-                    placeholder="00"
-                    className={styles.timeInput}
-                    min="0"
-                    max="59"
-                  />
-                  <span className={styles.timeUnit}>sec</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Weight input (shown on first set only if exercise has rx weights) */}
-            {currentIntervalSet === 1 && weightTarget && (
+            {/* Weight input (if exercise has rx weights) */}
+            {weightTarget && (
               <div className={styles.weightInputContainer}>
                 <label className={styles.timeLabel}>{weightLabel}</label>
                 <div className={styles.weightInputRow}>
@@ -1362,44 +2507,85 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
               </div>
             )}
 
-            {/* Show previous splits */}
-            {intervalSplitTimes.length > 0 && (
-              <div className={styles.splitsContainer}>
-                <label className={styles.splitsLabel}>Previous Splits</label>
-                <div className={styles.splitsList}>
-                  {intervalSplitTimes.map((time, i) => (
-                    <div key={i} className={styles.splitItem}>
-                      <span>Set {i + 1}:</span>
-                      <span>{Math.floor(time / 60)}:{(time % 60).toString().padStart(2, '0')}</span>
+            {/* All sets - scrollable list */}
+            <div className={styles.intervalSetsContainer}>
+              <label className={styles.splitsLabel}>All Sets ({totalIntervalSets} total)</label>
+              <div className={styles.intervalSetsList}>
+                {intervalSplitTimes.map((time, setIndex) => (
+                  <div
+                    key={setIndex}
+                    className={styles.intervalSetRow}
+                    onBlur={(e) => {
+                      const currentTarget = e.currentTarget;
+                      if (currentTarget.contains(e.relatedTarget as Node)) return;
+                      setTimeout(() => {
+                        if (currentTarget.contains(document.activeElement)) return;
+                        handleSetTimeBlur(setIndex);
+                      }, 0);
+                    }}
+                  >
+                    <span className={styles.intervalSetNumber}>Set {setIndex + 1}</span>
+                    <div className={styles.intervalSetTimeInputs}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={time > 0 ? Math.floor(time / 60).toString() : ''}
+                        onChange={(e) => {
+                          const mins = parseInt(e.target.value) || 0;
+                          const secs = time % 60;
+                          handleSetTimeChange(setIndex, mins, secs);
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        className={styles.intervalSetTimeInput}
+                      />
+                      <span className={styles.intervalSetTimeSeparator}>:</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={time > 0 ? (time % 60).toString().padStart(2, '0') : ''}
+                        onChange={(e) => {
+                          const mins = Math.floor(time / 60);
+                          const rawSecs = parseInt(e.target.value) || 0;
+                          const secs = Math.min(rawSecs, 59);
+                          handleSetTimeChange(setIndex, mins, secs);
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="00"
+                        className={styles.intervalSetTimeInput}
+                      />
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </Card>
 
           {/* Navigation */}
           <div className={styles.wizardActions}>
             <Button
               variant="secondary"
-              onClick={onBack}
+              onClick={handleHeaderBack}
               size="lg"
+              icon={<BackIcon />}
             >
-              Cancel
+              Back
             </Button>
             <Button
-              onClick={handleRecordIntervalSplit}
+              onClick={handleFinishAllIntervals}
               size="lg"
-              disabled={!completionMinutes && !completionSeconds}
+              disabled={!intervalSplitTimes.some(t => t > 0)}
             >
-              {currentIntervalSet >= totalIntervalSets ? 'Finish Workout' : 'Next Set'}
+              Finish Workout
             </Button>
           </div>
         </motion.div>
       )}
 
-      {/* Regular exercises - strength/sets or for-time */}
-      {step === 'log-results' && parsedWorkout && (isCurrentExerciseStrength || isCurrentExerciseForTime) && (
+      {/* Regular exercises - strength/sets, for-time, or bodyweight */}
+      {step === 'log-results' && parsedWorkout && (isCurrentExerciseStrength || isCurrentExerciseForTime || isCurrentExerciseBodyweight) && (
         <motion.div
           className={styles.wizardContainer}
           initial={{ opacity: 0, x: 20 }}
@@ -1473,63 +2659,116 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
                       return (
                         <div key={mov.name} className={styles.alternativeGroup}>
                           <div className={styles.alternativeRow}>
-                            <span className={styles.alternativeOriginal}>
-                              {mov.distance && `${mov.distance}m `}{mov.name}
-                            </span>
                             <select
                               className={styles.alternativeSelect}
                               value={selectedAlt || ''}
                               onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
                             >
-                              <option value="">Original</option>
+                              <option value="">{mov.name}</option>
                               {mov.alternatives.map((alt) => (
                                 <option key={alt.name} value={alt.name}>
                                   {alt.name}
                                 </option>
                               ))}
                             </select>
+                            {mov.distance && (
+                              <div className={styles.distanceEditRow}>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  value={customDistances[mov.name] || mov.distance || ''}
+                                  onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
+                                  className={styles.distanceInput}
+                                  min="0"
+                                />
+                                <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
+                              </div>
+                            )}
                           </div>
-                          {selectedAlt && mov.distance && (
-                            <div className={styles.distanceEditRow}>
-                              <input
-                                type="number"
-                                inputMode="numeric"
-                                value={customDistances[mov.name] || ''}
-                                onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                                className={styles.distanceInput}
-                                min="0"
-                              />
-                              <span className={styles.distanceUnit}>m</span>
-                            </div>
-                          )}
                         </div>
                       );
                     })}
                   </div>
                 )}
 
-                {/* Weight input (once) */}
-                {weightTarget && (
-                  <div className={styles.weightInputContainer}>
-                    <label className={styles.timeLabel}>{weightLabel}</label>
-                    <div className={styles.weightInputRow}>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={workoutWeight}
-                        onChange={(e) => setWorkoutWeight(e.target.value)}
-                        placeholder={weightTarget.rxWeights?.male?.toString() || ''}
-                        className={styles.weightInput}
-                        min="0"
-                      />
-                      <span className={styles.weightUnit}>
-                        {weightTarget.rxWeights?.unit || 'kg'}
-                      </span>
-                    </div>
-                    {weightTarget.rxWeights && (
-                      <span className={styles.rxHint}>
-                        Rx: {weightTarget.rxWeights.female}/{weightTarget.rxWeights.male} {weightTarget.rxWeights.unit}
-                      </span>
+                {/* Per-movement weight inputs */}
+                {weightedMovements.length > 0 && (
+                  <div
+                    className={styles.movementWeightsSection}
+                    onBlur={(e) => {
+                      const currentTarget = e.currentTarget;
+                      if (currentTarget.contains(e.relatedTarget as Node)) return;
+                      if (!useSingleWeightForMovements) return;
+                      setTimeout(() => {
+                        if (currentTarget.contains(document.activeElement)) return;
+                        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
+                        applySharedMovementWeight(sharedWeight);
+                      }, 0);
+                    }}
+                  >
+                    <label className={styles.alternativesLabel}>Weight Used</label>
+                    {hasMixedMovementWeights && (
+                      <label className={styles.weightToggle}>
+                        <input
+                          type="checkbox"
+                          checked={useSingleWeightForMovements}
+                          onChange={(e) => setUseSingleWeightForMovements(e.target.checked)}
+                        />
+                        Apply one weight to all weighted movements
+                      </label>
+                    )}
+                    {useSingleWeightForMovements ? (
+                      <div className={styles.movementWeightRow}>
+                        <span className={styles.movementWeightName}>All weighted movements</span>
+                        <div className={styles.movementWeightInputGroup}>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={sharedMovementWeight}
+                            onChange={(e) => setSharedMovementWeight(e.target.value)}
+                            placeholder={weightedMovements[0]?.rxWeights?.male?.toString() || '0'}
+                            className={styles.movementWeightInput}
+                            min="0"
+                          />
+                          <span className={styles.weightUnit}>
+                            {weightedMovements[0]?.rxWeights?.unit || 'kg'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={styles.weightHint}>Only weighted movements show inputs</p>
+                        {manuallyEditedWeights.size > 0 && (
+                          <p className={styles.weightHint}>Custom movement weights applied</p>
+                        )}
+                        {weightedMovements.map((mov) => (
+                          <div key={mov.name} className={styles.movementWeightRow}>
+                            <span className={styles.movementWeightName}>{mov.name}</span>
+                            <div className={styles.movementWeightInputGroup}>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={movementWeights[mov.name] || ''}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  handleMovementWeightManualEdit(mov.name, val);
+                                }}
+                                placeholder={mov.rxWeights?.male?.toString() || '0'}
+                                className={styles.movementWeightInput}
+                                min="0"
+                              />
+                              <span className={styles.weightUnit}>
+                                {mov.rxWeights?.unit || 'kg'}
+                              </span>
+                            </div>
+                            {mov.rxWeights && (
+                              <span className={styles.movementRxHint}>
+                                Rx: {mov.rxWeights.female}/{mov.rxWeights.male}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </>
                     )}
                   </div>
                 )}
@@ -1569,6 +2808,85 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
               </>
             ) : (
               <>
+                {hasMixedMovementWeights && weightedMovements.length > 0 && (
+                  <div
+                    className={styles.movementWeightsSection}
+                    onBlur={(e) => {
+                      const currentTarget = e.currentTarget;
+                      if (currentTarget.contains(e.relatedTarget as Node)) return;
+                      if (!useSingleWeightForMovements) return;
+                      setTimeout(() => {
+                        if (currentTarget.contains(document.activeElement)) return;
+                        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
+                        applySharedMovementWeight(sharedWeight);
+                      }, 0);
+                    }}
+                  >
+                    <label className={styles.alternativesLabel}>Weight Used</label>
+                    <label className={styles.weightToggle}>
+                      <input
+                        type="checkbox"
+                        checked={useSingleWeightForMovements}
+                        onChange={(e) => setUseSingleWeightForMovements(e.target.checked)}
+                      />
+                      Apply one weight to all weighted movements
+                    </label>
+                    {useSingleWeightForMovements ? (
+                      <div className={styles.movementWeightRow}>
+                        <span className={styles.movementWeightName}>All weighted movements</span>
+                        <div className={styles.movementWeightInputGroup}>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={sharedMovementWeight}
+                            onChange={(e) => setSharedMovementWeight(e.target.value)}
+                            placeholder={weightedMovements[0]?.rxWeights?.male?.toString() || '0'}
+                            className={styles.movementWeightInput}
+                            min="0"
+                          />
+                          <span className={styles.weightUnit}>
+                            {weightedMovements[0]?.rxWeights?.unit || 'kg'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={styles.weightHint}>Only weighted movements show inputs</p>
+                        {manuallyEditedWeights.size > 0 && (
+                          <p className={styles.weightHint}>Custom movement weights applied</p>
+                        )}
+                        {weightedMovements.map((mov) => (
+                          <div key={mov.name} className={styles.movementWeightRow}>
+                            <span className={styles.movementWeightName}>{mov.name}</span>
+                            <div className={styles.movementWeightInputGroup}>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={movementWeights[mov.name] || ''}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  handleMovementWeightManualEdit(mov.name, val);
+                                }}
+                                placeholder={mov.rxWeights?.male?.toString() || '0'}
+                                className={styles.movementWeightInput}
+                                min="0"
+                              />
+                              <span className={styles.weightUnit}>
+                                {mov.rxWeights?.unit || 'kg'}
+                              </span>
+                            </div>
+                            {mov.rxWeights && (
+                              <span className={styles.movementRxHint}>
+                                Rx: {mov.rxWeights.female}/{mov.rxWeights.male}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Sets */}
                 <div className={styles.setsContainer}>
                   {currentSets.map((set, setIndex) => (
@@ -1576,21 +2894,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
                       <span className={styles.setNumber}>Set {set.setNumber}</span>
 
                       <div className={styles.setInputs}>
-                        <div className={styles.inputGroup}>
-                          <label>Weight (kg)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={set.weight ?? ''}
-                            onChange={(e) => updateSet(
-                              setIndex,
-                              'weight',
-                              e.target.value ? parseFloat(e.target.value) : undefined
-                            )}
-                            placeholder="0"
-                            className={styles.setInput}
-                          />
-                        </div>
+                        {/* Only show weight for exercises that need it */}
+                        {currentExerciseNeedsWeight && !hasMixedMovementWeights && (
+                          <div className={styles.inputGroup}>
+                            <label>Weight (kg)</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={set.weight ?? ''}
+                              onChange={(e) => updateSet(
+                                setIndex,
+                                'weight',
+                                e.target.value ? parseFloat(e.target.value) : undefined
+                              )}
+                              onBlur={() => {
+                                if (setIndex === 0) {
+                                  applySetAutofillFromFirst('weight');
+                                }
+                              }}
+                              placeholder="0"
+                              className={styles.setInput}
+                            />
+                          </div>
+                        )}
 
                         <div className={styles.inputGroup}>
                           <label>Reps</label>
@@ -1603,6 +2929,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
                               'actualReps',
                               e.target.value ? parseInt(e.target.value) : undefined
                             )}
+                            onBlur={() => {
+                              if (setIndex === 0) {
+                                applySetAutofillFromFirst('actualReps');
+                              }
+                            }}
                             placeholder={set.targetReps?.toString() || '0'}
                             className={styles.setInput}
                           />
@@ -1637,9 +2968,228 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
           <div className={styles.wizardActions}>
             <Button
               variant="secondary"
-              onClick={handlePreviousExercise}
-              disabled={currentExerciseIndex === 0}
+              onClick={handleHeaderBack}
               size="lg"
+              icon={<BackIcon />}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={handleNextExercise}
+              size="lg"
+            >
+              {currentExerciseIndex >= parsedWorkout.exercises.length - 1
+                ? 'Save Workout'
+                : 'Next Exercise'
+              }
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Cardio exercises - calories tracking */}
+      {step === 'log-results' && parsedWorkout && isCurrentExerciseCardio && (
+        <motion.div
+          className={styles.wizardContainer}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          key={currentExerciseIndex}
+        >
+          {/* Workout title */}
+          {parsedWorkout.title && (
+            <h2 className={styles.workoutTitle}>{parsedWorkout.title}</h2>
+          )}
+
+          {/* Progress indicator */}
+          <div className={styles.progressBar}>
+            <div className={styles.progressText}>
+              Exercise {currentExerciseIndex + 1} of {parsedWorkout.exercises.length}
+            </div>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill}
+                style={{
+                  width: `${((currentExerciseIndex + 1) / parsedWorkout.exercises.length) * 100}%`
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Current exercise */}
+          <Card padding="lg" className={styles.exerciseCard}>
+            <h2 className={styles.exerciseName}>
+              {parsedWorkout.exercises[currentExerciseIndex].name}
+            </h2>
+            <p className={styles.exercisePrescriptionLarge}>
+              {parsedWorkout.exercises[currentExerciseIndex].prescription}
+            </p>
+
+            {/* Cardio inputs */}
+            <div className={styles.setsContainer}>
+              <div className={styles.setRow}>
+                <div className={styles.setInputs}>
+                  <div className={styles.inputGroup}>
+                    <label>Turns/Intervals</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={cardioTurns}
+                      onChange={(e) => setCardioTurns(e.target.value)}
+                      placeholder="e.g. 3"
+                      className={styles.setInput}
+                      min="1"
+                    />
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label>Avg Calories per Turn</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={cardioCaloriesPerTurn}
+                      onChange={(e) => setCardioCaloriesPerTurn(e.target.value)}
+                      placeholder="e.g. 25"
+                      className={styles.setInput}
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Show total calories */}
+              {cardioTurns && cardioCaloriesPerTurn && (
+                <div className={styles.totalDisplay}>
+                  <span className={styles.totalLabel}>Total Calories:</span>
+                  <span className={styles.totalValue}>
+                    {parseInt(cardioTurns) * parseInt(cardioCaloriesPerTurn)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Navigation */}
+          <div className={styles.wizardActions}>
+            <Button
+              variant="secondary"
+              onClick={handleHeaderBack}
+              size="lg"
+              icon={<BackIcon />}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={handleNextExercise}
+              size="lg"
+            >
+              {currentExerciseIndex >= parsedWorkout.exercises.length - 1
+                ? 'Save Workout'
+                : 'Next Exercise'
+              }
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Cardio exercises - distance tracking */}
+      {step === 'log-results' && parsedWorkout && isCurrentExerciseCardioDistance && (
+        <motion.div
+          className={styles.wizardContainer}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          key={currentExerciseIndex}
+        >
+          {/* Workout title */}
+          {parsedWorkout.title && (
+            <h2 className={styles.workoutTitle}>{parsedWorkout.title}</h2>
+          )}
+
+          {/* Progress indicator */}
+          <div className={styles.progressBar}>
+            <div className={styles.progressText}>
+              Exercise {currentExerciseIndex + 1} of {parsedWorkout.exercises.length}
+            </div>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill}
+                style={{
+                  width: `${((currentExerciseIndex + 1) / parsedWorkout.exercises.length) * 100}%`
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Current exercise */}
+          <Card padding="lg" className={styles.exerciseCard}>
+            <h2 className={styles.exerciseName}>
+              {parsedWorkout.exercises[currentExerciseIndex].name}
+            </h2>
+            <p className={styles.exercisePrescriptionLarge}>
+              {parsedWorkout.exercises[currentExerciseIndex].prescription}
+            </p>
+
+            {/* Distance inputs */}
+            <div className={styles.setsContainer}>
+              <div className={styles.setRow}>
+                <div className={styles.setInputs}>
+                  <div className={styles.inputGroup}>
+                    <label>Turns/Intervals</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={cardioDistanceTurns}
+                      onChange={(e) => setCardioDistanceTurns(e.target.value)}
+                      placeholder="e.g. 3"
+                      className={styles.setInput}
+                      min="1"
+                    />
+                  </div>
+
+                  <div className={styles.inputGroup}>
+                    <label>Distance per Turn</label>
+                    <div className={styles.distanceInputWrapper}>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={cardioDistancePerTurn}
+                        onChange={(e) => setCardioDistancePerTurn(e.target.value)}
+                        placeholder="e.g. 400"
+                        className={styles.setInput}
+                        min="0"
+                      />
+                      <select
+                        value={cardioDistanceUnit}
+                        onChange={(e) => setCardioDistanceUnit(e.target.value as 'm' | 'km' | 'mi')}
+                        className={styles.unitSelect}
+                      >
+                        <option value="m">m</option>
+                        <option value="km">km</option>
+                        <option value="mi">mi</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Show total distance */}
+              {cardioDistanceTurns && cardioDistancePerTurn && (
+                <div className={styles.totalDisplay}>
+                  <span className={styles.totalLabel}>Total Distance:</span>
+                  <span className={styles.totalValue}>
+                    {parseInt(cardioDistanceTurns) * parseInt(cardioDistancePerTurn)} {cardioDistanceUnit}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* Navigation */}
+          <div className={styles.wizardActions}>
+            <Button
+              variant="secondary"
+              onClick={handleHeaderBack}
+              size="lg"
+              icon={<BackIcon />}
             >
               Back
             </Button>
@@ -1673,6 +3223,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage }: Add
         <RewardScreen
           data={rewardData}
           onDone={onWorkoutCreated}
+          onEdit={handleEditFromReward}
         />
       )}
     </div>

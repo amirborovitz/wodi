@@ -163,12 +163,9 @@ export function calculateAllRings(params: {
     userAverageVolume: params.userAverageVolume,
   });
 
-  const consistencyRing = calculateConsistencyRing({
-    workoutsThisWeek: params.workoutsThisWeek,
-    weeklyGoal: params.weeklyGoal,
-  });
-
-  return [intensityRing, volumeRing, consistencyRing];
+  // Only show intensity and volume for single workout summary
+  // Consistency is about weekly progress, not relevant per-workout
+  return [intensityRing, volumeRing];
 }
 
 /**

@@ -2,13 +2,28 @@ import { motion } from 'framer-motion';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { usePRCount } from '../hooks/usePRCount';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
-import { WorkoutFeedCard } from '../components/history';
+import { WorkoutHistoryFeed } from '../components/history';
+import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import styles from './HistoryScreen.module.css';
 
-export function HistoryScreen() {
-  const { workouts, loading, stats } = useWorkouts();
+interface HistoryScreenProps {
+  onSelectWorkout?: (workout: WorkoutWithStats) => void;
+}
+
+export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
+  const { workouts, loading, stats, deleteWorkout } = useWorkouts();
   const { prCount } = usePRCount();
   const { weeklyXP } = useWeeklyStats();
+
+  const handleDeleteWorkout = async (workoutId: string) => {
+    const workout = workouts.find(w => w.id === workoutId);
+    const confirmDelete = window.confirm(
+      `Delete "${workout?.title || 'this workout'}"?\n\nThis cannot be undone.`
+    );
+    if (confirmDelete) {
+      await deleteWorkout(workoutId);
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -29,7 +44,7 @@ export function HistoryScreen() {
         transition={{ duration: 0.3 }}
       >
         <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>🔥</span>
+          <span className={styles.summaryIcon}>WK</span>
           <div className={styles.summaryContent}>
             <span className={styles.summaryValue}>{stats.thisWeek}</span>
             <span className={styles.summaryLabel}>This Week</span>
@@ -37,7 +52,7 @@ export function HistoryScreen() {
         </div>
         <div className={styles.summaryDivider} />
         <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>📅</span>
+          <span className={styles.summaryIcon}>MO</span>
           <div className={styles.summaryContent}>
             <span className={styles.summaryValue}>{stats.thisMonth}</span>
             <span className={styles.summaryLabel}>This Month</span>
@@ -45,7 +60,7 @@ export function HistoryScreen() {
         </div>
         <div className={styles.summaryDivider} />
         <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>🏆</span>
+          <span className={styles.summaryIcon}>PR</span>
           <div className={styles.summaryContent}>
             <span className={styles.summaryValue}>{prCount}</span>
             <span className={styles.summaryLabel}>PRs</span>
@@ -74,7 +89,7 @@ export function HistoryScreen() {
           transition={{ duration: 0.3 }}
         >
           <div className={styles.emptyIcon}>
-            <span className={styles.emptyEmoji}>🏋️</span>
+            <span className={styles.emptyEmoji}>NO</span>
           </div>
           <h2 className={styles.emptyTitle}>No workouts yet</h2>
           <p className={styles.emptyText}>
@@ -85,15 +100,20 @@ export function HistoryScreen() {
 
       {/* Workout Feed */}
       {!loading && workouts.length > 0 && (
-        <div className={styles.workoutFeed}>
-          {workouts.map((workout, index) => (
-            <WorkoutFeedCard
-              key={workout.id}
-              workout={workout}
-              index={index}
-            />
-          ))}
-        </div>
+        <WorkoutHistoryFeed
+          workouts={workouts}
+          onSelectWorkout={
+            onSelectWorkout
+              ? (id) => {
+                  const selected = workouts.find((workout) => workout.id === id);
+                  if (selected) {
+                    onSelectWorkout(selected);
+                  }
+                }
+              : undefined
+          }
+          onDeleteWorkout={handleDeleteWorkout}
+        />
       )}
     </div>
   );

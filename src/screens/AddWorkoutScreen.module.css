@@ -7,9 +7,9 @@
 
 /* Header */
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
   padding: var(--space-4) var(--space-6);
   padding-top: calc(var(--space-4) + var(--safe-top));
   background: var(--color-bg);
@@ -19,21 +19,7 @@
 }
 
 .backButton {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-surface);
-  border: none;
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.backButton svg {
-  width: 20px;
-  height: 20px;
+  justify-self: start;
 }
 
 .title {
@@ -41,10 +27,11 @@
   font-weight: var(--font-semibold);
   color: var(--color-text);
   margin: 0;
+  text-align: center;
 }
 
 .spacer {
-  width: 40px;
+  width: 68px;
 }
 
 .hiddenInput {
@@ -216,6 +203,80 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   font-family: var(--font-family);
+}
+
+/* DEV MODE - Temporary styles for testing */
+.devModeToggle {
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-family);
+  opacity: 0.6;
+}
+
+.devModeToggle:hover {
+  opacity: 1;
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.devSection {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px dashed var(--neon-cyan);
+  border-radius: var(--radius-lg);
+}
+
+.devTitle {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+}
+
+.devList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.devItem {
+  text-align: left;
+  padding: var(--space-3);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+.devItem:hover {
+  border-color: var(--neon-cyan);
+}
+
+.devItemTitle {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
+
+.devItemMeta {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
 }
 
 /* Processing Step */
@@ -514,6 +575,55 @@
   transition: all 0.2s ease;
 }
 
+/* Total display for cardio */
+.totalDisplay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.totalLabel {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.totalValue {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+}
+
+/* Distance input with unit selector */
+.distanceInputWrapper {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.distanceInputWrapper .setInput {
+  flex: 1;
+}
+
+.unitSelect {
+  padding: var(--space-2) var(--space-2);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  min-width: 60px;
+}
+
+.unitSelect:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 .wizardActions {
   display: flex;
   gap: var(--space-3);
@@ -642,19 +752,11 @@
 .alternativeRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-}
-
-.alternativeOriginal {
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  flex: 1;
 }
 
 .alternativeSelect {
   flex: 1;
-  max-width: 160px;
   padding: var(--space-2) var(--space-3);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -680,7 +782,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding-left: var(--space-2);
+  flex-shrink: 0;
 }
 
 .distanceInput {
@@ -839,6 +941,160 @@
   font-weight: var(--font-medium);
 }
 
+/* All-sets-on-one-screen interval logging */
+.intervalSetsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.intervalSetsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--space-2);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+}
+
+.intervalSetRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.intervalSetNumber {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  min-width: 50px;
+}
+
+.intervalSetTimeInputs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.intervalSetTimeInput {
+  width: 50px;
+  padding: var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  font-family: var(--font-mono);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.intervalSetTimeInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.intervalSetTimeInput::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.intervalSetTimeSeparator {
+  font-size: var(--text-md);
+  font-weight: var(--font-bold);
+  color: var(--color-text-secondary);
+}
+
+/* Per-movement weight inputs section */
+.movementWeightsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+}
+
+.weightHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.weightToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.weightToggle input {
+  accent-color: var(--color-accent);
+}
+
+.movementWeightRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.movementWeightName {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+}
+
+.movementWeightInputGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.movementWeightInput {
+  width: 70px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  font-family: var(--font-mono);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.movementWeightInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.movementWeightInput::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.movementRxHint {
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
 /* Hover effects only for devices with hover capability */
 @media (hover: hover) {
   .savedSelect:hover {
@@ -853,5 +1109,9 @@
   .addSetButton:hover {
     border-color: var(--color-accent);
     color: var(--color-accent);
+  }
+
+  .movementWeightRow:hover {
+    border-color: var(--color-accent);
   }
 }

@@ -4,22 +4,34 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
-import { StatsScreen } from './screens/StatsScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { AddWorkoutScreen } from './screens/AddWorkoutScreen';
-import { FloatingDock } from './components/ui';
+import { WorkoutDetailScreen } from './screens/WorkoutDetailScreen';
+import { BottomNav } from './components/ui';
 import type { Screen } from './types';
+import type { WorkoutWithStats } from './hooks/useWorkouts';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
-const MAIN_SCREENS: Screen[] = ['home', 'history', 'stats'];
+const MAIN_SCREENS: Screen[] = ['home', 'history'];
 
 function AppContent() {
   const { user, loading } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [selectedWorkout, setSelectedWorkout] = useState<WorkoutWithStats | null>(null);
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutWithStats | null>(null);
 
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
+    setEditingWorkout(null); // Clear any editing state
+    setCurrentScreen('add-workout');
+  };
+
+  const handleEditWorkout = (workout: WorkoutWithStats) => {
+    setEditingWorkout(workout);
+    setPendingImage(null); // Clear any pending image
     setCurrentScreen('add-workout');
   };
 
@@ -53,25 +65,60 @@ function AppContent() {
           <AddWorkoutScreen
             onBack={() => {
               setPendingImage(null);
-              setCurrentScreen('home');
+              setEditingWorkout(null);
+              setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
             onWorkoutCreated={() => {
               setPendingImage(null);
+              setEditingWorkout(null);
+              setHomeRingsKey((prev) => prev + 1);
               setCurrentScreen('home');
             }}
             initialImage={pendingImage}
+            editWorkout={editingWorkout}
+          />
+        );
+      case 'workout-detail':
+        return selectedWorkout ? (
+          <WorkoutDetailScreen
+            workout={selectedWorkout}
+            onBack={() => setCurrentScreen('history')}
+            onEditWorkout={() => handleEditWorkout(selectedWorkout)}
+          />
+        ) : (
+          <HistoryScreen
+            onSelectWorkout={(workout) => {
+              setSelectedWorkout(workout);
+              setCurrentScreen('workout-detail');
+            }}
           />
         );
       case 'history':
-        return <HistoryScreen />;
-      case 'stats':
-        return <StatsScreen />;
+        return (
+          <HistoryScreen
+            onSelectWorkout={(workout) => {
+              setSelectedWorkout(workout);
+              setCurrentScreen('workout-detail');
+            }}
+          />
+        );
+      case 'profile':
+        return <ProfileScreen />;
       case 'home':
       default:
         return (
           <HomeScreen
-            onAddWorkout={() => setCurrentScreen('add-workout')}
+            onAddWorkout={() => {
+              setEditingWorkout(null);
+              setCurrentScreen('add-workout');
+            }}
             onImageSelected={handleImageSelected}
+            onUsePastWorkout={() => {
+              setEditingWorkout(null);
+              setPendingImage(null);
+              setCurrentScreen('add-workout');
+            }}
+            ringsKey={homeRingsKey}
           />
         );
     }
@@ -91,12 +138,11 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Floating Dock Navigation - only on main screens */}
+      {/* Bottom Navigation - only on main screens */}
       {showBottomNav && (
-        <FloatingDock
+        <BottomNav
           currentScreen={currentScreen}
           onNavigate={(screen) => setCurrentScreen(screen)}
-          onAddWorkout={() => setCurrentScreen('add-workout')}
         />
       )}
     </>

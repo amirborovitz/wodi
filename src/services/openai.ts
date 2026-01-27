@@ -12,12 +12,16 @@ const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit workout parser. Parse t
 Return ONLY valid JSON:
 {
   "title": "workout name if visible",
+  "rawText": "full workout text from the image (OCR-style, line breaks ok)",
   "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
   "format": "for_time" | "intervals" | "amrap" | "emom" | "strength" | "tabata",
   "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
   "sets": 5,
   "timeCap": 900,
   "intervalTime": 180,
+  "containerRounds": null,
+  "benchmarkName": null,
+  "benchmarkModified": false,
   "exercises": [
     {
       "name": "Exercise or Block Name",
@@ -33,6 +37,30 @@ Return ONLY valid JSON:
     }
   ]
 }
+
+## CONTAINER/BENCHMARK RECOGNITION
+Detect nested workout structures like "7 rounds of Cindy" or "3 rounds of DT":
+- **containerRounds**: The OUTER rounds wrapping a benchmark (e.g., 7 in "7 rounds of Cindy")
+- **benchmarkName**: Name of recognized benchmark (Cindy, DT, Fran, Grace, etc.)
+- **benchmarkModified**: true if benchmark has modifications (different weight, scaled reps, etc.)
+
+### PRIORITY RULES FOR BENCHMARKS:
+1. FIRST: If definition is provided in text (e.g., "Cindy = 5/10/15"), use that definition
+2. SECOND: If no definition, use standard benchmark with any noted modifications
+
+### STANDARD BENCHMARKS (use these if not defined in text):
+- **Cindy**: AMRAP 20 of 5 Pull-ups, 10 Push-ups, 15 Air Squats
+- **DT**: 5 rounds of 12 Deadlifts, 9 Hang Power Cleans, 6 Push Jerks @ 70/47.5kg
+- **Fran**: 21-15-9 Thrusters 42.5/30kg, Pull-ups
+- **Grace**: 30 Clean & Jerks @ 60/42.5kg for time
+- **Isabel**: 30 Snatches @ 60/42.5kg for time
+- **Helen**: 3 rounds of 400m Run, 21 KB Swings 24/16kg, 12 Pull-ups
+- **Diane**: 21-15-9 Deadlifts 102/70kg, Handstand Push-ups
+- **Elizabeth**: 21-15-9 Cleans 60/42.5kg, Ring Dips
+- **Jackie**: 1000m Row, 50 Thrusters 20/15kg, 30 Pull-ups for time
+- **Karen**: 150 Wall Balls 9/6kg for time
+- **Annie**: 50-40-30-20-10 Double Unders, Sit-ups
+- **Mary**: AMRAP 20 of 5 HSPUs, 10 Pistols, 15 Pull-ups
 
 ## FORMAT DETECTION (pick exactly one)
 - **amrap_intervals**: "2:30 AMRAP, 1:30 rest x 4", "4 rounds of 3 min AMRAP" → Log ROUNDS PER SET (multiple AMRAPs)
@@ -56,6 +84,9 @@ Parse "40/60 kg" as rxWeights: { female: 40, male: 60, unit: "kg" }
 Parse "95/65 lb" as rxWeights: { male: 95, female: 65, unit: "lb" }
 Parse "@60kg" or "60kg" as rxWeights: { male: 60, female: 60, unit: "kg" }
 Parse "2x22.5 kg db" → note in prescription, rxWeights: { male: 22.5, female: 22.5, unit: "kg" }
+IMPORTANT: "twin kb" or "double kb" means 2 kettlebells - DOUBLE the weight for rxWeights
+  e.g., "twin kb 16kg" → rxWeights: { male: 32, female: 32, unit: "kg" } (16×2)
+  e.g., "2 kb 24kg" → rxWeights: { male: 48, female: 48, unit: "kg" } (24×2)
 
 ## MOVEMENT ALIASES (use canonical names)
 Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
@@ -119,6 +150,21 @@ Output:
   }]
 }
 
+Input: "Push Press 5x3"
+Output:
+{
+  "type": "strength",
+  "format": "strength",
+  "scoreType": "load",
+  "exercises": [{
+    "name": "Push Press",
+    "type": "strength",
+    "prescription": "5x3",
+    "suggestedSets": 5,
+    "suggestedReps": 3
+  }]
+}
+
 Input: "2:30 AMRAP, 1:30 rest x 4: 10 heavy russian swings, 25 single unders/50 double unders"
 Output:
 {
@@ -141,12 +187,117 @@ Output:
   }]
 }
 
+Input: "Long Metcon Interval: 8 sets out every 2:30 of 300m run, 5 twin KB clean 32/24"
+Output:
+{
+  "type": "metcon",
+  "format": "intervals",
+  "scoreType": "time_per_set",
+  "sets": 8,
+  "intervalTime": 150,
+  "exercises": [{
+    "name": "Long Metcon - 8 sets every 2:30",
+    "type": "wod",
+    "prescription": "300m Run + 5 Twin KB Clean 32/24kg",
+    "suggestedSets": 8,
+    "movements": [
+      { "name": "Run", "distance": 300, "unit": "m" },
+      { "name": "Kettlebell Clean", "reps": 5, "rxWeights": { "male": 64, "female": 48, "unit": "kg" } }
+    ]
+  }]
+}
+
+Input: "7 rounds of Cindy for time"
+Output:
+{
+  "type": "for_time",
+  "format": "for_time",
+  "scoreType": "time",
+  "containerRounds": 7,
+  "benchmarkName": "Cindy",
+  "benchmarkModified": false,
+  "exercises": [{
+    "name": "7 Rounds of Cindy",
+    "type": "wod",
+    "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats",
+    "suggestedSets": 7,
+    "movements": [
+      { "name": "Pull-up", "reps": 5 },
+      { "name": "Push-up", "reps": 10 },
+      { "name": "Air Squat", "reps": 15 }
+    ]
+  }]
+}
+
+Input: "DT @ 50kg"
+Output:
+{
+  "type": "for_time",
+  "format": "for_time",
+  "scoreType": "time",
+  "containerRounds": 5,
+  "benchmarkName": "DT",
+  "benchmarkModified": true,
+  "exercises": [{
+    "name": "DT @ 50kg",
+    "type": "wod",
+    "prescription": "5 rounds: 12 Deadlifts, 9 Hang Power Cleans, 6 Push Jerks @ 50kg",
+    "suggestedSets": 5,
+    "movements": [
+      { "name": "Deadlift", "reps": 12, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } },
+      { "name": "Hang Power Clean", "reps": 9, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } },
+      { "name": "Push Jerk", "reps": 6, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } }
+    ]
+  }]
+}
+
+Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
+Output:
+{
+  "title": "Cycle 1 - Push",
+  "type": "mixed",
+  "format": "strength",
+  "scoreType": "load",
+  "exercises": [
+    {
+      "name": "Strict Shoulder Press",
+      "type": "strength",
+      "prescription": "5x3",
+      "suggestedSets": 5,
+      "suggestedReps": 3
+    },
+    {
+      "name": "Superset: Goblet Squat + V-ups",
+      "type": "strength",
+      "prescription": "3x12 each movement",
+      "suggestedSets": 3,
+      "suggestedReps": 12,
+      "movements": [
+        { "name": "Goblet Squat", "reps": 12 },
+        { "name": "V-up", "reps": 12 }
+      ]
+    },
+    {
+      "name": "Metcon: Max Cal Ecobike",
+      "type": "cardio",
+      "prescription": "15 min max calories, teams of 5",
+      "suggestedSets": 1,
+      "timeCap": 900
+    }
+  ]
+}
+
 ## RULES
 1. Keep round-based WODs as ONE exercise with movements array
 2. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon)
 3. Always include "format" and "scoreType" fields
 4. Parse weight notation into rxWeights object
 5. Use canonical movement names
+6. IMPORTANT: Exercise name MUST include set count and interval timing (e.g., "8 sets every 2:30" or "5 Sets For Time")
+7. SETS x REPS PARSING: "AxB" means A sets of B reps (e.g., "5x3" = suggestedSets:5, suggestedReps:3; "3x10" = suggestedSets:3, suggestedReps:10)
+8. If the workout has titled sections (e.g., "Cycle 1 - Push", "Superset x3", "Medium Metcon - Interval"), treat each as a separate exercise block.
+9. Do not duplicate exercises; each block should appear once.
+10. MULTI-BLOCK WORKOUTS: When a workout has multiple distinct sections (Cycle, Strength, Superset, Metcon, Finisher, etc.), create a SEPARATE exercise for EACH block. Never merge or skip blocks. Count the blocks in the input and ensure your output has the same number of exercises.
 
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
@@ -190,6 +341,12 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
 
     const parsed = JSON.parse(jsonStr.trim());
 
+    console.log('[OpenAI Parse] Raw AI response:', {
+      exerciseCount: parsed.exercises?.length,
+      exercises: parsed.exercises?.map((e: Record<string, unknown>) => ({ name: e.name, type: e.type })),
+      rawText: (parsed.rawText as string)?.substring(0, 300),
+    });
+
     if (parsed.error) {
       throw new Error(parsed.error);
     }
@@ -200,6 +357,89 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
     console.error('Error parsing workout image:', error);
     throw error;
   }
+}
+
+const WORKOUT_REFINE_PROMPT = `You are a workout parser refinement engine. You will receive:
+- rawText: the OCR/visible text
+- parsed: the current parsed JSON
+
+Your job: return a corrected ParsedWorkout JSON that:
+1) Preserves the original meaning and structure.
+2) Splits complex, multi-block workouts into correct exercises when needed.
+3) Adds containerRounds / benchmarkName when explicit.
+4) Keeps movements accurate with per-round reps and weights.
+
+CRITICAL: Count the distinct sections in the raw text (look for: Cycle, Strength, Superset, Metcon, Finisher, Interval, AMRAP, EMOM, numbered items like "1.", "2.", "3.", etc.).
+The number of exercises in your output MUST match the number of distinct blocks in the input.
+
+If rawText mentions 3 blocks but parsed only has 2 exercises, you MUST add the missing block.
+If rawText has numbered items (1. Push Press, 2. Superset, 3. Metcon), each numbered item is a SEPARATE exercise.
+
+Return ONLY valid JSON in this schema:
+{
+  "title": "workout name if visible",
+  "rawText": "full raw text",
+  "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
+  "format": "for_time" | "intervals" | "amrap" | "emom" | "strength" | "tabata",
+  "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
+  "sets": 5,
+  "timeCap": 900,
+  "intervalTime": 180,
+  "containerRounds": null,
+  "benchmarkName": null,
+  "benchmarkModified": false,
+  "rawText": "full raw text",
+  "exercises": [
+    {
+      "name": "Exercise or Block Name",
+      "type": "strength" | "cardio" | "skill" | "wod",
+      "prescription": "human-readable prescription",
+      "suggestedSets": 5,
+      "suggestedReps": 10,
+      "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+      "movements": [
+        { "name": "Run", "distance": 300, "unit": "m" },
+        { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Keep round-based WODs as ONE exercise with movements array unless clearly multiple blocks.
+- If the text defines a benchmark (e.g., "Cindy = 5/10/15"), use that definition.
+- If multiple blocks exist (e.g., "Cindy + DT + Cash-out"), split into separate exercises.
+- Preserve all titled sections (Cycle, Superset, Metcon, Interval, etc.) as distinct exercises.
+- Ensure sets x reps like "5x3" becomes suggestedSets=5 and suggestedReps=3.
+- Never duplicate the same exercise block unless the raw text explicitly repeats it.
+- If you are unsure, preserve the original parsed structure and just correct obvious errors.`;
+
+export async function refineParsedWorkout(
+  parsed: ParsedWorkout,
+  rawText: string
+): Promise<ParsedWorkout> {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: WORKOUT_REFINE_PROMPT },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              rawText,
+              parsed,
+            }),
+          },
+        ],
+      },
+    ],
+    temperature: 0,
+  });
+
+  const text = response.choices[0]?.message?.content || '';
+  return JSON.parse(text) as ParsedWorkout;
 }
 
 function validateRxWeights(data: unknown): RxWeights | undefined {
@@ -271,14 +511,32 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         }
       }
 
+      const name = String(exercise.name || 'Unknown Exercise');
+      const prescription = String(exercise.prescription || '');
+      let suggestedSets = typeof exercise.suggestedSets === 'number' ? exercise.suggestedSets : 1;
+      let suggestedReps = typeof exercise.suggestedReps === 'number' ? exercise.suggestedReps : undefined;
+
+      const setsRepsMatch = `${name} ${prescription}`.match(/(\d+)\s*[x]\s*(\d+)/i)
+        || `${name} ${prescription}`.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+      if (setsRepsMatch) {
+        const parsedSets = parseInt(setsRepsMatch[1], 10);
+        const parsedReps = parseInt(setsRepsMatch[2], 10);
+        if (!Number.isNaN(parsedSets) && !Number.isNaN(parsedReps)) {
+          if (suggestedSets !== parsedSets || suggestedReps !== parsedReps) {
+            suggestedSets = parsedSets;
+            suggestedReps = parsedReps;
+          }
+        }
+      }
+
       exercises.push({
-        name: String(exercise.name || 'Unknown Exercise'),
+        name,
         type: validExerciseTypes.includes(exercise.type as ExerciseType)
           ? (exercise.type as ExerciseType)
           : 'wod',
-        prescription: String(exercise.prescription || ''),
-        suggestedSets: typeof exercise.suggestedSets === 'number' ? exercise.suggestedSets : 1,
-        suggestedReps: typeof exercise.suggestedReps === 'number' ? exercise.suggestedReps : undefined,
+        prescription,
+        suggestedSets,
+        suggestedReps,
         suggestedWeight: typeof exercise.suggestedWeight === 'number' ? exercise.suggestedWeight : undefined,
         rxWeights: validateRxWeights(exercise.rxWeights),
         movements: movements.length > 0 ? movements : undefined,
@@ -286,16 +544,37 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
     }
   }
 
+  const rawText = typeof raw.rawText === 'string' ? raw.rawText : undefined;
+
+  // Global deduplication - check all pairs, not just consecutive
+  const seen = new Map<string, number>(); // key -> first index
+  const dedupedExercises = exercises.filter((exercise, index) => {
+    const key = `${exercise.name}|${exercise.prescription}|${exercise.suggestedSets}|${exercise.suggestedReps}`;
+    if (seen.has(key)) {
+      // It's a duplicate - only keep if movements differ
+      const firstIndex = seen.get(key)!;
+      const firstMovements = JSON.stringify(exercises[firstIndex].movements || []);
+      const currentMovements = JSON.stringify(exercise.movements || []);
+      return firstMovements !== currentMovements;
+    }
+    seen.set(key, index);
+    return true;
+  });
+
   return {
     title: typeof raw.title === 'string' ? raw.title : undefined,
     type,
     format,
     scoreType,
-    exercises,
+    exercises: dedupedExercises,
     sets: typeof raw.sets === 'number' ? raw.sets : undefined,
     timeCap: typeof raw.timeCap === 'number' ? raw.timeCap : undefined,
     intervalTime: typeof raw.intervalTime === 'number' ? raw.intervalTime : undefined,
     restTime: typeof raw.restTime === 'number' ? raw.restTime : undefined,
+    containerRounds: typeof raw.containerRounds === 'number' ? raw.containerRounds : undefined,
+    benchmarkName: typeof raw.benchmarkName === 'string' ? raw.benchmarkName : undefined,
+    benchmarkModified: typeof raw.benchmarkModified === 'boolean' ? raw.benchmarkModified : undefined,
+    rawText,
   };
 }
 

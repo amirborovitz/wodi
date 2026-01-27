@@ -67,6 +67,9 @@ export interface Workout {
   title: string;
   type: WorkoutType;
   imageUrl?: string;
+  partnerWorkout?: boolean;
+  partnerFactor?: number;
+  workloadBreakdown?: WorkloadBreakdown;
   status: WorkoutStatus;
   exercises: Exercise[];
   scores?: WorkoutScores;
@@ -98,6 +101,7 @@ export interface ExerciseSet {
   weight?: number;         // kg
   time?: number;           // seconds
   distance?: number;       // meters
+  calories?: number;       // for cardio exercises
   completed: boolean;
 }
 
@@ -122,6 +126,28 @@ export interface ParsedWorkout {
   intervalTime?: number;        // Interval duration in seconds (for EMOM/intervals)
   restTime?: number;            // Rest duration in seconds (for interval workouts)
   rawText?: string;
+  containerRounds?: number;     // Outer rounds (e.g., 7 in "7 rounds of Cindy")
+  benchmarkName?: string;       // Named benchmark if recognized (e.g., "Cindy", "Fran")
+  benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
+}
+
+// Workload breakdown types
+export interface MovementTotal {
+  name: string;
+  totalReps?: number;
+  totalDistance?: number;
+  totalCalories?: number;
+  weight?: number;
+  unit?: 'kg' | 'lb' | 'm' | 'cal';
+  color?: 'cyan' | 'magenta' | 'yellow';
+}
+
+export interface WorkloadBreakdown {
+  movements: MovementTotal[];
+  grandTotalReps: number;
+  grandTotalVolume: number;
+  containerRounds?: number;
+  benchmarkName?: string;
 }
 
 // Individual movement within a workout
@@ -152,6 +178,7 @@ export type Screen =
   | 'add-workout'
   | 'history'
   | 'stats'
+  | 'settings'
   | 'workout-detail'
   | 'profile';
 
@@ -225,6 +252,8 @@ export interface RewardData {
     byRegion: Record<BodyRegion, MuscleGroup[]>;
     summary: string;
   };
+  workloadBreakdown?: WorkloadBreakdown;  // Per-movement totals for display
+  workoutContext?: string;
 }
 
 // Weekly stats for consistency ring
@@ -250,4 +279,5 @@ export interface WorkoutWithStats extends Workout {
   totalVolume: number;
   metconMinutes?: number;
   xp?: XPBreakdown;
+  isPR?: boolean;
 }

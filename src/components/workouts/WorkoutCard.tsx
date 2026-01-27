@@ -13,32 +13,32 @@ interface WorkoutCardProps {
 const typeStyles: Record<WorkoutType, { gradient: string; icon: string; label: string }> = {
   for_time: {
     gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
-    icon: '🔥',
+    icon: 'FT',
     label: 'For Time',
   },
   amrap: {
     gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    icon: '💪',
+    icon: 'AMRAP',
     label: 'AMRAP',
   },
   emom: {
     gradient: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-    icon: '⏱️',
+    icon: 'EMOM',
     label: 'EMOM',
   },
   strength: {
     gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    icon: '🏋️',
+    icon: 'STR',
     label: 'Strength',
   },
   metcon: {
     gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    icon: '🚀',
+    icon: 'MET',
     label: 'MetCon',
   },
   mixed: {
     gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    icon: '⚡',
+    icon: 'MIX',
     label: 'Mixed',
   },
 };
@@ -66,8 +66,8 @@ function formatDuration(minutes: number): string {
 
 function formatVolume(kg: number): string {
   if (kg === 0) return '';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${kg}kg`;
+  if (kg >= 1000) return `${(kg / 1000).toFixed(3)}t`;
+  return `${Math.round(kg).toLocaleString()} kg`;
 }
 
 export function WorkoutCard({ workout, index, onClick }: WorkoutCardProps) {
@@ -95,7 +95,7 @@ export function WorkoutCard({ workout, index, onClick }: WorkoutCardProps) {
         <span className={styles.date}>{formatDate(workout.date)}</span>
         {duration > 0 && (
           <>
-            <span className={styles.dot}>·</span>
+            <span className={styles.dot}>-</span>
             <span>{formatDuration(duration)}</span>
           </>
         )}

@@ -1,0 +1,184 @@
+import { motion } from 'framer-motion';
+import styles from './ConcentricRings.module.css';
+
+interface RingData {
+  value: number;
+  goal: number;
+}
+
+interface ConcentricRingsProps {
+  sessions: RingData;   // Cyan - inner ring
+  metcon: RingData;     // Magenta - middle ring
+  volume: RingData;     // Yellow - outer ring
+  size?: number;        // Container size in px (default: 280)
+}
+
+interface RingProps {
+  percentage: number;
+  radius: number;
+  strokeWidth: number;
+  color: string;
+  glowColor: string;
+  delay: number;
+}
+
+function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: RingProps) {
+  const circumference = 2 * Math.PI * radius;
+  const cappedPercentage = Math.min(percentage, 100);
+  const strokeDashoffset = circumference - (cappedPercentage / 100) * circumference;
+  const isGoalMet = percentage >= 100;
+
+  return (
+    <g className={isGoalMet ? styles.successPulse : ''}>
+      {/* Background ring */}
+      <circle
+        cx="50%"
+        cy="50%"
+        r={radius}
+        fill="none"
+        stroke={`color-mix(in srgb, ${color} 24%, #0b0b0b)`}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+      {/* Glow layer (behind main ring) */}
+      <motion.circle
+        cx="50%"
+        cy="50%"
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth + 4}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset }}
+        transition={{ duration: 1.2, delay, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          filter: `blur(8px)`,
+          opacity: 0.4,
+          transform: 'rotate(-90deg)',
+          transformOrigin: 'center',
+        }}
+      />
+      {/* Main progress ring */}
+      <motion.circle
+        cx="50%"
+        cy="50%"
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset }}
+        transition={{ duration: 1.2, delay, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          transform: 'rotate(-90deg)',
+          transformOrigin: 'center',
+          filter: isGoalMet ? `drop-shadow(${glowColor})` : 'none',
+        }}
+        className={isGoalMet ? styles.ringSuccess : ''}
+      />
+    </g>
+  );
+}
+
+export function ConcentricRings({ sessions, metcon, volume, size = 280 }: ConcentricRingsProps) {
+  const strokeWidth = 16;
+  const gap = 22;
+  const center = size / 2;
+
+  // Calculate radii (outer to inner)
+  const outerRadius = center - strokeWidth / 2 - 10;   // Volume (yellow)
+  const middleRadius = outerRadius - gap;              // Metcon (magenta)
+  const innerRadius = middleRadius - gap;              // Sessions (cyan)
+
+  // Calculate percentages
+  const volumePercent = (volume.value / volume.goal) * 100;
+  const metconPercent = (metcon.value / metcon.goal) * 100;
+  const sessionsPercent = (sessions.value / sessions.goal) * 100;
+
+  return (
+    <div className={styles.container} style={{ width: size, height: size }}>
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className={styles.svg}
+        width={size}
+        height={size}
+      >
+        {/* Volume ring (outer - yellow) */}
+        <Ring
+          percentage={volumePercent}
+          radius={outerRadius}
+          strokeWidth={strokeWidth}
+          color="var(--color-volume)"
+          glowColor="0 0 20px var(--glow-volume)"
+          delay={0}
+        />
+
+        {/* Metcon ring (middle - magenta) */}
+        <Ring
+          percentage={metconPercent}
+          radius={middleRadius}
+          strokeWidth={strokeWidth}
+          color="var(--color-metcon)"
+          glowColor="0 0 20px var(--glow-metcon)"
+          delay={0.1}
+        />
+
+        {/* Sessions ring (inner - cyan) */}
+        <Ring
+          percentage={sessionsPercent}
+          radius={innerRadius}
+          strokeWidth={strokeWidth}
+          color="var(--color-sessions)"
+          glowColor="0 0 20px var(--glow-sessions)"
+          delay={0.2}
+        />
+      </svg>
+
+      {/* Center content */}
+      <div className={styles.center}>
+        <motion.span
+          className={styles.centerValue}
+          style={{ color: 'var(--color-sessions)' }}
+          initial={{ scale: 0.8 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {sessions.value}
+        </motion.span>
+      </div>
+
+      {/* Legend */}
+      <div className={styles.legend}>
+        <div className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
+          <span className={styles.legendText}>
+            {formatValue(volume.value, 'kg')} / {formatValue(volume.goal, 'kg')}
+          </span>
+        </div>
+        <div className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
+          <span className={styles.legendText}>
+            {metcon.value} / {metcon.goal} min
+          </span>
+        </div>
+        <div className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: 'var(--color-sessions)' }} />
+          <span className={styles.legendText}>
+            {sessions.value} / {sessions.goal} sessions
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatValue(value: number, unit: string): string {
+  if (unit === 'kg' && value >= 1000) {
+    return `${(value / 1000).toFixed(1)}t`;
+  }
+  return `${value.toLocaleString()}${unit}`;
+}

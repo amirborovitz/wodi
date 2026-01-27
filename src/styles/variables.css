@@ -1,14 +1,23 @@
-/* WodBoard Design Tokens */
+/* WodBoard Design Tokens - 2026 High-Performance */
 
 :root {
-  /* Colors - Dark Theme */
-  --color-bg: #0a0a0a;
-  --color-bg-elevated: #111111;
-  --color-surface: #1a1a1a;
-  --color-surface-2: #242424;
-  --color-surface-3: #2e2e2e;
+  /* Colors - Deep Dark Theme */
+  --color-bg: #050505;
+  --color-bg-elevated: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-2: #1a1a1a;
+  --color-surface-3: #242424;
 
-  /* Accent Colors */
+  /* The Trinity Colors */
+  --color-sessions: #00F2FF;  /* Cyan - Sessions/Streak */
+  --color-metcon: #FF00E5;    /* Magenta - Metcon/Conditioning */
+  --color-volume: #FFD600;    /* Yellow/Gold - Volume/Strength */
+
+  /* Card Styling */
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.1);
+
+  /* Accent Colors (legacy - migrating to Trinity) */
   --color-accent: #ff4d4d;          /* Red - energy/power */
   --color-accent-hover: #ff6666;
   --color-accent-2: #00d4aa;        /* Teal - success/cardio */
@@ -16,6 +25,10 @@
   --color-warning: #ffb800;
   --color-error: #ff4d4d;
   --color-success: #00d4aa;
+
+  /* Level/XP Colors */
+  --xp-gold: #FFB800;
+  --pr-gradient: linear-gradient(135deg, #FFD600 0%, #FF8A00 100%);
 
   /* Text Colors */
   --color-text: #ffffff;
@@ -114,25 +127,32 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 
-  /* Ring Colors - Reward Engine */
-  --color-ring-intensity: #00BFFF;
-  --color-ring-volume: #00FF7F;
-  --color-ring-consistency: #FF6B9D;
+  /* Ring Colors - Trinity System */
+  --color-ring-sessions: #00F2FF;   /* Cyan - inner ring */
+  --color-ring-metcon: #FF00E5;     /* Magenta - middle ring */
+  --color-ring-volume: #FFD600;     /* Yellow - outer ring */
 
-  /* Glow Effects - Reward Engine */
-  --glow-intensity: rgba(0, 191, 255, 0.5);
-  --glow-volume: rgba(0, 255, 127, 0.5);
-  --glow-consistency: rgba(255, 107, 157, 0.5);
-  --glow-gold: rgba(255, 215, 0, 0.4);
+  /* Glow Effects - Trinity System */
+  --glow-sessions: rgba(0, 242, 255, 0.5);
+  --glow-metcon: rgba(255, 0, 229, 0.5);
+  --glow-volume: rgba(255, 214, 0, 0.5);
+  --glow-gold: rgba(255, 184, 0, 0.4);
 
-  /* ========== LIQUID NEON DESIGN SYSTEM ========== */
+  /* ========== 2026 HIGH-PERFORMANCE DESIGN SYSTEM ========== */
 
-  /* Neon Colors */
-  --neon-cyan: #00FFFF;
-  --neon-magenta: #FF00FF;
+  /* Neon Colors (Trinity aliases) */
+  --neon-cyan: #00F2FF;
+  --neon-magenta: #FF00E5;
+  --neon-yellow: #FFD600;
   --neon-lime: #39FF14;
-  --neon-orange: #FF6600;
+  --neon-orange: #FF8A00;
   --neon-pink: #FF1493;
+
+  /* Neon Glow Effects */
+  --neon-glow: 0 0 15px rgba(0, 242, 255, 0.4);
+  --neon-glow-sessions: 0 0 20px rgba(0, 242, 255, 0.5);
+  --neon-glow-metcon: 0 0 20px rgba(255, 0, 229, 0.5);
+  --neon-glow-volume: 0 0 20px rgba(255, 214, 0, 0.5);
 
   /* Glassmorphism */
   --glass-bg: rgba(255, 255, 255, 0.05);
@@ -140,22 +160,21 @@
   --glass-bg-active: rgba(255, 255, 255, 0.12);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-border-light: rgba(255, 255, 255, 0.15);
-  --glass-blur: 20px;
-  --glass-blur-heavy: 40px;
+  --glass-blur: blur(12px);
+  --glass-blur-heavy: blur(24px);
 
   /* Floating Dock */
   --dock-bg: rgba(26, 26, 26, 0.8);
   --dock-blur: 24px;
   --dock-border: rgba(255, 255, 255, 0.08);
 
-  /* Liquid Orb Gradient */
+  /* Liquid Orb Gradient - Trinity */
   --orb-gradient: conic-gradient(
     from 0deg,
-    var(--neon-cyan),
-    var(--neon-magenta),
-    var(--neon-lime),
-    var(--neon-orange),
-    var(--neon-cyan)
+    var(--color-sessions),
+    var(--color-metcon),
+    var(--color-volume),
+    var(--color-sessions)
   );
 
   /* Mesh Gradient Colors (per workout type) */

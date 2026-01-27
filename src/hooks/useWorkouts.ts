@@ -4,6 +4,8 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
+  doc,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -13,6 +15,7 @@ import type { Workout, WorkoutType } from '../types';
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
   totalVolume: number;
+  isPR?: boolean;
 }
 
 interface UseWorkoutsResult {
@@ -20,6 +23,7 @@ interface UseWorkoutsResult {
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
+  deleteWorkout: (workoutId: string) => Promise<boolean>;
   stats: {
     thisWeek: number;
     thisMonth: number;
@@ -42,13 +46,19 @@ function getStartOfMonth(): Date {
 }
 
 function calculateWorkoutStats(workout: Workout): { totalReps: number; totalVolume: number } {
+  if (workout.workloadBreakdown) {
+    return {
+      totalReps: workout.workloadBreakdown.grandTotalReps || 0,
+      totalVolume: workout.workloadBreakdown.grandTotalVolume || 0,
+    };
+  }
   let totalReps = 0;
   let totalVolume = 0;
 
   for (const exercise of workout.exercises) {
     for (const set of exercise.sets) {
-      if (set.completed) {
-        const reps = set.actualReps || set.targetReps || 0;
+      const reps = set.actualReps ?? (set.completed ? set.targetReps : 0) ?? 0;
+      if (reps > 0) {
         const weight = set.weight || 0;
         totalReps += reps;
         totalVolume += reps * weight;
@@ -56,6 +66,13 @@ function calculateWorkoutStats(workout: Workout): { totalReps: number; totalVolu
     }
   }
 
+  const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
+  if (partnerFactor !== 1) {
+    return {
+      totalReps: Math.round(totalReps * partnerFactor),
+      totalVolume: Math.round(totalVolume * partnerFactor),
+    };
+  }
   return { totalReps, totalVolume };
 }
 
@@ -85,7 +102,18 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
       );
 
       console.log('Fetching workouts for user:', user.id);
-      const snapshot = await getDocs(q);
+      const prsRef = collection(db, 'personalRecords');
+      const prQuery = query(
+        prsRef,
+        where('userId', '==', user.id)
+      );
+
+      const [snapshot, prSnapshot] = await Promise.all([getDocs(q), getDocs(prQuery)]);
+      const prWorkoutIds = new Set(
+        prSnapshot.docs
+          .map((doc) => doc.data().workoutId as string | undefined)
+          .filter((id): id is string => Boolean(id))
+      );
       console.log('Found documents:', snapshot.size);
 
       const fetchedWorkouts: WorkoutWithStats[] = snapshot.docs
@@ -100,6 +128,9 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             title: data.title,
             type: data.type as WorkoutType,
             imageUrl: data.imageUrl,
+            partnerWorkout: data.partnerWorkout,
+            partnerFactor: data.partnerFactor,
+            workloadBreakdown: data.workloadBreakdown,
             status: data.status,
             exercises: data.exercises || [],
             scores: data.scores,
@@ -110,7 +141,8 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
           };
 
           const stats = calculateWorkoutStats(workout);
-          return { ...workout, ...stats };
+          const isPR = Boolean(data.isPR || data.hasPR || data.pr || prWorkoutIds.has(doc.id));
+          return { ...workout, ...stats, isPR };
         })
         // Filter completed workouts and sort by date (newest first)
         .filter((w) => w.status === 'completed')
@@ -131,6 +163,20 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
     fetchWorkouts();
   }, [user?.id]);
 
+  const deleteWorkout = async (workoutId: string): Promise<boolean> => {
+    if (!user) return false;
+
+    try {
+      await deleteDoc(doc(db, 'workouts', workoutId));
+      // Remove from local state immediately for instant feedback
+      setWorkouts(prev => prev.filter(w => w.id !== workoutId));
+      return true;
+    } catch (err) {
+      console.error('Error deleting workout:', err);
+      return false;
+    }
+  };
+
   // Calculate summary stats
   const startOfWeek = getStartOfWeek();
   const startOfMonth = getStartOfMonth();
@@ -146,6 +192,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
     loading,
     error,
     refresh: fetchWorkouts,
+    deleteWorkout,
     stats,
   };
 }

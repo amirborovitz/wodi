@@ -8,6 +8,7 @@ interface WorkoutSummaryProps {
   duration: number;
   exerciseCount: number;
   totalVolume: number;
+  totalReps?: number;
   delay?: number;
 }
 
@@ -26,6 +27,7 @@ export function WorkoutSummary({
   duration,
   exerciseCount,
   totalVolume,
+  totalReps,
   delay = 2.2,
 }: WorkoutSummaryProps) {
   const formatDuration = (mins: number) => {
@@ -62,6 +64,15 @@ export function WorkoutSummary({
           <span className={styles.statValue}>{exerciseCount}</span>
           <span className={styles.statLabel}>Exercises</span>
         </div>
+        {totalReps && totalReps > 0 && (
+          <>
+            <div className={styles.divider} />
+            <div className={styles.stat}>
+              <span className={styles.statValue}>{totalReps}</span>
+              <span className={styles.statLabel}>Reps</span>
+            </div>
+          </>
+        )}
         {totalVolume > 0 && (
           <>
             <div className={styles.divider} />

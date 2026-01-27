@@ -1,7 +1,7 @@
 import styles from './BottomNav.module.css';
 import type { Screen } from '../../types';
 
-type NavScreen = 'home' | 'history' | 'stats';
+type NavScreen = 'home' | 'history';
 
 interface BottomNavProps {
   currentScreen: Screen;
@@ -17,7 +17,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     id: 'home',
-    label: 'Home',
+    label: 'Dashboard',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeLinecap="round" strokeLinejoin="round" />
@@ -27,19 +27,10 @@ const navItems: NavItem[] = [
   },
   {
     id: 'history',
-    label: 'Workouts',
+    label: 'History',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M4 6h16M4 12h16M4 18h10" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    id: 'stats',
-    label: 'Stats',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

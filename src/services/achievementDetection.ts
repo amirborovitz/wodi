@@ -34,13 +34,7 @@ export async function detectBestAchievement(
     achievements.push(benchmarkAchievement);
   }
 
-  // Priority 3: Streak milestones
-  const streakAchievement = checkStreakMilestone(context.currentStreak);
-  if (streakAchievement) {
-    achievements.push(streakAchievement);
-  }
-
-  // Priority 4: Workout count milestones
+  // Priority 3: Workout count milestones
   const milestoneAchievement = checkWorkoutMilestone(context.totalWorkouts);
   if (milestoneAchievement) {
     achievements.push(milestoneAchievement);
@@ -48,7 +42,13 @@ export async function detectBestAchievement(
 
   // Return highest priority achievement, or generic encouragement
   if (achievements.length > 0) {
-    const priorityOrder = { pr: 1, benchmark: 2, streak: 3, milestone: 4, generic: 5 };
+    const priorityOrder: Record<Achievement['type'], number> = {
+      pr: 1,
+      benchmark: 2,
+      milestone: 3,
+      generic: 4,
+      streak: 99,
+    };
     achievements.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
     return achievements[0];
   }
@@ -174,28 +174,6 @@ function detectBenchmarkAchievement(
       title: `${ordinal} Fastest!`,
       subtitle: `${workout.title}: ${formatTime(currentTime)}`,
       icon: 'medal',
-    };
-  }
-
-  return null;
-}
-
-/**
- * Check for streak milestone achievements
- */
-function checkStreakMilestone(currentStreak: number): Achievement | null {
-  const milestones = [7, 14, 21, 30, 50, 100, 365];
-
-  if (milestones.includes(currentStreak)) {
-    const emoji = currentStreak >= 30 ? 'fire' : 'fire';
-    return {
-      type: 'streak',
-      title: `${currentStreak} Day Streak!`,
-      subtitle: currentStreak >= 30
-        ? "You're on fire! Keep it going!"
-        : 'Keep the momentum going!',
-      value: currentStreak,
-      icon: emoji,
     };
   }
 
