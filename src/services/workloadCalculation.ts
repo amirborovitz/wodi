@@ -120,6 +120,8 @@ export function calculateWorkloadBreakdown(
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
+  let grandTotalDistance = 0;
+  let grandTotalCalories = 0;
 
   for (const exercise of workout.exercises) {
     const multiplier = getContainerMultiplier(workout, exercise);
@@ -182,6 +184,12 @@ export function calculateWorkloadBreakdown(
         if (weight && reps > 0) {
           grandTotalVolume += weight * reps;
         }
+        if (distance > 0) {
+          grandTotalDistance += distance;
+        }
+        if (calories > 0) {
+          grandTotalCalories += calories;
+        }
       }
     } else {
       // Exercise without movements array - use exercise itself
@@ -233,6 +241,8 @@ export function calculateWorkloadBreakdown(
     movements,
     grandTotalReps,
     grandTotalVolume: Math.round(grandTotalVolume),
+    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
+    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: workout.containerRounds,
     benchmarkName: workout.benchmarkName,
   };
@@ -248,6 +258,8 @@ export function calculateWorkloadFromExercises(
     sets: Array<{
       actualReps?: number;
       weight?: number;
+      distance?: number;
+      calories?: number;
     }>;
   }>,
   containerRounds?: number,
@@ -256,11 +268,15 @@ export function calculateWorkloadFromExercises(
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
+  let grandTotalDistance = 0;
+  let grandTotalCalories = 0;
 
   for (const exercise of exercises) {
     const key = exercise.name.toLowerCase();
     let exerciseReps = 0;
     let exerciseWeight: number | undefined;
+    let exerciseDistance = 0;
+    let exerciseCalories = 0;
 
     for (const set of exercise.sets) {
       if (set.actualReps) {
@@ -268,6 +284,12 @@ export function calculateWorkloadFromExercises(
       }
       if (set.weight && !exerciseWeight) {
         exerciseWeight = set.weight;
+      }
+      if (set.distance) {
+        exerciseDistance += set.distance;
+      }
+      if (set.calories) {
+        exerciseCalories += set.calories;
       }
     }
 
@@ -278,14 +300,25 @@ export function calculateWorkloadFromExercises(
       movementMap.set(key, {
         ...existing,
         totalReps: (existing.totalReps || 0) + exerciseReps,
+        totalDistance: (existing.totalDistance || 0) + exerciseDistance,
+        totalCalories: (existing.totalCalories || 0) + exerciseCalories,
         weight: existing.weight || exerciseWeight,
       });
     } else {
+      const unit = exerciseDistance > 0
+        ? 'm'
+        : exerciseCalories > 0
+          ? 'cal'
+          : exerciseWeight
+            ? 'kg'
+            : undefined;
       movementMap.set(key, {
         name: exercise.name,
         totalReps: exerciseReps > 0 ? exerciseReps : undefined,
+        totalDistance: exerciseDistance > 0 ? exerciseDistance : undefined,
+        totalCalories: exerciseCalories > 0 ? exerciseCalories : undefined,
         weight: exerciseWeight,
-        unit: exerciseWeight ? 'kg' : undefined,
+        unit,
         color,
       });
     }
@@ -293,6 +326,12 @@ export function calculateWorkloadFromExercises(
     grandTotalReps += exerciseReps;
     if (exerciseWeight && exerciseReps > 0) {
       grandTotalVolume += exerciseWeight * exerciseReps;
+    }
+    if (exerciseDistance > 0) {
+      grandTotalDistance += exerciseDistance;
+    }
+    if (exerciseCalories > 0) {
+      grandTotalCalories += exerciseCalories;
     }
   }
 
@@ -314,6 +353,8 @@ export function calculateWorkloadFromExercises(
     movements,
     grandTotalReps: Math.round(grandTotalReps * factor),
     grandTotalVolume: Math.round(grandTotalVolume * factor),
+    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance * factor) : undefined,
+    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
     containerRounds,
   };
 }

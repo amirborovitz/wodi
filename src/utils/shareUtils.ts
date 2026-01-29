@@ -11,12 +11,14 @@ export interface ShareOptions {
  */
 export async function elementToCanvas(
   element: HTMLElement,
-  options?: { scale?: number }
+  options?: { scale?: number; width?: number; height?: number }
 ): Promise<HTMLCanvasElement> {
   const scale = options?.scale || 2; // 2x for retina quality
 
   const canvas = await html2canvas(element, {
     scale,
+    width: options?.width,
+    height: options?.height,
     useCORS: true,
     allowTaint: true,
     backgroundColor: null,

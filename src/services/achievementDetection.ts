@@ -13,12 +13,12 @@ interface AchievementContext {
 }
 
 /**
- * Detect the best achievement from a completed workout
- * Returns the highest priority achievement found
+ * Detect all achievements from a completed workout
+ * Returns all achievements sorted by priority
  */
-export async function detectBestAchievement(
+export async function detectAllAchievements(
   context: AchievementContext
-): Promise<Achievement> {
+): Promise<Achievement[]> {
   const achievements: Achievement[] = [];
 
   // Priority 1: Check for new PRs
@@ -40,16 +40,29 @@ export async function detectBestAchievement(
     achievements.push(milestoneAchievement);
   }
 
-  // Return highest priority achievement, or generic encouragement
+  // Sort by priority
+  const priorityOrder: Record<Achievement['type'], number> = {
+    pr: 1,
+    benchmark: 2,
+    milestone: 3,
+    generic: 4,
+    streak: 99,
+  };
+  achievements.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
+
+  return achievements;
+}
+
+/**
+ * Detect the best achievement from a completed workout
+ * Returns the highest priority achievement found
+ */
+export async function detectBestAchievement(
+  context: AchievementContext
+): Promise<Achievement> {
+  const achievements = await detectAllAchievements(context);
+
   if (achievements.length > 0) {
-    const priorityOrder: Record<Achievement['type'], number> = {
-      pr: 1,
-      benchmark: 2,
-      milestone: 3,
-      generic: 4,
-      streak: 99,
-    };
-    achievements.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
     return achievements[0];
   }
 

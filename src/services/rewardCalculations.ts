@@ -85,9 +85,9 @@ export function calculateVolumeRing(params: VolumeParams): RingMetric {
 
     // Format volume display
     const displayValue = totalVolume >= 1000
-      ? `${(totalVolume / 1000).toFixed(1)}`
+      ? `${(totalVolume / 1000).toFixed(2)}`
       : totalVolume;
-    const unit = totalVolume >= 1000 ? 't' : 'kg';
+    const unit = totalVolume >= 1000 ? 'tons' : 'kg';
 
     return {
       id: 'volume',

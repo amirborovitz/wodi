@@ -12,7 +12,8 @@ import { useRewardData } from '../hooks/useRewardData';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { RewardScreen } from './RewardScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, RxWeights, WorkloadBreakdown, MovementTotal } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
+import { MovementListEditor } from '../components/workouts/InlineMovementEditor';
 import styles from './AddWorkoutScreen.module.css';
 
 const BackIcon = () => (
@@ -36,6 +37,8 @@ interface ExerciseResult {
   completionTime?: number; // seconds - for "for time" workouts
   notes?: string;
   movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
+  movementAlternatives?: Record<string, string>; // Selected alternatives for movements
+  movementDistances?: Record<string, number>; // Per-movement distance overrides
   rounds?: number; // Number of rounds completed (for multi-movement WODs)
   // Cardio tracking (calories)
   cardioTurns?: number; // Number of turns/intervals on cardio machine
@@ -69,6 +72,8 @@ function buildWorkloadBreakdownFromResults(
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
+  let grandTotalDistance = 0;
+  let grandTotalCalories = 0;
   const roundOverrides = parseCindyDtRounds(
     parsedWorkout?.rawText || results.map((result) => result.exercise.prescription).join(' ')
   );
@@ -98,51 +103,82 @@ function buildWorkloadBreakdownFromResults(
         }
       }
 
-      movements.forEach((mov) => {
-        const perRound = mov.reps || 0;
-        if (perRound <= 0) return;
-
-        const lowerName = mov.name.toLowerCase();
-        let movementRounds = totalRounds;
-        if (roundOverrides) {
-          if (CINDY_MOVEMENTS.some((name) => lowerName.includes(name))) {
-            movementRounds = roundOverrides.cindyRounds || totalRounds;
-          } else if (DT_MOVEMENTS.some((name) => lowerName.includes(name))) {
-            movementRounds = roundOverrides.dtRounds || totalRounds;
-          }
+    movements.forEach((mov) => {
+      const lowerName = mov.name.toLowerCase();
+      let movementRounds = totalRounds;
+      if (roundOverrides) {
+        if (CINDY_MOVEMENTS.some((name) => lowerName.includes(name))) {
+          movementRounds = roundOverrides.cindyRounds || totalRounds;
+        } else if (DT_MOVEMENTS.some((name) => lowerName.includes(name))) {
+          movementRounds = roundOverrides.dtRounds || totalRounds;
         }
-        const movementReps = perRound * movementRounds;
-        if (movementReps <= 0) return;
+      }
 
-        const weight = result.movementWeights?.[mov.name]
-          ?? mov.rxWeights?.male
-          ?? mov.rxWeights?.female
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
-        const unit = weight ? (mov.rxWeights?.unit || 'kg') : undefined;
-        const key = mov.name.toLowerCase();
-        const existing = movementMap.get(key);
+      const perRoundReps = mov.reps || 0;
+      const perRoundDistance = result.movementDistances?.[mov.name] ?? mov.distance ?? 0;
+      const perRoundCalories = mov.calories || 0;
+      const perRoundTime = mov.time || 0;
 
-        if (existing) {
-          movementMap.set(key, {
-            ...existing,
-            totalReps: (existing.totalReps || 0) + movementReps,
-            weight: existing.weight || weight,
-            unit: existing.unit || unit,
-          });
-        } else {
-          movementMap.set(key, {
-            name: mov.name,
-            totalReps: movementReps,
-            weight,
-            unit,
-          });
-        }
+      if (perRoundReps <= 0 && perRoundDistance <= 0 && perRoundCalories <= 0 && perRoundTime <= 0) {
+        return;
+      }
 
+      const movementReps = perRoundReps * movementRounds;
+      const movementDistance = perRoundDistance * movementRounds;
+      const movementCalories = perRoundCalories * movementRounds;
+      const movementTime = perRoundTime * movementRounds;
+
+      const movementName = result.movementAlternatives?.[mov.name] || mov.name;
+      const key = movementName.toLowerCase();
+
+      const weight = result.movementWeights?.[mov.name]
+        ?? mov.rxWeights?.male
+        ?? mov.rxWeights?.female
+        ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
+      const unit = movementDistance > 0
+        ? (mov.unit || 'm')
+        : movementCalories > 0
+          ? 'cal'
+          : weight
+            ? (mov.rxWeights?.unit || 'kg')
+            : undefined;
+      const existing = movementMap.get(key);
+
+      if (existing) {
+        movementMap.set(key, {
+          ...existing,
+          totalReps: (existing.totalReps || 0) + movementReps,
+          totalDistance: (existing.totalDistance || 0) + movementDistance,
+          totalCalories: (existing.totalCalories || 0) + movementCalories,
+          totalTime: (existing.totalTime || 0) + movementTime,
+          weight: existing.weight || weight,
+          unit: existing.unit || unit,
+        });
+      } else {
+        movementMap.set(key, {
+          name: movementName,
+          totalReps: movementReps > 0 ? movementReps : undefined,
+          totalDistance: movementDistance > 0 ? movementDistance : undefined,
+          totalCalories: movementCalories > 0 ? movementCalories : undefined,
+          totalTime: movementTime > 0 ? movementTime : undefined,
+          weight,
+          unit,
+        });
+      }
+
+      if (movementReps > 0) {
         grandTotalReps += movementReps;
         if (weight) {
           grandTotalVolume += weight * movementReps;
         }
-      });
+      }
+      if (movementDistance > 0) {
+        grandTotalDistance += movementDistance;
+      }
+      if (movementCalories > 0) {
+        grandTotalCalories += movementCalories;
+      }
+    });
 
       return;
     }
@@ -150,6 +186,49 @@ function buildWorkloadBreakdownFromResults(
     let exerciseReps = 0;
     let exerciseVolume = 0;
     let exerciseWeight: number | undefined;
+    if (result.totalDistance && result.totalDistance > 0) {
+      const key = result.exercise.name.toLowerCase();
+      const existing = movementMap.get(key);
+      const totalDistance = result.totalDistance;
+      const unit = result.distanceUnit || 'm';
+
+      if (existing) {
+        movementMap.set(key, {
+          ...existing,
+          totalDistance: (existing.totalDistance || 0) + totalDistance,
+          unit: existing.unit || unit,
+        });
+      } else {
+        movementMap.set(key, {
+          name: result.exercise.name,
+          totalDistance,
+          unit,
+        });
+      }
+
+      grandTotalDistance += totalDistance;
+    }
+
+    if (result.totalCalories && result.totalCalories > 0) {
+      const key = result.exercise.name.toLowerCase();
+      const existing = movementMap.get(key);
+      const totalCalories = result.totalCalories;
+
+      if (existing) {
+        movementMap.set(key, {
+          ...existing,
+          totalCalories: (existing.totalCalories || 0) + totalCalories,
+        });
+      } else {
+        movementMap.set(key, {
+          name: result.exercise.name,
+          totalCalories,
+          unit: 'cal',
+        });
+      }
+
+      grandTotalCalories += totalCalories;
+    }
 
     result.sets.forEach((set) => {
       if (set.actualReps && set.actualReps > 0) {
@@ -188,14 +267,21 @@ function buildWorkloadBreakdownFromResults(
 
   const factor = partnerFactor || 1;
   const movements = Array.from(movementMap.values())
-    .filter(m => m.totalReps && m.totalReps > 0)
-    .map(m => ({ ...m, totalReps: Math.round((m.totalReps || 0) * factor) }))
+    .filter(m => (m.totalReps && m.totalReps > 0) || (m.totalDistance && m.totalDistance > 0) || (m.totalCalories && m.totalCalories > 0))
+    .map(m => ({
+      ...m,
+      totalReps: m.totalReps !== undefined ? Math.round((m.totalReps || 0) * factor) : undefined,
+      totalDistance: m.totalDistance !== undefined ? Math.round((m.totalDistance || 0) * factor) : undefined,
+      totalCalories: m.totalCalories !== undefined ? Math.round((m.totalCalories || 0) * factor) : undefined,
+    }))
     .sort((a, b) => (b.totalReps || 0) - (a.totalReps || 0));
 
   return {
     movements,
     grandTotalReps: Math.round(grandTotalReps * factor),
     grandTotalVolume: Math.round(grandTotalVolume * factor),
+    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance * factor) : undefined,
+    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
     containerRounds: parsedWorkout?.containerRounds,
     benchmarkName: parsedWorkout?.benchmarkName,
   };
@@ -261,67 +347,6 @@ function readSavedWorkouts(): SavedWorkout[] {
   }
 }
 
-// Movement alternatives with distance conversions
-// Conversions: 100m run = 125m row = 300m bike
-interface MovementAlternative {
-  name: string;
-  distanceMultiplier?: number; // multiply original distance by this
-}
-
-const MOVEMENT_ALTERNATIVES: Record<string, MovementAlternative[]> = {
-  'run': [
-    { name: 'Row', distanceMultiplier: 1.25 },           // 100m run = 125m row
-    { name: 'Echo Bike', distanceMultiplier: 3 },        // 100m run = 300m bike
-    { name: 'Ski Erg', distanceMultiplier: 1.25 },       // similar to row
-    { name: 'AirRunner', distanceMultiplier: 1 },
-    { name: 'Treadmill', distanceMultiplier: 1 },
-  ],
-  'running': [
-    { name: 'Row', distanceMultiplier: 1.25 },
-    { name: 'Echo Bike', distanceMultiplier: 3 },
-    { name: 'Ski Erg', distanceMultiplier: 1.25 },
-  ],
-  'row': [
-    { name: 'Run', distanceMultiplier: 0.8 },            // 125m row = 100m run
-    { name: 'Echo Bike', distanceMultiplier: 2.4 },      // 125m row = 300m bike
-    { name: 'Ski Erg', distanceMultiplier: 1 },
-  ],
-  'rowing': [
-    { name: 'Run', distanceMultiplier: 0.8 },
-    { name: 'Echo Bike', distanceMultiplier: 2.4 },
-  ],
-  'bike': [
-    { name: 'Run', distanceMultiplier: 0.33 },           // 300m bike = 100m run
-    { name: 'Row', distanceMultiplier: 0.42 },           // 300m bike = 125m row
-    { name: 'Ski Erg', distanceMultiplier: 0.42 },
-  ],
-  'echo bike': [
-    { name: 'Row', distanceMultiplier: 0.42 },
-    { name: 'Run', distanceMultiplier: 0.33 },
-    { name: 'Ski Erg', distanceMultiplier: 0.42 },
-  ],
-  'ski erg': [
-    { name: 'Row', distanceMultiplier: 1 },
-    { name: 'Echo Bike', distanceMultiplier: 2.4 },
-    { name: 'Run', distanceMultiplier: 0.8 },
-  ],
-};
-
-// Check if a movement has alternatives
-function getMovementAlternatives(movementName: string): MovementAlternative[] {
-  const normalized = movementName.toLowerCase().trim();
-  for (const [key, alternatives] of Object.entries(MOVEMENT_ALTERNATIVES)) {
-    if (normalized.includes(key)) {
-      return alternatives;
-    }
-  }
-  return [];
-}
-
-function isAerobicMovement(movement: ParsedMovement): boolean {
-  return Boolean(movement.distance || movement.calories || movement.time);
-}
-
 // Check if a movement requires weight input (barbell/KB/DB movements)
 function isWeightedMovement(movement: ParsedMovement): boolean {
   if (movement.rxWeights) return true;
@@ -339,26 +364,6 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
   if (excludePatterns.some(p => name.includes(p))) return false;
 
   return weightedPatterns.some(p => name.includes(p));
-}
-
-function getWeightTarget(exercise?: ParsedExercise): { name: string; rxWeights?: RxWeights } | null {
-  if (!exercise) return null;
-
-  if (exercise.rxWeights) {
-    return { name: exercise.name, rxWeights: exercise.rxWeights };
-  }
-
-  const movementWithRx = exercise.movements?.find(m => m.rxWeights);
-  if (movementWithRx) {
-    return { name: movementWithRx.name, rxWeights: movementWithRx.rxWeights };
-  }
-
-  const gorillaRow = exercise.movements?.find(m => /gorilla row/i.test(m.name));
-  if (gorillaRow) {
-    return { name: gorillaRow.name };
-  }
-
-  return null;
 }
 
 // ============================================
@@ -540,57 +545,88 @@ function exerciseNeedsWeight(exercise: ParsedExercise): boolean {
 // Determine the logging mode for each exercise
 type ExerciseLoggingMode = 'strength' | 'intervals' | 'amrap_intervals' | 'for_time' | 'sets' | 'cardio' | 'cardio_distance' | 'bodyweight';
 
+function shouldForceForTimeMode(exercise: ParsedExercise, workoutFormat?: string): boolean {
+  const movements = exercise.movements || [];
+  if (movements.length < 2) return false;
+
+  const name = exercise.name.toLowerCase();
+  const prescription = exercise.prescription.toLowerCase();
+  const hasForTimeSignal = workoutFormat === 'for_time' ||
+    name.includes('for time') ||
+    prescription.includes('for time') ||
+    /\brft\b/i.test(name) ||
+    /\brft\b/i.test(prescription);
+
+  if (!hasForTimeSignal) return false;
+
+  const hasDistanceOrCalories = movements.some((mov) => Boolean(mov.distance || mov.calories || mov.time));
+  const hasReps = movements.some((mov) => Boolean(mov.reps && mov.reps > 0));
+
+  if (hasDistanceOrCalories && hasReps) {
+    return true; // Mixed WODs should log total time, not a single cardio metric
+  }
+
+  if (workoutFormat === 'for_time' && movements.length > 1) {
+    return true;
+  }
+
+  return false;
+}
+
 function getExerciseLoggingMode(exercise: ParsedExercise, workoutFormat?: string): ExerciseLoggingMode {
   const name = exercise.name.toLowerCase();
   const prescription = exercise.prescription.toLowerCase();
   const classification = classifyExercise(exercise);
 
-  // Cardio exercises (calories-based) always use cardio mode regardless of workout format
-  if (classification === 'cardio_calories') {
-    return 'cardio';
+  // 1. Check movements array first
+  if (shouldForceForTimeMode(exercise, workoutFormat)) {
+    return 'for_time';
   }
 
-  // Distance-based cardio (running, swimming, etc.)
-  if (classification === 'cardio_distance') {
-    return 'cardio_distance';
+  // 2. Check for "for time" patterns BEFORE cardio classification
+  // This handles mixed workouts like "10 rounds for time: 30sec bike, 10 pull-ups, 300m run"
+  const isForTimePattern =
+    workoutFormat === 'for_time' ||
+    name.includes('for time') ||
+    name.includes('round') ||
+    prescription.includes('for time') ||
+    prescription.includes('round') ||
+    /\brounds?\b/i.test(name) ||
+    /\brounds?\b/i.test(prescription) ||
+    /^\d+\s*(round|rft)/i.test(name) ||
+    name.includes('sets for time') ||
+    prescription.includes('sets for time');
+
+  if (isForTimePattern) {
+    return 'for_time';
   }
 
-  // Bodyweight exercises use bodyweight mode (reps only)
-  if (classification === 'bodyweight') {
-    return 'bodyweight';
-  }
-
-  // Strength exercises use weight/reps per set
-  if (exercise.type === 'strength') {
-    return 'strength';
-  }
-
-  // Check for AMRAP interval patterns (must check before for_time)
+  // 3. Check for AMRAP interval patterns
   if (workoutFormat === 'amrap_intervals' ||
       (name.includes('amrap') && (name.includes('x') || name.includes('rest')))) {
     return 'amrap_intervals';
   }
 
-  // "X sets for time" = do all sets continuously, record ONE total time
-  if (name.includes('sets for time') ||
-      prescription.includes('sets for time') ||
-      /^\d+\s*sets?\s*(for time|ft)/i.test(name) ||
-      /^\d+\s*sets?\s*(for time|ft)/i.test(prescription) ||
-      workoutFormat === 'for_time') {
-    return 'for_time';
+  // 4. Cardio exercises - ONLY if not a "for time" workout
+  if (classification === 'cardio_calories') {
+    return 'cardio';
   }
 
-  // Check for other for-time patterns
-  const isForTime = name.includes('for time') ||
-    name.includes('round') ||
-    prescription.includes('for time') ||
-    /^\d+\s*(round|rft)/i.test(name);
-
-  if (isForTime) {
-    return 'for_time';
+  if (classification === 'cardio_distance') {
+    return 'cardio_distance';
   }
 
-  // Intervals format = record time per set (rare, explicit only)
+  // 5. Bodyweight exercises use bodyweight mode (reps only)
+  if (classification === 'bodyweight') {
+    return 'bodyweight';
+  }
+
+  // 6. Strength exercises use weight/reps per set
+  if (exercise.type === 'strength') {
+    return 'strength';
+  }
+
+  // 7. Intervals format = record time per set (rare, explicit only)
   if (workoutFormat === 'intervals') {
     return 'intervals';
   }
@@ -774,6 +810,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const [selectedAlternatives, setSelectedAlternatives] = useState<Record<string, string>>({});
   // Custom distances for alternatives (maps movement name to user-edited distance)
   const [customDistances, setCustomDistances] = useState<Record<string, number>>({});
+  // Custom times for time-based movements (maps movement name to time in seconds)
+  const [customTimes, setCustomTimes] = useState<Record<string, number>>({});
 
   // Per-movement weight tracking (maps movement name to weight)
   const [movementWeights, setMovementWeights] = useState<Record<string, number>>({});
@@ -1095,13 +1133,21 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   // Get the current exercise and its logging mode
   const currentExercise = parsedWorkout?.exercises[currentExerciseIndex];
 
-  // Use smart classification if available, otherwise fall back to local rules
+  // Determine exercise logging mode
+  // FIRST check local rules (handles "for time" workouts), THEN use smart classification for pure cardio
   const smartClassification = smartClassifications[currentExerciseIndex];
+  const localMode = currentExercise ? getExerciseLoggingMode(currentExercise, parsedWorkout?.format) : 'sets';
+
+  // If local rules detect "for_time", use that (handles mixed workouts like "10 rounds: bike + swings + run")
+  // Only use smart classification for pure cardio exercises (not mixed "for time" workouts)
   const currentExerciseMode = currentExercise
-    ? (smartClassification?.inputType === 'cardio_calories' ? 'cardio'
+    ? (localMode === 'for_time' ? 'for_time'
+      : localMode === 'amrap_intervals' ? 'amrap_intervals'
+      : localMode === 'intervals' ? 'intervals'
+      : smartClassification?.inputType === 'cardio_calories' ? 'cardio'
       : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
       : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
-      : getExerciseLoggingMode(currentExercise, parsedWorkout?.format))
+      : localMode)
     : 'sets';
 
   // Per-exercise checks based on logging mode
@@ -1147,52 +1193,56 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   // Get total sets for interval exercises
   const totalIntervalSets = currentExercise?.suggestedSets || parsedWorkout?.sets || 1;
 
-  const weightTarget = currentExercise ? getWeightTarget(currentExercise) : null;
-  const weightLabel = weightTarget?.name ? `${weightTarget.name} Weight` : 'Weight Used';
-
-  // Get movements with available alternatives
-  const movementsWithAlternatives = currentExercise?.movements?.map(m => ({
-    ...m,
-    alternatives: getMovementAlternatives(m.name),
-  })).filter(m => m.alternatives.length > 0 && isAerobicMovement(m)) || [];
-
-  // Handle selecting an alternative for a movement
-  const handleSelectAlternative = (originalMovement: string, alternative: string, originalDistance?: number) => {
-    if (!alternative || alternative === originalMovement) {
+  // Handle selecting an alternative for a movement (used by MovementListEditor)
+  const handleSelectAlternative = (originalMovement: string, alternative: string | null, newDistance?: number) => {
+    if (!alternative) {
       // Clearing the alternative
       setSelectedAlternatives(prev => {
         const next = { ...prev };
         delete next[originalMovement];
         return next;
       });
+      // Reset distance to original
       setCustomDistances(prev => {
         const next = { ...prev };
         delete next[originalMovement];
         return next;
       });
     } else {
-      // Setting an alternative - calculate default distance
-      const altInfo = getMovementAlternatives(originalMovement).find(a => a.name === alternative);
-      const defaultDistance = altInfo?.distanceMultiplier && originalDistance
-        ? Math.round(originalDistance * altInfo.distanceMultiplier)
-        : originalDistance || 0;
-
       setSelectedAlternatives(prev => ({
         ...prev,
         [originalMovement]: alternative,
       }));
-      setCustomDistances(prev => ({
-        ...prev,
-        [originalMovement]: defaultDistance,
-      }));
+      if (newDistance !== undefined) {
+        setCustomDistances(prev => ({
+          ...prev,
+          [originalMovement]: newDistance,
+        }));
+      }
     }
   };
 
-  // Handle changing the custom distance for an alternative
+  // Handle changing the custom distance for a movement
   const handleCustomDistanceChange = (movementName: string, distance: number) => {
     setCustomDistances(prev => ({
       ...prev,
       [movementName]: distance,
+    }));
+  };
+
+  // Handle changing the custom time for a movement
+  const handleTimeChange = (movementName: string, time: number) => {
+    setCustomTimes(prev => ({
+      ...prev,
+      [movementName]: time,
+    }));
+  };
+
+  // Handle changing the weight for a specific movement
+  const handleMovementWeightChange = (movementName: string, weight: number) => {
+    setMovementWeights(prev => ({
+      ...prev,
+      [movementName]: weight,
     }));
   };
 
@@ -1475,6 +1525,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setUseSingleWeightForMovements(!isMixedMovements);
         setSharedMovementWeight('');
       }
+      setSelectedAlternatives(existing.movementAlternatives || {});
+      setCustomDistances(existing.movementDistances || {});
       setWorkoutWeight(
         existing.sets?.[0]?.weight !== undefined
           ? existing.sets[0].weight.toString()
@@ -1491,6 +1543,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setWorkoutWeight('');
       setCardioDistanceTurns('');
       setCardioDistancePerTurn('');
+      setSelectedAlternatives({});
+      setCustomDistances({});
     }
 
     // Reset interval-specific state on entry
@@ -1594,11 +1648,30 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       return undefined;
     })();
 
+    const movementAlternatives = currentExercise.movements?.reduce<Record<string, string>>((acc, mov) => {
+      const selected = selectedAlternatives[mov.name];
+      if (selected) {
+        acc[mov.name] = selected;
+      }
+      return acc;
+    }, {});
+
+    const movementDistances = currentExercise.movements?.reduce<Record<string, number>>((acc, mov) => {
+      if (mov.distance && mov.distance > 0) {
+        acc[mov.name] = customDistances[mov.name] !== undefined
+          ? customDistances[mov.name]
+          : mov.distance;
+      }
+      return acc;
+    }, {});
+
     const result: ExerciseResult = {
       exercise: currentExercise,
       sets: currentSets,
       completionTime,
       movementWeights: effectiveMovementWeights,
+      ...(movementAlternatives && Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
+      ...(movementDistances && Object.keys(movementDistances).length > 0 ? { movementDistances } : {}),
       rounds,
       ...cardioData,
       ...distanceData,
@@ -1627,6 +1700,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCardioCaloriesPerTurn('');
         setCardioDistanceTurns('');
         setCardioDistancePerTurn('');
+        setSelectedAlternatives({});
+        setCustomDistances({});
       }
     }
   };
@@ -1965,6 +2040,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         ...reward,
         workloadBreakdown,
         workoutContext: workoutContextLine || undefined,
+        workoutRawText: parsedWorkout.rawText?.trim() || undefined,
       });
       if (skipPersistence) {
         setIsEditingAfterSave(false);
@@ -2195,6 +2271,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               {parsedWorkout.sets && parsedWorkout.sets > 1 && (
                 <span className={styles.previewFormat}>{parsedWorkout.sets} sets</span>
               )}
+              {parsedWorkout.timeCap && (
+                <span className={styles.previewFormat}>
+                  {Math.floor(parsedWorkout.timeCap / 60)} min cap
+                </span>
+              )}
             </div>
 
             <div className={styles.exerciseList}>
@@ -2251,7 +2332,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Workout details */}
-          <Card padding="lg" className={styles.exerciseCard}>
+          <Card padding="none" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[0]?.name || 'AMRAP Intervals'}
             </h2>
@@ -2259,71 +2340,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               {parsedWorkout.exercises[0]?.prescription}
             </p>
 
-            {/* Show movements if available */}
+            {/* Movements with inline editing (alternatives, distance, time, weight) */}
             {parsedWorkout.exercises[0]?.movements && (
-              <div className={styles.movementsList}>
-                {parsedWorkout.exercises[0].movements.map((mov, i) => {
-                  const selectedAlt = selectedAlternatives[mov.name];
-                  // Use custom distance if set, otherwise fall back to original
-                  const displayDistance = selectedAlt && customDistances[mov.name] !== undefined
-                    ? customDistances[mov.name]
-                    : mov.distance;
-                  const displayUnit = mov.unit || 'm';
-                  return (
-                    <div key={i} className={styles.movementItem}>
-                      {displayDistance && `${displayDistance}${displayUnit} `}
-                      {mov.reps && `${mov.reps}x `}
-                      {selectedAlt ? (
-                        <span className={styles.altMovement}>{selectedAlt}</span>
-                      ) : (
-                        mov.name
-                      )}
-                      {mov.rxWeights && ` (${mov.rxWeights.female || mov.rxWeights.male}/${mov.rxWeights.male}kg)`}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Movement alternatives (shown on first set only) */}
-            {currentIntervalSet === 1 && movementsWithAlternatives.length > 0 && (
-              <div className={styles.alternativesSection}>
-                <label className={styles.alternativesLabel}>Substitutions</label>
-                {movementsWithAlternatives.map((mov) => {
-                  const selectedAlt = selectedAlternatives[mov.name];
-                  return (
-                    <div key={mov.name} className={styles.alternativeGroup}>
-                      <div className={styles.alternativeRow}>
-                        <select
-                          className={styles.alternativeSelect}
-                          value={selectedAlt || ''}
-                          onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
-                        >
-                          <option value="">{mov.name}</option>
-                          {mov.alternatives.map((alt) => (
-                            <option key={alt.name} value={alt.name}>
-                              {alt.name}
-                            </option>
-                          ))}
-                        </select>
-                        {mov.distance && (
-                          <div className={styles.distanceEditRow}>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              value={customDistances[mov.name] || mov.distance || ''}
-                              onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                              className={styles.distanceInput}
-                              min="0"
-                            />
-                            <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              <MovementListEditor
+                movements={parsedWorkout.exercises[0].movements}
+                selectedAlternatives={selectedAlternatives}
+                customDistances={customDistances}
+                customTimes={customTimes}
+                customWeights={movementWeights}
+                onAlternativeChange={handleSelectAlternative}
+                onDistanceChange={handleCustomDistanceChange}
+                onTimeChange={handleTimeChange}
+                onWeightChange={handleMovementWeightChange}
+                readOnly={currentIntervalSet > 1}
+              />
             )}
 
             {/* Rounds input */}
@@ -2341,25 +2371,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               />
               <span className={styles.roundsHint}>Use decimals for partial rounds (e.g., 3.5)</span>
             </div>
-
-            {/* Weight input (shown on first set only) */}
-            {currentIntervalSet === 1 && (
-              <div className={styles.weightInputContainer}>
-                <label className={styles.timeLabel}>Weight Used (optional)</label>
-                <div className={styles.weightInputRow}>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={workoutWeight}
-                    onChange={(e) => setWorkoutWeight(e.target.value)}
-                    placeholder="e.g., 24"
-                    className={styles.weightInput}
-                    min="0"
-                  />
-                  <span className={styles.weightUnit}>kg</span>
-                </div>
-              </div>
-            )}
 
             {/* Show previous rounds */}
             {intervalRounds.length > 0 && (
@@ -2407,7 +2418,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           key="interval-all-sets"
         >
           {/* Workout details */}
-          <Card padding="lg" className={styles.exerciseCard}>
+          <Card padding="none" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[0]?.name || 'Interval Workout'}
             </h2>
@@ -2415,96 +2426,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               {parsedWorkout.exercises[0]?.prescription}
             </p>
 
-            {/* Show movements if available */}
+            {/* Movements with inline editing */}
             {parsedWorkout.exercises[0]?.movements && (
-              <div className={styles.movementsList}>
-                {parsedWorkout.exercises[0].movements.map((mov, i) => {
-                  const selectedAlt = selectedAlternatives[mov.name];
-                  const displayDistance = selectedAlt && customDistances[mov.name] !== undefined
-                    ? customDistances[mov.name]
-                    : mov.distance;
-                  const displayUnit = mov.unit || 'm';
-                  return (
-                    <div key={i} className={styles.movementItem}>
-                      {displayDistance && `${displayDistance}${displayUnit} `}
-                      {mov.reps && `${mov.reps}x `}
-                      {selectedAlt ? (
-                        <span className={styles.altMovement}>{selectedAlt}</span>
-                      ) : (
-                        mov.name
-                      )}
-                      {mov.rxWeights && ` (${mov.rxWeights.female || mov.rxWeights.male}/${mov.rxWeights.male}kg)`}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Movement alternatives */}
-            {movementsWithAlternatives.length > 0 && (
-              <div className={styles.alternativesSection}>
-                <label className={styles.alternativesLabel}>Substitutions</label>
-                {movementsWithAlternatives.map((mov) => {
-                  const selectedAlt = selectedAlternatives[mov.name];
-                  return (
-                    <div key={mov.name} className={styles.alternativeGroup}>
-                      <div className={styles.alternativeRow}>
-                        <select
-                          className={styles.alternativeSelect}
-                          value={selectedAlt || ''}
-                          onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
-                        >
-                          <option value="">{mov.name}</option>
-                          {mov.alternatives.map((alt) => (
-                            <option key={alt.name} value={alt.name}>
-                              {alt.name}
-                            </option>
-                          ))}
-                        </select>
-                        {mov.distance && (
-                          <div className={styles.distanceEditRow}>
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              value={customDistances[mov.name] || mov.distance || ''}
-                              onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                              className={styles.distanceInput}
-                              min="0"
-                            />
-                            <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Weight input (if exercise has rx weights) */}
-            {weightTarget && (
-              <div className={styles.weightInputContainer}>
-                <label className={styles.timeLabel}>{weightLabel}</label>
-                <div className={styles.weightInputRow}>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={workoutWeight}
-                    onChange={(e) => setWorkoutWeight(e.target.value)}
-                    placeholder={weightTarget.rxWeights?.male?.toString() || ''}
-                    className={styles.weightInput}
-                    min="0"
-                  />
-                  <span className={styles.weightUnit}>
-                    {weightTarget.rxWeights?.unit || 'kg'}
-                  </span>
-                </div>
-                {weightTarget.rxWeights && (
-                  <span className={styles.rxHint}>
-                    Rx: {weightTarget.rxWeights.female}/{weightTarget.rxWeights.male} {weightTarget.rxWeights.unit}
-                  </span>
-                )}
-              </div>
+              <MovementListEditor
+                movements={parsedWorkout.exercises[0].movements}
+                selectedAlternatives={selectedAlternatives}
+                customDistances={customDistances}
+                customTimes={customTimes}
+                customWeights={movementWeights}
+                onAlternativeChange={handleSelectAlternative}
+                onDistanceChange={handleCustomDistanceChange}
+                onTimeChange={handleTimeChange}
+                onWeightChange={handleMovementWeightChange}
+              />
             )}
 
             {/* All sets - scrollable list */}
@@ -2613,7 +2547,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Current exercise */}
-          <Card padding="lg" className={styles.exerciseCard}>
+          <Card padding="none" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[currentExerciseIndex].name}
             </h2>
@@ -2624,153 +2558,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             {/* Show time input for "for time" workouts, otherwise show sets */}
             {isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format) ? (
               <>
-                {/* Show movements if available */}
+                {/* Movements with inline editing */}
                 {currentExercise?.movements && (
-                  <div className={styles.movementsList}>
-                    {currentExercise.movements.map((mov, i) => {
-                      const selectedAlt = selectedAlternatives[mov.name];
-                      // Use custom distance if set, otherwise fall back to original
-                      const displayDistance = selectedAlt && customDistances[mov.name] !== undefined
-                        ? customDistances[mov.name]
-                        : mov.distance;
-                      const displayUnit = mov.unit || 'm';
-                      return (
-                        <div key={i} className={styles.movementItem}>
-                          {displayDistance && `${displayDistance}${displayUnit} `}
-                          {mov.reps && `${mov.reps}x `}
-                          {selectedAlt ? (
-                            <span className={styles.altMovement}>{selectedAlt}</span>
-                          ) : (
-                            mov.name
-                          )}
-                          {mov.rxWeights && ` (${mov.rxWeights.female}/${mov.rxWeights.male}kg)`}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Movement alternatives */}
-                {movementsWithAlternatives.length > 0 && (
-                  <div className={styles.alternativesSection}>
-                    <label className={styles.alternativesLabel}>Substitutions</label>
-                    {movementsWithAlternatives.map((mov) => {
-                      const selectedAlt = selectedAlternatives[mov.name];
-                      return (
-                        <div key={mov.name} className={styles.alternativeGroup}>
-                          <div className={styles.alternativeRow}>
-                            <select
-                              className={styles.alternativeSelect}
-                              value={selectedAlt || ''}
-                              onChange={(e) => handleSelectAlternative(mov.name, e.target.value, mov.distance)}
-                            >
-                              <option value="">{mov.name}</option>
-                              {mov.alternatives.map((alt) => (
-                                <option key={alt.name} value={alt.name}>
-                                  {alt.name}
-                                </option>
-                              ))}
-                            </select>
-                            {mov.distance && (
-                              <div className={styles.distanceEditRow}>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  value={customDistances[mov.name] || mov.distance || ''}
-                                  onChange={(e) => handleCustomDistanceChange(mov.name, parseInt(e.target.value) || 0)}
-                                  className={styles.distanceInput}
-                                  min="0"
-                                />
-                                <span className={styles.distanceUnit}>{mov.unit || 'm'}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Per-movement weight inputs */}
-                {weightedMovements.length > 0 && (
-                  <div
-                    className={styles.movementWeightsSection}
-                    onBlur={(e) => {
-                      const currentTarget = e.currentTarget;
-                      if (currentTarget.contains(e.relatedTarget as Node)) return;
-                      if (!useSingleWeightForMovements) return;
-                      setTimeout(() => {
-                        if (currentTarget.contains(document.activeElement)) return;
-                        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
-                        applySharedMovementWeight(sharedWeight);
-                      }, 0);
-                    }}
-                  >
-                    <label className={styles.alternativesLabel}>Weight Used</label>
-                    {hasMixedMovementWeights && (
-                      <label className={styles.weightToggle}>
-                        <input
-                          type="checkbox"
-                          checked={useSingleWeightForMovements}
-                          onChange={(e) => setUseSingleWeightForMovements(e.target.checked)}
-                        />
-                        Apply one weight to all weighted movements
-                      </label>
-                    )}
-                    {useSingleWeightForMovements ? (
-                      <div className={styles.movementWeightRow}>
-                        <span className={styles.movementWeightName}>All weighted movements</span>
-                        <div className={styles.movementWeightInputGroup}>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={sharedMovementWeight}
-                            onChange={(e) => setSharedMovementWeight(e.target.value)}
-                            placeholder={weightedMovements[0]?.rxWeights?.male?.toString() || '0'}
-                            className={styles.movementWeightInput}
-                            min="0"
-                          />
-                          <span className={styles.weightUnit}>
-                            {weightedMovements[0]?.rxWeights?.unit || 'kg'}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className={styles.weightHint}>Only weighted movements show inputs</p>
-                        {manuallyEditedWeights.size > 0 && (
-                          <p className={styles.weightHint}>Custom movement weights applied</p>
-                        )}
-                        {weightedMovements.map((mov) => (
-                          <div key={mov.name} className={styles.movementWeightRow}>
-                            <span className={styles.movementWeightName}>{mov.name}</span>
-                            <div className={styles.movementWeightInputGroup}>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                value={movementWeights[mov.name] || ''}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  handleMovementWeightManualEdit(mov.name, val);
-                                }}
-                                placeholder={mov.rxWeights?.male?.toString() || '0'}
-                                className={styles.movementWeightInput}
-                                min="0"
-                              />
-                              <span className={styles.weightUnit}>
-                                {mov.rxWeights?.unit || 'kg'}
-                              </span>
-                            </div>
-                            {mov.rxWeights && (
-                              <span className={styles.movementRxHint}>
-                                Rx: {mov.rxWeights.female}/{mov.rxWeights.male}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
+                  <MovementListEditor
+                    movements={currentExercise.movements}
+                    selectedAlternatives={selectedAlternatives}
+                    customDistances={customDistances}
+                    customTimes={customTimes}
+                    customWeights={movementWeights}
+                    onAlternativeChange={handleSelectAlternative}
+                    onDistanceChange={handleCustomDistanceChange}
+                    onTimeChange={handleTimeChange}
+                    onWeightChange={handleMovementWeightChange}
+                  />
                 )}
 
                 {/* Time input */}
@@ -3016,7 +2816,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Current exercise */}
-          <Card padding="lg" className={styles.exerciseCard}>
+          <Card padding="none" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[currentExerciseIndex].name}
             </h2>
@@ -3120,7 +2920,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Current exercise */}
-          <Card padding="lg" className={styles.exerciseCard}>
+          <Card padding="none" className={styles.exerciseCard}>
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[currentExerciseIndex].name}
             </h2>

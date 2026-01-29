@@ -10,26 +10,56 @@ interface WorkloadBreakdownProps {
 }
 
 /**
- * Format the value for display
+ * Format time in seconds to mm:ss or just seconds
+ */
+function formatTime(seconds: number): string {
+  if (seconds >= 60) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}:00`;
+  }
+  return `${seconds}s`;
+}
+
+/**
+ * Format the value for display - handles combined metrics
  */
 function formatValue(movement: MovementTotal): string {
+  const parts: string[] = [];
+
+  // Distance
   if (movement.totalDistance && movement.totalDistance > 0) {
-    // Convert to km if over 1000m
     if (movement.totalDistance >= 1000) {
-      return `${(movement.totalDistance / 1000).toFixed(1)}km`;
+      parts.push(`${(movement.totalDistance / 1000).toFixed(1)}km`);
+    } else {
+      parts.push(`${movement.totalDistance}m`);
     }
-    return `${movement.totalDistance}m`;
   }
 
+  // Time
+  if (movement.totalTime && movement.totalTime > 0) {
+    parts.push(formatTime(movement.totalTime));
+  }
+
+  // Calories
   if (movement.totalCalories && movement.totalCalories > 0) {
-    return `${movement.totalCalories} cal`;
+    parts.push(`${movement.totalCalories} cal`);
   }
 
-  if (movement.totalReps && movement.totalReps > 0) {
+  // Reps (only if no other metrics)
+  if (parts.length === 0 && movement.totalReps && movement.totalReps > 0) {
     return movement.totalReps.toString();
   }
 
-  return '0';
+  // Combine with " + " for mixed metrics (e.g., "9km + 5:00")
+  return parts.length > 0 ? parts.join(' + ') : '0';
+}
+
+function formatDistance(meters: number): string {
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+  return `${meters}m`;
 }
 
 /**
@@ -37,7 +67,7 @@ function formatValue(movement: MovementTotal): string {
  */
 function formatVolume(kg: number): string {
   if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(3)}t`;
+    return `${(kg / 1000).toFixed(2)} tons`;
   }
   return `${Math.round(kg).toLocaleString()} kg`;
 }
@@ -95,21 +125,20 @@ export function WorkloadBreakdown({
   if (!breakdown.movements || breakdown.movements.length === 0) {
     return null;
   }
+  const totalDistance = breakdown.grandTotalDistance ?? breakdown.movements.reduce(
+    (sum, movement) => sum + (movement.totalDistance || 0),
+    0
+  );
+  const totalCalories = breakdown.grandTotalCalories ?? breakdown.movements.reduce(
+    (sum, movement) => sum + (movement.totalCalories || 0),
+    0
+  );
   const gridRef = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState(1);
-  const tileVariants = {
-    hidden: { opacity: 0, y: 10, scale: 0.98 },
-    visible: (rowIndex: number) => ({
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: {
-        delay: animationDelay + rowIndex * 0.05,
-        duration: 0.3,
-        ease: [0.16, 1, 0.3, 1] as const,
-      },
-    }),
-  };
+  const [columns, setColumns] = useState(3);
+
+  // Group stagger - entire rows animate together for premium feel
+  const rowStaggerDelay = 0.12; // Delay between rows
+  const liquidEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
   useEffect(() => {
     const grid = gridRef.current;
@@ -129,6 +158,14 @@ export function WorkloadBreakdown({
     return () => observer.disconnect();
   }, []);
 
+  // Group movements by row for synchronized animation
+  const rows: MovementTotal[][] = [];
+  breakdown.movements.forEach((movement, idx) => {
+    const rowIndex = Math.floor(idx / columns);
+    if (!rows[rowIndex]) rows[rowIndex] = [];
+    rows[rowIndex].push(movement);
+  });
+
   return (
     <motion.div
       className={styles.container}
@@ -139,27 +176,37 @@ export function WorkloadBreakdown({
       <span className={styles.sectionTitle}>Workload Breakdown</span>
 
       <div className={styles.grid} ref={gridRef}>
-        {breakdown.movements.map((movement, idx) => (
+        {rows.map((row, rowIndex) => (
           <motion.div
-            key={movement.name}
-            className={`${styles.tile} ${styles[movement.color || 'magenta']}`}
-            custom={Math.floor(idx / columns)}
-            variants={tileVariants}
-            initial="hidden"
-            animate="visible"
+            key={`row-${rowIndex}`}
+            className={styles.row}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: animationDelay + rowIndex * rowStaggerDelay,
+              duration: 0.35,
+              ease: liquidEase,
+            }}
           >
-            <span className={styles.value}>{formatValue(movement)}</span>
-            <span className={styles.name}>{shortenName(movement.name)}</span>
-            {movement.weight && movement.weight > 0 && (
-              <span className={styles.weight}>
-                @ {movement.weight}{movement.unit === 'lb' ? 'lb' : 'kg'}
-              </span>
-            )}
+            {row.map((movement) => (
+              <div
+                key={movement.name}
+                className={`${styles.tile} ${styles[movement.color || 'magenta']}`}
+              >
+                <span className={styles.value}>{formatValue(movement)}</span>
+                <span className={styles.name}>{shortenName(movement.name)}</span>
+                {movement.weight && movement.weight > 0 && (
+                  <span className={styles.weight}>
+                    @ {movement.weight}{movement.unit === 'lb' ? 'lb' : 'kg'}
+                  </span>
+                )}
+              </div>
+            ))}
           </motion.div>
         ))}
       </div>
 
-      {showTotals && (breakdown.grandTotalReps > 0 || breakdown.grandTotalVolume > 0) && (
+      {showTotals && (breakdown.grandTotalReps > 0 || breakdown.grandTotalVolume > 0 || totalDistance > 0 || totalCalories > 0) && (
         <div className={styles.totals}>
           {breakdown.grandTotalReps > 0 && (
             <div className={styles.totalItem}>
@@ -171,6 +218,18 @@ export function WorkloadBreakdown({
             <div className={styles.totalItem}>
               <span className={styles.totalValue}>{formatVolume(breakdown.grandTotalVolume)}</span>
               <span className={styles.totalLabel}>Volume</span>
+            </div>
+          )}
+          {totalDistance > 0 && (
+            <div className={styles.totalItem}>
+              <span className={styles.totalValue}>{formatDistance(Math.round(totalDistance))}</span>
+              <span className={styles.totalLabel}>Distance</span>
+            </div>
+          )}
+          {totalCalories > 0 && (
+            <div className={styles.totalItem}>
+              <span className={styles.totalValue}>{Math.round(totalCalories)}</span>
+              <span className={styles.totalLabel}>Calories</span>
             </div>
           )}
         </div>

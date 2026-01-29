@@ -35,8 +35,11 @@ function formatDate(date: Date): string {
   });
 }
 
-function formatVolumeTons(kg: number): string {
-  return `${(kg / 1000).toFixed(1)}t`;
+function formatVolume(kg: number): string {
+  if (kg >= 1000) {
+    return `${(kg / 1000).toFixed(2)} tons`;
+  }
+  return `${Math.round(kg).toLocaleString()} kg`;
 }
 
 function formatDuration(minutes: number): string {
@@ -119,7 +122,7 @@ export function WorkoutDetailScreen({ workout, onBack, onEditWorkout }: WorkoutD
           className={`${styles.statBlock} ${styles.statGlow}`}
           style={{ '--stat-color': 'var(--color-volume)', '--stat-glow': 'var(--glow-volume)' } as React.CSSProperties}
         >
-          <span className={styles.statValue}>{formatVolumeTons(workout.totalVolume)}</span>
+          <span className={styles.statValue}>{formatVolume(workout.totalVolume)}</span>
           <span className={styles.statLabel}>Volume</span>
         </div>
 

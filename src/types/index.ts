@@ -137,8 +137,9 @@ export interface MovementTotal {
   totalReps?: number;
   totalDistance?: number;
   totalCalories?: number;
+  totalTime?: number;           // Time in seconds
   weight?: number;
-  unit?: 'kg' | 'lb' | 'm' | 'cal';
+  unit?: MeasurementUnit;
   color?: 'cyan' | 'magenta' | 'yellow';
 }
 
@@ -146,9 +147,14 @@ export interface WorkloadBreakdown {
   movements: MovementTotal[];
   grandTotalReps: number;
   grandTotalVolume: number;
+  grandTotalDistance?: number;
+  grandTotalCalories?: number;
   containerRounds?: number;
   benchmarkName?: string;
 }
+
+// Unit types for measurements
+export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
 
 // Individual movement within a workout
 export interface ParsedMovement {
@@ -158,7 +164,7 @@ export interface ParsedMovement {
   time?: number;                // Time in seconds
   calories?: number;            // Calorie target
   rxWeights?: RxWeights;        // Rx weights (male/female)
-  unit?: string;                // Unit for distance/time display
+  unit?: MeasurementUnit;       // Unit for distance/time display
 }
 
 export interface ParsedExercise {
@@ -237,6 +243,7 @@ export type BodyRegion = 'upper' | 'lower' | 'core' | 'full_body';
 export interface RewardData {
   rings: RingMetric[];
   heroAchievement: Achievement;
+  achievements?: Achievement[];  // All detected achievements
   workoutSummary: {
     title: string;
     type: WorkoutType;
@@ -254,6 +261,7 @@ export interface RewardData {
   };
   workloadBreakdown?: WorkloadBreakdown;  // Per-movement totals for display
   workoutContext?: string;
+  workoutRawText?: string;
 }
 
 // Weekly stats for consistency ring

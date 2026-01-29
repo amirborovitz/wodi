@@ -6,10 +6,10 @@ import type { RingMetric, Achievement } from '../types';
 export function getVolumeMessage(kg: number): string {
   const tons = kg / 1000;
 
-  if (tons >= 10) return `You moved ${tons.toFixed(1)} tons today! Beast mode!`;
-  if (tons >= 5) return `${tons.toFixed(1)} tons lifted! Unstoppable!`;
-  if (tons >= 2) return `You lifted ${tons.toFixed(1)} tons!`;
-  if (tons >= 1) return `${tons.toFixed(1)} tons of iron moved!`;
+  if (tons >= 10) return `You moved ${tons.toFixed(2)} tons today! Beast mode!`;
+  if (tons >= 5) return `${tons.toFixed(2)} tons lifted! Unstoppable!`;
+  if (tons >= 2) return `You lifted ${tons.toFixed(2)} tons!`;
+  if (tons >= 1) return `${tons.toFixed(2)} tons of iron moved!`;
   if (kg >= 500) return `${Math.round(kg)}kg lifted! Strong work!`;
   if (kg >= 100) return `${Math.round(kg)}kg moved! Keep pushing!`;
   return 'Every rep counts!';
@@ -88,7 +88,7 @@ export function formatDurationFriendly(mins: number): string {
  * Format volume with appropriate units
  */
 export function formatVolumeFriendly(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
   return `${Math.round(kg)}kg`;
 }
 

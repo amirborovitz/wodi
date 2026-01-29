@@ -45,7 +45,7 @@ export const ShareableCard = forwardRef<HTMLDivElement, ShareableCardProps>(
     };
 
     const formatVolume = (kg: number): string => {
-      if (kg >= 1000) return `${(kg / 1000).toFixed(3)}t`;
+      if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
       return `${Math.round(kg).toLocaleString()} kg`;
     };
 

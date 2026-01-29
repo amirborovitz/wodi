@@ -6,7 +6,12 @@
 }
 
 .svg {
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.1));
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.15));
+}
+
+/* Liquid fill shimmer on progress circles */
+.svg circle {
+  will-change: stroke-dashoffset, opacity;
 }
 
 .center {

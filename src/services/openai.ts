@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit } from '../types';
+import { postProcessParsedWorkout } from './workoutPostProcessor';
 
 const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
@@ -352,7 +353,25 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
     }
 
     // Validate and transform the response
-    return validateParsedWorkout(parsed);
+    const validated = validateParsedWorkout(parsed);
+
+    // Post-process to fix common AI parsing issues
+    const postProcessed = postProcessParsedWorkout(validated);
+
+    console.log('[OpenAI Parse] Post-processed:', {
+      exercises: postProcessed.exercises?.map(e => ({
+        name: e.name,
+        movements: e.movements?.map(m => ({
+          name: m.name,
+          reps: m.reps,
+          time: m.time,
+          distance: m.distance,
+          rxWeights: m.rxWeights,
+        })),
+      })),
+    });
+
+    return postProcessed;
   } catch (error) {
     console.error('Error parsing workout image:', error);
     throw error;
@@ -439,7 +458,10 @@ export async function refineParsedWorkout(
   });
 
   const text = response.choices[0]?.message?.content || '';
-  return JSON.parse(text) as ParsedWorkout;
+  const refined = JSON.parse(text) as ParsedWorkout;
+
+  // Post-process the refined workout
+  return postProcessParsedWorkout(refined);
 }
 
 function validateRxWeights(data: unknown): RxWeights | undefined {
@@ -455,6 +477,14 @@ function validateRxWeights(data: unknown): RxWeights | undefined {
   return { male, female, unit };
 }
 
+function validateMeasurementUnit(value: unknown): MeasurementUnit | undefined {
+  const validUnits: MeasurementUnit[] = ['kg', 'lb', 'm', 'km', 'mi', 'cal'];
+  if (typeof value === 'string' && validUnits.includes(value as MeasurementUnit)) {
+    return value as MeasurementUnit;
+  }
+  return undefined;
+}
+
 function validateMovement(data: unknown): ParsedMovement | null {
   if (!data || typeof data !== 'object') return null;
   const raw = data as Record<string, unknown>;
@@ -468,7 +498,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
     time: typeof raw.time === 'number' ? raw.time : undefined,
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
     rxWeights: validateRxWeights(raw.rxWeights),
-    unit: typeof raw.unit === 'string' ? raw.unit : undefined,
+    unit: validateMeasurementUnit(raw.unit),
   };
 }
 

@@ -16,7 +16,7 @@ export function StatsScreen() {
   const longestStreak = user?.stats.longestStreak || 0;
 
   const formatVolume = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+    if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
     return `${kg}kg`;
   };
 

@@ -39,7 +39,7 @@ export function WorkoutSummary({
   };
 
   const formatVolume = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+    if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
     return `${Math.round(kg)}kg`;
   };
 

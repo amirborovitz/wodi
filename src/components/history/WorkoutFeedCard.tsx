@@ -108,7 +108,7 @@ function formatDuration(minutes: number): string {
 
 function formatVolume(kg: number): string {
   if (kg === 0) return '0';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(3)}t`;
+  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
   return `${Math.round(kg).toLocaleString()} kg`;
 }
 

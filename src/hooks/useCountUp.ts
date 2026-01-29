@@ -94,7 +94,7 @@ export function useCountUpVolume(
  */
 export function formatAnimatedVolume(kg: number): string {
   if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(3)}t`;
+    return `${(kg / 1000).toFixed(2)} tons`;
   }
   return `${Math.round(kg).toLocaleString()} kg`;
 }

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { calculateAllRings, getWeekStart } from '../services/rewardCalculations';
-import { detectBestAchievement } from '../services/achievementDetection';
+import { detectBestAchievement, detectAllAchievements } from '../services/achievementDetection';
 import type { RewardData, Exercise, PersonalRecord, Workout, WorkoutType, WorkoutFormat, MuscleGroup, BodyRegion } from '../types';
 
 interface WorkoutSummaryInput {
@@ -112,8 +112,8 @@ export function useRewardData(): UseRewardDataResult {
         weeklyGoal: 4, // Default goal
       });
 
-      // Detect best achievement
-      const heroAchievement = await detectBestAchievement({
+      // Detect all achievements
+      const achievementContext = {
         workout: {
           title: workout.title,
           duration: workout.durationMinutes,
@@ -123,11 +123,15 @@ export function useRewardData(): UseRewardDataResult {
         recentWorkouts,
         currentStreak,
         totalWorkouts,
-      });
+      };
+
+      const allAchievements = await detectAllAchievements(achievementContext);
+      const heroAchievement = allAchievements[0] || await detectBestAchievement(achievementContext);
 
       const data: RewardData = {
         rings,
         heroAchievement,
+        achievements: allAchievements,
         workoutSummary: {
           title: workout.title,
           type: workout.type,

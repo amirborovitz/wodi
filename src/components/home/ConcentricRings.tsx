@@ -28,6 +28,9 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
   const strokeDashoffset = circumference - (cappedPercentage / 100) * circumference;
   const isGoalMet = percentage >= 100;
 
+  // Liquid fill easing - smooth deceleration like fluid settling
+  const liquidEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
   return (
     <g className={isGoalMet ? styles.successPulse : ''}>
       {/* Background ring */}
@@ -40,7 +43,26 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
         strokeWidth={strokeWidth}
         strokeLinecap="round"
       />
-      {/* Glow layer (behind main ring) */}
+      {/* Outer glow layer - soft ambient */}
+      <motion.circle
+        cx="50%"
+        cy="50%"
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth + 12}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference, opacity: 0 }}
+        animate={{ strokeDashoffset, opacity: 0.15 }}
+        transition={{ duration: 1.4, delay, ease: liquidEase }}
+        style={{
+          filter: 'blur(16px)',
+          transform: 'rotate(-90deg)',
+          transformOrigin: 'center',
+        }}
+      />
+      {/* Inner glow layer - concentrated */}
       <motion.circle
         cx="50%"
         cy="50%"
@@ -50,12 +72,11 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
         strokeWidth={strokeWidth + 4}
         strokeLinecap="round"
         strokeDasharray={circumference}
-        initial={{ strokeDashoffset: circumference }}
-        animate={{ strokeDashoffset }}
-        transition={{ duration: 1.2, delay, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ strokeDashoffset: circumference, opacity: 0 }}
+        animate={{ strokeDashoffset, opacity: 0.5 }}
+        transition={{ duration: 1.3, delay: delay + 0.05, ease: liquidEase }}
         style={{
-          filter: `blur(8px)`,
-          opacity: 0.4,
+          filter: 'blur(6px)',
           transform: 'rotate(-90deg)',
           transformOrigin: 'center',
         }}
@@ -72,7 +93,7 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
         strokeDasharray={circumference}
         initial={{ strokeDashoffset: circumference }}
         animate={{ strokeDashoffset }}
-        transition={{ duration: 1.2, delay, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 1.2, delay, ease: liquidEase }}
         style={{
           transform: 'rotate(-90deg)',
           transformOrigin: 'center',
@@ -178,7 +199,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
 
 function formatValue(value: number, unit: string): string {
   if (unit === 'kg' && value >= 1000) {
-    return `${(value / 1000).toFixed(1)}t`;
+    return `${(value / 1000).toFixed(2)} tons`;
   }
   return `${value.toLocaleString()}${unit}`;
 }
