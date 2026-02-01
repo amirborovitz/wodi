@@ -9,10 +9,12 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  updateProfile,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, googleProvider, db } from '../services/firebase';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { auth, googleProvider, db, storage } from '../services/firebase';
 import type { User, UserStats, UserGoals } from '../types';
 
 interface AuthContextValue {
@@ -22,6 +24,7 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUserGoals: (goals: UserGoals) => Promise<void>;
+  updateUserPhoto: (file: File) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -106,11 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let userData: User;
       if (userSnap.exists()) {
         const data = userSnap.data();
+        const cached = getCachedUser();
+        const cachedPhotoNewer = cached?.photoUpdatedAt && (!data.photoUpdatedAt || cached.photoUpdatedAt > data.photoUpdatedAt);
         userData = {
           id: fbUser.uid,
           email: fbUser.email || '',
           displayName: data.displayName || fbUser.displayName || 'Athlete',
-          photoUrl: data.photoUrl || fbUser.photoURL || undefined,
+          photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
+          photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
           createdAt: data.createdAt?.toDate() || new Date(),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
@@ -121,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: fbUser.email || '',
           displayName: fbUser.displayName || 'Athlete',
           photoUrl: fbUser.photoURL || undefined,
+          photoUpdatedAt: undefined,
           createdAt: new Date(),
           stats: DEFAULT_STATS,
         };
@@ -143,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: fbUser.email || '',
         displayName: fbUser.displayName || 'Athlete',
         photoUrl: fbUser.photoURL || undefined,
+        photoUpdatedAt: undefined,
         createdAt: new Date(),
         stats: DEFAULT_STATS,
       };
@@ -158,11 +166,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userSnap.exists()) {
         const data = userSnap.data();
+        const cached = getCachedUser();
+        const cachedPhotoNewer = cached?.photoUpdatedAt && (!data.photoUpdatedAt || cached.photoUpdatedAt > data.photoUpdatedAt);
         const userData: User = {
           id: fbUser.uid,
           email: fbUser.email || '',
           displayName: data.displayName || fbUser.displayName || 'Athlete',
-          photoUrl: data.photoUrl || fbUser.photoURL || undefined,
+          photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
+          photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
           createdAt: data.createdAt?.toDate() || new Date(),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
@@ -189,6 +200,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCachedUser(updatedUser);
     } catch (error) {
       console.error('Error updating user goals:', error);
+      throw error;
+    }
+  };
+
+  const updateUserPhoto = async (file: File) => {
+    if (!user || !firebaseUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const extension = file.type.includes('png') ? 'png' : 'jpg';
+      const storageRef = ref(storage, `users/${firebaseUser.uid}/avatar-${Date.now()}.${extension}`);
+      await uploadBytes(storageRef, file);
+      const photoUrl = await getDownloadURL(storageRef);
+      const photoUpdatedAt = Date.now();
+
+      const updatedUser = { ...user, photoUrl, photoUpdatedAt };
+      setUser(updatedUser);
+      setCachedUser(updatedUser);
+
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      await setDoc(userRef, { photoUrl, photoUpdatedAt }, { merge: true });
+
+      try {
+        await updateProfile(firebaseUser, { photoURL: photoUrl });
+      } catch (error) {
+        console.warn('Unable to update auth profile photo', error);
+      }
+
+      return photoUrl;
+    } catch (error) {
+      console.error('Error updating user photo:', error);
       throw error;
     }
   };
@@ -220,6 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       updateUserGoals,
+      updateUserPhoto,
     }}>
       {children}
     </AuthContext.Provider>

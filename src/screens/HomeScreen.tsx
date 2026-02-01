@@ -9,10 +9,11 @@ interface HomeScreenProps {
   onAddWorkout: () => void;
   onImageSelected?: (file: File) => void;
   onUsePastWorkout?: () => void;
+  onOpenProfile?: () => void;
   ringsKey?: number;
 }
 
-export function HomeScreen({ onAddWorkout, onImageSelected, onUsePastWorkout, ringsKey }: HomeScreenProps) {
+export function HomeScreen({ onAddWorkout, onImageSelected, onUsePastWorkout, onOpenProfile, ringsKey }: HomeScreenProps) {
   const { user } = useAuth();
   const weeklyStats = useWeeklyStats();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,12 +73,25 @@ export function HomeScreen({ onAddWorkout, onImageSelected, onUsePastWorkout, ri
               {getGreeting()}, <span className={styles.name}>{firstName}</span>
             </h1>
           </div>
-          {user?.photoUrl && (
-            <img
-              src={user.photoUrl}
-              alt={user.displayName}
-              className={styles.avatar}
-            />
+          {onOpenProfile && (
+            <button
+              type="button"
+              className={styles.avatarButton}
+              onClick={onOpenProfile}
+              aria-label="Open profile"
+            >
+              {user?.photoUrl ? (
+                <img
+                  src={`${user.photoUrl}?v=${user.photoUpdatedAt || 0}`}
+                  alt={user.displayName}
+                  className={styles.avatar}
+                />
+              ) : (
+                <span className={styles.avatarFallback}>
+                  {firstName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </button>
           )}
         </motion.header>
 

@@ -17,7 +17,7 @@ const typeStyles: Record<WorkoutType, { gradient: string; icon: string; label: s
   for_time: {
     gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
     icon: 'FT',
-    label: 'For Time',
+    label: 'Metcon Time',
     color: '#FF6B6B',
   },
   amrap: {
@@ -180,7 +180,7 @@ export function WorkoutFeedCard({ workout, index, onClick, onDelete, isPR = fals
           <div className={styles.statsRow}>
             {duration > 0 && (
               <div className={styles.stat}>
-                <span className={styles.statIcon}>TIME</span>
+                <span className={styles.statIcon}>METCON TIME</span>
                 <span className={styles.statValue}>{formatDuration(duration)}</span>
               </div>
             )}

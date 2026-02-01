@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import type { KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, refineParsedWorkout } from '../services/openai';
 import { assignMovementColors } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
+import {
+  getLoggingGuidance,
+  recordUserCorrection,
+  recordPatternUsage,
+  getDefaultFields,
+} from '../services/loggingPatternLearning';
+import type { LoggingGuidanceResponse, ExerciseLoggingMode, LoggingPatternFields } from '../types';
 import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +47,7 @@ interface ExerciseResult {
   movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
   movementAlternatives?: Record<string, string>; // Selected alternatives for movements
   movementDistances?: Record<string, number>; // Per-movement distance overrides
+  movementReps?: Record<string, number>; // Per-movement rep overrides
   rounds?: number; // Number of rounds completed (for multi-movement WODs)
   // Cardio tracking (calories)
   cardioTurns?: number; // Number of turns/intervals on cardio machine
@@ -87,7 +96,10 @@ function buildWorkloadBreakdownFromResults(
       ? Math.round(setWeights.reduce((sum, weight) => sum + weight, 0) / setWeights.length)
       : undefined;
     if (movements && movements.length > 0) {
-      const repsPerRound = movements.reduce((sum, mov) => sum + (mov.reps || 0), 0);
+      const repsPerRound = movements.reduce((sum, mov) => {
+        const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
+        return sum + reps;
+      }, 0);
       const explicitRounds = result.rounds || result.sets.length || 1;
       let totalRounds = explicitRounds;
 
@@ -114,7 +126,7 @@ function buildWorkloadBreakdownFromResults(
         }
       }
 
-      const perRoundReps = mov.reps || 0;
+      const perRoundReps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
       const perRoundDistance = result.movementDistances?.[mov.name] ?? mov.distance ?? 0;
       const perRoundCalories = mov.calories || 0;
       const perRoundTime = mov.time || 0;
@@ -543,7 +555,7 @@ function exerciseNeedsWeight(exercise: ParsedExercise): boolean {
 }
 
 // Determine the logging mode for each exercise
-type ExerciseLoggingMode = 'strength' | 'intervals' | 'amrap_intervals' | 'for_time' | 'sets' | 'cardio' | 'cardio_distance' | 'bodyweight';
+// ExerciseLoggingMode is now imported from '../types'
 
 function shouldForceForTimeMode(exercise: ParsedExercise, workoutFormat?: string): boolean {
   const movements = exercise.movements || [];
@@ -577,42 +589,76 @@ function getExerciseLoggingMode(exercise: ParsedExercise, workoutFormat?: string
   const name = exercise.name.toLowerCase();
   const prescription = exercise.prescription.toLowerCase();
   const classification = classifyExercise(exercise);
+  const movements = exercise.movements || [];
 
-  // 1. Check movements array first
-  if (shouldForceForTimeMode(exercise, workoutFormat)) {
-    return 'for_time';
-  }
+  // DEBUG: Log all inputs
+  console.log('[getExerciseLoggingMode] Input:', {
+    exerciseName: name,
+    prescription,
+    workoutFormat,
+    classification,
+    movementsCount: movements.length,
+    movements: movements.map(m => m.name),
+  });
 
-  // 2. Check for "for time" patterns BEFORE cardio classification
-  // This handles mixed workouts like "10 rounds for time: 30sec bike, 10 pull-ups, 300m run"
-  const isForTimePattern =
-    workoutFormat === 'for_time' ||
-    name.includes('for time') ||
-    name.includes('round') ||
-    prescription.includes('for time') ||
-    prescription.includes('round') ||
-    /\brounds?\b/i.test(name) ||
-    /\brounds?\b/i.test(prescription) ||
-    /^\d+\s*(round|rft)/i.test(name) ||
-    name.includes('sets for time') ||
-    prescription.includes('sets for time');
+  // 1. Check for AMRAP patterns - ONLY look at THIS exercise's name/prescription
+  // Don't use workoutFormat here - each exercise should be evaluated independently
+  const isAmrapPattern =
+    name.includes('amrap') ||
+    prescription.includes('amrap');
 
-  if (isForTimePattern) {
-    return 'for_time';
-  }
+  console.log('[getExerciseLoggingMode] AMRAP check:', { isAmrapPattern, name, prescription });
 
-  // 3. Check for AMRAP interval patterns
-  if (workoutFormat === 'amrap_intervals' ||
-      (name.includes('amrap') && (name.includes('x') || name.includes('rest')))) {
+  // AMRAP intervals (multiple AMRAPs with rest) - only if THIS exercise mentions it
+  if (isAmrapPattern && (name.includes('x') || name.includes('rest'))) {
+    console.log('[getExerciseLoggingMode] -> Returning: amrap_intervals');
     return 'amrap_intervals';
   }
 
-  // 4. Cardio exercises - ONLY if not a "for time" workout
-  if (classification === 'cardio_calories') {
+  // Standard AMRAP with multiple movements
+  if (isAmrapPattern && movements.length >= 2) {
+    console.log('[getExerciseLoggingMode] -> Returning: amrap (multi-movement)');
+    return 'amrap';
+  }
+
+  // Single-movement AMRAP still uses 'amrap' mode
+  if (isAmrapPattern && movements.length === 1) {
+    console.log('[getExerciseLoggingMode] -> Returning: amrap (single-movement)');
+    return 'amrap';
+  }
+
+  // 2. Check movements array for forced "for time" mode
+  if (shouldForceForTimeMode(exercise, workoutFormat)) {
+    console.log('[getExerciseLoggingMode] -> Returning: for_time (forced)');
+    return 'for_time';
+  }
+
+  // 3. Check for "for time" patterns - ONLY look at THIS exercise's name/prescription
+  // Don't use workoutFormat here - each exercise should be evaluated independently
+  const isForTimePattern =
+    name.includes('for time') ||
+    prescription.includes('for time') ||
+    /\brounds?\s+for\s+time\b/i.test(name) ||
+    /\brounds?\s+for\s+time\b/i.test(prescription) ||
+    /^\d+\s*rft\b/i.test(name) ||
+    name.includes('sets for time') ||
+    prescription.includes('sets for time');
+
+  console.log('[getExerciseLoggingMode] ForTime check:', { isForTimePattern, name });
+
+  if (isForTimePattern) {
+    console.log('[getExerciseLoggingMode] -> Returning: for_time');
+    return 'for_time';
+  }
+
+  // 4. Cardio exercises - ONLY for single-exercise cardio (not mixed WODs)
+  if (classification === 'cardio_calories' && movements.length <= 1) {
+    console.log('[getExerciseLoggingMode] -> Returning: cardio');
     return 'cardio';
   }
 
-  if (classification === 'cardio_distance') {
+  if (classification === 'cardio_distance' && movements.length <= 1) {
+    console.log('[getExerciseLoggingMode] -> Returning: cardio_distance');
     return 'cardio_distance';
   }
 
@@ -775,11 +821,66 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 
   // DEV MODE - temporary for testing
   const [showDevWorkouts, setShowDevWorkouts] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(pointer: coarse)');
+    const update = () => setIsCoarsePointer(mediaQuery.matches);
+    update();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', update);
+      return () => mediaQuery.removeEventListener('change', update);
+    }
+    mediaQuery.addListener(update);
+    return () => mediaQuery.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+    const viewport = window.visualViewport;
+
+    const updateKeyboardOffset = () => {
+      const offset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      if (containerRef.current) {
+        containerRef.current.style.setProperty('--keyboard-offset', `${offset}px`);
+      }
+    };
+
+    updateKeyboardOffset();
+    viewport.addEventListener('resize', updateKeyboardOffset);
+    viewport.addEventListener('scroll', updateKeyboardOffset);
+    return () => {
+      viewport.removeEventListener('resize', updateKeyboardOffset);
+      viewport.removeEventListener('scroll', updateKeyboardOffset);
+    };
+  }, []);
+
+  const handleMobileNextInput = (event: KeyboardEvent<HTMLElement>) => {
+    if (!isCoarsePointer || event.key !== 'Enter') return;
+    const target = event.target as HTMLElement;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    event.preventDefault();
+    const scope = target.closest('[data-mobile-input-scope]') || target.ownerDocument;
+    const inputs = Array.from(scope.querySelectorAll('input, select, textarea')).filter((el) => {
+      const element = el as HTMLElement;
+      return !el.hasAttribute('disabled') && element.offsetParent !== null;
+    });
+    const index = inputs.indexOf(target);
+    if (index >= 0 && index < inputs.length - 1) {
+      (inputs[index + 1] as HTMLElement).focus();
+    } else {
+      target.blur();
+    }
+  };
 
   // Wizard state
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
@@ -812,6 +913,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const [customDistances, setCustomDistances] = useState<Record<string, number>>({});
   // Custom times for time-based movements (maps movement name to time in seconds)
   const [customTimes, setCustomTimes] = useState<Record<string, number>>({});
+  // Custom reps for movements (maps movement name to reps)
+  const [customReps, setCustomReps] = useState<Record<string, number>>({});
 
   // Per-movement weight tracking (maps movement name to weight)
   const [movementWeights, setMovementWeights] = useState<Record<string, number>>({});
@@ -828,6 +931,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     source: 'rule' | 'learned' | 'ai';
     reason: string;
   }>>({});
+
+  // Logging guidance cache (maps exercise index to logging guidance)
+  const [loggingGuidance, setLoggingGuidance] = useState<Record<number, LoggingGuidanceResponse>>({});
+  // Track user mode overrides (when user manually selects a different mode)
+  const [modeOverrides, setModeOverrides] = useState<Record<number, ExerciseLoggingMode>>({});
+  // Track if AI is currently loading guidance
+  const [isLoadingGuidance, setIsLoadingGuidance] = useState(false);
 
   // Reward screen state
   const [rewardData, setRewardData] = useState<RewardData | null>(null);
@@ -964,6 +1074,49 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
     runSmartClassification();
   }, [step, currentExerciseIndex, parsedWorkout, smartClassifications]);
+
+  // Load logging guidance when entering log-results step
+  useEffect(() => {
+    if (step !== 'log-results' || !parsedWorkout) return;
+
+    const exercise = parsedWorkout.exercises[currentExerciseIndex];
+    if (!exercise) return;
+
+    // Check if we already have guidance for this exercise
+    if (loggingGuidance[currentExerciseIndex]) {
+      console.log('[LoggingGuidance] Using cached result for exercise', currentExerciseIndex);
+      return;
+    }
+
+    const loadGuidance = async () => {
+      setIsLoadingGuidance(true);
+      try {
+        const guidance = await getLoggingGuidance(
+          exercise,
+          parsedWorkout.format,
+          parsedWorkout.rawText
+        );
+
+        setLoggingGuidance(prev => ({
+          ...prev,
+          [currentExerciseIndex]: guidance,
+        }));
+
+        console.log('[LoggingGuidance] Got guidance:', {
+          exercise: exercise.name,
+          mode: guidance.loggingMode,
+          confidence: guidance.confidence,
+          source: guidance.source,
+        });
+      } catch (error) {
+        console.warn('[LoggingGuidance] Failed to get guidance:', error);
+      } finally {
+        setIsLoadingGuidance(false);
+      }
+    };
+
+    loadGuidance();
+  }, [step, currentExerciseIndex, parsedWorkout, loggingGuidance]);
 
   const persistSavedWorkouts = (next: SavedWorkout[]) => {
     setSavedWorkouts(next);
@@ -1115,8 +1268,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     setCardioDistancePerTurn('');
     setSelectedAlternatives({});
     setCustomDistances({});
+    setCustomReps({});
     setMovementWeights({});
     setManuallyEditedWeights(new Set());
+
+    // Reset logging guidance state
+    setLoggingGuidance({});
+    setModeOverrides({});
 
     // Create initial sets for first exercise
     const firstExercise = parsedWorkout.exercises[0];
@@ -1134,30 +1292,54 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const currentExercise = parsedWorkout?.exercises[currentExerciseIndex];
 
   // Determine exercise logging mode
-  // FIRST check local rules (handles "for time" workouts), THEN use smart classification for pure cardio
+  // Priority: 1. User override, 2. Logging guidance, 3. Local rules, 4. Smart classification
   const smartClassification = smartClassifications[currentExerciseIndex];
   const localMode = currentExercise ? getExerciseLoggingMode(currentExercise, parsedWorkout?.format) : 'sets';
+  const guidance = loggingGuidance[currentExerciseIndex];
+  const userOverride = modeOverrides[currentExerciseIndex];
 
-  // If local rules detect "for_time", use that (handles mixed workouts like "10 rounds: bike + swings + run")
-  // Only use smart classification for pure cardio exercises (not mixed "for time" workouts)
-  const currentExerciseMode = currentExercise
-    ? (localMode === 'for_time' ? 'for_time'
-      : localMode === 'amrap_intervals' ? 'amrap_intervals'
-      : localMode === 'intervals' ? 'intervals'
-      : smartClassification?.inputType === 'cardio_calories' ? 'cardio'
-      : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
-      : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
-      : localMode)
+  // If user manually selected a mode, use that
+  // Otherwise, use guidance if available and confident, else fall back to local rules
+  const currentExerciseMode: ExerciseLoggingMode = currentExercise
+    ? (userOverride
+      ? userOverride
+      : guidance && guidance.confidence >= 0.7
+        ? guidance.loggingMode
+        : localMode === 'for_time' ? 'for_time'
+          : localMode === 'amrap' ? 'amrap'
+          : localMode === 'amrap_intervals' ? 'amrap_intervals'
+          : localMode === 'intervals' ? 'intervals'
+          : smartClassification?.inputType === 'cardio_calories' ? 'cardio'
+          : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
+          : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
+          : localMode)
     : 'sets';
+
+  // Determine if we should show the mode selector (low confidence or ambiguous)
+  const showModeSelector = guidance && guidance.confidence < 0.85 && !userOverride;
 
   // Per-exercise checks based on logging mode
   const isCurrentExerciseInterval = currentExerciseMode === 'intervals';
   const isCurrentExerciseAmrapInterval = currentExerciseMode === 'amrap_intervals';
+  const isCurrentExerciseAmrap = currentExerciseMode === 'amrap';
   const isCurrentExerciseForTime = currentExerciseMode === 'for_time';
   const isCurrentExerciseStrength = currentExerciseMode === 'strength' || currentExerciseMode === 'sets';
   const isCurrentExerciseCardio = currentExerciseMode === 'cardio';
   const isCurrentExerciseCardioDistance = currentExerciseMode === 'cardio_distance';
   const isCurrentExerciseBodyweight = currentExerciseMode === 'bodyweight';
+
+  // DEBUG: Log UI flags
+  console.log('[UI Flags]', {
+    step,
+    currentExerciseMode,
+    isCurrentExerciseAmrap,
+    isCurrentExerciseAmrapInterval,
+    isCurrentExerciseForTime,
+    isCurrentExerciseCardio,
+    isCurrentExerciseCardioDistance,
+    parsedWorkoutFormat: parsedWorkout?.format,
+    parsedWorkoutType: parsedWorkout?.type,
+  });
 
   // Check if current exercise needs weight input (used for strength exercises)
   const currentExerciseNeedsWeight = currentExercise
@@ -1230,6 +1412,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     }));
   };
 
+  // Handle changing custom reps for a movement
+  const handleRepsChange = (movementName: string, reps: number) => {
+    setCustomReps(prev => ({
+      ...prev,
+      [movementName]: reps,
+    }));
+  };
+
   // Handle changing the custom time for a movement
   const handleTimeChange = (movementName: string, time: number) => {
     setCustomTimes(prev => ({
@@ -1245,6 +1435,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       [movementName]: weight,
     }));
   };
+
+  // Handle user changing the logging mode manually
+  const handleModeOverride = useCallback((mode: ExerciseLoggingMode) => {
+    setModeOverrides(prev => ({
+      ...prev,
+      [currentExerciseIndex]: mode,
+    }));
+    console.log('[LoggingGuidance] User override:', mode);
+  }, [currentExerciseIndex]);
 
   // Get all weighted movements for the current exercise
   function getWeightedMovements(exercise: ParsedExercise | undefined): ParsedMovement[] {
@@ -1337,7 +1536,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     const weight = parseFloat(workoutWeight) || undefined;
 
     // Calculate total reps per set from movements (for volume calculation)
-    const repsPerSet = currentExercise.movements?.reduce((sum, mov) => sum + (mov.reps || 0), 0) || 0;
+    const repsPerSet = currentExercise.movements?.reduce((sum, mov) => {
+      const reps = customReps[mov.name] ?? mov.reps ?? 0;
+      return sum + reps;
+    }, 0) || 0;
 
     // Build sets array with split times
     const sets: ExerciseSet[] = splitTimes.map((time, i) => ({
@@ -1414,7 +1616,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     const weight = parseFloat(workoutWeight) || undefined;
 
     // Calculate reps per round from movements (for volume calculation)
-    const repsPerRound = currentExercise.movements?.reduce((sum, mov) => sum + (mov.reps || 0), 0) || 1;
+    const repsPerRound = currentExercise.movements?.reduce((sum, mov) => {
+      const reps = customReps[mov.name] ?? mov.reps ?? 0;
+      return sum + reps;
+    }, 0) || 1;
 
     // Build sets array with rounds - actualReps = rounds × reps_per_round for volume
     const sets: ExerciseSet[] = rounds.map((roundCount, i) => ({
@@ -1527,6 +1732,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       }
       setSelectedAlternatives(existing.movementAlternatives || {});
       setCustomDistances(existing.movementDistances || {});
+      setCustomReps(existing.movementReps || {});
       setWorkoutWeight(
         existing.sets?.[0]?.weight !== undefined
           ? existing.sets[0].weight.toString()
@@ -1545,6 +1751,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setCardioDistancePerTurn('');
       setSelectedAlternatives({});
       setCustomDistances({});
+      setCustomReps({});
     }
 
     // Reset interval-specific state on entry
@@ -1598,14 +1805,22 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       completionTime = mins * 60 + secs;
     }
 
-    // Extract rounds from exercise name/prescription (e.g., "7 rounds" or "14 rounds of Cindy")
+    // Extract rounds - first check user input (for AMRAP mode), then parse from text
+    const isAmrapMode = exerciseMode === 'amrap';
     let rounds: number | undefined;
-    const roundsMatch = currentExercise.name.match(/(\d+)\s*rounds?/i) ||
-                        currentExercise.prescription.match(/(\d+)\s*rounds?/i);
-    if (roundsMatch) {
-      rounds = parseInt(roundsMatch[1]);
-    } else if (currentExercise.suggestedSets) {
-      rounds = currentExercise.suggestedSets;
+
+    // For AMRAP mode, use user-entered rounds
+    if (isAmrapMode && currentRounds) {
+      rounds = parseFloat(currentRounds) || undefined;
+    } else {
+      // Fallback: extract from exercise name/prescription (e.g., "7 rounds" or "14 rounds of Cindy")
+      const roundsMatch = currentExercise.name.match(/(\d+)\s*rounds?/i) ||
+                          currentExercise.prescription.match(/(\d+)\s*rounds?/i);
+      if (roundsMatch) {
+        rounds = parseInt(roundsMatch[1]);
+      } else if (currentExercise.suggestedSets) {
+        rounds = currentExercise.suggestedSets;
+      }
     }
 
     // Calculate cardio data (calories)
@@ -1656,11 +1871,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       return acc;
     }, {});
 
+    const movementReps = currentExercise.movements?.reduce<Record<string, number>>((acc, mov) => {
+      if (mov.reps !== undefined) {
+        acc[mov.name] = customReps[mov.name] !== undefined
+          ? customReps[mov.name]
+          : mov.reps;
+      }
+      return acc;
+    }, {});
+
     const movementDistances = currentExercise.movements?.reduce<Record<string, number>>((acc, mov) => {
-      if (mov.distance && mov.distance > 0) {
-        acc[mov.name] = customDistances[mov.name] !== undefined
-          ? customDistances[mov.name]
-          : mov.distance;
+      // Include distance if either: movement has default distance, or user entered custom distance
+      const distance = customDistances[mov.name] ?? mov.distance;
+      if (distance && distance > 0) {
+        acc[mov.name] = distance;
       }
       return acc;
     }, {});
@@ -1671,6 +1895,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       completionTime,
       movementWeights: effectiveMovementWeights,
       ...(movementAlternatives && Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
+      ...(movementReps && Object.keys(movementReps).length > 0 ? { movementReps } : {}),
       ...(movementDistances && Object.keys(movementDistances).length > 0 ? { movementDistances } : {}),
       rounds,
       ...cardioData,
@@ -1700,8 +1925,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCardioCaloriesPerTurn('');
         setCardioDistanceTurns('');
         setCardioDistancePerTurn('');
+        setCurrentRounds('');
         setSelectedAlternatives({});
         setCustomDistances({});
+        setCustomReps({});
       }
     }
   };
@@ -1723,6 +1950,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setMovementWeights({});
         setManuallyEditedWeights(new Set());
       }
+      setCustomReps(exerciseResults[prevIndex].movementReps || {});
       // Restore time if it was a for-time workout
       if (exerciseResults[prevIndex].completionTime) {
         const totalSeconds = exerciseResults[prevIndex].completionTime!;
@@ -1749,6 +1977,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCardioDistanceTurns('');
         setCardioDistancePerTurn('');
       }
+      setSelectedAlternatives(exerciseResults[prevIndex].movementAlternatives || {});
+      setCustomDistances(exerciseResults[prevIndex].movementDistances || {});
       // Remove the last result since we're going back (skip when editing existing results)
       if (!isEditingAfterSave) {
         setExerciseResults(prev => prev.slice(0, -1));
@@ -1761,6 +1991,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setCardioCaloriesPerTurn('');
       setCardioDistanceTurns('');
       setCardioDistancePerTurn('');
+      setSelectedAlternatives({});
+      setCustomDistances({});
+      setCustomReps({});
     }
   };
 
@@ -1810,6 +2043,27 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     setStep('saving');
 
     try {
+      // Record user corrections for learning system
+      for (let i = 0; i < results.length; i++) {
+        const exercise = parsedWorkout.exercises[i];
+        const guidance = loggingGuidance[i];
+        const override = modeOverrides[i];
+
+        if (override && exercise) {
+          // User manually selected a different mode - record as correction
+          await recordUserCorrection(
+            exercise.name,
+            exercise.prescription,
+            guidance?.patternId,
+            override,
+            getDefaultFields(override)
+          );
+        } else if (guidance?.patternId) {
+          // User accepted the guidance without changes - record as correct
+          await recordPatternUsage(guidance.patternId, true);
+        }
+      }
+
       const skipPersistence = isEditingAfterSave;
       // Calculate total duration (totals computed after exercises map)
       let totalDuration = 0; // in seconds
@@ -1820,7 +2074,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
         // Calculate volume from per-movement weights if available
         if (movements && movements.length > 0) {
-          const repsPerRound = movements.reduce((sum, mov) => sum + (mov.reps || 0), 0);
+          const repsPerRound = movements.reduce((sum, mov) => {
+            const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
+            return sum + reps;
+          }, 0);
           const roundCountsFromSets: number[] = [];
 
           if (repsPerRound > 0) {
@@ -1837,7 +2094,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           const totalRounds = roundCounts.reduce((sum, value) => sum + value, 0);
 
           movements.forEach((mov) => {
-            const perRound = mov.reps || 0;
+            const perRound = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
             if (perRound > 0) {
               repsFromMovements += perRound * totalRounds;
             }
@@ -1934,7 +2191,35 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       const totalReps = breakdownFromResults.grandTotalReps;
 
       const workoutTitle = parsedWorkout.title || "Today's Workout";
-      const durationMinutes = totalDuration > 0 ? totalDuration / 60 : 0;
+
+      // For AMRAP/EMOM, use time cap if no completion time was logged
+      // This ensures metcon minutes are counted even when user doesn't log time
+      // Check both type AND format since post-processor may correct format but not type
+      const isTimedWorkout =
+        parsedWorkout.type === 'amrap' || parsedWorkout.type === 'emom' ||
+        parsedWorkout.format === 'amrap' || parsedWorkout.format === 'emom';
+      const timeCapSeconds = parsedWorkout.timeCap || 0;
+      const effectiveDuration = totalDuration > 0
+        ? totalDuration
+        : (isTimedWorkout && timeCapSeconds > 0 ? timeCapSeconds : 0);
+      const durationMinutes = effectiveDuration > 0 ? effectiveDuration / 60 : 0;
+
+      // DEBUG: Log duration calculation
+      console.warn('⏱️ DURATION CALC', {
+        type: parsedWorkout.type,
+        format: parsedWorkout.format,
+        isTimedWorkout,
+        timeCap: parsedWorkout.timeCap,
+        timeCapSeconds,
+        totalDuration,
+        effectiveDuration,
+        durationMinutes,
+        breakdownMovements: breakdownFromResults.movements?.map(m => ({
+          name: m.name,
+          distance: m.totalDistance,
+          reps: m.totalReps,
+        })),
+      });
 
       const workoutDate = savedWorkoutMeta?.date || new Date();
 
@@ -1949,8 +2234,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         workloadBreakdown: breakdownFromResults,
         status: 'completed',
         exercises,
-        duration: totalDuration > 0 ? Math.round(totalDuration / 60) : null,
-        durationSeconds: totalDuration > 0 ? totalDuration : null,
+        duration: effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : null,
+        durationSeconds: effectiveDuration > 0 ? effectiveDuration : null,
         notes: null,
         updatedAt: serverTimestamp(),
       };
@@ -1999,7 +2284,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       const workloadBreakdown: WorkloadBreakdown | undefined = breakdownFromResults;
 
       const formatLabelMap: Record<string, string> = {
-        for_time: 'For Time',
+        for_time: 'Metcon Time',
         amrap: 'AMRAP',
         emom: 'EMOM',
         strength: 'Strength',
@@ -2058,7 +2343,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   };
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} ref={containerRef}>
       {/* Header */}
       <header className={styles.header}>
         <Button
@@ -2332,7 +2617,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Workout details */}
-          <Card padding="none" className={styles.exerciseCard}>
+          <Card
+            padding="none"
+            className={styles.exerciseCard}
+            data-mobile-input-scope
+            onKeyDown={handleMobileNextInput}
+          >
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[0]?.name || 'AMRAP Intervals'}
             </h2>
@@ -2348,10 +2638,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 customDistances={customDistances}
                 customTimes={customTimes}
                 customWeights={movementWeights}
+                customReps={customReps}
                 onAlternativeChange={handleSelectAlternative}
                 onDistanceChange={handleCustomDistanceChange}
                 onTimeChange={handleTimeChange}
                 onWeightChange={handleMovementWeightChange}
+                onRepsChange={handleRepsChange}
                 readOnly={currentIntervalSet > 1}
               />
             )}
@@ -2409,6 +2701,92 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         </motion.div>
       )}
 
+      {/* Standard AMRAP - single AMRAP with rounds input */}
+      {step === 'log-results' && parsedWorkout && isCurrentExerciseAmrap && (
+        <motion.div
+          className={styles.wizardContainer}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          key="amrap-standard"
+        >
+          {/* Workout title */}
+          {parsedWorkout.title && (
+            <h2 className={styles.workoutTitle}>{parsedWorkout.title}</h2>
+          )}
+
+          {/* Workout details */}
+          <Card
+            padding="none"
+            className={styles.exerciseCard}
+            data-mobile-input-scope
+            onKeyDown={handleMobileNextInput}
+          >
+            <h2 className={styles.exerciseName}>
+              {parsedWorkout.exercises[currentExerciseIndex]?.name || 'AMRAP'}
+            </h2>
+            <p className={styles.exercisePrescriptionLarge}>
+              {parsedWorkout.exercises[currentExerciseIndex]?.prescription}
+            </p>
+
+            {/* Movements with inline editing (alternatives, distance, time, weight) */}
+            {parsedWorkout.exercises[currentExerciseIndex]?.movements && (
+              <MovementListEditor
+                movements={parsedWorkout.exercises[currentExerciseIndex].movements}
+                selectedAlternatives={selectedAlternatives}
+                customDistances={customDistances}
+                customTimes={customTimes}
+                customWeights={movementWeights}
+                customReps={customReps}
+                onAlternativeChange={handleSelectAlternative}
+                onDistanceChange={handleCustomDistanceChange}
+                onTimeChange={handleTimeChange}
+                onWeightChange={handleMovementWeightChange}
+                onRepsChange={handleRepsChange}
+              />
+            )}
+
+            {/* Rounds input */}
+            <div className={styles.roundsInputContainer}>
+              <label className={styles.timeLabel}>Rounds Completed</label>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.5"
+                value={currentRounds}
+                onChange={(e) => setCurrentRounds(e.target.value)}
+                placeholder="e.g., 5.5"
+                className={styles.roundsInput}
+                min="0"
+              />
+              <span className={styles.roundsHint}>Use decimals for partial rounds (e.g., 5.5 = 5 rounds + half)</span>
+            </div>
+          </Card>
+
+          {/* Navigation */}
+          <div className={styles.wizardActions}>
+            <Button
+              variant="secondary"
+              onClick={handleHeaderBack}
+              size="lg"
+              icon={<BackIcon />}
+            >
+              Back
+            </Button>
+            <Button
+              onClick={handleNextExercise}
+              size="lg"
+              variant={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? 'danger' : 'primary'}
+              className={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? styles.saveButton : ''}
+            >
+              {currentExerciseIndex >= parsedWorkout.exercises.length - 1
+                ? 'Save Workout'
+                : 'Next Exercise'
+              }
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Time-based Intervals - ALL SETS ON ONE SCREEN */}
       {step === 'log-results' && parsedWorkout && isCurrentExerciseInterval && (
         <motion.div
@@ -2418,7 +2796,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           key="interval-all-sets"
         >
           {/* Workout details */}
-          <Card padding="none" className={styles.exerciseCard}>
+          <Card
+            padding="none"
+            className={styles.exerciseCard}
+            data-mobile-input-scope
+            onKeyDown={handleMobileNextInput}
+          >
             <h2 className={styles.exerciseName}>
               {parsedWorkout.exercises[0]?.name || 'Interval Workout'}
             </h2>
@@ -2434,10 +2817,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 customDistances={customDistances}
                 customTimes={customTimes}
                 customWeights={movementWeights}
+                customReps={customReps}
                 onAlternativeChange={handleSelectAlternative}
                 onDistanceChange={handleCustomDistanceChange}
                 onTimeChange={handleTimeChange}
                 onWeightChange={handleMovementWeightChange}
+                onRepsChange={handleRepsChange}
               />
             )}
 
@@ -2547,13 +2932,43 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           </div>
 
           {/* Current exercise */}
-          <Card padding="none" className={styles.exerciseCard}>
-            <h2 className={styles.exerciseName}>
-              {parsedWorkout.exercises[currentExerciseIndex].name}
-            </h2>
-            <p className={styles.exercisePrescriptionLarge}>
-              {parsedWorkout.exercises[currentExerciseIndex].prescription}
-            </p>
+          <Card
+            padding="none"
+            className={styles.exerciseCard}
+            data-mobile-input-scope
+            onKeyDown={handleMobileNextInput}
+          >
+            <div className={styles.exerciseHeader}>
+              <h2 className={styles.exerciseName}>
+                {parsedWorkout.exercises[currentExerciseIndex].name}
+              </h2>
+              <p className={styles.exercisePrescriptionLarge}>
+                {parsedWorkout.exercises[currentExerciseIndex].prescription}
+              </p>
+            </div>
+
+            {/* Mode selector for low confidence or AI-suggested */}
+            {showModeSelector && (
+              <div className={styles.modeSelectorContainer}>
+                <label className={styles.modeSelectorLabel}>
+                  Logging mode {isLoadingGuidance && <span className={styles.loadingIndicator}>(AI thinking...)</span>}
+                </label>
+                <select
+                  value={userOverride || currentExerciseMode}
+                  onChange={(e) => handleModeOverride(e.target.value as ExerciseLoggingMode)}
+                  className={styles.modeSelector}
+                >
+                  <option value="strength">Weight/Reps</option>
+                  <option value="bodyweight">Reps Only</option>
+                  <option value="for_time">Time</option>
+                  <option value="cardio">Calories</option>
+                  <option value="cardio_distance">Distance</option>
+                </select>
+                {guidance?.explanation && (
+                  <p className={styles.modeSelectorHint}>{guidance.explanation}</p>
+                )}
+              </div>
+            )}
 
             {/* Show time input for "for time" workouts, otherwise show sets */}
             {isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format) ? (
@@ -2566,42 +2981,46 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     customDistances={customDistances}
                     customTimes={customTimes}
                     customWeights={movementWeights}
+                    customReps={customReps}
                     onAlternativeChange={handleSelectAlternative}
                     onDistanceChange={handleCustomDistanceChange}
                     onTimeChange={handleTimeChange}
                     onWeightChange={handleMovementWeightChange}
+                    onRepsChange={handleRepsChange}
                   />
                 )}
 
                 {/* Time input */}
                 <div className={styles.timeInputContainer}>
-                  <label className={styles.timeLabel}>Total Time</label>
-                  <div className={styles.timeInputs}>
-                    <div className={styles.timeInputGroup}>
+                  <label className={styles.timeLabel}>Metcon Time</label>
+                  <div className={styles.timePill}>
+                    <div className={styles.timePillField}>
                       <input
                         type="number"
                         inputMode="numeric"
+                        enterKeyHint="next"
                         value={completionMinutes}
                         onChange={(e) => setCompletionMinutes(e.target.value)}
                         placeholder="00"
-                        className={styles.timeInput}
+                        className={styles.timePillInput}
                         min="0"
                       />
-                      <span className={styles.timeUnit}>min</span>
+                      <span className={styles.timePillUnit}>min</span>
                     </div>
-                    <span className={styles.timeSeparator}>:</span>
-                    <div className={styles.timeInputGroup}>
+                    <span className={styles.timePillSeparator}>:</span>
+                    <div className={styles.timePillField}>
                       <input
                         type="number"
                         inputMode="numeric"
+                        enterKeyHint="next"
                         value={completionSeconds}
                         onChange={(e) => setCompletionSeconds(e.target.value)}
                         placeholder="00"
-                        className={styles.timeInput}
+                        className={styles.timePillInput}
                         min="0"
                         max="59"
                       />
-                      <span className={styles.timeUnit}>sec</span>
+                      <span className={styles.timePillUnit}>sec</span>
                     </div>
                   </div>
                 </div>
@@ -2698,10 +3117,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                         {currentExerciseNeedsWeight && !hasMixedMovementWeights && (
                           <div className={styles.inputGroup}>
                             <label>Weight (kg)</label>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              value={set.weight ?? ''}
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            enterKeyHint="next"
+                            value={set.weight ?? ''}
                               onChange={(e) => updateSet(
                                 setIndex,
                                 'weight',
@@ -2723,6 +3143,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                           <input
                             type="number"
                             inputMode="numeric"
+                            enterKeyHint="next"
                             value={set.actualReps ?? ''}
                             onChange={(e) => updateSet(
                               setIndex,
@@ -2777,6 +3198,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             <Button
               onClick={handleNextExercise}
               size="lg"
+              variant={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? 'danger' : 'primary'}
+              className={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? styles.saveButton : ''}
             >
               {currentExerciseIndex >= parsedWorkout.exercises.length - 1
                 ? 'Save Workout'
@@ -2817,12 +3240,37 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
           {/* Current exercise */}
           <Card padding="none" className={styles.exerciseCard}>
-            <h2 className={styles.exerciseName}>
-              {parsedWorkout.exercises[currentExerciseIndex].name}
-            </h2>
-            <p className={styles.exercisePrescriptionLarge}>
-              {parsedWorkout.exercises[currentExerciseIndex].prescription}
-            </p>
+            <div className={styles.exerciseHeader}>
+              <h2 className={styles.exerciseName}>
+                {parsedWorkout.exercises[currentExerciseIndex].name}
+              </h2>
+              <p className={styles.exercisePrescriptionLarge}>
+                {parsedWorkout.exercises[currentExerciseIndex].prescription}
+              </p>
+            </div>
+
+            {/* Mode selector for low confidence or AI-suggested */}
+            {showModeSelector && (
+              <div className={styles.modeSelectorContainer}>
+                <label className={styles.modeSelectorLabel}>
+                  Logging mode {isLoadingGuidance && <span className={styles.loadingIndicator}>(AI thinking...)</span>}
+                </label>
+                <select
+                  value={userOverride || currentExerciseMode}
+                  onChange={(e) => handleModeOverride(e.target.value as ExerciseLoggingMode)}
+                  className={styles.modeSelector}
+                >
+                  <option value="cardio">Calories</option>
+                  <option value="cardio_distance">Distance</option>
+                  <option value="for_time">Time</option>
+                  <option value="strength">Weight/Reps</option>
+                  <option value="bodyweight">Reps Only</option>
+                </select>
+                {guidance?.explanation && (
+                  <p className={styles.modeSelectorHint}>{guidance.explanation}</p>
+                )}
+              </div>
+            )}
 
             {/* Cardio inputs */}
             <div className={styles.setsContainer}>
@@ -2833,6 +3281,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     <input
                       type="number"
                       inputMode="numeric"
+                      enterKeyHint="next"
                       value={cardioTurns}
                       onChange={(e) => setCardioTurns(e.target.value)}
                       placeholder="e.g. 3"
@@ -2846,6 +3295,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     <input
                       type="number"
                       inputMode="numeric"
+                      enterKeyHint="next"
                       value={cardioCaloriesPerTurn}
                       onChange={(e) => setCardioCaloriesPerTurn(e.target.value)}
                       placeholder="e.g. 25"
@@ -2881,6 +3331,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             <Button
               onClick={handleNextExercise}
               size="lg"
+              variant={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? 'danger' : 'primary'}
+              className={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? styles.saveButton : ''}
             >
               {currentExerciseIndex >= parsedWorkout.exercises.length - 1
                 ? 'Save Workout'
@@ -2921,12 +3373,37 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
           {/* Current exercise */}
           <Card padding="none" className={styles.exerciseCard}>
-            <h2 className={styles.exerciseName}>
-              {parsedWorkout.exercises[currentExerciseIndex].name}
-            </h2>
-            <p className={styles.exercisePrescriptionLarge}>
-              {parsedWorkout.exercises[currentExerciseIndex].prescription}
-            </p>
+            <div className={styles.exerciseHeader}>
+              <h2 className={styles.exerciseName}>
+                {parsedWorkout.exercises[currentExerciseIndex].name}
+              </h2>
+              <p className={styles.exercisePrescriptionLarge}>
+                {parsedWorkout.exercises[currentExerciseIndex].prescription}
+              </p>
+            </div>
+
+            {/* Mode selector for low confidence or AI-suggested */}
+            {showModeSelector && (
+              <div className={styles.modeSelectorContainer}>
+                <label className={styles.modeSelectorLabel}>
+                  Logging mode {isLoadingGuidance && <span className={styles.loadingIndicator}>(AI thinking...)</span>}
+                </label>
+                <select
+                  value={userOverride || currentExerciseMode}
+                  onChange={(e) => handleModeOverride(e.target.value as ExerciseLoggingMode)}
+                  className={styles.modeSelector}
+                >
+                  <option value="cardio">Calories</option>
+                  <option value="cardio_distance">Distance</option>
+                  <option value="for_time">Time</option>
+                  <option value="strength">Weight/Reps</option>
+                  <option value="bodyweight">Reps Only</option>
+                </select>
+                {guidance?.explanation && (
+                  <p className={styles.modeSelectorHint}>{guidance.explanation}</p>
+                )}
+              </div>
+            )}
 
             {/* Distance inputs */}
             <div className={styles.setsContainer}>
@@ -2937,6 +3414,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     <input
                       type="number"
                       inputMode="numeric"
+                      enterKeyHint="next"
                       value={cardioDistanceTurns}
                       onChange={(e) => setCardioDistanceTurns(e.target.value)}
                       placeholder="e.g. 3"
@@ -2948,10 +3426,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                   <div className={styles.inputGroup}>
                     <label>Distance per Turn</label>
                     <div className={styles.distanceInputWrapper}>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        value={cardioDistancePerTurn}
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      enterKeyHint="next"
+                      value={cardioDistancePerTurn}
                         onChange={(e) => setCardioDistancePerTurn(e.target.value)}
                         placeholder="e.g. 400"
                         className={styles.setInput}
@@ -2996,6 +3475,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             <Button
               onClick={handleNextExercise}
               size="lg"
+              variant={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? 'danger' : 'primary'}
+              className={currentExerciseIndex >= parsedWorkout.exercises.length - 1 ? styles.saveButton : ''}
             >
               {currentExerciseIndex >= parsedWorkout.exercises.length - 1
                 ? 'Save Workout'

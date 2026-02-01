@@ -31,7 +31,7 @@ const typeLabels: Record<WorkoutType, string> = {
   metcon: 'METCON',
   emom: 'EMOM',
   amrap: 'AMRAP',
-  for_time: 'FOR TIME',
+  for_time: 'METCON TIME',
   mixed: 'MIXED',
 };
 
@@ -158,7 +158,7 @@ export const ShareableCardStory = forwardRef<HTMLDivElement, ShareableCardStoryP
           <div className={styles.statBox}>
             <span className={styles.statEmoji}>⏱️</span>
             <span className={styles.statValue}>{formatDurationFriendly(duration)}</span>
-            <span className={styles.statLabel}>Time</span>
+            <span className={styles.statLabel}>Metcon Time</span>
           </div>
           {totalVolume > 0 && (
             <div className={styles.statBox}>

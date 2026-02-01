@@ -1,116 +1,250 @@
+/* ========================================
+   MOVEMENT LIST - Container
+   ======================================== */
 .movementList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-
-.movementRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: 0;
+  padding: 12px 16px 28px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
 }
 
-.movementRow:last-child {
+/* ========================================
+   METRIC STRIP - Strict 3-Column CSS Grid
+
+   THE "NO-DRIFT" RULE:
+   Column edges must align EXACTLY across all rows.
+
+   Col 1 (Movement): 1fr   - Left-aligned, TEXT WRAPS
+   Col 2 (Value):    75px  - Fixed width inputs
+   Col 3 (Unit):     75px  - Fixed width, right-aligned
+   ======================================== */
+.metricStrip {
+  display: grid;
+  grid-template-columns: 1fr 75px 75px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 12px;
+}
+
+.metricStrip:last-child {
   border-bottom: none;
 }
 
-.movementLabel {
+/* ========================================
+   COLUMN 1: Movement Name (1fr flexible)
+   Left-aligned. TEXT CAN WRAP to second line.
+   No ellipsis, no truncation.
+   ======================================== */
+.colA {
   min-width: 0;
 }
 
-.movementName {
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  font-weight: var(--font-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.movementSelect {
+/* Base control style - IDENTICAL for dropdown AND static label */
+.movementControl {
   width: 100%;
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+  min-height: 44px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
   color: var(--color-text);
-  font-size: var(--text-sm);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Dropdown select */
+.movementSelect {
+  composes: movementControl;
   cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  /* Allow text to wrap */
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .movementSelect:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
+  border-color: #00FFFF;
+  box-shadow: 0 0 0 1px #00FFFF;
 }
 
-.movementControls {
+.movementSelect:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Static label - MUST look identical to dropdown */
+.movementStaticLabel {
+  composes: movementControl;
+}
+
+.movementName {
+  /* Allow text to wrap - NO ellipsis, NO nowrap */
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.3;
+  font-size: 14px;
+}
+
+/* ========================================
+   COLUMN 2: Value (75px fixed)
+   Centered. Numeric inputs.
+   ======================================== */
+.colB {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 75px;
+}
+
+/* ========================================
+   COLUMN 3: Unit/Weight (75px fixed)
+   Right-aligned to screen edge.
+   Contains either: unit label OR weight input + kg
+   ======================================== */
+.colC {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-2);
-  min-width: 160px;
+  gap: 4px;
+  width: 75px;
 }
 
-.movementStat {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px 0;
+/* Weight input in Column 3 - smaller to fit with 'kg' label */
+.colC .valueInput {
+  width: 44px;
+  padding: 0 4px;
 }
 
+/* ========================================
+   VALUE INPUT - Fixed width numeric inputs
+   Subtle 1px border (0.1 opacity)
+   Cyan glow on focus
+   ======================================== */
 .valueInput {
-  width: 70px;
-  padding: var(--space-2) var(--space-2);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  width: 60px;
+  height: 44px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
   color: var(--color-text);
-  font-size: var(--text-sm);
+  font-size: 16px;
+  font-family: var(--font-mono);
+  font-weight: 500;
   text-align: center;
+  box-sizing: border-box;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
+/* Hide spin buttons */
+.valueInput::-webkit-outer-spin-button,
+.valueInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Focus state - Cyan glow (#00FFFF) */
 .valueInput:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
+  border-color: #00FFFF;
+  box-shadow: 0 0 0 1px #00FFFF;
+  background: rgba(0, 255, 255, 0.06);
 }
 
 .valueInput::placeholder {
   color: var(--color-text-secondary);
-  opacity: 0.5;
+  opacity: 0.35;
+  font-weight: 400;
 }
 
-.movementUnit {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  min-width: 2ch;
-}
-
-.movementValue {
-  font-size: var(--text-sm);
+/* ========================================
+   STATIC VALUE (read-only display)
+   ======================================== */
+.staticValue {
+  font-size: 16px;
   color: var(--color-text);
   font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: center;
+  width: 60px;
+  display: inline-block;
 }
 
-.movementStat .movementUnit {
+/* ========================================
+   UNIT LABEL - Right-aligned in Col 3
+   's', 'reps', 'm', 'kg' labels
+   ======================================== */
+.valueUnit {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: right;
   text-transform: lowercase;
+  opacity: 0.8;
+  flex-shrink: 0;
+  min-width: 28px;
 }
 
-/* Mobile: stack inputs on new line when needed */
-@media (max-width: 400px) {
-  .movementRow {
-    grid-template-columns: 1fr;
-    align-items: flex-start;
+/* ========================================
+   MOBILE RESPONSIVE
+   Tighter grid but same alignment rules
+   ======================================== */
+@media (max-width: 380px) {
+  .metricStrip {
+    grid-template-columns: 1fr 65px 65px;
+    min-height: 44px;
+    gap: 8px;
   }
 
-  .movementControls {
-    justify-content: flex-start;
+  .movementControl {
+    min-height: 40px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .movementName {
+    font-size: 13px;
+  }
+
+  .colB,
+  .colC {
+    width: 65px;
+  }
+
+  .valueInput {
+    width: 52px;
+    height: 40px;
+    padding: 0 6px;
+    font-size: 15px;
+  }
+
+  .colC .valueInput {
+    width: 38px;
+  }
+
+  .staticValue {
+    width: 52px;
+    font-size: 15px;
+  }
+
+  .valueUnit {
+    min-width: 24px;
+    font-size: 11px;
   }
 }

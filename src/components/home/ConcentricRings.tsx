@@ -183,7 +183,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
           <span className={styles.legendText}>
-            {metcon.value} / {metcon.goal} min
+            {metcon.value} / {metcon.goal} min metcon
           </span>
         </div>
         <div className={styles.legendItem}>

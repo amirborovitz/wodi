@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
@@ -9,7 +9,7 @@ import type { UserGoals } from '../types';
 import styles from './ProfileScreen.module.css';
 
 export function ProfileScreen() {
-  const { user, updateUserGoals, signOut } = useAuth();
+  const { user, updateUserGoals, updateUserPhoto, signOut } = useAuth();
   const { workouts } = useWorkouts();
   const { prCount } = usePRCount();
   const weeklyStats = useWeeklyStats();
@@ -22,6 +22,11 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoVersion, setPhotoVersion] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const totalVolume = workouts.reduce((acc, w) => acc + w.totalVolume, 0);
   const totalWorkouts = user?.stats.totalWorkouts || workouts.length;
@@ -60,6 +65,32 @@ export function ProfileScreen() {
     }
   };
 
+  const handlePhotoPick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+
+    setPhotoUploading(true);
+    setPhotoError(null);
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreviewUrl(previewUrl);
+    try {
+      await updateUserPhoto(file);
+      setPhotoVersion(Date.now());
+      setPhotoPreviewUrl(null);
+    } catch (error) {
+      console.error('Failed to update photo', error);
+      setPhotoError('Failed to update photo.');
+      setPhotoPreviewUrl(null);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const formatVolume = (kg: number) => {
     if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
     return `${kg}kg`;
@@ -81,18 +112,54 @@ export function ProfileScreen() {
         transition={{ duration: 0.3 }}
       >
         <div className={styles.profileInfo}>
-          {user?.photoUrl && (
-            <img
-              src={user.photoUrl}
-              alt={user.displayName}
-              className={styles.avatar}
+          <div
+            className={styles.avatarWrap}
+            onClick={handlePhotoPick}
+            onKeyDown={(event) => {
+              if (photoUploading) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handlePhotoPick();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Update profile photo"
+          >
+            {photoPreviewUrl ? (
+              <img
+                src={photoPreviewUrl}
+                alt={user?.displayName}
+                className={styles.avatar}
+              />
+            ) : user?.photoUrl ? (
+              <img
+                src={`${user.photoUrl}?v=${user.photoUpdatedAt || photoVersion}`}
+                alt={user.displayName}
+                className={styles.avatar}
+              />
+            ) : (
+              <div className={styles.avatarFallback}>
+                {user?.displayName?.[0]?.toUpperCase() || 'W'}
+              </div>
+            )}
+            <span className={styles.avatarButton}>
+              {photoUploading ? '...' : '✎'}
+            </span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className={styles.hiddenInput}
+              onChange={handlePhotoChange}
             />
-          )}
+          </div>
           <div className={styles.profileText}>
             <h1 className={styles.name}>{user?.displayName}</h1>
             <span className={styles.levelBadge}>
               Level {level}: {levelTitle}
             </span>
+            {photoError && <span className={styles.photoError}>{photoError}</span>}
           </div>
         </div>
       </motion.header>

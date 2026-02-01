@@ -76,7 +76,7 @@ export function PowerCellDashboard() {
           icon={<VolumeIcon />}
         />
         <PowerCell
-          label="Metcon"
+          label="Metcon Time"
           value={weeklyMetconMinutes}
           goal={goals.metconGoal}
           unit="min"
@@ -101,7 +101,7 @@ export function PowerCellDashboard() {
         transition={{ delay: 0.5 }}
       >
         <span className={styles.goalText}>
-          Goals: {(goals.volumeGoal / 1000).toFixed(0)}k kg | {goals.metconGoal} min | {goals.streakGoal} sessions
+          Goals: {(goals.volumeGoal / 1000).toFixed(0)}k kg | Metcon Time {goals.metconGoal} min | {goals.streakGoal} sessions
         </span>
       </motion.div>
     </div>

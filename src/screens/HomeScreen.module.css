@@ -53,6 +53,33 @@
   border: 2px solid var(--glass-border);
 }
 
+.avatarButton {
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarFallback {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid var(--glass-border);
+  color: var(--color-text);
+  font-weight: var(--font-bold);
+  font-size: var(--text-sm);
+}
+
 /* Rings Container */
 .ringsContainer {
   display: flex;

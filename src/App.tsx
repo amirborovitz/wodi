@@ -13,7 +13,7 @@ import type { WorkoutWithStats } from './hooks/useWorkouts';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
-const MAIN_SCREENS: Screen[] = ['home', 'history'];
+const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'stats', 'settings'];
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -118,6 +118,7 @@ function AppContent() {
               setPendingImage(null);
               setCurrentScreen('add-workout');
             }}
+            onOpenProfile={() => setCurrentScreen('profile')}
             ringsKey={homeRingsKey}
           />
         );

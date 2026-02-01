@@ -4,6 +4,7 @@ export interface User {
   email: string;
   displayName: string;
   photoUrl?: string;
+  photoUpdatedAt?: number;
   createdAt: Date;
   stats: UserStats;
   goals?: UserGoals;
@@ -288,4 +289,69 @@ export interface WorkoutWithStats extends Workout {
   metconMinutes?: number;
   xp?: XPBreakdown;
   isPR?: boolean;
+}
+
+// ============================================
+// LOGGING PATTERN LEARNING TYPES
+// ============================================
+
+// Exercise logging mode determines what UI is shown for logging
+export type ExerciseLoggingMode =
+  | 'strength'           // weight/reps per set
+  | 'cardio'             // calories
+  | 'cardio_distance'    // distance
+  | 'for_time'           // completion time
+  | 'amrap'              // rounds + reps
+  | 'amrap_intervals'    // multiple AMRAPs with rest
+  | 'intervals'          // time per set
+  | 'bodyweight'         // reps only
+  | 'sets';              // generic sets (weight/reps)
+
+// Fields to show/hide for logging an exercise
+export interface LoggingPatternFields {
+  showWeight: boolean;
+  showReps: boolean;
+  showTime: boolean;
+  showDistance: boolean;
+  showCalories: boolean;
+  showRounds: boolean;
+  defaultUnit?: 'm' | 'km' | 'mi' | 'kg' | 'lb' | 'cal';
+}
+
+// Learned logging pattern stored in Firebase
+export interface LearnedLoggingPattern {
+  id: string;                         // Base64 of normalized pattern
+  exercisePattern: string;            // "echo bike max"
+  keywords: string[];                 // ["echo", "bike", "max"]
+
+  loggingMode: ExerciseLoggingMode;
+  fields: LoggingPatternFields;
+
+  source: 'rule' | 'ai' | 'user_correction';
+  confidence: number;                 // 0-1
+  usageCount: number;
+  correctCount: number;               // User accepted
+  correctionCount: number;            // User changed
+  aiExplanation?: string;
+
+  createdAt: Date;
+  lastUsed: Date;
+}
+
+// Request for logging guidance
+export interface LoggingGuidanceRequest {
+  exerciseName: string;
+  prescription: string;
+  workoutContext?: string;
+  workoutFormat?: WorkoutFormat;
+}
+
+// Response from logging guidance system
+export interface LoggingGuidanceResponse {
+  loggingMode: ExerciseLoggingMode;
+  fields: LoggingPatternFields;
+  confidence: number;
+  source: 'rule' | 'cache' | 'ai';
+  explanation?: string;
+  patternId?: string;                 // For tracking corrections
 }

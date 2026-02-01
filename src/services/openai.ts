@@ -458,7 +458,15 @@ export async function refineParsedWorkout(
   });
 
   const text = response.choices[0]?.message?.content || '';
-  const refined = JSON.parse(text) as ParsedWorkout;
+
+  // Strip markdown code blocks if present (```json ... ```)
+  let jsonStr = text;
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1];
+  }
+
+  const refined = JSON.parse(jsonStr.trim()) as ParsedWorkout;
 
   // Post-process the refined workout
   return postProcessParsedWorkout(refined);

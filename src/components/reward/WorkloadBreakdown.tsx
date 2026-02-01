@@ -125,14 +125,23 @@ export function WorkloadBreakdown({
   if (!breakdown.movements || breakdown.movements.length === 0) {
     return null;
   }
-  const totalDistance = breakdown.grandTotalDistance ?? breakdown.movements.reduce(
+
+  // Only show aggregate distance if there's ONE movement type with distance
+  // (e.g., don't sum Echo Bike + Sled Push - they're different activities)
+  const distanceMovements = breakdown.movements.filter(m => m.totalDistance && m.totalDistance > 0);
+  const hasMultipleDistanceTypes = distanceMovements.length > 1;
+  const totalDistance = hasMultipleDistanceTypes ? 0 : (breakdown.grandTotalDistance ?? breakdown.movements.reduce(
     (sum, movement) => sum + (movement.totalDistance || 0),
     0
-  );
-  const totalCalories = breakdown.grandTotalCalories ?? breakdown.movements.reduce(
+  ));
+
+  // Same logic for calories - only aggregate if single movement type
+  const calorieMovements = breakdown.movements.filter(m => m.totalCalories && m.totalCalories > 0);
+  const hasMultipleCalorieTypes = calorieMovements.length > 1;
+  const totalCalories = hasMultipleCalorieTypes ? 0 : (breakdown.grandTotalCalories ?? breakdown.movements.reduce(
     (sum, movement) => sum + (movement.totalCalories || 0),
     0
-  );
+  ));
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(3);
 

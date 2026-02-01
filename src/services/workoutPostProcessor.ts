@@ -111,18 +111,102 @@ const MOVEMENT_ALIASES: Record<string, string> = {
  * Main post-processor function
  */
 export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout {
+  console.warn('🔧 [PostProcessor] CALLED with:', {
+    title: workout.title,
+    type: workout.type,
+    format: workout.format,
+    timeCap: workout.timeCap,
+  });
+
   // Extract time cap if missing
   const timeCap = workout.timeCap || extractTimeCap(workout);
 
+  // Correct format and type if AI returned wrong one (e.g., "strength" for AMRAP)
+  const correctedFormat = correctWorkoutFormat(workout);
+  const correctedType = correctWorkoutType(workout, correctedFormat);
+
+  console.warn('🔧 [PostProcessor] RESULT:', {
+    originalFormat: workout.format,
+    correctedFormat,
+    originalType: workout.type,
+    correctedType,
+    timeCap,
+    title: workout.title,
+  });
+
   return {
     ...workout,
+    type: correctedType,
+    format: correctedFormat,
     timeCap,
     exercises: workout.exercises.map(postProcessExercise),
   };
 }
 
 /**
- * Extract time cap from workout text (e.g., "42min TC", "20 min cap", "TC 15")
+ * Correct workout type to match the corrected format
+ * Ensures type and format are consistent for time cap calculations
+ */
+function correctWorkoutType(workout: ParsedWorkout, correctedFormat: ParsedWorkout['format']): ParsedWorkout['type'] {
+  // Map format to appropriate type
+  if (correctedFormat === 'amrap' || correctedFormat === 'amrap_intervals') {
+    return 'amrap';
+  }
+  if (correctedFormat === 'emom') {
+    return 'emom';
+  }
+  if (correctedFormat === 'for_time') {
+    return 'for_time';
+  }
+  // Keep original type for other formats
+  return workout.type;
+}
+
+/**
+ * Correct workout format based on title and exercise content
+ * AI often returns "strength" for mixed workouts containing AMRAP/EMOM
+ */
+function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
+  const textToCheck = [
+    workout.title,
+    workout.rawText,
+    ...workout.exercises.map(e => e.name),
+    ...workout.exercises.map(e => e.prescription),
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  console.warn('🔧 [correctWorkoutFormat] Checking text:', textToCheck.slice(0, 200));
+  console.warn('🔧 [correctWorkoutFormat] Contains AMRAP?', textToCheck.includes('amrap'));
+
+  // Check for AMRAP patterns first
+  if (textToCheck.includes('amrap')) {
+    // Check for AMRAP intervals (multiple AMRAPs with rest)
+    if (/amrap.*x\s*\d/i.test(textToCheck) || /\d+\s*x\s*amrap/i.test(textToCheck) ||
+        (textToCheck.includes('amrap') && textToCheck.includes('rest'))) {
+      console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap_intervals');
+      return 'amrap_intervals';
+    }
+    console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap');
+    return 'amrap';
+  }
+
+  // Check for EMOM patterns
+  if (textToCheck.includes('emom') || textToCheck.includes('e2mom') ||
+      /every\s+\d+\s*(?:min|:)/i.test(textToCheck)) {
+    return 'emom';
+  }
+
+  // Check for explicit "for time" patterns
+  if (textToCheck.includes('for time') || /\brft\b/i.test(textToCheck) ||
+      /\d+\s+rounds?\s+for\s+time/i.test(textToCheck)) {
+    return 'for_time';
+  }
+
+  // Keep original format if no correction needed
+  return workout.format;
+}
+
+/**
+ * Extract time cap from workout text (e.g., "42min TC", "20 min cap", "25min AMRAP")
  */
 function extractTimeCap(workout: ParsedWorkout): number | undefined {
   const text = [
@@ -131,22 +215,34 @@ function extractTimeCap(workout: ParsedWorkout): number | undefined {
     ...workout.exercises.map(e => `${e.name} ${e.prescription}`),
   ].filter(Boolean).join(' ').toLowerCase();
 
-  // Patterns: "42min TC", "TC 42", "42 min time cap", "time cap: 42", "cap 42 min"
+  // Patterns for time cap extraction
   const patterns = [
+    // Explicit time cap patterns
     /(\d+)\s*min(?:ute)?s?\s*(?:tc|time\s*cap)/i,
     /(?:tc|time\s*cap)\s*:?\s*(\d+)\s*min/i,
     /(?:tc|time\s*cap)\s*:?\s*(\d+)/i,
     /\*\s*(\d+)\s*min/i,  // "*42min TC" format
     /cap\s*:?\s*(\d+)\s*min/i,
+    // AMRAP patterns: "25min AMRAP", "25 min AMRAP", "AMRAP 25"
+    /(\d+)\s*min(?:ute)?s?\s*amrap/i,
+    /amrap\s*(\d+)\s*min/i,
+    /amrap\s*(\d+)/i,
+    // EMOM patterns: "20min EMOM", "EMOM 20"
+    /(\d+)\s*min(?:ute)?s?\s*e(?:2)?mom/i,
+    /e(?:2)?mom\s*(\d+)\s*min/i,
+    /e(?:2)?mom\s*(\d+)/i,
   ];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
-      return parseInt(match[1]) * 60; // Convert to seconds
+      const minutes = parseInt(match[1]);
+      console.log('[extractTimeCap] Found time cap:', minutes, 'minutes from pattern:', pattern);
+      return minutes * 60; // Convert to seconds
     }
   }
 
+  console.log('[extractTimeCap] No time cap found in:', text.slice(0, 100));
   return undefined;
 }
 

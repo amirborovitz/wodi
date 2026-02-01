@@ -14,7 +14,7 @@ const typeStyles: Record<WorkoutType, { gradient: string; icon: string; label: s
   for_time: {
     gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
     icon: 'FT',
-    label: 'For Time',
+    label: 'Metcon Time',
   },
   amrap: {
     gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',

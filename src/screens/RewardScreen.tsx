@@ -152,12 +152,20 @@ interface MetricBlock {
 }
 
 export function RewardScreen({ data, onDone }: RewardScreenProps) {
+  // DEBUG: Very obvious log
+  console.warn('🏆 REWARD SCREEN LOADED', {
+    duration: data.workoutSummary?.duration,
+    movements: data.workloadBreakdown?.movements?.map(m => `${m.name}: ${m.totalDistance || m.totalReps || m.totalCalories}`),
+    grandTotalDistance: data.workloadBreakdown?.grandTotalDistance,
+  });
+
   const { workoutSummary, heroAchievement } = data;
   const hasPR = heroAchievement && heroAchievement.type === 'pr';
   const isSharing = false;
   const [isStoryStudioOpen, setIsStoryStudioOpen] = useState(false);
   const weeklyStats = useWeeklyStats();
   const { user } = useAuth();
+  const userInitial = user?.displayName?.trim()?.[0]?.toUpperCase() || 'W';
 
   const goalAccomplished = !weeklyStats.loading && (
     weeklyStats.volumePercent >= 100 ||
@@ -168,7 +176,7 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
   const goalTags = !weeklyStats.loading
     ? [
         weeklyStats.volumePercent >= 100 ? 'Volume' : null,
-        weeklyStats.metconPercent >= 100 ? 'Time' : null,
+        weeklyStats.metconPercent >= 100 ? 'Metcon Time' : null,
         weeklyStats.frequencyPercent >= 100 ? 'Sessions' : null,
       ].filter(Boolean).join(' · ')
     : '';
@@ -208,9 +216,33 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
   // Get totals from workload breakdown
   const totalReps = data.workloadBreakdown?.grandTotalReps || workoutSummary.totalReps || 0;
   const totalVolume = data.workloadBreakdown?.grandTotalVolume || workoutSummary.totalVolume || 0;
-  const totalDistance = data.workloadBreakdown?.grandTotalDistance || 0;
   const totalCalories = data.workloadBreakdown?.grandTotalCalories || 0;
   const totalSeconds = Math.round((workoutSummary.duration || 0) * 60);
+
+  // Only show aggregate distance if there's ONE movement type with distance
+  // (e.g., don't sum Echo Bike + Sled Push - they're different activities)
+  const distanceMovements = data.workloadBreakdown?.movements?.filter(m => m.totalDistance && m.totalDistance > 0) || [];
+  const hasMultipleDistanceTypes = distanceMovements.length > 1;
+  const totalDistance = hasMultipleDistanceTypes ? 0 : (data.workloadBreakdown?.grandTotalDistance || 0);
+  const singleDistanceMovement = distanceMovements.length === 1 ? distanceMovements[0] : null;
+
+  // DEBUG: Log reward data
+  console.log('[RewardScreen] Data:', {
+    duration: workoutSummary.duration,
+    totalSeconds,
+    totalReps,
+    totalVolume,
+    grandTotalDistance: data.workloadBreakdown?.grandTotalDistance,
+    distanceMovements: distanceMovements.map(m => ({ name: m.name, distance: m.totalDistance })),
+    hasMultipleDistanceTypes,
+    totalDistance,
+    movements: data.workloadBreakdown?.movements?.map(m => ({
+      name: m.name,
+      reps: m.totalReps,
+      distance: m.totalDistance,
+      calories: m.totalCalories,
+    })),
+  });
 
   // Animated counters - faster for trophy feel
   const animatedVolumeKg = useCountUp(totalVolume, { delay: 200, duration: 1000, decimals: 0 });
@@ -238,7 +270,7 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
       type: 'time',
       icon: <StopwatchIcon />,
       value: formatDurationFromSeconds(animatedSeconds),
-      label: 'TIME',
+      label: 'METCON TIME',
       className: styles.timeBlock,
     });
 
@@ -261,13 +293,17 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
     }
 
     if (totalDistance > 0) {
+      // Show movement name if it's a single distance type (e.g., "ECHO BIKE" instead of "DIST")
+      const distanceLabel = singleDistanceMovement
+        ? singleDistanceMovement.name.toUpperCase().slice(0, 12)
+        : 'DIST';
       candidates.push({
         priority: 2,
         metric: {
           type: 'distance',
           icon: <RouteIcon />,
           value: formatDistance(animatedDistance),
-          label: 'DIST',
+          label: distanceLabel,
           className: styles.distanceBlock,
         },
       });
@@ -350,6 +386,32 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
         >
           <h1 className={styles.heroTitle}>CRUSHING IT!</h1>
         </motion.div>
+
+        {/* Celebration Duo */}
+        <div className={styles.celebrationRow}>
+          <motion.div
+            className={styles.avatarDance}
+            animate={{ y: [0, -6, 0], rotate: [0, 2, -2, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            {user?.photoUrl ? (
+              <img src={user.photoUrl} alt="Your avatar" className={styles.avatarImage} />
+            ) : (
+              <span className={styles.avatarInitial}>{userInitial}</span>
+            )}
+          </motion.div>
+          <motion.div
+            className={styles.mascot}
+            animate={{ y: [0, -8, 0], rotate: [0, -3, 3, 0] }}
+            transition={{ duration: 1.9, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <div className={styles.mascotFace}>
+              <span className={styles.mascotEye} />
+              <span className={styles.mascotEye} />
+              <span className={styles.mascotSmile} />
+            </div>
+          </motion.div>
+        </div>
 
         {/* Goal Banner - directly under hero title */}
         {goalAccomplished && (

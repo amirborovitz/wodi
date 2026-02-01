@@ -67,7 +67,7 @@ export function SettingsScreen() {
           <div className={styles.profileCard}>
             {user?.photoUrl && (
               <img
-                src={user.photoUrl}
+                src={`${user.photoUrl}?v=${user.photoUpdatedAt || 0}`}
                 alt={user.displayName}
                 className={styles.avatar}
               />

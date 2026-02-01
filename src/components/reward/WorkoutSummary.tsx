@@ -17,7 +17,7 @@ const typeLabels: Record<WorkoutType, string> = {
   metcon: 'Metcon',
   emom: 'EMOM',
   amrap: 'AMRAP',
-  for_time: 'For Time',
+  for_time: 'Metcon Time',
   mixed: 'Mixed',
 };
 

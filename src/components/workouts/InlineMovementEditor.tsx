@@ -1,3 +1,4 @@
+import type { FocusEvent } from 'react';
 import type { ParsedMovement } from '../../types';
 import { getExerciseAlternatives, findExerciseDefinition } from '../../data/exerciseDefinitions';
 import styles from './InlineMovementEditor.module.css';
@@ -9,13 +10,15 @@ interface MovementEditorProps {
   customDistance?: number;
   customTime?: number;
   customWeight?: number;
+  customReps?: number;
   // Callbacks
   onAlternativeChange?: (originalName: string, alternativeName: string | null, newDistance?: number) => void;
   onDistanceChange?: (movementName: string, distance: number) => void;
   onTimeChange?: (movementName: string, time: number) => void;
   onWeightChange?: (movementName: string, weight: number) => void;
+  onRepsChange?: (movementName: string, reps: number) => void;
   // Display options
-  showWeight?: boolean;  // Force show weight input
+  showWeight?: boolean;
   readOnly?: boolean;
 }
 
@@ -38,16 +41,37 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
   return weightedPatterns.some(pattern => name.includes(pattern));
 }
 
+function abbreviateMovementLabel(name: string): string {
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  const exactMap: Record<string, string> = {
+    'russian kettlebell swing': 'KB Swings',
+    'russian kettlebell swings': 'KB Swings',
+    'kettlebell swing': 'KB Swings',
+    'kettlebell swings': 'KB Swings',
+    'american kettlebell swing': 'KB Swings',
+    'american kettlebell swings': 'KB Swings',
+    'v-up': 'V-ups',
+    'v up': 'V-ups',
+    'v-ups': 'V-ups',
+  };
+
+  if (exactMap[lower]) return exactMap[lower];
+  return trimmed;
+}
+
 export function InlineMovementEditor({
   movement,
   selectedAlternative,
   customDistance,
   customTime,
   customWeight,
+  customReps,
   onAlternativeChange,
   onDistanceChange,
   onTimeChange,
   onWeightChange,
+  onRepsChange,
   showWeight,
   readOnly = false,
 }: MovementEditorProps) {
@@ -64,62 +88,35 @@ export function InlineMovementEditor({
 
   // Display name (either selected alternative or original)
   const displayName = selectedAlternative || movement.name;
+  const displayLabel = abbreviateMovementLabel(displayName);
 
   // Display values (custom or original)
   const displayDistance = customDistance ?? movement.distance;
   const displayTime = customTime ?? movement.time;
+  const displayReps = customReps ?? movement.reps;
   const displayUnit = movement.unit || 'm';
 
-  // Determine what to show as the primary measurement
+  // Determine what to show as the primary measurement (Column B)
   const showTimeInput = hasTime || (supportsTime && !hasDistance && !hasCalories);
   const showDistanceInput = hasDistance;
   const showCaloriesDisplay = hasCalories && !hasDistance && !hasTime;
+  const showRepsInput = movement.reps !== undefined;
 
-  // For simple movements with no editability
-  const isSimpleMovement = !hasAlternatives && !isWeighted && !hasDistance && !hasTime && !hasCalories;
+  // Determine what to show as secondary (Column C) - only for weighted movements
+  const showWeightInput = isWeighted;
+  const showRxDisplay = !isWeighted && movement.rxWeights;
 
-  if (readOnly || isSimpleMovement) {
-    const stats: Array<{ value: string; unit: string }> = [];
-    if (movement.reps) stats.push({ value: movement.reps.toString(), unit: 'reps' });
-    if (hasDistance && movement.distance) stats.push({ value: movement.distance.toString(), unit: displayUnit });
-    if (hasCalories && movement.calories) stats.push({ value: movement.calories.toString(), unit: 'cal' });
-    if (hasTime && movement.time) stats.push({ value: movement.time.toString(), unit: 'sec' });
-    if (movement.rxWeights) {
-      const weightLabel = `${movement.rxWeights.female ?? movement.rxWeights.male}/${movement.rxWeights.male ?? movement.rxWeights.female}`;
-      stats.push({ value: weightLabel, unit: movement.rxWeights.unit || 'kg' });
-    }
-
-    return (
-      <div className={styles.movementRow}>
-        <div className={styles.movementLabel}>
-          <span className={styles.movementName}>{displayName}</span>
-        </div>
-        <div className={styles.movementControls}>
-          {stats.map((stat, index) => (
-            <span key={`${stat.value}-${index}`} className={styles.movementStat}>
-              <span className={styles.movementValue}>{stat.value}</span>
-              <span className={styles.movementUnit}>{stat.unit}</span>
-            </span>
-          ))}
-          {!stats.length && (
-            <span className={styles.movementStat}>
-              <span className={styles.movementValue}>-</span>
-              <span className={styles.movementUnit}>-</span>
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // Select all text on focus for easy overwriting
+  const handleSelectOnFocus = (event: FocusEvent<HTMLInputElement>) => {
+    event.currentTarget.select();
+  };
 
   const handleAlternativeSelect = (value: string) => {
     if (!onAlternativeChange) return;
 
     if (value === '' || value === movement.name) {
-      // Reset to original
       onAlternativeChange(movement.name, null, movement.distance);
     } else {
-      // Find the alternative and calculate new distance
       const alt = alternatives.find(a => a.name === value);
       const newDistance = alt?.distanceMultiplier && movement.distance
         ? Math.round(movement.distance * alt.distanceMultiplier)
@@ -128,90 +125,160 @@ export function InlineMovementEditor({
     }
   };
 
+  // Column 2: Primary Value (reps/sec/distance/calories) - VALUE ONLY, no unit
+  const renderPrimaryValue = () => {
+    if (readOnly) {
+      if (showRepsInput && movement.reps) {
+        return <span className={styles.staticValue}>{movement.reps}</span>;
+      }
+      if (showDistanceInput && movement.distance) {
+        return <span className={styles.staticValue}>{movement.distance}</span>;
+      }
+      if (showTimeInput && movement.time) {
+        return <span className={styles.staticValue}>{movement.time}</span>;
+      }
+      if (showCaloriesDisplay && movement.calories) {
+        return <span className={styles.staticValue}>{movement.calories}</span>;
+      }
+      return null;
+    }
+
+    // Editable inputs - VALUE ONLY
+    if (showRepsInput) {
+      return (
+        <input
+          type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          className={styles.valueInput}
+          value={displayReps ?? ''}
+          onChange={(e) => onRepsChange?.(movement.name, parseInt(e.target.value) || 0)}
+          onFocus={handleSelectOnFocus}
+          min="0"
+        />
+      );
+    }
+    if (showDistanceInput) {
+      return (
+        <input
+          type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          className={styles.valueInput}
+          value={displayDistance || ''}
+          onChange={(e) => onDistanceChange?.(movement.name, parseInt(e.target.value) || 0)}
+          onFocus={handleSelectOnFocus}
+          min="0"
+        />
+      );
+    }
+    if (showTimeInput) {
+      return (
+        <input
+          type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          className={styles.valueInput}
+          value={displayTime || ''}
+          onChange={(e) => onTimeChange?.(movement.name, parseInt(e.target.value) || 0)}
+          onFocus={handleSelectOnFocus}
+          min="0"
+          placeholder="0"
+        />
+      );
+    }
+    if (showCaloriesDisplay) {
+      return <span className={styles.staticValue}>{movement.calories}</span>;
+    }
+    return null;
+  };
+
+  // Column 3: Unit OR Weight - Right-aligned
+  // For weighted movements: weight input + kg
+  // For non-weighted: unit label (s, reps, m, cal)
+  const renderUnitOrWeight = () => {
+    // Weighted movements get weight input in Column 3
+    if (showWeightInput) {
+      if (readOnly && movement.rxWeights) {
+        const weightLabel = `${movement.rxWeights.female ?? movement.rxWeights.male}/${movement.rxWeights.male ?? movement.rxWeights.female}`;
+        return <span className={styles.valueUnit}>{weightLabel}{movement.rxWeights.unit || 'kg'}</span>;
+      }
+      return (
+        <>
+          <input
+            type="number"
+            inputMode="decimal"
+            enterKeyHint="next"
+            className={styles.valueInput}
+            value={customWeight || ''}
+            onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
+            onFocus={handleSelectOnFocus}
+            placeholder={movement.rxWeights?.male?.toString() || '0'}
+            min="0"
+          />
+          <span className={styles.valueUnit}>kg</span>
+        </>
+      );
+    }
+
+    // Rx display without editable weight
+    if (showRxDisplay && movement.rxWeights) {
+      const weightLabel = `${movement.rxWeights.female || movement.rxWeights.male}/${movement.rxWeights.male}`;
+      return <span className={styles.valueUnit}>{weightLabel}{movement.rxWeights.unit || 'kg'}</span>;
+    }
+
+    // Non-weighted: show unit label only
+    if (showRepsInput) {
+      return <span className={styles.valueUnit}>reps</span>;
+    }
+    if (showDistanceInput) {
+      return <span className={styles.valueUnit}>{displayUnit}</span>;
+    }
+    if (showTimeInput) {
+      return <span className={styles.valueUnit}>s</span>;
+    }
+    if (showCaloriesDisplay) {
+      return <span className={styles.valueUnit}>cal</span>;
+    }
+
+    // Empty placeholder - keeps grid stable
+    return <span className={styles.valueUnit}></span>;
+  };
+
   return (
-    <div className={styles.movementRow}>
-      <div className={styles.movementLabel}>
+    <div className={styles.metricStrip}>
+      {/* Column 1: Movement Name (1.2fr) - Left-aligned */}
+      <div className={styles.colA}>
         {hasAlternatives ? (
           <select
             className={styles.movementSelect}
             value={selectedAlternative || movement.name}
             onChange={(e) => handleAlternativeSelect(e.target.value)}
+            disabled={readOnly}
           >
-            <option value={movement.name}>{movement.name}</option>
+            <option value={movement.name}>{abbreviateMovementLabel(movement.name)}</option>
             {alternatives.map((alt) => (
               <option key={alt.name} value={alt.name}>
-                {alt.name}
+                {abbreviateMovementLabel(alt.name)}
                 {alt.type === 'easier' ? ' (scaled)' : alt.type === 'harder' ? ' (Rx+)' : ''}
               </option>
             ))}
           </select>
         ) : (
-          <span className={styles.movementName}>{displayName}</span>
+          <div className={styles.movementStaticLabel}>
+            <span className={styles.movementName}>{displayLabel}</span>
+          </div>
         )}
       </div>
 
-      <div className={styles.movementControls}>
-        {movement.reps && (
-          <span className={styles.movementStat}>
-            <span className={styles.movementValue}>{movement.reps}</span>
-            <span className={styles.movementUnit}>reps</span>
-          </span>
-        )}
-        {showTimeInput && (
-          <span className={styles.movementStat}>
-            <input
-              type="number"
-              inputMode="numeric"
-              className={styles.valueInput}
-              value={displayTime || ''}
-              onChange={(e) => onTimeChange?.(movement.name, parseInt(e.target.value) || 0)}
-              min="0"
-              placeholder="sec"
-            />
-            <span className={styles.movementUnit}>s</span>
-          </span>
-        )}
-        {showDistanceInput && (
-          <span className={styles.movementStat}>
-            <input
-              type="number"
-              inputMode="numeric"
-              className={styles.valueInput}
-              value={displayDistance || ''}
-              onChange={(e) => onDistanceChange?.(movement.name, parseInt(e.target.value) || 0)}
-              min="0"
-            />
-            <span className={styles.movementUnit}>{displayUnit}</span>
-          </span>
-        )}
-        {showCaloriesDisplay && (
-          <span className={styles.movementStat}>
-            <span className={styles.movementValue}>{movement.calories}</span>
-            <span className={styles.movementUnit}>cal</span>
-          </span>
-        )}
-        {isWeighted && (
-          <span className={styles.movementStat}>
-            <input
-              type="number"
-              inputMode="decimal"
-              className={styles.valueInput}
-              value={customWeight || ''}
-              onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
-              placeholder={movement.rxWeights?.male?.toString() || 'kg'}
-              min="0"
-            />
-            <span className={styles.movementUnit}>kg</span>
-          </span>
-        )}
-        {!isWeighted && movement.rxWeights && (
-          <span className={styles.movementStat}>
-            <span className={styles.movementValue}>
-              {movement.rxWeights.female || movement.rxWeights.male}/{movement.rxWeights.male}
-            </span>
-            <span className={styles.movementUnit}>{movement.rxWeights.unit || 'kg'}</span>
-          </span>
-        )}
+      {/* Column 2: Value (80px fixed) - Centered numeric input */}
+      <div className={styles.colB}>
+        {renderPrimaryValue()}
+      </div>
+
+      {/* Column 3: Unit/Weight (80px fixed) - Right-aligned */}
+      <div className={styles.colC}>
+        {renderUnitOrWeight()}
       </div>
     </div>
   );
@@ -223,10 +290,12 @@ interface MovementListEditorProps {
   customDistances: Record<string, number>;
   customTimes: Record<string, number>;
   customWeights: Record<string, number>;
+  customReps: Record<string, number>;
   onAlternativeChange: (originalName: string, alternativeName: string | null, newDistance?: number) => void;
   onDistanceChange: (movementName: string, distance: number) => void;
   onTimeChange: (movementName: string, time: number) => void;
   onWeightChange: (movementName: string, weight: number) => void;
+  onRepsChange: (movementName: string, reps: number) => void;
   readOnly?: boolean;
 }
 
@@ -236,10 +305,12 @@ export function MovementListEditor({
   customDistances,
   customTimes,
   customWeights,
+  customReps,
   onAlternativeChange,
   onDistanceChange,
   onTimeChange,
   onWeightChange,
+  onRepsChange,
   readOnly = false,
 }: MovementListEditorProps) {
   return (
@@ -252,10 +323,12 @@ export function MovementListEditor({
           customDistance={customDistances[movement.name]}
           customTime={customTimes[movement.name]}
           customWeight={customWeights[movement.name]}
+          customReps={customReps[movement.name]}
           onAlternativeChange={onAlternativeChange}
           onDistanceChange={onDistanceChange}
           onTimeChange={onTimeChange}
           onWeightChange={onWeightChange}
+          onRepsChange={onRepsChange}
           readOnly={readOnly}
         />
       ))}
