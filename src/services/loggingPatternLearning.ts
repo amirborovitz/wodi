@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, setDoc, query, where, getDocs, serverTimestamp, increment as firestoreIncrement } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, query, where, getDocs, increment as firestoreIncrement } from 'firebase/firestore';
 import { db } from './firebase';
 import OpenAI from 'openai';
 import type {
@@ -99,24 +99,6 @@ const EXPLICIT_DISTANCE_PATTERNS = [
   /\d+\s*km\b/i, /\d+\s*mile/i, /\d+\s*mi\b/,
   /\d+\s*yard/i, /\d+\s*yd\b/i,
   /for distance/i, /max distance/i,
-];
-
-// Cardio machines - can track calories OR distance depending on workout text
-const CARDIO_MACHINE_PATTERNS = [
-  'echo bike', 'ecobike', 'assault bike', 'air bike', 'airbike', 'airdyne',
-  'ski erg', 'skierg', 'ski-erg',
-  'rower', 'rowing', 'row erg', 'rowerg',
-  'bike erg', 'bikeerg',
-];
-
-// Distance-based cardio - typically track distance
-const DISTANCE_CARDIO_PATTERNS = [
-  'run', 'running', 'sprint',
-  'swim', 'swimming',
-  'walk', 'walking', 'hike',
-  'sled push', 'sled pull', 'sled drag',
-  'farmer carry', 'farmers carry', 'farmer walk',
-  'yoke carry', 'yoke walk',
 ];
 
 // Bodyweight exercises - reps only
@@ -373,7 +355,7 @@ export async function saveLoggingPattern(
       }, { merge: true });
     } else {
       // Create new pattern
-      const newPattern: Omit<LearnedLoggingPattern, 'createdAt'> & { createdAt: ReturnType<typeof serverTimestamp> } = {
+      const newPattern: LearnedLoggingPattern = {
         id: patternId,
         exercisePattern: normalized,
         keywords,
@@ -385,7 +367,7 @@ export async function saveLoggingPattern(
         correctCount: source === 'user_correction' ? 1 : 0,
         correctionCount: 0,
         lastUsed: now,
-        createdAt: serverTimestamp() as unknown as Date,
+        createdAt: now,
         ...(aiExplanation && { aiExplanation }),
       };
       await setDoc(patternRef, newPattern);

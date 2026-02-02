@@ -12,7 +12,7 @@ import {
   recordPatternUsage,
   getDefaultFields,
 } from '../services/loggingPatternLearning';
-import type { LoggingGuidanceResponse, ExerciseLoggingMode, LoggingPatternFields } from '../types';
+import type { LoggingGuidanceResponse, ExerciseLoggingMode } from '../types';
 import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -21,10 +21,8 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import { RewardScreen } from './RewardScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
-import { MovementListEditor, StrengthMovementListEditor } from '../components/workouts/InlineMovementEditor';
+import { MovementListEditor } from '../components/workouts/InlineMovementEditor';
 import styles from './AddWorkoutScreen.module.css';
-
-console.log('🚀 AddWorkoutScreen loaded - VERSION 2');
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -60,9 +58,6 @@ interface ExerciseResult {
   distancePerTurn?: number; // Distance per turn (in meters)
   totalDistance?: number; // Total distance (turns × distance per turn)
   distanceUnit?: 'm' | 'km' | 'mi'; // Unit for distance
-  // Strength movement tracking
-  completedMovements?: Record<string, boolean>; // Checkmarks for prescribed sets
-  performanceReps?: Record<string, Record<number, number>>; // Reps per set for max reps movements
 }
 
 const CINDY_MOVEMENTS = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat'];
@@ -131,12 +126,7 @@ function buildWorkloadBreakdownFromResults(
         }
       }
 
-      // For max reps movements, sum actual reps from performanceReps instead of using prescribed reps
-      let perRoundReps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
-      if (mov.isMaxReps && result.performanceReps?.[mov.name]) {
-        const setReps = result.performanceReps[mov.name];
-        perRoundReps = Object.values(setReps).reduce((sum, reps) => sum + reps, 0);
-      }
+      const perRoundReps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
       const perRoundDistance = result.movementDistances?.[mov.name] ?? mov.distance ?? 0;
       const perRoundCalories = mov.calories || 0;
       const perRoundTime = mov.time || 0;
@@ -145,8 +135,7 @@ function buildWorkloadBreakdownFromResults(
         return;
       }
 
-      // For max reps movements, the total is already computed above (sum of all sets), don't multiply by rounds
-      const movementReps = mov.isMaxReps && result.performanceReps?.[mov.name] ? perRoundReps : perRoundReps * movementRounds;
+      const movementReps = perRoundReps * movementRounds;
       const movementDistance = perRoundDistance * movementRounds;
       const movementCalories = perRoundCalories * movementRounds;
       const movementTime = perRoundTime * movementRounds;
@@ -626,15 +615,9 @@ function getExerciseLoggingMode(exercise: ParsedExercise, workoutFormat?: string
     return 'amrap_intervals';
   }
 
-  // Standard AMRAP with multiple movements
-  if (isAmrapPattern && movements.length >= 2) {
-    console.log('[getExerciseLoggingMode] -> Returning: amrap (multi-movement)');
-    return 'amrap';
-  }
-
-  // Single-movement AMRAP still uses 'amrap' mode
-  if (isAmrapPattern && movements.length === 1) {
-    console.log('[getExerciseLoggingMode] -> Returning: amrap (single-movement)');
+  // Any AMRAP pattern should return 'amrap' mode
+  if (isAmrapPattern) {
+    console.log('[getExerciseLoggingMode] -> Returning: amrap');
     return 'amrap';
   }
 
@@ -717,9 +700,6 @@ function analyzeRefineNeed(parsed: ParsedWorkout): { shouldRefine: boolean; reas
   const benchmarkMatches = text.match(/\b(cindy|dt|fran|grace|helen|diane|jackie|karen|annie|mary)\b/gi);
   const hasMixedBlocks = text.includes('+') || text.includes(' then ');
   const hasStructuredBlocks = /superset|cycle|metcon|interval|teams? of|cash[- ]?out|finisher/i.test(text);
-  // Detect implicit superset patterns (without "superset" keyword)
-  const hasImplicitSuperset = /\d+\s*sets?:\s*\d+.*,\s*\d+/i.test(text) // "3 sets: 10 A, 10 B"
-    || /[abc]\d\.\s*\w+.*[abc]\d\.\s*\w+/i.test(text); // "A1. exercise A2. exercise"
   const duplicateExercises = parsed.exercises.some((exercise, index) => {
     if (index === 0) return false;
     const prev = parsed.exercises[index - 1];
@@ -740,7 +720,6 @@ function analyzeRefineNeed(parsed: ParsedWorkout): { shouldRefine: boolean; reas
   if (benchmarkMatches && benchmarkMatches.length >= 2) reasons.push('multiple_benchmarks');
   if (hasMixedBlocks && roundMatches.length > 0) reasons.push('mixed_blocks_with_rounds');
   if (hasStructuredBlocks) reasons.push('structured_blocks');
-  if (hasImplicitSuperset) reasons.push('implicit_superset');
   if (duplicateExercises) reasons.push('duplicate_exercises');
   if (hasMultipleBlocks && hasMixedTypes) reasons.push('mixed_exercise_types');
   if (rawTextHasMoreBlocks) reasons.push('potentially_missing_blocks');
@@ -795,11 +774,7 @@ async function refineWorkoutIfNeeded(
 
   console.log('[Refine] Initial parse:', {
     exerciseCount: parsed.exercises.length,
-    exercises: parsed.exercises.map(e => ({
-      name: e.name,
-      type: e.type,
-      movements: e.movements?.map(m => ({ name: m.name, reps: m.reps, sets: m.sets })),
-    })),
+    exercises: parsed.exercises.map(e => ({ name: e.name, type: e.type })),
     rawText: parsed.rawText?.substring(0, 200),
   });
   console.log('[Refine] Analysis:', analysis.reasons, 'shouldRefine:', analysis.shouldRefine);
@@ -810,11 +785,7 @@ async function refineWorkoutIfNeeded(
     const refined = await refineParsedWorkout(parsed, analysis.rawText);
     console.log('[Refine] Refined result:', {
       exerciseCount: refined.exercises.length,
-      exercises: refined.exercises.map(e => ({
-        name: e.name,
-        type: e.type,
-        movements: e.movements?.map(m => ({ name: m.name, reps: m.reps, sets: m.sets })),
-      })),
+      exercises: refined.exercises.map(e => ({ name: e.name, type: e.type })),
     });
     if (userId) {
       await addDoc(
@@ -941,16 +912,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
   // Per-movement weight tracking (maps movement name to weight)
   const [movementWeights, setMovementWeights] = useState<Record<string, number>>({});
-  // Track which weight fields were manually edited
-  const [manuallyEditedWeights, setManuallyEditedWeights] = useState<Set<string>>(new Set());
-  const [useSingleWeightForMovements, setUseSingleWeightForMovements] = useState(true);
-  const [sharedMovementWeight, setSharedMovementWeight] = useState<string>('');
-
-  // Strength movement list state (for grouped prescribed/performance UI)
-  // Tracks completed prescribed movements (checkmark button)
-  const [completedMovements, setCompletedMovements] = useState<Record<string, boolean>>({});
-  // Tracks reps per set for performance movements: movementName -> setNumber -> reps
-  const [performanceReps, setPerformanceReps] = useState<Record<string, Record<number, number>>>({});
 
   // Smart classification cache (maps exercise index to AI classification result)
   const [smartClassifications, setSmartClassifications] = useState<Record<number, {
@@ -1299,7 +1260,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     setCustomDistances({});
     setCustomReps({});
     setMovementWeights({});
-    setManuallyEditedWeights(new Set());
 
     // Reset logging guidance state
     setLoggingGuidance({});
@@ -1327,17 +1287,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const guidance = loggingGuidance[currentExerciseIndex];
   const userOverride = modeOverrides[currentExerciseIndex];
 
-  // If user manually selected a mode, use that
-  // Otherwise, use guidance if available and confident, else fall back to local rules
+  // Priority:
+  // 1. User override (always wins)
+  // 2. AMRAP/for_time/intervals from local rules (workout-level modes take priority)
+  // 3. AI guidance (for exercise-level modes like cardio/strength)
+  // 4. Smart classification fallback
   const currentExerciseMode: ExerciseLoggingMode = currentExercise
     ? (userOverride
       ? userOverride
-      : guidance && guidance.confidence >= 0.7
-        ? guidance.loggingMode
+      : localMode === 'amrap' ? 'amrap'
+        : localMode === 'amrap_intervals' ? 'amrap_intervals'
         : localMode === 'for_time' ? 'for_time'
-          : localMode === 'amrap' ? 'amrap'
-          : localMode === 'amrap_intervals' ? 'amrap_intervals'
-          : localMode === 'intervals' ? 'intervals'
+        : localMode === 'intervals' ? 'intervals'
+        : guidance && guidance.confidence >= 0.7
+          ? guidance.loggingMode
           : smartClassification?.inputType === 'cardio_calories' ? 'cardio'
           : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
           : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
@@ -1374,13 +1337,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const currentExerciseNeedsWeight = currentExercise
     ? (smartClassification?.inputType === 'weighted' || (!smartClassification && exerciseNeedsWeight(currentExercise)))
     : true;
-
-  const weightedMovements = currentExercise ? getWeightedMovements(currentExercise) : [];
-  const hasMixedMovementWeights = Boolean(
-    currentExercise?.movements &&
-    weightedMovements.length > 0 &&
-    weightedMovements.length < currentExercise.movements.length
-  );
 
   // Debug: log exercise classification when in log-results step
   if (currentExercise && step === 'log-results') {
@@ -1473,32 +1429,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     }));
     console.log('[LoggingGuidance] User override:', mode);
   }, [currentExerciseIndex]);
-
-  // Get all weighted movements for the current exercise
-  function getWeightedMovements(exercise: ParsedExercise | undefined): ParsedMovement[] {
-    if (!exercise?.movements) return [];
-    return exercise.movements.filter(isWeightedMovement);
-  }
-
-  // Handle weight change for a specific movement (with auto-fill logic)
-  // handleMovementWeightChange removed (unused)
-
-  // Handle blur on weight input - trigger auto-fill if this is the first entry
-  const applySharedMovementWeight = (weight: number) => {
-    if (!currentExercise || weightedMovements.length === 0 || weight <= 0) return;
-    const next: Record<string, number> = {};
-    weightedMovements.forEach((mov) => {
-      next[mov.name] = weight;
-    });
-    setMovementWeights(next);
-    setManuallyEditedWeights(new Set(weightedMovements.map((mov) => mov.name)));
-  };
-
-  // Mark a weight field as manually edited (user explicitly changed it)
-  const handleMovementWeightManualEdit = (movementName: string, weight: number) => {
-    setManuallyEditedWeights((prev: Set<string>) => new Set(prev).add(movementName));
-    setMovementWeights(prev => ({ ...prev, [movementName]: weight }));
-  };
 
   // Track which interval sets have been manually edited
   const [manuallyEditedIntervalSets, setManuallyEditedIntervalSets] = useState<Set<number>>(new Set());
@@ -1695,15 +1625,75 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   };
 
   const initializeSetsForExercise = (exercise: ParsedExercise) => {
-    const numSets = exercise.suggestedSets || 1;
-    const sets: ExerciseSet[] = Array.from({ length: numSets }, (_, i) => ({
-      id: `set-${i}`,
-      setNumber: i + 1,
-      targetReps: exercise.suggestedReps,
-      actualReps: exercise.suggestedReps,
-      weight: exercise.suggestedWeight,
-      completed: false,
-    }));
+    const prescription = exercise.prescription?.toLowerCase() || '';
+    const name = exercise.name?.toLowerCase() || '';
+    const fullText = `${name} ${prescription}`;
+
+    // Parse complex prescriptions like "3x2 rpe9 2xmax @bw"
+    // Look for patterns: "Nx M" (sets x reps) and "Nx max"
+    const setPatterns: Array<{ sets: number; reps: number | undefined; isMax: boolean }> = [];
+
+    // Match patterns like "3x2", "3 sets x 2 reps", "2xmax", "2 x max"
+    const patterns = fullText.matchAll(/(\d+)\s*(?:sets?)?\s*[x×]\s*(\d+|max)/gi);
+    for (const match of patterns) {
+      const numSets = parseInt(match[1], 10);
+      const repsOrMax = match[2].toLowerCase();
+      const isMax = repsOrMax === 'max';
+      const reps = isMax ? undefined : parseInt(repsOrMax, 10);
+      setPatterns.push({ sets: numSets, reps, isMax });
+    }
+
+    // Build sets array based on parsed patterns
+    const sets: ExerciseSet[] = [];
+
+    if (setPatterns.length > 0) {
+      // Use parsed patterns
+      let setNumber = 1;
+      for (const pattern of setPatterns) {
+        for (let i = 0; i < pattern.sets; i++) {
+          sets.push({
+            id: `set-${setNumber - 1}`,
+            setNumber,
+            targetReps: pattern.reps,
+            actualReps: pattern.reps,
+            weight: pattern.isMax ? undefined : exercise.suggestedWeight,
+            completed: false,
+          });
+          setNumber++;
+        }
+      }
+    } else {
+      // Fallback: use suggestedSets/suggestedReps or try to extract from text
+      const numSets = exercise.suggestedSets || 1;
+      let reps = exercise.suggestedReps;
+
+      // Try to find reps in text: "10/10" (per side), "10 reps", standalone numbers
+      if (!reps) {
+        // Match "10/10" pattern (reps per side) - use first number
+        const perSideMatch = fullText.match(/(\d+)\/\d+/);
+        if (perSideMatch) {
+          reps = parseInt(perSideMatch[1], 10);
+        } else {
+          // Match "N reps" or standalone number followed by movement
+          const repsMatch = fullText.match(/(\d+)\s*(?:reps?|each)/i);
+          if (repsMatch) {
+            reps = parseInt(repsMatch[1], 10);
+          }
+        }
+      }
+
+      for (let i = 0; i < numSets; i++) {
+        sets.push({
+          id: `set-${i}`,
+          setNumber: i + 1,
+          targetReps: reps,
+          actualReps: reps,
+          weight: exercise.suggestedWeight,
+          completed: false,
+        });
+      }
+    }
+
     setCurrentSets(sets);
     setManuallyEditedSets(new Set()); // Reset manual edits for new exercise
   };
@@ -1712,12 +1702,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     if (!parsedWorkout) return;
     const exercise = parsedWorkout.exercises[index];
     const existing = results[index];
-    const weightedMovements = getWeightedMovements(exercise);
-    const isMixedMovements = Boolean(
-      exercise.movements &&
-      weightedMovements.length > 0 &&
-      weightedMovements.length < exercise.movements.length
-    );
 
     setCurrentExerciseIndex(index);
 
@@ -1749,21 +1733,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCardioDistancePerTurn('');
       }
       setMovementWeights(existing.movementWeights || {});
-      setManuallyEditedWeights(new Set(Object.keys(existing.movementWeights || {})));
-      if (existing.movementWeights && Object.keys(existing.movementWeights).length > 0) {
-        const weights = Object.values(existing.movementWeights).filter((weight) => weight > 0);
-        const allSame = weights.length > 0 && weights.every((weight) => weight === weights[0]);
-        setUseSingleWeightForMovements(allSame || !isMixedMovements);
-        setSharedMovementWeight(allSame ? weights[0].toString() : '');
-      } else {
-        setUseSingleWeightForMovements(!isMixedMovements);
-        setSharedMovementWeight('');
-      }
       setSelectedAlternatives(existing.movementAlternatives || {});
       setCustomDistances(existing.movementDistances || {});
       setCustomReps(existing.movementReps || {});
-      setCompletedMovements(existing.completedMovements || {});
-      setPerformanceReps(existing.performanceReps || {});
       setWorkoutWeight(
         existing.sets?.[0]?.weight !== undefined
           ? existing.sets[0].weight.toString()
@@ -1774,17 +1746,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setCompletionMinutes('');
       setCompletionSeconds('');
       setMovementWeights({});
-      setManuallyEditedWeights(new Set());
-      setUseSingleWeightForMovements(!isMixedMovements);
-      setSharedMovementWeight('');
       setWorkoutWeight('');
       setCardioDistanceTurns('');
       setCardioDistancePerTurn('');
       setSelectedAlternatives({});
       setCustomDistances({});
       setCustomReps({});
-      setCompletedMovements({});
-      setPerformanceReps({});
     }
 
     // Reset interval-specific state on entry
@@ -1811,11 +1778,24 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
   const applySetAutofillFromFirst = (field: keyof ExerciseSet) => {
     setCurrentSets(prev => {
-      const firstValue = prev[0]?.[field];
+      const firstSet = prev[0];
+      const firstValue = firstSet?.[field];
       if (firstValue === undefined || firstValue === null || firstValue === 0) return prev;
+
+      // For weight: only copy to sets of the same type (weighted vs bodyweight/max)
+      const firstIsMax = !firstSet.targetReps || firstSet.targetReps === 0;
+
       return prev.map((set, i) => {
         if (i === 0) return set;
         if (manuallyEditedSets.has(`${i}-${field}`)) return set;
+
+        // For weight field: only auto-fill to sets of the same type
+        if (field === 'weight') {
+          const setIsMax = !set.targetReps || set.targetReps === 0;
+          // Don't copy weight from weighted set to max/bodyweight set (or vice versa)
+          if (firstIsMax !== setIsMax) return set;
+        }
+
         return { ...set, [field]: firstValue, completed: true };
       });
     });
@@ -1882,19 +1862,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     }
 
     // Save current exercise results with per-movement weights
-    const effectiveMovementWeights = (() => {
-      if (Object.keys(movementWeights).length > 0) return { ...movementWeights };
-      if (useSingleWeightForMovements) {
-        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
-        if (sharedWeight > 0 && weightedMovements.length > 0) {
-          return weightedMovements.reduce<Record<string, number>>((acc, mov) => {
-            acc[mov.name] = sharedWeight;
-            return acc;
-          }, {});
-        }
-      }
-      return undefined;
-    })();
+    const effectiveMovementWeights = Object.keys(movementWeights).length > 0
+      ? { ...movementWeights }
+      : undefined;
 
     const movementAlternatives = currentExercise.movements?.reduce<Record<string, string>>((acc, mov) => {
       const selected = selectedAlternatives[mov.name];
@@ -1930,8 +1900,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       ...(movementAlternatives && Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
       ...(movementReps && Object.keys(movementReps).length > 0 ? { movementReps } : {}),
       ...(movementDistances && Object.keys(movementDistances).length > 0 ? { movementDistances } : {}),
-      ...(Object.keys(completedMovements).length > 0 ? { completedMovements } : {}),
-      ...(Object.keys(performanceReps).length > 0 ? { performanceReps } : {}),
       rounds,
       ...cardioData,
       ...distanceData,
@@ -1955,7 +1923,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCompletionMinutes('');
         setCompletionSeconds('');
         setMovementWeights({});
-        setManuallyEditedWeights(new Set());
         setCardioTurns('');
         setCardioCaloriesPerTurn('');
         setCardioDistanceTurns('');
@@ -1964,8 +1931,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setSelectedAlternatives({});
         setCustomDistances({});
         setCustomReps({});
-        setCompletedMovements({});
-        setPerformanceReps({});
       }
     }
   };
@@ -1982,10 +1947,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setCurrentSets(exerciseResults[prevIndex].sets);
       if (exerciseResults[prevIndex].movementWeights) {
         setMovementWeights(exerciseResults[prevIndex].movementWeights);
-        setManuallyEditedWeights(new Set(Object.keys(exerciseResults[prevIndex].movementWeights)));
       } else {
         setMovementWeights({});
-        setManuallyEditedWeights(new Set());
       }
       setCustomReps(exerciseResults[prevIndex].movementReps || {});
       // Restore time if it was a for-time workout
@@ -2016,8 +1979,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       }
       setSelectedAlternatives(exerciseResults[prevIndex].movementAlternatives || {});
       setCustomDistances(exerciseResults[prevIndex].movementDistances || {});
-      setCompletedMovements(exerciseResults[prevIndex].completedMovements || {});
-      setPerformanceReps(exerciseResults[prevIndex].performanceReps || {});
       // Remove the last result since we're going back (skip when editing existing results)
       if (!isEditingAfterSave) {
         setExerciseResults(prev => prev.slice(0, -1));
@@ -2033,8 +1994,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setSelectedAlternatives({});
       setCustomDistances({});
       setCustomReps({});
-      setCompletedMovements({});
-      setPerformanceReps({});
     }
   };
 
@@ -3012,13 +2971,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             )}
 
             {/* Show time input for "for time" workouts, otherwise show sets */}
-            {console.log('[UI Debug] Exercise render:', {
-              name: currentExercise?.name,
-              hasMovements: !!currentExercise?.movements,
-              movementsCount: currentExercise?.movements?.length,
-              isForTime: isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format),
-              hasStrengthSets: currentExercise?.movements?.some(m => m.sets || m.isMaxReps),
-            })}
             {isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format) ? (
               <>
                 {/* Movements with inline editing */}
@@ -3075,191 +3027,81 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               </>
             ) : (
               <>
-                {/* Check if exercise has structured movements (prescribed + performance) */}
-                {currentExercise?.movements && currentExercise.movements.some(m => m.sets || m.isMaxReps === true) ? (
-                  // NEW: Grouped strength movement UI
-                  <StrengthMovementListEditor
-                    movements={currentExercise.movements}
-                    customWeights={movementWeights}
-                    customReps={performanceReps}
-                    completedSets={completedMovements}
-                    onWeightChange={(name, weight) => {
-                      setMovementWeights(prev => ({ ...prev, [name]: weight }));
-                    }}
-                    onRepsChange={(name, setNumber, reps) => {
-                      setPerformanceReps(prev => ({
-                        ...prev,
-                        [name]: { ...(prev[name] || {}), [setNumber]: reps }
-                      }));
-                    }}
-                    onComplete={(name, completed) => {
-                      setCompletedMovements(prev => ({ ...prev, [name]: completed }));
-                    }}
-                  />
-                ) : (
-                  <>
-                {/* Show movements for supersets and multi-movement exercises */}
-                {console.log('[UI Debug] Superset check:', {
-                  hasMovements: !!currentExercise?.movements,
-                  movementsLength: currentExercise?.movements?.length,
-                  movements: currentExercise?.movements?.map(m => m.name),
-                })}
-                {currentExercise?.movements && currentExercise.movements.length > 1 && (
-                  <MovementListEditor
-                    movements={currentExercise.movements}
-                    selectedAlternatives={selectedAlternatives}
-                    customDistances={customDistances}
-                    customTimes={customTimes}
-                    customWeights={movementWeights}
-                    customReps={customReps}
-                    onAlternativeChange={handleSelectAlternative}
-                    onDistanceChange={handleCustomDistanceChange}
-                    onTimeChange={handleTimeChange}
-                    onWeightChange={handleMovementWeightChange}
-                    onRepsChange={handleRepsChange}
-                  />
-                )}
+                {/* Strength Sets - Centered Card Design */}
+                <div className={styles.strengthSetsContainer}>
+                  {currentSets.map((set, setIndex) => {
+                    // Only treat as "max reps" if this specific set has no target reps
+                    const isMaxReps = !set.targetReps || set.targetReps === 0;
+                    // Display value: actualReps if set, otherwise use targetReps as pre-fill
+                    const displayReps = set.actualReps ?? set.targetReps ?? '';
 
-                {hasMixedMovementWeights && weightedMovements.length > 0 && (
-                  <div
-                    className={styles.movementWeightsSection}
-                    onBlur={(e) => {
-                      const currentTarget = e.currentTarget;
-                      if (currentTarget.contains(e.relatedTarget as Node)) return;
-                      if (!useSingleWeightForMovements) return;
-                      setTimeout(() => {
-                        if (currentTarget.contains(document.activeElement)) return;
-                        const sharedWeight = parseFloat(sharedMovementWeight) || 0;
-                        applySharedMovementWeight(sharedWeight);
-                      }, 0);
-                    }}
-                  >
-                    <label className={styles.alternativesLabel}>Weight Used</label>
-                    <label className={styles.weightToggle}>
-                      <input
-                        type="checkbox"
-                        checked={useSingleWeightForMovements}
-                        onChange={(e) => setUseSingleWeightForMovements(e.target.checked)}
-                      />
-                      Apply one weight to all weighted movements
-                    </label>
-                    {useSingleWeightForMovements ? (
-                      <div className={styles.movementWeightRow}>
-                        <span className={styles.movementWeightName}>All weighted movements</span>
-                        <div className={styles.movementWeightInputGroup}>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            value={sharedMovementWeight}
-                            onChange={(e) => setSharedMovementWeight(e.target.value)}
-                            placeholder={weightedMovements[0]?.rxWeights?.male?.toString() || '0'}
-                            className={styles.movementWeightInput}
-                            min="0"
-                          />
-                          <span className={styles.weightUnit}>
-                            {weightedMovements[0]?.rxWeights?.unit || 'kg'}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className={styles.weightHint}>Only weighted movements show inputs</p>
-                        {manuallyEditedWeights.size > 0 && (
-                          <p className={styles.weightHint}>Custom movement weights applied</p>
-                        )}
-                        {weightedMovements.map((mov) => (
-                          <div key={mov.name} className={styles.movementWeightRow}>
-                            <span className={styles.movementWeightName}>{mov.name}</span>
-                            <div className={styles.movementWeightInputGroup}>
-                              <input
-                                type="number"
-                                inputMode="decimal"
-                                value={movementWeights[mov.name] || ''}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  handleMovementWeightManualEdit(mov.name, val);
-                                }}
-                                placeholder={mov.rxWeights?.male?.toString() || '0'}
-                                className={styles.movementWeightInput}
-                                min="0"
-                              />
-                              <span className={styles.weightUnit}>
-                                {mov.rxWeights?.unit || 'kg'}
-                              </span>
-                            </div>
-                            {mov.rxWeights && (
-                              <span className={styles.movementRxHint}>
-                                Rx: {mov.rxWeights.female}/{mov.rxWeights.male}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                )}
+                    return (
+                      <div key={set.id} className={styles.strengthSetCard}>
+                        <span className={styles.strengthSetLabel}>
+                          Set {set.setNumber}{isMaxReps ? ' (Max)' : ''}
+                        </span>
 
-                {/* Sets */}
-                <div className={styles.setsContainer}>
-                  {currentSets.map((set, setIndex) => (
-                    <div key={set.id} className={styles.setRow}>
-                      <span className={styles.setNumber}>Set {set.setNumber}</span>
+                        <div className={styles.strengthSetInputs}>
+                          {/* Weight input - show for strength exercises (user can leave blank for bodyweight) */}
+                          {(currentExerciseNeedsWeight || isCurrentExerciseStrength) && (
+                            <>
+                              <div className={styles.strengthSetField}>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  enterKeyHint="next"
+                                  value={set.weight ?? ''}
+                                  onChange={(e) => updateSet(
+                                    setIndex,
+                                    'weight',
+                                    e.target.value ? parseFloat(e.target.value) : undefined
+                                  )}
+                                  onBlur={() => {
+                                    if (setIndex === 0) {
+                                      applySetAutofillFromFirst('weight');
+                                    }
+                                  }}
+                                  placeholder="0"
+                                  className={styles.strengthSetInput}
+                                />
+                                <span className={styles.strengthSetUnit}>kg</span>
+                              </div>
+                              <span className={styles.strengthSetSeparator}>×</span>
+                            </>
+                          )}
 
-                      <div className={styles.setInputs}>
-                        {/* Only show weight for exercises that need it */}
-                        {currentExerciseNeedsWeight && !hasMixedMovementWeights && (
-                          <div className={styles.inputGroup}>
-                            <label>Weight (kg)</label>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            enterKeyHint="next"
-                            value={set.weight ?? ''}
+                          {/* Reps input */}
+                          <div className={styles.strengthSetField}>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              enterKeyHint="next"
+                              value={displayReps}
                               onChange={(e) => updateSet(
                                 setIndex,
-                                'weight',
-                                e.target.value ? parseFloat(e.target.value) : undefined
+                                'actualReps',
+                                e.target.value ? parseInt(e.target.value) : undefined
                               )}
                               onBlur={() => {
-                                if (setIndex === 0) {
-                                  applySetAutofillFromFirst('weight');
+                                // Don't auto-fill for max reps sets
+                                if (setIndex === 0 && !isMaxReps) {
+                                  applySetAutofillFromFirst('actualReps');
                                 }
                               }}
                               placeholder="0"
-                              className={styles.setInput}
+                              className={styles.strengthSetInput}
                             />
+                            <span className={styles.strengthSetUnit}>reps</span>
                           </div>
-                        )}
-
-                        <div className={styles.inputGroup}>
-                          <label>Reps</label>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            enterKeyHint="next"
-                            value={set.actualReps ?? ''}
-                            onChange={(e) => updateSet(
-                              setIndex,
-                              'actualReps',
-                              e.target.value ? parseInt(e.target.value) : undefined
-                            )}
-                            onBlur={() => {
-                              if (setIndex === 0) {
-                                applySetAutofillFromFirst('actualReps');
-                              }
-                            }}
-                            placeholder={set.targetReps?.toString() || '0'}
-                            className={styles.setInput}
-                          />
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Add set button */}
                 <button
-                  className={styles.addSetButton}
+                  className={styles.addSetButtonCentered}
                   onClick={() => setCurrentSets(prev => [
                     ...prev,
                     {
@@ -3274,8 +3116,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 >
                   + Add Set
                 </button>
-                  </>
-                )}
               </>
             )}
           </Card>

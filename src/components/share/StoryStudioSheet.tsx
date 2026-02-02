@@ -213,7 +213,7 @@ export function StoryStudioSheet({ open, onClose, data, userName }: StoryStudioS
     return canvasToBlob(canvas, 'png', 0.95);
   };
 
-  const handleShare = async (platform: 'instagram' | 'whatsapp' | 'tiktok' | 'system') => {
+  const handleShare = async (_platform: 'instagram' | 'whatsapp' | 'tiktok' | 'system') => {
     if (isSharing) return;
     setIsSharing(true);
 

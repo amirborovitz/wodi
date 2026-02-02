@@ -125,6 +125,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   const correctedFormat = correctWorkoutFormat(workout);
   const correctedType = correctWorkoutType(workout, correctedFormat);
 
+  // Post-process exercises and detect implied supersets
+  let processedExercises = workout.exercises.map(postProcessExercise);
+
+  // Try to detect and fix implied supersets that AI missed
+  processedExercises = processedExercises.map(detectImpliedSuperset);
+
   console.warn('🔧 [PostProcessor] RESULT:', {
     originalFormat: workout.format,
     correctedFormat,
@@ -139,8 +145,87 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     type: correctedType,
     format: correctedFormat,
     timeCap,
-    exercises: workout.exercises.map(postProcessExercise),
+    exercises: processedExercises,
   };
+}
+
+/**
+ * Detect and restructure implied supersets that AI missed
+ * Patterns like "3 sets: exercise1 exercise2" should become a superset with movements
+ */
+function detectImpliedSuperset(exercise: ParsedExercise): ParsedExercise {
+  // Skip if already has multiple movements
+  if (exercise.movements && exercise.movements.length > 1) {
+    return exercise;
+  }
+
+  const fullText = `${exercise.name} ${exercise.prescription}`.toLowerCase();
+
+  console.warn('🔧 [detectImpliedSuperset] Checking:', fullText);
+
+  // Pattern: "N sets: exercise1 exercise2" or "N sets of exercise1 exercise2"
+  // Example: "3 sets: 10/10 powell raises 10/10 external rotation"
+  const setsColonPattern = /(\d+)\s*sets?\s*[:\-]\s*(.+)/i;
+  const match = fullText.match(setsColonPattern);
+
+  if (!match) {
+    console.warn('🔧 [detectImpliedSuperset] No sets: pattern found');
+    return exercise;
+  }
+
+  const numSets = parseInt(match[1], 10);
+  const movementsText = match[2].trim();
+
+  console.warn('🔧 [detectImpliedSuperset] Found pattern:', { numSets, movementsText });
+
+  // Split by rep counts: "10/10 exercise1 10/10 exercise2" -> ["", "exercise1 ", "exercise2"]
+  // Use the rep pattern to split
+  const repsSplitPattern = /\d+(?:\/\d+)?(?:\s+(?:reps?|each))?\s+/g;
+  const parts = movementsText.split(repsSplitPattern).filter(p => p.trim().length > 1);
+
+  // Also extract the reps for each movement
+  const repsMatches = [...movementsText.matchAll(/(\d+)(?:\/\d+)?(?:\s+(?:reps?|each))?\s+/g)];
+
+  console.warn('🔧 [detectImpliedSuperset] Split parts:', parts);
+  console.warn('🔧 [detectImpliedSuperset] Reps matches:', repsMatches.map(m => m[1]));
+
+  const movements: ParsedMovement[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const movementName = parts[i].trim();
+    const repsStr = repsMatches[i]?.[1];
+    const reps = repsStr ? parseInt(repsStr, 10) : undefined;
+
+    if (movementName && movementName.length > 1) {
+      movements.push({
+        name: normalizeMovementName(movementName),
+        reps,
+      });
+    }
+  }
+
+  // If we found 2+ movements, restructure as superset
+  if (movements.length >= 2) {
+    console.warn('🔧 [detectImpliedSuperset] Detected superset:', {
+      original: exercise.name,
+      movements: movements.map(m => ({ name: m.name, reps: m.reps })),
+      numSets,
+    });
+
+    const movementNames = movements.map(m => m.name).join(' + ');
+
+    return {
+      ...exercise,
+      name: `Superset: ${movementNames}`,
+      type: 'strength',
+      suggestedSets: numSets,
+      suggestedReps: movements[0].reps,
+      movements,
+    };
+  }
+
+  console.warn('🔧 [detectImpliedSuperset] Not enough movements found:', movements.length);
+  return exercise;
 }
 
 /**
@@ -277,8 +362,32 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     postProcessMovement(mov, exercise.prescription, exercise.name)
   );
 
+  // Extract suggestedReps if missing - look for patterns like "10/10", "3x10", or just "10 reps"
+  let suggestedReps = exercise.suggestedReps;
+  if (!suggestedReps) {
+    const fullText = `${exercise.name} ${exercise.prescription}`.toLowerCase();
+    // Match "10/10" (per side) - use first number
+    const perSideMatch = fullText.match(/(\d+)\/\d+/);
+    if (perSideMatch) {
+      suggestedReps = parseInt(perSideMatch[1], 10);
+    } else {
+      // Match "NxM" pattern - use M as reps
+      const setsRepsMatch = fullText.match(/(\d+)\s*[x×]\s*(\d+)/i);
+      if (setsRepsMatch) {
+        suggestedReps = parseInt(setsRepsMatch[2], 10);
+      } else {
+        // Match "N reps" or "N each"
+        const repsMatch = fullText.match(/(\d+)\s*(?:reps?|each)/i);
+        if (repsMatch) {
+          suggestedReps = parseInt(repsMatch[1], 10);
+        }
+      }
+    }
+  }
+
   return {
     ...exercise,
+    suggestedReps,
     rxWeights: exercise.rxWeights || prescriptionWeights,
     movements: processedMovements,
   };

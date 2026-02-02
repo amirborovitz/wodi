@@ -1,86 +1,108 @@
 /* ========================================
-   MOVEMENT LIST - Container
+   MOVEMENT LIST - Container with subtle grain
    ======================================== */
 .movementList {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 12px 16px 28px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--glass-shadow);
+  gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 /* ========================================
-   METRIC STRIP - Strict 3-Column CSS Grid
-
-   THE "NO-DRIFT" RULE:
-   Column edges must align EXACTLY across all rows.
-
-   Col 1 (Movement): 1fr   - Left-aligned, TEXT WRAPS
-   Col 2 (Value):    75px  - Fixed width inputs
-   Col 3 (Unit):     75px  - Fixed width, right-aligned
+   MOVEMENT CARD - Adaptive height, grain texture
+   Irregular border-radius (3 corners rounded)
    ======================================== */
-.metricStrip {
-  display: grid;
-  grid-template-columns: 1fr 75px 75px;
-  align-items: center;
-  min-height: 48px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  gap: 12px;
+.movementCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  /* Gradient background with subtle grain effect */
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.01) 50%,
+      rgba(0, 242, 255, 0.02) 100%
+    );
+  /* Irregular border radius - 3 corners rounded, 1 sharp */
+  border-radius: 14px 14px 4px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.15s ease;
 }
 
-.metricStrip:last-child {
-  border-bottom: none;
+/* Noise texture overlay */
+.movementCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+}
+
+.movementCard:hover {
+  border-color: rgba(0, 242, 255, 0.2);
+}
+
+/* Focus-within for keyboard navigation */
+.movementCard:focus-within {
+  border-color: rgba(0, 242, 255, 0.3);
 }
 
 /* ========================================
-   COLUMN 1: Movement Name (1fr flexible)
-   Left-aligned. TEXT CAN WRAP to second line.
-   No ellipsis, no truncation.
+   MOVEMENT HEADER - Name on top layer
+   Bold, primary color (White/Cyan)
    ======================================== */
-.colA {
-  min-width: 0;
+.movementHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
-/* Base control style - IDENTICAL for dropdown AND static label */
-.movementControl {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
+.movementName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* Cyan accent for weighted movements */
+.movementName.weighted {
+  color: var(--neon-cyan);
+}
+
+/* Dropdown select for alternatives */
+.movementSelect {
+  flex: 1;
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  padding-right: 28px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
+  border-radius: 10px 10px 3px 10px;
   color: var(--color-text);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   font-family: inherit;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-/* Dropdown select */
-.movementSelect {
-  composes: movementControl;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300F2FF' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  padding-right: 28px;
-  /* Allow text to wrap */
   white-space: normal;
   line-height: 1.3;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .movementSelect:focus {
   outline: none;
-  border-color: #00FFFF;
-  box-shadow: 0 0 0 1px #00FFFF;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 0 1px var(--neon-cyan);
 }
 
 .movementSelect:disabled {
@@ -88,164 +110,233 @@
   cursor: default;
 }
 
-/* Static label - MUST look identical to dropdown */
+/* Static label when no alternatives */
 .movementStaticLabel {
-  composes: movementControl;
-}
-
-.movementName {
-  /* Allow text to wrap - NO ellipsis, NO nowrap */
-  white-space: normal;
-  word-wrap: break-word;
-  line-height: 1.3;
-  font-size: 14px;
+  flex: 1;
 }
 
 /* ========================================
-   COLUMN 2: Value (75px fixed)
-   Centered. Numeric inputs.
+   METRIC CLUSTER - Pills/Chips that wrap
+   Slightly indented from movement name
    ======================================== */
-.colB {
+.metricCluster {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 75px;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-left: var(--space-2);
 }
 
 /* ========================================
-   COLUMN 3: Unit/Weight (75px fixed)
-   Right-aligned to screen edge.
-   Contains either: unit label OR weight input + kg
+   METRIC PILL - Individual metric chip
+   Subtle glass effect, rounded
    ======================================== */
-.colC {
-  display: flex;
+.metricPill {
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  width: 75px;
-}
-
-/* Weight input in Column 3 - smaller to fit with 'kg' label */
-.colC .valueInput {
-  width: 44px;
-  padding: 0 4px;
-}
-
-/* ========================================
-   VALUE INPUT - Fixed width numeric inputs
-   Subtle 1px border (0.1 opacity)
-   Cyan glow on focus
-   ======================================== */
-.valueInput {
-  width: 60px;
-  height: 44px;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 8px 14px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  font-size: 16px;
-  font-family: var(--font-mono);
-  font-weight: 500;
-  text-align: center;
-  box-sizing: border-box;
-  -moz-appearance: textfield;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-/* Hide spin buttons */
-.valueInput::-webkit-outer-spin-button,
-.valueInput::-webkit-inner-spin-button {
+.metricPill:focus-within {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 255, 0.06);
+}
+
+/* Editable pill has different styling */
+.metricPill.editable {
+  padding: 4px 4px 4px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.metricPill.editable:focus-within {
+  border-color: var(--neon-cyan);
+  background: rgba(0, 242, 255, 0.04);
+}
+
+/* ========================================
+   PILL INPUT - Numeric input inside pill
+   ======================================== */
+.pillInput {
+  width: 48px;
+  height: 32px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-align: center;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pillInput::-webkit-outer-spin-button,
+.pillInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Focus state - Cyan glow (#00FFFF) */
-.valueInput:focus {
+.pillInput:focus {
   outline: none;
-  border-color: #00FFFF;
-  box-shadow: 0 0 0 1px #00FFFF;
-  background: rgba(0, 255, 255, 0.06);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
 }
 
-.valueInput::placeholder {
+.pillInput::placeholder {
   color: var(--color-text-secondary);
-  opacity: 0.35;
+  opacity: 0.4;
   font-weight: 400;
 }
 
-/* ========================================
-   STATIC VALUE (read-only display)
-   ======================================== */
-.staticValue {
-  font-size: 16px;
-  color: var(--color-text);
-  font-family: var(--font-mono);
-  font-weight: 500;
-  text-align: center;
-  width: 60px;
-  display: inline-block;
+/* Wider input for weight values */
+.pillInput.wide {
+  width: 56px;
 }
 
 /* ========================================
-   UNIT LABEL - Right-aligned in Col 3
-   's', 'reps', 'm', 'kg' labels
+   PILL VALUE - Static value display
    ======================================== */
-.valueUnit {
-  font-size: 12px;
+.pillValue {
+  font-size: 15px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Accent color for important values */
+.pillValue.accent {
+  color: var(--neon-cyan);
+}
+
+/* ========================================
+   PILL UNIT - Unit label (reps, kg, m, s)
+   ======================================== */
+.pillUnit {
+  font-size: 11px;
+  font-weight: 500;
   color: var(--color-text-secondary);
-  text-align: right;
-  text-transform: lowercase;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   opacity: 0.8;
-  flex-shrink: 0;
-  min-width: 28px;
+}
+
+/* Cyan unit for emphasis */
+.pillUnit.accent {
+  color: var(--neon-cyan);
+  opacity: 1;
+}
+
+/* ========================================
+   RX BADGE - Prescription weight hint
+   ======================================== */
+.rxBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(0, 242, 255, 0.08);
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ========================================
+   SEPARATOR - Visual separator between pills
+   ======================================== */
+.pillSeparator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  opacity: 0.5;
 }
 
 /* ========================================
    MOBILE RESPONSIVE
-   Tighter grid but same alignment rules
    ======================================== */
 @media (max-width: 380px) {
-  .metricStrip {
-    grid-template-columns: 1fr 65px 65px;
-    min-height: 44px;
-    gap: 8px;
-  }
-
-  .movementControl {
-    min-height: 40px;
-    padding: 6px 10px;
-    font-size: 13px;
+  .movementCard {
+    padding: var(--space-3);
+    gap: var(--space-2);
   }
 
   .movementName {
-    font-size: 13px;
+    font-size: 14px;
   }
 
-  .colB,
-  .colC {
-    width: 65px;
+  .movementSelect {
+    min-height: 32px;
+    padding: 6px 10px;
+    padding-right: 26px;
+    font-size: 14px;
   }
 
-  .valueInput {
-    width: 52px;
-    height: 40px;
-    padding: 0 6px;
-    font-size: 15px;
+  .metricCluster {
+    gap: 6px;
+    padding-left: var(--space-1);
   }
 
-  .colC .valueInput {
-    width: 38px;
+  .metricPill {
+    padding: 6px 10px;
+    gap: 4px;
   }
 
-  .staticValue {
-    width: 52px;
-    font-size: 15px;
+  .metricPill.editable {
+    padding: 3px 3px 3px 10px;
   }
 
-  .valueUnit {
-    min-width: 24px;
-    font-size: 11px;
+  .pillInput {
+    width: 42px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .pillInput.wide {
+    width: 50px;
+  }
+
+  .pillValue {
+    font-size: 14px;
+  }
+
+  .pillUnit {
+    font-size: 10px;
+  }
+
+  .rxBadge {
+    padding: 3px 8px;
+    font-size: 9px;
+  }
+}
+
+/* ========================================
+   HOVER EFFECTS (non-touch devices)
+   ======================================== */
+@media (hover: hover) {
+  .movementCard:hover {
+    transform: translateY(-1px);
+  }
+
+  .metricPill:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .metricPill.editable:hover {
+    border-color: rgba(0, 242, 255, 0.3);
   }
 }
 
