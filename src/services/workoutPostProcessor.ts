@@ -167,21 +167,34 @@ function correctWorkoutType(workout: ParsedWorkout, correctedFormat: ParsedWorko
  * AI often returns "strength" for mixed workouts containing AMRAP/EMOM
  */
 function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
-  const textToCheck = [
+  // Only check title and exercise names for format keywords - not full rawText or prescriptions
+  // This prevents false positives from random word matches in descriptions
+  const prominentText = [
+    workout.title,
+    ...workout.exercises.map(e => e.name),
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  const fullText = [
     workout.title,
     workout.rawText,
     ...workout.exercises.map(e => e.name),
     ...workout.exercises.map(e => e.prescription),
   ].filter(Boolean).join(' ').toLowerCase();
 
-  console.warn('🔧 [correctWorkoutFormat] Checking text:', textToCheck.slice(0, 200));
-  console.warn('🔧 [correctWorkoutFormat] Contains AMRAP?', textToCheck.includes('amrap'));
+  console.warn('🔧 [correctWorkoutFormat] Checking text:', fullText.slice(0, 200));
+  console.warn('🔧 [correctWorkoutFormat] Prominent text contains AMRAP?', prominentText.includes('amrap'));
 
-  // Check for AMRAP patterns first
-  if (textToCheck.includes('amrap')) {
+  // If AI already classified as strength and no AMRAP in title/exercise names, keep it
+  if (workout.format === 'strength' && !prominentText.includes('amrap')) {
+    console.warn('🔧 [correctWorkoutFormat] -> Keeping strength format (no AMRAP in title/names)');
+    return 'strength';
+  }
+
+  // Check for AMRAP patterns - only in prominent text (title, exercise names)
+  if (prominentText.includes('amrap')) {
     // Check for AMRAP intervals (multiple AMRAPs with rest)
-    if (/amrap.*x\s*\d/i.test(textToCheck) || /\d+\s*x\s*amrap/i.test(textToCheck) ||
-        (textToCheck.includes('amrap') && textToCheck.includes('rest'))) {
+    if (/amrap.*x\s*\d/i.test(fullText) || /\d+\s*x\s*amrap/i.test(fullText) ||
+        (prominentText.includes('amrap') && fullText.includes('rest'))) {
       console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap_intervals');
       return 'amrap_intervals';
     }

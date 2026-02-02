@@ -11,34 +11,41 @@ interface MovementEditorProps {
   customTime?: number;
   customWeight?: number;
   customReps?: number;
+  completed?: boolean;
   // Callbacks
   onAlternativeChange?: (originalName: string, alternativeName: string | null, newDistance?: number) => void;
   onDistanceChange?: (movementName: string, distance: number) => void;
   onTimeChange?: (movementName: string, time: number) => void;
   onWeightChange?: (movementName: string, weight: number) => void;
   onRepsChange?: (movementName: string, reps: number) => void;
+  onComplete?: (movementName: string, completed: boolean) => void;
   // Display options
   showWeight?: boolean;
   readOnly?: boolean;
 }
 
-// Check if a movement requires weight input
+// Check if a movement requires weight input (not bodyweight)
 function isWeightedMovement(movement: ParsedMovement): boolean {
+  if (movement.isBodyweight) return false;
   if (movement.rxWeights) return true;
 
   const name = movement.name.toLowerCase();
   const weightedPatterns = [
     'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
     'lunge', 'row', 'swing', 'turkish', 'farmer', 'carry', 'curl',
-    'bench', 'overhead', 'front rack', 'back rack', 'goblet',
+    'bench', 'overhead', 'front rack', 'back rack', 'goblet', 'weighted',
   ];
 
-  // Exclude cardio "row" - only barbell/dumbbell movements
   if (name.includes('row') && (name.includes('ring') || name.includes('rower') || name.includes('erg'))) {
     return false;
   }
 
   return weightedPatterns.some(pattern => name.includes(pattern));
+}
+
+// Check if movement has fixed reps (prescribed) vs max reps (needs logging)
+function isPrescribedReps(movement: ParsedMovement): boolean {
+  return typeof movement.reps === 'number' && !movement.isMaxReps;
 }
 
 function abbreviateMovementLabel(name: string): string {
@@ -54,12 +61,165 @@ function abbreviateMovementLabel(name: string): string {
     'v-up': 'V-ups',
     'v up': 'V-ups',
     'v-ups': 'V-ups',
+    'weighted pull-up': 'Weighted Pull-up',
+    'weighted pull-ups': 'Weighted Pull-ups',
   };
 
   if (exactMap[lower]) return exactMap[lower];
   return trimmed;
 }
 
+/**
+ * PRESCRIBED SET ROW
+ * For weighted movements with fixed reps (e.g., "3x2 @ 32kg")
+ * Shows: [Movement Name] [3x badge] [2 reps @ 32kg] [✓ checkmark]
+ */
+function PrescribedSetRow({
+  movement,
+  customWeight,
+  completed = false,
+  onWeightChange,
+  onComplete,
+  readOnly = false,
+}: {
+  movement: ParsedMovement;
+  customWeight?: number;
+  completed?: boolean;
+  onWeightChange?: (movementName: string, weight: number) => void;
+  onComplete?: (movementName: string, completed: boolean) => void;
+  readOnly?: boolean;
+}) {
+  const displayName = abbreviateMovementLabel(movement.name);
+  const sets = movement.sets || 1;
+  const reps = typeof movement.reps === 'number' ? movement.reps : 0;
+  const weight = customWeight ?? movement.rxWeights?.male ?? movement.rxWeights?.female ?? 0;
+  const unit = movement.rxWeights?.unit || 'kg';
+
+  const handleSelectOnFocus = (event: FocusEvent<HTMLInputElement>) => {
+    event.currentTarget.select();
+  };
+
+  return (
+    <div className={`${styles.prescribedRow} ${completed ? styles.completed : ''}`}>
+      {/* Movement name */}
+      <div className={styles.prescribedName}>
+        <span className={styles.movementLabel}>{displayName}</span>
+        {sets > 1 && <span className={styles.setsBadge}>{sets}x</span>}
+      </div>
+
+      {/* Prescription: "2 reps @ 32kg" */}
+      <div className={styles.prescribedInfo}>
+        <span className={styles.repsDisplay}>{reps} reps</span>
+        {isWeightedMovement(movement) && (
+          <>
+            <span className={styles.atSymbol}>@</span>
+            {readOnly ? (
+              <span className={styles.weightDisplay}>{weight}{unit}</span>
+            ) : (
+              <div className={styles.weightInputGroup}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className={styles.weightInput}
+                  value={customWeight || ''}
+                  onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
+                  onFocus={handleSelectOnFocus}
+                  placeholder={weight.toString()}
+                  min="0"
+                />
+                <span className={styles.weightUnit}>{unit}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Checkmark completion button */}
+      <button
+        type="button"
+        className={`${styles.checkButton} ${completed ? styles.checked : ''}`}
+        onClick={() => onComplete?.(movement.name, !completed)}
+        disabled={readOnly}
+        aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
+      >
+        {completed ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : null}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * PERFORMANCE INPUT ROW
+ * For bodyweight/max reps movements (e.g., "2 sets max reps")
+ * Shows: [Movement Name] [Set #] [____ input] [RECORD REPS hint]
+ */
+function PerformanceInputRow({
+  movement,
+  setNumber,
+  customReps,
+  onRepsChange,
+  readOnly = false,
+}: {
+  movement: ParsedMovement;
+  setNumber: number;
+  customReps?: number;
+  onRepsChange?: (movementName: string, setNumber: number, reps: number) => void;
+  readOnly?: boolean;
+}) {
+  const displayName = abbreviateMovementLabel(movement.name);
+
+  const handleSelectOnFocus = (event: FocusEvent<HTMLInputElement>) => {
+    event.currentTarget.select();
+  };
+
+  return (
+    <div className={styles.performanceRow}>
+      {/* Movement name + set number */}
+      <div className={styles.performanceName}>
+        <span className={styles.movementLabel}>{displayName}</span>
+        <span className={styles.setNumber}>Set {setNumber}</span>
+      </div>
+
+      {/* Reps input */}
+      <div className={styles.performanceInput}>
+        <input
+          type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          className={styles.repsInput}
+          value={customReps ?? ''}
+          onChange={(e) => onRepsChange?.(movement.name, setNumber, parseInt(e.target.value) || 0)}
+          onFocus={handleSelectOnFocus}
+          placeholder="—"
+          min="0"
+          disabled={readOnly}
+        />
+        <span className={styles.repsHint}>reps</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * SECTION HEADER
+ * Visual divider between movement types
+ */
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={styles.sectionHeader}>
+      <span className={styles.sectionTitle}>{children}</span>
+      <div className={styles.sectionLine} />
+    </div>
+  );
+}
+
+// ============================================
+// LEGACY SINGLE MOVEMENT EDITOR (for non-strength contexts)
+// ============================================
 export function InlineMovementEditor({
   movement,
   selectedAlternative,
@@ -81,32 +241,28 @@ export function InlineMovementEditor({
   const hasDistance = movement.distance !== undefined && movement.distance > 0;
   const hasTime = movement.time !== undefined && movement.time > 0;
   const hasCalories = movement.calories !== undefined && movement.calories > 0;
+  const isMaxReps = movement.isMaxReps === true;
 
-  // Check what the exercise supports
   const exerciseDef = findExerciseDefinition(movement.name);
   const supportsTime = exerciseDef?.supportsUnits?.includes('time') || hasTime;
 
-  // Display name (either selected alternative or original)
   const displayName = selectedAlternative || movement.name;
-  const displayLabel = abbreviateMovementLabel(displayName);
+  const baseLabel = abbreviateMovementLabel(displayName);
+  const displayLabel = movement.sets ? `${baseLabel} ${movement.sets}x` : baseLabel;
 
-  // Display values (custom or original)
   const displayDistance = customDistance ?? movement.distance;
   const displayTime = customTime ?? movement.time;
   const displayReps = customReps ?? movement.reps;
   const displayUnit = movement.unit || 'm';
 
-  // Determine what to show as the primary measurement (Column B)
   const showTimeInput = hasTime || (supportsTime && !hasDistance && !hasCalories);
   const showDistanceInput = hasDistance;
   const showCaloriesDisplay = hasCalories && !hasDistance && !hasTime;
-  const showRepsInput = movement.reps !== undefined;
-
-  // Determine what to show as secondary (Column C) - only for weighted movements
+  // Show reps input for movements with reps OR max reps
+  const showRepsInput = movement.reps !== undefined || isMaxReps;
   const showWeightInput = isWeighted;
   const showRxDisplay = !isWeighted && movement.rxWeights;
 
-  // Select all text on focus for easy overwriting
   const handleSelectOnFocus = (event: FocusEvent<HTMLInputElement>) => {
     event.currentTarget.select();
   };
@@ -125,11 +281,11 @@ export function InlineMovementEditor({
     }
   };
 
-  // Column 2: Primary Value (reps/sec/distance/calories) - VALUE ONLY, no unit
   const renderPrimaryValue = () => {
     if (readOnly) {
       if (showRepsInput && movement.reps) {
-        return <span className={styles.staticValue}>{movement.reps}</span>;
+        const repsDisplay = isMaxReps ? (customReps ?? 'max') : movement.reps;
+        return <span className={styles.staticValue}>{repsDisplay}</span>;
       }
       if (showDistanceInput && movement.distance) {
         return <span className={styles.staticValue}>{movement.distance}</span>;
@@ -143,7 +299,6 @@ export function InlineMovementEditor({
       return null;
     }
 
-    // Editable inputs - VALUE ONLY
     if (showRepsInput) {
       return (
         <input
@@ -154,6 +309,7 @@ export function InlineMovementEditor({
           value={displayReps ?? ''}
           onChange={(e) => onRepsChange?.(movement.name, parseInt(e.target.value) || 0)}
           onFocus={handleSelectOnFocus}
+          placeholder={isMaxReps ? 'max' : '0'}
           min="0"
         />
       );
@@ -193,11 +349,7 @@ export function InlineMovementEditor({
     return null;
   };
 
-  // Column 3: Unit OR Weight - Right-aligned
-  // For weighted movements: weight input + kg
-  // For non-weighted: unit label (s, reps, m, cal)
   const renderUnitOrWeight = () => {
-    // Weighted movements get weight input in Column 3
     if (showWeightInput) {
       if (readOnly && movement.rxWeights) {
         const weightLabel = `${movement.rxWeights.female ?? movement.rxWeights.male}/${movement.rxWeights.male ?? movement.rxWeights.female}`;
@@ -221,13 +373,11 @@ export function InlineMovementEditor({
       );
     }
 
-    // Rx display without editable weight
     if (showRxDisplay && movement.rxWeights) {
       const weightLabel = `${movement.rxWeights.female || movement.rxWeights.male}/${movement.rxWeights.male}`;
       return <span className={styles.valueUnit}>{weightLabel}{movement.rxWeights.unit || 'kg'}</span>;
     }
 
-    // Non-weighted: show unit label only
     if (showRepsInput) {
       return <span className={styles.valueUnit}>reps</span>;
     }
@@ -241,13 +391,11 @@ export function InlineMovementEditor({
       return <span className={styles.valueUnit}>cal</span>;
     }
 
-    // Empty placeholder - keeps grid stable
     return <span className={styles.valueUnit}></span>;
   };
 
   return (
     <div className={styles.metricStrip}>
-      {/* Column 1: Movement Name (1.2fr) - Left-aligned */}
       <div className={styles.colA}>
         {hasAlternatives ? (
           <select
@@ -271,12 +419,10 @@ export function InlineMovementEditor({
         )}
       </div>
 
-      {/* Column 2: Value (80px fixed) - Centered numeric input */}
       <div className={styles.colB}>
         {renderPrimaryValue()}
       </div>
 
-      {/* Column 3: Unit/Weight (80px fixed) - Right-aligned */}
       <div className={styles.colC}>
         {renderUnitOrWeight()}
       </div>
@@ -284,6 +430,81 @@ export function InlineMovementEditor({
   );
 }
 
+// ============================================
+// STRENGTH MOVEMENT LIST EDITOR
+// Groups movements by type with section headers
+// ============================================
+interface StrengthMovementListProps {
+  movements: ParsedMovement[];
+  customWeights: Record<string, number>;
+  customReps: Record<string, Record<number, number>>; // movementName -> setNumber -> reps
+  completedSets: Record<string, boolean>; // movementName -> completed
+  onWeightChange: (movementName: string, weight: number) => void;
+  onRepsChange: (movementName: string, setNumber: number, reps: number) => void;
+  onComplete: (movementName: string, completed: boolean) => void;
+  readOnly?: boolean;
+}
+
+export function StrengthMovementListEditor({
+  movements,
+  customWeights,
+  customReps,
+  completedSets,
+  onWeightChange,
+  onRepsChange,
+  onComplete,
+  readOnly = false,
+}: StrengthMovementListProps) {
+  // Separate movements into prescribed (fixed reps) and performance (max reps)
+  const prescribedMovements = movements.filter(m => isPrescribedReps(m));
+  const performanceMovements = movements.filter(m => !isPrescribedReps(m));
+
+  return (
+    <div className={styles.strengthList}>
+      {/* STRENGTH section - prescribed sets with checkmarks */}
+      {prescribedMovements.length > 0 && (
+        <>
+          <SectionHeader>STRENGTH</SectionHeader>
+          {prescribedMovements.map((movement, index) => (
+            <PrescribedSetRow
+              key={`prescribed-${movement.name}-${index}`}
+              movement={movement}
+              customWeight={customWeights[movement.name]}
+              completed={completedSets[movement.name] ?? false}
+              onWeightChange={onWeightChange}
+              onComplete={onComplete}
+              readOnly={readOnly}
+            />
+          ))}
+        </>
+      )}
+
+      {/* FINISHER section - bodyweight/max reps with inputs */}
+      {performanceMovements.length > 0 && (
+        <>
+          <SectionHeader>FINISHER</SectionHeader>
+          {performanceMovements.map((movement, movIndex) => {
+            const sets = movement.sets || 1;
+            return Array.from({ length: sets }, (_, setIndex) => (
+              <PerformanceInputRow
+                key={`performance-${movement.name}-${movIndex}-${setIndex}`}
+                movement={movement}
+                setNumber={setIndex + 1}
+                customReps={customReps[movement.name]?.[setIndex + 1]}
+                onRepsChange={onRepsChange}
+                readOnly={readOnly}
+              />
+            ));
+          })}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// LEGACY MOVEMENT LIST EDITOR (for metcons, etc.)
+// ============================================
 interface MovementListEditorProps {
   movements: ParsedMovement[];
   selectedAlternatives: Record<string, string>;

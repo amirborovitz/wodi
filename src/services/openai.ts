@@ -39,6 +39,19 @@ Return ONLY valid JSON:
   ]
 }
 
+## MOVEMENT FIELDS
+Each movement in the "movements" array can have:
+- **name**: Canonical movement name (required)
+- **sets**: Number of sets for THIS movement (use when movements have different set counts)
+- **reps**: Number of reps (omit if max reps)
+- **isMaxReps**: true if user does max reps (user will enter their count)
+- **distance**: Distance in meters (for runs, rows, etc.)
+- **time**: Time in seconds
+- **calories**: Calorie target
+- **rxWeights**: { male, female, unit } for weighted movements
+- **unit**: "m", "km", "mi", "cal", "kg", "lb"
+- **isBodyweight**: true if this is a bodyweight variation (no weight needed)
+
 ## CONTAINER/BENCHMARK RECOGNITION
 Detect nested workout structures like "7 rounds of Cindy" or "3 rounds of DT":
 - **containerRounds**: The OUTER rounds wrapping a benchmark (e.g., 7 in "7 rounds of Cindy")
@@ -148,6 +161,24 @@ Output:
     "prescription": "5x5 @75%",
     "suggestedSets": 5,
     "suggestedReps": 5
+  }]
+}
+
+Input: "Strength - Pull: Pull ups 3x2 @RPE 9 (weighted), 2 sets max reps bodyweight"
+Output:
+{
+  "type": "strength",
+  "format": "strength",
+  "scoreType": "load",
+  "exercises": [{
+    "name": "Pull-up",
+    "type": "strength",
+    "prescription": "3x2 weighted @RPE9, 2 sets max reps BW",
+    "suggestedSets": 5,
+    "movements": [
+      { "name": "Weighted Pull-up", "sets": 3, "reps": 2 },
+      { "name": "Pull-up", "sets": 2, "isMaxReps": true, "isBodyweight": true }
+    ]
   }]
 }
 
@@ -288,6 +319,42 @@ Output:
   ]
 }
 
+Input: "3 sets: 10/10 powell raises, 10/10 seated external rotations"
+Output:
+{
+  "type": "strength",
+  "format": "strength",
+  "scoreType": "load",
+  "exercises": [{
+    "name": "Superset: Powell Raises + Seated External Rotations",
+    "type": "strength",
+    "prescription": "3 sets: 10/10 Powell Raises, 10/10 Seated External Rotations",
+    "suggestedSets": 3,
+    "movements": [
+      { "name": "Powell Raise", "reps": 20 },
+      { "name": "Seated External Rotation", "reps": 20 }
+    ]
+  }]
+}
+
+Input: "A1. DB Row 3x10, A2. Face Pulls 3x15"
+Output:
+{
+  "type": "strength",
+  "format": "strength",
+  "scoreType": "load",
+  "exercises": [{
+    "name": "Superset: DB Row + Face Pulls",
+    "type": "strength",
+    "prescription": "A1. DB Row 3x10, A2. Face Pulls 3x15",
+    "suggestedSets": 3,
+    "movements": [
+      { "name": "Dumbbell Row", "reps": 10 },
+      { "name": "Face Pull", "reps": 15 }
+    ]
+  }]
+}
+
 ## RULES
 1. Keep round-based WODs as ONE exercise with movements array
 2. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon)
@@ -299,6 +366,20 @@ Output:
 8. If the workout has titled sections (e.g., "Cycle 1 - Push", "Superset x3", "Medium Metcon - Interval"), treat each as a separate exercise block.
 9. Do not duplicate exercises; each block should appear once.
 10. MULTI-BLOCK WORKOUTS: When a workout has multiple distinct sections (Cycle, Strength, Superset, Metcon, Finisher, etc.), create a SEPARATE exercise for EACH block. Never merge or skip blocks. Count the blocks in the input and ensure your output has the same number of exercises.
+
+## SUPERSET RECOGNITION
+Supersets are multiple exercises done back-to-back. Recognize these patterns:
+- "3 sets: exercise A, exercise B" → Superset with movements array
+- "A1. exercise, A2. exercise" or "A1/A2/A3" notation → Superset
+- "Superset: A + B" or "Superset 3x10: A, B" → Superset
+- Multiple exercises listed with shared set count → Superset
+- Exercises separated by commas with a shared "X sets" prefix → Superset
+IMPORTANT: Supersets MUST have a "movements" array with each exercise as a separate movement.
+
+## UNILATERAL REPS NOTATION
+"10/10" means 10 reps PER SIDE (left + right) = 20 total reps.
+Parse "10/10 powell raises" as: { "name": "Powell Raise", "reps": 20 }
+This applies to any unilateral exercise (single-arm, single-leg movements).
 
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
@@ -431,7 +512,14 @@ Rules:
 - Preserve all titled sections (Cycle, Superset, Metcon, Interval, etc.) as distinct exercises.
 - Ensure sets x reps like "5x3" becomes suggestedSets=5 and suggestedReps=3.
 - Never duplicate the same exercise block unless the raw text explicitly repeats it.
-- If you are unsure, preserve the original parsed structure and just correct obvious errors.`;
+- If you are unsure, preserve the original parsed structure and just correct obvious errors.
+
+Superset Recognition:
+- "3 sets: exercise A, exercise B" → Superset with movements array
+- "A1. exercise, A2. exercise" notation → Superset
+- Multiple exercises with shared set count → Superset
+- Supersets MUST have a "movements" array with each exercise as a separate movement.
+- "10/10" notation means 10 reps per side (20 total) for unilateral exercises.`;
 
 export async function refineParsedWorkout(
   parsed: ParsedWorkout,
@@ -499,14 +587,20 @@ function validateMovement(data: unknown): ParsedMovement | null {
 
   if (!raw.name || typeof raw.name !== 'string') return null;
 
+  // Handle isMaxReps flag (for "max reps" movements)
+  const isMaxReps = raw.isMaxReps === true || raw.reps === 'max' || raw.reps === 'MAX';
+
   return {
     name: raw.name,
+    sets: typeof raw.sets === 'number' ? raw.sets : undefined,
     reps: typeof raw.reps === 'number' ? raw.reps : undefined,
+    isMaxReps: isMaxReps || undefined,
     distance: typeof raw.distance === 'number' ? raw.distance : undefined,
     time: typeof raw.time === 'number' ? raw.time : undefined,
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
+    isBodyweight: typeof raw.isBodyweight === 'boolean' ? raw.isBodyweight : undefined,
   };
 }
 

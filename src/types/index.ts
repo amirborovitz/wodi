@@ -160,12 +160,15 @@ export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
 // Individual movement within a workout
 export interface ParsedMovement {
   name: string;                 // Canonical movement name
-  reps?: number;                // Rep count
+  sets?: number;                // Number of sets for this movement
+  reps?: number;                // Rep count (undefined if max reps)
+  isMaxReps?: boolean;          // True if user does max reps (label shows "max", user enters actual count)
   distance?: number;            // Distance in meters
   time?: number;                // Time in seconds
   calories?: number;            // Calorie target
   rxWeights?: RxWeights;        // Rx weights (male/female)
   unit?: MeasurementUnit;       // Unit for distance/time display
+  isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
 }
 
 export interface ParsedExercise {

@@ -248,3 +248,372 @@
     font-size: 11px;
   }
 }
+
+/* ========================================
+   STRENGTH LIST - New Grouped Layout
+   ======================================== */
+.strengthList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 16px 20px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ========================================
+   SECTION HEADER
+   "STRENGTH" / "FINISHER" dividers
+   ======================================== */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0 8px;
+}
+
+.sectionHeader:first-child {
+  padding-top: 8px;
+}
+
+.sectionTitle {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sectionLine {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+}
+
+/* ========================================
+   PRESCRIBED SET ROW
+   Weighted sets with checkmark completion
+   ======================================== */
+.prescribedRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+
+.prescribedRow:last-child {
+  border-bottom: none;
+}
+
+.prescribedRow.completed {
+  opacity: 0.6;
+}
+
+.prescribedRow.completed .prescribedName,
+.prescribedRow.completed .prescribedInfo {
+  text-decoration: line-through;
+  text-decoration-color: rgba(0, 255, 255, 0.5);
+}
+
+/* Movement name + sets badge */
+.prescribedName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.movementLabel {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.setsBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 8px;
+  background: linear-gradient(135deg, #00FFFF 0%, #00CCCC 100%);
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #000;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* Prescription info: "2 reps @ 32kg" */
+.prescribedInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.repsDisplay {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.atSymbol {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.weightDisplay {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.weightInputGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.weightInput {
+  width: 52px;
+  height: 36px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: center;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.weightInput::-webkit-outer-spin-button,
+.weightInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weightInput:focus {
+  outline: none;
+  border-color: #00FFFF;
+  box-shadow: 0 0 0 1px #00FFFF;
+}
+
+.weightInput::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.4;
+}
+
+.weightUnit {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+/* Checkmark completion button */
+.checkButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.checkButton:hover {
+  background: rgba(0, 255, 255, 0.08);
+  border-color: rgba(0, 255, 255, 0.3);
+}
+
+.checkButton:active {
+  transform: scale(0.95);
+}
+
+.checkButton.checked {
+  background: linear-gradient(135deg, #00FFFF 0%, #00CCCC 100%);
+  border-color: transparent;
+}
+
+.checkButton.checked svg {
+  width: 18px;
+  height: 18px;
+  color: #000;
+}
+
+.checkButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ========================================
+   PERFORMANCE INPUT ROW
+   Bodyweight/max reps with input field
+   ======================================== */
+.performanceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.performanceRow:last-child {
+  border-bottom: none;
+}
+
+.performanceName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.setNumber {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.performanceInput {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.repsInput {
+  width: 64px;
+  height: 44px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 18px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-align: center;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.repsInput::-webkit-outer-spin-button,
+.repsInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.repsInput:focus {
+  outline: none;
+  border-color: #00FFFF;
+  box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.2);
+  background: rgba(0, 255, 255, 0.06);
+}
+
+.repsInput::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.3;
+  font-size: 16px;
+}
+
+.repsInput:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.repsHint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  text-transform: lowercase;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE - Strength Layout
+   ======================================== */
+@media (max-width: 380px) {
+  .strengthList {
+    padding: 6px 12px 16px;
+  }
+
+  .prescribedRow {
+    min-height: 48px;
+    padding: 8px 0;
+    gap: 8px;
+  }
+
+  .movementLabel {
+    font-size: 14px;
+  }
+
+  .setsBadge {
+    min-width: 24px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 10px;
+  }
+
+  .repsDisplay {
+    font-size: 13px;
+  }
+
+  .weightInput {
+    width: 44px;
+    height: 32px;
+    font-size: 13px;
+  }
+
+  .checkButton {
+    width: 36px;
+    height: 36px;
+  }
+
+  .checkButton.checked svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .performanceRow {
+    min-height: 44px;
+    padding: 6px 0;
+  }
+
+  .repsInput {
+    width: 56px;
+    height: 40px;
+    font-size: 16px;
+  }
+}
