@@ -913,6 +913,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   // Per-movement weight tracking (maps movement name to weight)
   const [movementWeights, setMovementWeights] = useState<Record<string, number>>({});
 
+  // Per-movement per-set reps tracking for supersets (maps movement name -> set index -> reps)
+  const [performanceReps, setPerformanceReps] = useState<Record<string, Record<number, number>>>({});
+
   // Smart classification cache (maps exercise index to AI classification result)
   const [smartClassifications, setSmartClassifications] = useState<Record<number, {
     inputType: ExerciseInputType;
@@ -975,16 +978,32 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialImage]);
 
-  // Handle edit workout - skip directly to log-results with workout data
+  // Handle edit workout - skip directly to log-results with pre-filled data
   useEffect(() => {
     if (!editWorkout) return;
+
+    console.log('[EditWorkout] Starting edit for workout:', editWorkout.id, editWorkout.title);
+
+    // Store workout ID for updating instead of creating new
+    setSavedWorkoutMeta({
+      id: editWorkout.id,
+      totalVolume: editWorkout.totalVolume || 0,
+      date: editWorkout.date instanceof Date ? editWorkout.date : new Date(editWorkout.date),
+    });
+
+    // Determine format from workout type
+    const format: ParsedWorkout['format'] = editWorkout.type === 'strength' ? 'strength'
+      : editWorkout.type === 'amrap' ? 'amrap'
+      : editWorkout.type === 'emom' ? 'emom'
+      : 'for_time';
 
     // Convert WorkoutWithStats to ParsedWorkout format
     const editParsedWorkout: ParsedWorkout = {
       title: editWorkout.title,
       type: editWorkout.type,
-      format: editWorkout.type === 'strength' ? 'strength' : 'for_time',
+      format,
       scoreType: editWorkout.type === 'strength' ? 'load' : 'time',
+      timeCap: editWorkout.duration ? editWorkout.duration * 60 : undefined,
       exercises: editWorkout.exercises.map(ex => ({
         name: ex.name,
         type: ex.type,
@@ -995,11 +1014,74 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       })),
     };
 
-    // Set up the workout and skip directly to preview (so user can confirm before logging)
+    // Convert stored exercises back to ExerciseResult format
+    const restoredResults: ExerciseResult[] = editWorkout.exercises.map((ex, index) => {
+      // Get completion time from sets if available
+      const completionTime = ex.sets.find(s => s.time)?.time;
+
+      // Get total calories from sets
+      const totalCalories = ex.sets.reduce((sum, s) => sum + (s.calories || 0), 0);
+
+      // Get total distance from sets
+      const totalDistance = ex.sets.reduce((sum, s) => sum + (s.distance || 0), 0);
+
+      // Parse rounds from prescription if available (e.g., "5 rounds")
+      const roundsMatch = ex.prescription.match(/(\d+)\s*rounds?/i);
+      const rounds = roundsMatch ? parseInt(roundsMatch[1], 10) : ex.sets.length || 1;
+
+      const result: ExerciseResult = {
+        exercise: editParsedWorkout.exercises[index],
+        sets: ex.sets,
+        completionTime,
+        rounds,
+        ...(totalCalories > 0 && {
+          totalCalories,
+          cardioTurns: ex.sets.length,
+          cardioCaloriesPerTurn: ex.sets[0]?.calories,
+        }),
+        ...(totalDistance > 0 && {
+          totalDistance,
+          distanceTurns: ex.sets.length,
+          distancePerTurn: ex.sets[0]?.distance,
+        }),
+      };
+
+      return result;
+    });
+
+    // Set up all state for editing
     setParsedWorkout(editParsedWorkout);
+    setExerciseResults(restoredResults);
     setImageUrl(editWorkout.imageUrl || null);
     setError(null);
-    setStep('preview');
+    setIsEditingAfterSave(true); // Flag to update instead of create
+
+    // Pre-fill the first exercise's state
+    if (restoredResults.length > 0) {
+      const firstResult = restoredResults[0];
+      setCurrentSets(firstResult.sets);
+
+      if (firstResult.completionTime) {
+        const mins = Math.floor(firstResult.completionTime / 60);
+        const secs = firstResult.completionTime % 60;
+        setCompletionMinutes(mins > 0 ? mins.toString() : '');
+        setCompletionSeconds(secs > 0 ? secs.toString() : '');
+      }
+
+      if (firstResult.cardioTurns) {
+        setCardioTurns(firstResult.cardioTurns.toString());
+        setCardioCaloriesPerTurn(firstResult.cardioCaloriesPerTurn?.toString() || '');
+      }
+
+      if (firstResult.distanceTurns) {
+        setCardioDistanceTurns(firstResult.distanceTurns.toString());
+        setCardioDistancePerTurn(firstResult.distancePerTurn?.toString() || '');
+      }
+    }
+
+    // Skip directly to log-results so user can see and edit their values
+    setStep('log-results');
+    console.log('[EditWorkout] Pre-filled results:', restoredResults);
   }, [editWorkout]);
 
   // Run smart classification for exercises with low confidence when entering log-results
@@ -1905,6 +1987,43 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       ...distanceData,
     };
 
+    // Validation before proceeding: check if user forgot to enter key data
+    const isAmrapWorkout = parsedWorkout.format === 'amrap' || parsedWorkout.type === 'amrap';
+    const isForTimeWorkoutType = parsedWorkout.format === 'for_time' || parsedWorkout.type === 'for_time';
+    const hasRepsInSets = currentSets.some(s => s.actualReps && s.actualReps > 0);
+
+    // Debug log
+    console.warn('🔍 [handleNextExercise] Validation:', {
+      exerciseName: currentExercise.name,
+      isAmrapWorkout,
+      isForTimeWorkoutType,
+      rounds,
+      completionTime,
+      hasRepsInSets,
+      isAmrapMode,
+      currentRounds,
+    });
+
+    // Warn if AMRAP workout but no rounds entered
+    if (isAmrapMode && !rounds && !hasRepsInSets) {
+      const confirmed = window.confirm(
+        `You haven't entered the number of rounds for "${currentExercise.name}". Continue anyway?`
+      );
+      if (!confirmed) {
+        return; // User cancelled
+      }
+    }
+
+    // Warn if For Time workout but no time entered
+    if (isForTime && !completionTime && !hasRepsInSets) {
+      const confirmed = window.confirm(
+        `You haven't entered your completion time for "${currentExercise.name}". Continue anyway?`
+      );
+      if (!confirmed) {
+        return; // User cancelled
+      }
+    }
+
     const newResults = upsertExerciseResult(result);
 
     // Check if this was the last exercise
@@ -2037,8 +2156,123 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     setStep('log-results');
   };
 
+  // Handle renaming a movement from the reward screen
+  const handleRenameMovement = (oldName: string, newName: string) => {
+    if (!rewardData?.workloadBreakdown) return;
+
+    const updatedMovements = rewardData.workloadBreakdown.movements.map(m =>
+      m.name === oldName ? { ...m, name: newName } : m
+    );
+
+    setRewardData({
+      ...rewardData,
+      workloadBreakdown: {
+        ...rewardData.workloadBreakdown,
+        movements: updatedMovements,
+      },
+    });
+  };
+
+  // Handle deleting a movement from the reward screen
+  const handleDeleteMovement = (name: string) => {
+    if (!rewardData?.workloadBreakdown) return;
+
+    const deletedMovement = rewardData.workloadBreakdown.movements.find(m => m.name === name);
+    const updatedMovements = rewardData.workloadBreakdown.movements.filter(m => m.name !== name);
+
+    // Recalculate totals
+    const grandTotalReps = updatedMovements.reduce((sum, m) => sum + (m.totalReps || 0), 0);
+    const grandTotalDistance = updatedMovements.reduce((sum, m) => sum + (m.totalDistance || 0), 0);
+    const grandTotalCalories = updatedMovements.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
+
+    // Recalculate volume (weight × reps for each movement)
+    const grandTotalVolume = updatedMovements.reduce((sum, m) => {
+      const weight = m.weight || 0;
+      const reps = m.totalReps || 0;
+      return sum + (weight * reps);
+    }, 0);
+
+    setRewardData({
+      ...rewardData,
+      workloadBreakdown: {
+        ...rewardData.workloadBreakdown,
+        movements: updatedMovements,
+        grandTotalReps,
+        grandTotalVolume,
+        grandTotalDistance,
+        grandTotalCalories,
+      },
+      // Update workout summary if movement had significant data
+      workoutSummary: {
+        ...rewardData.workoutSummary,
+        totalReps: grandTotalReps,
+        totalVolume: grandTotalVolume,
+      },
+    });
+
+    console.log('[RewardScreen] Deleted movement:', name, deletedMovement);
+  };
+
   const saveWorkout = async (results: ExerciseResult[]) => {
     if (!user || !parsedWorkout) return;
+
+    // Validation: Check for missing rounds/time in AMRAP/for_time workouts
+    const isRoundsBasedWorkout = parsedWorkout.format === 'amrap' ||
+      parsedWorkout.format === 'amrap_intervals' ||
+      parsedWorkout.type === 'amrap';
+
+    const isForTimeWorkout = parsedWorkout.format === 'for_time' ||
+      parsedWorkout.type === 'for_time';
+
+    // Debug log
+    console.warn('🔍 [Validation] Checking workout:', {
+      format: parsedWorkout.format,
+      type: parsedWorkout.type,
+      isRoundsBasedWorkout,
+      isForTimeWorkout,
+      results: results.map(r => ({
+        name: r.exercise.name,
+        rounds: r.rounds,
+        completionTime: r.completionTime,
+        setsCount: r.sets.length,
+      })),
+    });
+
+    // Check if workout is missing key scoring data
+    let missingData = false;
+    let missingWhat = '';
+
+    if (isRoundsBasedWorkout) {
+      // For AMRAP: check if ANY result is missing rounds
+      const hasAnyRounds = results.some(r => r.rounds && r.rounds > 0);
+      const hasAnyRepsInSets = results.some(r => r.sets.some(s => s.actualReps && s.actualReps > 0));
+
+      if (!hasAnyRounds && !hasAnyRepsInSets) {
+        missingData = true;
+        missingWhat = 'rounds completed';
+      }
+    }
+
+    if (isForTimeWorkout) {
+      // For time: check if ANY result has completion time
+      const hasAnyTime = results.some(r => r.completionTime && r.completionTime > 0);
+
+      if (!hasAnyTime) {
+        missingData = true;
+        missingWhat = 'completion time';
+      }
+    }
+
+    console.warn('🔍 [Validation] Result:', { missingData, missingWhat });
+
+    if (missingData) {
+      const confirmed = window.confirm(
+        `You haven't entered your ${missingWhat}. Save anyway?`
+      );
+      if (!confirmed) {
+        return; // User cancelled, don't save
+      }
+    }
 
     setStep('saving');
 
@@ -2578,7 +2812,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           <div className={styles.previewActions}>
             <Button
               variant="secondary"
-              onClick={() => setStep('capture')}
+              onClick={onBack}
               size="lg"
             >
               Retake
@@ -2645,7 +2879,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 onWeightChange={handleMovementWeightChange}
                 onRepsChange={handleRepsChange}
                 readOnly={currentIntervalSet > 1}
-              />
+                              />
             )}
 
             {/* Rounds input */}
@@ -2742,7 +2976,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 onTimeChange={handleTimeChange}
                 onWeightChange={handleMovementWeightChange}
                 onRepsChange={handleRepsChange}
-              />
+                              />
             )}
 
             {/* Rounds input */}
@@ -2823,7 +3057,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 onTimeChange={handleTimeChange}
                 onWeightChange={handleMovementWeightChange}
                 onRepsChange={handleRepsChange}
-              />
+                              />
             )}
 
             {/* All sets - scrollable list */}
@@ -2971,6 +3205,16 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             )}
 
             {/* Show time input for "for time" workouts, otherwise show sets */}
+            {(() => {
+              console.log('[UI Debug] Exercise render:', {
+                name: currentExercise?.name,
+                hasMovements: !!currentExercise?.movements,
+                movementsCount: currentExercise?.movements?.length,
+                movements: currentExercise?.movements?.map(m => m.name),
+                isForTime: isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format),
+              });
+              return null;
+            })()}
             {isForTimeWorkout(parsedWorkout.exercises[currentExerciseIndex], parsedWorkout.type, parsedWorkout.format) ? (
               <>
                 {/* Movements with inline editing */}
@@ -2987,7 +3231,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     onTimeChange={handleTimeChange}
                     onWeightChange={handleMovementWeightChange}
                     onRepsChange={handleRepsChange}
-                  />
+                                      />
                 )}
 
                 {/* Time input */}
@@ -3027,7 +3271,57 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               </>
             ) : (
               <>
-                {/* Strength Sets - Centered Card Design */}
+                {/* Superset UI - show each set with all movements */}
+                {currentExercise?.movements && currentExercise.movements.length > 1 ? (
+                  <div className={styles.strengthSetsContainer}>
+                    {currentSets.map((set, setIndex) => (
+                      <div key={set.id} className={styles.strengthSetCard}>
+                        <span className={styles.strengthSetLabel}>Set {set.setNumber}</span>
+                        <div className={styles.supersetMovements}>
+                          {currentExercise.movements!.map((mov) => (
+                            <div key={mov.name} className={styles.supersetMovementRow}>
+                              <span className={styles.supersetMovementName}>{mov.name}</span>
+                              <div className={styles.supersetInputs}>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder={mov.reps?.toString() || 'reps'}
+                                  value={performanceReps[mov.name]?.[setIndex] ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value ? parseInt(e.target.value) : undefined;
+                                    setPerformanceReps(prev => ({
+                                      ...prev,
+                                      [mov.name]: { ...(prev[mov.name] || {}), [setIndex]: val as number }
+                                    }));
+                                  }}
+                                  className={styles.supersetInput}
+                                />
+                                <span className={styles.supersetInputLabel}>reps</span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  placeholder="0"
+                                  value={movementWeights[`${mov.name}-${setIndex}`] ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                                    setMovementWeights(prev => ({
+                                      ...prev,
+                                      [`${mov.name}-${setIndex}`]: val as number
+                                    }));
+                                  }}
+                                  className={styles.supersetInput}
+                                />
+                                <span className={styles.supersetInputLabel}>kg</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                <>
+                {/* Strength Sets - Centered Card Design (single movement) */}
                 <div className={styles.strengthSetsContainer}>
                   {currentSets.map((set, setIndex) => {
                     // Only treat as "max reps" if this specific set has no target reps
@@ -3116,6 +3410,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 >
                   + Add Set
                 </button>
+                </>
+                )}
               </>
             )}
           </Card>
@@ -3440,6 +3736,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           data={rewardData}
           onDone={onWorkoutCreated}
           onEdit={handleEditFromReward}
+          onRenameMovement={handleRenameMovement}
+          onDeleteMovement={handleDeleteMovement}
         />
       )}
     </div>

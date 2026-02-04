@@ -1,342 +1,325 @@
 /* ========================================
-   MOVEMENT LIST - Container with subtle grain
+   MOVEMENT LIST - Clean rows with spacing
    ======================================== */
 .movementList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: 12px;
+  padding: 16px;
 }
 
 /* ========================================
-   MOVEMENT CARD - Adaptive height, grain texture
-   Irregular border-radius (3 corners rounded)
+   MOVEMENT CARD - Flexbox row layout
+   [Name] [Value+Unit] [Weight+Unit]
    ======================================== */
 .movementCard {
-  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  /* Gradient background with subtle grain effect */
-  background:
-    linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.03) 0%,
-      rgba(255, 255, 255, 0.01) 50%,
-      rgba(0, 242, 255, 0.02) 100%
-    );
-  /* Irregular border radius - 3 corners rounded, 1 sharp */
-  border-radius: 14px 14px 4px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  transition: border-color 0.2s ease, transform 0.15s ease;
-}
-
-/* Noise texture overlay */
-.movementCard::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
-}
-
-.movementCard:hover {
-  border-color: rgba(0, 242, 255, 0.2);
-}
-
-/* Focus-within for keyboard navigation */
-.movementCard:focus-within {
-  border-color: rgba(0, 242, 255, 0.3);
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
 }
 
 /* ========================================
-   MOVEMENT HEADER - Name on top layer
-   Bold, primary color (White/Cyan)
+   MOVEMENT NAME - Flexible, allows wrapping
    ======================================== */
-.movementHeader {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
 .movementName {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
   font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text);
+  font-weight: 500;
+  color: #FFFFFF;
   line-height: 1.3;
-  letter-spacing: -0.01em;
+  /* Allow wrapping instead of truncation */
+  white-space: normal;
+  word-wrap: break-word;
 }
 
-/* Cyan accent for weighted movements */
-.movementName.weighted {
-  color: var(--neon-cyan);
-}
-
-/* Dropdown select for alternatives */
+/* Dropdown select - bordered box */
 .movementSelect {
-  flex: 1;
-  min-height: 36px;
-  padding: var(--space-2) var(--space-3);
-  padding-right: 28px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px 10px 3px 10px;
-  color: var(--color-text);
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 28px 8px 14px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  color: #FFFFFF;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2300F2FF' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  white-space: normal;
-  line-height: 1.3;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Allow text to wrap in select (limited browser support, fallback to ellipsis) */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .movementSelect:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 0 1px var(--neon-cyan);
+  border-color: rgba(0, 242, 255, 0.5);
 }
 
 .movementSelect:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 
-/* Static label when no alternatives */
-.movementStaticLabel {
-  flex: 1;
-}
-
 /* ========================================
-   METRIC CLUSTER - Pills/Chips that wrap
-   Slightly indented from movement name
+   VALUE GROUP - Value + Unit glued together (8px gap)
    ======================================== */
-.metricCluster {
+.valueGroup {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding-left: var(--space-2);
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.weightGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* ========================================
-   METRIC PILL - Individual metric chip
-   Subtle glass effect, rounded
+   NAME COLUMN - Contains name + substitution info
    ======================================== */
-.metricPill {
-  display: inline-flex;
+.nameColumn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ========================================
+   SUBSTITUTION INDICATORS
+   ======================================== */
+.substituted {
+  /* Subtle visual distinction for substituted rows */
+}
+
+.substitutedSelect {
+  border-color: rgba(255, 200, 100, 0.4);
+}
+
+.substitutionInfo {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  padding-left: 2px;
 }
 
-.metricPill:focus-within {
-  border-color: var(--neon-cyan);
-  background: rgba(0, 242, 255, 0.06);
+.substitutionBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: rgba(255, 200, 100, 0.15);
+  border: 1px solid rgba(255, 200, 100, 0.3);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 200, 100, 0.9);
 }
 
-/* Editable pill has different styling */
-.metricPill.editable {
-  padding: 4px 4px 4px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.metricPill.editable:focus-within {
-  border-color: var(--neon-cyan);
-  background: rgba(0, 242, 255, 0.04);
+.originalName {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
 }
 
 /* ========================================
-   PILL INPUT - Numeric input inside pill
+   VALUE INPUT - Bordered box, min 48px touch target
+   Cyan border when has value
    ======================================== */
-.pillInput {
-  width: 48px;
-  height: 32px;
-  padding: 0 6px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.valueInput {
+  width: 64px;
+  height: 48px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
-  color: var(--color-text);
-  font-size: 15px;
+  color: #FFFFFF;
+  font-size: 18px;
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-weight: 500;
   text-align: center;
   -moz-appearance: textfield;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.pillInput::-webkit-outer-spin-button,
-.pillInput::-webkit-inner-spin-button {
+.valueInput::-webkit-outer-spin-button,
+.valueInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.pillInput:focus {
+.valueInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+  border-color: rgba(0, 242, 255, 0.6);
 }
 
-.pillInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.4;
+.valueInput:not(:placeholder-shown) {
+  border-color: rgba(0, 242, 255, 0.5);
+}
+
+.valueInput::placeholder {
+  color: rgba(255, 255, 255, 0.3);
   font-weight: 400;
 }
 
-/* Wider input for weight values */
-.pillInput.wide {
-  width: 56px;
-}
-
 /* ========================================
-   PILL VALUE - Static value display
+   WEIGHT INPUT - Bordered box, min 48px touch target
    ======================================== */
-.pillValue {
-  font-size: 15px;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-/* Accent color for important values */
-.pillValue.accent {
-  color: var(--neon-cyan);
-}
-
-/* ========================================
-   PILL UNIT - Unit label (reps, kg, m, s)
-   ======================================== */
-.pillUnit {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.8;
-}
-
-/* Cyan unit for emphasis */
-.pillUnit.accent {
-  color: var(--neon-cyan);
-  opacity: 1;
-}
-
-/* ========================================
-   RX BADGE - Prescription weight hint
-   ======================================== */
-.rxBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  background: rgba(0, 242, 255, 0.08);
-  border: 1px solid rgba(0, 242, 255, 0.2);
+.weightInput {
+  width: 64px;
+  height: 48px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 12px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--neon-cyan);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: #FFFFFF;
+  font-size: 18px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.weightInput::-webkit-outer-spin-button,
+.weightInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weightInput:focus {
+  outline: none;
+  border-color: rgba(0, 242, 255, 0.6);
+}
+
+.weightInput:not(:placeholder-shown) {
+  border-color: rgba(0, 242, 255, 0.5);
+}
+
+.weightInput::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 400;
 }
 
 /* ========================================
-   SEPARATOR - Visual separator between pills
+   VALUE DISPLAY - Read-only value in box
    ======================================== */
-.pillSeparator {
+.valueDisplay {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: 12px;
-  color: var(--color-text-muted);
-  opacity: 0.5;
+  width: 64px;
+  height: 48px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  font-size: 18px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: #FFFFFF;
+}
+
+/* ========================================
+   UNIT LABEL - Glued to value with 8px gap
+   ======================================== */
+.unitLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  min-width: 28px;
 }
 
 /* ========================================
    MOBILE RESPONSIVE
    ======================================== */
 @media (max-width: 380px) {
-  .movementCard {
-    padding: var(--space-3);
-    gap: var(--space-2);
+  .movementList {
+    padding: 12px;
+    gap: 10px;
   }
 
-  .movementName {
+  .movementCard {
+    gap: 8px;
+  }
+
+  .movementName,
+  .movementSelect {
+    min-height: 44px;
     font-size: 14px;
+    padding: 6px 10px;
   }
 
   .movementSelect {
-    min-height: 32px;
-    padding: 6px 10px;
-    padding-right: 26px;
-    font-size: 14px;
+    padding-right: 24px;
   }
 
-  .metricCluster {
+  .valueGroup,
+  .weightGroup {
     gap: 6px;
-    padding-left: var(--space-1);
   }
 
-  .metricPill {
-    padding: 6px 10px;
+  .valueInput,
+  .weightInput {
+    width: 56px;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .valueDisplay {
+    width: 56px;
+    height: 44px;
+    padding: 0 6px;
+    font-size: 16px;
+  }
+
+  .unitLabel {
+    font-size: 12px;
+    min-width: 24px;
+  }
+
+  .unitLabel {
+    font-size: 11px;
+  }
+
+  .substitutionInfo {
     gap: 4px;
   }
 
-  .metricPill.editable {
-    padding: 3px 3px 3px 10px;
-  }
-
-  .pillInput {
-    width: 42px;
-    height: 28px;
-    font-size: 14px;
-  }
-
-  .pillInput.wide {
-    width: 50px;
-  }
-
-  .pillValue {
-    font-size: 14px;
-  }
-
-  .pillUnit {
-    font-size: 10px;
-  }
-
-  .rxBadge {
-    padding: 3px 8px;
+  .substitutionBadge {
     font-size: 9px;
+    padding: 1px 4px;
+  }
+
+  .originalName {
+    font-size: 10px;
   }
 }
 
 /* ========================================
-   HOVER EFFECTS (non-touch devices)
+   HOVER EFFECTS
    ======================================== */
 @media (hover: hover) {
-  .movementCard:hover {
-    transform: translateY(-1px);
-  }
-
-  .metricPill:hover {
-    border-color: rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  .metricPill.editable:hover {
-    border-color: rgba(0, 242, 255, 0.3);
+  .movementName:hover,
+  .movementSelect:hover,
+  .valueInput:hover,
+  .weightInput:hover {
+    border-color: rgba(255, 255, 255, 0.25);
   }
 }
 
@@ -429,9 +412,10 @@
   font-size: 15px;
   font-weight: 500;
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  /* Allow wrapping instead of truncation */
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .setsBadge {
@@ -484,7 +468,7 @@
   gap: 4px;
 }
 
-.weightInput {
+.prescribedWeightInput {
   width: 52px;
   height: 36px;
   padding: 0 8px;
@@ -500,19 +484,19 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.weightInput::-webkit-outer-spin-button,
-.weightInput::-webkit-inner-spin-button {
+.prescribedWeightInput::-webkit-outer-spin-button,
+.prescribedWeightInput::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-.weightInput:focus {
+.prescribedWeightInput:focus {
   outline: none;
   border-color: #00FFFF;
   box-shadow: 0 0 0 1px #00FFFF;
 }
 
-.weightInput::placeholder {
+.prescribedWeightInput::placeholder {
   color: var(--color-text-secondary);
   opacity: 0.4;
 }
@@ -523,13 +507,13 @@
   opacity: 0.7;
 }
 
-/* Checkmark completion button */
+/* Checkmark completion button - min 44px touch target */
 .checkButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: rgba(255, 255, 255, 0.04);
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
@@ -570,7 +554,6 @@
 .performanceRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   min-height: 52px;
   padding: 8px 0;
@@ -601,7 +584,7 @@
 .performanceInput {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -681,20 +664,20 @@
     font-size: 13px;
   }
 
-  .weightInput {
+  .prescribedWeightInput {
     width: 44px;
     height: 32px;
     font-size: 13px;
   }
 
   .checkButton {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
   }
 
   .checkButton.checked svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
 
   .performanceRow {

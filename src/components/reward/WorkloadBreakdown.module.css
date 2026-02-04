@@ -28,6 +28,38 @@
   gap: var(--space-2);
 }
 
+/* Swipe container for gestures */
+.swipeContainer {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+/* Background action indicators */
+.actionDelete,
+.actionEdit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.actionDelete {
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 80, 80, 0.3));
+  color: #ff6b6b;
+}
+
+.actionEdit {
+  left: 0;
+  background: linear-gradient(-90deg, transparent, rgba(0, 242, 255, 0.2));
+  color: var(--color-sessions);
+}
+
 /* Individual movement tile */
 .tile {
   display: flex;
@@ -44,6 +76,32 @@
   overflow: hidden;
   min-height: 72px;
   box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.12);
+  cursor: default;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.tile.editable {
+  cursor: pointer;
+}
+
+.tile.editable:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Edit hint chevron */
+.editHint {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+
+.tile.editable:hover .editHint {
+  opacity: 0.7;
 }
 
 /* Glow effect behind tile based on color */

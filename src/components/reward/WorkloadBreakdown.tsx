@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import type { PanInfo } from 'framer-motion';
 import type { WorkloadBreakdown as WorkloadBreakdownType, MovementTotal } from '../../types';
 import styles from './WorkloadBreakdown.module.css';
 
@@ -7,6 +8,9 @@ interface WorkloadBreakdownProps {
   breakdown: WorkloadBreakdownType;
   showTotals?: boolean;
   animationDelay?: number;
+  editable?: boolean;
+  onEditMovement?: (movement: MovementTotal) => void;
+  onDeleteMovement?: (movementName: string) => void;
 }
 
 /**
@@ -117,10 +121,133 @@ function shortenName(name: string): string {
     .join(' ');
 }
 
+// Swipeable Movement Tile Component
+function SwipeableTile({
+  movement,
+  editable,
+  onEdit,
+  onDelete,
+  color,
+}: {
+  movement: MovementTotal;
+  editable: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  color: string;
+}) {
+  const x = useMotionValue(0);
+  const deleteOpacity = useTransform(x, [-100, -50], [1, 0]);
+  const editOpacity = useTransform(x, [50, 100], [0, 1]);
+  const scale = useTransform(x, [-100, 0, 100], [0.95, 1, 0.95]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    setIsDragging(false);
+    const threshold = 80;
+
+    if (info.offset.x < -threshold && onDelete) {
+      // Swipe left - delete
+      animate(x, -150, { type: 'spring', stiffness: 300, damping: 30 });
+      setTimeout(() => {
+        if (navigator.vibrate) navigator.vibrate(20);
+        onDelete();
+      }, 150);
+    } else if (info.offset.x > threshold && onEdit) {
+      // Swipe right - edit
+      animate(x, 150, { type: 'spring', stiffness: 300, damping: 30 });
+      setTimeout(() => {
+        if (navigator.vibrate) navigator.vibrate(10);
+        onEdit();
+      }, 150);
+    } else {
+      // Snap back
+      animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 });
+    }
+  };
+
+  const handleTap = () => {
+    if (!isDragging && editable && onEdit) {
+      if (navigator.vibrate) navigator.vibrate(10);
+      onEdit();
+    }
+  };
+
+  return (
+    <div className={styles.swipeContainer}>
+      {/* Background actions */}
+      {editable && (
+        <>
+          <motion.div className={styles.actionDelete} style={{ opacity: deleteOpacity }}>
+            <DeleteIcon />
+          </motion.div>
+          <motion.div className={styles.actionEdit} style={{ opacity: editOpacity }}>
+            <EditIcon />
+          </motion.div>
+        </>
+      )}
+
+      {/* Tile */}
+      <motion.div
+        className={`${styles.tile} ${styles[color]} ${editable ? styles.editable : ''}`}
+        style={{ x, scale }}
+        drag={editable ? 'x' : false}
+        dragConstraints={{ left: -100, right: 100 }}
+        dragElastic={0.1}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={handleDragEnd}
+        onClick={handleTap}
+        whileTap={editable ? { scale: 0.98 } : undefined}
+      >
+        <span className={styles.value}>{formatValue(movement)}</span>
+        <span className={styles.name}>{shortenName(movement.name)}</span>
+        {movement.weight && movement.weight > 0 && (
+          <span className={styles.weight}>
+            @ {movement.weight}{movement.unit === 'lb' ? 'lb' : 'kg'}
+          </span>
+        )}
+        {editable && (
+          <span className={styles.editHint}>
+            <ChevronIcon />
+          </span>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+// Icons
+function EditIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
 export function WorkloadBreakdown({
   breakdown,
   showTotals = false,
   animationDelay = 0.65,
+  editable = false,
+  onEditMovement,
+  onDeleteMovement,
 }: WorkloadBreakdownProps) {
   if (!breakdown.movements || breakdown.movements.length === 0) {
     return null;
@@ -198,18 +325,14 @@ export function WorkloadBreakdown({
             }}
           >
             {row.map((movement) => (
-              <div
+              <SwipeableTile
                 key={movement.name}
-                className={`${styles.tile} ${styles[movement.color || 'magenta']}`}
-              >
-                <span className={styles.value}>{formatValue(movement)}</span>
-                <span className={styles.name}>{shortenName(movement.name)}</span>
-                {movement.weight && movement.weight > 0 && (
-                  <span className={styles.weight}>
-                    @ {movement.weight}{movement.unit === 'lb' ? 'lb' : 'kg'}
-                  </span>
-                )}
-              </div>
+                movement={movement}
+                editable={editable}
+                onEdit={() => onEditMovement?.(movement)}
+                onDelete={() => onDeleteMovement?.(movement.name)}
+                color={movement.color || 'magenta'}
+              />
             ))}
           </motion.div>
         ))}

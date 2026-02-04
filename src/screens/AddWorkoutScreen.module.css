@@ -515,31 +515,12 @@
 }
 
 .setRow {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.02) 100%
-  );
-  border-radius: 14px 14px 4px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for set row */
-.setRow::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
 }
 
 .setNumber {
@@ -570,9 +551,9 @@
 .setInput {
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: var(--text-md);
   font-family: var(--font-mono);
   color: var(--color-text);
@@ -581,8 +562,8 @@
 
 .setInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+  border-color: var(--color-sessions);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .setInput::placeholder {
@@ -607,32 +588,14 @@
 
 /* Total display for cardio */
 .totalDisplay {
-  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(0, 242, 255, 0.04) 50%,
-    rgba(0, 242, 255, 0.06) 100%
-  );
-  border-radius: 14px 14px 4px 14px;
-  border: 1px solid rgba(0, 242, 255, 0.15);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for total display */
-.totalDisplay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
 }
 
 .totalLabel {
@@ -645,7 +608,6 @@
   font-weight: var(--font-bold);
   font-family: var(--font-mono);
   color: var(--color-accent);
-  text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
 }
 
 /* Distance input with unit selector */
@@ -718,34 +680,16 @@
 }
 
 .timePill {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.02) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px 24px 8px 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
   box-shadow: var(--glass-shadow);
   margin-top: var(--space-4);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for time pill */
-.timePill::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
 }
 
 .timePillField {
@@ -757,23 +701,22 @@
 .timePillInput {
   width: 52px;
   padding: var(--space-2);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
   font-size: var(--text-2xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--neon-cyan);
   text-align: center;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .timePillInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
+  border-bottom-color: #00FFFF;
   color: var(--neon-cyan);
   text-shadow: var(--neon-glow);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
 }
 
 .timePillInput::placeholder {
@@ -957,33 +900,26 @@
 .roundsInput {
   width: 120px;
   padding: var(--space-4);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.02) 100%
-  );
-  border: 2px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px 20px 6px 20px;
+  background: var(--color-surface-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   font-size: var(--text-2xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
-  color: var(--neon-cyan);
+  color: var(--color-text);
   text-align: center;
-  text-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
 }
 
 .roundsInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35), 0 0 12px rgba(0, 242, 255, 0.2);
+  border-color: var(--color-sessions);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .roundsInput::placeholder {
   color: var(--color-text-secondary);
   opacity: 0.5;
   font-size: var(--text-lg);
-  text-shadow: none;
 }
 
 .roundsHint {
@@ -1051,61 +987,24 @@
 }
 
 .intervalSetsList {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   max-height: 300px;
   overflow-y: auto;
   padding: var(--space-2);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.015) 100%
-  );
-  border-radius: 14px 14px 4px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for interval sets list */
-.intervalSetsList::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
 }
 
 .intervalSetRow {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.02) 100%
-  );
-  border-radius: 12px 12px 3px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for interval set row */
-.intervalSetRow::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
 }
 
 .intervalSetNumber {
@@ -1125,9 +1024,9 @@
 .intervalSetTimeInput {
   width: 50px;
   padding: var(--space-2);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: var(--text-md);
   font-family: var(--font-mono);
   font-weight: var(--font-semibold);
@@ -1137,8 +1036,8 @@
 
 .intervalSetTimeInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+  border-color: var(--color-sessions);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .intervalSetTimeInput::placeholder {
@@ -1266,8 +1165,8 @@
   padding: var(--space-4) var(--space-6);
   background: linear-gradient(135deg, #FF6B6B 0%, #E55A5A 100%);
   border: none;
-  border-radius: var(--radius-md);
-  color: white;
+  border-radius: 12px;
+  color: #FFFFFF;
   font-size: var(--text-md);
   font-weight: var(--font-bold);
   font-family: var(--font-family);
@@ -1275,12 +1174,12 @@
   letter-spacing: var(--tracking-wide);
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
 }
 
 .saveButton:hover {
   background: linear-gradient(135deg, #FF7B7B 0%, #F56A6A 100%);
-  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
   transform: translateY(-1px);
 }
 
@@ -1300,32 +1199,14 @@
    Allows user to override suggested logging mode
    ======================================== */
 .modeSelectorContainer {
-  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(0, 242, 255, 0.04) 50%,
-    rgba(0, 242, 255, 0.06) 100%
-  );
+  background: rgba(0, 242, 255, 0.05);
   border: 1px dashed rgba(0, 242, 255, 0.3);
-  border-radius: 12px 12px 4px 12px;
+  border-radius: var(--radius-md);
   margin-bottom: var(--space-4);
-  overflow: hidden;
-}
-
-/* Noise texture overlay for mode selector */
-.modeSelectorContainer::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
 }
 
 .modeSelectorLabel {
@@ -1355,9 +1236,9 @@
 
 .modeSelector {
   padding: var(--space-2) var(--space-3);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: var(--text-sm);
   font-family: var(--font-family);
   color: var(--color-text);
@@ -1390,7 +1271,6 @@
 }
 
 .strengthSetCard {
-  position: relative;
   width: 100%;
   max-width: 280px;
   display: flex;
@@ -1398,26 +1278,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(0, 242, 255, 0.02) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px 14px 4px 14px;
-  overflow: hidden;
-}
-
-/* Noise texture overlay for strength set card */
-.strengthSetCard::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
 }
 
 .strengthSetLabel {
@@ -1445,9 +1308,9 @@
 .strengthSetInput {
   width: 80px;
   padding: var(--space-3);
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: var(--color-surface-2);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   font-size: var(--text-xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
@@ -1458,7 +1321,7 @@
 .strengthSetInput:focus {
   outline: none;
   border-color: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .strengthSetInput::placeholder {
@@ -1482,7 +1345,6 @@
 }
 
 .addSetButtonCentered {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1492,35 +1354,68 @@
   margin: 0 auto;
   padding: var(--space-3);
   background: transparent;
-  border: 2px dashed rgba(255, 255, 255, 0.15);
-  border-radius: 14px 14px 4px 14px;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   font-family: var(--font-family);
   cursor: pointer;
   transition: all 0.2s ease;
-  overflow: hidden;
 }
 
 .addSetButtonCentered:hover {
   border-color: var(--color-accent);
   color: var(--color-accent);
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.02) 0%,
-    rgba(0, 242, 255, 0.03) 50%,
-    rgba(0, 242, 255, 0.04) 100%
-  );
 }
 
-/* Noise texture overlay for add set button on hover */
-.addSetButtonCentered:hover::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.015;
-  pointer-events: none;
-  mix-blend-mode: overlay;
+/* Superset UI Styles */
+.supersetMovements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  width: 100%;
+}
+
+.supersetMovementRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+}
+
+.supersetMovementName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+}
+
+.supersetInputs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.supersetInput {
+  width: 60px;
+  padding: var(--space-2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  text-align: center;
+}
+
+.supersetInput:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.supersetInputLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import styles from './RewardScreen.module.css';
-import type { RewardData } from '../types';
+import type { RewardData, MovementTotal } from '../types';
 import { WorkloadBreakdown } from '../components/reward';
+import { MovementEditSheet } from '../components/reward/MovementEditSheet';
 import { StoryStudioSheet } from '../components/share/StoryStudioSheet';
 import { useCountUp } from '../hooks/useCountUp';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
@@ -11,7 +12,9 @@ import { useAuth } from '../context/AuthContext';
 interface RewardScreenProps {
   data: RewardData;
   onDone: () => void;
-  onEdit?: () => void;  // Optional - Edit button removed from UI
+  onEdit?: () => void;
+  onRenameMovement?: (oldName: string, newName: string) => void;
+  onDeleteMovement?: (name: string) => void;
 }
 
 // Confetti particle component
@@ -151,7 +154,7 @@ interface MetricBlock {
   className: string;
 }
 
-export function RewardScreen({ data, onDone }: RewardScreenProps) {
+export function RewardScreen({ data, onDone, onEdit: _onEdit, onRenameMovement, onDeleteMovement }: RewardScreenProps) {
   // DEBUG: Very obvious log
   console.warn('🏆 REWARD SCREEN LOADED', {
     duration: data.workoutSummary?.duration,
@@ -163,6 +166,24 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
   const hasPR = heroAchievement && heroAchievement.type === 'pr';
   const isSharing = false;
   const [isStoryStudioOpen, setIsStoryStudioOpen] = useState(false);
+
+  // Movement editing state
+  const [editingMovement, setEditingMovement] = useState<MovementTotal | null>(null);
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+
+  const handleEditMovement = (movement: MovementTotal) => {
+    setEditingMovement(movement);
+    setIsEditSheetOpen(true);
+  };
+
+  const handleRenameMovement = (oldName: string, newName: string) => {
+    onRenameMovement?.(oldName, newName);
+  };
+
+  const handleDeleteMovement = (name: string) => {
+    onDeleteMovement?.(name);
+    setIsEditSheetOpen(false);
+  };
   const weeklyStats = useWeeklyStats();
   const { user } = useAuth();
   const userInitial = user?.displayName?.trim()?.[0]?.toUpperCase() || 'W';
@@ -476,13 +497,28 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
           </motion.div>
         )}
 
-        {/* Workload Breakdown */}
+        {/* Workload Breakdown - Tap to edit movements */}
         {data.workloadBreakdown && data.workloadBreakdown.movements.length > 0 && (
           <WorkloadBreakdown
             breakdown={data.workloadBreakdown}
             animationDelay={0.65}
             showTotals
+            editable={Boolean(onRenameMovement || onDeleteMovement)}
+            onEditMovement={handleEditMovement}
+            onDeleteMovement={handleDeleteMovement}
           />
+        )}
+
+        {/* Subtle edit hint */}
+        {(onRenameMovement || onDeleteMovement) && data.workloadBreakdown && data.workloadBreakdown.movements.length > 0 && (
+          <motion.p
+            className={styles.editHint}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2 }}
+          >
+            Tap a movement to edit or swipe to delete
+          </motion.p>
         )}
 
         {/* Action Footer */}
@@ -492,21 +528,33 @@ export function RewardScreen({ data, onDone }: RewardScreenProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
         >
-          <button
-            className={styles.shareButton}
-            onClick={handleShare}
-            disabled={isSharing}
-          >
-            Share Result
-          </button>
-          <button
-            className={styles.doneButton}
-            onClick={onDone}
-          >
-            Done
-          </button>
+          <div className={styles.primaryActions}>
+            <button
+              className={styles.shareButton}
+              onClick={handleShare}
+              disabled={isSharing}
+            >
+              Share Result
+            </button>
+            <button
+              className={styles.doneButton}
+              onClick={onDone}
+            >
+              Done
+            </button>
+          </div>
         </motion.div>
       </motion.div>
+
+      {/* Movement Edit Sheet */}
+      <MovementEditSheet
+        open={isEditSheetOpen}
+        movement={editingMovement}
+        onClose={() => setIsEditSheetOpen(false)}
+        onRename={handleRenameMovement}
+        onDelete={handleDeleteMovement}
+      />
+
       <StoryStudioSheet
         open={isStoryStudioOpen}
         onClose={() => setIsStoryStudioOpen(false)}

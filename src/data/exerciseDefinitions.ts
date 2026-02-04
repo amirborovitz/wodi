@@ -278,14 +278,29 @@ const ALL_EXERCISES: ExerciseDefinition[] = [
 // ============================================
 
 /**
+ * Escape special regex characters
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Find an exercise definition by name (checks name and aliases)
  */
 export function findExerciseDefinition(name: string): ExerciseDefinition | null {
   const normalized = name.toLowerCase().trim();
 
   for (const exercise of ALL_EXERCISES) {
+    // Exact name match
     if (exercise.name.toLowerCase() === normalized) return exercise;
-    if (exercise.aliases.some(alias => normalized.includes(alias))) return exercise;
+
+    // Word-boundary alias match (not substring)
+    if (exercise.aliases.some(alias => {
+      const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
+      return regex.test(normalized);
+    })) {
+      return exercise;
+    }
   }
 
   return null;

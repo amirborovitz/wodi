@@ -142,6 +142,10 @@ export interface MovementTotal {
   weight?: number;
   unit?: MeasurementUnit;
   color?: 'cyan' | 'magenta' | 'yellow';
+  // Substitution tracking
+  originalMovement?: string;    // Original movement name before substitution
+  wasSubstituted?: boolean;     // True if this is a substitution
+  substitutionType?: 'easier' | 'harder' | 'equivalent';  // Scaling type
 }
 
 export interface WorkloadBreakdown {
@@ -180,6 +184,17 @@ export interface ParsedExercise {
   suggestedWeight?: number;
   rxWeights?: RxWeights;        // Rx weights (male/female)
   movements?: ParsedMovement[]; // Individual movements (for complex WODs)
+}
+
+// Movement substitution tracking during logging
+export interface MovementSubstitution {
+  originalName: string;           // Original movement from workout
+  selectedName: string;           // What user selected instead
+  substitutionType: 'easier' | 'harder' | 'equivalent';
+  distanceMultiplier?: number;    // e.g., 1.25 for row vs run
+  repMultiplier?: number;         // e.g., 3 for single-unders vs double-unders
+  originalValue?: number;         // Original distance/reps
+  adjustedValue?: number;         // Adjusted value after multiplier
 }
 
 // App navigation

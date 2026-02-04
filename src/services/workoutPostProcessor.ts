@@ -31,6 +31,53 @@ const CARDIO_MACHINES = [
  * Movement name normalization map
  */
 const MOVEMENT_ALIASES: Record<string, string> = {
+  // Overhead (OH) movements - must come before other movements
+  'oh lunge': 'Overhead Lunge',
+  'oh lunges': 'Overhead Lunge',
+  'overhead lunge': 'Overhead Lunge',
+  'overhead lunges': 'Overhead Lunge',
+  'oh squat': 'Overhead Squat',
+  'oh walk': 'Overhead Walk',
+  'oh walks': 'Overhead Walk',
+  'oh carry': 'Overhead Carry',
+
+  // DB (Dumbbell) movements - must come before 'du' to prevent false matches
+  'db snatch': 'DB Snatch',
+  'db snatches': 'DB Snatch',
+  'dumbbell snatch': 'DB Snatch',
+  'db clean': 'DB Clean',
+  'db cleans': 'DB Clean',
+  'dumbbell clean': 'DB Clean',
+  'db press': 'DB Press',
+  'dumbbell press': 'DB Press',
+  'db thruster': 'DB Thruster',
+  'db thrusters': 'DB Thruster',
+  'dumbbell thruster': 'DB Thruster',
+  'db squat': 'DB Squat',
+  'db squats': 'DB Squat',
+  'dumbbell squat': 'DB Squat',
+  'db deadlift': 'DB Deadlift',
+  'dumbbell deadlift': 'DB Deadlift',
+  'db row': 'DB Row',
+  'db rows': 'DB Row',
+  'dumbbell row': 'DB Row',
+  'db lunge': 'DB Lunge',
+  'db lunges': 'DB Lunge',
+  'dumbbell lunge': 'DB Lunge',
+  'db swing': 'DB Swing',
+  'db curl': 'DB Curl',
+  'db curls': 'DB Curl',
+  'dumbbell curl': 'DB Curl',
+
+  // Hang variations
+  'hang clean': 'Hang Clean',
+  'hang cleans': 'Hang Clean',
+  'hang snatch': 'Hang Snatch',
+  'hang snatches': 'Hang Snatch',
+  'hang power clean': 'Hang Power Clean',
+  'hang power snatch': 'Hang Power Snatch',
+
+  // KB (Kettlebell) movements
   'kb swing': 'Kettlebell Swing',
   'kettlebell swing': 'Kettlebell Swing',
   'russian swing': 'Russian Kettlebell Swing',
@@ -71,7 +118,6 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'clean': 'Clean',
   'power clean': 'Power Clean',
   'squat clean': 'Squat Clean',
-  'hang power clean': 'Hang Power Clean',
   'hpc': 'Hang Power Clean',
   'snatch': 'Snatch',
   'power snatch': 'Power Snatch',
@@ -288,14 +334,14 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
   }
 
   // Check for EMOM patterns
-  if (textToCheck.includes('emom') || textToCheck.includes('e2mom') ||
-      /every\s+\d+\s*(?:min|:)/i.test(textToCheck)) {
+  if (fullText.includes('emom') || fullText.includes('e2mom') ||
+      /every\s+\d+\s*(?:min|:)/i.test(fullText)) {
     return 'emom';
   }
 
   // Check for explicit "for time" patterns
-  if (textToCheck.includes('for time') || /\brft\b/i.test(textToCheck) ||
-      /\d+\s+rounds?\s+for\s+time/i.test(textToCheck)) {
+  if (fullText.includes('for time') || /\brft\b/i.test(fullText) ||
+      /\d+\s+rounds?\s+for\s+time/i.test(fullText)) {
     return 'for_time';
   }
 
@@ -563,19 +609,25 @@ function postProcessMovement(
 function normalizeMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
 
-  // Check for exact match first
+  // 1. Check for exact match first (highest priority)
   if (MOVEMENT_ALIASES[lower]) {
     return MOVEMENT_ALIASES[lower];
   }
 
-  // Check for partial matches
-  for (const [alias, canonical] of Object.entries(MOVEMENT_ALIASES)) {
-    if (lower.includes(alias)) {
+  // 2. Check for word-boundary matches (safer than substring)
+  // Sort aliases by length (longest first) to match more specific ones
+  const sortedAliases = Object.entries(MOVEMENT_ALIASES)
+    .sort((a, b) => b[0].length - a[0].length);
+
+  for (const [alias, canonical] of sortedAliases) {
+    // Use word boundary regex instead of includes()
+    const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
+    if (regex.test(lower)) {
       return canonical;
     }
   }
 
-  // Default: capitalize first letter of each word
+  // 3. Default: capitalize first letter of each word
   return name.split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');

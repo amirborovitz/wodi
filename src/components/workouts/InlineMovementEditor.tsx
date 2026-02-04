@@ -1,4 +1,4 @@
-import type { FocusEvent, ReactNode } from 'react';
+import type { FocusEvent } from 'react';
 import type { ParsedMovement } from '../../types';
 import { getExerciseAlternatives, findExerciseDefinition } from '../../data/exerciseDefinitions';
 import styles from './InlineMovementEditor.module.css';
@@ -44,16 +44,100 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
 function abbreviateMovementLabel(name: string): string {
   const trimmed = name.trim();
   const lower = trimmed.toLowerCase();
+
+  // Exact name mappings
   const exactMap: Record<string, string> = {
+    // Overhead movements
+    'overhead lunge': 'OH Lunges',
+    'overhead lunges': 'OH Lunges',
+    'oh lunge': 'OH Lunges',
+    'oh lunges': 'OH Lunges',
+    'overhead squat': 'OH Squat',
+    'oh squat': 'OH Squat',
+    'overhead walk': 'OH Walk',
+    'oh walk': 'OH Walk',
+    'overhead carry': 'OH Carry',
+    'oh carry': 'OH Carry',
+
+    // Dumbbell movements
+    'db snatch': 'DB Snatch',
+    'dumbbell snatch': 'DB Snatch',
+    'db clean': 'DB Clean',
+    'dumbbell clean': 'DB Clean',
+    'db press': 'DB Press',
+    'dumbbell press': 'DB Press',
+    'db thruster': 'DB Thruster',
+    'dumbbell thruster': 'DB Thruster',
+    'db squat': 'DB Squat',
+    'dumbbell squat': 'DB Squat',
+    'db lunge': 'DB Lunge',
+    'db lunges': 'DB Lunges',
+    'dumbbell lunge': 'DB Lunge',
+    'db deadlift': 'DB Deadlift',
+    'dumbbell deadlift': 'DB Deadlift',
+    'db row': 'DB Row',
+    'dumbbell row': 'DB Row',
+    'db curl': 'DB Curl',
+    'dumbbell curl': 'DB Curl',
+
+    // Kettlebell movements
     'russian kettlebell swing': 'KB Swings',
     'russian kettlebell swings': 'KB Swings',
     'kettlebell swing': 'KB Swings',
     'kettlebell swings': 'KB Swings',
     'american kettlebell swing': 'KB Swings',
     'american kettlebell swings': 'KB Swings',
+
+    // Gymnastics
     'v-up': 'V-ups',
     'v up': 'V-ups',
     'v-ups': 'V-ups',
+    'pull-up': 'Pull-ups',
+    'pull up': 'Pull-ups',
+    'pull-ups': 'Pull-ups',
+    'pullup': 'Pull-ups',
+    'pullups': 'Pull-ups',
+    'push-up': 'Push-ups',
+    'push up': 'Push-ups',
+    'push-ups': 'Push-ups',
+    'pushup': 'Push-ups',
+    'pushups': 'Push-ups',
+    'sit-up': 'Sit-ups',
+    'sit up': 'Sit-ups',
+    'sit-ups': 'Sit-ups',
+    'situp': 'Sit-ups',
+    'situps': 'Sit-ups',
+    'box jump': 'Box Jumps',
+    'box jumps': 'Box Jumps',
+    'burpee': 'Burpees',
+    'burpees': 'Burpees',
+    'double under': 'Double-unders',
+    'double unders': 'Double-unders',
+    'double-under': 'Double-unders',
+    'double-unders': 'Double-unders',
+    'toes to bar': 'Toes-to-bar',
+    'toes-to-bar': 'Toes-to-bar',
+    't2b': 'Toes-to-bar',
+    'muscle up': 'Muscle-ups',
+    'muscle-up': 'Muscle-ups',
+    'muscle ups': 'Muscle-ups',
+    'muscle-ups': 'Muscle-ups',
+    'ring dip': 'Ring Dips',
+    'ring dips': 'Ring Dips',
+    'wall ball': 'Wall Balls',
+    'wall balls': 'Wall Balls',
+    'handstand push up': 'HSPUs',
+    'handstand push-up': 'HSPUs',
+    'handstand pushup': 'HSPUs',
+    'hspu': 'HSPUs',
+    'hspus': 'HSPUs',
+
+    // Hang variations
+    'hang clean': 'Hang Clean',
+    'hang snatch': 'Hang Snatch',
+    'hang power clean': 'HPC',
+    'hang power snatch': 'HPS',
+    'hpc': 'HPC',
   };
 
   if (exactMap[lower]) return exactMap[lower];
@@ -91,6 +175,11 @@ export function InlineMovementEditor({
   const displayName = selectedAlternative || movement.name;
   const displayLabel = abbreviateMovementLabel(displayName);
 
+  // Track if this is a substitution and what type
+  const isSubstituted = selectedAlternative && selectedAlternative !== movement.name;
+  const selectedAlt = isSubstituted ? alternatives.find(a => a.name === selectedAlternative) : null;
+  const substitutionType = selectedAlt?.type; // 'easier' | 'harder' | 'equivalent'
+
   // Display values (custom or original)
   const displayDistance = customDistance ?? movement.distance;
   const displayTime = customTime ?? movement.time;
@@ -123,153 +212,24 @@ export function InlineMovementEditor({
     }
   };
 
-  // Build metric pills array
-  const renderMetricPills = () => {
-    const pills: ReactNode[] = [];
-
-    // Reps pill
-    if (showRepsInput) {
-      if (readOnly) {
-        pills.push(
-          <div key="reps" className={styles.metricPill}>
-            <span className={styles.pillValue}>{movement.reps}</span>
-            <span className={styles.pillUnit}>reps</span>
-          </div>
-        );
-      } else {
-        pills.push(
-          <div key="reps" className={`${styles.metricPill} ${styles.editable}`}>
-            <span className={styles.pillUnit}>reps</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              enterKeyHint="next"
-              className={styles.pillInput}
-              value={displayReps ?? ''}
-              onChange={(e) => onRepsChange?.(movement.name, parseInt(e.target.value) || 0)}
-              onFocus={handleSelectOnFocus}
-              min="0"
-            />
-          </div>
-        );
-      }
-    }
-
-    // Distance pill
-    if (showDistanceInput) {
-      if (readOnly) {
-        pills.push(
-          <div key="distance" className={styles.metricPill}>
-            <span className={styles.pillValue}>{movement.distance}</span>
-            <span className={styles.pillUnit}>{displayUnit}</span>
-          </div>
-        );
-      } else {
-        pills.push(
-          <div key="distance" className={`${styles.metricPill} ${styles.editable}`}>
-            <span className={styles.pillUnit}>{displayUnit}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              enterKeyHint="next"
-              className={styles.pillInput}
-              value={displayDistance || ''}
-              onChange={(e) => onDistanceChange?.(movement.name, parseInt(e.target.value) || 0)}
-              onFocus={handleSelectOnFocus}
-              min="0"
-            />
-          </div>
-        );
-      }
-    }
-
-    // Time pill
-    if (showTimeInput) {
-      if (readOnly) {
-        pills.push(
-          <div key="time" className={styles.metricPill}>
-            <span className={styles.pillValue}>{movement.time}</span>
-            <span className={styles.pillUnit}>sec</span>
-          </div>
-        );
-      } else {
-        pills.push(
-          <div key="time" className={`${styles.metricPill} ${styles.editable}`}>
-            <span className={styles.pillUnit}>sec</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              enterKeyHint="next"
-              className={styles.pillInput}
-              value={displayTime || ''}
-              onChange={(e) => onTimeChange?.(movement.name, parseInt(e.target.value) || 0)}
-              onFocus={handleSelectOnFocus}
-              placeholder="0"
-              min="0"
-            />
-          </div>
-        );
-      }
-    }
-
-    // Calories pill (always read-only display)
-    if (showCaloriesDisplay) {
-      pills.push(
-        <div key="calories" className={styles.metricPill}>
-          <span className={`${styles.pillValue} ${styles.accent}`}>{movement.calories}</span>
-          <span className={`${styles.pillUnit} ${styles.accent}`}>cal</span>
-        </div>
-      );
-    }
-
-    // Weight pill
-    if (showWeightInput) {
-      if (readOnly && movement.rxWeights) {
-        const weightLabel = `${movement.rxWeights.female ?? movement.rxWeights.male}/${movement.rxWeights.male ?? movement.rxWeights.female}`;
-        pills.push(
-          <div key="weight" className={styles.metricPill}>
-            <span className={styles.pillValue}>{weightLabel}</span>
-            <span className={styles.pillUnit}>{movement.rxWeights.unit || 'kg'}</span>
-          </div>
-        );
-      } else {
-        pills.push(
-          <div key="weight" className={`${styles.metricPill} ${styles.editable}`}>
-            <input
-              type="number"
-              inputMode="decimal"
-              enterKeyHint="next"
-              className={`${styles.pillInput} ${styles.wide}`}
-              value={customWeight || ''}
-              onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
-              onFocus={handleSelectOnFocus}
-              placeholder={movement.rxWeights?.male?.toString() || '0'}
-              min="0"
-            />
-            <span className={styles.pillUnit}>kg</span>
-          </div>
-        );
-
-        // Add Rx badge if there's a prescription
-        if (movement.rxWeights) {
-          const rxLabel = `Rx: ${movement.rxWeights.female || '?'}/${movement.rxWeights.male}`;
-          pills.push(
-            <span key="rx" className={styles.rxBadge}>{rxLabel}</span>
-          );
-        }
-      }
-    }
-
-    return pills;
+  // Determine primary value and unit
+  const getPrimaryValue = () => {
+    if (showRepsInput) return { value: displayReps, unit: 'reps', type: 'reps' as const };
+    if (showDistanceInput) return { value: displayDistance, unit: displayUnit, type: 'distance' as const };
+    if (showTimeInput) return { value: displayTime, unit: 's', type: 'time' as const };
+    if (showCaloriesDisplay) return { value: movement.calories, unit: 'cal', type: 'calories' as const };
+    return null;
   };
 
+  const primary = getPrimaryValue();
+
   return (
-    <div className={styles.movementCard}>
-      {/* Movement Header - Name on top */}
-      <div className={styles.movementHeader}>
+    <div className={`${styles.movementCard} ${isSubstituted ? styles.substituted : ''}`}>
+      {/* Movement Name - flexible width, allows wrapping */}
+      <div className={styles.nameColumn}>
         {hasAlternatives ? (
           <select
-            className={styles.movementSelect}
+            className={`${styles.movementSelect} ${isSubstituted ? styles.substitutedSelect : ''}`}
             value={selectedAlternative || movement.name}
             onChange={(e) => handleAlternativeSelect(e.target.value)}
             disabled={readOnly}
@@ -283,18 +243,75 @@ export function InlineMovementEditor({
             ))}
           </select>
         ) : (
-          <div className={styles.movementStaticLabel}>
-            <span className={`${styles.movementName} ${isWeighted ? styles.weighted : ''}`}>
-              {displayLabel}
+          <div className={styles.movementName}>
+            {displayLabel}
+          </div>
+        )}
+
+        {/* Substitution indicator */}
+        {isSubstituted && (
+          <div className={styles.substitutionInfo}>
+            <span className={styles.substitutionBadge}>
+              {substitutionType === 'easier' ? 'scaled' : substitutionType === 'harder' ? 'Rx+' : 'alt'}
+            </span>
+            <span className={styles.originalName}>
+              was {abbreviateMovementLabel(movement.name)}
             </span>
           </div>
         )}
       </div>
 
-      {/* Metric Cluster - Pills below, indented */}
-      <div className={styles.metricCluster}>
-        {renderMetricPills()}
-      </div>
+      {/* Value Group - value + unit glued together */}
+      {primary && (
+        <div className={styles.valueGroup}>
+          {!readOnly ? (
+            <input
+              type="number"
+              inputMode="numeric"
+              enterKeyHint="next"
+              className={styles.valueInput}
+              value={primary.value ?? ''}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 0;
+                if (primary.type === 'reps') onRepsChange?.(movement.name, val);
+                else if (primary.type === 'distance') onDistanceChange?.(movement.name, val);
+                else if (primary.type === 'time') onTimeChange?.(movement.name, val);
+              }}
+              onFocus={handleSelectOnFocus}
+              min="0"
+            />
+          ) : (
+            <div className={styles.valueDisplay}>{primary.value}</div>
+          )}
+          {!showWeightInput && (
+            <span className={styles.unitLabel}>{primary.unit}</span>
+          )}
+        </div>
+      )}
+
+      {/* Weight Group - weight + unit glued together */}
+      {showWeightInput && (
+        <div className={styles.weightGroup}>
+          {!readOnly ? (
+            <input
+              type="number"
+              inputMode="decimal"
+              enterKeyHint="next"
+              className={styles.weightInput}
+              value={customWeight || ''}
+              onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
+              onFocus={handleSelectOnFocus}
+              placeholder={movement.rxWeights?.male?.toString() || ''}
+              min="0"
+            />
+          ) : movement.rxWeights ? (
+            <div className={styles.valueDisplay}>
+              {movement.rxWeights.male}
+            </div>
+          ) : null}
+          <span className={styles.unitLabel}>kg</span>
+        </div>
+      )}
     </div>
   );
 }
