@@ -17,6 +17,14 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, googleProvider, db, storage } from '../services/firebase';
 import type { User, UserStats, UserGoals } from '../types';
 
+interface UserProfileUpdate {
+  displayName?: string;
+  age?: number;
+  weight?: number;
+  sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  onboardingComplete?: boolean;
+}
+
 interface AuthContextValue {
   user: User | null;
   firebaseUser: FirebaseUser | null;
@@ -25,6 +33,9 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   updateUserGoals: (goals: UserGoals) => Promise<void>;
   updateUserPhoto: (file: File) => Promise<string>;
+  updateUserProfile: (profile: UserProfileUpdate) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -120,6 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: data.createdAt?.toDate() || new Date(),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
+          age: data.age,
+          weight: data.weight,
+          sex: data.sex,
+          onboardingComplete: data.onboardingComplete,
         };
       } else {
         // Create new user document
@@ -177,6 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: data.createdAt?.toDate() || new Date(),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
+          age: data.age,
+          weight: data.weight,
+          sex: data.sex,
+          onboardingComplete: data.onboardingComplete,
         };
         setUser(userData);
         setCachedUser(userData);
@@ -236,6 +255,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUserProfile = async (profile: UserProfileUpdate) => {
+    if (!user || !firebaseUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      await setDoc(userRef, profile, { merge: true });
+
+      const updatedUser = { ...user, ...profile };
+      setUser(updatedUser);
+      setCachedUser(updatedUser);
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  };
+
+  const completeOnboarding = async () => {
+    await updateUserProfile({ onboardingComplete: true });
+  };
+
+  const refreshUser = async () => {
+    if (firebaseUser) {
+      await fetchAndSetUser(firebaseUser);
+    }
+  };
+
   const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
@@ -264,6 +311,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       updateUserGoals,
       updateUserPhoto,
+      updateUserProfile,
+      completeOnboarding,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>

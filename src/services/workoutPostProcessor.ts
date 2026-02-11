@@ -4,6 +4,7 @@
  */
 
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, RxWeights } from '../types';
+import { getAlternativeType } from '../data/exerciseDefinitions';
 
 /**
  * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg"
@@ -110,6 +111,14 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'k2e': 'Knees to Elbow',
   'muscle-up': 'Muscle-up',
   'muscle up': 'Muscle-up',
+  'bmu': 'Bar Muscle-up',
+  'b.m.u': 'Bar Muscle-up',
+  'b.m.u.': 'Bar Muscle-up',
+  'bar muscle up': 'Bar Muscle-up',
+  'bar muscle-up': 'Bar Muscle-up',
+  'ring muscle-up': 'Ring Muscle-up',
+  'ring muscle up': 'Ring Muscle-up',
+  'rmu': 'Ring Muscle-up',
   'hspu': 'Handstand Push-up',
   'handstand push-up': 'Handstand Push-up',
   'handstand pushup': 'Handstand Push-up',
@@ -164,8 +173,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     timeCap: workout.timeCap,
   });
 
+  // Detect partner workout if AI missed it
+  const partnerResult = detectAndAdjustPartnerWorkout(workout);
+
   // Extract time cap if missing
-  const timeCap = workout.timeCap || extractTimeCap(workout);
+  const timeCap = workout.timeCap || partnerResult.timeCap || extractTimeCap(workout);
 
   // Correct format and type if AI returned wrong one (e.g., "strength" for AMRAP)
   const correctedFormat = correctWorkoutFormat(workout);
@@ -173,6 +185,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
 
   // Post-process exercises and detect implied supersets
   let processedExercises = workout.exercises.map(postProcessExercise);
+
+  // Merge alternative movements that AI created as separate entries
+  processedExercises = processedExercises.map(ex => ({
+    ...ex,
+    movements: ex.movements ? mergeAlternativeMovements(ex.movements) : undefined,
+  }));
 
   // Try to detect and fix implied supersets that AI missed
   processedExercises = processedExercises.map(detectImpliedSuperset);
@@ -183,6 +201,7 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     originalType: workout.type,
     correctedType,
     timeCap,
+    partnerWorkout: partnerResult.partnerWorkout,
     title: workout.title,
   });
 
@@ -191,7 +210,14 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     type: correctedType,
     format: correctedFormat,
     timeCap,
-    exercises: processedExercises,
+    partnerWorkout: workout.partnerWorkout || partnerResult.partnerWorkout || undefined,
+    sets: partnerResult.adjustedSets ?? workout.sets,
+    exercises: processedExercises.map(ex => ({
+      ...ex,
+      suggestedSets: (ex.type === 'wod' && partnerResult.adjustedSets)
+        ? partnerResult.adjustedSets
+        : ex.suggestedSets,
+    })),
   };
 }
 
@@ -362,11 +388,12 @@ function extractTimeCap(workout: ParsedWorkout): number | undefined {
   // Patterns for time cap extraction
   const patterns = [
     // Explicit time cap patterns
-    /(\d+)\s*min(?:ute)?s?\s*(?:tc|time\s*cap)/i,
-    /(?:tc|time\s*cap)\s*:?\s*(\d+)\s*min/i,
-    /(?:tc|time\s*cap)\s*:?\s*(\d+)/i,
+    /(\d+)\s*min(?:ute)?s?\s*(?:tc|t\.c\.|time\s*cap)/i,
+    /(?:tc|t\.c\.|time\s*cap)\s*:?\s*(\d+)\s*min/i,
+    /(?:tc|t\.c\.|time\s*cap)\s*:?\s*(\d+)/i,
     /\*\s*(\d+)\s*min/i,  // "*42min TC" format
     /cap\s*:?\s*(\d+)\s*min/i,
+    /(\d+)\s*min\s*t\.?c\.?/i,  // "16 min T.C." or "16 min tc"
     // AMRAP patterns: "25min AMRAP", "25 min AMRAP", "AMRAP 25"
     /(\d+)\s*min(?:ute)?s?\s*amrap/i,
     /amrap\s*(\d+)\s*min/i,
@@ -408,6 +435,16 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     postProcessMovement(mov, exercise.prescription, exercise.name)
   );
 
+  // Skill/practice exercises are timed blocks — don't infer sets x reps
+  if (exercise.type === 'skill') {
+    return {
+      ...exercise,
+      suggestedSets: exercise.suggestedSets || 1,
+      rxWeights: exercise.rxWeights || prescriptionWeights,
+      movements: processedMovements,
+    };
+  }
+
   // Extract suggestedReps if missing - look for patterns like "10/10", "3x10", or just "10 reps"
   let suggestedReps = exercise.suggestedReps;
   if (!suggestedReps) {
@@ -431,9 +468,17 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     }
   }
 
+  // Detect variable rep schemes if AI missed them
+  let suggestedRepsPerSet = exercise.suggestedRepsPerSet;
+  if (!suggestedRepsPerSet) {
+    suggestedRepsPerSet = detectVariableRepScheme(exercise);
+  }
+
   return {
     ...exercise,
     suggestedReps,
+    suggestedRepsPerSet,
+    suggestedSets: suggestedRepsPerSet ? suggestedRepsPerSet.length : exercise.suggestedSets,
     rxWeights: exercise.rxWeights || prescriptionWeights,
     movements: processedMovements,
   };
@@ -443,7 +488,7 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
  * Parse movements from prescription text when AI didn't create movements array
  * Example: "30sec bike, 10 pull-ups, 10 russian swings 32/24kg, 300m run"
  */
-function parseMovementsFromPrescription(prescription: string, exerciseName: string): ParsedMovement[] | undefined {
+export function parseMovementsFromPrescription(prescription: string, exerciseName: string): ParsedMovement[] | undefined {
   const text = `${exerciseName} ${prescription}`.toLowerCase();
 
   // Check if this looks like a multi-movement workout
@@ -482,6 +527,71 @@ function parseMovementFromText(text: string): ParsedMovement | null {
   // Skip time cap annotations
   if (lower.includes('tc') || lower.includes('time cap') || lower.includes('cap')) {
     return null;
+  }
+
+  // Parse slash alternatives like "4 B.M.U / 8 Pull-ups"
+  const slashRepsMatch = text.match(/^\s*(\d+)\s+(.+?)\s*\/\s*(\d+)\s+(.+)\s*$/i);
+  if (slashRepsMatch) {
+    const repsA = parseInt(slashRepsMatch[1], 10);
+    const repsB = parseInt(slashRepsMatch[3], 10);
+    const nameA = normalizeMovementName(slashRepsMatch[2].trim());
+    const nameB = normalizeMovementName(slashRepsMatch[4].trim());
+
+    let baseName = nameA;
+    let baseReps = repsA;
+    let altName = nameB;
+    let altReps = repsB;
+
+    const altType = getAlternativeType(nameA, nameB);
+    if (altType === 'easier') {
+      baseName = nameB;
+      baseReps = repsB;
+      altName = nameA;
+      altReps = repsA;
+    } else if (altType === 'harder') {
+      baseName = nameA;
+      baseReps = repsA;
+      altName = nameB;
+      altReps = repsB;
+    } else if (repsB > repsA) {
+      baseName = nameB;
+      baseReps = repsB;
+      altName = nameA;
+      altReps = repsA;
+    }
+
+    return {
+      name: baseName,
+      reps: baseReps,
+      alternative: {
+        name: altName,
+        reps: altReps,
+      },
+    };
+  }
+
+  const slashNameMatch = text.match(/^\s*(.+?)\s*\/\s*(.+)\s*$/i);
+  if (slashNameMatch) {
+    const nameA = normalizeMovementName(slashNameMatch[1].trim());
+    const nameB = normalizeMovementName(slashNameMatch[2].trim());
+    let baseName = nameA;
+    let altName = nameB;
+
+    const altType = getAlternativeType(nameA, nameB);
+    if (altType === 'easier') {
+      baseName = nameB;
+      altName = nameA;
+    } else if (altType === 'harder') {
+      baseName = nameA;
+      altName = nameB;
+    }
+
+    return {
+      name: baseName,
+      alternative: {
+        name: altName,
+      },
+    };
   }
 
   const movement: ParsedMovement = { name: '' };
@@ -778,6 +888,179 @@ function cleanWeightFromName(name: string): string {
     .replace(SINGLE_WEIGHT_PATTERN, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Known alternative movement pairs (primary -> alternatives)
+ * Primary is the easier/scaled movement; alternatives are harder/Rx
+ */
+const KNOWN_ALTERNATIVE_PAIRS: Array<{ primary: string; alternatives: string[]; repMultiplier?: number }> = [
+  { primary: 'Single Under', alternatives: ['Double Under'], repMultiplier: 3 },
+  { primary: 'Pull-up', alternatives: ['Chest to Bar Pull-up', 'Muscle-up', 'Bar Muscle-up'] },
+  { primary: 'Push-up', alternatives: ['Handstand Push-up'] },
+  { primary: 'Air Squat', alternatives: ['Pistol'] },
+  { primary: 'Knees to Elbow', alternatives: ['Toes to Bar'] },
+];
+
+/**
+ * Detect partner workout patterns in raw text and adjust rounds
+ */
+function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
+  partnerWorkout: boolean;
+  adjustedSets?: number;
+  timeCap?: number;
+} {
+  const text = [
+    workout.rawText,
+    workout.title,
+    ...workout.exercises.map(e => `${e.name} ${e.prescription}`),
+  ].filter(Boolean).join(' ');
+
+  const lower = text.toLowerCase();
+
+  // Partner detection patterns
+  const partnerPatterns = [
+    /\bi\s*go\s*you\s*go\b/i,
+    /\bigug\b/i,
+    /\bin\s+pairs?\b/i,
+    /\bwith\s+a\s+partner\b/i,
+    /\bpartner\s+wod\b/i,
+    /\bteams?\s+of\s+2\b/i,
+    /\bpartner\s+rft\b/i,
+  ];
+
+  const isPartner = workout.partnerWorkout || partnerPatterns.some(p => p.test(lower));
+
+  if (!isPartner) {
+    return { partnerWorkout: false };
+  }
+
+  // Extract "(N each)" pattern to get per-person round count
+  const eachMatch = lower.match(/\((\d+)\s*each\)/);
+  let adjustedSets: number | undefined;
+  if (eachMatch) {
+    adjustedSets = parseInt(eachMatch[1], 10);
+  }
+
+  console.warn('🔧 [detectPartnerWorkout] Detected partner workout:', { adjustedSets });
+
+  return {
+    partnerWorkout: true,
+    adjustedSets,
+  };
+}
+
+/**
+ * Merge consecutive movements that are known alternatives into one with alternative field
+ * e.g., [Double Under reps:40, Single Under reps:60] -> [Double Under reps:40, alternative: {name: Single Under, reps:60}]
+ */
+function mergeAlternativeMovements(movements: ParsedMovement[]): ParsedMovement[] {
+  if (movements.length < 2) return movements;
+
+  const result: ParsedMovement[] = [];
+  const consumed = new Set<number>();
+
+  for (let i = 0; i < movements.length; i++) {
+    if (consumed.has(i)) continue;
+
+    const current = movements[i];
+
+    // Skip if already has an alternative
+    if (current.alternative) {
+      result.push(current);
+      continue;
+    }
+
+    // Check if next movement is a known alternative
+    if (i + 1 < movements.length && !consumed.has(i + 1)) {
+      const next = movements[i + 1];
+      const pair = findAlternativePair(current.name, next.name);
+
+      if (pair) {
+        consumed.add(i + 1);
+        // Determine which is primary
+        const isPrimaryFirst = normalizeForComparison(current.name) === normalizeForComparison(pair.primary);
+        const primary = isPrimaryFirst ? current : next;
+        const alt = isPrimaryFirst ? next : current;
+
+        result.push({
+          ...primary,
+          alternative: {
+            name: alt.name,
+            reps: alt.reps,
+            distance: alt.distance,
+            calories: alt.calories,
+          },
+        });
+        continue;
+      }
+    }
+
+    result.push(current);
+  }
+
+  return result;
+}
+
+/**
+ * Find if two movements form a known alternative pair
+ */
+function findAlternativePair(name1: string, name2: string): typeof KNOWN_ALTERNATIVE_PAIRS[0] | null {
+  const n1 = normalizeForComparison(name1);
+  const n2 = normalizeForComparison(name2);
+
+  for (const pair of KNOWN_ALTERNATIVE_PAIRS) {
+    const primary = normalizeForComparison(pair.primary);
+    const alts = pair.alternatives.map(normalizeForComparison);
+
+    if ((n1 === primary && alts.includes(n2)) || (n2 === primary && alts.includes(n1))) {
+      return pair;
+    }
+  }
+  return null;
+}
+
+/**
+ * Normalize a movement name for comparison
+ */
+function normalizeForComparison(name: string): string {
+  return name.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+}
+
+/**
+ * Detect variable rep schemes like "6-5-4-3-2" or "[21-15-9]" in exercise text
+ */
+function detectVariableRepScheme(exercise: ParsedExercise): number[] | undefined {
+  const fullText = `${exercise.name} ${exercise.prescription}`;
+
+  // Match patterns like "[6-5-4-3-2]", "6-5-4-3-2", "21-15-9"
+  // Must have at least 3 numbers separated by dashes to distinguish from weight notation
+  const bracketMatch = fullText.match(/\[(\d+(?:-\d+){2,})\]/);
+  if (bracketMatch) {
+    return bracketMatch[1].split('-').map(Number);
+  }
+
+  // Match standalone dash-separated rep schemes (need context that it's reps, not weight)
+  // Look for patterns like "sets 6-5-4-3-2" or "reps: 21-15-9" or just "21-15-9" as the main structure
+  const dashMatch = fullText.match(/(?:sets?|reps?|:)\s*(\d+(?:-\d+){2,})/i);
+  if (dashMatch) {
+    return dashMatch[1].split('-').map(Number);
+  }
+
+  // Match well-known CrossFit rep schemes as standalone: 21-15-9, 50-40-30-20-10, etc.
+  // Only match if the numbers are clearly descending or ascending
+  const standaloneMatch = fullText.match(/\b(\d+(?:-\d+){2,})\b/);
+  if (standaloneMatch) {
+    const nums = standaloneMatch[1].split('-').map(Number);
+    // Verify it's a monotonic sequence (all descending or all ascending) to avoid matching dates/weights
+    const isDescending = nums.every((n, i) => i === 0 || n <= nums[i - 1]);
+    const isAscending = nums.every((n, i) => i === 0 || n >= nums[i - 1]);
+    if ((isDescending || isAscending) && nums.length >= 3) {
+      return nums;
+    }
+  }
+
+  return undefined;
 }
 
 /**

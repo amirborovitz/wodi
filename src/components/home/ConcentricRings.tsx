@@ -128,7 +128,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
         width={size}
         height={size}
       >
-        {/* Volume ring (outer - yellow) */}
+        {/* Lift ring (outer - yellow) */}
         <Ring
           percentage={volumePercent}
           radius={outerRadius}
@@ -138,7 +138,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
           delay={0}
         />
 
-        {/* Metcon ring (middle - magenta) */}
+        {/* Move ring (middle - magenta) */}
         <Ring
           percentage={metconPercent}
           radius={middleRadius}
@@ -148,7 +148,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
           delay={0.1}
         />
 
-        {/* Sessions ring (inner - cyan) */}
+        {/* Show Up ring (inner - cyan) */}
         <Ring
           percentage={sessionsPercent}
           radius={innerRadius}
@@ -177,19 +177,19 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
           <span className={styles.legendText}>
-            {formatValue(volume.value, 'kg')} / {formatValue(volume.goal, 'kg')}
+            Lift {'\u00b7'} {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
           </span>
         </div>
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
           <span className={styles.legendText}>
-            {metcon.value} / {metcon.goal} min metcon
+            Move {'\u00b7'} {metcon.value} / {metcon.goal} min
           </span>
         </div>
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-sessions)' }} />
           <span className={styles.legendText}>
-            {sessions.value} / {sessions.goal} sessions
+            Show Up {'\u00b7'} {sessions.value} / {sessions.goal}
           </span>
         </div>
       </div>
@@ -197,9 +197,9 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
   );
 }
 
-function formatValue(value: number, unit: string): string {
+function formatNumber(value: number, unit: string): string {
   if (unit === 'kg' && value >= 1000) {
-    return `${(value / 1000).toFixed(2)} tons`;
+    return (value / 1000).toFixed(1);
   }
-  return `${value.toLocaleString()}${unit}`;
+  return value.toLocaleString();
 }

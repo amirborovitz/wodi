@@ -1,221 +1,158 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
-import { DEFAULT_USER_GOALS } from '../types';
-import type { UserGoals } from '../types';
+import { SettingsList } from '../components/settings/SettingsList';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import type { SettingsSection } from '../components/settings/SettingsList';
+import type { User } from '../types';
 import styles from './SettingsScreen.module.css';
 
-export function SettingsScreen() {
-  const { user, updateUserGoals, signOut } = useAuth();
+interface SettingsScreenProps {
+  onBack: () => void;
+  onNavigateToProfile: () => void;
+  onNavigateToGoals: () => void;
+  onSignOut: () => void;
+  user: User | null;
+}
 
-  const currentGoals = user?.goals || DEFAULT_USER_GOALS;
+export function SettingsScreen({
+  onBack,
+  onNavigateToProfile,
+  onNavigateToGoals,
+  onSignOut,
+  user,
+}: SettingsScreenProps) {
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
-  const [volumeGoal, setVolumeGoal] = useState(currentGoals.volumeGoal);
-  const [metconGoal, setMetconGoal] = useState(currentGoals.metconGoal);
-  const [streakGoal, setStreakGoal] = useState(currentGoals.streakGoal);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  const hasChanges =
-    volumeGoal !== currentGoals.volumeGoal ||
-    metconGoal !== currentGoals.metconGoal ||
-    streakGoal !== currentGoals.streakGoal;
-
-  const handleSave = async () => {
-    if (!hasChanges) return;
-
-    setSaving(true);
-    try {
-      const newGoals: UserGoals = {
-        volumeGoal,
-        metconGoal,
-        streakGoal,
-      };
-      await updateUserGoals(newGoals);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error('Failed to save goals:', error);
-    } finally {
-      setSaving(false);
-    }
+  const handleSignOut = () => {
+    setShowSignOutConfirm(false);
+    onSignOut();
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Failed to sign out:', error);
-    }
-  };
+  const sections: SettingsSection[] = [
+    {
+      title: 'Account',
+      items: [
+        {
+          id: 'profile',
+          label: 'Profile',
+          icon: <ProfileIcon />,
+          value: user?.displayName || 'Set up profile',
+          type: 'navigation',
+          onPress: onNavigateToProfile,
+        },
+        {
+          id: 'goals',
+          label: 'Training Goals',
+          icon: <GoalsIcon />,
+          value: `${user?.goals?.streakGoal || 5} days/week`,
+          type: 'navigation',
+          onPress: onNavigateToGoals,
+        },
+      ],
+    },
+    {
+      title: 'About',
+      items: [
+        {
+          id: 'version',
+          label: 'App Version',
+          icon: <InfoIcon />,
+          value: '1.0.0',
+          type: 'navigation',
+          onPress: () => {},
+        },
+      ],
+    },
+    {
+      items: [
+        {
+          id: 'signout',
+          label: 'Sign Out',
+          icon: <SignOutIcon />,
+          type: 'destructive',
+          onPress: () => setShowSignOutConfirm(true),
+        },
+      ],
+    },
+  ];
 
   return (
-    <div className={styles.container}>
+    <motion.div
+      className={styles.container}
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+    >
       <header className={styles.header}>
+        <button className={styles.backButton} onClick={onBack}>
+          <BackIcon />
+        </button>
         <h1 className={styles.title}>Settings</h1>
+        <div className={styles.headerSpacer} />
       </header>
 
       <div className={styles.content}>
-        {/* Profile Section */}
-        <motion.section
-          className={styles.section}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <h2 className={styles.sectionTitle}>Profile</h2>
-          <div className={styles.profileCard}>
-            {user?.photoUrl && (
-              <img
-                src={`${user.photoUrl}?v=${user.photoUpdatedAt || 0}`}
-                alt={user.displayName}
-                className={styles.avatar}
-              />
-            )}
-            <div className={styles.profileInfo}>
-              <span className={styles.profileName}>{user?.displayName}</span>
-              <span className={styles.profileEmail}>{user?.email}</span>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Weekly Goals Section */}
-        <motion.section
-          className={styles.section}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
-          <h2 className={styles.sectionTitle}>Weekly Goals</h2>
-          <p className={styles.sectionDescription}>
-            Set your weekly targets for the Power Cell Dashboard
-          </p>
-
-          {/* Volume Goal */}
-          <div className={styles.goalItem}>
-            <div className={styles.goalHeader}>
-              <span className={styles.goalIcon}>🏋️</span>
-              <div className={styles.goalInfo}>
-                <span className={styles.goalLabel}>Volume Goal</span>
-                <span className={styles.goalHint}>Total kg lifted per week</span>
-              </div>
-            </div>
-            <div className={styles.goalInput}>
-              <input
-                type="number"
-                value={volumeGoal}
-                onChange={(e) => setVolumeGoal(Number(e.target.value))}
-                min={1000}
-                max={100000}
-                step={1000}
-                className={styles.input}
-              />
-              <span className={styles.inputUnit}>kg</span>
-            </div>
-            <div className={styles.presets}>
-              {[10000, 15000, 20000, 30000].map((preset) => (
-                <button
-                  key={preset}
-                  className={`${styles.presetButton} ${volumeGoal === preset ? styles.presetActive : ''}`}
-                  onClick={() => setVolumeGoal(preset)}
-                >
-                  {preset / 1000}k
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Metcon Goal */}
-          <div className={styles.goalItem}>
-            <div className={styles.goalHeader}>
-              <span className={styles.goalIcon}>⏱️</span>
-              <div className={styles.goalInfo}>
-                <span className={styles.goalLabel}>Metcon Goal</span>
-                <span className={styles.goalHint}>Total cardio minutes per week</span>
-              </div>
-            </div>
-            <div className={styles.goalInput}>
-              <input
-                type="number"
-                value={metconGoal}
-                onChange={(e) => setMetconGoal(Number(e.target.value))}
-                min={10}
-                max={300}
-                step={5}
-                className={styles.input}
-              />
-              <span className={styles.inputUnit}>min</span>
-            </div>
-            <div className={styles.presets}>
-              {[30, 45, 60, 90].map((preset) => (
-                <button
-                  key={preset}
-                  className={`${styles.presetButton} ${metconGoal === preset ? styles.presetActive : ''}`}
-                  onClick={() => setMetconGoal(preset)}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Streak Goal */}
-          <div className={styles.goalItem}>
-            <div className={styles.goalHeader}>
-              <span className={styles.goalIcon}>🔥</span>
-              <div className={styles.goalInfo}>
-                <span className={styles.goalLabel}>Sessions Goal</span>
-                <span className={styles.goalHint}>Workouts per week</span>
-              </div>
-            </div>
-            <div className={styles.goalInput}>
-              <input
-                type="number"
-                value={streakGoal}
-                onChange={(e) => setStreakGoal(Number(e.target.value))}
-                min={1}
-                max={7}
-                step={1}
-                className={styles.input}
-              />
-              <span className={styles.inputUnit}>days</span>
-            </div>
-            <div className={styles.presets}>
-              {[2, 3, 4, 5].map((preset) => (
-                <button
-                  key={preset}
-                  className={`${styles.presetButton} ${streakGoal === preset ? styles.presetActive : ''}`}
-                  onClick={() => setStreakGoal(preset)}
-                >
-                  {preset}x
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <motion.button
-            className={`${styles.saveButton} ${!hasChanges ? styles.saveDisabled : ''} ${saved ? styles.saveSaved : ''}`}
-            onClick={handleSave}
-            disabled={!hasChanges || saving}
-            whileTap={{ scale: 0.98 }}
-          >
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Goals'}
-          </motion.button>
-        </motion.section>
-
-        {/* Sign Out Section */}
-        <motion.section
-          className={styles.section}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
-          <button className={styles.signOutButton} onClick={handleSignOut}>
-            Sign Out
-          </button>
-        </motion.section>
+        <SettingsList sections={sections} />
       </div>
-    </div>
+
+      <ConfirmDialog
+        open={showSignOutConfirm}
+        title="Sign Out"
+        message="Are you sure you want to sign out of your account?"
+        confirmText="Sign Out"
+        cancelText="Cancel"
+        destructive
+        onConfirm={handleSignOut}
+        onCancel={() => setShowSignOutConfirm(false)}
+      />
+    </motion.div>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function GoalsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   );
 }

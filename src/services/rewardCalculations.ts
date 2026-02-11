@@ -59,7 +59,7 @@ export function calculateIntensityRing(params: IntensityParams): RingMetric {
 
   return {
     id: 'intensity',
-    label: 'Intensity',
+    label: 'Move',
     value: Math.round(durationMinutes),
     percentage,
     unit: 'min',
@@ -91,7 +91,7 @@ export function calculateVolumeRing(params: VolumeParams): RingMetric {
 
     return {
       id: 'volume',
-      label: 'Volume',
+      label: 'Lift',
       value: Number(displayValue),
       percentage,
       unit,
@@ -105,7 +105,7 @@ export function calculateVolumeRing(params: VolumeParams): RingMetric {
 
     return {
       id: 'volume',
-      label: 'Reps',
+      label: 'Lift',
       value: totalReps,
       percentage,
       unit: 'reps',
@@ -124,7 +124,7 @@ export function calculateConsistencyRing(params: ConsistencyParams): RingMetric 
 
   const percentage = Math.min(Math.round((workoutsThisWeek / weeklyGoal) * 100), 100);
 
-  const label = workoutsThisWeek >= weeklyGoal ? 'Goal Met!' : 'Consistency';
+  const label = workoutsThisWeek >= weeklyGoal ? 'Goal Met!' : 'Show Up';
 
   return {
     id: 'consistency',

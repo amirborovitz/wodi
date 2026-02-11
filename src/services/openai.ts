@@ -23,6 +23,7 @@ Return ONLY valid JSON:
   "containerRounds": null,
   "benchmarkName": null,
   "benchmarkModified": false,
+  "partnerWorkout": false,
   "exercises": [
     {
       "name": "Exercise or Block Name",
@@ -30,10 +31,11 @@ Return ONLY valid JSON:
       "prescription": "human-readable prescription",
       "suggestedSets": 5,
       "suggestedReps": 10,
+      "suggestedRepsPerSet": [6, 5, 4, 3, 2],
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
       "movements": [
         { "name": "Run", "distance": 300, "unit": "m" },
-        { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
+        { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "alternative": { "name": "Alt Name", "reps": 10 } }
       ]
     }
   ]
@@ -91,7 +93,7 @@ IMPORTANT: "twin kb" or "double kb" means 2 kettlebells - DOUBLE the weight for 
 
 ## MOVEMENT ALIASES (use canonical names)
 Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
-Gymnastics: hspu → Handstand Push-up, t2b → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
+Gymnastics: hspu → Handstand Push-up, t2b → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
 Cardio: du → Double Under, su → Single Under, cal → Calories
 Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 
@@ -182,8 +184,7 @@ Output:
     "suggestedSets": 4,
     "movements": [
       { "name": "Russian Kettlebell Swing", "reps": 10 },
-      { "name": "Single Under", "reps": 25 },
-      { "name": "Double Under", "reps": 50 }
+      { "name": "Single Under", "reps": 25, "alternative": { "name": "Double Under", "reps": 50 } }
     ]
   }]
 }
@@ -286,6 +287,94 @@ Output:
       "timeCap": 900
     }
   ]
+}
+
+## SKILL / PRACTICE BLOCKS
+"Practice", "build weight", "movement focus" = timed skill work, NOT sets x reps.
+- type: "skill", suggestedSets: 1, NO suggestedReps, NO movements from other blocks
+- Include the time in prescription (e.g., "12 min practice")
+- Do NOT copy reps or movements from the metcon into the skill block
+
+Input: "Movement focus: Barbell cycling C&J. 12 min practice & build weight. Then Partner IGUG 12 RFT (6 each): 8 C&J, 40 DU/60 singles. 16 min TC"
+Output:
+{
+  "type": "mixed",
+  "format": "for_time",
+  "scoreType": "time",
+  "partnerWorkout": true,
+  "timeCap": 960,
+  "exercises": [
+    {
+      "name": "Barbell Cycling - Clean and Jerk",
+      "type": "skill",
+      "prescription": "12 min practice & build weight",
+      "suggestedSets": 1
+    },
+    {
+      "name": "Partner RFT (6 each)",
+      "type": "wod",
+      "prescription": "6 rounds each: 8 C&J, 40 DU/60 Singles, 16 min TC",
+      "suggestedSets": 6,
+      "movements": [
+        { "name": "Clean and Jerk", "reps": 8 },
+        { "name": "Double Under", "reps": 40, "alternative": { "name": "Single Under", "reps": 60 } }
+      ]
+    }
+  ]
+}
+
+## VARIABLE REP SCHEMES
+When reps vary per set, use "suggestedRepsPerSet" array instead of a single "suggestedReps".
+- "[6-5-4-3-2]" or "6-5-4-3-2" → suggestedRepsPerSet: [6,5,4,3,2], suggestedSets: 5
+- "21-15-9" → suggestedRepsPerSet: [21,15,9], suggestedSets: 3
+- "5-5-3-3-1-1" → suggestedRepsPerSet: [5,5,3,3,1,1], suggestedSets: 6
+- Do NOT use isMaxReps or "(max)" when explicit rep counts are given per set
+- The length of suggestedRepsPerSet MUST equal suggestedSets
+
+Example: "Strict Pull-ups 5 sets [6-5-4-3-2]"
+→ suggestedSets: 5, suggestedRepsPerSet: [6,5,4,3,2] (NOT suggestedReps with max)
+
+## PARTNER WORKOUTS
+Detect partner/team workouts and set "partnerWorkout": true at the top level.
+- Keywords: "I go you go", "IGUG", "in pairs", "with a partner", "partner WOD", "teams of 2"
+- "(6 each)" means each partner does 6 rounds → use 6 as round/set count, NOT 12
+- "(N each)" → sets/rounds = N (the per-person count)
+- Set partnerWorkout: true in the top-level workout object
+
+## MOVEMENT ALTERNATIVES (OR options)
+When "/" between movements means choose one (OR), use the "alternative" field on the primary movement.
+- "40 D.U. / 60 singles" → primary: Single Under reps:60, alternative: {name: "Double Under", reps: 40}
+- "C2B / Pull-ups" → primary: Pull-up, alternative: {name: "Chest to Bar Pull-up"}
+- "4 B.M.U / 8 pull ups" → primary: Pull-up reps:8, alternative: {name: "Bar Muscle-up", reps: 4}
+- Do NOT create two separate movements for OR options
+- The EASIER/scaled movement should be the primary (default). The harder/Rx movement goes in "alternative".
+- "/" between equipment variants (e.g., "KB's/DB's front squat") is NOT an OR choice — treat as a single movement with the first equipment type.
+
+## RFT + TIME CAP
+- "RFT" or "rounds for time" MUST use format: "for_time", scoreType: "time"
+- "T.C." or "TC" or "time cap" = Time Cap: "16 min T.C." → timeCap: 960
+- Combined example:
+
+Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 15 Box Jumps. 16 min T.C."
+Output:
+{
+  "type": "for_time",
+  "format": "for_time",
+  "scoreType": "time",
+  "partnerWorkout": true,
+  "sets": 6,
+  "timeCap": 960,
+  "exercises": [{
+    "name": "Partner RFT (6 each)",
+    "type": "wod",
+    "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps",
+    "suggestedSets": 6,
+    "movements": [
+      { "name": "Deadlift", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
+      { "name": "Single Under", "reps": 60, "alternative": { "name": "Double Under", "reps": 40 } },
+      { "name": "Box Jump", "reps": 15 }
+    ]
+  }]
 }
 
 ## RULES
@@ -501,6 +590,20 @@ function validateMovement(data: unknown): ParsedMovement | null {
 
   if (!raw.name || typeof raw.name !== 'string') return null;
 
+  // Validate alternative if present
+  let alternative: ParsedMovement['alternative'] = undefined;
+  if (raw.alternative && typeof raw.alternative === 'object') {
+    const alt = raw.alternative as Record<string, unknown>;
+    if (alt.name && typeof alt.name === 'string') {
+      alternative = {
+        name: alt.name,
+        reps: typeof alt.reps === 'number' ? alt.reps : undefined,
+        distance: typeof alt.distance === 'number' ? alt.distance : undefined,
+        calories: typeof alt.calories === 'number' ? alt.calories : undefined,
+      };
+    }
+  }
+
   return {
     name: raw.name,
     reps: typeof raw.reps === 'number' ? raw.reps : undefined,
@@ -509,6 +612,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
+    alternative,
   };
 }
 
@@ -569,6 +673,19 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         }
       }
 
+      // Validate suggestedRepsPerSet
+      let suggestedRepsPerSet: number[] | undefined = undefined;
+      if (Array.isArray(exercise.suggestedRepsPerSet)) {
+        const arr = exercise.suggestedRepsPerSet.filter((v: unknown) => typeof v === 'number' && v > 0) as number[];
+        if (arr.length > 0) {
+          suggestedRepsPerSet = arr;
+          // Ensure suggestedSets matches array length
+          if (suggestedSets !== arr.length) {
+            suggestedSets = arr.length;
+          }
+        }
+      }
+
       exercises.push({
         name,
         type: validExerciseTypes.includes(exercise.type as ExerciseType)
@@ -577,6 +694,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         prescription,
         suggestedSets,
         suggestedReps,
+        suggestedRepsPerSet,
         suggestedWeight: typeof exercise.suggestedWeight === 'number' ? exercise.suggestedWeight : undefined,
         rxWeights: validateRxWeights(exercise.rxWeights),
         movements: movements.length > 0 ? movements : undefined,
@@ -614,6 +732,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
     containerRounds: typeof raw.containerRounds === 'number' ? raw.containerRounds : undefined,
     benchmarkName: typeof raw.benchmarkName === 'string' ? raw.benchmarkName : undefined,
     benchmarkModified: typeof raw.benchmarkModified === 'boolean' ? raw.benchmarkModified : undefined,
+    partnerWorkout: typeof raw.partnerWorkout === 'boolean' ? raw.partnerWorkout : undefined,
     rawText,
   };
 }

@@ -161,6 +161,8 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
       { name: 'Banded Pull-ups', type: 'easier' },
       { name: 'Jumping Pull-ups', type: 'easier' },
       { name: 'Chest-to-Bar', type: 'harder' },
+      { name: 'Muscle-up', type: 'harder' },
+      { name: 'Bar Muscle-up', type: 'harder' },
     ],
   },
   {
@@ -178,7 +180,7 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
   {
     id: 'muscleup',
     name: 'Muscle-up',
-    aliases: ['muscle-up', 'muscleup', 'muscle up', 'bar muscle-up', 'ring muscle-up'],
+    aliases: ['muscle-up', 'muscleup', 'muscle up', 'bar muscle-up', 'bar muscle up', 'bmu', 'b.m.u', 'ring muscle-up', 'ring muscle up', 'rmu'],
     category: 'gymnastics',
     defaultUnit: 'reps',
     alternatives: [
@@ -312,6 +314,41 @@ export function findExerciseDefinition(name: string): ExerciseDefinition | null 
 export function getExerciseAlternatives(name: string): ExerciseAlternative[] {
   const definition = findExerciseDefinition(name);
   return definition?.alternatives || [];
+}
+
+/**
+ * Get the relative type between a movement and an alternative, if defined.
+ */
+export function getAlternativeType(
+  originalName: string,
+  alternativeName: string
+): ExerciseAlternative['type'] | null {
+  const normalize = (value: string) => value.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+  const altFromOriginal = getExerciseAlternatives(originalName)
+    .find(a => normalize(a.name) === normalize(alternativeName));
+  if (altFromOriginal) return altFromOriginal.type;
+
+  const altFromReverse = getExerciseAlternatives(alternativeName)
+    .find(a => normalize(a.name) === normalize(originalName));
+  if (!altFromReverse) return null;
+  if (altFromReverse.type === 'easier') return 'harder';
+  if (altFromReverse.type === 'harder') return 'easier';
+  return 'equivalent';
+}
+
+/**
+ * If the movement is a known harder option, return the easier default.
+ */
+export function getDefaultEasierAlternative(name: string): string | null {
+  const normalize = (value: string) => value.toLowerCase().replace(/[-\s]+/g, ' ').trim();
+  const normalized = normalize(name);
+  for (const exercise of ALL_EXERCISES) {
+    const match = exercise.alternatives.find(
+      alt => alt.type === 'harder' && normalize(alt.name) === normalized
+    );
+    if (match) return exercise.name;
+  }
+  return null;
 }
 
 /**

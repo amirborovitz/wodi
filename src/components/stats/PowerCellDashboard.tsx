@@ -68,7 +68,7 @@ export function PowerCellDashboard() {
       {/* Power Cells Grid */}
       <div className={styles.cells}>
         <PowerCell
-          label="Volume"
+          label="Lift"
           value={weeklyVolume}
           goal={goals.volumeGoal}
           unit="kg"
@@ -76,7 +76,7 @@ export function PowerCellDashboard() {
           icon={<VolumeIcon />}
         />
         <PowerCell
-          label="Metcon Time"
+          label="Move"
           value={weeklyMetconMinutes}
           goal={goals.metconGoal}
           unit="min"
@@ -84,7 +84,7 @@ export function PowerCellDashboard() {
           icon={<MetconIcon />}
         />
         <PowerCell
-          label="Sessions"
+          label="Show Up"
           value={weeklyFrequency}
           goal={goals.streakGoal}
           unit="days"
@@ -101,7 +101,7 @@ export function PowerCellDashboard() {
         transition={{ delay: 0.5 }}
       >
         <span className={styles.goalText}>
-          Goals: {(goals.volumeGoal / 1000).toFixed(0)}k kg | Metcon Time {goals.metconGoal} min | {goals.streakGoal} sessions
+          Goals: {(goals.volumeGoal / 1000).toFixed(0)}k kg | In Motion {goals.metconGoal} min | {goals.streakGoal} sessions
         </span>
       </motion.div>
     </div>

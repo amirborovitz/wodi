@@ -1,5 +1,6 @@
-import { collection, doc, getDoc, setDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db } from './firebase';
+// Firebase imports reserved for future use
+// import { collection, doc, getDoc, setDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+// import { db } from './firebase';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -31,81 +32,13 @@ export interface LearnedExercisePattern {
   aiReasoning?: string;
 }
 
-// Normalize exercise text for pattern matching
-function normalizeExerciseText(name: string, prescription: string): string {
-  return `${name} ${prescription}`
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Extract keywords from exercise text
-function extractKeywords(text: string): string[] {
-  const normalized = text.toLowerCase();
-  const keywords: string[] = [];
-
-  // Equipment keywords
-  const equipment = ['bike', 'echo', 'assault', 'rower', 'row', 'ski', 'erg', 'sled', 'barbell', 'dumbbell', 'kettlebell'];
-  equipment.forEach(eq => {
-    if (normalized.includes(eq)) keywords.push(eq);
-  });
-
-  // Movement keywords
-  const movements = ['run', 'swim', 'walk', 'push', 'pull', 'squat', 'press', 'clean', 'snatch', 'deadlift'];
-  movements.forEach(mov => {
-    if (normalized.includes(mov)) keywords.push(mov);
-  });
-
-  // Metric keywords
-  const metrics = ['cal', 'calories', 'meter', 'mile', 'km', 'distance', 'time', 'reps'];
-  metrics.forEach(met => {
-    if (normalized.includes(met)) keywords.push(met);
-  });
-
-  return [...new Set(keywords)];
-}
-
-// Check if we have a learned pattern for this exercise
+// Learned patterns disabled — Firestore collection has no security rules
+// and has never contained data. Returns null to fall through to rule/AI classification.
 export async function getLearnedPattern(
-  exerciseName: string,
-  prescription: string
+  _exerciseName: string,
+  _prescription: string
 ): Promise<LearnedExercisePattern | null> {
-  try {
-    const normalized = normalizeExerciseText(exerciseName, prescription);
-    const keywords = extractKeywords(normalized);
-
-    if (keywords.length === 0) return null;
-
-    // Query for patterns with matching keywords
-    const patternsRef = collection(db, 'learnedExercisePatterns');
-    const q = query(patternsRef, where('keywords', 'array-contains-any', keywords.slice(0, 10)));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) return null;
-
-    // Find best matching pattern
-    let bestMatch: LearnedExercisePattern | null = null;
-    let bestScore = 0;
-
-    snapshot.docs.forEach(docSnap => {
-      const pattern = docSnap.data() as LearnedExercisePattern;
-      // Score based on keyword overlap
-      const patternKeywords = new Set(pattern.keywords);
-      const matchCount = keywords.filter(k => patternKeywords.has(k)).length;
-      const score = matchCount / Math.max(keywords.length, pattern.keywords.length);
-
-      if (score > bestScore && score >= 0.5) {
-        bestScore = score;
-        bestMatch = pattern;
-      }
-    });
-
-    return bestMatch;
-  } catch (error) {
-    console.warn('Failed to get learned pattern:', error);
-    return null;
-  }
+  return null;
 }
 
 // Use AI to classify an ambiguous exercise
@@ -172,63 +105,19 @@ Return ONLY valid JSON, no explanation.`;
   }
 }
 
-// Save a learned pattern to Firestore
+// Learned pattern saving disabled — Firestore collection has no security rules
 export async function saveLearnedPattern(
-  exerciseName: string,
-  prescription: string,
-  classification: {
+  _exerciseName: string,
+  _prescription: string,
+  _classification: {
     metricType: ExerciseMetricType;
     inputType: 'weighted' | 'bodyweight' | 'cardio_calories' | 'cardio_distance';
   },
-  source: 'rule' | 'ai' | 'user_feedback',
-  aiReasoning?: string,
-  confidence: number = 0.8
+  _source: 'rule' | 'ai' | 'user_feedback',
+  _aiReasoning?: string,
+  _confidence: number = 0.8
 ): Promise<void> {
-  try {
-    const normalized = normalizeExerciseText(exerciseName, prescription);
-    const keywords = extractKeywords(normalized);
-
-    // Create a deterministic ID based on the pattern
-    const patternId = btoa(normalized).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-
-    const patternRef = doc(db, 'learnedExercisePatterns', patternId);
-    const existing = await getDoc(patternRef);
-
-    const pattern: Partial<LearnedExercisePattern> = {
-      exercisePattern: normalized,
-      keywords,
-      metricType: classification.metricType,
-      inputType: classification.inputType,
-      source,
-      confidence,
-      lastUsed: new Date(),
-      ...(aiReasoning && { aiReasoning }),
-    };
-
-    if (existing.exists()) {
-      // Update existing pattern
-      await setDoc(patternRef, {
-        ...pattern,
-        usageCount: (existing.data().usageCount || 0) + 1,
-        // Increase confidence if same classification
-        confidence: existing.data().metricType === classification.metricType
-          ? Math.min(1, (existing.data().confidence || 0.5) + 0.05)
-          : confidence,
-      }, { merge: true });
-    } else {
-      // Create new pattern
-      await setDoc(patternRef, {
-        ...pattern,
-        id: patternId,
-        usageCount: 1,
-        createdAt: serverTimestamp(),
-      });
-    }
-
-    console.log('[LearnedPattern] Saved pattern:', normalized, classification);
-  } catch (error) {
-    console.warn('Failed to save learned pattern:', error);
-  }
+  // No-op
 }
 
 // Main function to classify exercise with learning

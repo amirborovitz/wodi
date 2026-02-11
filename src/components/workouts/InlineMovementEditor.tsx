@@ -1,6 +1,6 @@
 import type { FocusEvent } from 'react';
 import type { ParsedMovement } from '../../types';
-import { getExerciseAlternatives, findExerciseDefinition } from '../../data/exerciseDefinitions';
+import { getExerciseAlternatives, findExerciseDefinition, getAlternativeType } from '../../data/exerciseDefinitions';
 import styles from './InlineMovementEditor.module.css';
 
 interface MovementEditorProps {
@@ -159,9 +159,19 @@ export function InlineMovementEditor({
   showWeight,
   readOnly = false,
 }: MovementEditorProps) {
-  const alternatives = getExerciseAlternatives(movement.name);
+  const definedAlternatives = getExerciseAlternatives(movement.name);
+  // Include parsed alternative (from OR option like "40 DU / 60 singles") if not already in list
+  const parsedAlt = movement.alternative;
+  const hasParsedAlt = parsedAlt && !definedAlternatives.some(a => a.name.toLowerCase() === parsedAlt.name.toLowerCase());
+  const parsedAltType = parsedAlt ? getAlternativeType(movement.name, parsedAlt.name) : null;
+  const alternatives = hasParsedAlt
+    ? [{
+        name: parsedAlt.name,
+        type: (parsedAltType || 'harder') as 'easier' | 'equivalent' | 'harder',
+      }, ...definedAlternatives]
+    : definedAlternatives;
   const hasAlternatives = alternatives.length > 0;
-  const isWeighted = showWeight || isWeightedMovement(movement);
+  const isWeighted = showWeight === undefined ? isWeightedMovement(movement) : showWeight;
   const hasDistance = movement.distance !== undefined && movement.distance > 0;
   const hasTime = movement.time !== undefined && movement.time > 0;
   const hasCalories = movement.calories !== undefined && movement.calories > 0;
@@ -175,10 +185,7 @@ export function InlineMovementEditor({
   const displayName = selectedAlternative || movement.name;
   const displayLabel = abbreviateMovementLabel(displayName);
 
-  // Track if this is a substitution and what type
   const isSubstituted = selectedAlternative && selectedAlternative !== movement.name;
-  const selectedAlt = isSubstituted ? alternatives.find(a => a.name === selectedAlternative) : null;
-  const substitutionType = selectedAlt?.type; // 'easier' | 'harder' | 'equivalent'
 
   // Display values (custom or original)
   const displayDistance = customDistance ?? movement.distance;
@@ -203,12 +210,21 @@ export function InlineMovementEditor({
 
     if (value === '' || value === movement.name) {
       onAlternativeChange(movement.name, null, movement.distance);
+      // Restore original reps if switching back
+      if (movement.reps && onRepsChange) {
+        onRepsChange(movement.name, movement.reps);
+      }
     } else {
       const alt = alternatives.find(a => a.name === value);
       const newDistance = alt?.distanceMultiplier && movement.distance
         ? Math.round(movement.distance * alt.distanceMultiplier)
         : movement.distance;
       onAlternativeChange(movement.name, value, newDistance);
+
+      // If selecting a parsed alternative with custom reps, apply them
+      if (parsedAlt && value === parsedAlt.name && parsedAlt.reps && onRepsChange) {
+        onRepsChange(movement.name, parsedAlt.reps);
+      }
     }
   };
 
@@ -248,17 +264,6 @@ export function InlineMovementEditor({
           </div>
         )}
 
-        {/* Substitution indicator */}
-        {isSubstituted && (
-          <div className={styles.substitutionInfo}>
-            <span className={styles.substitutionBadge}>
-              {substitutionType === 'easier' ? 'scaled' : substitutionType === 'harder' ? 'Rx+' : 'alt'}
-            </span>
-            <span className={styles.originalName}>
-              was {abbreviateMovementLabel(movement.name)}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Value Group - value + unit glued together */}
@@ -328,6 +333,7 @@ interface MovementListEditorProps {
   onTimeChange: (movementName: string, time: number) => void;
   onWeightChange: (movementName: string, weight: number) => void;
   onRepsChange: (movementName: string, reps: number) => void;
+  showWeight?: boolean;
   readOnly?: boolean;
 }
 
@@ -343,6 +349,7 @@ export function MovementListEditor({
   onTimeChange,
   onWeightChange,
   onRepsChange,
+  showWeight,
   readOnly = false,
 }: MovementListEditorProps) {
   return (
@@ -361,6 +368,7 @@ export function MovementListEditor({
           onTimeChange={onTimeChange}
           onWeightChange={onWeightChange}
           onRepsChange={onRepsChange}
+          showWeight={showWeight}
           readOnly={readOnly}
         />
       ))}

@@ -19,7 +19,7 @@ const typeLabels: Record<WorkoutType, string> = {
   metcon: 'METCON',
   emom: 'EMOM',
   amrap: 'AMRAP',
-  for_time: 'METCON TIME',
+  for_time: 'IN MOTION',
   mixed: 'MIXED',
 };
 
@@ -46,7 +46,7 @@ export const ShareableCard = forwardRef<HTMLDivElement, ShareableCardProps>(
 
     const formatVolume = (kg: number): string => {
       if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-      return `${Math.round(kg).toLocaleString()} kg`;
+      return `${parseFloat(kg.toFixed(1)).toLocaleString()} kg`;
     };
 
     const formatTime = (seconds: number): string => {

@@ -21,7 +21,7 @@ export async function elementToCanvas(
     height: options?.height,
     useCORS: true,
     allowTaint: true,
-    backgroundColor: null,
+    backgroundColor: '#0b0b0b',
     logging: false,
   });
 
@@ -94,7 +94,7 @@ export async function shareImage(
 ): Promise<boolean> {
   try {
     // Check if Web Share API is supported
-    if (!navigator.share || !navigator.canShare) {
+    if (!navigator.share) {
       return false;
     }
 
@@ -104,11 +104,6 @@ export async function shareImage(
       text: text || 'Check out my workout!',
       files: [file],
     };
-
-    // Check if we can share files
-    if (!navigator.canShare(shareData)) {
-      return false;
-    }
 
     await navigator.share(shareData);
     return true;

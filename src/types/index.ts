@@ -8,6 +8,10 @@ export interface User {
   createdAt: Date;
   stats: UserStats;
   goals?: UserGoals;
+  age?: number;              // Optional, for calorie calculation
+  weight?: number;           // kg, important for calorie calculation
+  sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  onboardingComplete?: boolean;  // Track if user completed onboarding
 }
 
 export interface UserStats {
@@ -76,6 +80,7 @@ export interface Workout {
   scores?: WorkoutScores;
   duration?: number;       // minutes
   notes?: string;
+  rawText?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,6 +97,9 @@ export interface Exercise {
   type: ExerciseType;
   prescription: string;    // "3x8" or "21-15-9" or "AMRAP 12"
   sets: ExerciseSet[];
+  rxWeights?: RxWeights;   // Prescribed weight for share display
+  movements?: ParsedMovement[];  // Structured movement data (for WODs)
+  rounds?: number;         // Number of rounds (for multi-round WODs)
 }
 
 export interface ExerciseSet {
@@ -103,6 +111,7 @@ export interface ExerciseSet {
   time?: number;           // seconds
   distance?: number;       // meters
   calories?: number;       // for cardio exercises
+  isMax?: boolean;         // true only when prescription explicitly says "max"
   completed: boolean;
 }
 
@@ -130,6 +139,7 @@ export interface ParsedWorkout {
   containerRounds?: number;     // Outer rounds (e.g., 7 in "7 rounds of Cindy")
   benchmarkName?: string;       // Named benchmark if recognized (e.g., "Cindy", "Fran")
   benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
+  partnerWorkout?: boolean;     // Detected partner workout (IGUG, "in pairs", etc.)
 }
 
 // Workload breakdown types
@@ -140,12 +150,14 @@ export interface MovementTotal {
   totalCalories?: number;
   totalTime?: number;           // Time in seconds
   weight?: number;
+  weightProgression?: number[]; // Per-set weights when they vary (e.g., [35, 37.5, 40])
   unit?: MeasurementUnit;
   color?: 'cyan' | 'magenta' | 'yellow';
   // Substitution tracking
   originalMovement?: string;    // Original movement name before substitution
   wasSubstituted?: boolean;     // True if this is a substitution
   substitutionType?: 'easier' | 'harder' | 'equivalent';  // Scaling type
+  implementCount?: number;  // 1=single, 2=pair (KB/DB)
 }
 
 export interface WorkloadBreakdown {
@@ -173,6 +185,12 @@ export interface ParsedMovement {
   rxWeights?: RxWeights;        // Rx weights (male/female)
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
+  alternative?: {               // OR option (e.g., "40 DU / 60 singles")
+    name: string;
+    reps?: number;
+    distance?: number;
+    calories?: number;
+  };
 }
 
 export interface ParsedExercise {
@@ -181,6 +199,7 @@ export interface ParsedExercise {
   prescription: string;
   suggestedSets: number;
   suggestedReps?: number;
+  suggestedRepsPerSet?: number[]; // Variable reps per set (e.g., [6, 5, 4, 3, 2])
   suggestedWeight?: number;
   rxWeights?: RxWeights;        // Rx weights (male/female)
   movements?: ParsedMovement[]; // Individual movements (for complex WODs)
@@ -204,8 +223,12 @@ export type Screen =
   | 'history'
   | 'stats'
   | 'settings'
+  | 'profile-settings'
+  | 'goals-settings'
   | 'workout-detail'
-  | 'profile';
+  | 'profile'
+  | 'onboarding'
+  | 'pr';
 
 // Common component props
 export interface BaseProps {
@@ -323,6 +346,7 @@ export type ExerciseLoggingMode =
   | 'amrap_intervals'    // multiple AMRAPs with rest
   | 'intervals'          // time per set
   | 'bodyweight'         // reps only
+  | 'emom'               // EMOM minute-by-minute weight logging
   | 'sets';              // generic sets (weight/reps)
 
 // Fields to show/hide for logging an exercise
@@ -372,4 +396,23 @@ export interface LoggingGuidanceResponse {
   source: 'rule' | 'cache' | 'ai';
   explanation?: string;
   patternId?: string;                 // For tracking corrections
+}
+
+export interface ClassificationLogEntry {
+  exerciseName: string;
+  prescription: string;
+  workoutTitle: string;
+  workoutFormat?: string;
+  rawText?: string;
+  // What each layer suggested
+  localMode: ExerciseLoggingMode;
+  guidanceMode?: ExerciseLoggingMode;
+  guidanceConfidence?: number;
+  guidanceSource?: 'rule' | 'cache' | 'ai';
+  // What was actually used
+  finalMode: ExerciseLoggingMode;
+  wasOverridden: boolean;
+  // Meta
+  timestamp: Date;
+  userId?: string;
 }

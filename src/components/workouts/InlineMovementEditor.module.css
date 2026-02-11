@@ -27,9 +27,9 @@
   align-items: center;
   min-height: 44px;
   padding: 8px 14px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: var(--radius-lg);
   font-size: 15px;
   font-weight: 500;
   color: #FFFFFF;
@@ -44,9 +44,9 @@
   width: 100%;
   min-height: 44px;
   padding: 8px 28px 8px 14px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: var(--radius-lg);
   color: #FFFFFF;
   font-size: 15px;
   font-weight: 500;
@@ -56,15 +56,13 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  /* Allow text to wrap in select (limited browser support, fallback to ellipsis) */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Let long movement names wrap when supported */
+  white-space: normal;
 }
 
 .movementSelect:focus {
   outline: none;
-  border-color: rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
 }
 
 .movementSelect:disabled {
@@ -78,14 +76,16 @@
 .valueGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .weightGroup {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -146,9 +146,9 @@
   width: 64px;
   height: 48px;
   padding: 0 8px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: var(--radius-lg);
   color: #FFFFFF;
   font-size: 18px;
   font-family: var(--font-mono);
@@ -165,7 +165,7 @@
 
 .valueInput:focus {
   outline: none;
-  border-color: rgba(0, 242, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.6), 0 0 18px rgba(0, 242, 255, 0.4);
 }
 
 .valueInput:not(:placeholder-shown) {
@@ -184,9 +184,9 @@
   width: 64px;
   height: 48px;
   padding: 0 8px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: var(--radius-lg);
   color: #FFFFFF;
   font-size: 18px;
   font-family: var(--font-mono);
@@ -203,7 +203,7 @@
 
 .weightInput:focus {
   outline: none;
-  border-color: rgba(0, 242, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.6), 0 0 18px rgba(0, 242, 255, 0.4);
 }
 
 .weightInput:not(:placeholder-shown) {
@@ -225,9 +225,9 @@
   width: 64px;
   height: 48px;
   padding: 0 8px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: var(--radius-lg);
   font-size: 18px;
   font-family: var(--font-mono);
   font-weight: 500;

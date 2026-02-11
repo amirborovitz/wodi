@@ -1,0 +1,215 @@
+.container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  padding-top: calc(var(--space-4) + var(--safe-top));
+  background: var(--color-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.backButton {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  transition: all 0.2s ease;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.backButton:active {
+  transform: scale(0.95);
+}
+
+.title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.headerSpacer {
+  width: 80px;
+  text-align: right;
+}
+
+.savingIndicator {
+  font-size: var(--text-xs);
+  color: var(--color-sessions);
+  font-weight: var(--font-medium);
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-4);
+  padding-bottom: calc(100px + var(--safe-bottom));
+  max-width: 500px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.goalCard {
+  padding: var(--space-5);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  transition: all 0.3s ease;
+}
+
+.goalSaved {
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
+}
+
+.goalHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.goalDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.goalInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.goalLabel {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
+
+.goalHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.goalControl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.stepButton {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stepButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.stepButton:active:not(:disabled) {
+  transform: scale(0.95);
+  background: rgba(0, 242, 255, 0.2);
+}
+
+.stepButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.goalValue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+}
+
+.valueNumber {
+  font-size: 2.5rem;
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.valueUnit {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+.presets {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.presetButton {
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  font-family: var(--font-family);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.presetButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+}
+
+.presetActive {
+  background: rgba(0, 242, 255, 0.15);
+  border-color: var(--color-sessions);
+  color: var(--color-sessions);
+}
+
+.presetActive:hover {
+  background: rgba(0, 242, 255, 0.2);
+}
+
+.hint {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}

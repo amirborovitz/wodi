@@ -1,5 +1,6 @@
-import { collection, doc, getDoc, setDoc, query, where, getDocs, increment as firestoreIncrement } from 'firebase/firestore';
-import { db } from './firebase';
+// Firebase imports reserved for future use
+// import { collection, doc, getDoc, setDoc, addDoc, query, where, getDocs, increment as firestoreIncrement, serverTimestamp } from 'firebase/firestore';
+// import { db } from './firebase';
 import OpenAI from 'openai';
 import type {
   ParsedExercise,
@@ -15,74 +16,6 @@ const openai = new OpenAI({
   apiKey: import.meta.env.VITE_OPENAI_API_KEY,
   dangerouslyAllowBrowser: true
 });
-
-// ============================================
-// PATTERN MATCHING UTILITIES
-// ============================================
-
-function normalizeExerciseText(name: string, prescription: string): string {
-  return `${name} ${prescription}`
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function extractKeywords(text: string): string[] {
-  const normalized = text.toLowerCase();
-  const keywords: string[] = [];
-
-  // Equipment keywords
-  const equipment = [
-    'bike', 'echo', 'assault', 'air', 'airdyne',
-    'rower', 'row', 'rowing', 'erg',
-    'ski', 'skierg',
-    'sled', 'prowler',
-    'barbell', 'dumbbell', 'kettlebell', 'kb', 'db', 'bb',
-    'wall ball', 'medicine ball', 'med ball',
-  ];
-  equipment.forEach(eq => {
-    if (normalized.includes(eq)) keywords.push(eq.split(' ')[0]); // Use first word
-  });
-
-  // Movement keywords
-  const movements = [
-    'run', 'sprint', 'swim', 'walk', 'carry',
-    'push', 'pull', 'press', 'squat', 'lunge',
-    'clean', 'snatch', 'deadlift', 'jerk',
-    'burpee', 'thruster', 'cluster',
-  ];
-  movements.forEach(mov => {
-    if (normalized.includes(mov)) keywords.push(mov);
-  });
-
-  // Metric keywords (high priority)
-  const metricKeywords: Record<string, string> = {
-    'max cal': 'cal',
-    'for cal': 'cal',
-    'calories': 'cal',
-    'cal ': 'cal',
-    'meter': 'distance',
-    'mile': 'distance',
-    ' m ': 'distance',
-    ' km': 'distance',
-    'distance': 'distance',
-    'for time': 'time',
-    'rft': 'time',
-    'amrap': 'amrap',
-    'rounds': 'rounds',
-  };
-  Object.entries(metricKeywords).forEach(([pattern, keyword]) => {
-    if (normalized.includes(pattern)) keywords.push(keyword);
-  });
-
-  return [...new Set(keywords)];
-}
-
-function generatePatternId(text: string): string {
-  // Create a deterministic ID based on the normalized pattern
-  return btoa(text).replace(/[^a-zA-Z0-9]/g, '').substring(0, 24);
-}
 
 // ============================================
 // EXPLICIT RULES (highest confidence)
@@ -268,163 +201,34 @@ export function applyExplicitRules(
 // FIREBASE CACHE OPERATIONS
 // ============================================
 
+// Learned patterns disabled — Firestore collection has no security rules
+// and has never contained data. Returns null to fall through to rule/AI classification.
 export async function getLearnedLoggingPattern(
-  exerciseName: string,
-  prescription: string
+  _exerciseName: string,
+  _prescription: string
 ): Promise<LearnedLoggingPattern | null> {
-  try {
-    const normalized = normalizeExerciseText(exerciseName, prescription);
-    const keywords = extractKeywords(normalized);
-
-    if (keywords.length === 0) return null;
-
-    // Query for patterns with matching keywords
-    const patternsRef = collection(db, 'learnedLoggingPatterns');
-    const q = query(patternsRef, where('keywords', 'array-contains-any', keywords.slice(0, 10)));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) return null;
-
-    // Find best matching pattern
-    let bestMatch: LearnedLoggingPattern | null = null;
-    let bestScore = 0;
-
-    snapshot.docs.forEach(docSnap => {
-      const pattern = docSnap.data() as LearnedLoggingPattern;
-      // Score based on keyword overlap
-      const patternKeywords = new Set(pattern.keywords);
-      const matchCount = keywords.filter(k => patternKeywords.has(k)).length;
-      const score = matchCount / Math.max(keywords.length, pattern.keywords.length);
-
-      // Also boost score if the pattern string matches well
-      const patternNormalized = pattern.exercisePattern.toLowerCase();
-      if (normalized.includes(patternNormalized) || patternNormalized.includes(normalized)) {
-        const boost = 0.2;
-        const boostedScore = Math.min(1, score + boost);
-        if (boostedScore > bestScore) {
-          bestScore = boostedScore;
-          bestMatch = pattern;
-        }
-      } else if (score > bestScore && score >= 0.5) {
-        bestScore = score;
-        bestMatch = pattern;
-      }
-    });
-
-    return bestMatch;
-  } catch (error) {
-    console.warn('[LoggingPatternLearning] Failed to get learned pattern:', error);
-    return null;
-  }
+  return null;
 }
 
+// Pattern saving disabled — Firestore collection has no security rules
 export async function saveLoggingPattern(
-  exerciseName: string,
-  prescription: string,
-  loggingMode: ExerciseLoggingMode,
-  fields: LoggingPatternFields,
-  source: 'rule' | 'ai' | 'user_correction',
-  aiExplanation?: string,
-  confidence: number = 0.8
+  _exerciseName: string,
+  _prescription: string,
+  _loggingMode: ExerciseLoggingMode,
+  _fields: LoggingPatternFields,
+  _source: 'rule' | 'ai' | 'user_correction',
+  _aiExplanation?: string,
+  _confidence: number = 0.8
 ): Promise<string> {
-  try {
-    const normalized = normalizeExerciseText(exerciseName, prescription);
-    const keywords = extractKeywords(normalized);
-    const patternId = generatePatternId(normalized);
-
-    const patternRef = doc(db, 'learnedLoggingPatterns', patternId);
-    const existing = await getDoc(patternRef);
-
-    const now = new Date();
-
-    if (existing.exists()) {
-      const existingData = existing.data() as LearnedLoggingPattern;
-      // Update existing pattern
-      await setDoc(patternRef, {
-        loggingMode,
-        fields,
-        source,
-        confidence: source === 'user_correction'
-          ? 0.95
-          : existingData.loggingMode === loggingMode
-            ? Math.min(1, existingData.confidence + 0.05)
-            : confidence,
-        usageCount: firestoreIncrement(1),
-        lastUsed: now,
-        ...(aiExplanation && { aiExplanation }),
-      }, { merge: true });
-    } else {
-      // Create new pattern
-      const newPattern: LearnedLoggingPattern = {
-        id: patternId,
-        exercisePattern: normalized,
-        keywords,
-        loggingMode,
-        fields,
-        source,
-        confidence,
-        usageCount: 1,
-        correctCount: source === 'user_correction' ? 1 : 0,
-        correctionCount: 0,
-        lastUsed: now,
-        createdAt: now,
-        ...(aiExplanation && { aiExplanation }),
-      };
-      await setDoc(patternRef, newPattern);
-    }
-
-    console.log('[LoggingPatternLearning] Saved pattern:', normalized, loggingMode);
-    return patternId;
-  } catch (error) {
-    console.warn('[LoggingPatternLearning] Failed to save pattern:', error);
-    return '';
-  }
+  return '';
 }
 
+// Pattern usage recording disabled — Firestore collection has no security rules
 export async function recordPatternUsage(
-  patternId: string,
-  wasAccepted: boolean
+  _patternId: string,
+  _wasAccepted: boolean
 ): Promise<void> {
-  if (!patternId) return;
-
-  try {
-    const patternRef = doc(db, 'learnedLoggingPatterns', patternId);
-    const existing = await getDoc(patternRef);
-
-    if (!existing.exists()) return;
-
-    const existingData = existing.data() as LearnedLoggingPattern;
-
-    if (wasAccepted) {
-      // User accepted without changes - boost confidence
-      const newCorrectCount = (existingData.correctCount || 0) + 1;
-      const totalUsage = newCorrectCount + (existingData.correctionCount || 0);
-      const newConfidence = Math.min(1.0, newCorrectCount / totalUsage);
-
-      await setDoc(patternRef, {
-        correctCount: firestoreIncrement(1),
-        confidence: newConfidence,
-        lastUsed: new Date(),
-      }, { merge: true });
-    } else {
-      // User overrode - reduce confidence (actual correction saves new pattern)
-      await setDoc(patternRef, {
-        correctionCount: firestoreIncrement(1),
-        lastUsed: new Date(),
-      }, { merge: true });
-
-      // Recalculate confidence
-      const newCorrectionCount = (existingData.correctionCount || 0) + 1;
-      const totalUsage = (existingData.correctCount || 0) + newCorrectionCount;
-      const newConfidence = (existingData.correctCount || 0) / totalUsage;
-
-      await setDoc(patternRef, {
-        confidence: newConfidence,
-      }, { merge: true });
-    }
-  } catch (error) {
-    console.warn('[LoggingPatternLearning] Failed to record usage:', error);
-  }
+  // No-op
 }
 
 // ============================================
@@ -626,3 +430,4 @@ export async function recordUserCorrection(
 
   console.log('[LoggingPatternLearning] Recorded user correction:', correctedMode);
 }
+

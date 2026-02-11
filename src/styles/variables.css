@@ -48,6 +48,7 @@
   --text-xs: 0.75rem;     /* 12px */
   --text-sm: 0.875rem;    /* 14px */
   --text-base: 1rem;      /* 16px */
+  --text-md: 1rem;        /* 16px */
   --text-lg: 1.125rem;    /* 18px */
   --text-xl: 1.25rem;     /* 20px */
   --text-2xl: 1.5rem;     /* 24px */
@@ -88,10 +89,10 @@
   --space-12: 3rem;       /* 48px */
   --space-16: 4rem;       /* 64px */
 
-  /* Border Radius */
+  /* Border Radius - standardized 16px system for primary surfaces */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-lg: 16px;  /* Primary radius for buttons and cards */
   --radius-xl: 20px;
   --radius-full: 9999px;
 
@@ -100,7 +101,7 @@
   --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(255, 77, 77, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 242, 255, 0.3);
 
   /* Blur */
   --blur-sm: 4px;
@@ -213,6 +214,7 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
@@ -223,11 +225,13 @@ body {
   background-color: var(--color-bg);
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 /* Focus States */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-sessions);
   outline-offset: 2px;
 }
 

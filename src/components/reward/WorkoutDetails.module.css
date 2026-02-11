@@ -49,7 +49,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-md);
   font-weight: var(--font-bold);
-  color: var(--color-accent);
+  color: var(--color-sessions);
   flex-shrink: 0;
 }
 

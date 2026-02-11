@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import type { WorkloadBreakdown as WorkloadBreakdownType, MovementTotal } from '../../types';
@@ -6,7 +6,6 @@ import styles from './WorkloadBreakdown.module.css';
 
 interface WorkloadBreakdownProps {
   breakdown: WorkloadBreakdownType;
-  showTotals?: boolean;
   animationDelay?: number;
   editable?: boolean;
   onEditMovement?: (movement: MovementTotal) => void;
@@ -26,193 +25,108 @@ function formatTime(seconds: number): string {
 }
 
 /**
- * Format the value for display - handles combined metrics
+ * Display name for movements — Title Case
  */
-function formatValue(movement: MovementTotal): string {
-  const parts: string[] = [];
-
-  // Distance
-  if (movement.totalDistance && movement.totalDistance > 0) {
-    if (movement.totalDistance >= 1000) {
-      parts.push(`${(movement.totalDistance / 1000).toFixed(1)}km`);
-    } else {
-      parts.push(`${movement.totalDistance}m`);
-    }
-  }
-
-  // Time
-  if (movement.totalTime && movement.totalTime > 0) {
-    parts.push(formatTime(movement.totalTime));
-  }
-
-  // Calories
-  if (movement.totalCalories && movement.totalCalories > 0) {
-    parts.push(`${movement.totalCalories} cal`);
-  }
-
-  // Reps (only if no other metrics)
-  if (parts.length === 0 && movement.totalReps && movement.totalReps > 0) {
-    return movement.totalReps.toString();
-  }
-
-  // Combine with " + " for mixed metrics (e.g., "9km + 5:00")
-  return parts.length > 0 ? parts.join(' + ') : '0';
-}
-
-function formatDistance(meters: number): string {
-  if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(1)}km`;
-  }
-  return `${meters}m`;
-}
-
-/**
- * Format volume for display
- */
-function formatVolume(kg: number): string {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(2)} tons`;
-  }
-  return `${Math.round(kg).toLocaleString()} kg`;
-}
-
-/**
- * Get shortened movement name for display
- */
-function shortenName(name: string): string {
-  // Common abbreviations
-  const abbreviations: Record<string, string> = {
-    'handstand push-up': 'HSPU',
-    'handstand pushup': 'HSPU',
-    'toes to bar': 'T2B',
-    'knees to elbow': 'K2E',
-    'chest to bar pull-up': 'C2B',
-    'chest to bar pullup': 'C2B',
-    'double under': 'DU',
-    'single under': 'SU',
-    'air squat': 'Air Squat',
-    'push-up': 'Push-up',
-    'pushup': 'Push-up',
-    'pull-up': 'Pull-up',
-    'pullup': 'Pull-up',
-    'kettlebell swing': 'KB Swing',
-    'russian kettlebell swing': 'RKB Swing',
-    'american kettlebell swing': 'AKB Swing',
-    'hang power clean': 'HPC',
-    'power clean': 'PC',
-    'squat clean': 'Squat Clean',
-    'clean and jerk': 'C&J',
-    'power snatch': 'P. Snatch',
-    'squat snatch': 'Sq. Snatch',
-    'overhead squat': 'OHS',
-    'front squat': 'Front Squat',
-    'back squat': 'Back Squat',
-    'shoulder to overhead': 'S2OH',
-  };
-
-  const lowerName = name.toLowerCase();
-  if (abbreviations[lowerName]) {
-    return abbreviations[lowerName];
-  }
-
-  // Capitalize first letter of each word
+function displayName(name: string): string {
   return name.split(' ')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 
-// Swipeable Movement Tile Component
-function SwipeableTile({
-  movement,
-  editable,
-  onEdit,
-  onDelete,
-  color,
-}: {
-  movement: MovementTotal;
-  editable: boolean;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  color: string;
-}) {
-  const x = useMotionValue(0);
-  const deleteOpacity = useTransform(x, [-100, -50], [1, 0]);
-  const editOpacity = useTransform(x, [50, 100], [0, 1]);
-  const scale = useTransform(x, [-100, 0, 100], [0.95, 1, 0.95]);
-  const [isDragging, setIsDragging] = useState(false);
+/**
+ * Categorize a movement for highlight color.
+ */
+type TileCategory = 'gold' | 'cyan' | 'neutral';
 
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    setIsDragging(false);
-    const threshold = 80;
+const STRENGTH_PATTERNS = [
+  'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
+  'swing', 'lunge', 'curl', 'extension', 'row', 'kettlebell', 'kb',
+  'dumbbell', 'db', 'barbell', 'bb', 'goblet', 'wall ball', 'ball slam',
+];
 
-    if (info.offset.x < -threshold && onDelete) {
-      // Swipe left - delete
-      animate(x, -150, { type: 'spring', stiffness: 300, damping: 30 });
-      setTimeout(() => {
-        if (navigator.vibrate) navigator.vibrate(20);
-        onDelete();
-      }, 150);
-    } else if (info.offset.x > threshold && onEdit) {
-      // Swipe right - edit
-      animate(x, 150, { type: 'spring', stiffness: 300, damping: 30 });
-      setTimeout(() => {
-        if (navigator.vibrate) navigator.vibrate(10);
-        onEdit();
-      }, 150);
+const CARDIO_PATTERNS = [
+  'run', 'bike', 'ski', 'swim', 'burpee', 'double under', 'single under',
+];
+
+function categorizeMovement(mov: MovementTotal): TileCategory {
+  const lower = mov.name.toLowerCase();
+  if (mov.weight && mov.weight > 0) return 'gold';
+  if (STRENGTH_PATTERNS.some(p => lower.includes(p))) return 'gold';
+  if (mov.totalDistance && mov.totalDistance > 0) return 'cyan';
+  if (mov.totalCalories && mov.totalCalories > 0) return 'cyan';
+  if (CARDIO_PATTERNS.some(p => lower.includes(p))) return 'cyan';
+  return 'neutral';
+}
+
+/**
+ * Impact score for highlighting top movements.
+ */
+function impactScore(mov: MovementTotal): number {
+  if (mov.weight && mov.weight > 0 && mov.totalReps) {
+    return mov.totalReps * mov.weight;
+  }
+  if (mov.totalDistance && mov.totalDistance > 0) {
+    return mov.totalDistance;
+  }
+  return mov.totalReps || 0;
+}
+
+/**
+ * Build stat segments for a movement row.
+ * Number+unit are glued into a single string (e.g. "40 reps", "@ 50kg", "200m").
+ */
+function buildStatSegments(movement: MovementTotal): { text: string }[] {
+  const segments: { text: string }[] = [];
+
+  // Reps
+  if (movement.totalReps && movement.totalReps > 0) {
+    segments.push({ text: `${movement.totalReps} reps` });
+  }
+
+  // Weight / progression
+  if (movement.weightProgression && movement.weightProgression.length > 1) {
+    const weights = movement.weightProgression;
+    const unit = movement.unit === 'lb' ? 'lb' : 'kg';
+    if (weights.every(w => w === weights[0])) {
+      segments.push({ text: `@ ${weights[0]}${unit}` });
     } else {
-      // Snap back
-      animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 });
+      const deduped = weights.filter((w, i, arr) => i === 0 || w !== arr[i - 1]);
+      if (deduped.length > 4) {
+        segments.push({ text: `${Math.min(...deduped)}\u2013${Math.max(...deduped)}${unit}` });
+      } else {
+        segments.push({ text: `${deduped.join('\u2192')}${unit}` });
+      }
     }
-  };
-
-  const handleTap = () => {
-    if (!isDragging && editable && onEdit) {
-      if (navigator.vibrate) navigator.vibrate(10);
-      onEdit();
+  } else if (movement.weight && movement.weight > 0) {
+    const unit = movement.unit === 'lb' ? 'lb' : 'kg';
+    if (movement.implementCount && movement.implementCount > 1) {
+      const perImplement = parseFloat((movement.weight / movement.implementCount).toFixed(1));
+      segments.push({ text: `@ ${movement.implementCount}x ${perImplement}${unit}` });
+    } else {
+      segments.push({ text: `@ ${movement.weight}${unit}` });
     }
-  };
+  }
 
-  return (
-    <div className={styles.swipeContainer}>
-      {/* Background actions */}
-      {editable && (
-        <>
-          <motion.div className={styles.actionDelete} style={{ opacity: deleteOpacity }}>
-            <DeleteIcon />
-          </motion.div>
-          <motion.div className={styles.actionEdit} style={{ opacity: editOpacity }}>
-            <EditIcon />
-          </motion.div>
-        </>
-      )}
+  // Distance
+  if (movement.totalDistance && movement.totalDistance > 0) {
+    if (movement.totalDistance >= 1000) {
+      segments.push({ text: `${(movement.totalDistance / 1000).toFixed(1)}km` });
+    } else {
+      segments.push({ text: `${movement.totalDistance}m` });
+    }
+  }
 
-      {/* Tile */}
-      <motion.div
-        className={`${styles.tile} ${styles[color]} ${editable ? styles.editable : ''}`}
-        style={{ x, scale }}
-        drag={editable ? 'x' : false}
-        dragConstraints={{ left: -100, right: 100 }}
-        dragElastic={0.1}
-        onDragStart={() => setIsDragging(true)}
-        onDragEnd={handleDragEnd}
-        onClick={handleTap}
-        whileTap={editable ? { scale: 0.98 } : undefined}
-      >
-        <span className={styles.value}>{formatValue(movement)}</span>
-        <span className={styles.name}>{shortenName(movement.name)}</span>
-        {movement.weight && movement.weight > 0 && (
-          <span className={styles.weight}>
-            @ {movement.weight}{movement.unit === 'lb' ? 'lb' : 'kg'}
-          </span>
-        )}
-        {editable && (
-          <span className={styles.editHint}>
-            <ChevronIcon />
-          </span>
-        )}
-      </motion.div>
-    </div>
-  );
+  // Time
+  if (movement.totalTime && movement.totalTime > 0) {
+    segments.push({ text: formatTime(movement.totalTime) });
+  }
+
+  // Calories
+  if (movement.totalCalories && movement.totalCalories > 0) {
+    segments.push({ text: `${movement.totalCalories} cal` });
+  }
+
+  return segments;
 }
 
 // Icons
@@ -233,17 +147,110 @@ function DeleteIcon() {
   );
 }
 
-function ChevronIcon() {
+// Swipeable Movement Row Component
+function MovementRow({
+  movement,
+  editable,
+  onEdit,
+  onDelete,
+  highlighted,
+  category,
+}: {
+  movement: MovementTotal;
+  editable: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  highlighted: boolean;
+  category: TileCategory;
+}) {
+  const x = useMotionValue(0);
+  const deleteOpacity = useTransform(x, [-100, -50], [1, 0]);
+  const editOpacity = useTransform(x, [50, 100], [0, 1]);
+  const scale = useTransform(x, [-100, 0, 100], [0.95, 1, 0.95]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    setIsDragging(false);
+    const threshold = 80;
+
+    if (info.offset.x < -threshold && onDelete) {
+      animate(x, -150, { type: 'spring', stiffness: 300, damping: 30 });
+      setTimeout(() => {
+        if (navigator.vibrate) navigator.vibrate(20);
+        onDelete();
+      }, 150);
+    } else if (info.offset.x > threshold && onEdit) {
+      animate(x, 150, { type: 'spring', stiffness: 300, damping: 30 });
+      setTimeout(() => {
+        if (navigator.vibrate) navigator.vibrate(10);
+        onEdit();
+      }, 150);
+    } else {
+      animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 });
+    }
+  };
+
+  const handleTap = () => {
+    if (!isDragging && editable && onEdit) {
+      if (navigator.vibrate) navigator.vibrate(10);
+      onEdit();
+    }
+  };
+
+  const segments = buildStatSegments(movement);
+  const highlightClass = highlighted ? styles[`highlighted_${category}`] : '';
+
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
+    <div className={styles.swipeContainer}>
+      {editable && (
+        <>
+          <motion.div className={styles.actionDelete} style={{ opacity: deleteOpacity }}>
+            <DeleteIcon />
+          </motion.div>
+          <motion.div className={styles.actionEdit} style={{ opacity: editOpacity }}>
+            <EditIcon />
+          </motion.div>
+        </>
+      )}
+
+      <motion.div
+        className={`${styles.movementRow} ${highlightClass} ${editable ? styles.editable : ''}`}
+        style={{ x, scale }}
+        drag={editable ? 'x' : false}
+        dragConstraints={{ left: -100, right: 100 }}
+        dragElastic={0.1}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={handleDragEnd}
+        onClick={handleTap}
+        whileTap={editable ? { scale: 0.98 } : undefined}
+      >
+        <span className={styles.movementName}>{displayName(movement.name)}</span>
+        {segments.length > 0 && (
+          <div className={styles.movementStats}>
+            {segments.map((seg, i) => (
+              <span key={i}>
+                {i > 0 && <span className={styles.statSeparator}>{'\u00b7'} </span>}
+                <span className={styles.statSegment}>
+                  {seg.text}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+        {movement.wasSubstituted && movement.originalMovement && (
+          <span className={styles.subLabel}>
+            {movement.substitutionType === 'easier'
+              ? `Scaled from ${displayName(movement.originalMovement)}`
+              : `Substituted from ${displayName(movement.originalMovement)}`}
+          </span>
+        )}
+      </motion.div>
+    </div>
   );
 }
 
 export function WorkloadBreakdown({
   breakdown,
-  showTotals = false,
   animationDelay = 0.65,
   editable = false,
   onEditMovement,
@@ -253,54 +260,21 @@ export function WorkloadBreakdown({
     return null;
   }
 
-  // Only show aggregate distance if there's ONE movement type with distance
-  // (e.g., don't sum Echo Bike + Sled Push - they're different activities)
-  const distanceMovements = breakdown.movements.filter(m => m.totalDistance && m.totalDistance > 0);
-  const hasMultipleDistanceTypes = distanceMovements.length > 1;
-  const totalDistance = hasMultipleDistanceTypes ? 0 : (breakdown.grandTotalDistance ?? breakdown.movements.reduce(
-    (sum, movement) => sum + (movement.totalDistance || 0),
-    0
-  ));
-
-  // Same logic for calories - only aggregate if single movement type
-  const calorieMovements = breakdown.movements.filter(m => m.totalCalories && m.totalCalories > 0);
-  const hasMultipleCalorieTypes = calorieMovements.length > 1;
-  const totalCalories = hasMultipleCalorieTypes ? 0 : (breakdown.grandTotalCalories ?? breakdown.movements.reduce(
-    (sum, movement) => sum + (movement.totalCalories || 0),
-    0
-  ));
-  const gridRef = useRef<HTMLDivElement>(null);
-  const [columns, setColumns] = useState(3);
-
-  // Group stagger - entire rows animate together for premium feel
-  const rowStaggerDelay = 0.12; // Delay between rows
+  const staggerDelay = 0.08;
   const liquidEase: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid || typeof ResizeObserver === 'undefined') return;
+  const isScaled = breakdown.movements.some(m => m.wasSubstituted && m.substitutionType === 'easier');
 
-    const minTileWidth = 100;
-    const gap = 8;
-    const updateColumns = () => {
-      const width = grid.getBoundingClientRect().width;
-      const nextColumns = Math.max(1, Math.floor((width + gap) / (minTileWidth + gap)));
-      setColumns(nextColumns);
-    };
-
-    updateColumns();
-    const observer = new ResizeObserver(updateColumns);
-    observer.observe(grid);
-    return () => observer.disconnect();
-  }, []);
-
-  // Group movements by row for synchronized animation
-  const rows: MovementTotal[][] = [];
-  breakdown.movements.forEach((movement, idx) => {
-    const rowIndex = Math.floor(idx / columns);
-    if (!rows[rowIndex]) rows[rowIndex] = [];
-    rows[rowIndex].push(movement);
-  });
+  // Compute which movements are "top 2" by impact score
+  const highlightedNames = useMemo(() => {
+    const scored = breakdown.movements.map(m => ({
+      name: m.name,
+      score: impactScore(m),
+      category: categorizeMovement(m),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return new Set(scored.slice(0, 2).map(s => s.name));
+  }, [breakdown.movements]);
 
   return (
     <motion.div
@@ -309,63 +283,35 @@ export function WorkloadBreakdown({
       animate={{ opacity: 1 }}
       transition={{ delay: animationDelay }}
     >
-      <span className={styles.sectionTitle}>Workload Breakdown</span>
+      {isScaled && (
+        <span className={styles.scaledBadge}>★ SCALED</span>
+      )}
 
-      <div className={styles.grid} ref={gridRef}>
-        {rows.map((row, rowIndex) => (
+      <span className={styles.sectionTitle}>Movements</span>
+
+      <div className={styles.list}>
+        {breakdown.movements.map((movement, idx) => (
           <motion.div
-            key={`row-${rowIndex}`}
-            className={styles.row}
+            key={movement.name}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
-              delay: animationDelay + rowIndex * rowStaggerDelay,
+              delay: animationDelay + idx * staggerDelay,
               duration: 0.35,
               ease: liquidEase,
             }}
           >
-            {row.map((movement) => (
-              <SwipeableTile
-                key={movement.name}
-                movement={movement}
-                editable={editable}
-                onEdit={() => onEditMovement?.(movement)}
-                onDelete={() => onDeleteMovement?.(movement.name)}
-                color={movement.color || 'magenta'}
-              />
-            ))}
+            <MovementRow
+              movement={movement}
+              editable={editable}
+              onEdit={() => onEditMovement?.(movement)}
+              onDelete={() => onDeleteMovement?.(movement.name)}
+              highlighted={highlightedNames.has(movement.name)}
+              category={categorizeMovement(movement)}
+            />
           </motion.div>
         ))}
       </div>
-
-      {showTotals && (breakdown.grandTotalReps > 0 || breakdown.grandTotalVolume > 0 || totalDistance > 0 || totalCalories > 0) && (
-        <div className={styles.totals}>
-          {breakdown.grandTotalReps > 0 && (
-            <div className={styles.totalItem}>
-              <span className={styles.totalValue}>{breakdown.grandTotalReps}</span>
-              <span className={styles.totalLabel}>Total Reps</span>
-            </div>
-          )}
-          {breakdown.grandTotalVolume > 0 && (
-            <div className={styles.totalItem}>
-              <span className={styles.totalValue}>{formatVolume(breakdown.grandTotalVolume)}</span>
-              <span className={styles.totalLabel}>Volume</span>
-            </div>
-          )}
-          {totalDistance > 0 && (
-            <div className={styles.totalItem}>
-              <span className={styles.totalValue}>{formatDistance(Math.round(totalDistance))}</span>
-              <span className={styles.totalLabel}>Distance</span>
-            </div>
-          )}
-          {totalCalories > 0 && (
-            <div className={styles.totalItem}>
-              <span className={styles.totalValue}>{Math.round(totalCalories)}</span>
-              <span className={styles.totalLabel}>Calories</span>
-            </div>
-          )}
-        </div>
-      )}
     </motion.div>
   );
 }

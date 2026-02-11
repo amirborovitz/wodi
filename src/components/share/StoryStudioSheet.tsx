@@ -175,10 +175,10 @@ export function StoryStudioSheet({ open, onClose, data, userName }: StoryStudioS
     const volume = data.workoutSummary.totalVolume;
     const volumeText = volume >= 1000
       ? `${(volume / 1000).toFixed(2)} tons`
-      : `${Math.round(volume).toLocaleString()} kg`;
+      : `${parseFloat(volume.toFixed(1)).toLocaleString()} kg`;
     return [
-      { label: 'Volume', value: volumeText },
-      { label: 'Metcon Time', value: `${Math.round(data.workoutSummary.duration)} min` },
+      { label: 'Lifted', value: volumeText },
+      { label: 'Moved', value: `${Math.round(data.workoutSummary.duration)} min` },
       { label: 'Reps', value: `${data.workoutSummary.totalReps}` },
     ];
   }, [data]);

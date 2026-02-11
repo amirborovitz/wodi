@@ -17,7 +17,7 @@ const typeStyles: Record<WorkoutType, { gradient: string; icon: string; label: s
   for_time: {
     gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
     icon: 'FT',
-    label: 'Metcon Time',
+    label: 'In Motion',
     color: '#FF6B6B',
   },
   amrap: {
@@ -109,7 +109,7 @@ function formatDuration(minutes: number): string {
 function formatVolume(kg: number): string {
   if (kg === 0) return '0';
   if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-  return `${Math.round(kg).toLocaleString()} kg`;
+  return `${parseFloat(kg.toFixed(1)).toLocaleString()} kg`;
 }
 
 export function WorkoutFeedCard({ workout, index, onClick, onDelete, isPR = false }: WorkoutFeedCardProps) {
@@ -180,7 +180,7 @@ export function WorkoutFeedCard({ workout, index, onClick, onDelete, isPR = fals
           <div className={styles.statsRow}>
             {duration > 0 && (
               <div className={styles.stat}>
-                <span className={styles.statIcon}>METCON TIME</span>
+                <span className={styles.statIcon}>IN MOTION</span>
                 <span className={styles.statValue}>{formatDuration(duration)}</span>
               </div>
             )}

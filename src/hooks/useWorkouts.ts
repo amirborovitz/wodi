@@ -136,6 +136,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             scores: data.scores,
             duration: data.duration,
             notes: data.notes,
+            rawText: data.rawText || undefined,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
           };
