@@ -246,9 +246,133 @@
   font-size: 1.75rem;
   font-weight: 700;
   opacity: 0.6;
+  margin-left: 4px;
+  display: inline-block;
+  vertical-align: baseline;
 }
 
-/* ─── Stats Grid (2×2) ─── */
+.heroCardAllTime {
+  box-shadow: 0 0 0 1px rgba(255, 214, 0, 0.18), 0 8px 28px rgba(255, 196, 0, 0.18);
+}
+
+/* ─── Hall of Fame (permanent PR section) ─── */
+.hallOfFame {
+  margin: var(--space-4) var(--space-4) 0;
+  padding: 14px 16px 12px;
+  background: linear-gradient(135deg, rgba(255, 214, 0, 0.06), rgba(255, 138, 0, 0.03));
+  border: 1px solid rgba(255, 214, 0, 0.15);
+  border-radius: 20px;
+}
+
+.hallOfFameHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.hallOfFameHeader:active {
+  opacity: 0.8;
+}
+
+.hallOfFameIcon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFD600;
+  flex-shrink: 0;
+}
+
+.hallOfFameTitle {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex: 1;
+}
+
+.hallOfFameCount {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: rgba(255, 214, 0, 0.6);
+}
+
+.hallOfFameChevron {
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
+
+/* Horizontal scrolling PR badges */
+.prBadgeScroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 2px;
+}
+
+.prBadgeScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.prBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 214, 0, 0.08);
+  border: 1px solid rgba(255, 214, 0, 0.2);
+  border-radius: var(--radius-full, 999px);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.prBadgeMovement {
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.prBadgeWeight {
+  font-size: 13px;
+  font-weight: 800;
+  color: #FFD600;
+}
+
+.hallOfFameEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.hallOfFameEmptyIcon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 214, 0, 0.65);
+}
+
+.hallOfFameEmptyIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hallOfFameEmptyText {
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  letter-spacing: 0.01em;
+}
+
+/* ─── Stats Grid (2×2 + optional New PRs) ─── */
 .statsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -288,8 +412,19 @@
   font-size: 1rem;
   font-weight: 600;
   opacity: 0.6;
+  margin-left: 4px;
+  display: inline-block;
+  vertical-align: baseline;
 }
 
 .statEmpty {
   color: rgba(255, 255, 255, 0.25);
+}
+
+.statValueGold {
+  color: #FFD600;
+}
+
+.statCardPR {
+  border-color: rgba(255, 214, 0, 0.15);
 }

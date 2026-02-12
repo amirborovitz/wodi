@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
+import { usePRs } from '../hooks/usePRs';
 import { calculateMetconMinutes } from '../utils/xpCalculations';
 import styles from './ProfileScreen.module.css';
 
@@ -22,10 +23,11 @@ interface ProfileScreenProps {
   onNavigateToSettings?: () => void;
 }
 
-export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts();
   const weeklyStats = useWeeklyStats();
+  const { prs, loading: prsLoading } = usePRs();
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -52,6 +54,42 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
     return workouts.filter((w) => w.date >= cutoff);
   }, [workouts, timePeriod]);
 
+  // ─── Top lifetime PRs (for Hall of Fame) ───
+  const hallOfFamePRs = useMemo(() => {
+    if (prsLoading || prs.length === 0) return [];
+    const bestByMovement = new Map<string, typeof prs[number]>();
+    prs.forEach((pr) => {
+      const key = pr.movement.toLowerCase().trim();
+      const existing = bestByMovement.get(key);
+      if (!existing || pr.weight > existing.weight) {
+        bestByMovement.set(key, pr);
+      }
+    });
+    return [...bestByMovement.values()]
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 12);
+  }, [prs, prsLoading]);
+
+  // ─── Time-period cutoff (shared) ───
+  const periodCutoff = useMemo(() => {
+    if (timePeriod === 'all') return null;
+    const now = new Date();
+    if (timePeriod === 'week') {
+      const dayOfWeek = now.getDay();
+      const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
+    }
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, [timePeriod]);
+
+  // ─── New PRs hit in current period ───
+  const newPRsInPeriod = useMemo(() => {
+    if (prsLoading || prs.length === 0 || !periodCutoff) return 0;
+    return prs.filter(pr => {
+      return pr.date >= periodCutoff;
+    }).length;
+  }, [prs, prsLoading, periodCutoff]);
+
   // ─── Computed stats ───
   const stats = useMemo(() => {
     const totalVolume = filteredWorkouts.reduce((acc, w) => acc + w.totalVolume, 0);
@@ -77,6 +115,10 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
       totalMetconMinutes,
       totalDistance,
       workoutCount: filteredWorkouts.length,
+      totalDaysActive: new Set(filteredWorkouts.map((w) => {
+        const d = new Date(w.date);
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      })).size,
       intensity,
     };
   }, [filteredWorkouts]);
@@ -115,8 +157,8 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
 
   // ─── Level calculation ───
   const totalWorkouts = user?.stats.totalWorkouts || workouts.length;
-  const totalXP = weeklyStats.weeklyXP + totalWorkouts * 20;
-  const level = Math.floor(totalXP / 500) + 1;
+  const totalEP = weeklyStats.weeklyEP + totalWorkouts * 10;
+  const level = Math.floor(totalEP / 500) + 1;
   const levelTitle = getLevelTitle(level);
 
   // ─── Photo handlers ───
@@ -149,7 +191,7 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
   // ─── Formatters ───
   const formatVolume = (kg: number): { value: string; unit: string } => {
     if (kg >= 1000) {
-      return { value: (kg / 1000).toFixed(1), unit: 't' };
+      return { value: (kg / 1000).toFixed(1), unit: 'tons' };
     }
     return { value: Math.round(kg).toString(), unit: 'kg' };
   };
@@ -162,7 +204,13 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
   };
 
   const formatMinutes = (mins: number): { value: string; unit: string } => {
-    return { value: Math.round(mins).toString(), unit: 'm' };
+    const rounded = Math.round(mins);
+    if (rounded >= 60) {
+      const h = Math.floor(rounded / 60);
+      const m = rounded % 60;
+      return { value: m > 0 ? `${h}h ${m}` : `${h}`, unit: m > 0 ? 'min' : 'hrs' };
+    }
+    return { value: rounded.toString(), unit: 'min' };
   };
 
   // ─── Period slider position ───
@@ -262,6 +310,48 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
         </div>
       </motion.div>
 
+      {/* Hall of Fame — permanent, always visible */}
+      <motion.div
+        className={styles.hallOfFame}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div
+          className={styles.hallOfFameHeader}
+          onClick={onNavigateToPR}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigateToPR?.(); } }}
+        >
+          <div className={styles.hallOfFameIcon}>
+            <TrophyIcon />
+          </div>
+          <span className={styles.hallOfFameTitle}>Hall of Fame</span>
+          <span className={styles.hallOfFameCount}>{prs.length} PR{prs.length !== 1 ? 's' : ''}</span>
+          <div className={styles.hallOfFameChevron}>
+            <ChevronRightIcon />
+          </div>
+        </div>
+        {!prsLoading && hallOfFamePRs.length > 0 ? (
+          <div className={styles.prBadgeScroll}>
+            {hallOfFamePRs.map((pr) => (
+              <div key={pr.id} className={styles.prBadge}>
+                <span className={styles.prBadgeMovement}>{pr.movement}</span>
+                <span className={styles.prBadgeWeight}>{pr.weight}kg</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.hallOfFameEmpty}>
+            <span className={styles.hallOfFameEmptyIcon}>
+              <TrophyIcon />
+            </span>
+            <span className={styles.hallOfFameEmptyText}>Your first PR is waiting...</span>
+          </div>
+        )}
+      </motion.div>
+
       {/* Period Toggle */}
       <div className={styles.periodToggle}>
         <div className={styles.periodSlider} style={sliderStyle} />
@@ -282,7 +372,7 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
       <div className={styles.bentoGrid}>
         {/* Hero: Total Lifted */}
         <motion.div
-          className={styles.heroCard}
+          className={`${styles.heroCard} ${timePeriod === 'all' ? styles.heroCardAllTime : ''}`}
           custom={0}
           initial="hidden"
           animate="visible"
@@ -358,6 +448,35 @@ export function ProfileScreen({ onNavigateToSettings }: ProfileScreenProps) {
               )}
             </span>
           </motion.div>
+
+          {/* New PRs (time-filtered) */}
+          {timePeriod !== 'all' && (
+            <motion.div
+              className={`${styles.statCard} ${styles.statCardPR}`}
+              custom={5}
+              initial="hidden"
+              animate="visible"
+              variants={cardVariants}
+            >
+              <span className={styles.statLabel}>New PRs</span>
+              <span className={`${styles.statValue} ${newPRsInPeriod === 0 ? styles.statEmpty : styles.statValueGold}`}>
+                {newPRsInPeriod > 0 ? newPRsInPeriod : '\u2014'}
+              </span>
+            </motion.div>
+          )}
+
+          {timePeriod === 'all' && (
+            <motion.div
+              className={styles.statCard}
+              custom={5}
+              initial="hidden"
+              animate="visible"
+              variants={cardVariants}
+            >
+              <span className={styles.statLabel}>Total Days Active</span>
+              <span className={styles.statValue}>{stats.totalDaysActive}</span>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
@@ -373,6 +492,27 @@ function getLevelTitle(level: number): string {
   if (level >= 10) return 'Grinder';
   if (level >= 5) return 'Athlete';
   return 'Rookie';
+}
+
+function TrophyIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22" />
+      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22" />
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
 }
 
 function SettingsIcon() {
