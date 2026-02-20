@@ -35,7 +35,7 @@ export function WorkoutSummary({
     if (mins < 60) return `${Math.round(mins)} min`;
     const hours = Math.floor(mins / 60);
     const remainingMins = Math.round(mins % 60);
-    return `${hours}h ${remainingMins}m`;
+    return remainingMins > 0 ? `${hours}h ${remainingMins}min` : `${hours}h`;
   };
 
   const formatVolume = (kg: number) => {

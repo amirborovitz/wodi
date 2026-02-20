@@ -1,6 +1,5 @@
 /* =========================================================================
-   SHARE LAUNCH SHEET v3 -- Segment picker + single dynamic card
-   Bottom sheet: segment pills, single StickerCard, icon action buttons.
+   SHARE LAUNCH SHEET v4 -- Primary CTA + Story Studio
    ========================================================================= */
 
 /* ---------------------------------------------------------------------------
@@ -71,7 +70,7 @@
 .sheetTitle {
   margin: 0;
   font-family: var(--font-family);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--color-text);
   letter-spacing: -0.02em;
@@ -122,17 +121,6 @@
   flex-shrink: 0;
 }
 
-.nativeShareHint {
-  margin: 12px 0 0;
-  width: 100%;
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  font-size: 12px;
-  line-height: 1.4;
-  letter-spacing: 0.01em;
-}
-
 .dot {
   width: 6px;
   height: 6px;
@@ -169,8 +157,74 @@
 }
 
 .cardScaler > * {
-  transform: scale(0.82);
+  transform: scale(0.92);
   transform-origin: center center;
+}
+
+/* ---------------------------------------------------------------------------
+   PRIMARY CTA BUTTON
+   --------------------------------------------------------------------------- */
+.primaryBtn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  background: linear-gradient(135deg, #ff7a18 0%, #ff46b5 52%, #7748ff 100%);
+  border: none;
+  border-radius: var(--radius-lg);
+
+  font-family: var(--font-family);
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: -0.01em;
+
+  cursor: pointer;
+  flex-shrink: 0;
+
+  box-shadow:
+    0 2px 12px rgba(255, 70, 181, 0.35),
+    0 0 24px rgba(119, 72, 255, 0.24);
+
+  transition: transform 0.15s var(--ease-out),
+              box-shadow 0.15s var(--ease-out),
+              opacity 0.15s var(--ease-out);
+}
+
+.primaryBtn:hover {
+  box-shadow:
+    0 2px 16px rgba(255, 70, 181, 0.45),
+    0 0 32px rgba(119, 72, 255, 0.28);
+}
+
+.primaryBtn:active {
+  transform: scale(0.97);
+}
+
+.primaryBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+
+.primaryBtnDone {
+  background: linear-gradient(135deg, #00D4AA 0%, #00E5B8 100%);
+  box-shadow:
+    0 2px 12px rgba(0, 212, 170, 0.3),
+    0 0 24px rgba(0, 212, 170, 0.15);
+}
+
+.shareHint {
+  margin: 12px 0 0;
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  opacity: 0.92;
 }
 
 /* ---------------------------------------------------------------------------
@@ -179,9 +233,10 @@
 .iconRow {
   display: flex;
   justify-content: center;
-  gap: 28px;
-  margin-top: 20px;
+  gap: 18px;
+  margin-top: 14px;
   flex-shrink: 0;
+  width: 100%;
 }
 
 .iconBtn {
@@ -211,8 +266,8 @@
 }
 
 .iconBtnCircle {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -243,7 +298,10 @@
   font-weight: 500;
   color: var(--color-text-secondary);
   letter-spacing: 0.02em;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: 62px;
+  text-align: center;
+  line-height: 1.2;
 }
 
 /* ---------------------------------------------------------------------------
@@ -251,7 +309,7 @@
    --------------------------------------------------------------------------- */
 .doneBtn {
   width: 100%;
-  margin-top: 20px;
+  margin-top: 12px;
   padding: 13px;
   background: rgba(255, 255, 255, 0.08);
   border: none;
@@ -278,64 +336,6 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-.captureBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: calc(var(--z-modal) + 2);
-}
-
-.captureView {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-modal) + 3);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
-  gap: 12px;
-}
-
-.captureCloseBtn {
-  align-self: flex-end;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  color: var(--color-text);
-  font-family: var(--font-family);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 12px;
-}
-
-.captureCardWrap {
-  width: min(92vw, 360px);
-  display: flex;
-  justify-content: center;
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.55));
-}
-
-.captureHint {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-/* ---------------------------------------------------------------------------
-   HIDDEN EXPORT TARGET
-   --------------------------------------------------------------------------- */
-.exportTarget {
-  position: fixed;
-  left: -9999px;
-  top: 0;
-  width: 360px;
-  pointer-events: none;
-  opacity: 0;
-}
-
 /* ---------------------------------------------------------------------------
    RESPONSIVE
    --------------------------------------------------------------------------- */
@@ -349,16 +349,16 @@
   }
 
   .cardScaler > * {
-    transform: scale(0.72);
+    transform: scale(0.80);
   }
 
   .iconRow {
-    gap: 18px;
+    gap: 12px;
   }
 
   .iconBtnCircle {
-    width: 44px;
-    height: 44px;
+    width: 46px;
+    height: 46px;
   }
 
   .iconBtnLabel {
@@ -366,6 +366,11 @@
   }
 
   .sheetTitle {
-    font-size: 18px;
+    font-size: 21px;
+  }
+
+  .primaryBtn {
+    font-size: 15px;
+    padding: 12px;
   }
 }

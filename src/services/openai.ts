@@ -377,16 +377,59 @@ Output:
   }]
 }
 
+## BUY-IN / BUY-OUT (CRITICAL — movements done once, NOT per round)
+Some workouts have movements done ONCE before or after the main rounds. These are NOT part of the rounds.
+Common terms: "buy-in", "buy in", "buyin", "cash in", "cash out", "buy-out", "buyout", "into X rounds ... into", "then", "finish with".
+Structure: Create SEPARATE exercises for buy-in and buy-out movements (suggestedSets: 1, NOT multiplied by rounds).
+IMPORTANT: Name buy-in exercises "Buy-In: ..." and buy-out exercises "Buy-Out: ..." to distinguish them.
+The buy-in and buy-out can be ANY movement type — distance (runs), reps (pull-ups, burpees), calories, etc.
+"RFT" = "Rounds For Time" — the same as "rounds" but format must be "for_time".
+
+Input: "For Time: 600m Run (buy in), 8 RFT: 8 Push Press 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run"
+Output:
+{
+  "type": "for_time",
+  "format": "for_time",
+  "scoreType": "time",
+  "exercises": [
+    {
+      "name": "Buy-In: 600m Run",
+      "type": "wod",
+      "prescription": "600m Run",
+      "suggestedSets": 1,
+      "movements": [{ "name": "Run", "distance": 600, "unit": "m" }]
+    },
+    {
+      "name": "8 Rounds For Time",
+      "type": "wod",
+      "prescription": "8 Push Press 40/50kg, 8 TTB, 8 KB Swings 24/16kg",
+      "suggestedSets": 8,
+      "movements": [
+        { "name": "Push Press", "reps": 8, "rxWeights": { "male": 50, "female": 40, "unit": "kg" } },
+        { "name": "Toes to Bar", "reps": 8 },
+        { "name": "Kettlebell Swing", "reps": 8, "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
+      ]
+    },
+    {
+      "name": "Buy-Out: 600m Run",
+      "type": "wod",
+      "prescription": "600m Run",
+      "suggestedSets": 1,
+      "movements": [{ "name": "Run", "distance": 600, "unit": "m" }]
+    }
+  ]
+}
+
 ## RULES
-1. Keep round-based WODs as ONE exercise with movements array
-2. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon)
+1. Keep round-based WODs as ONE exercise with movements array (but separate buy-in/buy-out into their own exercises)
+2. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Buy-in/Buy-out)
 3. Always include "format" and "scoreType" fields
 4. Parse weight notation into rxWeights object
 5. Use canonical movement names
 6. IMPORTANT: Exercise name MUST include set count and interval timing (e.g., "8 sets every 2:30" or "5 Sets For Time")
 7. SETS x REPS PARSING: "AxB" means A sets of B reps (e.g., "5x3" = suggestedSets:5, suggestedReps:3; "3x10" = suggestedSets:3, suggestedReps:10)
 8. If the workout has titled sections (e.g., "Cycle 1 - Push", "Superset x3", "Medium Metcon - Interval"), treat each as a separate exercise block.
-9. Do not duplicate exercises; each block should appear once.
+9. Do not duplicate exercises; each block should appear once (except buy-in/buy-out — a 600m Run buy-in and 600m Run buy-out are TWO separate exercises, not duplicates).
 10. MULTI-BLOCK WORKOUTS: When a workout has multiple distinct sections (Cycle, Strength, Superset, Metcon, Finisher, etc.), create a SEPARATE exercise for EACH block. Never merge or skip blocks. Count the blocks in the input and ensure your output has the same number of exercises.
 11. IMPLIED SUPERSETS: When you see "N sets: exercise1 exercise2" or "N sets of exercise1, exercise2" (multiple exercises under one set count), treat it as a superset. Name it "Superset: exercise1 + exercise2" and include both in movements array with their reps. Example: "3 sets: 10/10 powell raises 10/10 external rotation" becomes a superset with 2 movements, each with reps:10.
 
@@ -516,6 +559,7 @@ Return ONLY valid JSON in this schema:
 
 Rules:
 - Keep round-based WODs as ONE exercise with movements array unless clearly multiple blocks.
+- BUY-IN / BUY-OUT: Movements done once before/after rounds (buy-in, cash in, buy-out, cash out, "into X rounds into", "then", "finish with") must be SEPARATE exercises with suggestedSets: 1. They are NOT part of the rounds. Name them "Buy-In: ..." and "Buy-Out: ..." respectively. A buy-in and buy-out with the same movement (e.g., two 600m Runs) are NOT duplicates — keep both.
 - If the text defines a benchmark (e.g., "Cindy = 5/10/15"), use that definition.
 - If multiple blocks exist (e.g., "Cindy + DT + Cash-out"), split into separate exercises.
 - Preserve all titled sections (Cycle, Superset, Metcon, Interval, etc.) as distinct exercises.
@@ -704,19 +748,18 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
 
   const rawText = typeof raw.rawText === 'string' ? raw.rawText : undefined;
 
-  // Global deduplication - check all pairs, not just consecutive
-  const seen = new Map<string, number>(); // key -> first index
+  // Consecutive deduplication only — remove back-to-back identical exercises
+  // (Global dedup was killing buy-out exercises that match buy-in)
   const dedupedExercises = exercises.filter((exercise, index) => {
-    const key = `${exercise.name}|${exercise.prescription}|${exercise.suggestedSets}|${exercise.suggestedReps}`;
-    if (seen.has(key)) {
-      // It's a duplicate - only keep if movements differ
-      const firstIndex = seen.get(key)!;
-      const firstMovements = JSON.stringify(exercises[firstIndex].movements || []);
-      const currentMovements = JSON.stringify(exercise.movements || []);
-      return firstMovements !== currentMovements;
-    }
-    seen.set(key, index);
-    return true;
+    if (index === 0) return true;
+    const prev = exercises[index - 1];
+    const sameKey = exercise.name === prev.name
+      && exercise.prescription === prev.prescription
+      && exercise.suggestedSets === prev.suggestedSets
+      && exercise.suggestedReps === prev.suggestedReps;
+    if (!sameKey) return true;
+    // Same key — check movements
+    return JSON.stringify(exercise.movements || []) !== JSON.stringify(prev.movements || []);
   });
 
   return {

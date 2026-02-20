@@ -561,17 +561,41 @@
 
 .progressFill {
   height: 100%;
-  background: var(--color-sessions);
+  background: linear-gradient(90deg, var(--neon-cyan) 0%, var(--neon-magenta) 60%, var(--neon-yellow) 100%);
+  background-size: 200% 100%;
   border-radius: var(--radius-full);
-  transition: width var(--duration-slow) var(--ease-out);
+  transition: width var(--duration-slow) var(--ease-out),
+              background-position var(--duration-slow) var(--ease-out),
+              box-shadow var(--duration-slow) var(--ease-out);
   box-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+}
+
+/* Shift gradient based on progress via inline style data attribute */
+.progressFillEarly {
+  background-position: 100% 0;
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+}
+
+.progressFillMid {
+  background-position: 50% 0;
+  box-shadow: 0 0 8px rgba(255, 0, 229, 0.4);
+}
+
+.progressFillLate {
+  background-position: 0% 0;
+  box-shadow: 0 0 10px rgba(255, 214, 0, 0.5);
 }
 
 .exerciseCard {
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: var(--space-4);
   overflow: hidden;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .exerciseHeader {
@@ -584,7 +608,7 @@
 
 .exerciseName {
   font-size: var(--text-lg);
-  font-weight: var(--font-bold);
+  font-weight: var(--font-semibold);
   color: var(--color-text);
   margin: 0 0 var(--space-1) 0;
   overflow: hidden;
@@ -598,7 +622,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--color-sessions);
-  margin: 0 0 12px 0;
+  margin: 0 0 var(--space-3) 0;
 }
 
 .setsContainer {
@@ -612,9 +636,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: var(--glass-bg);
+  background: transparent;
   border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
+  border: none;
 }
 
 .setNumber {
@@ -633,35 +657,41 @@
 .inputGroup {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
 }
 
 .inputGroup label {
   font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+  order: 1;
 }
 
 .setInput {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.05);
+  padding: var(--space-2) var(--space-2);
+  background: transparent;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   font-size: var(--text-md);
   font-family: var(--font-mono);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
 }
 
 .setInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
 }
 
 .setInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .addSetButton {
@@ -686,8 +716,8 @@
   align-items: center;
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background: var(--glass-bg);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--glass-border);
 }
 
@@ -732,16 +762,12 @@
   display: flex;
   gap: var(--space-3);
   margin-top: var(--space-4);
-  padding: var(--space-3) 0 calc(var(--space-4) + var(--safe-bottom)) 0;
+  padding: var(--space-4) var(--space-4) calc(var(--space-5) + var(--safe-bottom));
   position: sticky;
   bottom: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(10, 10, 10, 0) 0%,
-    rgba(10, 10, 10, 0.75) 45%,
-    rgba(10, 10, 10, 0.9) 100%
-  );
-  backdrop-filter: blur(8px);
+  backdrop-filter: var(--glass-blur-heavy);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  background: rgba(10, 10, 10, 0.5);
 }
 
 .wizardActions > * {
@@ -777,10 +803,10 @@
   justify-content: center;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-5);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--glass-shadow);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 999px;
+  box-shadow: none;
   margin-top: var(--space-4);
 }
 
@@ -812,7 +838,7 @@
 }
 
 .timePillInput::placeholder {
-  color: rgba(0, 242, 255, 0.4);
+  color: rgba(255, 255, 255, 0.2);
 }
 
 .timePillUnit {
@@ -835,8 +861,8 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4);
-  background: var(--glass-bg);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--glass-border);
   margin-bottom: var(--space-4);
 }
@@ -916,18 +942,19 @@
 .distanceInput {
   width: 80px;
   padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   font-size: var(--text-md);
   font-family: var(--font-mono);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
 }
 
 .distanceInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
 }
 
 .distanceUnit {
@@ -991,9 +1018,9 @@
 .roundsInput {
   width: 120px;
   padding: var(--space-4);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   font-size: var(--text-2xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
@@ -1003,12 +1030,12 @@
 
 .roundsInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
 }
 
 .roundsInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
   font-size: var(--text-lg);
 }
 
@@ -1024,7 +1051,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-4) 0;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .weightInputRow {
@@ -1036,24 +1063,24 @@
 .weightInput {
   width: 80px;
   padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   font-size: var(--text-lg);
   font-family: var(--font-mono);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
 }
 
 .weightInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
 }
 
 .weightInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .weightUnit {
@@ -1082,9 +1109,6 @@
   max-height: 300px;
   overflow-y: auto;
   padding: var(--space-2);
-  background: var(--glass-bg);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
 }
 
 .intervalSetRow {
@@ -1092,9 +1116,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
-  background: rgba(8, 8, 12, 0.8);
+  background: transparent;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
+  border: none;
 }
 
 .intervalSetNumber {
@@ -1114,24 +1138,24 @@
 .intervalSetTimeInput {
   width: 50px;
   padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   font-size: var(--text-md);
   font-family: var(--font-mono);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
 }
 
 .intervalSetTimeInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
 }
 
 .intervalSetTimeInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .intervalSetTimeSeparator {
@@ -1146,10 +1170,12 @@
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--glass-bg);
-  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-xl);
   margin-bottom: var(--space-4);
   border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur-heavy);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
 }
 
 .weightHint {
@@ -1176,9 +1202,9 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3);
-  background: rgba(8, 8, 12, 0.8);
+  background: transparent;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
+  border: none;
 }
 
 .movementWeightName {
@@ -1192,30 +1218,31 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
 }
 
 .movementWeightInput {
-  width: 70px;
-  padding: var(--space-2) var(--space-3);
-  background: rgba(255, 255, 255, 0.05);
+  width: 60px;
+  padding: var(--space-2);
+  background: transparent;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
   font-size: var(--text-md);
   font-family: var(--font-mono);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
 }
 
 .movementWeightInput:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .movementWeightInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .movementRxHint {
@@ -1252,9 +1279,9 @@
 .saveButton {
   width: 100%;
   padding: var(--space-4) var(--space-6);
-  background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%);
+  background: linear-gradient(135deg, #FF6B35 0%, #FF3366 50%, #FF0080 100%) !important;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: 999px;
   color: #000;
   font-size: var(--text-md);
   font-weight: var(--font-bold);
@@ -1263,11 +1290,12 @@
   letter-spacing: var(--tracking-wide);
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-out);
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 24px rgba(255, 51, 102, 0.4);
 }
 
 .saveButton:hover {
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 4px 32px rgba(255, 51, 102, 0.6);
   transform: translateY(-1px);
 }
 
@@ -1365,17 +1393,20 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.strengthSetCard:last-child {
+  border-bottom: none;
 }
 
 .strengthSetLabel {
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
+  font-variant: small-caps;
 }
 
 .strengthSetInputs {
@@ -1387,17 +1418,20 @@
 
 .strengthSetField {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
 }
 
 .strengthSetInput {
-  width: 80px;
-  padding: var(--space-3);
-  background: var(--color-surface-2);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  width: 64px;
+  padding: var(--space-2);
+  background: transparent;
+  border: none;
+  border-radius: 0;
   font-size: var(--text-xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
@@ -1407,27 +1441,24 @@
 
 .strengthSetInput:focus {
   outline: none;
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
 }
 
 .strengthSetInput::placeholder {
-  color: var(--color-text-secondary);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .strengthSetUnit {
   font-size: var(--text-xs);
-  color: var(--color-text-secondary);
+  color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
 }
 
 .strengthSetSeparator {
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: var(--font-bold);
-  color: var(--color-text-muted);
-  padding-top: var(--space-3);
+  color: rgba(255, 255, 255, 0.25);
   line-height: 1;
 }
 
@@ -1469,15 +1500,31 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.supersetMovementRow:last-child {
+  border-bottom: none;
+}
+
+.supersetMovementHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .supersetMovementName {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
+
+.supersetPrescriptionHint {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
 }
 
 .supersetInputs {
@@ -1486,26 +1533,40 @@
   gap: var(--space-2);
 }
 
+.supersetInputPill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-3);
+}
+
 .supersetInput {
-  width: 60px;
-  padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-primary);
+  width: 52px;
+  padding: var(--space-1);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text);
   font-size: var(--text-base);
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
   text-align: center;
 }
 
 .supersetInput:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+}
+
+.supersetInput::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
 .supersetInputLabel {
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ─── EMOM Logging UI ─── */
@@ -1519,61 +1580,29 @@
 }
 
 .emomPhaseBlock {
-  padding: 0 var(--space-2) var(--space-2);
+  position: relative;
+  padding: var(--space-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.emomPhaseBlock:last-child {
+  border-bottom: none;
 }
 
 .emomPhaseBlock + .emomPhaseBlock {
-  margin-top: var(--space-2);
+  padding-top: var(--space-3);
 }
 
 .emomPhaseHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-3);
-  margin-bottom: var(--space-1);
-  font-size: 0.6875rem;
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-sessions);
+  color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid rgba(0, 242, 255, 0.1);
-}
-
-.emomImplementPills {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-}
-
-.emomImplementType {
-  font-size: 10px;
-  font-weight: var(--font-semibold);
-  color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-right: var(--space-1);
-}
-
-.emomImplementPill {
-  height: 30px;
-  padding: 4px 14px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-  font-weight: var(--font-bold);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-text-tertiary);
-  border: none;
-  cursor: pointer;
-  transition: all var(--duration-fast) ease;
-  line-height: 1;
-}
-
-.emomImplementPillActive {
-  background: var(--color-sessions);
-  color: var(--color-bg);
+  letter-spacing: 0.08em;
 }
 
 .emomCollapsedWeight {
@@ -1584,13 +1613,13 @@
 }
 
 .emomWeightLabel {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   font-weight: var(--font-medium);
 }
 
 .emomWeightSummary {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   padding: 0 var(--space-3);
   margin-top: var(--space-1);
@@ -1602,7 +1631,7 @@
   background: none;
   border: none;
   color: var(--color-sessions);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: var(--font-medium);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
@@ -1614,7 +1643,7 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-2) var(--space-3);
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: var(--color-text-secondary);
 }
@@ -1652,33 +1681,32 @@
 .emomWeightInput {
   width: 72px;
   padding: var(--space-2);
-  background: var(--color-surface-2);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 999px;
   font-size: var(--text-sm);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
-  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+  transition: box-shadow var(--duration-fast) ease;
   -webkit-appearance: none;
   -moz-appearance: textfield;
 }
 
 .emomWeightInput:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.2), 0 0 12px rgba(0, 242, 255, 0.1);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
 }
 
 .emomWeightInput::placeholder {
-  color: var(--color-text-tertiary);
+  color: rgba(255, 255, 255, 0.2);
   font-weight: var(--font-normal);
-  opacity: 0.6;
+  opacity: 1;
 }
 
 .emomWeightUnit {
-  font-size: 0.6875rem;
+  font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-text-tertiary);
   text-transform: uppercase;

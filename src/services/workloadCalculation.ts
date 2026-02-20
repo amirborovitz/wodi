@@ -1,4 +1,5 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
+import { isWeightedCarry } from '../utils/xpCalculations';
 
 /**
  * Trinity Color Assignment Rules:
@@ -121,6 +122,7 @@ export function calculateWorkloadBreakdown(
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
   let grandTotalDistance = 0;
+  let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
   for (const exercise of workout.exercises) {
@@ -176,6 +178,7 @@ export function calculateWorkloadBreakdown(
             weight,
             unit,
             color,
+            distancePerRep: (movement.distance || 0) > 0 ? (movement.distance || 0) : undefined,
           });
         }
 
@@ -186,6 +189,9 @@ export function calculateWorkloadBreakdown(
         }
         if (distance > 0) {
           grandTotalDistance += distance;
+          if ((weight && weight > 0) || isWeightedCarry(movement.name)) {
+            grandTotalWeightedDistance += distance;
+          }
         }
         if (calories > 0) {
           grandTotalCalories += calories;
@@ -237,11 +243,20 @@ export function calculateWorkloadBreakdown(
       return (b.totalReps || 0) - (a.totalReps || 0);
     });
 
+  // Derive volume from final movements for consistency with display
+  const derivedVolume = movements.reduce((sum, m) => {
+    if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
+      return sum + m.weight * m.totalReps;
+    }
+    return sum;
+  }, 0);
+
   return {
     movements,
     grandTotalReps,
-    grandTotalVolume: Math.round(grandTotalVolume),
+    grandTotalVolume: Math.round(derivedVolume),
     grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
+    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: workout.containerRounds,
     benchmarkName: workout.benchmarkName,
@@ -269,6 +284,7 @@ export function calculateWorkloadFromExercises(
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
   let grandTotalDistance = 0;
+  let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
   for (const exercise of exercises) {
@@ -329,6 +345,9 @@ export function calculateWorkloadFromExercises(
     }
     if (exerciseDistance > 0) {
       grandTotalDistance += exerciseDistance;
+      if ((exerciseWeight && exerciseWeight > 0) || isWeightedCarry(exercise.name)) {
+        grandTotalWeightedDistance += exerciseDistance;
+      }
     }
     if (exerciseCalories > 0) {
       grandTotalCalories += exerciseCalories;
@@ -349,11 +368,20 @@ export function calculateWorkloadFromExercises(
       return (b.totalReps || 0) - (a.totalReps || 0);
     });
 
+  // Derive volume from final movements for consistency with display
+  const derivedVolume = movements.reduce((sum, m) => {
+    if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
+      return sum + m.weight * m.totalReps;
+    }
+    return sum;
+  }, 0);
+
   return {
     movements,
     grandTotalReps: Math.round(grandTotalReps * factor),
-    grandTotalVolume: Math.round(grandTotalVolume * factor),
+    grandTotalVolume: Math.round(derivedVolume),
     grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance * factor) : undefined,
+    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance * factor) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
     containerRounds,
   };

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import type { PanInfo } from 'framer-motion';
 import type { WorkloadBreakdown as WorkloadBreakdownType, MovementTotal } from '../../types';
+import { isWeightedCarry } from '../../utils/xpCalculations';
 import styles from './WorkloadBreakdown.module.css';
 
 interface WorkloadBreakdownProps {
@@ -10,6 +11,7 @@ interface WorkloadBreakdownProps {
   editable?: boolean;
   onEditMovement?: (movement: MovementTotal) => void;
   onDeleteMovement?: (movementName: string) => void;
+  prMovements?: Set<string>;
 }
 
 /**
@@ -34,9 +36,13 @@ function displayName(name: string): string {
 }
 
 /**
- * Categorize a movement for highlight color.
+ * Movement categories:
+ * gold = Weightlifting/Barbell
+ * cyan = Monostructural/Cardio
+ * pink = Gymnastics/Bodyweight
+ * neutral = fallback
  */
-type TileCategory = 'gold' | 'cyan' | 'neutral';
+type TileCategory = 'gold' | 'cyan' | 'pink' | 'neutral';
 
 const STRENGTH_PATTERNS = [
   'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
@@ -48,13 +54,26 @@ const CARDIO_PATTERNS = [
   'run', 'bike', 'ski', 'swim', 'burpee', 'double under', 'single under',
 ];
 
+const GYMNASTICS_PATTERNS = [
+  'pull-up', 'pullup', 'pull up', 'push-up', 'pushup', 'push up',
+  'toes to bar', 'toes-to-bar', 't2b', 'ttb',
+  'muscle-up', 'muscle up', 'ring', 'handstand', 'hspu', 'hspd',
+  'pistol', 'dip', 'sit-up', 'situp', 'sit up', 'v-up', 'vup',
+  'box jump', 'rope climb', 'knees to elbow', 'k2e',
+  'chest to bar', 'c2b', 'ctb', 'bar muscle',
+];
+
 function categorizeMovement(mov: MovementTotal): TileCategory {
   const lower = mov.name.toLowerCase();
+  // Weighted → gold
   if (mov.weight && mov.weight > 0) return 'gold';
   if (STRENGTH_PATTERNS.some(p => lower.includes(p))) return 'gold';
+  // Cardio/distance
   if (mov.totalDistance && mov.totalDistance > 0) return 'cyan';
   if (mov.totalCalories && mov.totalCalories > 0) return 'cyan';
   if (CARDIO_PATTERNS.some(p => lower.includes(p))) return 'cyan';
+  // Gymnastics/bodyweight
+  if (GYMNASTICS_PATTERNS.some(p => lower.includes(p))) return 'pink';
   return 'neutral';
 }
 
@@ -73,57 +92,58 @@ function impactScore(mov: MovementTotal): number {
 
 /**
  * Build stat segments for a movement row.
- * Number+unit are glued into a single string (e.g. "40 reps", "@ 50kg", "200m").
+ * Each segment has separate `number` and `text` parts for styling.
+ * Uses pipe "|" separator. No "@" symbol.
  */
-function buildStatSegments(movement: MovementTotal): { text: string }[] {
-  const segments: { text: string }[] = [];
+function buildStatSegments(movement: MovementTotal): { number: string; text: string }[] {
+  const segments: { number: string; text: string }[] = [];
 
   // Reps
   if (movement.totalReps && movement.totalReps > 0) {
-    segments.push({ text: `${movement.totalReps} reps` });
+    segments.push({ number: `${movement.totalReps}`, text: ' reps' });
   }
 
-  // Weight / progression
+  // Weight / progression — clean format, no "@"
   if (movement.weightProgression && movement.weightProgression.length > 1) {
     const weights = movement.weightProgression;
     const unit = movement.unit === 'lb' ? 'lb' : 'kg';
     if (weights.every(w => w === weights[0])) {
-      segments.push({ text: `@ ${weights[0]}${unit}` });
+      segments.push({ number: `${weights[0]}`, text: ` ${unit}` });
     } else {
       const deduped = weights.filter((w, i, arr) => i === 0 || w !== arr[i - 1]);
       if (deduped.length > 4) {
-        segments.push({ text: `${Math.min(...deduped)}\u2013${Math.max(...deduped)}${unit}` });
+        segments.push({ number: `${Math.min(...deduped)}\u2013${Math.max(...deduped)}`, text: ` ${unit}` });
       } else {
-        segments.push({ text: `${deduped.join('\u2192')}${unit}` });
+        segments.push({ number: `${deduped.join('\u2192')}`, text: ` ${unit}` });
       }
     }
   } else if (movement.weight && movement.weight > 0) {
     const unit = movement.unit === 'lb' ? 'lb' : 'kg';
     if (movement.implementCount && movement.implementCount > 1) {
       const perImplement = parseFloat((movement.weight / movement.implementCount).toFixed(1));
-      segments.push({ text: `@ ${movement.implementCount}x ${perImplement}${unit}` });
+      segments.push({ number: `${movement.implementCount}x ${perImplement}`, text: ` ${unit}` });
     } else {
-      segments.push({ text: `@ ${movement.weight}${unit}` });
+      segments.push({ number: `${movement.weight}`, text: ` ${unit}` });
     }
   }
 
   // Distance
   if (movement.totalDistance && movement.totalDistance > 0) {
     if (movement.totalDistance >= 1000) {
-      segments.push({ text: `${(movement.totalDistance / 1000).toFixed(1)}km` });
+      segments.push({ number: `${(movement.totalDistance / 1000).toFixed(1)}`, text: ' km' });
     } else {
-      segments.push({ text: `${movement.totalDistance}m` });
+      segments.push({ number: `${movement.totalDistance}`, text: ' m' });
     }
   }
 
   // Time
   if (movement.totalTime && movement.totalTime > 0) {
-    segments.push({ text: formatTime(movement.totalTime) });
+    segments.push({ number: formatTime(movement.totalTime), text: '' });
   }
 
   // Calories
   if (movement.totalCalories && movement.totalCalories > 0) {
-    segments.push({ text: `${movement.totalCalories} cal` });
+    segments.push({ number: `${movement.totalCalories}`, text: ' cal' });
   }
 
   return segments;
@@ -155,6 +175,7 @@ function MovementRow({
   onDelete,
   highlighted,
   category,
+  isPR,
 }: {
   movement: MovementTotal;
   editable: boolean;
@@ -162,6 +183,7 @@ function MovementRow({
   onDelete?: () => void;
   highlighted: boolean;
   category: TileCategory;
+  isPR?: boolean;
 }) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [-100, -50], [1, 0]);
@@ -214,7 +236,7 @@ function MovementRow({
       )}
 
       <motion.div
-        className={`${styles.movementRow} ${highlightClass} ${editable ? styles.editable : ''}`}
+        className={`${styles.movementRow} ${highlightClass} ${editable ? styles.editable : ''} ${isPR ? styles.prRow : ''}`}
         style={{ x, scale }}
         drag={editable ? 'x' : false}
         dragConstraints={{ left: -100, right: 100 }}
@@ -224,14 +246,24 @@ function MovementRow({
         onClick={handleTap}
         whileTap={editable ? { scale: 0.98 } : undefined}
       >
-        <span className={styles.movementName}>{displayName(movement.name)}</span>
+        <span className={styles.movementName}>
+          {displayName(movement.name)}
+          {isPR && <span className={styles.prBadge}>PR</span>}
+          {isWeightedCarry(movement.name) && movement.weight && movement.weight > 0 && (
+            <span className={styles.carryBadge}>HEAVY CARRY</span>
+          )}
+          {!isWeightedCarry(movement.name) && movement.weight && movement.weight > 0 && movement.totalDistance && movement.totalDistance > 0 && (
+            <span className={styles.carryBadge}>WEIGHTED</span>
+          )}
+        </span>
         {segments.length > 0 && (
           <div className={styles.movementStats}>
             {segments.map((seg, i) => (
               <span key={i}>
-                {i > 0 && <span className={styles.statSeparator}>{'\u00b7'} </span>}
+                {i > 0 && <span className={styles.statSeparator}>|</span>}
                 <span className={styles.statSegment}>
-                  {seg.text}
+                  <span className={styles.statNumber}>{seg.number}</span>
+                  <span className={styles.statText}>{seg.text}</span>
                 </span>
               </span>
             ))}
@@ -255,6 +287,7 @@ export function WorkloadBreakdown({
   editable = false,
   onEditMovement,
   onDeleteMovement,
+  prMovements,
 }: WorkloadBreakdownProps) {
   if (!breakdown.movements || breakdown.movements.length === 0) {
     return null;
@@ -308,6 +341,7 @@ export function WorkloadBreakdown({
               onDelete={() => onDeleteMovement?.(movement.name)}
               highlighted={highlightedNames.has(movement.name)}
               category={categorizeMovement(movement)}
+              isPR={prMovements?.has(movement.name.toLowerCase())}
             />
           </motion.div>
         ))}

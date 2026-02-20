@@ -71,6 +71,77 @@ export async function detectBestAchievement(
 }
 
 /**
+ * PR-eligible movement patterns — only barbell/major lifts.
+ * Accessory movements (step-ups, lunges with plate, weighted runs) get
+ * weight inputs for logging but are NOT PR-worthy.
+ */
+const PR_ELIGIBLE_PATTERNS = [
+  'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press',
+  'thruster', 'row',  // barbell row
+  'bench', 'curl',
+];
+
+const PR_EXCLUDED_PATTERNS = [
+  'step-up', 'step up', 'stepup', 'box step',
+  'lunge', 'walking',
+  'run', 'carry', 'farmer', 'sled', 'suitcase', 'yoke', 'ruck',
+  'shuttle', 'bike', 'ski', 'swim',
+  'push-up', 'pushup', 'pull-up', 'pullup', 'sit-up', 'situp',
+  'burpee', 'double under', 'single under',
+];
+
+function isPREligible(movementName: string): boolean {
+  const lower = movementName.toLowerCase();
+  if (PR_EXCLUDED_PATTERNS.some(p => lower.includes(p))) return false;
+  return PR_ELIGIBLE_PATTERNS.some(p => lower.includes(p));
+}
+
+/**
+ * Extract weighted movement candidates from an exercise.
+ * For WODs with a movements array, returns individual movement names + weights.
+ * For simple strength exercises, returns the exercise name + max set weight.
+ * Only returns PR-eligible movements (barbell lifts, not accessories).
+ */
+function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight: number }> {
+  // If exercise has individual movements (WODs, AMRAPs, etc.), use those
+  if (exercise.movements && exercise.movements.length > 0) {
+    const candidates: Array<{ name: string; weight: number }> = [];
+    for (const m of exercise.movements) {
+      const w = m.rxWeights?.male ?? m.rxWeights?.female ?? 0;
+      if (w > 0 && isPREligible(m.name)) {
+        candidates.push({ name: m.name, weight: w });
+      }
+    }
+    // If we found weighted movements, use them
+    if (candidates.length > 0) {
+      // If there's exactly one weighted movement, prefer the max set weight
+      // (the user may have scaled up/down from rx)
+      if (candidates.length === 1) {
+        let maxSetWeight = 0;
+        for (const set of exercise.sets) {
+          if (set.weight && set.weight > maxSetWeight) maxSetWeight = set.weight;
+        }
+        if (maxSetWeight > 0) {
+          candidates[0].weight = maxSetWeight;
+        }
+      }
+      return candidates;
+    }
+  }
+
+  // Fallback: simple exercise — use exercise name + max set weight
+  if (!isPREligible(exercise.name)) return [];
+  let bestWeight = 0;
+  for (const set of exercise.sets) {
+    if (set.weight && set.weight > bestWeight) bestWeight = set.weight;
+  }
+  if (bestWeight > 0) {
+    return [{ name: exercise.name, weight: bestWeight }];
+  }
+  return [];
+}
+
+/**
  * Detect PRs from the workout exercises
  */
 function detectPRs(
@@ -80,41 +151,28 @@ function detectPRs(
   const achievements: Achievement[] = [];
 
   for (const exercise of exercises) {
-    // Find best lift in this workout for this movement
-    let bestWeight = 0;
-    let bestReps = 0;
+    const candidates = getWeightedMovements(exercise);
 
-    for (const set of exercise.sets) {
-      if (set.weight && set.actualReps && set.completed) {
-        if (set.weight > bestWeight ||
-            (set.weight === bestWeight && (set.actualReps || 0) > bestReps)) {
-          bestWeight = set.weight;
-          bestReps = set.actualReps || 0;
-        }
+    for (const { name: movementName, weight: bestWeight } of candidates) {
+      const existingPR = allTimeRecords.find(
+        pr => pr.movement.toLowerCase() === movementName.toLowerCase()
+      );
+
+      if (!existingPR || bestWeight > existingPR.weight) {
+        const improvement = existingPR ? bestWeight - existingPR.weight : 0;
+
+        achievements.push({
+          type: 'pr',
+          title: existingPR ? 'New PR!' : 'First PR!',
+          subtitle: existingPR
+            ? `${bestWeight}kg ${movementName} (+${improvement}kg)`
+            : `${bestWeight}kg ${movementName}`,
+          movement: movementName,
+          value: bestWeight,
+          previousBest: existingPR?.weight,
+          icon: 'trophy',
+        });
       }
-    }
-
-    if (bestWeight === 0) continue;
-
-    // Check against all-time records
-    const existingPR = allTimeRecords.find(
-      pr => pr.movement.toLowerCase() === exercise.name.toLowerCase()
-    );
-
-    if (!existingPR || bestWeight > existingPR.weight) {
-      const improvement = existingPR ? bestWeight - existingPR.weight : 0;
-
-      achievements.push({
-        type: 'pr',
-        title: existingPR ? 'New PR!' : 'First PR!',
-        subtitle: existingPR
-          ? `${bestWeight}kg ${exercise.name} (+${improvement}kg)`
-          : `${bestWeight}kg ${exercise.name}`,
-        movement: exercise.name,
-        value: bestWeight,
-        previousBest: existingPR?.weight,
-        icon: 'trophy',
-      });
     }
   }
 
@@ -256,28 +314,22 @@ export function extractNewPRs(
   const newPRs: PersonalRecord[] = [];
 
   for (const exercise of workout.exercises) {
-    let bestWeight = 0;
+    const candidates = getWeightedMovements(exercise);
 
-    for (const set of exercise.sets) {
-      if (set.weight && set.completed && set.weight > bestWeight) {
-        bestWeight = set.weight;
+    for (const { name: movementName, weight: bestWeight } of candidates) {
+      const existingPR = existingPRs.find(
+        pr => pr.movement.toLowerCase() === movementName.toLowerCase()
+      );
+
+      if (!existingPR || bestWeight > existingPR.weight) {
+        newPRs.push({
+          id: `${workout.id}-${movementName}`,
+          movement: movementName,
+          weight: bestWeight,
+          date: workout.date,
+          workoutId: workout.id,
+        });
       }
-    }
-
-    if (bestWeight === 0) continue;
-
-    const existingPR = existingPRs.find(
-      pr => pr.movement.toLowerCase() === exercise.name.toLowerCase()
-    );
-
-    if (!existingPR || bestWeight > existingPR.weight) {
-      newPRs.push({
-        id: `${workout.id}-${exercise.name}`,
-        movement: exercise.name,
-        weight: bestWeight,
-        date: workout.date,
-        workoutId: workout.id,
-      });
     }
   }
 

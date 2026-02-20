@@ -1,4 +1,4 @@
-/* WorkloadBreakdown — Stacked Card List */
+/* WorkloadBreakdown — Timeline Card List */
 
 .container {
   display: flex;
@@ -36,16 +36,37 @@
 .sectionTitle {
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-text-muted);
+  color: rgba(255, 255, 255, 0.35);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: 0.12em;
   text-align: center;
 }
 
+/* Timeline thread — vertical line container */
 .list {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  position: relative;
+  padding-left: 20px;
+}
+
+/* The glowing vertical thread line */
+.list::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border-radius: 1px;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.06);
 }
 
 /* Swipe container for gestures */
@@ -53,6 +74,21 @@
   position: relative;
   overflow: hidden;
   border-radius: 20px;
+}
+
+/* Timeline dot on the thread */
+.swipeContainer::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.1);
+  z-index: 2;
 }
 
 /* Background action indicators */
@@ -80,22 +116,41 @@
   color: var(--color-sessions);
 }
 
-/* Movement row — full-width stacked card */
+/* Movement row — glassmorphic card */
 .movementRow {
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   position: relative;
   overflow: hidden;
-  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.06);
   cursor: default;
   user-select: none;
   touch-action: pan-y;
+}
+
+/* Specular top-edge highlight */
+.movementRow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 255, 255, 0.1) 35%,
+    rgba(255, 255, 255, 0.1) 65%,
+    rgba(255, 255, 255, 0) 90%
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .movementRow.editable {
@@ -103,51 +158,68 @@
 }
 
 .movementRow.editable:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
 }
 
-/* Highlighted rows — subtle left border accent */
+/* Color-coded left border accents */
+/* Yellow = Weightlifting/Barbell */
 .highlighted_gold {
   border-left: 3px solid rgba(255, 214, 0, 0.5);
 }
 
+/* Cyan = Monostructural/Cardio */
 .highlighted_cyan {
   border-left: 3px solid rgba(0, 242, 255, 0.5);
 }
 
-.highlighted_neutral {
-  border-left: 3px solid rgba(255, 255, 255, 0.25);
+/* Pink = Gymnastics/Bodyweight */
+.highlighted_pink {
+  border-left: 3px solid rgba(255, 0, 229, 0.5);
 }
 
-/* Movement name — bold, white, full width */
+/* Fallback neutral */
+.highlighted_neutral {
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Movement name — bold, white */
 .movementName {
   font-size: var(--text-base, 16px);
   font-weight: var(--font-bold);
-  color: var(--color-text);
+  color: #FFFFFF;
   line-height: var(--leading-tight);
 }
 
-/* Stats row — muted grey, units glued to numbers */
+/* Stats row — numbers white, text/pipes muted */
 .movementStats {
   display: flex;
-  gap: 4px;
+  gap: 0;
   flex-wrap: wrap;
   align-items: baseline;
   font-size: var(--text-sm, 14px);
-  color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
 }
 
-/* Each stat segment keeps number+unit together */
+/* Each stat segment */
 .statSegment {
   display: inline-flex;
   gap: 0;
   white-space: nowrap;
 }
 
+.statNumber {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.statText {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 400;
+}
+
 .statSeparator {
-  color: var(--color-text-muted);
-  opacity: 0.5;
+  color: rgba(255, 255, 255, 0.2);
+  padding: 0 6px;
 }
 
 /* Substitution sub-label */
@@ -155,13 +227,69 @@
   font-size: var(--text-xs, 12px);
   font-style: italic;
   font-weight: normal;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* PR badge — gold pill inline */
+.prBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #FFD600;
+  background: linear-gradient(135deg, rgba(255, 214, 0, 0.18), rgba(255, 138, 0, 0.12));
+  border: 1px solid rgba(255, 214, 0, 0.35);
+  border-radius: var(--radius-full, 999px);
+  vertical-align: middle;
+  line-height: 1.6;
+}
+
+/* Heavy carry badge — sunset gradient pill */
+.carryBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #FF6B35, #FF2D87);
+  color: #fff;
+  border-radius: 999px;
+  vertical-align: middle;
+  line-height: 1.6;
+}
+
+/* PR row — gold border + breathing glow */
+.prRow {
+  border: 1px solid rgba(255, 214, 0, 0.3);
+  animation: prGlow 2s ease-in-out infinite;
+}
+
+@keyframes prGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 214, 0, 0.15); }
+  50% { box-shadow: 0 0 12px rgba(255, 214, 0, 0.3); }
 }
 
 /* Responsive adjustments */
 @media (max-width: 380px) {
   .list {
     gap: var(--space-1);
+    padding-left: 16px;
+  }
+
+  .list::before {
+    left: 4px;
+  }
+
+  .swipeContainer::before {
+    left: -13px;
+    width: 5px;
+    height: 5px;
   }
 
   .movementRow {

@@ -7,6 +7,7 @@ interface WorkoutHistoryFeedProps {
   workouts: WorkoutWithStats[];
   onSelectWorkout?: (id: string) => void;
   onDeleteWorkout?: (id: string) => void;
+  onEditWorkout?: (id: string) => void;
 }
 
 interface WorkoutGroup {
@@ -22,7 +23,7 @@ function formatMonthLabel(date: Date): string {
   });
 }
 
-export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout }: WorkoutHistoryFeedProps) {
+export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout, onEditWorkout }: WorkoutHistoryFeedProps) {
   const groups = useMemo<WorkoutGroup[]>(() => {
     const sorted = [...workouts].sort((a, b) => b.date.getTime() - a.date.getTime());
     const byMonth = new Map<string, WorkoutGroup>();
@@ -53,14 +54,17 @@ export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout 
           </div>
           <div className={styles.groupList}>
             {group.workouts.map((workout, index) => (
-              <WorkoutFeedCard
-                key={workout.id}
-                workout={workout}
-                index={index}
-                isPR={workout.isPR}
-                onClick={onSelectWorkout ? () => onSelectWorkout(workout.id) : undefined}
-                onDelete={onDeleteWorkout ? () => onDeleteWorkout(workout.id) : undefined}
-              />
+              <div key={workout.id} className={styles.cardRow}>
+                <div className={`${styles.cardDot} ${workout.isPR ? styles.prDot : ''}`} />
+                <WorkoutFeedCard
+                  workout={workout}
+                  index={index}
+                  isPR={workout.isPR}
+                  onClick={onSelectWorkout ? () => onSelectWorkout(workout.id) : undefined}
+                  onDelete={onDeleteWorkout ? () => onDeleteWorkout(workout.id) : undefined}
+                  onEdit={onEditWorkout ? () => onEditWorkout(workout.id) : undefined}
+                />
+              </div>
             ))}
           </div>
         </section>

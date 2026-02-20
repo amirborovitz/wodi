@@ -148,10 +148,22 @@ export async function shareWorkoutCard(
 }
 
 /**
- * Check if native sharing is supported
+ * Check if native sharing with files is supported.
+ * Chrome iOS supports navigator.share but NOT file sharing,
+ * so we probe canShare() with a tiny test file.
  */
 export function isNativeShareSupported(): boolean {
-  return typeof navigator !== 'undefined' &&
-         typeof navigator.share === 'function' &&
-         typeof navigator.canShare === 'function';
+  try {
+    if (
+      typeof navigator === 'undefined' ||
+      typeof navigator.share !== 'function' ||
+      typeof navigator.canShare !== 'function'
+    ) {
+      return false;
+    }
+    const testFile = new File([new Uint8Array(1)], 'test.png', { type: 'image/png' });
+    return navigator.canShare({ files: [testFile] });
+  } catch {
+    return false;
+  }
 }

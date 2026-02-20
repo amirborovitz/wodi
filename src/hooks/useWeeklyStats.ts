@@ -2,16 +2,16 @@ import { useMemo } from 'react';
 import { useWorkouts } from './useWorkouts';
 import type { WorkoutWithStats } from './useWorkouts';
 import { useAuth } from '../context/AuthContext';
-import { calculateMetconMinutes, calculateWorkoutXP } from '../utils/xpCalculations';
+import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
 import { DEFAULT_USER_GOALS } from '../types';
-import type { UserGoals, XPBreakdown } from '../types';
+import type { UserGoals, EPBreakdown } from '../types';
 
 interface WeeklyStatsResult {
   // Raw values
   weeklyVolume: number;
   weeklyMetconMinutes: number;
   weeklyFrequency: number;
-  weeklyXP: number;
+  weeklyEP: number;
 
   // Percentages (capped at 100 for display, but raw can exceed)
   volumePercent: number;
@@ -26,8 +26,8 @@ interface WeeklyStatsResult {
   metconOverload: boolean;
   frequencyOverload: boolean;
 
-  // Workouts this week with XP
-  weeklyWorkouts: Array<WorkoutWithStats & { xp: XPBreakdown; metconMinutes: number }>;
+  // Workouts this week with EP
+  weeklyWorkouts: Array<WorkoutWithStats & { ep: EPBreakdown; metconMinutes: number }>;
 
   // Loading state
   loading: boolean;
@@ -48,6 +48,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
 
   // Get user goals or defaults
   const goals: UserGoals = user?.goals || DEFAULT_USER_GOALS;
+  const bodyweight = user?.weight || DEFAULT_BW;
 
   // Calculate weekly stats
   const weeklyData = useMemo(() => {
@@ -58,12 +59,12 @@ export function useWeeklyStats(): WeeklyStatsResult {
 
     // Calculate stats for each workout
     const workoutsWithStats = thisWeekWorkouts.map((workout) => {
-      const metconMinutes = calculateMetconMinutes(workout);
-      const xp = calculateWorkoutXP(workout.totalVolume, metconMinutes);
+      const metconMinutes = getTimeCapMinutes(workout);
+      const ep = calculateWorkoutEP(workout.totalVolume, metconMinutes, bodyweight, false, workout.workloadBreakdown?.movements);
       return {
         ...workout,
         metconMinutes,
-        xp,
+        ep,
       };
     });
 
@@ -71,7 +72,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
     const weeklyVolume = workoutsWithStats.reduce((acc, w) => acc + w.totalVolume, 0);
     const weeklyMetconMinutes = workoutsWithStats.reduce((acc, w) => acc + w.metconMinutes, 0);
     const weeklyFrequency = workoutsWithStats.length;
-    const weeklyXP = workoutsWithStats.reduce((acc, w) => acc + w.xp.total, 0);
+    const weeklyEP = workoutsWithStats.reduce((acc, w) => acc + w.ep.total, 0);
 
     // Calculate percentages
     const volumePercent = Math.round((weeklyVolume / goals.volumeGoal) * 100);
@@ -82,7 +83,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
       weeklyVolume,
       weeklyMetconMinutes,
       weeklyFrequency,
-      weeklyXP,
+      weeklyEP,
       volumePercent,
       metconPercent,
       frequencyPercent,
@@ -91,7 +92,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
       frequencyOverload: frequencyPercent > 100,
       weeklyWorkouts: workoutsWithStats,
     };
-  }, [workouts, goals]);
+  }, [workouts, goals, bodyweight]);
 
   return {
     ...weeklyData,

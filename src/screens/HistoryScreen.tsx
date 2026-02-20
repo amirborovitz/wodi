@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useWorkouts } from '../hooks/useWorkouts';
-import { usePRCount } from '../hooks/usePRCount';
-import { useWeeklyStats } from '../hooks/useWeeklyStats';
+import { useAuth } from '../context/AuthContext';
+import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
 import { WorkoutHistoryFeed } from '../components/history';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import styles from './HistoryScreen.module.css';
@@ -12,16 +13,31 @@ interface HistoryScreenProps {
 
 export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
   const { workouts, loading, stats, deleteWorkout } = useWorkouts();
-  const { prCount } = usePRCount();
-  const { weeklyXP } = useWeeklyStats();
+  const { user } = useAuth();
+
+  const monthlyEP = useMemo(() => {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    const bodyweight = user?.weight || DEFAULT_BW;
+
+    return workouts
+      .filter(w => w.date.getMonth() === thisMonth && w.date.getFullYear() === thisYear)
+      .reduce((sum, w) => {
+        const tcMin = getTimeCapMinutes(w);
+        const ep = calculateWorkoutEP(w.totalVolume, tcMin, bodyweight, w.isPR, w.workloadBreakdown?.movements);
+        return sum + ep.total;
+      }, 0);
+  }, [workouts, user?.weight]);
 
   const handleDeleteWorkout = async (workoutId: string) => {
-    const workout = workouts.find(w => w.id === workoutId);
-    const confirmDelete = window.confirm(
-      `Delete "${workout?.title || 'this workout'}"?\n\nThis cannot be undone.`
-    );
-    if (confirmDelete) {
-      await deleteWorkout(workoutId);
+    await deleteWorkout(workoutId);
+  };
+
+  const handleEditWorkout = (workoutId: string) => {
+    const selected = workouts.find(w => w.id === workoutId);
+    if (selected && onSelectWorkout) {
+      onSelectWorkout(selected);
     }
   };
 
@@ -29,41 +45,27 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
     <div className={styles.container}>
       <header className={styles.header}>
         <h1 className={styles.title}>Workouts</h1>
-        <div className={styles.xpBadge}>
-          <span className={styles.xpIcon}>+</span>
-          <span className={styles.xpValue}>{weeklyXP}</span>
-          <span className={styles.xpLabel}>XP this week</span>
-        </div>
       </header>
 
-      {/* Summary Stats */}
+      {/* Bento Summary */}
       <motion.div
-        className={styles.summaryBar}
+        className={styles.bentoRow}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
-        <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>WK</span>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryValue}>{stats.thisWeek}</span>
-            <span className={styles.summaryLabel}>This Week</span>
+        <div className={styles.bentoCard}>
+          <span className={styles.bentoLabel}>This Week</span>
+          <div>
+            <span className={styles.bentoValue}>{stats.thisWeek}</span>
+            <span className={styles.bentoUnit}>workouts</span>
           </div>
         </div>
-        <div className={styles.summaryDivider} />
-        <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>MO</span>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryValue}>{stats.thisMonth}</span>
-            <span className={styles.summaryLabel}>This Month</span>
-          </div>
-        </div>
-        <div className={styles.summaryDivider} />
-        <div className={styles.summaryItem}>
-          <span className={styles.summaryIcon}>PR</span>
-          <div className={styles.summaryContent}>
-            <span className={styles.summaryValue}>{prCount}</span>
-            <span className={styles.summaryLabel}>PRs</span>
+        <div className={styles.bentoCard}>
+          <span className={styles.bentoLabel}>Monthly EP</span>
+          <div>
+            <span className={styles.epGradientValue}>+{monthlyEP.toLocaleString()}</span>
+            <span className={styles.bentoUnit}>EP</span>
           </div>
         </div>
       </motion.div>
@@ -91,7 +93,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
           <div className={styles.emptyIcon}>
             <span className={styles.emptyEmoji}>NO</span>
           </div>
-          <h2 className={styles.emptyTitle}>No workouts yet</h2>
+          <h2 className={styles.emptyTitle}>No work logged yet</h2>
           <p className={styles.emptyText}>
             Your completed workouts will appear here. Go crush a WOD!
           </p>
@@ -113,6 +115,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
               : undefined
           }
           onDeleteWorkout={handleDeleteWorkout}
+          onEditWorkout={handleEditWorkout}
         />
       )}
     </div>

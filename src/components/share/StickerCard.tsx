@@ -75,7 +75,7 @@ export const StickerCard = forwardRef<HTMLDivElement, StickerCardProps>(
             {/* Footer */}
             <footer className={styles.footer}>
               <div className={styles.footerLine} aria-hidden="true" />
-              <span className={styles.footerText}>WORKOUT COMPLETE</span>
+              <span className={styles.footerText}>wodi</span>
             </footer>
           </div>
         </div>
@@ -138,7 +138,7 @@ export const StickerCard = forwardRef<HTMLDivElement, StickerCardProps>(
           {/* Footer */}
           <footer className={styles.footer}>
             <div className={styles.footerLine} aria-hidden="true" />
-            <span className={styles.footerText}>WORKOUT COMPLETE</span>
+            <span className={styles.footerText}>wodi</span>
           </footer>
         </div>
       </div>
@@ -453,6 +453,6 @@ function formatTime(totalSeconds: number): string {
 }
 
 function formatVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} tons`;
   return `${parseFloat(kg.toFixed(1)).toLocaleString()}kg`;
 }

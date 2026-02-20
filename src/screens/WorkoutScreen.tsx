@@ -9,7 +9,7 @@ import { Button } from '../components/ui';
 import { useCountUp } from '../hooks/useCountUp';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { useAuth } from '../context/AuthContext';
-import { calculateMetconMinutes, calculateWorkoutXP } from '../utils/xpCalculations';
+import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
 import { calculateWorkloadFromExercises, assignMovementColors } from '../services/workloadCalculation';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 
@@ -64,7 +64,6 @@ const CheckIcon = () => (
   </svg>
 );
 
-
 const CloseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -76,42 +75,46 @@ const CloseIcon = () => (
 // Helpers
 // ============================================
 
-function formatDurationFromSeconds(totalSeconds: number): string {
-  if (totalSeconds === 0) return '--';
+function formatDurationFromSeconds(totalSeconds: number): { num: string; unit: string } {
+  if (totalSeconds === 0) return { num: '--', unit: '' };
   const mins = Math.floor(totalSeconds / 60);
   const secs = Math.round(totalSeconds % 60);
   if (mins >= 60) {
     const hrs = Math.floor(mins / 60);
     const remainingMins = mins % 60;
-    return `${hrs}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return { num: `${hrs}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`, unit: '' };
   }
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return { num: `${mins}`, unit: 'min' };
 }
 
-function formatDistance(meters: number): string {
-  if (meters >= 1000) return `${(meters / 1000).toFixed(1)}km`;
-  return `${Math.round(meters)}m`;
+function formatDistanceSplit(meters: number): { num: string; unit: string } {
+  if (meters >= 1000) return { num: `${(meters / 1000).toFixed(1)}`, unit: 'km' };
+  return { num: `${Math.round(meters)}`, unit: 'm' };
+}
+
+function formatDistanceValue(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
+  return `${Math.round(meters)} m`;
 }
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
-    weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
 }
 
-function formatVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-  return `${parseFloat(kg.toFixed(1)).toLocaleString()} kg`;
+function formatVolumeSplit(kg: number): { num: string; unit: string } {
+  if (kg >= 1000) return { num: `${(kg / 1000).toFixed(2)}`, unit: 'tons' };
+  return { num: `${parseFloat(kg.toFixed(1)).toLocaleString()}`, unit: 'kg' };
 }
 
-function formatDuration(minutes: number): string {
-  if (minutes === 0) return '\u2014';
-  if (minutes < 60) return `${minutes} min`;
+function formatDurationSplit(minutes: number): { num: string; unit: string } {
+  if (minutes === 0) return { num: '\u2014', unit: '' };
+  if (minutes < 60) return { num: `${minutes}`, unit: 'min' };
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  return mins > 0 ? { num: `${hrs}h ${mins}`, unit: 'min' } : { num: `${hrs}`, unit: 'h' };
 }
 
 // ============================================
@@ -234,23 +237,181 @@ function RawTextSheet({ open, onClose, rawText, title }: {
 }
 
 // ============================================
-// Metric Block types
+// Volume Breakdown Bottom Sheet
 // ============================================
 
-type MetricBlockType = 'time' | 'volume' | 'distance' | 'reps' | 'calories' | 'xp';
+function VolumeBreakdownSheet({ open, onClose, movements }: {
+  open: boolean;
+  onClose: () => void;
+  movements: MovementTotal[];
+}) {
+  const weightedMovements = movements.filter(m => m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0);
+  const grandTotal = weightedMovements.reduce((sum, m) => sum + Math.round((m.weight || 0) * (m.totalReps || 0)), 0);
 
-// Category color mapping:
-// Gold → Strength/Load (volume, lifted, heaviest)
-// Magenta → Time/Effort (moved, intervals)
-// Cyan → Engine/Distance (run, bike, row, cals)
-// Neutral → XP, reps (no glow)
-type MetricCategory = 'gold' | 'magenta' | 'cyan' | 'neutral';
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className={styles.rawTextBackdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className={styles.rawTextSheet}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 32, stiffness: 380 }}
+          >
+            <div className={styles.rawTextDragHandle} aria-hidden="true" />
+            <div className={styles.rawTextHeader}>
+              <h2 className={styles.rawTextTitle}>Volume Breakdown</h2>
+              <button
+                className={styles.rawTextCloseBtn}
+                onClick={onClose}
+                type="button"
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
 
-interface MetricBlock {
-  type: MetricBlockType;
-  value: string;
-  label: string;
-  category: MetricCategory;
+            <div className={styles.volumeBreakdownList}>
+              {weightedMovements.map((m, i) => {
+                const volume = Math.round((m.weight || 0) * (m.totalReps || 0));
+                const implLabel = m.implementCount && m.implementCount > 1
+                  ? `${m.implementCount}\u00d7${(m.weight || 0) / m.implementCount}`
+                  : `${m.weight}`;
+                return (
+                  <div key={`${m.name}-${i}`} className={styles.volumeRow}>
+                    <span className={styles.volumeMovName}>{m.name}</span>
+                    <span className={styles.volumeCalc}>
+                      {m.totalReps} <span className={styles.volumeOp}>&times;</span> {implLabel}kg
+                    </span>
+                    <span className={styles.volumeResult}>
+                      {volume >= 1000
+                        ? `${(volume / 1000).toFixed(2)} tons`
+                        : `${volume.toLocaleString()}kg`}
+                    </span>
+                  </div>
+                );
+              })}
+
+              <div className={`${styles.volumeRow} ${styles.volumeTotalRow}`}>
+                <span className={styles.volumeMovName}>Total</span>
+                <span className={styles.volumeCalc} />
+                <span className={styles.volumeResult}>
+                  {grandTotal >= 1000
+                    ? `${(grandTotal / 1000).toFixed(2)} tons`
+                    : `${grandTotal.toLocaleString()} kg`}
+                </span>
+              </div>
+            </div>
+
+            <button
+              className={styles.rawTextDismiss}
+              onClick={onClose}
+              type="button"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function DistanceBreakdownSheet({ open, onClose, movements }: {
+  open: boolean;
+  onClose: () => void;
+  movements: MovementTotal[];
+}) {
+  const distanceMovements = movements.filter((m) => (m.totalDistance || 0) > 0);
+  const grandTotal = distanceMovements.reduce((sum, m) => sum + (m.totalDistance || 0), 0);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className={styles.rawTextBackdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className={styles.rawTextSheet}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 32, stiffness: 380 }}
+          >
+            <div className={styles.rawTextDragHandle} aria-hidden="true" />
+            <div className={styles.rawTextHeader}>
+              <h2 className={styles.rawTextTitle}>Distance Breakdown</h2>
+              <button
+                className={styles.rawTextCloseBtn}
+                onClick={onClose}
+                type="button"
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className={styles.volumeBreakdownList}>
+              {distanceMovements.map((m, i) => {
+                const distance = m.totalDistance || 0;
+                const weight = m.weight || 0;
+                const wUnit = m.unit === 'lb' ? 'lb' : 'kg';
+                const perRep = m.distancePerRep || 0;
+                const rounds = perRep > 0 ? Math.round(distance / perRep) : 0;
+
+                // Build calc: "8 × 500m" or "8 × 500m @ 10kg" or just "@ 10kg"
+                const parts: string[] = [];
+                if (rounds > 1 && perRep > 0) {
+                  parts.push(`${rounds} \u00d7 ${formatDistanceValue(perRep)}`);
+                }
+                if (weight > 0) {
+                  parts.push(`@ ${weight}${wUnit}`);
+                }
+                const calcText = parts.join(' ');
+
+                return (
+                  <div key={`${m.name}-${i}`} className={styles.volumeRow}>
+                    <span className={styles.volumeMovName}>{m.name}</span>
+                    <span className={styles.volumeCalc}>{calcText}</span>
+                    <span className={styles.volumeResult}>
+                      {formatDistanceValue(distance)}
+                    </span>
+                  </div>
+                );
+              })}
+
+              <div className={`${styles.volumeRow} ${styles.volumeTotalRow}`}>
+                <span className={styles.volumeMovName}>Total</span>
+                <span className={styles.volumeCalc} />
+                <span className={styles.volumeResult}>{formatDistanceValue(grandTotal)}</span>
+              </div>
+            </div>
+
+            <button
+              className={styles.rawTextDismiss}
+              onClick={onClose}
+              type="button"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
 }
 
 // ============================================
@@ -274,11 +435,12 @@ export function WorkoutScreen({
   const [isRawTextOpen, setIsRawTextOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<MovementTotal | null>(null);
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
-  const [isShareMode, setIsShareMode] = useState(false);
+  const [isVolumeSheetOpen, setIsVolumeSheetOpen] = useState(false);
+  const [isDistanceSheetOpen, setIsDistanceSheetOpen] = useState(false);
 
   const isReward = mode === 'reward';
 
-  // ── Normalize data from both modes ────────────────────────────────
+  // -- Normalize data from both modes ────────────────────────────────
 
   const title = isReward
     ? rewardData?.workoutSummary?.title || 'Workout'
@@ -288,7 +450,6 @@ export function WorkoutScreen({
     ? rewardData?.heroAchievement?.type === 'pr'
     : workout?.isPR;
 
-  // Raw text: use stored rawText, or reconstruct from exercises as fallback
   const rawText = isReward
     ? rewardData?.workoutRawText
     : (workout?.rawText || (() => {
@@ -317,143 +478,97 @@ export function WorkoutScreen({
   }, [isReward, rewardData?.workloadBreakdown, workout?.exercises, workout?.partnerWorkout, workout?.partnerFactor, workout?.workloadBreakdown]);
 
   // Totals
-  const totalReps = isReward
-    ? (rewardData?.workloadBreakdown?.grandTotalReps || rewardData?.workoutSummary?.totalReps || 0)
-    : (workloadBreakdown?.grandTotalReps || workout?.totalReps || 0);
-
   const totalVolume = isReward
     ? (rewardData?.workloadBreakdown?.grandTotalVolume || rewardData?.workoutSummary?.totalVolume || 0)
     : (workout?.totalVolume || 0);
 
-  const totalCalories = isReward
-    ? (rewardData?.workloadBreakdown?.grandTotalCalories || 0)
-    : (workloadBreakdown?.grandTotalCalories || 0);
+  const totalReps = isReward
+    ? (rewardData?.workloadBreakdown?.grandTotalReps || rewardData?.workoutSummary?.totalReps || 0)
+    : (workloadBreakdown?.grandTotalReps || workout?.totalReps || 0);
 
-  // Duration: use stored duration, or extract from exercise set time data as fallback
   const durationMinutes = isReward
     ? (rewardData?.workoutSummary?.duration || 0)
     : (workout?.duration || (() => {
-        // Fallback: sum completion times from exercise sets
         let secs = 0;
         workout?.exercises?.forEach(ex => ex.sets?.forEach(s => { if (s.time) secs += s.time; }));
         return secs > 0 ? Math.round(secs / 60) : 0;
       })());
 
-  const totalSeconds = isReward
-    ? Math.round(durationMinutes * 60)
-    : 0; // detail mode uses formatted minutes
+  const totalSeconds = isReward ? Math.round(durationMinutes * 60) : 0;
 
-  // Distance logic
-  const distanceMovements = (isReward ? rewardData?.workloadBreakdown : workloadBreakdown)
-    ?.movements?.filter(m => m.totalDistance && m.totalDistance > 0) || [];
-  const hasMultipleDistanceTypes = distanceMovements.length > 1;
-  const totalDistance = hasMultipleDistanceTypes ? 0 : ((isReward ? rewardData?.workloadBreakdown : workloadBreakdown)?.grandTotalDistance || 0);
+  const activeBreakdown = isReward ? rewardData?.workloadBreakdown : workloadBreakdown;
+  const totalDistance = activeBreakdown?.grandTotalDistance || 0;
 
+  // EP (Effort Points)
+  const bodyweight = user?.weight || DEFAULT_BW;
 
-  // XP
-  const detailXP = !isReward && workout
-    ? calculateWorkoutXP(workout.totalVolume, calculateMetconMinutes(workout), workout.isPR || false)
+  const rewardTimeCapMinutes = (() => {
+    const format = rewardData?.workoutSummary?.format;
+    if (format === 'strength') return 0;
+    return durationMinutes;
+  })();
+
+  const detailEP = !isReward && workout
+    ? calculateWorkoutEP(
+        workout.totalVolume,
+        getTimeCapMinutes(workout),
+        bodyweight,
+        workout.isPR || false,
+        workout.workloadBreakdown?.movements
+      )
     : null;
 
-  const rewardBaseXP = 20;
-  const rewardVolumeXP = Math.floor(totalVolume / 100);
-  const rewardMetconXP = Math.floor(durationMinutes * 2);
-  const rewardPrXP = isPR ? 25 : 0;
-  const rewardTotalXP = rewardBaseXP + rewardVolumeXP + rewardMetconXP + rewardPrXP;
-  const totalXP = isReward ? rewardTotalXP : (detailXP?.total || 0);
+  const rewardEP = isReward
+    ? calculateWorkoutEP(totalVolume, rewardTimeCapMinutes, bodyweight, isPR || false, workloadBreakdown?.movements)
+    : null;
 
-  // ── Animated counters (reward mode) ───────────────────────────────
+  const totalEP = isReward ? (rewardEP?.total || 0) : (detailEP?.total || 0);
+
+  // -- Animated counters (reward mode) ───────────────────────────────
 
   const animatedVolumeKg = useCountUp(isReward ? totalVolume : 0, { delay: 200, duration: 1000, decimals: 0 });
   const animatedVolumeTons = useCountUp(isReward ? totalVolume / 1000 : 0, { delay: 200, duration: 1000, decimals: 2 });
   const animatedReps = useCountUp(isReward ? totalReps : 0, { delay: 250, duration: 1000 });
   const animatedSeconds = useCountUp(isReward ? totalSeconds : 0, { delay: 300, duration: 1000 });
   const animatedDistance = useCountUp(isReward ? totalDistance : 0, { delay: 250, duration: 1000, decimals: 0 });
-  const animatedCalories = useCountUp(isReward ? totalCalories : 0, { delay: 250, duration: 1000, decimals: 0 });
-  const animatedXP = useCountUp(isReward ? totalXP : 0, { delay: 350, duration: 1000 });
+  const animatedEP = useCountUp(isReward ? totalEP : 0, { delay: 350, duration: 1000 });
 
-  // ── Build hero + bento + secondary metrics ─────────────────────
+  // -- Receipt card: split number and unit ──────────────────────────
 
-  const heroMetric = useMemo((): MetricBlock => ({
-    type: 'time',
-    value: isReward ? formatDurationFromSeconds(animatedSeconds) : formatDuration(durationMinutes),
-    label: 'METCON',
-    category: 'magenta',
-  }), [isReward, animatedSeconds, durationMinutes]);
-
-  const bentoMetrics = useMemo((): MetricBlock[] => {
-    const metrics: MetricBlock[] = [];
+  // Left stat: Volume (or Reps fallback)
+  const leftStat = (() => {
     if (totalVolume > 0) {
-      metrics.push({
-        type: 'volume',
-        value: isReward
-          ? (totalVolume >= 1000 ? `${animatedVolumeTons.toFixed(2)} tons` : `${parseFloat(animatedVolumeKg.toFixed(1)).toLocaleString()} kg`)
-          : formatVolume(totalVolume),
-        label: 'LIFTED',
-        category: 'gold',
-      });
+      if (isReward) {
+        if (totalVolume >= 1000) return { num: animatedVolumeTons.toFixed(2), unit: 'tons', label: 'LIFTED' };
+        return { num: parseFloat(animatedVolumeKg.toFixed(1)).toLocaleString(), unit: 'kg', label: 'LIFTED' };
+      }
+      const split = formatVolumeSplit(totalVolume);
+      return { ...split, label: 'LIFTED' };
     }
-    metrics.push({
-      type: 'xp',
-      value: isReward ? `+${animatedXP}` : `+${totalXP}`,
-      label: 'XP',
-      category: 'neutral',
-    });
-    return metrics;
-  }, [isReward, totalVolume, animatedVolumeTons, animatedVolumeKg, animatedXP, totalXP]);
+    return { num: isReward ? animatedReps.toLocaleString() : totalReps.toLocaleString(), unit: '', label: 'REPS' };
+  })();
 
-  const secondaryMetrics = useMemo((): MetricBlock[] => {
-    const metrics: MetricBlock[] = [];
-    if (totalDistance > 0) {
-      metrics.push({
-        type: 'distance',
-        value: isReward ? formatDistance(animatedDistance) : formatDistance(totalDistance),
-        label: 'DISTANCE',
-        category: 'cyan',
-      });
-    }
-    if (totalCalories > 0) {
-      metrics.push({
-        type: 'calories',
-        value: isReward ? `${Math.round(animatedCalories)}` : `${totalCalories}`,
-        label: 'BURNED',
-        category: 'cyan',
-      });
-    }
-    if (totalReps > 0) {
-      metrics.push({
-        type: 'reps',
-        value: isReward ? animatedReps.toLocaleString() : totalReps.toLocaleString(),
-        label: 'REPS',
-        category: 'neutral',
-      });
-    }
-    return metrics;
-  }, [isReward, totalDistance, animatedDistance, totalCalories, animatedCalories, totalReps, animatedReps]);
+  // Right stat: EP
+  const rightStat = {
+    num: isReward ? `+${animatedEP}` : `+${totalEP}`,
+    unit: '',
+    label: 'EFFORT POINTS',
+  };
 
-  // ── Weekly goal (reward mode) ─────────────────────────────────────
+  // Engine pills (no REPS — only time + distance)
+  const timeSplit = isReward ? formatDurationFromSeconds(animatedSeconds) : formatDurationSplit(durationMinutes);
+  const showTime = durationMinutes > 0;
+  const distSplit = isReward
+    ? formatDistanceSplit(animatedDistance)
+    : formatDistanceSplit(totalDistance);
+  const showDistance = totalDistance > 0;
 
-  const goalAccomplished = isReward && !weeklyStats.loading && (
-    weeklyStats.volumePercent >= 100 ||
-    weeklyStats.metconPercent >= 100 ||
-    weeklyStats.frequencyPercent >= 100
-  );
+  const hasEnginePills = showTime || showDistance;
 
-  const goalTags = isReward && !weeklyStats.loading
-    ? [
-        weeklyStats.volumePercent >= 100 ? 'Lift' : null,
-        weeklyStats.metconPercent >= 100 ? 'Move' : null,
-        weeklyStats.frequencyPercent >= 100 ? 'Show Up' : null,
-      ].filter(Boolean).join(' \u00b7 ')
-    : '';
-
-  // ── Achievement pills (reward mode) ───────────────────────────────
+  // -- Achievement pills (reward mode) ───────────────────────────────
 
   const achievementPills: { label: string; emoji: string }[] = [];
   if (isReward) {
-    if (goalAccomplished) {
-      achievementPills.push({ label: 'Weekly Goal Met!', emoji: '\ud83c\udfaf' });
-    }
     const allAchievements = rewardData?.achievements || (rewardData?.heroAchievement ? [rewardData.heroAchievement] : []);
     for (const ach of allAchievements) {
       if (ach.type === 'pr' && ach.movement && ach.value) {
@@ -468,12 +583,43 @@ export function WorkoutScreen({
         achievementPills.push({ label: ach.title, emoji: '\ud83d\udc51' });
       }
     }
-    if (weeklyStats.frequencyPercent >= 100) {
-      achievementPills.push({ label: 'Consistency Streak!', emoji: '\ud83d\udd25' });
+
+    if (!weeklyStats.loading) {
+      const goalsHit = [
+        weeklyStats.volumePercent >= 100,
+        weeklyStats.metconPercent >= 100,
+        weeklyStats.frequencyPercent >= 100,
+      ].filter(Boolean).length;
+
+      if (goalsHit >= 2) {
+        achievementPills.push({ label: 'Weekly goals crushed!', emoji: '\ud83d\udc51' });
+      } else if (weeklyStats.frequencyPercent >= 100) {
+        achievementPills.push({
+          label: `${weeklyStats.weeklyFrequency} sessions this week!`,
+          emoji: '\ud83d\udd25',
+        });
+      } else if (weeklyStats.volumePercent >= 100) {
+        achievementPills.push({ label: 'Weekly lift target hit!', emoji: '\ud83d\udcaa' });
+      } else if (weeklyStats.metconPercent >= 100) {
+        achievementPills.push({ label: 'Cardio goal smashed!', emoji: '\u26a1' });
+      }
     }
   }
 
-  // ── Movement editing (reward mode) ────────────────────────────────
+  // -- PR movements (for badge display) ────────────────────────────────
+
+  const prMovements = useMemo(() => {
+    const allAchievements = rewardData?.achievements || [];
+    const names = new Set<string>();
+    for (const ach of allAchievements) {
+      if (ach.type === 'pr' && ach.movement) {
+        names.add(ach.movement.toLowerCase());
+      }
+    }
+    return names;
+  }, [rewardData?.achievements]);
+
+  // -- Movement editing (reward mode) ────────────────────────────────
 
   const handleEditMovement = (movement: MovementTotal) => {
     setEditingMovement(movement);
@@ -489,24 +635,19 @@ export function WorkoutScreen({
     setIsEditSheetOpen(false);
   };
 
-  // ── Share adapter for detail mode ─────────────────────────────────
+  // -- Share adapter for detail mode ─────────────────────────────────
 
-  // Hydrate WOD exercises with movements from workloadBreakdown for old workouts
-  // that don't have structured movements on the Exercise object
   const hydratedExercises = useMemo(() => {
     if (!workout?.exercises) return [];
     const breakdownMovements = workloadBreakdown?.movements || [];
     if (breakdownMovements.length === 0) return workout.exercises;
 
     return workout.exercises.map(ex => {
-      if (ex.movements && ex.movements.length > 0) return ex; // already has movements
-      if (ex.type !== 'wod') return ex; // only hydrate WODs
-      // Parse rounds from prescription (e.g. "3 rounds" or "3 RFT")
+      if (ex.movements && ex.movements.length > 0) return ex;
+      if (ex.type !== 'wod') return ex;
       const roundsMatch = ex.prescription?.match(/(\d+)\s*(?:rounds?|rft)/i);
       const rounds = roundsMatch ? parseInt(roundsMatch[1], 10) : undefined;
       const r = rounds || 1;
-      // Convert MovementTotal[] → ParsedMovement[] for the share card
-      // Divide totals by rounds to get per-round values
       const parsed = breakdownMovements.map(m => ({
         name: m.name,
         reps: m.totalReps ? Math.round(m.totalReps / r) : undefined,
@@ -543,237 +684,260 @@ export function WorkoutScreen({
         }
       : undefined;
 
-  // ── User info ─────────────────────────────────────────────────────
+  // -- User info (needed for share) ────────────────────────────────
 
-  const userInitial = user?.displayName?.trim()?.[0]?.toUpperCase() || 'W';
   const userName = user?.displayName?.split(' ')[0]?.toUpperCase();
 
   // ============================================================
-  // RENDER — Reward Mode
+  // RENDER
   // ============================================================
 
-  if (isReward && rewardData) {
-    return (
-      <motion.div
-        className={styles.overlay}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        <ConfettiBurst />
+  if (!isReward && !workout) return null;
 
+  const handleEditClick = isReward ? onEdit : onEditWorkout;
+  const d = isReward ? 0.15 : 0.1;
+
+  // Header date for detail mode
+  const headerDateStr = !isReward && workout ? formatDate(workout.date) : '';
+
+  const sharedBody = (
+    <>
+      {/* -- Reward-only top chrome: title + dismiss button ────── */}
+      {isReward && (
         <motion.div
-          className={styles.modal}
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className={styles.heroHeader}
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: d, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* Hero Header */}
-          <motion.div
-            className={styles.heroHeader}
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <h1 className={styles.heroTitle}>WORKOUT COMPLETE</h1>
-          </motion.div>
+          <h1 className={styles.heroTitle}>WORKOUT COMPLETE</h1>
+          {onDone && (
+            <button className={styles.dismissButton} onClick={onDone} type="button" aria-label="Done">
+              <CloseIcon />
+            </button>
+          )}
+        </motion.div>
+      )}
 
-          {/* Celebration Duo */}
-          <div className={styles.celebrationRow}>
-            <motion.div
-              className={styles.avatarDance}
-              animate={{ y: [0, -6, 0], rotate: [0, 2, -2, 0] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              {user?.photoUrl ? (
-                <img src={user.photoUrl} alt="Your avatar" className={styles.avatarImage} />
-              ) : (
-                <span className={styles.avatarInitial}>{userInitial}</span>
-              )}
-            </motion.div>
-            <motion.div
-              className={styles.mascot}
-              animate={{ y: [0, -8, 0], rotate: [0, -3, 3, 0] }}
-              transition={{ duration: 1.9, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <div className={styles.mascotFace}>
-                <span className={styles.mascotEye} />
-                <span className={styles.mascotEye} />
-                <span className={styles.mascotSmile} />
-              </div>
-            </motion.div>
-          </div>
+      {/* -- Detail-only header: condensed ──────────────────────── */}
+      {!isReward && workout && (
+        <>
+          <header className={styles.header}>
+            <Button variant="ghost" size="sm" onClick={onBack} icon={<BackIcon />} className={styles.backButton}>
+              Back
+            </Button>
+            <span className={styles.headerTitle}>
+              <span className={styles.headerTitleAccent}>Today's Work</span>
+              {' \u00b7 '}
+              {headerDateStr}
+            </span>
+          </header>
 
-          {/* Goal Banner */}
-          {goalAccomplished && (
+          {isPR && (
             <motion.div
-              className={styles.goalBanner}
+              className={styles.prHeader}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.25, duration: 0.4 }}
+              transition={{ delay: d + 0.1, type: 'spring', stiffness: 300 }}
             >
-              <span className={styles.goalIcon}>{'\ud83c\udfc5'}</span>
-              <span className={styles.goalText}>Goal Accomplished!</span>
-              {goalTags && <span className={styles.goalTags}>{goalTags}</span>}
+              <span className={styles.prIcon}>{'\ud83c\udfc6'}</span>
+              <span className={styles.prText}>PR Achieved!</span>
             </motion.div>
           )}
+        </>
+      )}
 
-          {/* Workout Title */}
-          <motion.h2
-            className={styles.workoutTitle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+      {/* -- Workout Title ──────────────────────────────────────── */}
+      {isReward ? (
+        <motion.h2
+          className={styles.workoutTitle}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: d + 0.15 }}
+        >
+          {title}
+        </motion.h2>
+      ) : (
+        <motion.h1
+          className={`${styles.workoutTitle} ${styles.workoutTitleLarge}`}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: d + 0.15 }}
+        >
+          {title}
+        </motion.h1>
+      )}
+
+      {/* -- Receipt Hero Card (single glassmorphism container) ── */}
+      <motion.div
+        className={styles.receiptCard}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: d + 0.2, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {/* Top Half: Hero Metrics — Volume + EP */}
+        <div className={styles.receiptHeroRow}>
+          {/* Left: Volume / Reps */}
+          <div
+            className={`${styles.receiptCell} ${totalVolume > 0 ? styles.receiptCellTappable : ''}`}
+            onClick={totalVolume > 0 ? () => setIsVolumeSheetOpen(true) : undefined}
           >
-            {title}
-          </motion.h2>
+            <div className={styles.receiptValueRow}>
+              <span className={`${styles.receiptHeroNumber} ${styles.accentGold}`}>
+                {leftStat.num}
+              </span>
+              {leftStat.unit && (
+                <span className={styles.receiptHeroUnit}>{leftStat.unit}</span>
+              )}
+            </div>
+            <span className={styles.receiptLabel}>{leftStat.label}</span>
+          </div>
 
-          {/* Hero Time */}
-          <motion.div
-            className={styles.heroTime}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.32, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <span className={styles.heroTimeValue}>{heroMetric.value}</span>
-            <span className={styles.heroTimeLabel}>{heroMetric.label}</span>
-          </motion.div>
+          {/* Right: EP */}
+          <div className={styles.receiptCell}>
+            <div className={styles.receiptValueRow}>
+              <span className={`${styles.receiptHeroNumber} ${styles.accentGreen}`}>
+                {rightStat.num}
+              </span>
+            </div>
+            <span className={styles.receiptLabel}>{rightStat.label}</span>
+          </div>
+        </div>
 
-          {/* Bento Grid */}
-          {bentoMetrics.length > 0 && (
-            <motion.div
-              className={styles.bentoGrid}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.38, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {bentoMetrics.map((metric) => (
-                <div key={metric.type} className={`${styles.bentoCard} ${styles[`cat_${metric.category}`]}`}>
-                  <span className={styles.bentoValue}>{metric.value}</span>
-                  <span className={styles.bentoLabel}>{metric.label}</span>
+        {/* Divider */}
+        {hasEnginePills && <div className={styles.receiptDivider} />}
+
+        {/* Bottom Half: Engine Metrics — Time + Distance */}
+        {hasEnginePills && (
+          <div className={styles.receiptEngineRow}>
+            {showTime && (
+              <div className={styles.receiptCell}>
+                <div className={styles.receiptValueRow}>
+                  <span className={`${styles.receiptEngineNumber} ${styles.accentMagenta}`}>
+                    {timeSplit.num}
+                  </span>
+                  {timeSplit.unit && (
+                    <span className={styles.receiptEngineUnit}>{timeSplit.unit}</span>
+                  )}
                 </div>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Secondary Metrics */}
-          {secondaryMetrics.length > 0 && (
-            <motion.div
-              className={styles.secondaryMetrics}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.42, duration: 0.35 }}
-            >
-              {secondaryMetrics.map((metric) => (
-                <span key={metric.type} className={`${styles.secondaryMetricChip} ${styles[`cat_${metric.category}`]}`}>
-                  <span className={styles.chipValue}>{metric.value}</span>
-                  <span className={styles.chipLabel}>{metric.label}</span>
-                </span>
-              ))}
-            </motion.div>
-          )}
-
-          {/* View Programming */}
-          {rawText && !isShareMode && (
-            <motion.button
-              className={styles.viewProgramming}
-              onClick={() => setIsRawTextOpen(true)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.45 }}
-            >
-              View Programming ›
-            </motion.button>
-          )}
-
-          {/* Achievement Pills */}
-          {achievementPills.length > 0 && (
-            <motion.div
-              className={styles.achievementFeed}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.35 }}
-            >
-              {achievementPills.map((pill, i) => (
-                <motion.div
-                  key={`${pill.emoji}-${pill.label}`}
-                  className={styles.achievementPill}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.55 + i * 0.1 }}
-                >
-                  <span className={styles.achievementEmoji}>{pill.emoji}</span>
-                  <span className={styles.achievementLabel}>{pill.label}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Workload Breakdown */}
-          {workloadBreakdown && workloadBreakdown.movements.length > 0 && (
-            <WorkloadBreakdown
-              breakdown={workloadBreakdown}
-              animationDelay={0.65}
-
-              editable={Boolean(onRenameMovement || onDeleteMovement)}
-              onEditMovement={handleEditMovement}
-              onDeleteMovement={handleDeleteMovement}
-            />
-          )}
-
-          {/* Edit hint */}
-          {(onRenameMovement || onDeleteMovement) && workloadBreakdown && workloadBreakdown.movements.length > 0 && (
-            <motion.p
-              className={styles.editHint}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.2 }}
-            >
-              Tap a movement to edit or swipe to delete
-            </motion.p>
-          )}
-
-          {/* Action Footer */}
-          <motion.div
-            className={styles.actionFooter}
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {isShareMode ? (
-              <div className={styles.shareFooter}>
-                <button
-                  className={styles.shareButton}
-                  onClick={() => { setIsShareLaunchOpen(true); setIsShareMode(false); }}
-                >
-                  Share Result
-                </button>
-                <button className={styles.shareCancel} onClick={() => setIsShareMode(false)}>
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className={styles.actionRow}>
-                {onEdit && (
-                  <button className={styles.actionBtn} onClick={onEdit}>
-                    <EditIcon /> Edit
-                  </button>
-                )}
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => { setIsShareLaunchOpen(true); setIsShareMode(false); }}
-                >
-                  <ShareIcon /> Share
-                </button>
-                <button className={`${styles.actionBtn} ${styles.actionBtnPrimary}`} onClick={onDone}>
-                  <CheckIcon /> Done
-                </button>
+                <span className={styles.receiptEngineLabel}>MOVE TIME</span>
               </div>
             )}
-          </motion.div>
-        </motion.div>
+            {showDistance && (
+              <div
+                className={`${styles.receiptCell} ${styles.receiptCellTappable}`}
+                onClick={() => setIsDistanceSheetOpen(true)}
+              >
+                <div className={styles.receiptValueRow}>
+                  <span className={`${styles.receiptEngineNumber} ${styles.accentCyan}`}>
+                    {distSplit.num}
+                  </span>
+                  {distSplit.unit && (
+                    <span className={styles.receiptEngineUnit}>{distSplit.unit}</span>
+                  )}
+                </div>
+                <span className={styles.receiptEngineLabel}>DISTANCE</span>
+              </div>
+            )}
+          </div>
+        )}
+      </motion.div>
 
-        {/* Movement Edit Sheet */}
+      {/* -- View Workout ───────────────────────────────────────── */}
+      {rawText && (
+        <motion.button
+          className={styles.viewProgramming}
+          onClick={() => setIsRawTextOpen(true)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: d + 0.3 }}
+        >
+          View Workout ›
+        </motion.button>
+      )}
+
+      {/* -- Trophy Case (reward only) ──────────────────────────── */}
+      {isReward && achievementPills.length > 0 && (
+        <motion.div
+          className={styles.trophyCase}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: d + 0.35, duration: 0.35 }}
+        >
+          <span className={styles.trophyLabel}>Highlights</span>
+          <div className={styles.trophyRow}>
+            {achievementPills.map((pill, i) => (
+              <motion.div
+                key={`${pill.emoji}-${pill.label}`}
+                className={styles.trophyPill}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: d + 0.4 + i * 0.1 }}
+              >
+                <span className={styles.trophyEmoji}>{pill.emoji}</span>
+                <span className={styles.trophyText}>{pill.label}</span>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* -- Workload Breakdown ─────────────────────────────────── */}
+      {workloadBreakdown && workloadBreakdown.movements.length > 0 && (
+        <WorkloadBreakdown
+          breakdown={workloadBreakdown}
+          animationDelay={isReward ? 0.65 : 0.4}
+          prMovements={prMovements}
+          editable={isReward && Boolean(onRenameMovement || onDeleteMovement)}
+          onEditMovement={isReward ? handleEditMovement : undefined}
+          onDeleteMovement={isReward ? handleDeleteMovement : undefined}
+        />
+      )}
+
+      {/* -- Edit hint (reward only) ────────────────────────────── */}
+      {isReward && (onRenameMovement || onDeleteMovement) && workloadBreakdown && workloadBreakdown.movements.length > 0 && (
+        <motion.p
+          className={styles.editHint}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          Tap a movement to edit or swipe to delete
+        </motion.p>
+      )}
+
+      {/* -- Action Bar ─────────────────────────────────────────── */}
+      <motion.div
+        className={styles.shareBar}
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: isReward ? 0.9 : 0.6, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {/* Primary: Share */}
+        <button
+          className={styles.shareBarPrimary}
+          onClick={() => setIsShareLaunchOpen(true)}
+        >
+          <ShareIcon /> Share
+        </button>
+
+        {/* Secondary: Edit (always), Done (reward only) */}
+        {handleEditClick && (
+          <button className={styles.shareBarGhost} onClick={handleEditClick}>
+            <EditIcon /> Edit
+          </button>
+        )}
+
+        {/* Done moved to top-right dismiss X in reward mode */}
+      </motion.div>
+    </>
+  );
+
+  // -- Bottom sheets ──────────────────────────────────────────
+
+  const bottomSheets = (
+    <>
+      {isReward && (
         <MovementEditSheet
           open={isEditSheetOpen}
           movement={editingMovement}
@@ -781,185 +945,7 @@ export function WorkoutScreen({
           onRename={handleRenameMovement}
           onDelete={handleDeleteMovement}
         />
-
-        {shareData && (
-          <ShareLaunchSheet
-            open={isShareLaunchOpen}
-            onClose={() => setIsShareLaunchOpen(false)}
-            data={shareData}
-            userName={userName}
-          />
-        )}
-
-        <RawTextSheet
-          open={isRawTextOpen}
-          onClose={() => setIsRawTextOpen(false)}
-          rawText={rawText || ''}
-          title={title}
-        />
-      </motion.div>
-    );
-  }
-
-  // ============================================================
-  // RENDER — Detail Mode
-  // ============================================================
-
-  if (!workout) return null;
-
-  return (
-    <div className={styles.container}>
-      {/* Header: Back — Date */}
-      <header className={styles.header}>
-        <Button variant="ghost" size="sm" onClick={onBack} icon={<BackIcon />} className={styles.backButton}>
-          Back
-        </Button>
-        <span className={styles.headerDate}>{formatDate(workout.date)}</span>
-      </header>
-
-      {/* User Row */}
-      <motion.div
-        className={styles.userRow}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.15 }}
-      >
-        <div className={styles.userAvatar}>
-          {user?.photoUrl ? (
-            <img src={user.photoUrl} alt={user.displayName} className={styles.avatarImage} />
-          ) : (
-            <span className={styles.avatarInitial}>
-              {user?.displayName?.[0]?.toUpperCase() || 'W'}
-            </span>
-          )}
-        </div>
-        <span className={styles.userName}>{user?.displayName || 'Athlete'}</span>
-      </motion.div>
-
-      {/* PR Badge */}
-      {isPR && (
-        <motion.div
-          className={styles.prHeader}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, type: 'spring', stiffness: 300 }}
-        >
-          <span className={styles.prIcon}>{'\ud83c\udfc6'}</span>
-          <span className={styles.prText}>PR Achieved!</span>
-        </motion.div>
       )}
-
-      {/* Workout Title */}
-      <motion.h1
-        className={`${styles.workoutTitle} ${styles.workoutTitleLarge}`}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-      >
-        {title}
-      </motion.h1>
-
-      {/* Hero Time */}
-      <motion.div
-        className={styles.heroTime}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.28, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      >
-        <span className={styles.heroTimeValue}>{heroMetric.value}</span>
-        <span className={styles.heroTimeLabel}>{heroMetric.label}</span>
-      </motion.div>
-
-      {/* Bento Grid */}
-      {bentoMetrics.length > 0 && (
-        <motion.div
-          className={styles.bentoGrid}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {bentoMetrics.map((metric) => (
-            <div key={metric.type} className={`${styles.bentoCard} ${styles[`cat_${metric.category}`]}`}>
-              <span className={styles.bentoValue}>{metric.value}</span>
-              <span className={styles.bentoLabel}>{metric.label}</span>
-            </div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Secondary Metrics */}
-      {secondaryMetrics.length > 0 && (
-        <motion.div
-          className={styles.secondaryMetrics}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.36, duration: 0.35 }}
-        >
-          {secondaryMetrics.map((metric) => (
-            <span key={metric.type} className={`${styles.secondaryMetricChip} ${styles[`cat_${metric.category}`]}`}>
-              <span className={styles.chipValue}>{metric.value}</span>
-              <span className={styles.chipLabel}>{metric.label}</span>
-            </span>
-          ))}
-        </motion.div>
-      )}
-
-      {/* View Programming */}
-      {rawText && !isShareMode && (
-        <motion.button
-          className={styles.viewProgramming}
-          onClick={() => setIsRawTextOpen(true)}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.38 }}
-        >
-          View Programming ›
-        </motion.button>
-      )}
-
-      {/* Workload Breakdown */}
-      {workloadBreakdown && workloadBreakdown.movements.length > 0 && (
-        <WorkloadBreakdown
-          breakdown={workloadBreakdown}
-          animationDelay={0.4}
-        />
-      )}
-
-      {/* Footer: Edit + Share */}
-      <motion.div
-        className={styles.actionFooter}
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      >
-        {isShareMode ? (
-          <div className={styles.shareFooter}>
-            <button
-              className={styles.shareButton}
-              onClick={() => { setIsShareLaunchOpen(true); setIsShareMode(false); }}
-            >
-              Share Result
-            </button>
-            <button className={styles.shareCancel} onClick={() => setIsShareMode(false)}>
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className={styles.actionRow}>
-            {onEditWorkout && (
-              <button className={styles.actionBtn} onClick={onEditWorkout}>
-                <EditIcon /> Edit
-              </button>
-            )}
-            <button
-              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
-              onClick={() => { setIsShareLaunchOpen(true); setIsShareMode(false); }}
-            >
-              <ShareIcon /> Share
-            </button>
-          </div>
-        )}
-      </motion.div>
 
       {shareData && (
         <ShareLaunchSheet
@@ -976,6 +962,26 @@ export function WorkoutScreen({
         rawText={rawText || ''}
         title={title}
       />
+      <VolumeBreakdownSheet
+        open={isVolumeSheetOpen}
+        onClose={() => setIsVolumeSheetOpen(false)}
+        movements={workloadBreakdown?.movements || []}
+      />
+      <DistanceBreakdownSheet
+        open={isDistanceSheetOpen}
+        onClose={() => setIsDistanceSheetOpen(false)}
+        movements={workloadBreakdown?.movements || []}
+      />
+    </>
+  );
+
+  // -- Single wrapper ──────────────────────────────────────────
+
+  return (
+    <div className={`${styles.container} ${isReward ? styles.containerReward : ''}`}>
+      {isReward && <ConfettiBurst />}
+      {sharedBody}
+      {bottomSheets}
     </div>
   );
 }

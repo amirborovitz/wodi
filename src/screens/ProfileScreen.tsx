@@ -1,33 +1,66 @@
-import { useRef, useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
-import { usePRs } from '../hooks/usePRs';
-import { calculateMetconMinutes } from '../utils/xpCalculations';
+import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
 import styles from './ProfileScreen.module.css';
 
 type TimePeriod = 'week' | 'month' | 'all';
 
+const PERIODS: TimePeriod[] = ['week', 'month', 'all'];
 const PERIOD_LABELS: Record<TimePeriod, string> = {
   week: 'Week',
   month: 'Month',
   all: 'All Time',
 };
 
-const PERIODS: TimePeriod[] = ['week', 'month', 'all'];
-const DAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
 interface ProfileScreenProps {
   onNavigateToPR?: () => void;
   onNavigateToSettings?: () => void;
+}
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function useTickerNumber(target: number, duration = 420): number {
+  const [display, setDisplay] = useState(0);
+  const prevRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = target;
+    if (from === to) return;
+
+    const start = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = easeInOutCubic(progress);
+      setDisplay(from + (to - from) * eased);
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        prevRef.current = to;
+      }
+    };
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, duration]);
+
+  return display;
 }
 
 export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts();
   const weeklyStats = useWeeklyStats();
-  const { prs, loading: prsLoading } = usePRs();
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -36,41 +69,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
   const [photoVersion, setPhotoVersion] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ─── Time-period filtering ───
-  const filteredWorkouts = useMemo(() => {
-    if (timePeriod === 'all') return workouts;
-
-    const now = new Date();
-    let cutoff: Date;
-
-    if (timePeriod === 'week') {
-      const dayOfWeek = now.getDay();
-      const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      cutoff = new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
-    } else {
-      cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    return workouts.filter((w) => w.date >= cutoff);
-  }, [workouts, timePeriod]);
-
-  // ─── Top lifetime PRs (for Hall of Fame) ───
-  const hallOfFamePRs = useMemo(() => {
-    if (prsLoading || prs.length === 0) return [];
-    const bestByMovement = new Map<string, typeof prs[number]>();
-    prs.forEach((pr) => {
-      const key = pr.movement.toLowerCase().trim();
-      const existing = bestByMovement.get(key);
-      if (!existing || pr.weight > existing.weight) {
-        bestByMovement.set(key, pr);
-      }
-    });
-    return [...bestByMovement.values()]
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 12);
-  }, [prs, prsLoading]);
-
-  // ─── Time-period cutoff (shared) ───
   const periodCutoff = useMemo(() => {
     if (timePeriod === 'all') return null;
     const now = new Date();
@@ -79,98 +77,61 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
       const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
       return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
     }
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
   }, [timePeriod]);
 
-  // ─── New PRs hit in current period ───
-  const newPRsInPeriod = useMemo(() => {
-    if (prsLoading || prs.length === 0 || !periodCutoff) return 0;
-    return prs.filter(pr => {
-      return pr.date >= periodCutoff;
-    }).length;
-  }, [prs, prsLoading, periodCutoff]);
+  const filteredWorkouts = useMemo(() => {
+    if (!periodCutoff) return workouts;
+    return workouts.filter((w) => w.date >= periodCutoff);
+  }, [workouts, periodCutoff]);
 
-  // ─── Computed stats ───
   const stats = useMemo(() => {
-    const totalVolume = filteredWorkouts.reduce((acc, w) => acc + w.totalVolume, 0);
-    const totalReps = filteredWorkouts.reduce((acc, w) => acc + w.totalReps, 0);
-    const totalMetconMinutes = filteredWorkouts.reduce(
-      (acc, w) => acc + calculateMetconMinutes(w),
+    const bodyweight = user?.weight || DEFAULT_BW;
+    const totalLiftedKg = filteredWorkouts.reduce((sum, w) => sum + (w.totalVolume || 0), 0);
+    const effortPoints = filteredWorkouts.reduce((sum, w) => {
+      const ep = calculateWorkoutEP(w.totalVolume || 0, getTimeCapMinutes(w), bodyweight, Boolean(w.isPR), w.workloadBreakdown?.movements);
+      return sum + ep.total;
+    }, 0);
+    const moveMinutes = filteredWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0);
+    const workoutsCount = filteredWorkouts.length;
+    const distanceMeters = filteredWorkouts.reduce(
+      (sum, w) => sum + (w.workloadBreakdown?.grandTotalDistance || 0),
       0
     );
-    const totalDistance = filteredWorkouts.reduce(
-      (acc, w) => acc + (w.workloadBreakdown?.grandTotalDistance || 0),
-      0
-    );
-
-    // Intensity: repsPerMinute / 2, clamped 1–10
-    let intensity: number | null = null;
-    if (totalMetconMinutes > 0) {
-      const repsPerMinute = totalReps / totalMetconMinutes;
-      intensity = Math.min(10, Math.max(1, repsPerMinute / 2));
-    }
-
     return {
-      totalVolume,
-      totalMetconMinutes,
-      totalDistance,
-      workoutCount: filteredWorkouts.length,
-      totalDaysActive: new Set(filteredWorkouts.map((w) => {
-        const d = new Date(w.date);
-        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      })).size,
-      intensity,
+      totalLiftedKg,
+      effortPoints,
+      moveMinutes,
+      workoutsCount,
+      distanceMeters,
     };
-  }, [filteredWorkouts]);
+  }, [filteredWorkouts, user?.weight]);
 
-  // ─── 7-Day consistency ───
-  const last7Days = useMemo(() => {
-    const days: { date: Date; initial: string; active: boolean }[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Find Monday of current week
-    const dayOfWeek = today.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + mondayOffset);
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      const hasWorkout = workouts.some((w) => {
-        const wd = new Date(w.date);
-        return (
-          wd.getFullYear() === d.getFullYear() &&
-          wd.getMonth() === d.getMonth() &&
-          wd.getDate() === d.getDate()
-        );
-      });
-      days.push({
-        date: d,
-        initial: DAY_INITIALS[i],
-        active: hasWorkout,
-      });
-    }
-    return days;
-  }, [workouts]);
-
-  // ─── Level calculation ───
   const totalWorkouts = user?.stats.totalWorkouts || workouts.length;
   const totalEP = weeklyStats.weeklyEP + totalWorkouts * 10;
   const level = Math.floor(totalEP / 500) + 1;
-  const levelTitle = getLevelTitle(level);
 
-  // ─── Photo handlers ───
-  const handlePhotoPick = () => {
-    fileInputRef.current?.click();
+  const displayLiftedKg = useTickerNumber(stats.totalLiftedKg);
+  const displayEffortPoints = useTickerNumber(stats.effortPoints);
+  const displayMoveMinutes = useTickerNumber(stats.moveMinutes);
+  const displayWorkouts = useTickerNumber(stats.workoutsCount);
+  const displayDistanceMeters = useTickerNumber(stats.distanceMeters);
+
+  const periodIndex = PERIODS.indexOf(timePeriod);
+  const sliderStyle = {
+    left: `calc(${(periodIndex / PERIODS.length) * 100}% + 3px)`,
+    width: `calc(${100 / PERIODS.length}% - 6px)`,
   };
 
+  const lifted = formatLifted(displayLiftedKg);
+  const moveParts = formatMoveParts(displayMoveMinutes, timePeriod === 'all');
+  const distance = formatDistance(displayDistanceMeters);
+
+  const handlePhotoPick = () => fileInputRef.current?.click();
   const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     event.target.value = '';
-
     setPhotoUploading(true);
     setPhotoError(null);
     const previewUrl = URL.createObjectURL(file);
@@ -188,69 +149,15 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
     }
   };
 
-  // ─── Formatters ───
-  const formatVolume = (kg: number): { value: string; unit: string } => {
-    if (kg >= 1000) {
-      return { value: (kg / 1000).toFixed(1), unit: 'tons' };
-    }
-    return { value: Math.round(kg).toString(), unit: 'kg' };
-  };
-
-  const formatDistance = (meters: number): { value: string; unit: string } => {
-    if (meters >= 1000) {
-      return { value: (meters / 1000).toFixed(1), unit: 'km' };
-    }
-    return { value: Math.round(meters).toString(), unit: 'm' };
-  };
-
-  const formatMinutes = (mins: number): { value: string; unit: string } => {
-    const rounded = Math.round(mins);
-    if (rounded >= 60) {
-      const h = Math.floor(rounded / 60);
-      const m = rounded % 60;
-      return { value: m > 0 ? `${h}h ${m}` : `${h}`, unit: m > 0 ? 'min' : 'hrs' };
-    }
-    return { value: rounded.toString(), unit: 'min' };
-  };
-
-  // ─── Period slider position ───
-  const periodIndex = PERIODS.indexOf(timePeriod);
-  const sliderStyle = {
-    left: `calc(${(periodIndex / 3) * 100}% + 3px)`,
-    width: `calc(${100 / 3}% - 6px)`,
-  };
-
-  const vol = formatVolume(stats.totalVolume);
-  const dist = formatDistance(stats.totalDistance);
-  const move = formatMinutes(stats.totalMetconMinutes);
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: 0.1 + i * 0.05, duration: 0.35, ease: [0.16, 1, 0.3, 1] as const },
-    }),
-  };
-
   return (
     <div className={styles.container}>
-      {/* Header */}
+      {/* Compact Left-Aligned Header */}
       <motion.div
         className={styles.header}
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.25 }}
       >
-        <button
-          className={styles.settingsButton}
-          onClick={onNavigateToSettings}
-          aria-label="Settings"
-        >
-          <SettingsIcon />
-        </button>
-
-        {/* Avatar */}
         <div
           className={styles.avatarWrap}
           onClick={handlePhotoPick}
@@ -274,83 +181,47 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
               className={styles.avatar}
             />
           ) : (
-            <div className={styles.avatarFallback}>
-              {user?.displayName?.[0]?.toUpperCase() || 'W'}
-            </div>
+            <div className={styles.avatarFallback}>{user?.displayName?.[0]?.toUpperCase() || 'W'}</div>
           )}
-          <span className={styles.avatarButton}>{photoUploading ? '...' : '\u270E'}</span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className={styles.hiddenInput}
-            onChange={handlePhotoChange}
-          />
+          <span className={styles.avatarButton}>{photoUploading ? '...' : 'E'}</span>
+          <input ref={fileInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={handlePhotoChange} />
         </div>
 
-        {/* Name & Level */}
-        <h1 className={styles.name}>{user?.displayName}</h1>
-        <span className={styles.levelBadge}>
-          Level {level}: {levelTitle}
-        </span>
-        {photoError && <span className={styles.photoError}>{photoError}</span>}
-
-        {/* 7-Day Consistency */}
-        <div className={styles.consistencyRow}>
-          {last7Days.map((day, i) => (
-            <div key={i} className={styles.dayColumn}>
-              <div className={`${styles.dot} ${day.active ? styles.dotActive : ''}`} />
-              <span
-                className={`${styles.dayLabel} ${day.active ? styles.dayLabelActive : ''}`}
-              >
-                {day.initial}
-              </span>
-            </div>
-          ))}
+        <div className={styles.nameArea}>
+          <h1 className={styles.name}>{user?.displayName}</h1>
+          <span className={styles.subtitle}>{getLevelTitle(level)}</span>
         </div>
+
+        <button className={styles.settingsButton} onClick={onNavigateToSettings} aria-label="Settings">
+          <SettingsIcon />
+        </button>
       </motion.div>
 
-      {/* Hall of Fame — permanent, always visible */}
+      {photoError && <span className={styles.photoError}>{photoError}</span>}
+
+      {/* Hero: Total Lifted + EP Score */}
       <motion.div
-        className={styles.hallOfFame}
-        initial={{ opacity: 0, y: 10 }}
+        className={styles.heroCard}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: 0.05, duration: 0.28 }}
       >
-        <div
-          className={styles.hallOfFameHeader}
-          onClick={onNavigateToPR}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigateToPR?.(); } }}
-        >
-          <div className={styles.hallOfFameIcon}>
-            <TrophyIcon />
-          </div>
-          <span className={styles.hallOfFameTitle}>Hall of Fame</span>
-          <span className={styles.hallOfFameCount}>{prs.length} PR{prs.length !== 1 ? 's' : ''}</span>
-          <div className={styles.hallOfFameChevron}>
-            <ChevronRightIcon />
-          </div>
+        <span className={styles.heroLabel}>TOTAL LIFTED</span>
+        <div className={styles.heroMetric}>
+          <span className={styles.heroNumber}>{lifted.value}</span>
+          <span className={styles.heroUnit}>{lifted.unit}</span>
         </div>
-        {!prsLoading && hallOfFamePRs.length > 0 ? (
-          <div className={styles.prBadgeScroll}>
-            {hallOfFamePRs.map((pr) => (
-              <div key={pr.id} className={styles.prBadge}>
-                <span className={styles.prBadgeMovement}>{pr.movement}</span>
-                <span className={styles.prBadgeWeight}>{pr.weight}kg</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.hallOfFameEmpty}>
-            <span className={styles.hallOfFameEmptyIcon}>
-              <TrophyIcon />
-            </span>
-            <span className={styles.hallOfFameEmptyText}>Your first PR is waiting...</span>
-          </div>
-        )}
+        <div className={styles.epRow}>
+          <span className={styles.epPlus}>+</span>
+          <span className={styles.epNumber}>{Math.round(displayEffortPoints)}</span>
+          <span className={styles.epLabel}>EP</span>
+        </div>
       </motion.div>
+
+      {/* PR Navigation Link */}
+      <button className={styles.prLink} onClick={onNavigateToPR}>
+        Records &amp; PRs &rarr;
+      </button>
 
       {/* Period Toggle */}
       <div className={styles.periodToggle}>
@@ -358,9 +229,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
         {PERIODS.map((period) => (
           <button
             key={period}
-            className={`${styles.periodOption} ${
-              timePeriod === period ? styles.periodOptionActive : ''
-            }`}
+            className={`${styles.periodOption} ${timePeriod === period ? styles.periodOptionActive : ''}`}
             onClick={() => setTimePeriod(period)}
           >
             {PERIOD_LABELS[period]}
@@ -368,119 +237,88 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
         ))}
       </div>
 
-      {/* Bento Grid */}
+      {/* Bento Grid: 3 Equal Cards */}
       <div className={styles.bentoGrid}>
-        {/* Hero: Total Lifted */}
-        <motion.div
-          className={`${styles.heroCard} ${timePeriod === 'all' ? styles.heroCardAllTime : ''}`}
-          custom={0}
-          initial="hidden"
-          animate="visible"
-          variants={cardVariants}
-        >
-          <span className={styles.heroLabel}>Total Lifted</span>
-          <span className={styles.heroValue}>
-            {vol.value}
-            <span className={styles.heroUnit}>{vol.unit}</span>
-          </span>
+        <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
+          <span className={styles.cardLabel}>MOVE TIME</span>
+          <div className={styles.metricLine}>
+            {moveParts.map((part, i) => (
+              <span key={i} className={part.type === 'number' ? styles.metricValue : styles.metricUnit}>
+                {part.text}
+              </span>
+            ))}
+          </div>
         </motion.div>
 
-        {/* 2×2 Grid */}
-        <div className={styles.statsGrid}>
-          {/* Intensity */}
-          <motion.div
-            className={styles.statCard}
-            custom={1}
-            initial="hidden"
-            animate="visible"
-            variants={cardVariants}
-          >
-            <span className={styles.statLabel}>AVG Intensity</span>
-            <span className={`${styles.statValue} ${stats.intensity === null ? styles.statEmpty : ''}`}>
-              {stats.intensity !== null ? stats.intensity.toFixed(1) : '\u2014'}
-            </span>
-          </motion.div>
+        <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
+          <span className={styles.cardLabel}>WORKOUTS</span>
+          <span className={styles.metricValue}>{Math.round(displayWorkouts)}</span>
+        </motion.div>
 
-          {/* Workouts */}
-          <motion.div
-            className={styles.statCard}
-            custom={2}
-            initial="hidden"
-            animate="visible"
-            variants={cardVariants}
-          >
-            <span className={styles.statLabel}>Workouts</span>
-            <span className={styles.statValue}>{stats.workoutCount}</span>
-          </motion.div>
-
-          {/* Move */}
-          <motion.div
-            className={styles.statCard}
-            custom={3}
-            initial="hidden"
-            animate="visible"
-            variants={cardVariants}
-          >
-            <span className={styles.statLabel}>Move</span>
-            <span className={styles.statValue}>
-              {move.value}
-              <span className={styles.statUnit}>{move.unit}</span>
-            </span>
-          </motion.div>
-
-          {/* Distance */}
-          <motion.div
-            className={styles.statCard}
-            custom={4}
-            initial="hidden"
-            animate="visible"
-            variants={cardVariants}
-          >
-            <span className={styles.statLabel}>Distance</span>
-            <span className={`${styles.statValue} ${stats.totalDistance === 0 ? styles.statEmpty : ''}`}>
-              {stats.totalDistance > 0 ? (
-                <>
-                  {dist.value}
-                  <span className={styles.statUnit}>{dist.unit}</span>
-                </>
-              ) : (
-                '\u2014'
-              )}
-            </span>
-          </motion.div>
-
-          {/* New PRs (time-filtered) */}
-          {timePeriod !== 'all' && (
-            <motion.div
-              className={`${styles.statCard} ${styles.statCardPR}`}
-              custom={5}
-              initial="hidden"
-              animate="visible"
-              variants={cardVariants}
-            >
-              <span className={styles.statLabel}>New PRs</span>
-              <span className={`${styles.statValue} ${newPRsInPeriod === 0 ? styles.statEmpty : styles.statValueGold}`}>
-                {newPRsInPeriod > 0 ? newPRsInPeriod : '\u2014'}
-              </span>
-            </motion.div>
+        <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
+          <span className={styles.cardLabel}>DISTANCE</span>
+          {stats.distanceMeters > 0 ? (
+            <div className={styles.metricLine}>
+              <span className={styles.metricValue}>{distance.value}</span>
+              <span className={styles.metricUnit}>{distance.unit}</span>
+            </div>
+          ) : (
+            <span className={`${styles.metricValue} ${styles.metricEmpty}`}>{'\u2014'}</span>
           )}
-
-          {timePeriod === 'all' && (
-            <motion.div
-              className={styles.statCard}
-              custom={5}
-              initial="hidden"
-              animate="visible"
-              variants={cardVariants}
-            >
-              <span className={styles.statLabel}>Total Days Active</span>
-              <span className={styles.statValue}>{stats.totalDaysActive}</span>
-            </motion.div>
-          )}
-        </div>
+        </motion.div>
       </div>
     </div>
   );
+}
+
+function formatLifted(kg: number): { value: string; unit: string } {
+  if (kg >= 1000) return { value: (kg / 1000).toFixed(1), unit: 'tons' };
+  return { value: Math.round(kg).toString(), unit: 'kg' };
+}
+
+type TextPart = { text: string; type: 'number' | 'unit' };
+
+function formatMoveParts(minutes: number, isAllTime: boolean): TextPart[] {
+  const mins = Math.floor(minutes);
+  if (mins === 0) {
+    return [{ text: '\u2014', type: 'number' }];
+  }
+  if (mins < 60) {
+    return [
+      { text: mins.toString(), type: 'number' },
+      { text: 'min', type: 'unit' },
+    ];
+  }
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (isAllTime && h >= 24) {
+    return [
+      { text: h.toString(), type: 'number' },
+      { text: 'h', type: 'unit' },
+    ];
+  }
+  if (m === 0) {
+    return [
+      { text: h.toString(), type: 'number' },
+      { text: 'h', type: 'unit' },
+    ];
+  }
+  return [
+    { text: h.toString(), type: 'number' },
+    { text: 'h ', type: 'unit' },
+    { text: m.toString(), type: 'number' },
+    { text: 'min', type: 'unit' },
+  ];
+}
+
+function formatDistance(meters: number): { value: string; unit: string } {
+  if (meters >= 100_000) {
+    return { value: Math.floor(meters / 1000).toString(), unit: 'km' };
+  }
+  if (meters >= 1000) {
+    return { value: (meters / 1000).toFixed(1), unit: 'km' };
+  }
+  return { value: Math.round(meters).toString(), unit: 'm' };
 }
 
 function getLevelTitle(level: number): string {
@@ -494,39 +332,9 @@ function getLevelTitle(level: number): string {
   return 'Rookie';
 }
 
-function TrophyIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-      <path d="M4 22h16" />
-      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22" />
-      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22" />
-      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
-}
-
 function SettingsIcon() {
   return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>

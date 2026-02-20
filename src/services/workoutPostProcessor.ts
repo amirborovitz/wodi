@@ -195,6 +195,9 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Try to detect and fix implied supersets that AI missed
   processedExercises = processedExercises.map(detectImpliedSuperset);
 
+  // Split buy-in/buy-out distance movements out of round-based WODs
+  processedExercises = splitBuyInBuyOut(processedExercises, workout.rawText);
+
   console.warn('🔧 [PostProcessor] RESULT:', {
     originalFormat: workout.format,
     correctedFormat,
@@ -218,6 +221,169 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
         ? partnerResult.adjustedSets
         : ex.suggestedSets,
     })),
+  };
+}
+
+/**
+ * Split buy-in/buy-out movements from round-based WODs.
+ *
+ * Analyzes the raw workout text to find movements that sit OUTSIDE
+ * the round block. Works for any movement type (distance, reps, cals).
+ *
+ * Text structure:  [buy-in stuff] N RFT: [round stuff] [buy-out stuff]
+ */
+function splitBuyInBuyOut(exercises: ParsedExercise[], rawText?: string): ParsedExercise[] {
+  if (!rawText) return exercises;
+
+  const lower = rawText.toLowerCase();
+
+  // Find the round marker: "8 rft", "8 rounds for time", "8 rounds of:", "8 rounds:", etc.
+  const roundMatch = lower.match(/(\d+)\s*(?:rft|rounds?\s*(?:for\s*time|of)?)\s*:?\s*/);
+  if (!roundMatch || roundMatch.index == null) return exercises;
+
+  const beforeRounds = lower.slice(0, roundMatch.index).trim();
+  const afterRoundMarker = lower.slice(roundMatch.index + roundMatch[0].length);
+
+  const result: ParsedExercise[] = [];
+
+  for (const ex of exercises) {
+    const movements = ex.movements;
+    const rounds = ex.suggestedSets || 1;
+
+    if (ex.type !== 'wod' || rounds < 2 || !movements || movements.length < 2) {
+      result.push(ex);
+      continue;
+    }
+
+    // Check first movement: is its name/distance/reps mentioned BEFORE the round marker?
+    const first = movements[0];
+    const hasBuyIn = beforeRounds.length > 0 && isMovementMentionedInText(first, beforeRounds);
+
+    // Check last movement: is it mentioned after the round content ends?
+    // Look for trailing content after separators: "into", "then", "finish with", or just
+    // the last comma-separated item in the text that matches the last movement
+    const last = movements[movements.length - 1];
+    const hasBuyOut = detectBuyOut(last, afterRoundMarker, movements);
+
+    if (!hasBuyIn && !hasBuyOut) {
+      result.push(ex);
+      continue;
+    }
+
+    const coreStart = hasBuyIn ? 1 : 0;
+    const coreEnd = hasBuyOut ? movements.length - 1 : movements.length;
+    const coreMovements = movements.slice(coreStart, coreEnd);
+
+    if (coreMovements.length === 0) {
+      result.push(ex);
+      continue;
+    }
+
+    console.warn('🔧 [splitBuyInBuyOut] Splitting:', {
+      exercise: ex.name,
+      buyIn: hasBuyIn ? first.name : null,
+      buyOut: hasBuyOut ? last.name : null,
+      coreCount: coreMovements.length,
+    });
+
+    if (hasBuyIn) {
+      result.push(makeSingleSetExercise('Buy-In', first));
+    }
+
+    result.push({
+      ...ex,
+      movements: coreMovements,
+    });
+
+    if (hasBuyOut) {
+      result.push(makeSingleSetExercise('Buy-Out', last));
+    }
+
+    continue;
+  }
+
+  return result;
+}
+
+/** Check if a movement's name, distance, or reps appear in a text fragment */
+function isMovementMentionedInText(mov: ParsedMovement, text: string): boolean {
+  const movLower = mov.name.toLowerCase();
+  // Direct name match
+  if (text.includes(movLower)) return true;
+  // Check common aliases: "run" matches "running", etc.
+  const aliases: Record<string, string[]> = {
+    'run': ['run', 'running'],
+    'row': ['row', 'rowing', 'rower'],
+    'bike': ['bike', 'echo bike', 'assault bike'],
+    'ski': ['ski', 'ski erg', 'skierg'],
+  };
+  for (const [, names] of Object.entries(aliases)) {
+    if (names.some(n => movLower.includes(n)) && names.some(n => text.includes(n))) {
+      return true;
+    }
+  }
+  // Check distance pattern: "600m" in text and movement has distance=600
+  if (mov.distance && mov.distance > 0) {
+    const distPattern = new RegExp(`\\b${mov.distance}\\s*m\\b`);
+    if (distPattern.test(text)) return true;
+  }
+  // Check reps pattern: "50 pull-ups" in text and movement has reps=50
+  if (mov.reps && mov.reps > 0) {
+    const repsPattern = new RegExp(`\\b${mov.reps}\\s+`);
+    if (repsPattern.test(text) && text.includes(movLower)) return true;
+  }
+  return false;
+}
+
+/** Detect if the last movement is a buy-out by checking for trailing text */
+function detectBuyOut(lastMov: ParsedMovement, textAfterRoundMarker: string, allMovements: ParsedMovement[]): boolean {
+  // Look for a buy-out section separator in the text after the round marker
+  // Common patterns: "into:\n600m run", "then 50 pull-ups", "cash out: ..."
+  const buyOutMarker = textAfterRoundMarker.match(/(?:into|then|finish\s*with|cash\s*out|buy\s*out)\s*:?\s*/i);
+
+  if (buyOutMarker && buyOutMarker.index != null) {
+    // Text after the buy-out separator
+    const afterSeparator = textAfterRoundMarker.slice(buyOutMarker.index + buyOutMarker[0].length).trim();
+    if (afterSeparator.length > 0 && isMovementMentionedInText(lastMov, afterSeparator)) {
+      return true;
+    }
+  }
+
+  // Fallback: find where the last round movement is mentioned, then check trailing
+  const roundMovNames = allMovements.slice(0, -1).map(m => m.name.toLowerCase());
+  let lastRoundMentionEnd = 0;
+  for (const name of roundMovNames) {
+    const idx = textAfterRoundMarker.lastIndexOf(name);
+    if (idx >= 0) {
+      lastRoundMentionEnd = Math.max(lastRoundMentionEnd, idx + name.length);
+    }
+  }
+
+  const trailing = textAfterRoundMarker.slice(lastRoundMentionEnd).trim();
+
+  // Look for buy-out separators anywhere in trailing text
+  const buyOutSeparators = /(?:into|then|finish\s*with|cash\s*out|buy\s*out)/i;
+  if (!buyOutSeparators.test(trailing) && trailing.length < 5) return false;
+
+  // Check if the last movement is mentioned in the trailing text
+  return isMovementMentionedInText(lastMov, trailing);
+}
+
+/** Create a 1-set exercise from a single movement */
+function makeSingleSetExercise(prefix: string, mov: ParsedMovement): ParsedExercise {
+  let label = mov.name;
+  if (mov.distance && mov.distance > 0) {
+    const distStr = mov.distance >= 1000 ? `${mov.distance / 1000}km` : `${mov.distance}m`;
+    label = `${distStr} ${mov.name}`;
+  } else if (mov.reps && mov.reps > 0) {
+    label = `${mov.reps} ${mov.name}`;
+  }
+  return {
+    name: `${prefix}: ${label}`,
+    type: 'wod',
+    prescription: label,
+    suggestedSets: 1,
+    movements: [mov],
   };
 }
 
@@ -430,9 +596,13 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     movements = parseMovementsFromPrescription(exercise.prescription, exercise.name);
   }
 
-  // Post-process each movement
-  const processedMovements = movements?.map((mov) =>
-    postProcessMovement(mov, exercise.prescription, exercise.name)
+  // Post-process movements in two passes to avoid cross-contamination
+  // when duplicate names exist (e.g., plain "Run" and weighted "Run with Plate"
+  // both normalize to "Run" — the plain one should NOT inherit the weighted one's weight)
+  const processedMovements = postProcessMovements(
+    movements ?? [],
+    exercise.prescription,
+    exercise.name
   );
 
   // Skill/practice exercises are timed blocks — don't infer sets x reps
@@ -604,14 +774,21 @@ function parseMovementFromText(text: string): ParsedMovement | null {
   }
 
   // Extract time: "30sec bike", "1min row"
+  // Note: bare "m" excluded from minutes to avoid confusion with meters (e.g. "7m shuttle run")
   const timeSecMatch = lower.match(/(\d+)\s*(?:sec(?:onds?)?|s)\s+(\w+.*)$/i);
-  const timeMinMatch = lower.match(/(\d+)\s*(?:min(?:utes?)?|m)\s+(\w+.*)$/i);
+  const timeMinMatch = lower.match(/(\d+)\s*(?:min(?:utes?)?)\s+(\w+.*)$/i);
 
   if (timeSecMatch) {
-    movement.time = parseInt(timeSecMatch[1]);
+    const t = parseInt(timeSecMatch[1]);
+    if (t > 0) {  // Skip time=0 — it's a start marker, not a duration
+      movement.time = t;
+    }
     movement.name = timeSecMatch[2].trim();
   } else if (timeMinMatch) {
-    movement.time = parseInt(timeMinMatch[1]) * 60;
+    const t = parseInt(timeMinMatch[1]);
+    if (t > 0) {
+      movement.time = t * 60;
+    }
     movement.name = timeMinMatch[2].trim();
   }
 
@@ -629,6 +806,16 @@ function parseMovementFromText(text: string): ParsedMovement | null {
   if (calMatch) {
     movement.calories = parseInt(calMatch[1]);
     movement.name = calMatch[2].trim();
+  }
+
+  // Extract calories from parenthetical: "(10-15 calories)", "(12 cal)"
+  if (!movement.calories) {
+    const parenCalMatch = lower.match(/\((\d+)(?:\s*[-–]\s*\d+)?\s*cal(?:ories?)?\)/i);
+    if (parenCalMatch) {
+      movement.calories = parseInt(parenCalMatch[1]);
+      // Clean the parenthetical from the name
+      movement.name = movement.name.replace(/\s*\(\d+(?:\s*[-–]\s*\d+)?\s*cal(?:ories?)?\)/i, '').trim();
+    }
   }
 
   // Extract weight: "32/24kg", "32/24", "@60kg"
@@ -661,67 +848,222 @@ function parseMovementFromText(text: string): ParsedMovement | null {
 /**
  * Post-process a single movement
  */
-function postProcessMovement(
-  movement: ParsedMovement,
+/**
+ * Enrich a normalized movement name with context the AI parser stripped.
+ * Scans the prescription text for modifiers near the movement's base name.
+ */
+function enrichMovementFromPrescription(normalizedName: string, fullText: string): string {
+  const lower = normalizedName.toLowerCase();
+  const text = fullText.toLowerCase();
+
+  // Map: modifier patterns in text → prefix to add to name, and which base names they apply to
+  const modifierRules: Array<{ patterns: RegExp[]; prefix: string; appliesTo: (name: string) => boolean }> = [
+    {
+      // "alternate/alternating/alt' db/kb snatch" etc.
+      patterns: [
+        /\b(?:alternate|alternating|alt['']?)\s+(?:db|dumbbell|kb|kettlebell)\b/i,
+        /\b(?:db|dumbbell|kb|kettlebell)\s+(?:alternate|alternating|alt['']?)\b/i,
+      ],
+      prefix: 'Alt',
+      appliesTo: (name) => /\b(db|kb|dumbbell|kettlebell)\b/i.test(name),
+    },
+    {
+      // "single arm/single-arm db/kb"
+      patterns: [/\b(?:single[- ]arm|one[- ]arm)\s+(?:db|dumbbell|kb|kettlebell)\b/i],
+      prefix: 'Single Arm',
+      appliesTo: (name) => /\b(db|kb|dumbbell|kettlebell)\b/i.test(name),
+    },
+    {
+      // "shuttle run" → rename "Run" to "Shuttle Run"
+      patterns: [/\bshuttle\s*run\b/i],
+      prefix: 'Shuttle',
+      appliesTo: (name) => /^run$/i.test(name),
+    },
+  ];
+
+  for (const rule of modifierRules) {
+    if (!rule.appliesTo(lower)) continue;
+    // Check if the prefix is already in the name
+    if (lower.startsWith(rule.prefix.toLowerCase())) continue;
+    if (rule.patterns.some(p => p.test(text))) {
+      return `${rule.prefix} ${normalizedName}`;
+    }
+  }
+
+  return normalizedName;
+}
+
+/**
+ * Post-process movements in two passes to prevent weight cross-contamination.
+ *
+ * Problem: When an exercise has duplicate movement names (e.g., "Run" and
+ * "Run with Plate"), both normalize to "Run". The full-text weight search
+ * then assigns the weighted variant's weight to BOTH movements.
+ *
+ * Solution — two passes:
+ *   Pass 1: Normalize names, extract weights from each movement's OWN name,
+ *           and preserve any AI-assigned rxWeights.
+ *   Pass 2: For movements still missing weights, search the full prescription
+ *           text BUT skip the search if a sibling with the same normalized
+ *           name already has weights (the weight belongs to THAT sibling).
+ */
+function postProcessMovements(
+  movements: ParsedMovement[],
   prescription: string,
   exerciseName: string
-): ParsedMovement {
-  const result = { ...movement };
-  const lowerName = movement.name.toLowerCase();
+): ParsedMovement[] {
   const fullText = `${exerciseName} ${prescription}`.toLowerCase();
 
-  // 1. Normalize movement name
-  result.name = normalizeMovementName(movement.name);
+  // ── Pass 1: normalize + extract weight from own name ──
+  const pass1 = movements.map((mov) => {
+    const result = { ...mov };
+    const lowerName = mov.name.toLowerCase();
 
-  // 2. Extract weights if missing
-  if (!result.rxWeights) {
-    // Try to find weight in the movement name itself
-    const nameWeights = extractWeightsFromText(movement.name);
-    if (nameWeights) {
-      result.rxWeights = nameWeights;
-      // Clean the weight from the name
-      result.name = cleanWeightFromName(result.name);
-    } else {
-      // Try to find weight associated with this movement in prescription
-      const movWeights = findWeightForMovement(lowerName, fullText);
-      if (movWeights) {
-        result.rxWeights = movWeights;
+    // 1. Normalize movement name
+    result.name = normalizeMovementName(mov.name);
+
+    // 1b. Enrich movement name with context from prescription text
+    result.name = enrichMovementFromPrescription(result.name, fullText);
+
+    // 2a. Extract weights from the movement's OWN name (not full text)
+    if (!result.rxWeights) {
+      const nameWeights = extractWeightsFromText(mov.name);
+      if (nameWeights) {
+        result.rxWeights = nameWeights;
+        result.name = cleanWeightFromName(result.name);
       }
     }
-  }
 
-  // 3. Handle time-based cardio
-  if (isCardioMachine(lowerName) && !result.time && !result.distance && !result.calories) {
-    const time = extractTimeFromText(fullText, lowerName);
-    if (time) {
-      result.time = time;
-    }
-  }
-
-  // 4. Ensure cardio movements have some metric
-  if (isCardioMachine(lowerName)) {
-    // If no metric set, check prescription for clues
-    if (!result.time && !result.distance && !result.calories) {
-      const distance = extractDistanceFromText(fullText, lowerName);
-      if (distance) {
-        result.distance = distance.value;
-        result.unit = distance.unit;
+    // 3. Handle time-based cardio
+    if (isCardioMachine(lowerName) && !result.time && !result.distance && !result.calories) {
+      const time = extractTimeFromText(fullText, lowerName);
+      if (time) {
+        result.time = time;
       }
     }
+
+    // 4. Ensure cardio movements have some metric
+    if (isCardioMachine(lowerName)) {
+      if (!result.time && !result.distance && !result.calories) {
+        const distance = extractDistanceFromText(fullText, lowerName);
+        if (distance) {
+          result.distance = distance.value;
+          result.unit = distance.unit;
+        }
+      }
+    }
+
+    return result;
+  });
+
+  // ── Pass 2: full-text weight search with positional clause matching ──
+  // For duplicate movement names, use clause-level matching so only the
+  // instance whose specific clause contains a weight gets it assigned.
+
+  // Build a set of normalized names that already have weights after pass 1
+  const namesWithWeights = new Set<string>();
+  for (const m of pass1) {
+    if (m.rxWeights) {
+      namesWithWeights.add(m.name.toLowerCase());
+    }
   }
 
-  return result;
+  // Count occurrences of each normalized name
+  const nameCounts = new Map<string, number>();
+  for (const m of pass1) {
+    const key = m.name.toLowerCase();
+    nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
+  }
+
+  // Track which occurrence index we're at for each normalized name
+  const nameSeenCount = new Map<string, number>();
+
+  console.log('[postProcessMovements] Pass 2 — nameCounts:', Object.fromEntries(nameCounts),
+    'namesWithWeights:', [...namesWithWeights]);
+
+  return pass1.map((result, i) => {
+    if (result.rxWeights) {
+      console.log(`[postProcessMovements] "${result.name}" already has weight from pass 1`);
+      return result;
+    }
+
+    const normalizedLower = result.name.toLowerCase();
+    const originalLower = movements[i].name.toLowerCase();
+    const isDuplicate = (nameCounts.get(normalizedLower) || 0) > 1;
+
+    // If a sibling with the same normalized name already has weights,
+    // skip the full-text search — the weight belongs to that sibling.
+    if (isDuplicate && namesWithWeights.has(normalizedLower)) {
+      console.log(
+        `[postProcessMovements] Skipping weight search for "${result.name}" — sibling already has weight`
+      );
+      return result;
+    }
+
+    // For duplicates where NO sibling has weight yet, use positional clause matching:
+    // split the text into clauses, find each clause mentioning this movement,
+    // and only assign weight if THIS instance's clause has one.
+    if (isDuplicate) {
+      const occurrenceIdx = nameSeenCount.get(normalizedLower) || 0;
+      nameSeenCount.set(normalizedLower, occurrenceIdx + 1);
+
+      const clauseWeight = findWeightForNthOccurrence(normalizedLower, fullText, occurrenceIdx);
+      if (clauseWeight) {
+        // Mark this name as having weight so later siblings with the same name
+        // but no weight in their clause won't get it
+        namesWithWeights.add(normalizedLower);
+        return { ...result, rxWeights: clauseWeight };
+      }
+      return result;
+    }
+
+    // Unique movement name — safe to search full text
+    // Try normalized name first (e.g., "run"), fall back to original (e.g., "200m run")
+    const movWeights =
+      findWeightForMovement(normalizedLower, fullText) ??
+      findWeightForMovement(originalLower, fullText);
+    if (movWeights) {
+      console.log(`[postProcessMovements] Found weight for unique "${result.name}" via full-text search`);
+      return { ...result, rxWeights: movWeights };
+    }
+
+    return result;
+  });
 }
 
 /**
  * Normalize movement name to canonical form
  */
+// Movement modifiers that should be preserved as prefixes during name normalization
+const PRESERVED_PREFIXES: Record<string, string> = {
+  'alternate': 'Alt',
+  'alternating': 'Alt',
+  'alt': 'Alt',
+  'single arm': 'Single Arm',
+  'single-arm': 'Single Arm',
+  'one arm': 'Single Arm',
+};
+
 function normalizeMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
+  console.log('[normalizeMovementName] input:', name, '→ lower:', lower);
 
   // 1. Check for exact match first (highest priority)
   if (MOVEMENT_ALIASES[lower]) {
+    console.log('[normalizeMovementName] exact match:', MOVEMENT_ALIASES[lower]);
     return MOVEMENT_ALIASES[lower];
+  }
+
+  // 1b. Extract preserved prefix modifiers before alias matching
+  let prefix = '';
+  let strippedLower = lower;
+  for (const [pattern, display] of Object.entries(PRESERVED_PREFIXES)) {
+    const prefixRegex = new RegExp(`^${escapeRegex(pattern)}\\s+`, 'i');
+    if (prefixRegex.test(strippedLower)) {
+      prefix = display + ' ';
+      strippedLower = strippedLower.replace(prefixRegex, '');
+      break;
+    }
   }
 
   // 2. Check for word-boundary matches (safer than substring)
@@ -732,8 +1074,18 @@ function normalizeMovementName(name: string): string {
   for (const [alias, canonical] of sortedAliases) {
     // Use word boundary regex instead of includes()
     const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
-    if (regex.test(lower)) {
-      return canonical;
+    if (regex.test(strippedLower)) {
+      return prefix + canonical;
+    }
+  }
+
+  // Also try original (with prefix) for aliases that include the modifier
+  if (prefix) {
+    for (const [alias, canonical] of sortedAliases) {
+      const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
+      if (regex.test(lower)) {
+        return canonical;
+      }
     }
   }
 
@@ -781,9 +1133,11 @@ function extractWeightsFromText(text: string): RxWeights | undefined {
  */
 function findWeightForMovement(movementName: string, text: string): RxWeights | undefined {
   // Look for patterns like "swings 32/24kg" or "kb swing @24kg"
+  // Use [^,\n\d]*? to stop at clause boundaries (commas, newlines) so we only match
+  // weight directly associated with THIS movement mention, not a different one
   const patterns = [
-    new RegExp(`${escapeRegex(movementName)}[^\\d]*(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
-    new RegExp(`${escapeRegex(movementName)}[^\\d]*@?\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
+    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
+    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?@?\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
   ];
 
   for (const pattern of patterns) {
@@ -810,6 +1164,37 @@ function findWeightForMovement(movementName: string, text: string): RxWeights | 
   }
 
   return undefined;
+}
+
+/**
+ * Find weight for the Nth occurrence of a movement in the text.
+ * Splits text into clauses (by comma/newline/semicolon), finds all clauses
+ * mentioning this movement, and extracts weight only from the Nth clause.
+ * This prevents "200m run, 200m run + 10/5kg plate" from assigning weight to both.
+ */
+function findWeightForNthOccurrence(
+  movementName: string,
+  text: string,
+  occurrenceIndex: number
+): RxWeights | undefined {
+  // Split into clauses
+  const clauses = text.split(/[,;\n]+/).map(c => c.trim()).filter(Boolean);
+
+  // Find all clauses mentioning this movement
+  const nameRegex = new RegExp(`\\b${escapeRegex(movementName)}\\b`, 'i');
+  const matchingClauses = clauses.filter(c => nameRegex.test(c));
+
+  console.log(
+    `[findWeightForNthOccurrence] "${movementName}" occurrence #${occurrenceIndex}`,
+    `clauses:`, matchingClauses
+  );
+
+  // Get the clause for this specific occurrence
+  const clause = matchingClauses[occurrenceIndex];
+  if (!clause) return undefined;
+
+  // Search for weight ONLY within this clause
+  return findWeightForMovement(movementName, clause);
 }
 
 /**

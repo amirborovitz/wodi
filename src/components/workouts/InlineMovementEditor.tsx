@@ -3,6 +3,36 @@ import type { ParsedMovement } from '../../types';
 import { getExerciseAlternatives, findExerciseDefinition, getAlternativeType } from '../../data/exerciseDefinitions';
 import styles from './InlineMovementEditor.module.css';
 
+/**
+ * Generate unique keys for a movements array.
+ * If a name appears more than once, subsequent occurrences get a "::1", "::2" suffix.
+ * Unique names keep their plain name as key.
+ */
+export function getMovementKeys(movements: ParsedMovement[]): string[] {
+  const counts = new Map<string, number>();
+  // First pass: count occurrences
+  for (const m of movements) {
+    counts.set(m.name, (counts.get(m.name) || 0) + 1);
+  }
+  // Second pass: assign keys
+  const seen = new Map<string, number>();
+  return movements.map(m => {
+    const total = counts.get(m.name) || 1;
+    if (total === 1) return m.name; // unique — no suffix
+    const idx = seen.get(m.name) || 0;
+    seen.set(m.name, idx + 1);
+    return idx === 0 ? m.name : `${m.name}::${idx}`;
+  });
+}
+
+/**
+ * Look up a value from a name-keyed map using a movement key.
+ * Tries the full key first, falls back to plain name (for backward compat with saved data).
+ */
+export function movementLookup<T>(map: Record<string, T>, key: string, plainName: string): T | undefined {
+  return map[key] ?? (key !== plainName ? map[plainName] : undefined);
+}
+
 interface MovementEditorProps {
   movement: ParsedMovement;
   // Current values
@@ -11,12 +41,18 @@ interface MovementEditorProps {
   customTime?: number;
   customWeight?: number;
   customReps?: number;
+  customCalories?: number;
+  // KB/DB implement count (only passed for KB/DB movements)
+  implementCount?: 1 | 2;
+  implementFixed?: boolean; // true = auto-determined, don't show selector
   // Callbacks
   onAlternativeChange?: (originalName: string, alternativeName: string | null, newDistance?: number) => void;
   onDistanceChange?: (movementName: string, distance: number) => void;
   onTimeChange?: (movementName: string, time: number) => void;
   onWeightChange?: (movementName: string, weight: number) => void;
   onRepsChange?: (movementName: string, reps: number) => void;
+  onCaloriesChange?: (movementName: string, calories: number) => void;
+  onImplementCountChange?: (movementName: string, count: 1 | 2) => void;
   // Display options
   showWeight?: boolean;
   readOnly?: boolean;
@@ -151,14 +187,20 @@ export function InlineMovementEditor({
   customTime,
   customWeight,
   customReps,
+  customCalories,
+  implementCount,
+  implementFixed,
   onAlternativeChange,
   onDistanceChange,
   onTimeChange,
   onWeightChange,
   onRepsChange,
+  onCaloriesChange,
+  onImplementCountChange,
   showWeight,
   readOnly = false,
 }: MovementEditorProps) {
+  console.log('[InlineMovementEditor] Rendering:', movement.name, { showWeight, implementCount, implementFixed, distance: movement.distance, time: movement.time, calories: movement.calories, reps: movement.reps });
   const definedAlternatives = getExerciseAlternatives(movement.name);
   // Include parsed alternative (from OR option like "40 DU / 60 singles") if not already in list
   const parsedAlt = movement.alternative;
@@ -191,13 +233,29 @@ export function InlineMovementEditor({
   const displayDistance = customDistance ?? movement.distance;
   const displayTime = customTime ?? movement.time;
   const displayReps = customReps ?? movement.reps;
+  const displayCalories = customCalories ?? movement.calories;
   const displayUnit = movement.unit || 'm';
 
+  // Use exercise's defaultUnit to pick the right primary metric
+  const defaultUnit = exerciseDef?.defaultUnit;
+
+  // Shuttle runs: distance is just the shuttle length (e.g. 7m), not a workout metric.
+  // Time is defined by the EMOM structure, not an editable input.
+  // Suppress both — the card just shows the movement name.
+  const isShuttleRun = /shuttle/i.test(movement.name);
+
+  // Non-machine cardio (run, shuttle run, bear crawl, etc.) prescribed by time:
+  // distance is unmeasurable, so suppress it and show time instead.
+  // Machine cardio (bike, rower, ski erg) keeps distance/calories because they're measurable.
+  const isMachineCardio = exerciseDef?.category === 'cardio' &&
+    /\b(bike|row|ski|erg|assault|echo|air\s?runner)\b/i.test(movement.name);
+  const timePrescribedNoDistance = hasTime && hasDistance && !isMachineCardio;
+
   // Determine what metrics to show
-  const showTimeInput = hasTime || (supportsTime && !hasDistance && !hasCalories);
-  const showDistanceInput = hasDistance;
-  const showCaloriesDisplay = hasCalories && !hasDistance && !hasTime;
   const showRepsInput = hasReps;
+  const showDistanceInput = hasDistance && !timePrescribedNoDistance && !isShuttleRun;
+  const showCaloriesInput = hasCalories || (defaultUnit === 'calories' && !hasReps && !hasDistance);
+  const showTimeInput = !isShuttleRun && (hasTime || (supportsTime && !showDistanceInput && !hasCalories)) && !(defaultUnit === 'calories' && showCaloriesInput);
   const showWeightInput = isWeighted;
 
   // Select all text on focus for easy overwriting
@@ -228,20 +286,24 @@ export function InlineMovementEditor({
     }
   };
 
-  // Determine primary value and unit
+  // Determine primary value and unit — respect exercise's defaultUnit for priority
   const getPrimaryValue = () => {
     if (showRepsInput) return { value: displayReps, unit: 'reps', type: 'reps' as const };
+    // For cardio machines (defaultUnit: calories), prefer calories over distance/time
+    if (defaultUnit === 'calories' && showCaloriesInput) return { value: displayCalories, unit: 'cal', type: 'calories' as const };
     if (showDistanceInput) return { value: displayDistance, unit: displayUnit, type: 'distance' as const };
-    if (showTimeInput) return { value: displayTime, unit: 's', type: 'time' as const };
-    if (showCaloriesDisplay) return { value: movement.calories, unit: 'cal', type: 'calories' as const };
+    if (showCaloriesInput) return { value: displayCalories, unit: 'cal', type: 'calories' as const };
+    if (showTimeInput) return { value: displayTime, unit: 'sec', type: 'time' as const };
     return null;
   };
 
   const primary = getPrimaryValue();
 
+  const hasImplementToggle = implementCount !== undefined && !implementFixed && !readOnly && onImplementCountChange;
+
   return (
     <div className={`${styles.movementCard} ${isSubstituted ? styles.substituted : ''}`}>
-      {/* Movement Name - flexible width, allows wrapping */}
+      {/* NAME HEADER — full width */}
       <div className={styles.nameColumn}>
         {hasAlternatives ? (
           <select
@@ -263,58 +325,78 @@ export function InlineMovementEditor({
             {displayLabel}
           </div>
         )}
-
       </div>
 
-      {/* Value Group - value + unit glued together */}
-      {primary && (
-        <div className={styles.valueGroup}>
-          {!readOnly ? (
-            <input
-              type="number"
-              inputMode="numeric"
-              enterKeyHint="next"
-              className={styles.valueInput}
-              value={primary.value ?? ''}
-              onChange={(e) => {
-                const val = parseInt(e.target.value) || 0;
-                if (primary.type === 'reps') onRepsChange?.(movement.name, val);
-                else if (primary.type === 'distance') onDistanceChange?.(movement.name, val);
-                else if (primary.type === 'time') onTimeChange?.(movement.name, val);
-              }}
-              onFocus={handleSelectOnFocus}
-              min="0"
-            />
-          ) : (
-            <div className={styles.valueDisplay}>{primary.value}</div>
-          )}
-          {!showWeightInput && (
-            <span className={styles.unitLabel}>{primary.unit}</span>
-          )}
-        </div>
-      )}
-
-      {/* Weight Group - weight + unit glued together */}
-      {showWeightInput && (
-        <div className={styles.weightGroup}>
-          {!readOnly ? (
-            <input
-              type="number"
-              inputMode="decimal"
-              enterKeyHint="next"
-              className={styles.weightInput}
-              value={customWeight || ''}
-              onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
-              onFocus={handleSelectOnFocus}
-              placeholder={movement.rxWeights?.male?.toString() || ''}
-              min="0"
-            />
-          ) : movement.rxWeights ? (
-            <div className={styles.valueDisplay}>
-              {movement.rxWeights.male}
+      {/* INPUT ROW — value, implement toggle, weight */}
+      {(primary || showWeightInput || hasImplementToggle) && (
+        <div className={styles.inputRow}>
+          {primary && (
+            <div className={styles.valueGroup}>
+              {!readOnly ? (
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  enterKeyHint="next"
+                  className={styles.valueInput}
+                  value={primary.value ?? ''}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    if (primary.type === 'reps') onRepsChange?.(movement.name, val);
+                    else if (primary.type === 'distance') onDistanceChange?.(movement.name, val);
+                    else if (primary.type === 'time') onTimeChange?.(movement.name, val);
+                    else if (primary.type === 'calories') onCaloriesChange?.(movement.name, val);
+                  }}
+                  onFocus={handleSelectOnFocus}
+                  min="0"
+                />
+              ) : (
+                <div className={styles.valueDisplay}>{primary.value}</div>
+              )}
+              <span className={styles.unitLabel}>{primary.unit}</span>
             </div>
-          ) : null}
-          <span className={styles.unitLabel}>kg</span>
+          )}
+
+          {hasImplementToggle && (
+            <div className={styles.implementSelector}>
+              <button
+                type="button"
+                className={`${styles.implementButton} ${implementCount === 1 ? styles.implementActive : ''}`}
+                onClick={() => onImplementCountChange!(movement.name, 1)}
+              >
+                1x
+              </button>
+              <button
+                type="button"
+                className={`${styles.implementButton} ${implementCount === 2 ? styles.implementActive : ''}`}
+                onClick={() => onImplementCountChange!(movement.name, 2)}
+              >
+                2x
+              </button>
+            </div>
+          )}
+
+          {showWeightInput && (
+            <div className={styles.weightGroup}>
+              {!readOnly ? (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  enterKeyHint="next"
+                  className={styles.weightInput}
+                  value={customWeight || ''}
+                  onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
+                  onFocus={handleSelectOnFocus}
+                  placeholder={movement.rxWeights?.male?.toString() || ''}
+                  min="0"
+                />
+              ) : movement.rxWeights ? (
+                <div className={styles.valueDisplay}>
+                  {movement.rxWeights.male}
+                </div>
+              ) : null}
+              <span className={styles.unitLabel}>kg</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -328,13 +410,20 @@ interface MovementListEditorProps {
   customTimes: Record<string, number>;
   customWeights: Record<string, number>;
   customReps: Record<string, number>;
+  customCalories?: Record<string, number>;
+  // Per-movement KB/DB implement counts
+  movementImplementCounts?: Record<string, 1 | 2>;
+  movementImplementFixed?: Record<string, boolean>;
   onAlternativeChange: (originalName: string, alternativeName: string | null, newDistance?: number) => void;
   onDistanceChange: (movementName: string, distance: number) => void;
   onTimeChange: (movementName: string, time: number) => void;
   onWeightChange: (movementName: string, weight: number) => void;
   onRepsChange: (movementName: string, reps: number) => void;
+  onCaloriesChange?: (movementName: string, calories: number) => void;
+  onImplementCountChange?: (movementName: string, count: 1 | 2) => void;
   showWeight?: boolean;
   readOnly?: boolean;
+  labels?: string[];
 }
 
 export function MovementListEditor({
@@ -344,34 +433,54 @@ export function MovementListEditor({
   customTimes,
   customWeights,
   customReps,
+  customCalories,
+  movementImplementCounts,
+  movementImplementFixed,
   onAlternativeChange,
   onDistanceChange,
   onTimeChange,
   onWeightChange,
   onRepsChange,
+  onCaloriesChange,
+  onImplementCountChange,
   showWeight,
   readOnly = false,
+  labels,
 }: MovementListEditorProps) {
+  const keys = getMovementKeys(movements);
+
   return (
     <div className={styles.movementList}>
-      {movements.map((movement, index) => (
-        <InlineMovementEditor
-          key={`${movement.name}-${index}`}
-          movement={movement}
-          selectedAlternative={selectedAlternatives[movement.name]}
-          customDistance={customDistances[movement.name]}
-          customTime={customTimes[movement.name]}
-          customWeight={customWeights[movement.name]}
-          customReps={customReps[movement.name]}
-          onAlternativeChange={onAlternativeChange}
-          onDistanceChange={onDistanceChange}
-          onTimeChange={onTimeChange}
-          onWeightChange={onWeightChange}
-          onRepsChange={onRepsChange}
-          showWeight={showWeight}
-          readOnly={readOnly}
-        />
-      ))}
+      {movements.map((movement, index) => {
+        const key = keys[index];
+        return (
+          <div key={`${movement.name}-${index}`}>
+            {labels?.[index] && (
+              <span className={styles.movementMinuteLabel}>{labels[index]}</span>
+            )}
+            <InlineMovementEditor
+              movement={movement}
+              selectedAlternative={selectedAlternatives[key]}
+              customDistance={customDistances[key]}
+              customTime={customTimes[key]}
+              customWeight={customWeights[key]}
+              customReps={customReps[key]}
+              customCalories={customCalories?.[key]}
+              implementCount={movementImplementCounts?.[key]}
+              implementFixed={movementImplementFixed?.[key]}
+              onAlternativeChange={(_name, alt, dist) => onAlternativeChange(key, alt, dist)}
+              onDistanceChange={(_name, dist) => onDistanceChange(key, dist)}
+              onTimeChange={(_name, time) => onTimeChange(key, time)}
+              onWeightChange={(_name, weight) => onWeightChange(key, weight)}
+              onRepsChange={(_name, reps) => onRepsChange(key, reps)}
+              onCaloriesChange={onCaloriesChange ? (_name, cal) => onCaloriesChange(key, cal) : undefined}
+              onImplementCountChange={onImplementCountChange ? (_name, count) => onImplementCountChange(key, count) : undefined}
+              showWeight={showWeight}
+              readOnly={readOnly}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

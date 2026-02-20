@@ -20,6 +20,11 @@ interface WorkoutSummaryInput {
   };
 }
 
+interface CalculateRewardResult {
+  data: RewardData;
+  fetchedPRs: PersonalRecord[];
+}
+
 interface UseRewardDataResult {
   loading: boolean;
   error: string | null;
@@ -29,7 +34,7 @@ interface UseRewardDataResult {
     workout: WorkoutSummaryInput,
     currentStreak: number,
     totalWorkouts: number
-  ) => Promise<RewardData>;
+  ) => Promise<CalculateRewardResult>;
 }
 
 export function useRewardData(): UseRewardDataResult {
@@ -42,7 +47,7 @@ export function useRewardData(): UseRewardDataResult {
     workout: WorkoutSummaryInput,
     currentStreak: number,
     totalWorkouts: number
-  ): Promise<RewardData> => {
+  ): Promise<CalculateRewardResult> => {
     setLoading(true);
     setError(null);
 
@@ -147,7 +152,7 @@ export function useRewardData(): UseRewardDataResult {
 
       setRewardData(data);
       setLoading(false);
-      return data;
+      return { data, fetchedPRs: allTimeRecords };
     } catch (err) {
       console.error('Error calculating reward data:', err);
       setError('Failed to calculate reward data');
@@ -183,7 +188,7 @@ export function useRewardData(): UseRewardDataResult {
       };
 
       setRewardData(fallbackData);
-      return fallbackData;
+      return { data: fallbackData, fetchedPRs: [] };
     }
   }, []);
 

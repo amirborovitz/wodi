@@ -81,6 +81,8 @@ export interface Workout {
   duration?: number;       // minutes
   notes?: string;
   rawText?: string;
+  timeCap?: number;        // seconds, from parsedWorkout.timeCap
+  format?: WorkoutFormat;  // workout format for EP recalculation
   createdAt: Date;
   updatedAt: Date;
 }
@@ -118,6 +120,7 @@ export interface ExerciseSet {
 // Personal Records
 export interface PersonalRecord {
   id: string;
+  userId?: string;
   movement: string;
   weight: number;
   date: Date;
@@ -158,6 +161,7 @@ export interface MovementTotal {
   wasSubstituted?: boolean;     // True if this is a substitution
   substitutionType?: 'easier' | 'harder' | 'equivalent';  // Scaling type
   implementCount?: number;  // 1=single, 2=pair (KB/DB)
+  distancePerRep?: number;  // Single-round distance before multiplying by rounds
 }
 
 export interface WorkloadBreakdown {
@@ -165,6 +169,7 @@ export interface WorkloadBreakdown {
   grandTotalReps: number;
   grandTotalVolume: number;
   grandTotalDistance?: number;
+  grandTotalWeightedDistance?: number;
   grandTotalCalories?: number;
   containerRounds?: number;
   benchmarkName?: string;
@@ -313,22 +318,25 @@ export interface WeeklyStats {
   goal: number;
 }
 
-// XP calculation breakdown
-export interface XPBreakdown {
-  base: number;        // 20 XP per workout
-  volume: number;      // 1 XP per 100kg lifted
-  metcon: number;      // 2 XP per metcon minute
-  streak: number;      // 10 XP bonus for hitting weekly goal
-  pr: number;          // 25 XP per PR
+// EP (Effort Points) calculation breakdown
+export interface EPBreakdown {
+  base: number;        // EP_BASE per workout
+  time: number;        // timeCap_minutes × EP_METCON_RATE
+  volume: number;      // (totalVolume / bodyweight) × EP_VOLUME_RATE
+  distance: number;    // distance_meters × EP_DISTANCE_RATE (× carry multiplier)
+  pr: number;          // EP_PR_BONUS per PR
   total: number;
 }
+
+/** @deprecated Use EPBreakdown instead */
+export type XPBreakdown = EPBreakdown;
 
 // Extended workout with calculated stats
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
   totalVolume: number;
   metconMinutes?: number;
-  xp?: XPBreakdown;
+  ep?: EPBreakdown;
   isPR?: boolean;
 }
 

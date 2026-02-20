@@ -1,7 +1,10 @@
-import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { motion, AnimatePresence, type PanInfo } from 'framer-motion';
 import type { WorkoutType } from '../../types';
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
-import { calculateMetconMinutes, calculateWorkoutXP } from '../../utils/xpCalculations';
+import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../../utils/xpCalculations';
+import { useAuth } from '../../context/AuthContext';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import styles from './WorkoutFeedCard.module.css';
 
 interface WorkoutFeedCardProps {
@@ -9,47 +12,41 @@ interface WorkoutFeedCardProps {
   index: number;
   onClick?: () => void;
   onDelete?: () => void;
-  isPR?: boolean; // Whether this workout contains a PR
+  onEdit?: () => void;
+  isPR?: boolean;
 }
 
-// Colorful gradients for each workout type
-const typeStyles: Record<WorkoutType, { gradient: string; icon: string; label: string; color: string }> = {
-  for_time: {
-    gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)',
-    icon: 'FT',
-    label: 'In Motion',
-    color: '#FF6B6B',
-  },
-  amrap: {
-    gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    icon: 'AMRAP',
-    label: 'AMRAP',
-    color: '#667eea',
-  },
-  emom: {
-    gradient: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
-    icon: 'EMOM',
-    label: 'EMOM',
-    color: '#11998e',
-  },
-  strength: {
-    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    icon: 'STR',
-    label: 'Strength',
-    color: '#f093fb',
-  },
-  metcon: {
-    gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    icon: 'MET',
-    label: 'MetCon',
-    color: '#4facfe',
-  },
-  mixed: {
-    gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    icon: 'MIX',
-    label: 'Mixed',
-    color: '#fa709a',
-  },
+const GENERIC_TITLES = /^(workout|practice|training|session|untitled|wod|cycle\s*\d*|week\s*\d*|day\s*\d*)$/i;
+
+function getSmartTitle(workout: WorkoutWithStats): string {
+  const raw = workout.title?.trim();
+  if (raw && !GENERIC_TITLES.test(raw)) return raw;
+
+  // Build from movements (first two)
+  const movements = workout.workloadBreakdown?.movements;
+  if (movements && movements.length > 0) {
+    const names = movements.map(m => m.name);
+    if (names.length === 1) return names[0];
+    return `${names[0]} & ${names[1]}`;
+  }
+
+  // Fallback to exercises (first two)
+  if (workout.exercises?.length > 0) {
+    const names = workout.exercises.map(e => e.name).filter(Boolean);
+    if (names.length === 1) return names[0];
+    if (names.length >= 2) return `${names[0]} & ${names[1]}`;
+  }
+
+  return 'Workout';
+}
+
+const typeStyles: Record<WorkoutType, { icon: string; label: string; color: string }> = {
+  for_time: { icon: 'FT', label: 'In Motion', color: '#FF6B6B' },
+  amrap: { icon: 'AMRAP', label: 'AMRAP', color: '#667eea' },
+  emom: { icon: 'EMOM', label: 'EMOM', color: '#11998e' },
+  strength: { icon: 'STR', label: 'Strength', color: '#f093fb' },
+  metcon: { icon: 'MET', label: 'MetCon', color: '#4facfe' },
+  mixed: { icon: 'MIX', label: 'Mixed', color: '#fa709a' },
 };
 
 type WorkoutBias = 'conditioning' | 'volume' | 'balanced';
@@ -67,16 +64,10 @@ function getWorkoutBias(volumeScore: number, metconScore: number): WorkoutBias {
 
 function getThreadStyle(bias: WorkoutBias) {
   if (bias === 'conditioning') {
-    return {
-      color: 'var(--color-metcon)',
-      glow: 'var(--glow-metcon)',
-    };
+    return { color: 'var(--color-metcon)', glow: 'var(--glow-metcon)' };
   }
   if (bias === 'volume') {
-    return {
-      color: 'var(--color-volume)',
-      glow: 'var(--glow-volume)',
-    };
+    return { color: 'var(--color-volume)', glow: 'var(--glow-volume)' };
   }
   return {
     color: 'var(--color-sessions)',
@@ -93,128 +84,243 @@ function formatDate(date: Date): string {
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
 
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function formatDuration(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return `${minutes} min`;
   const hrs = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
 
 function formatVolume(kg: number): string {
-  if (kg === 0) return '0';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-  return `${parseFloat(kg.toFixed(1)).toLocaleString()} kg`;
+  if (kg >= 1000) {
+    const tons = (kg / 1000).toFixed(2);
+    return `${tons} tons`;
+  }
+  return `${Math.round(kg)} kg`;
 }
 
-export function WorkoutFeedCard({ workout, index, onClick, onDelete, isPR = false }: WorkoutFeedCardProps) {
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent card click
-    onDelete?.();
-  };
+function formatDistance(meters: number): string {
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)}km`;
+  return `${Math.round(meters)}m`;
+}
+
+export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onEdit, isPR = false }: WorkoutFeedCardProps) {
+  const { user } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const style = typeStyles[workout.type] || typeStyles.mixed;
   const duration = workout.duration || 0;
-  const workoutTitle = workout.title?.trim() || 'Untitled Workout';
+  const workoutTitle = getSmartTitle(workout);
 
-  // Calculate XP for this workout
-  const metconMinutes = calculateMetconMinutes(workout);
-  const xp = calculateWorkoutXP(workout.totalVolume, metconMinutes, isPR);
-  const volumeScore = Math.floor(workout.totalVolume / 100);
-  const metconScore = Math.floor(metconMinutes * 2);
+  const bodyweight = user?.weight || DEFAULT_BW;
+  const timeCapMinutes = getTimeCapMinutes(workout);
+  const ep = calculateWorkoutEP(workout.totalVolume, timeCapMinutes, bodyweight, isPR, workout.workloadBreakdown?.movements);
+  const volumeScore = ep.volume;
+  const metconScore = ep.time;
   const bias = getWorkoutBias(volumeScore, metconScore);
   const threadStyle = getThreadStyle(bias);
 
-  return (
-    <motion.button
-      className={`${styles.card} ${isPR ? styles.prCard : ''}`}
-      style={
-        {
-          '--card-color': style.color,
-          '--thread-color': threadStyle.color,
-          '--thread-glow': threadStyle.glow,
-          ...(threadStyle.gradient ? { '--thread-gradient': threadStyle.gradient } : {}),
-        } as React.CSSProperties
-      }
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-      onClick={onClick}
-      whileTap={{ scale: 0.98 }}
-    >
-      {/* PR Badge */}
-      {isPR && (
-        <div className={styles.prBadge}>
-          <span className={styles.prIcon}>NEW PR!</span>
-        </div>
-      )}
+  const handleMoreClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsMenuOpen(true);
+  };
 
-      <div className={styles.cardContent}>
-        <div className={styles.mainContent}>
-          {/* Header with date */}
-          <div className={styles.header}>
-            <div className={styles.headerRight}>
+  const handleEdit = () => {
+    setIsMenuOpen(false);
+    onEdit?.();
+  };
+
+  const handleDeleteRequest = () => {
+    setIsMenuOpen(false);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setConfirmOpen(false);
+    onDelete?.();
+  };
+
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (info.offset.x < -80) {
+      setConfirmOpen(true);
+    }
+  };
+
+  return (
+    <>
+      <div className={styles.swipeTrack}>
+        {/* Delete reveal behind card */}
+        <div className={styles.deleteReveal}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+          </svg>
+          Delete
+        </div>
+
+        <motion.button
+          className={`${styles.card} ${isPR ? styles.prCard : ''}`}
+          style={
+            {
+              '--card-color': style.color,
+              '--thread-color': threadStyle.color,
+              '--thread-glow': threadStyle.glow,
+              ...(threadStyle.gradient ? { '--thread-gradient': threadStyle.gradient } : {}),
+            } as React.CSSProperties
+          }
+          initial={{ opacity: 0, scale: 0.97, y: 16 }}
+          whileInView={{ opacity: 1, scale: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          onClick={onClick}
+          whileTap={{ scale: 0.98 }}
+          drag="x"
+          dragConstraints={{ left: -100, right: 0 }}
+          dragElastic={0.1}
+          onDragEnd={handleDragEnd}
+        >
+          {/* PR Badge */}
+          {isPR && (
+            <div className={styles.prBadge}>
+              <span className={styles.prIcon}>NEW PR!</span>
+            </div>
+          )}
+
+          {/* Three-dot menu — absolute top-right */}
+          {(onDelete || onEdit) && (
+            <button
+              className={styles.moreButton}
+              onClick={handleMoreClick}
+              aria-label="More options"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="8" cy="3" r="1.5" />
+                <circle cx="8" cy="8" r="1.5" />
+                <circle cx="8" cy="13" r="1.5" />
+              </svg>
+            </button>
+          )}
+
+          <div className={styles.cardContent}>
+            <div className={styles.mainContent}>
+              {/* Date label */}
               <span className={styles.date}>{formatDate(workout.date)}</span>
-              {onDelete && (
-                <button
-                  className={styles.deleteButton}
-                  onClick={handleDelete}
-                  aria-label="Delete workout"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" strokeLinecap="round" strokeLinejoin="round" />
+
+              {/* Title */}
+              <h3 className={styles.title}>{workoutTitle}</h3>
+
+              {/* Stat pills */}
+              <div className={styles.statPills}>
+                {duration > 0 && (
+                  <span className={styles.statPill}>
+                    <span className={styles.statPillValue}>{formatDuration(duration)}</span>
+                  </span>
+                )}
+                {workout.totalVolume > 0 && (
+                  <span className={styles.statPill}>
+                    <span className={styles.statPillValue}>{formatVolume(workout.totalVolume)}</span>
+                  </span>
+                )}
+                {workout.workloadBreakdown?.grandTotalDistance != null && workout.workloadBreakdown.grandTotalDistance > 0 && (() => {
+                  const total = workout.workloadBreakdown!.grandTotalDistance!;
+                  const weighted = workout.workloadBreakdown!.grandTotalWeightedDistance || 0;
+                  const unweighted = total - weighted;
+                  const hasSubtitle = weighted > 0 && unweighted > 0;
+                  return (
+                    <span className={`${styles.statPill} ${hasSubtitle ? styles.statPillWithSub : ''}`}>
+                      <span className={styles.statPillValue}>{formatDistance(total)}</span>
+                      {hasSubtitle && (
+                        <span className={styles.statPillSubtitle}>
+                          {formatDistance(unweighted)} / {formatDistance(weighted)} Weighted
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
+                <span className={styles.epPill}>
+                  +{ep.total} EP
+                </span>
+              </div>
+
+              {/* Footer tags */}
+              <div className={styles.footer}>
+                <div className={styles.footerPill}>
+                  {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''}
+                </div>
+                {timeCapMinutes > 0 && workout.type !== 'strength' && (
+                  <div className={styles.footerPill}>
+                    {Math.round(timeCapMinutes)} min metcon
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Photo Thumbnail */}
+            {workout.imageUrl && (
+              <div className={styles.thumbnail}>
+                <img src={workout.imageUrl} alt="" className={styles.thumbnailImage} />
+              </div>
+            )}
+          </div>
+        </motion.button>
+      </div>
+
+      {/* Context Menu Bottom Sheet */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <>
+            <motion.div
+              className={styles.menuBackdrop}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setIsMenuOpen(false)}
+            />
+            <motion.div
+              className={styles.menuSheet}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            >
+              <div className={styles.menuHandle} />
+              {onEdit && (
+                <button className={styles.menuItem} onClick={handleEdit}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
+                  Edit Workout
                 </button>
               )}
-            </div>
-          </div>
-
-          {/* Title */}
-          <h3 className={styles.title}>{workoutTitle}</h3>
-
-          {/* Stats row */}
-          <div className={styles.statsRow}>
-            {duration > 0 && (
-              <div className={styles.stat}>
-                <span className={styles.statIcon}>IN MOTION</span>
-                <span className={styles.statValue}>{formatDuration(duration)}</span>
-              </div>
-            )}
-            <div className={styles.stat}>
-              <span className={styles.statIcon}>VOL</span>
-              <span className={styles.statValue}>{formatVolume(workout.totalVolume)}</span>
-            </div>
-            <div className={styles.xpBadge}>
-              <span className={styles.xpPlus}>+</span>
-              <span className={styles.xpValue}>{xp.total}</span>
-              <span className={styles.xpLabel}>XP</span>
-            </div>
-          </div>
-
-          {/* Exercise count pill */}
-          <div className={styles.footer}>
-            <div className={styles.exercisePill}>
-              {workout.exercises.length} exercise{workout.exercises.length !== 1 ? 's' : ''}
-            </div>
-            {metconMinutes > 0 && workout.type !== 'strength' && (
-              <div className={styles.metconPill}>
-                {metconMinutes} min metcon
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Photo Thumbnail */}
-        {workout.imageUrl && (
-          <div className={styles.thumbnail}>
-            <img src={workout.imageUrl} alt="" className={styles.thumbnailImage} />
-          </div>
+              {onDelete && (
+                <button className={`${styles.menuItem} ${styles.menuDestructive}`} onClick={handleDeleteRequest}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
+                  </svg>
+                  Delete Workout
+                </button>
+              )}
+            </motion.div>
+          </>
         )}
-      </div>
-    </motion.button>
+      </AnimatePresence>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Workout"
+        message={`Delete "${workoutTitle}"? This cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        destructive
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   );
 }

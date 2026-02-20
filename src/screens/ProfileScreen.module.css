@@ -1,90 +1,73 @@
+/* ============================================
+   Profile Screen — Premium Fun Dashboard
+   Compact header + Hero + Clean Bento
+   ============================================ */
+
 .container {
   min-height: 100vh;
   min-height: 100dvh;
-  background: #000000;
+  background: var(--color-bg);
   padding-bottom: calc(120px + var(--safe-bottom));
 }
 
-/* ─── Header ─── */
+/* ── Compact Header ────────────────────── */
+
 .header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: var(--space-6) var(--space-4) 0;
-  padding-top: calc(var(--space-6) + var(--safe-top));
-  position: relative;
+  gap: 12px;
+  padding: calc(var(--space-4) + var(--safe-top)) var(--space-4) 0;
 }
 
-.settingsButton {
-  position: absolute;
-  top: calc(var(--space-4) + var(--safe-top));
-  right: var(--space-4);
-  width: 40px;
-  height: 40px;
+/* ── Avatar (48px) ─────────────────────── */
+
+.avatarWrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 0, 0.1),
+    0 0 16px rgba(255, 214, 0, 0.1);
+}
+
+.avatarFallback {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-full);
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.settingsButton:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.settingsButton:active {
-  transform: scale(0.95);
-}
-
-/* ─── Avatar ─── */
-.avatarWrap {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  cursor: pointer;
-  margin-bottom: var(--space-3);
-}
-
-.avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--radius-full);
-  object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.avatarFallback {
-  width: 72px;
-  height: 72px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  color: var(--color-text);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 0, 0.1),
+    0 0 16px rgba(255, 214, 0, 0.1);
+  color: #ffffff;
   font-weight: var(--font-bold);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
 }
 
 .avatarButton {
   position: absolute;
   right: -2px;
   bottom: -2px;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(0, 0, 0, 0.85);
   color: rgba(255, 255, 255, 0.7);
-  font-size: 11px;
+  font-size: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -95,101 +78,191 @@
   display: none;
 }
 
-/* ─── Name & Level ─── */
+/* ── Name Area ─────────────────────────── */
+
+.nameArea {
+  flex: 1;
+  min-width: 0;
+}
+
 .name {
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
-  color: var(--color-text);
   margin: 0;
-  text-align: center;
+  color: #ffffff;
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.levelBadge {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.45);
-  text-align: center;
+.subtitle {
   display: block;
-  margin-top: 2px;
+  color: rgba(255, 214, 0, 0.65);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.02em;
 }
 
-.photoError {
-  font-size: var(--text-xs);
-  color: var(--color-error);
-  text-align: center;
-  margin-top: var(--space-1);
-}
+/* ── Settings Button ───────────────────── */
 
-/* ─── 7-Day Consistency Dots ─── */
-.consistencyRow {
+.settingsButton {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: var(--space-4);
-}
-
-.dayColumn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.6);
+  transition: background var(--duration-fast) ease;
+}
+
+.settingsButton:active {
   background: rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
 }
 
-.dotActive {
-  background: linear-gradient(135deg, #FFD600, #FF8A00);
-  box-shadow: 0 0 8px rgba(255, 214, 0, 0.6);
+.photoError {
+  padding: 0 var(--space-4);
+  margin-top: var(--space-1);
+  color: var(--color-error);
+  font-size: var(--text-xs);
 }
 
-.dayLabel {
+/* ── Hero Card ─────────────────────────── */
+
+.heroCard {
+  margin: var(--space-4) var(--space-4) 0;
+  padding: 24px 20px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  text-align: center;
+  overflow: hidden;
+}
+
+.heroLabel {
+  color: rgba(255, 255, 255, 0.5);
   font-size: 10px;
-  font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.3);
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-.dayLabelActive {
-  color: rgba(255, 214, 0, 0.7);
+.heroMetric {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
 }
 
-/* ─── Period Toggle ─── */
+.heroNumber {
+  font-size: 3.5rem;
+  font-weight: var(--font-black);
+  line-height: 1;
+  background: linear-gradient(135deg, #FF8A00 0%, #FF1493 50%, #FF8A00 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 3s ease infinite;
+}
+
+.heroUnit {
+  font-size: 1.5rem;
+  font-weight: var(--font-bold);
+  line-height: 1;
+  background: linear-gradient(135deg, #FF8A00 0%, #FF1493 50%, #FF8A00 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── EP Score Badge (Neon Yellow) ─────── */
+
+.epRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 6px 16px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 214, 0, 0.08);
+  border: 1px solid rgba(255, 214, 0, 0.18);
+}
+
+.epPlus {
+  color: var(--neon-yellow);
+  font-size: 1rem;
+  font-weight: var(--font-bold);
+  line-height: 1;
+  opacity: 0.75;
+}
+
+.epNumber {
+  color: var(--neon-yellow);
+  font-size: 1.25rem;
+  font-weight: var(--font-black);
+  line-height: 1;
+}
+
+.epLabel {
+  color: var(--neon-yellow);
+  font-size: 0.7rem;
+  font-weight: var(--font-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+/* ── PR Link ─────────────────────────── */
+
+.prLink {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-align: center;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color var(--duration-fast) ease;
+}
+
+.prLink:active {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Period Toggle ──────────────────────── */
+
 .periodToggle {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-full);
+  margin: var(--space-4) var(--space-4) 0;
   padding: 3px;
-  margin: var(--space-5) var(--space-4) 0;
-  position: relative;
-}
-
-.periodOption {
-  flex: 1;
-  padding: 6px 0;
-  background: none;
-  border: none;
-  font-size: 13px;
-  font-weight: var(--font-semibold);
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-  text-align: center;
-  position: relative;
-  z-index: 1;
-  transition: color 0.2s ease;
   border-radius: var(--radius-full);
-}
-
-.periodOptionActive {
-  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  position: relative;
 }
 
 .periodSlider {
@@ -197,234 +270,113 @@
   top: 3px;
   bottom: 3px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  transition:
+    left 0.28s var(--ease-out),
+    width 0.28s var(--ease-out);
 }
 
-/* ─── Bento Grid ─── */
-.bentoGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: var(--space-4);
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-/* ─── Hero Card (Total Lifted) ─── */
-.heroCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-8) var(--space-6);
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-}
-
-.heroLabel {
-  font-size: 11px;
-  font-weight: var(--font-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: var(--space-2);
-}
-
-.heroValue {
-  font-size: 3rem;
-  font-weight: 900;
-  color: #ffffff;
-  line-height: 1;
-}
-
-.heroUnit {
-  font-size: 1.75rem;
-  font-weight: 700;
-  opacity: 0.6;
-  margin-left: 4px;
-  display: inline-block;
-  vertical-align: baseline;
-}
-
-.heroCardAllTime {
-  box-shadow: 0 0 0 1px rgba(255, 214, 0, 0.18), 0 8px 28px rgba(255, 196, 0, 0.18);
-}
-
-/* ─── Hall of Fame (permanent PR section) ─── */
-.hallOfFame {
-  margin: var(--space-4) var(--space-4) 0;
-  padding: 14px 16px 12px;
-  background: linear-gradient(135deg, rgba(255, 214, 0, 0.06), rgba(255, 138, 0, 0.03));
-  border: 1px solid rgba(255, 214, 0, 0.15);
-  border-radius: 20px;
-}
-
-.hallOfFameHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  margin-bottom: 12px;
-}
-
-.hallOfFameHeader:active {
-  opacity: 0.8;
-}
-
-.hallOfFameIcon {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFD600;
-  flex-shrink: 0;
-}
-
-.hallOfFameTitle {
-  font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  color: rgba(255, 255, 255, 0.85);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.periodOption {
   flex: 1;
-}
-
-.hallOfFameCount {
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: rgba(255, 214, 0, 0.6);
-}
-
-.hallOfFameChevron {
-  color: rgba(255, 255, 255, 0.25);
-  flex-shrink: 0;
-}
-
-/* Horizontal scrolling PR badges */
-.prBadgeScroll {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding-bottom: 2px;
-}
-
-.prBadgeScroll::-webkit-scrollbar {
-  display: none;
-}
-
-.prBadge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(255, 214, 0, 0.08);
-  border: 1px solid rgba(255, 214, 0, 0.2);
-  border-radius: var(--radius-full, 999px);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.prBadgeMovement {
+  z-index: 1;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
   font-size: 13px;
   font-weight: var(--font-semibold);
-  color: rgba(255, 255, 255, 0.8);
+  padding: 7px 0;
+  transition: color var(--duration-fast) ease;
 }
 
-.prBadgeWeight {
-  font-size: 13px;
-  font-weight: 800;
-  color: #FFD600;
+.periodOptionActive {
+  color: #ffffff;
 }
 
-.hallOfFameEmpty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  color: rgba(255, 255, 255, 0.45);
-}
+/* ── Bento Grid (3 equal cards) ────────── */
 
-.hallOfFameEmptyIcon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 214, 0, 0.65);
-}
-
-.hallOfFameEmptyIcon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.hallOfFameEmptyText {
-  font-size: 13px;
-  font-weight: var(--font-medium);
-  letter-spacing: 0.01em;
-}
-
-/* ─── Stats Grid (2×2 + optional New PRs) ─── */
-.statsGrid {
+.bentoGrid {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-4);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+
+/* ── Stat Card ─────────────────────────── */
 
 .statCard {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  min-height: 96px;
+  padding: 14px 12px 16px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  padding: var(--space-5) var(--space-4);
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  min-height: 100px;
+  align-items: center;
+  overflow: hidden;
 }
 
-.statLabel {
-  font-size: 11px;
-  font-weight: var(--font-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+/* ── Card Typography ───────────────────── */
+
+.cardLabel {
+  margin-bottom: 6px;
   color: rgba(255, 255, 255, 0.5);
-  margin-bottom: var(--space-2);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  font-variant-caps: all-small-caps;
 }
 
-.statValue {
-  font-size: 1.75rem;
-  font-weight: 700;
+.metricLine {
+  display: flex;
+  gap: 0;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.metricValue {
   color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: var(--font-black);
   line-height: 1;
 }
 
-.statUnit {
-  font-size: 1rem;
-  font-weight: 600;
-  opacity: 0.6;
-  margin-left: 4px;
-  display: inline-block;
-  vertical-align: baseline;
+.metricUnit {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.5rem;
+  font-weight: var(--font-semibold);
+  line-height: 1;
 }
 
-.statEmpty {
-  color: rgba(255, 255, 255, 0.25);
+/* ── Empty state ────────────────────────── */
+
+.metricEmpty {
+  color: rgba(255, 255, 255, 0.2);
 }
 
-.statValueGold {
-  color: #FFD600;
-}
+/* ── Responsive ─────────────────────────── */
 
-.statCardPR {
-  border-color: rgba(255, 214, 0, 0.15);
+@media (max-width: 420px) {
+  .heroNumber {
+    font-size: 3rem;
+  }
+
+  .heroUnit {
+    font-size: 1.25rem;
+  }
+
+  .metricValue {
+    font-size: 1.25rem;
+  }
+
+  .metricUnit {
+    font-size: 1.25rem;
+  }
 }

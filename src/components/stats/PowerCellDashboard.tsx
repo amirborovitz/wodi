@@ -33,7 +33,7 @@ export function PowerCellDashboard() {
     weeklyVolume,
     weeklyMetconMinutes,
     weeklyFrequency,
-    weeklyXP,
+    weeklyEP,
     goals,
     loading,
   } = useWeeklyStats();
@@ -60,8 +60,8 @@ export function PowerCellDashboard() {
         <h2 className={styles.title}>Weekly Progress</h2>
         <div className={styles.xpBadge}>
           <span className={styles.xpIcon}>+</span>
-          <span className={styles.xpValue}>{weeklyXP}</span>
-          <span className={styles.xpLabel}>XP</span>
+          <span className={styles.xpValue}>{weeklyEP}</span>
+          <span className={styles.xpLabel}>EP</span>
         </div>
       </motion.div>
 

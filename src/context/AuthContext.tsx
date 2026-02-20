@@ -157,6 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(userData);
       setCachedUser(userData);
+
+      // Stamp last-active (fire-and-forget)
+      setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error fetching user data:', error);
       // Still set basic user info even if Firestore fails
