@@ -88,6 +88,7 @@ const PR_EXCLUDED_PATTERNS = [
   'shuttle', 'bike', 'ski', 'swim',
   'push-up', 'pushup', 'pull-up', 'pullup', 'sit-up', 'situp',
   'burpee', 'double under', 'single under',
+  'kb', 'kettlebell',
 ];
 
 function isPREligible(movementName: string): boolean {

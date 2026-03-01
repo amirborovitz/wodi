@@ -367,7 +367,7 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(0, 242, 255, 0.08), transparent 45%),
+    radial-gradient(circle at top left, rgba(0, 255, 255, 0.08), transparent 45%),
     var(--glass-bg);
   border: 1px solid var(--glass-border-light);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -442,7 +442,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  background: rgba(0, 242, 255, 0.15);
+  background: rgba(0, 255, 255, 0.15);
   color: var(--color-sessions);
   font-size: var(--text-xs);
   font-weight: var(--font-bold);
@@ -479,11 +479,11 @@
 .primaryCta {
   background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%) !important;
   color: #000 !important;
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .primaryCta:hover:not(:disabled) {
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
   transform: translateY(-1px);
 }
 
@@ -504,7 +504,7 @@
 .capturePrimaryButton {
   background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%) !important;
   color: #000 !important;
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
   font-weight: var(--font-bold);
   text-transform: none;
 }
@@ -567,13 +567,13 @@
   transition: width var(--duration-slow) var(--ease-out),
               background-position var(--duration-slow) var(--ease-out),
               box-shadow var(--duration-slow) var(--ease-out);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
 }
 
 /* Shift gradient based on progress via inline style data attribute */
 .progressFillEarly {
   background-position: 100% 0;
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
 }
 
 .progressFillMid {
@@ -755,7 +755,7 @@
 
 .unitSelect:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.5), 0 0 18px rgba(0, 255, 255, 0.35);
 }
 
 .wizardActions {
@@ -923,7 +923,7 @@
 
 .alternativeSelect:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.5), 0 0 18px rgba(0, 255, 255, 0.35);
 }
 
 .alternativeGroup {
@@ -954,7 +954,7 @@
 
 .distanceInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.4);
 }
 
 .distanceUnit {
@@ -1030,7 +1030,7 @@
 
 .roundsInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.4);
 }
 
 .roundsInput::placeholder {
@@ -1075,7 +1075,7 @@
 
 .weightInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.4);
 }
 
 .weightInput::placeholder {
@@ -1150,7 +1150,7 @@
 
 .intervalSetTimeInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.4);
 }
 
 .intervalSetTimeInput::placeholder {
@@ -1318,8 +1318,8 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
-  background: rgba(0, 242, 255, 0.05);
-  border: 1px dashed rgba(0, 242, 255, 0.3);
+  background: rgba(0, 255, 255, 0.05);
+  border: 1px dashed rgba(0, 255, 255, 0.3);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-4);
 }
@@ -1363,7 +1363,7 @@
 .modeSelector:focus {
   outline: none;
   border-color: var(--color-sessions);
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.35);
 }
 
 .modeSelectorHint {
@@ -1696,7 +1696,7 @@
 
 .emomWeightInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.4);
 }
 
 .emomWeightInput::placeholder {

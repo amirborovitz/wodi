@@ -17,8 +17,8 @@
   bottom: 0;
   width: 3px;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--neon-cyan) 0%, rgba(0, 242, 255, 0.08) 100%);
-  box-shadow: 0 0 8px rgba(0, 242, 255, 0.15);
+  background: linear-gradient(180deg, var(--neon-cyan) 0%, rgba(0, 255, 255, 0.08) 100%);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.15);
 }
 
 .groupMarker {
@@ -29,7 +29,7 @@
   height: 13px;
   border-radius: var(--radius-full);
   background: var(--neon-cyan);
-  box-shadow: 0 0 10px rgba(0, 242, 255, 0.4);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
 }
 
 .groupHeader {
@@ -72,9 +72,9 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: rgba(0, 242, 255, 0.4);
+  background: rgba(0, 255, 255, 0.4);
   border: 2px solid var(--color-bg, #0a0a1a);
-  box-shadow: 0 0 6px rgba(0, 242, 255, 0.2);
+  box-shadow: 0 0 6px rgba(0, 255, 255, 0.2);
   z-index: 2;
 }
 

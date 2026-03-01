@@ -33,37 +33,40 @@ export function EmomInputs({
   shouldShowMovementEditor,
   movementEditorProps,
 }: EmomInputsProps) {
-  const isStrengthEmom = currentExercise.type === 'strength';
+  const isStrengthEmom = currentExercise.type === 'strength'
+    || (currentExercise.movements?.some(m => m.inputType === 'weight') ?? false);
 
   const renderWeightRows = (sets: ExerciseSet[]) => (
-    <>
-      <p className={styles.emomHint}>Enter round 1 weight once, then adjust only rounds that change.</p>
-      {sets.map((set) => {
+    <div className={styles.emomRoundGrid}>
+      {sets.map((set, i) => {
         const setIndex = set.setNumber - 1;
+        const prevWeight = i > 0 ? sets[i - 1].weight : undefined;
+        const changed = i > 0 && set.weight !== prevWeight && set.weight !== undefined;
         return (
-          <div key={set.id} className={styles.emomMinuteRow}>
-            <span className={styles.emomMinuteNum}>{set.setNumber}</span>
-            <div className={styles.emomWeightField}>
-              <input
-                type="number"
-                inputMode="decimal"
-                enterKeyHint="next"
-                value={set.weight ?? ''}
-                onChange={(e) => {
-                  const val = e.target.value ? parseFloat(e.target.value) : undefined;
-                  updateSet(setIndex, 'weight', val);
-                }}
-                onBlur={() => emomAutoFillForward(setIndex)}
-                onFocus={onFocus}
-                placeholder="—"
-                className={styles.emomWeightInput}
-              />
-              <span className={styles.emomWeightUnit}>kg</span>
-            </div>
+          <div
+            key={set.id}
+            className={`${styles.emomRoundCell}${changed ? ` ${styles.emomRoundChanged}` : ''}`}
+          >
+            <span className={styles.emomRoundNum}>{set.setNumber}</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              enterKeyHint="next"
+              value={set.weight ?? ''}
+              onChange={(e) => {
+                const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                updateSet(setIndex, 'weight', val);
+              }}
+              onBlur={() => emomAutoFillForward(setIndex)}
+              onFocus={onFocus}
+              placeholder="—"
+              className={styles.emomRoundInput}
+            />
+            <span className={styles.emomRoundUnit}>kg</span>
           </div>
         );
       })}
-    </>
+    </div>
   );
 
   if (emomPhases.length > 0) {
@@ -78,11 +81,12 @@ export function EmomInputs({
               }
             </div>
 
-            {phaseIndex === 0 && movementsForEditor && shouldShowMovementEditor(currentExercise, movementsForEditor) && (
+            {/* Only show movement editor for non-weighted EMOMs (bodyweight/cardio).
+                Weighted EMOMs show weight per round — movements are in the title. */}
+            {!isStrengthEmom && phaseIndex === 0 && movementsForEditor && shouldShowMovementEditor(currentExercise, movementsForEditor) && (
               <MovementEditorBundle
                 {...movementEditorProps}
                 movements={movementsForEditor}
-                labels={movementsForEditor.map((_, i) => `Min ${i + 1}`)}
               />
             )}
 
@@ -98,15 +102,14 @@ export function EmomInputs({
   // No phases detected — flat EMOM
   return (
     <>
-      {movementsForEditor && shouldShowMovementEditor(currentExercise, movementsForEditor) && (
-        <>
-          <MovementEditorBundle
-            {...movementEditorProps}
-            movements={movementsForEditor}
-          />
-          {isStrengthEmom && renderWeightRows(currentSets)}
-        </>
+      {!isStrengthEmom && movementsForEditor && shouldShowMovementEditor(currentExercise, movementsForEditor) && (
+        <MovementEditorBundle
+          {...movementEditorProps}
+          movements={movementsForEditor}
+        />
       )}
+      {isStrengthEmom && renderWeightRows(currentSets)}
     </>
   );
 }
+

@@ -1,6 +1,6 @@
 .card {
   position: relative;
-  padding: 24px;
+  padding: 16px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-xl);
@@ -9,25 +9,26 @@
 }
 
 .header {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
-  color: var(--color-text);
-  margin: 0 0 4px 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
 }
 
 .subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  display: none;
 }
 
 .actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .primaryButton {
@@ -36,21 +37,21 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 18px 24px;
+  padding: 14px 20px;
   background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%);
   border: none;
   border-radius: var(--radius-lg);
   color: #000;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--font-bold);
-  min-height: 56px;
+  min-height: 48px;
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-out);
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .primaryButton:hover {
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
   transform: translateY(-1px);
 }
 
@@ -64,14 +65,14 @@
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 18px 24px;
+  padding: 14px 20px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   color: var(--color-text);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  min-height: 56px;
+  min-height: 48px;
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-out);
 }
@@ -96,7 +97,7 @@
   height: 100%;
   background: radial-gradient(
     ellipse at center,
-    rgba(0, 242, 255, 0.15) 0%,
+    rgba(0, 255, 255, 0.15) 0%,
     transparent 60%
   );
   pointer-events: none;

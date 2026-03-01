@@ -28,7 +28,8 @@
 }
 
 .centerValue {
-  font-size: calc(var(--text-3xl) + 2px);
+  font-family: var(--font-mono);
+  font-size: var(--text-4xl);
   font-weight: var(--font-black);
   line-height: 1;
   text-shadow: 0 0 16px var(--glow-sessions);
@@ -41,9 +42,10 @@
   gap: 8px;
   margin-top: 24px;
   padding: 16px;
+  width: 100%;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   backdrop-filter: var(--glass-blur);
 }
 
@@ -60,9 +62,20 @@
   flex-shrink: 0;
 }
 
-.legendText {
+.legendLabel {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+}
+
+.legendSep {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+.legendValue {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
 }
 

@@ -1,0 +1,274 @@
+/* ========================================
+   CYCLE TRACKER - Rep scheme chip tracker
+   ======================================== */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+/* Section label (small-caps uppercase) */
+.sectionLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  font-variant: small-caps;
+}
+
+/* Movement header rows */
+.movementRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.movementName {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text);
+}
+
+.movementWeightGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: var(--space-1) var(--space-3);
+}
+
+.movementWeightInput {
+  width: 60px;
+  padding: var(--space-2);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-size: var(--text-md);
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.movementWeightInput:focus {
+  outline: none;
+}
+
+.movementWeightInput::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
+}
+
+.movementWeightUnit {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}
+
+.implementToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rxHint {
+  font-size: var(--text-xs);
+  color: var(--color-sessions);
+  white-space: nowrap;
+}
+
+/* Cycle chips row */
+.cycleChipsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Base chip */
+.cycleChip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 48px;
+  padding: 0 var(--space-3);
+  border-radius: 999px;
+  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Completed state - cyan fill */
+.cycleChipCompleted {
+  background: rgba(0, 255, 255, 0.15);
+  border: 2px solid var(--color-sessions);
+  color: var(--color-sessions);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
+}
+
+/* Next state - dashed border, breathing pulse */
+.cycleChipNext {
+  background: transparent;
+  border: 2px dashed var(--color-sessions);
+  color: var(--color-sessions);
+  animation: nextPulse 2s ease-in-out infinite;
+}
+
+@keyframes nextPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(0, 255, 255, 0);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 255, 255, 0.3);
+    opacity: 1;
+  }
+}
+
+/* Idle state - dim, non-interactive */
+.cycleChipIdle {
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  cursor: default;
+}
+
+/* All-done celebration pulse */
+.cycleChipAllDone {
+  background: rgba(0, 255, 255, 0.15);
+  border: 2px solid var(--color-sessions);
+  color: var(--color-sessions);
+  animation: celebrationPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes celebrationPulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(0, 255, 255, 0.5);
+  }
+}
+
+/* Checkmark icon in completed chips */
+.checkIcon {
+  margin-left: var(--space-1);
+  font-size: var(--text-xs);
+  opacity: 0.7;
+}
+
+/* Mid-cycle link */
+.midCycleLink {
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.15);
+  text-underline-offset: 3px;
+}
+
+/* Partial stepper */
+.partialStepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 0, 229, 0.06);
+  border: 1px solid rgba(255, 0, 229, 0.15);
+  border-radius: var(--radius-xl);
+}
+
+.partialLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin-bottom: var(--space-1);
+}
+
+.stepperBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text);
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+}
+
+.stepperBtn:active {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.95);
+}
+
+.stepperValue {
+  font-size: var(--text-2xl);
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  min-width: 48px;
+  text-align: center;
+}
+
+.stepperContext {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* Summary / hint text */
+.summaryHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  padding: var(--space-1) var(--space-3);
+  letter-spacing: var(--tracking-wide);
+}
+
+.summaryHighlight {
+  color: var(--color-sessions);
+  font-weight: var(--font-semibold);
+  font-family: var(--font-mono);
+}
+
+/* Prevent iOS Safari input zoom */
+@media (pointer: coarse) {
+  .movementWeightInput {
+    font-size: var(--text-base);
+  }
+}

@@ -112,7 +112,7 @@
 
 .actionEdit {
   left: 0;
-  background: linear-gradient(-90deg, transparent, rgba(0, 242, 255, 0.2));
+  background: linear-gradient(-90deg, transparent, rgba(0, 255, 255, 0.2));
   color: var(--color-sessions);
 }
 
@@ -169,7 +169,7 @@
 
 /* Cyan = Monostructural/Cardio */
 .highlighted_cyan {
-  border-left: 3px solid rgba(0, 242, 255, 0.5);
+  border-left: 3px solid rgba(0, 255, 255, 0.5);
 }
 
 /* Pink = Gymnastics/Bodyweight */
@@ -213,12 +213,12 @@
 }
 
 .statText {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 400;
 }
 
 .statSeparator {
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
   padding: 0 6px;
 }
 

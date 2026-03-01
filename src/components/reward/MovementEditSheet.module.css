@@ -81,7 +81,7 @@
 }
 
 .saveButton:hover {
-  background: rgba(0, 242, 255, 0.1);
+  background: rgba(0, 255, 255, 0.1);
 }
 
 .saveButton:disabled {
@@ -128,8 +128,8 @@
 
 .input:focus {
   border-color: var(--color-sessions);
-  background: rgba(0, 242, 255, 0.05);
-  box-shadow: 0 0 0 3px rgba(0, 242, 255, 0.1);
+  background: rgba(0, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
 }
 
 .input::placeholder {
@@ -178,8 +178,8 @@
 
 .chip:active {
   transform: scale(0.95);
-  background: rgba(0, 242, 255, 0.15);
-  border-color: rgba(0, 242, 255, 0.3);
+  background: rgba(0, 255, 255, 0.15);
+  border-color: rgba(0, 255, 255, 0.3);
 }
 
 /* Preview */

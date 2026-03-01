@@ -2,14 +2,15 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './WorkoutScreen.module.css';
 import type { RewardData, MovementTotal, WorkloadBreakdown as WorkloadBreakdownType } from '../types';
-import { WorkloadBreakdown } from '../components/reward';
-import { MovementEditSheet } from '../components/reward/MovementEditSheet';
 import { ShareLaunchSheet } from '../components/share/ShareLaunchSheet';
+import { ExerciseStoryCard } from '../components/workout';
+import { isExcludedExercise } from '../components/share/shareCardUtils';
 import { Button } from '../components/ui';
 import { useCountUp } from '../hooks/useCountUp';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { useAuth } from '../context/AuthContext';
-import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
+import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW, EP_METCON_RATE, EP_VOLUME_RATE, EP_DISTANCE_RATE, EP_BODYWEIGHT_RATE, EP_PR_BONUS } from '../utils/xpCalculations';
+import type { EPBreakdown } from '../types';
 import { calculateWorkloadFromExercises, assignMovementColors } from '../services/workloadCalculation';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 
@@ -55,12 +56,6 @@ const ShareIcon = () => (
     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
     <polyline points="16 6 12 2 8 6" />
     <line x1="12" y1="2" x2="12" y2="15" />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
@@ -414,6 +409,81 @@ function DistanceBreakdownSheet({ open, onClose, movements }: {
   );
 }
 
+function EPBreakdownSheet({ open, onClose, ep }: {
+  open: boolean;
+  onClose: () => void;
+  ep: EPBreakdown;
+}) {
+  const rows: Array<{ label: string; formula: string; value: number }> = [
+    { label: 'Showing Up', formula: 'flat', value: ep.base },
+  ];
+  if (ep.time > 0) rows.push({ label: 'Time', formula: `${EP_METCON_RATE}/min`, value: ep.time });
+  if (ep.volume > 0) rows.push({ label: 'Volume', formula: `${EP_VOLUME_RATE} \u00d7 vol/bw`, value: ep.volume });
+  if (ep.bodyweight > 0) rows.push({ label: 'Bodyweight', formula: `${EP_BODYWEIGHT_RATE} \u00d7 tier`, value: ep.bodyweight });
+  if (ep.distance > 0) rows.push({ label: 'Distance', formula: `${EP_DISTANCE_RATE}/m`, value: ep.distance });
+  if (ep.intensity > 0) rows.push({ label: 'Intensity', formula: 'fast finish', value: ep.intensity });
+  if (ep.pr > 0) rows.push({ label: 'PR Bonus', formula: `+${EP_PR_BONUS}`, value: ep.pr });
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className={styles.rawTextBackdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            className={styles.rawTextSheet}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 32, stiffness: 380 }}
+          >
+            <div className={styles.rawTextDragHandle} aria-hidden="true" />
+            <div className={styles.rawTextHeader}>
+              <h2 className={styles.rawTextTitle}>EP Breakdown</h2>
+              <button
+                className={styles.rawTextCloseBtn}
+                onClick={onClose}
+                type="button"
+                aria-label="Close"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className={styles.epBreakdownList}>
+              {rows.map((row) => (
+                <div key={row.label} className={styles.epRow}>
+                  <span className={styles.epRowLabel}>{row.label}</span>
+                  <span className={styles.epRowFormula}>{row.formula}</span>
+                  <span className={styles.epRowValue}>+{row.value}</span>
+                </div>
+              ))}
+              <div className={`${styles.epRow} ${styles.epTotalRow}`}>
+                <span className={styles.epRowLabel}>Total</span>
+                <span className={styles.epRowFormula} />
+                <span className={styles.epRowValue}>{ep.total} EP</span>
+              </div>
+            </div>
+
+            <button
+              className={styles.rawTextDismiss}
+              onClick={onClose}
+              type="button"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ============================================
 // Main Component
 // ============================================
@@ -423,8 +493,8 @@ export function WorkoutScreen({
   rewardData,
   onDone,
   onEdit,
-  onRenameMovement,
-  onDeleteMovement,
+  onRenameMovement: _onRenameMovement,
+  onDeleteMovement: _onDeleteMovement,
   workout,
   onBack,
   onEditWorkout,
@@ -433,10 +503,9 @@ export function WorkoutScreen({
   const weeklyStats = useWeeklyStats();
   const [isShareLaunchOpen, setIsShareLaunchOpen] = useState(false);
   const [isRawTextOpen, setIsRawTextOpen] = useState(false);
-  const [editingMovement, setEditingMovement] = useState<MovementTotal | null>(null);
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [isVolumeSheetOpen, setIsVolumeSheetOpen] = useState(false);
   const [isDistanceSheetOpen, setIsDistanceSheetOpen] = useState(false);
+  const [isEPSheetOpen, setIsEPSheetOpen] = useState(false);
 
   const isReward = mode === 'reward';
 
@@ -464,18 +533,48 @@ export function WorkoutScreen({
     if (isReward) {
       return rewardData?.workloadBreakdown || null;
     }
+    // Use stored breakdown as primary source (has correct individual movement names)
+    // Enrich with per-set weightProgression from exercises where possible
     if (workout?.workloadBreakdown) {
+      const stored = workout.workloadBreakdown;
+      const enrichedMovements = stored.movements.map(mov => {
+        const enriched = { ...mov };
+        // Try to find matching exercise to extract weightProgression
+        if (workout.exercises) {
+          for (const ex of workout.exercises) {
+            // Match by exercise name or by movements inside the exercise
+            const isDirectMatch = ex.name.toLowerCase() === mov.name.toLowerCase();
+            const isMovementMatch = ex.movements?.some(
+              m => m.name.toLowerCase() === mov.name.toLowerCase()
+            );
+            if (isDirectMatch || isMovementMatch) {
+              const perSetWeights: number[] = [];
+              for (const set of ex.sets) {
+                if (set.weight) perSetWeights.push(set.weight);
+              }
+              if (perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0])) {
+                enriched.weightProgression = perSetWeights;
+              }
+              break;
+            }
+          }
+        }
+        return enriched;
+      });
       return {
-        ...workout.workloadBreakdown,
-        movements: assignMovementColors(workout.workloadBreakdown.movements),
+        ...stored,
+        movements: assignMovementColors(enrichedMovements),
       };
     }
-    if (!workout?.exercises || workout.exercises.length === 0) return null;
-    const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
-    const breakdown = calculateWorkloadFromExercises(workout.exercises, undefined, partnerFactor);
-    breakdown.movements = assignMovementColors(breakdown.movements);
-    return breakdown;
-  }, [isReward, rewardData?.workloadBreakdown, workout?.exercises, workout?.partnerWorkout, workout?.partnerFactor, workout?.workloadBreakdown]);
+    // Fallback: recalculate from exercises if no stored breakdown
+    if (workout?.exercises && workout.exercises.length > 0) {
+      const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
+      const breakdown = calculateWorkloadFromExercises(workout.exercises, undefined, partnerFactor, user?.weight);
+      breakdown.movements = assignMovementColors(breakdown.movements);
+      return breakdown;
+    }
+    return null;
+  }, [isReward, rewardData?.workloadBreakdown, workout?.exercises, workout?.partnerWorkout, workout?.partnerFactor, workout?.workloadBreakdown, user?.weight]);
 
   // Totals
   const totalVolume = isReward
@@ -498,13 +597,14 @@ export function WorkoutScreen({
 
   const activeBreakdown = isReward ? rewardData?.workloadBreakdown : workloadBreakdown;
   const totalDistance = activeBreakdown?.grandTotalDistance || 0;
+  const totalWeightedDistance = activeBreakdown?.grandTotalWeightedDistance || 0;
 
   // EP (Effort Points)
   const bodyweight = user?.weight || DEFAULT_BW;
 
   const rewardTimeCapMinutes = (() => {
-    const format = rewardData?.workoutSummary?.format;
-    if (format === 'strength') return 0;
+    const type = rewardData?.workoutSummary?.type;
+    if (type === 'strength') return 0;
     return durationMinutes;
   })();
 
@@ -518,8 +618,9 @@ export function WorkoutScreen({
       )
     : null;
 
+  const rewardActualTime = rewardData?.workoutSummary?.actualTimeMinutes;
   const rewardEP = isReward
-    ? calculateWorkoutEP(totalVolume, rewardTimeCapMinutes, bodyweight, isPR || false, workloadBreakdown?.movements)
+    ? calculateWorkoutEP(totalVolume, rewardTimeCapMinutes, bodyweight, isPR || false, workloadBreakdown?.movements, rewardActualTime)
     : null;
 
   const totalEP = isReward ? (rewardEP?.total || 0) : (detailEP?.total || 0);
@@ -531,7 +632,14 @@ export function WorkoutScreen({
   const animatedReps = useCountUp(isReward ? totalReps : 0, { delay: 250, duration: 1000 });
   const animatedSeconds = useCountUp(isReward ? totalSeconds : 0, { delay: 300, duration: 1000 });
   const animatedDistance = useCountUp(isReward ? totalDistance : 0, { delay: 250, duration: 1000, decimals: 0 });
+  const animatedWeightedDistance = useCountUp(isReward ? totalWeightedDistance : 0, { delay: 250, duration: 1000, decimals: 0 });
   const animatedEP = useCountUp(isReward ? totalEP : 0, { delay: 350, duration: 1000 });
+
+  // -- Exercises for story cards ────────────────────────────────────
+
+  const exercises = isReward
+    ? (rewardData?.exercises || [])
+    : (workout?.exercises || []);
 
   // -- Receipt card: split number and unit ──────────────────────────
 
@@ -562,8 +670,16 @@ export function WorkoutScreen({
     ? formatDistanceSplit(animatedDistance)
     : formatDistanceSplit(totalDistance);
   const showDistance = totalDistance > 0;
+  const carryDistSplit = isReward
+    ? formatDistanceSplit(animatedWeightedDistance)
+    : formatDistanceSplit(totalWeightedDistance);
+  const showCarry = totalWeightedDistance > 0;
+  // Find carry weight for label (e.g., "CARRY 50kg")
+  const carryWeight = activeBreakdown?.movements?.find(m =>
+    /carry|walk|yoke/i.test(m.name) && m.weight && m.weight > 0 && m.totalDistance && m.totalDistance > 0
+  )?.weight;
 
-  const hasEnginePills = showTime || showDistance;
+  // hasEnginePills no longer needed (receipt card removed)
 
   // -- Achievement pills (reward mode) ───────────────────────────────
 
@@ -618,22 +734,6 @@ export function WorkoutScreen({
     }
     return names;
   }, [rewardData?.achievements]);
-
-  // -- Movement editing (reward mode) ────────────────────────────────
-
-  const handleEditMovement = (movement: MovementTotal) => {
-    setEditingMovement(movement);
-    setIsEditSheetOpen(true);
-  };
-
-  const handleRenameMovement = (oldName: string, newName: string) => {
-    onRenameMovement?.(oldName, newName);
-  };
-
-  const handleDeleteMovement = (name: string) => {
-    onDeleteMovement?.(name);
-    setIsEditSheetOpen(false);
-  };
 
   // -- Share adapter for detail mode ─────────────────────────────────
 
@@ -702,7 +802,7 @@ export function WorkoutScreen({
 
   const sharedBody = (
     <>
-      {/* -- Reward-only top chrome: title + dismiss button ────── */}
+      {/* -- Reward-only top chrome: title ────────────────────── */}
       {isReward && (
         <motion.div
           className={styles.heroHeader}
@@ -711,11 +811,6 @@ export function WorkoutScreen({
           transition={{ delay: d, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
           <h1 className={styles.heroTitle}>WORKOUT COMPLETE</h1>
-          {onDone && (
-            <button className={styles.dismissButton} onClick={onDone} type="button" aria-label="Done">
-              <CloseIcon />
-            </button>
-          )}
         </motion.div>
       )}
 
@@ -731,6 +826,14 @@ export function WorkoutScreen({
               {' \u00b7 '}
               {headerDateStr}
             </span>
+            {rawText && (
+              <button
+                className={styles.headerOriginalLink}
+                onClick={() => setIsRawTextOpen(true)}
+              >
+                Original ›
+              </button>
+            )}
           </header>
 
           {isPR && (
@@ -768,142 +871,161 @@ export function WorkoutScreen({
         </motion.h1>
       )}
 
-      {/* -- Receipt Hero Card (single glassmorphism container) ── */}
+      {/* -- Stat Chips Row ────────────────────────────────────── */}
       <motion.div
-        className={styles.receiptCard}
-        initial={{ opacity: 0, y: 12 }}
+        className={styles.statChipsRow}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: d + 0.2, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: d + 0.20, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* Top Half: Hero Metrics — Volume + EP */}
-        <div className={styles.receiptHeroRow}>
-          {/* Left: Volume / Reps */}
+        {/* Volume chip */}
+        {totalVolume > 0 && (
           <div
-            className={`${styles.receiptCell} ${totalVolume > 0 ? styles.receiptCellTappable : ''}`}
-            onClick={totalVolume > 0 ? () => setIsVolumeSheetOpen(true) : undefined}
+            className={`${styles.statChip} ${styles.statChipTappable}`}
+            onClick={() => setIsVolumeSheetOpen(true)}
           >
-            <div className={styles.receiptValueRow}>
-              <span className={`${styles.receiptHeroNumber} ${styles.accentGold}`}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+              <span className={styles.statChipValue} style={{ color: '#FFD600' }}>
                 {leftStat.num}
               </span>
               {leftStat.unit && (
-                <span className={styles.receiptHeroUnit}>{leftStat.unit}</span>
+                <span className={styles.statChipUnit}>{leftStat.unit}</span>
               )}
             </div>
-            <span className={styles.receiptLabel}>{leftStat.label}</span>
-          </div>
-
-          {/* Right: EP */}
-          <div className={styles.receiptCell}>
-            <div className={styles.receiptValueRow}>
-              <span className={`${styles.receiptHeroNumber} ${styles.accentGreen}`}>
-                {rightStat.num}
-              </span>
-            </div>
-            <span className={styles.receiptLabel}>{rightStat.label}</span>
-          </div>
-        </div>
-
-        {/* Divider */}
-        {hasEnginePills && <div className={styles.receiptDivider} />}
-
-        {/* Bottom Half: Engine Metrics — Time + Distance */}
-        {hasEnginePills && (
-          <div className={styles.receiptEngineRow}>
-            {showTime && (
-              <div className={styles.receiptCell}>
-                <div className={styles.receiptValueRow}>
-                  <span className={`${styles.receiptEngineNumber} ${styles.accentMagenta}`}>
-                    {timeSplit.num}
-                  </span>
-                  {timeSplit.unit && (
-                    <span className={styles.receiptEngineUnit}>{timeSplit.unit}</span>
-                  )}
-                </div>
-                <span className={styles.receiptEngineLabel}>MOVE TIME</span>
-              </div>
-            )}
-            {showDistance && (
-              <div
-                className={`${styles.receiptCell} ${styles.receiptCellTappable}`}
-                onClick={() => setIsDistanceSheetOpen(true)}
-              >
-                <div className={styles.receiptValueRow}>
-                  <span className={`${styles.receiptEngineNumber} ${styles.accentCyan}`}>
-                    {distSplit.num}
-                  </span>
-                  {distSplit.unit && (
-                    <span className={styles.receiptEngineUnit}>{distSplit.unit}</span>
-                  )}
-                </div>
-                <span className={styles.receiptEngineLabel}>DISTANCE</span>
-              </div>
-            )}
+            <span className={styles.statChipLabel}>VOLUME</span>
           </div>
         )}
+
+        {/* EP chip */}
+        <div
+          className={`${styles.statChip} ${styles.statChipTappable}`}
+          onClick={() => setIsEPSheetOpen(true)}
+        >
+          <span className={styles.statChipValue} style={{ color: '#39FF14' }}>
+            {rightStat.num}
+          </span>
+          <span className={styles.statChipLabel}>EP</span>
+        </div>
+
+        {/* Time chip */}
+        {showTime && (
+          <div className={styles.statChip}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+              <span className={styles.statChipValue} style={{ color: '#FF00E5' }}>
+                {timeSplit.num}
+              </span>
+              {timeSplit.unit && (
+                <span className={styles.statChipUnit}>{timeSplit.unit}</span>
+              )}
+            </div>
+            <span className={styles.statChipLabel}>TIME</span>
+          </div>
+        )}
+
+        {/* Carry chip (weighted distance, e.g., farmer carry) */}
+        {showCarry && (
+          <div className={styles.statChip}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+              <span className={styles.statChipValue} style={{ color: '#FFD600' }}>
+                {carryDistSplit.num}
+              </span>
+              {carryDistSplit.unit && (
+                <span className={styles.statChipUnit}>{carryDistSplit.unit}</span>
+              )}
+            </div>
+            <span className={styles.statChipLabel}>
+              {carryWeight ? `CARRY ${carryWeight}kg` : 'CARRY'}
+            </span>
+          </div>
+        )}
+
+        {/* Distance chip */}
+        {showDistance && (
+          <div
+            className={`${styles.statChip} ${styles.statChipTappable}`}
+            onClick={() => setIsDistanceSheetOpen(true)}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+              <span className={styles.statChipValue} style={{ color: '#00FFFF' }}>
+                {distSplit.num}
+              </span>
+              {distSplit.unit && (
+                <span className={styles.statChipUnit}>{distSplit.unit}</span>
+              )}
+            </div>
+            <span className={styles.statChipLabel}>DISTANCE</span>
+          </div>
+        )}
+
+        {/* PR achievement chips */}
+        {isReward && achievementPills.filter(p => p.emoji === '\ud83c\udfc6').map((_pill, i) => (
+          <motion.div
+            key={`pr-chip-${i}`}
+            className={`${styles.statChip} ${styles.statChipPR}`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: d + 0.40 + i * 0.10, type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            <span className={styles.statChipValue} style={{ color: '#FFD600' }}>
+              {'\ud83c\udfc6'}
+            </span>
+            <span className={styles.statChipLabel}>PR</span>
+          </motion.div>
+        ))}
       </motion.div>
 
-      {/* -- View Workout ───────────────────────────────────────── */}
-      {rawText && (
+      {/* -- Goal Banners (reward only) ─────────────────────────── */}
+      {isReward && achievementPills.filter(p => p.emoji !== '\ud83c\udfc6').length > 0 && (
+        <div className={styles.goalBanners}>
+          {achievementPills.filter(p => p.emoji !== '\ud83c\udfc6').map((pill, i) => (
+            <motion.div
+              key={`goal-${i}`}
+              className={styles.goalBanner}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: d + 0.55 + i * 0.10 }}
+            >
+              <span className={styles.goalBannerEmoji}>{pill.emoji}</span>
+              <span className={styles.goalBannerText}>{pill.label}</span>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* -- Original Workout Link ──────────────────────────────── */}
+      {isReward && rawText && (
         <motion.button
-          className={styles.viewProgramming}
+          className={styles.originalLink}
           onClick={() => setIsRawTextOpen(true)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: d + 0.3 }}
         >
-          View Workout ›
+          Original ›
         </motion.button>
       )}
 
-      {/* -- Trophy Case (reward only) ──────────────────────────── */}
-      {isReward && achievementPills.length > 0 && (
-        <motion.div
-          className={styles.trophyCase}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: d + 0.35, duration: 0.35 }}
-        >
-          <span className={styles.trophyLabel}>Highlights</span>
-          <div className={styles.trophyRow}>
-            {achievementPills.map((pill, i) => (
-              <motion.div
-                key={`${pill.emoji}-${pill.label}`}
-                className={styles.trophyPill}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: d + 0.4 + i * 0.1 }}
-              >
-                <span className={styles.trophyEmoji}>{pill.emoji}</span>
-                <span className={styles.trophyText}>{pill.label}</span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* -- Workload Breakdown ─────────────────────────────────── */}
-      {workloadBreakdown && workloadBreakdown.movements.length > 0 && (
-        <WorkloadBreakdown
-          breakdown={workloadBreakdown}
-          animationDelay={isReward ? 0.65 : 0.4}
-          prMovements={prMovements}
-          editable={isReward && Boolean(onRenameMovement || onDeleteMovement)}
-          onEditMovement={isReward ? handleEditMovement : undefined}
-          onDeleteMovement={isReward ? handleDeleteMovement : undefined}
-        />
-      )}
-
-      {/* -- Edit hint (reward only) ────────────────────────────── */}
-      {isReward && (onRenameMovement || onDeleteMovement) && workloadBreakdown && workloadBreakdown.movements.length > 0 && (
-        <motion.p
-          className={styles.editHint}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-        >
-          Tap a movement to edit or swipe to delete
-        </motion.p>
+      {/* -- Exercise Story Cards ───────────────────────────────── */}
+      {exercises.length > 0 && (
+        <div className={styles.storyCards}>
+          {exercises.filter(ex => !isExcludedExercise(ex)).map((ex, i) => {
+            // Match breakdown movements to this exercise's movements by name
+            const exMovNames = (ex.movements || []).map(m => m.name.toLowerCase());
+            const matchedBreakdown = exMovNames.length > 0 && activeBreakdown?.movements
+              ? activeBreakdown.movements.filter(bm => exMovNames.includes(bm.name.toLowerCase()))
+              : undefined;
+            return (
+              <ExerciseStoryCard
+                key={ex.id || i}
+                exercise={ex}
+                animationDelay={isReward ? 0.5 + i * 0.12 : 0.3 + i * 0.1}
+                animated={isReward}
+                isPR={prMovements.has(ex.name.toLowerCase())}
+                breakdownMovements={matchedBreakdown && matchedBreakdown.length > 0 ? matchedBreakdown : undefined}
+              />
+            );
+          })}
+        </div>
       )}
 
       {/* -- Action Bar ─────────────────────────────────────────── */}
@@ -921,14 +1043,20 @@ export function WorkoutScreen({
           <ShareIcon /> Share
         </button>
 
-        {/* Secondary: Edit (always), Done (reward only) */}
-        {handleEditClick && (
-          <button className={styles.shareBarGhost} onClick={handleEditClick}>
-            <EditIcon /> Edit
-          </button>
-        )}
+        {/* Secondary actions row: Edit + Done (reward) or Edit alone (detail) */}
+        <div className={styles.shareBarSecondary}>
+          {handleEditClick && (
+            <button className={styles.shareBarGhost} onClick={handleEditClick}>
+              <EditIcon /> Edit
+            </button>
+          )}
 
-        {/* Done moved to top-right dismiss X in reward mode */}
+          {isReward && onDone && (
+            <button className={styles.shareBarDone} onClick={onDone}>
+              Done
+            </button>
+          )}
+        </div>
       </motion.div>
     </>
   );
@@ -937,16 +1065,6 @@ export function WorkoutScreen({
 
   const bottomSheets = (
     <>
-      {isReward && (
-        <MovementEditSheet
-          open={isEditSheetOpen}
-          movement={editingMovement}
-          onClose={() => setIsEditSheetOpen(false)}
-          onRename={handleRenameMovement}
-          onDelete={handleDeleteMovement}
-        />
-      )}
-
       {shareData && (
         <ShareLaunchSheet
           open={isShareLaunchOpen}
@@ -971,6 +1089,11 @@ export function WorkoutScreen({
         open={isDistanceSheetOpen}
         onClose={() => setIsDistanceSheetOpen(false)}
         movements={workloadBreakdown?.movements || []}
+      />
+      <EPBreakdownSheet
+        open={isEPSheetOpen}
+        onClose={() => setIsEPSheetOpen(false)}
+        ep={isReward ? (rewardEP || { base: 0, time: 0, volume: 0, bodyweight: 0, distance: 0, intensity: 0, pr: 0, total: 0 }) : (detailEP || { base: 0, time: 0, volume: 0, bodyweight: 0, distance: 0, intensity: 0, pr: 0, total: 0 })}
       />
     </>
   );

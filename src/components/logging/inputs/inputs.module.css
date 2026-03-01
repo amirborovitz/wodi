@@ -11,20 +11,23 @@
 
 .roundsInput {
   width: 120px;
-  padding: var(--space-4);
-  background: rgba(255, 255, 255, 0.1);
+  padding: var(--space-2) 0;
+  background: transparent;
   border: none;
-  border-radius: 999px;
+  border-bottom: 2px solid var(--color-sessions);
+  border-radius: 0;
   font-size: var(--text-2xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .roundsInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 
 .roundsInput::placeholder {
@@ -108,10 +111,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: rgba(255, 255, 255, 0.1);
+  padding: var(--space-3) 0;
+  background: transparent;
   border: none;
-  border-radius: 999px;
+  border-radius: 0;
   box-shadow: none;
   margin-top: var(--space-4);
 }
@@ -205,20 +208,23 @@
 
 .intervalSetTimeInput {
   width: 50px;
-  padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
+  padding: var(--space-1) 0;
+  background: transparent;
   border: none;
-  border-radius: 999px;
+  border-bottom: 2px solid var(--color-sessions);
+  border-radius: 0;
   font-size: var(--text-md);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .intervalSetTimeInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 
 .intervalSetTimeInput::placeholder {
@@ -238,19 +244,18 @@
 .strengthSetsContainer {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-6) 0;
+  gap: 0;
+  padding: var(--space-2) 0;
+  width: 100%;
 }
 
 .strengthSetCard {
   width: 100%;
-  max-width: 280px;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -259,46 +264,47 @@
 }
 
 .strengthSetLabel {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
-  font-variant: small-caps;
+  white-space: nowrap;
 }
 
 .strengthSetInputs {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  align-items: center;
   gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .strengthSetField {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  padding: var(--space-2) var(--space-3);
+  align-items: baseline;
+  gap: 2px;
 }
 
 .strengthSetInput {
-  width: 64px;
-  padding: var(--space-2);
+  width: 56px;
+  padding: var(--space-1) 0;
   background: transparent;
   border: none;
+  border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-xl);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .strengthSetInput:focus {
   outline: none;
+  border-bottom-color: var(--color-sessions);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 
 .strengthSetInput::placeholder {
@@ -307,17 +313,20 @@
 }
 
 .strengthSetUnit {
-  font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  letter-spacing: 0.03em;
+  margin-left: 2px;
 }
 
 .strengthSetSeparator {
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
   font-weight: var(--font-bold);
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.2);
   line-height: 1;
+  margin: 0 var(--space-1);
 }
 
 .addSetButtonCentered {
@@ -326,8 +335,7 @@
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  max-width: 280px;
-  margin: 0 auto;
+  margin: var(--space-2) 0 0;
   padding: var(--space-3);
   background: transparent;
   border: 2px dashed var(--color-border);
@@ -349,16 +357,17 @@
 .supersetMovements {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-3);
+  gap: 0;
   width: 100%;
+  padding: var(--space-2) 0;
 }
 
 .supersetMovementRow {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -368,20 +377,23 @@
 
 .supersetMovementHeader {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
 }
 
 .supersetMovementName {
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
   color: var(--color-text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .supersetPrescriptionHint {
   font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-tertiary);
   white-space: nowrap;
 }
 
@@ -389,32 +401,34 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .supersetInputPill {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  padding: var(--space-2) var(--space-3);
+  align-items: baseline;
+  gap: 2px;
 }
 
 .supersetInput {
   width: 52px;
-  padding: var(--space-1);
+  padding: var(--space-1) 0;
   background: transparent;
   border: none;
+  border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   color: var(--color-text);
   font-size: var(--text-base);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .supersetInput:focus {
   outline: none;
+  border-bottom-color: var(--color-sessions);
+  color: var(--neon-cyan);
 }
 
 .supersetInput::placeholder {
@@ -423,8 +437,47 @@
 }
 
 .supersetInputLabel {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  margin-left: 2px;
+}
+
+/* Per-set rows within a superset for weighted movements */
+.supersetPerSetSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: var(--space-2);
+}
+
+.supersetPerSetRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.strengthSetContext {
   font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-tertiary);
+  margin-left: var(--space-1);
+  font-weight: var(--font-normal);
+  font-variant: normal;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.strengthSetRepsFixed {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 
 /* ========================================
@@ -453,10 +506,7 @@
 }
 
 .emomPhaseHeader {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  padding: var(--space-1) var(--space-2);
+  padding: 0 0 var(--space-2);
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: rgba(255, 255, 255, 0.35);
@@ -464,112 +514,78 @@
   letter-spacing: 0.08em;
 }
 
-.emomCollapsedWeight {
+/* Per-round weight grid (2 columns) */
+.emomRoundGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.emomRoundCell {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-}
-
-.emomWeightLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-  font-weight: var(--font-medium);
-}
-
-.emomWeightSummary {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-  padding: 0 var(--space-3);
-  margin-top: var(--space-1);
-  letter-spacing: var(--tracking-wide);
-}
-
-.emomExpandLink {
-  display: block;
-  background: none;
-  border: none;
-  color: var(--color-sessions);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  padding: var(--space-2) var(--space-3);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.emomExpandedHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-}
-
-.emomMinuteRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 6px var(--space-3);
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-md);
-  transition: background var(--duration-fast) ease;
+  border-left: 2px solid transparent;
+  transition: border-color var(--duration-fast) ease,
+              background var(--duration-fast) ease;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
-.emomMinuteRow:active {
-  background: rgba(255, 255, 255, 0.03);
+.emomRoundChanged {
+  border-left-color: var(--color-volume);
+  background: rgba(255, 214, 0, 0.06);
 }
 
-.emomMinuteNum {
-  width: 24px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
+.emomRoundNum {
+  font-size: 11px;
   font-family: var(--font-mono);
+  font-weight: var(--font-bold);
   color: var(--color-text-tertiary);
+  width: 16px;
   text-align: center;
   flex-shrink: 0;
 }
 
-.emomWeightField {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.emomRoundInput {
   flex: 1;
-}
-
-.emomWeightInput {
-  width: 72px;
-  padding: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
+  min-width: 0;
+  padding: var(--space-1);
+  background: transparent;
   border: none;
-  border-radius: 999px;
+  border-bottom: 2px solid transparent;
   font-size: var(--text-sm);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
-  transition: box-shadow var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) ease;
   -webkit-appearance: none;
   -moz-appearance: textfield;
 }
 
-.emomWeightInput:focus {
+.emomRoundInput:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.4);
+  border-bottom-color: rgba(0, 255, 255, 0.5);
 }
 
-.emomWeightInput::placeholder {
+.emomRoundInput::placeholder {
   color: rgba(255, 255, 255, 0.2);
   font-weight: var(--font-normal);
-  opacity: 1;
 }
 
-.emomWeightUnit {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
+.emomRoundUnit {
+  font-size: 10px;
   color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  flex-shrink: 0;
 }
 
 /* ========================================
@@ -601,11 +617,11 @@
   flex: 1;
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
 
 .inputGroup label {
@@ -617,19 +633,23 @@
 
 .setInput {
   width: 100%;
-  padding: var(--space-2) var(--space-2);
+  padding: var(--space-1) 0;
   background: transparent;
   border: none;
+  border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-md);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .setInput:focus {
   outline: none;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 
 .setInput::placeholder {
@@ -682,21 +702,19 @@
 
 .unitSelect:focus {
   outline: none;
-  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.5), 0 0 18px rgba(0, 242, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(0, 255, 255, 0.5), 0 0 18px rgba(0, 255, 255, 0.35);
 }
 
 /* Per-movement weight inputs section */
 .movementWeightsSection {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-4);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: var(--glass-blur-heavy);
-  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  margin-bottom: var(--space-3);
+  border: none;
 }
 
 .weightHint {
@@ -721,44 +739,53 @@
 .movementWeightRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3);
+  padding: var(--space-3) 0;
   background: transparent;
-  border-radius: var(--radius-lg);
-  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.movementWeightRow:last-child {
+  border-bottom: none;
 }
 
 .movementWeightName {
   flex: 1;
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-bold);
   color: var(--color-text);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .movementWeightInputGroup {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  padding: var(--space-1) var(--space-3);
+  align-items: baseline;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .movementWeightInput {
-  width: 60px;
-  padding: var(--space-2);
+  width: 56px;
+  padding: var(--space-1) 0;
   background: transparent;
   border: none;
+  border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-family: var(--font-mono);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
+  transition: border-color var(--duration-fast) ease;
 }
 
 .movementWeightInput:focus {
   outline: none;
+  border-bottom-color: var(--color-sessions);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
 }
 
 .movementWeightInput::placeholder {
@@ -778,7 +805,7 @@
   .unitSelect,
   .intervalSetTimeInput,
   .movementWeightInput,
-  .emomWeightInput,
+  .emomRoundInput,
   .supersetInput {
     font-size: var(--text-base);
   }
@@ -792,5 +819,21 @@
 
   .movementWeightRow:hover {
     border-color: var(--color-sessions);
+  }
+}
+
+/* Tight grid on very small screens */
+@media (max-width: 360px) {
+  .emomRoundCell {
+    padding: 8px 6px;
+    gap: 4px;
+  }
+
+  .emomRoundNum {
+    width: 14px;
+  }
+
+  .emomRoundUnit {
+    display: none;
   }
 }

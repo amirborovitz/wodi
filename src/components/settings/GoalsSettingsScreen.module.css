@@ -145,7 +145,7 @@
 
 .stepButton:active:not(:disabled) {
   transform: scale(0.95);
-  background: rgba(0, 242, 255, 0.2);
+  background: rgba(0, 255, 255, 0.2);
 }
 
 .stepButton:disabled {
@@ -198,13 +198,13 @@
 }
 
 .presetActive {
-  background: rgba(0, 242, 255, 0.15);
+  background: rgba(0, 255, 255, 0.15);
   border-color: var(--color-sessions);
   color: var(--color-sessions);
 }
 
 .presetActive:hover {
-  background: rgba(0, 242, 255, 0.2);
+  background: rgba(0, 255, 255, 0.2);
 }
 
 .hint {

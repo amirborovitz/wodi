@@ -2,7 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StickerCard } from './StickerCard';
 import styles from './ShareLaunchSheet.module.css';
-import type { RewardData, Exercise, MovementTotal } from '../../types';
+import type { RewardData, Exercise } from '../../types';
+import {
+  buildShareSegments,
+  buildMovementLine,
+  formatTime,
+  formatVolume,
+  isExcludedExercise,
+  detectExerciseDisplayType,
+} from './shareCardUtils';
 
 interface ShareLaunchSheetProps {
   open: boolean;
@@ -11,183 +19,114 @@ interface ShareLaunchSheetProps {
   userName?: string;
 }
 
-type Segment = 'full' | number;
-type ExType = 'strength' | 'for_time' | 'amrap' | 'cardio' | 'bodyweight';
+const SCREENSHOT_HINTS = [
+  'Screenshot this & flex on your story',
+  'Screenshot it. Post it. Own it.',
+  'Take a screenshot & show the world',
+  'Screenshot this card, you earned it',
+  'Grab a screenshot & share the gains',
+];
 
-function buildMovementLine(mov: MovementTotal): string {
-  const parts: string[] = [];
-  if (mov.totalReps && mov.totalReps > 0) parts.push(`${mov.totalReps}`);
-  if (mov.totalDistance && mov.totalDistance > 0) {
-    parts.push(
-      mov.totalDistance >= 1000
-        ? `${(mov.totalDistance / 1000).toFixed(1)}km`
-        : `${Math.round(mov.totalDistance)}m`
-    );
-  }
-  if (mov.totalCalories && mov.totalCalories > 0) parts.push(`${mov.totalCalories} cal`);
-  if (mov.weight && mov.weight > 0) parts.push(`@ ${mov.weight}kg`);
-  const detail = parts.length > 0 ? ` - ${parts.join(' ')}` : '';
-  return `${mov.name}${detail}`;
-}
+// ---------------------------------------------------------------------------
+// Text export helpers
+// ---------------------------------------------------------------------------
 
-function formatTime(totalSeconds: number): string {
-  if (totalSeconds === 0) return '--';
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = Math.round(totalSeconds % 60);
-  if (mins >= 60) {
-    const hrs = Math.floor(mins / 60);
-    const rm = mins % 60;
-    return `${hrs}:${rm.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function formatVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)} tons`;
-  return `${parseFloat(kg.toFixed(1)).toLocaleString()}kg`;
-}
-
-function detectExerciseType(ex: Exercise): ExType {
-  const sets = ex.sets || [];
-  const hasWeight = sets.some((s) => s.weight != null && s.weight > 0);
-  const hasTime = sets.some((s) => s.time != null && s.time > 0);
-  const hasCals = sets.some((s) => s.calories != null && s.calories > 0);
-  const hasDist = sets.some((s) => s.distance != null && s.distance > 0);
-
-  const rx = (ex.prescription || '').toLowerCase();
-  if (rx.includes('amrap')) return 'amrap';
-  if (rx.includes('for time') || rx.includes('for_time')) return 'for_time';
-  if (hasWeight) return 'strength';
-  if (hasCals || hasDist) return 'cardio';
-  if (hasTime && !hasWeight) return 'for_time';
-  return 'bodyweight';
-}
-
-function buildExerciseLine(ex: Exercise): string {
-  const sets = (ex.sets || []).filter((s) => s.completed);
+function buildExerciseTextLine(ex: Exercise): string {
+  const sets = (ex.sets || []).filter(s => s.completed);
   const displaySets = sets.length > 0 ? sets : ex.sets || [];
-  const exType = detectExerciseType(ex);
-
+  const exType = detectExerciseDisplayType(ex);
   const nameLine = ex.name.toUpperCase();
 
   if (exType === 'strength') {
-    const setStrs = displaySets
-      .map((s) => {
-        const parts: string[] = [];
-        if (s.weight != null) parts.push(`${s.weight}kg`);
-        if (s.actualReps != null) parts.push(`x ${s.actualReps}`);
-        return parts.join(' ');
-      })
-      .filter(Boolean);
+    const weights = displaySets.map(s => s.weight).filter((w): w is number => w != null);
+    const reps = displaySets.map(s => s.actualReps).filter((r): r is number => r != null);
+    const allSameWeight = weights.length > 0 && weights.every(w => w === weights[0]);
+    const allSameReps = reps.length > 0 && reps.every(r => r === reps[0]);
 
-    const prescription = ex.prescription ? `${ex.prescription} | ` : '';
-    return `${nameLine}\n${prescription}${setStrs.join(', ')}`;
+    let setLine: string;
+    if (allSameWeight && allSameReps && weights.length > 0) {
+      setLine = `${displaySets.length}x${reps[0]} @ ${weights[0]}kg`;
+    } else if (!allSameWeight && allSameReps && weights.length > 1) {
+      setLine = `${displaySets.length}x${reps[0]} @ ${weights.join('>')}kg`;
+    } else {
+      setLine = displaySets.map(s => {
+        const w = s.weight != null ? `${s.weight}kg` : '';
+        const r = s.actualReps != null ? `${s.actualReps}` : '';
+        return w && r ? `${w} x ${r}` : w || r;
+      }).filter(Boolean).join(' · ');
+    }
+    return `${nameLine}\n${setLine}`;
   }
 
   if (exType === 'for_time') {
-    const timeSet = displaySets.find((s) => s.time != null && s.time > 0);
+    const timeSet = displaySets.find(s => s.time != null && s.time > 0);
     const timeStr = timeSet ? formatTime(timeSet.time || 0) : '';
-    const parts = [nameLine];
-    if (timeStr) parts.push(`${timeStr} | ${ex.prescription}`);
-    else parts.push(ex.prescription);
-    return parts.join('\n');
+    const lines = [nameLine];
+    if (timeStr) lines.push(timeStr);
+    if (ex.movements?.length) {
+      ex.movements.forEach(m => {
+        const p: string[] = [];
+        if (m.reps) p.push(`${m.reps}`);
+        p.push(m.name);
+        if (m.rxWeights) p.push(`@${m.rxWeights.male || m.rxWeights.female}${m.rxWeights.unit || 'kg'}`);
+        lines.push(`  ${p.join(' ')}`);
+      });
+    } else if (ex.prescription) {
+      lines.push(ex.prescription);
+    }
+    return lines.join('\n');
   }
 
   if (exType === 'amrap') {
-    const totalRounds = displaySets.filter((s) => s.completed).length;
+    const totalRounds = displaySets.filter(s => s.completed).length;
     const lastSet = displaySets[displaySets.length - 1];
     const extraReps = lastSet?.actualReps || 0;
-    const score =
-      totalRounds > 0
-        ? `${totalRounds} rounds${extraReps > 0 ? ` + ${extraReps} reps` : ''}`
-        : '';
-    return `${nameLine}\n${score ? `${score} | ` : ''}${ex.prescription}`;
+    const score = totalRounds > 0 ? `${totalRounds} rds${extraReps > 0 ? ` + ${extraReps}` : ''}` : '';
+    const lines = [nameLine];
+    if (score) lines.push(score);
+    if (ex.movements?.length) {
+      ex.movements.forEach(m => {
+        const p: string[] = [];
+        if (m.reps) p.push(`${m.reps}`);
+        p.push(m.name);
+        if (m.rxWeights) p.push(`@${m.rxWeights.male || m.rxWeights.female}${m.rxWeights.unit || 'kg'}`);
+        lines.push(`  ${p.join(' ')}`);
+      });
+    } else if (ex.prescription) {
+      lines.push(ex.prescription);
+    }
+    return lines.join('\n');
   }
 
   if (exType === 'cardio') {
     const totalCal = displaySets.reduce((a, s) => a + (s.calories || 0), 0);
     const totalDist = displaySets.reduce((a, s) => a + (s.distance || 0), 0);
     const metric = totalCal > 0 ? `${totalCal} cal` : totalDist > 0 ? `${totalDist}m` : '';
-    return `${nameLine}\n${metric ? `${metric} | ` : ''}${ex.prescription}`;
+    return `${nameLine}\n${metric ? `${metric} | ` : ''}${ex.prescription || ''}`;
   }
 
   const repStrs = displaySets
-    .map((s) => (s.actualReps != null ? `${s.actualReps} reps` : ''))
+    .map(s => (s.actualReps != null ? `${s.actualReps} reps` : ''))
     .filter(Boolean);
-  return `${nameLine}\n${repStrs.join(', ') || ex.prescription}`;
+  return `${nameLine}\n${repStrs.join(', ') || ex.prescription || ''}`;
 }
 
-function buildSingleExerciseText(ex: Exercise): string {
-  const sets = (ex.sets || []).filter((s) => s.completed);
-  const displaySets = sets.length > 0 ? sets : ex.sets || [];
-  const exType = detectExerciseType(ex);
-  const lines: string[] = [ex.name.toUpperCase()];
-
-  if (exType === 'strength') {
-    displaySets.forEach((s, i) => {
-      const parts: string[] = [];
-      if (s.weight != null) parts.push(`${s.weight}kg`);
-      if (s.actualReps != null) parts.push(`x ${s.actualReps}`);
-      lines.push(`Set ${s.setNumber || i + 1}: ${parts.join(' ')}`);
-    });
-
-    const vol = displaySets.reduce((a, s) => {
-      if (s.weight && s.actualReps) return a + s.weight * s.actualReps;
-      return a;
-    }, 0);
-    if (vol > 0) {
-      lines.push('');
-      lines.push(`Volume: ${formatVolume(vol)}`);
-    }
-  } else if (exType === 'for_time') {
-    const timeSet = displaySets.find((s) => s.time != null && s.time > 0);
-    if (timeSet) lines.push(`${formatTime(timeSet.time || 0)} completed`);
-    if (ex.prescription) lines.push(ex.prescription);
-  } else if (exType === 'amrap') {
-    const totalRounds = displaySets.filter((s) => s.completed).length;
-    const lastSet = displaySets[displaySets.length - 1];
-    const extraReps = lastSet?.actualReps || 0;
-    if (totalRounds > 0) {
-      lines.push(`${totalRounds} rounds${extraReps > 0 ? ` + ${extraReps} reps` : ''}`);
-    }
-    if (ex.prescription) lines.push(ex.prescription);
-  } else if (exType === 'cardio') {
-    const totalCal = displaySets.reduce((a, s) => a + (s.calories || 0), 0);
-    const totalDist = displaySets.reduce((a, s) => a + (s.distance || 0), 0);
-    if (totalCal > 0) lines.push(`${totalCal} cal`);
-    else if (totalDist > 0) lines.push(`${totalDist}m`);
-  } else {
-    displaySets.forEach((s, i) => {
-      if (s.actualReps != null) {
-        lines.push(`Set ${s.setNumber || i + 1}: ${s.actualReps} reps`);
-      }
-    });
-  }
-
-  return lines.join('\n');
-}
-
-function buildWorkoutText(data: RewardData, segment: Segment): string {
+function buildWorkoutText(data: RewardData): string {
   const { workoutSummary, exercises, workloadBreakdown } = data;
   const movements = workloadBreakdown?.movements || [];
-
-  if (segment !== 'full') {
-    const ex = exercises[segment];
-    if (!ex) return workoutSummary.title;
-    return buildSingleExerciseText(ex);
-  }
+  const filtered = exercises.filter(ex => !isExcludedExercise(ex));
 
   const lines: string[] = [workoutSummary.title.toUpperCase()];
 
-  const isMetcon = exercises.length <= 2 && movements.length > 1;
+  const isMetcon = filtered.length <= 2 && movements.length > 1;
   if (isMetcon) {
-    if (exercises[0]) lines.push(exercises[0].name.toUpperCase());
-    movements.forEach((mov) => {
-      lines.push(buildMovementLine(mov));
+    if (filtered[0]) lines.push(filtered[0].name.toUpperCase());
+    movements.forEach(mov => {
+      lines.push(`  ${buildMovementLine(mov)}`);
     });
   } else {
-    exercises.forEach((ex) => {
-      lines.push(buildExerciseLine(ex));
+    filtered.forEach(ex => {
+      lines.push(buildExerciseTextLine(ex));
     });
   }
 
@@ -229,7 +168,6 @@ async function copyText(text: string): Promise<boolean> {
       await navigator.clipboard.writeText(text);
       return true;
     }
-
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.style.position = 'fixed';
@@ -244,66 +182,35 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-function openDeepLink(url: string, fallbackUrl?: string) {
-  window.location.href = url;
-  if (fallbackUrl) {
-    window.setTimeout(() => {
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-    }, 700);
-  }
-}
+// ---------------------------------------------------------------------------
+// Icons
+// ---------------------------------------------------------------------------
 
-function InstagramIcon() {
+function CopyIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
-      <circle cx="12" cy="12" r="4.2" />
-      <circle cx="18.2" cy="5.8" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function MoreIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 19V5" />
-      <path d="m5 12 7-7 7 7" />
-      <path d="M5 19h14" />
-    </svg>
-  );
-}
-
-function LinkIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 5" />
-      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19" />
-    </svg>
-  );
-}
-
-function CopyTextIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="9" y="9" width="13" height="13" rx="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>
   );
 }
 
-function XIcon() {
+function CheckIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4l16 16" />
-      <path d="M20 4 4 20" />
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
 
-function CheckIcon() {
+function ChevronIcon({ expanded }: { expanded: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
+    <svg
+      width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s ease' }}
+    >
+      <polyline points="6 9 12 15 18 9" />
     </svg>
   );
 }
@@ -317,44 +224,37 @@ function CloseIcon() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Slide animation variants
+// ---------------------------------------------------------------------------
+
 const slideVariants = {
   enter: (d: number) => ({ x: d >= 0 ? 120 : -120, opacity: 0 }),
   center: { x: 0, opacity: 1 },
   exit: (d: number) => ({ x: d >= 0 ? -120 : 120, opacity: 0 }),
 };
 
-function getSegmentLabel(exercise: Exercise): string {
-  switch (exercise.type) {
-    case 'strength':
-      return 'Strength';
-    case 'wod':
-      return 'Metcon';
-    case 'cardio':
-      return 'Cardio';
-    case 'skill':
-      return 'Skill';
-    default:
-      return 'Workout';
-  }
-}
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 
 export function ShareLaunchSheet({ open, onClose, data, userName }: ShareLaunchSheetProps) {
-  const exercises = data.exercises || [];
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
-  const [isPrimaryBusy, setIsPrimaryBusy] = useState(false);
-  const [primaryDone, setPrimaryDone] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<'text' | 'link' | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [textExpanded, setTextExpanded] = useState(false);
+  const [hint] = useState(() => SCREENSHOT_HINTS[Math.floor(Math.random() * SCREENSHOT_HINTS.length)]);
 
-  const totalSegments = 1 + exercises.length;
-  const segment: Segment = currentIndex === 0 ? 'full' : currentIndex - 1;
-  const segmentLabels = ['Full Workout', ...exercises.map((ex) => getSegmentLabel(ex))];
+  // Build segments: Story (always) + Strength (conditional) + Metcon (conditional)
+  const segments = buildShareSegments(data);
+  const totalSegments = segments.length;
 
   const goTo = useCallback(
     (newIndex: number) => {
       if (newIndex < 0 || newIndex >= totalSegments) return;
       setDirection(newIndex > currentIndex ? 1 : -1);
       setCurrentIndex(newIndex);
+      setTextExpanded(false);
     },
     [currentIndex, totalSegments]
   );
@@ -363,83 +263,23 @@ export function ShareLaunchSheet({ open, onClose, data, userName }: ShareLaunchS
     if (open) {
       setCurrentIndex(0);
       setDirection(0);
-      setPrimaryDone(false);
-      setCopyFeedback(null);
+      setCopied(false);
+      setTextExpanded(false);
     }
   }, [open]);
 
-  const getPayload = () => {
-    const title = data.workoutSummary?.title || 'Workout';
-    const text = buildWorkoutText(data, segment);
-    const link = buildWorkoutLink();
-    return { title, text, link };
-  };
-
-  const handleInstagram = async () => {
-    if (isPrimaryBusy || primaryDone) return;
-    setIsPrimaryBusy(true);
-    try {
-      const { text, link } = getPayload();
-      await copyText(`${text}\n\n${link}`);
-      openDeepLink('instagram://story-camera', 'https://www.instagram.com/create/story/');
-      setPrimaryDone(true);
-      navigator.vibrate?.(10);
-      setTimeout(() => setPrimaryDone(false), 2200);
-    } finally {
-      setIsPrimaryBusy(false);
-    }
-  };
-
-  const handleMore = async () => {
-    const { title, text, link } = getPayload();
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title,
-          text,
-          url: link,
-        });
-        return;
-      }
-
-      await copyText(`${text}\n\n${link}`);
-      setCopyFeedback('text');
-      setTimeout(() => setCopyFeedback(null), 1800);
-    } catch {
-      // user canceled share
-    }
-  };
-
-  const handleWorkoutLink = async () => {
-    const { link } = getPayload();
-    const ok = await copyText(link);
-    if (!ok) return;
-    setCopyFeedback('link');
-    navigator.vibrate?.(10);
-    setTimeout(() => setCopyFeedback(null), 1800);
-  };
-
   const handleCopyText = async () => {
-    const { text, link } = getPayload();
+    const text = buildWorkoutText(data);
+    const link = buildWorkoutLink();
     const ok = await copyText(`${text}\n\n${link}`);
     if (!ok) return;
-    setCopyFeedback('text');
+    setCopied(true);
     navigator.vibrate?.(10);
-    setTimeout(() => setCopyFeedback(null), 1800);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleX = () => {
-    const { text, link } = getPayload();
-    const intent = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`;
-    window.open(intent, '_blank', 'noopener,noreferrer');
-  };
-
-  const iconActions = [
-    { id: 'more' as const, label: 'More', Icon: MoreIcon, handler: handleMore },
-    { id: 'link' as const, label: 'Workout Link', Icon: LinkIcon, handler: handleWorkoutLink },
-    { id: 'copyText' as const, label: 'Copy Text', Icon: CopyTextIcon, handler: handleCopyText },
-    { id: 'x' as const, label: 'X', Icon: XIcon, handler: handleX },
-  ];
+  const textPreview = buildWorkoutText(data);
+  const currentSegment = segments[currentIndex] || segments[0];
 
   return (
     <AnimatePresence>
@@ -460,15 +300,13 @@ export function ShareLaunchSheet({ open, onClose, data, userName }: ShareLaunchS
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 32, stiffness: 380 }}
           >
-            <div className={styles.dragHandle} aria-hidden="true" />
+            <button className={styles.closeBtn} onClick={onClose} type="button" aria-label="Close">
+              <CloseIcon />
+            </button>
 
-            <div className={styles.sheetHeader}>
-              <h2 className={styles.sheetTitle}>Share</h2>
-              <button className={styles.closeBtn} onClick={onClose} type="button" aria-label="Close">
-                <CloseIcon />
-              </button>
-            </div>
+            <p className={styles.screenshotHint}>{hint}</p>
 
+            {/* Card area */}
             <div className={styles.cardSwipeArea}>
               <div className={styles.cardArea}>
                 <AnimatePresence mode="wait" custom={direction}>
@@ -493,63 +331,65 @@ export function ShareLaunchSheet({ open, onClose, data, userName }: ShareLaunchS
                     <StickerCard
                       data={data}
                       userName={userName}
-                      segment={segment}
-                      label={segment !== 'full' ? segmentLabels[currentIndex] : undefined}
+                      segment={currentSegment.type}
+                      exercises={currentSegment.exercises}
                     />
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
 
+            {/* Colored dot indicators */}
             {totalSegments > 1 && (
               <div className={styles.dotsRow}>
-                {segmentLabels.map((_, i) => (
+                {segments.map((seg, i) => (
                   <button
                     key={i}
                     className={`${styles.dot} ${i === currentIndex ? styles.dotActive : ''}`}
+                    style={
+                      i === currentIndex
+                        ? { background: seg.color, boxShadow: `0 0 6px ${seg.color}66` }
+                        : undefined
+                    }
                     onClick={() => goTo(i)}
                     type="button"
-                    aria-label={segmentLabels[i]}
+                    aria-label={seg.label}
                   />
                 ))}
               </div>
             )}
 
-            <button
-              className={`${styles.primaryBtn} ${primaryDone ? styles.primaryBtnDone : ''}`}
-              onClick={handleInstagram}
-              disabled={isPrimaryBusy}
-              type="button"
-            >
-              {primaryDone ? (
-                <>
-                  <CheckIcon />
-                  <span>Opened Instagram</span>
-                </>
-              ) : (
-                <>
-                  <InstagramIcon />
-                  <span>Instagram Stories</span>
-                </>
-              )}
-            </button>
+            {/* Copy text expander */}
+            <div className={styles.copySection}>
+              <button
+                className={styles.copyToggle}
+                onClick={() => setTextExpanded(!textExpanded)}
+                type="button"
+              >
+                <span className={styles.copyToggleLabel}>Workout text</span>
+                <ChevronIcon expanded={textExpanded} />
+              </button>
 
-            <p className={styles.shareHint}>Share workout and tag @wodi</p>
-
-            <div className={styles.iconRow}>
-              {iconActions.map(({ id, label, Icon, handler }) => {
-                const isSuccess =
-                  (copyFeedback === 'text' && id === 'copyText') ||
-                  (copyFeedback === 'link' && id === 'link');
-                return (
-                  <button key={id} className={styles.iconBtn} onClick={handler} type="button" aria-label={label}>
-                    <div className={`${styles.iconBtnCircle} ${isSuccess ? styles.iconBtnCircleSuccess : ''}`}>
-                      {isSuccess ? <CheckIcon /> : <Icon />}
-                    </div>
-                    <span className={styles.iconBtnLabel}>{isSuccess ? 'Copied' : label}</span>
-                  </button>
-                );
-              })}
+              <AnimatePresence>
+                {textExpanded && (
+                  <motion.div
+                    className={styles.textPreview}
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                  >
+                    <pre className={styles.textContent}>{textPreview}</pre>
+                    <button
+                      className={`${styles.copyBtn} ${copied ? styles.copyBtnDone : ''}`}
+                      onClick={handleCopyText}
+                      type="button"
+                    >
+                      {copied ? <><CheckIcon /> Copied</> : <><CopyIcon /> Copy text</>}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <button className={styles.doneBtn} onClick={onClose} type="button">

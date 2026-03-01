@@ -74,6 +74,7 @@ export interface Workout {
   imageUrl?: string;
   partnerWorkout?: boolean;
   partnerFactor?: number;
+  teamSize?: number;
   workloadBreakdown?: WorkloadBreakdown;
   status: WorkoutStatus;
   exercises: Exercise[];
@@ -143,6 +144,7 @@ export interface ParsedWorkout {
   benchmarkName?: string;       // Named benchmark if recognized (e.g., "Cindy", "Fran")
   benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
   partnerWorkout?: boolean;     // Detected partner workout (IGUG, "in pairs", etc.)
+  teamSize?: number;            // Team size (2 for pairs, N for "team of N")
 }
 
 // Workload breakdown types
@@ -190,6 +192,9 @@ export interface ParsedMovement {
   rxWeights?: RxWeights;        // Rx weights (male/female)
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
+  inputType?: 'weight' | 'calories' | 'distance' | 'none';  // AI-classified input type
+  implementCount?: 1 | 2;       // 1=single, 2=pair (DB/KB). Default 1 when ambiguous.
+  perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
   alternative?: {               // OR option (e.g., "40 DU / 60 singles")
     name: string;
     reps?: number;
@@ -295,7 +300,8 @@ export interface RewardData {
     title: string;
     type: WorkoutType;
     format?: WorkoutFormat;   // for_time, amrap, etc.
-    duration: number;         // minutes
+    duration: number;         // minutes (max of actual vs programmed)
+    actualTimeMinutes?: number; // Actual completion time (for intensity EP)
     exerciseCount: number;
     totalVolume: number;      // kg
     totalReps: number;
@@ -323,7 +329,9 @@ export interface EPBreakdown {
   base: number;        // EP_BASE per workout
   time: number;        // timeCap_minutes × EP_METCON_RATE
   volume: number;      // (totalVolume / bodyweight) × EP_VOLUME_RATE
+  bodyweight: number;  // Bodyweight movement credit (burpees, pull-ups, etc.)
   distance: number;    // distance_meters × EP_DISTANCE_RATE (× carry multiplier)
+  intensity: number;   // Bonus for beating the time cap (timeCap / actualTime ratio)
   pr: number;          // EP_PR_BONUS per PR
   total: number;
 }

@@ -1,11 +1,38 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
-import { isWeightedCarry } from '../utils/xpCalculations';
+import { isWeightedCarry, DEFAULT_BW } from '../utils/xpCalculations';
+
+/**
+ * Bodyweight-volume movements: pull-up/dip variations where the athlete
+ * moves their own bodyweight through a full range of motion.
+ * Volume = bodyweight × reps (when no external load is logged).
+ */
+const BW_VOLUME_PATTERNS = [
+  // Pull-up family
+  'pull-up', 'pullup', 'pull up', 'chin-up', 'chinup', 'chin up',
+  'chest-to-bar', 'chest to bar', 'c2b', 'ctb',
+  // Muscle-up family (pull + dip)
+  'muscle-up', 'muscle up', 'muscleup',
+  'bar muscle-up', 'ring muscle-up',
+  // Dip family
+  'dip', 'ring dip', 'bar dip',
+  // Rope climb (pulling full BW)
+  'rope climb',
+];
+
+/**
+ * Check if a movement should use athlete bodyweight for volume calculation
+ * (pull-ups, dips, muscle-ups, and their variations).
+ */
+export function isBwVolumeMovement(movementName: string): boolean {
+  const name = movementName.toLowerCase();
+  return BW_VOLUME_PATTERNS.some(p => name.includes(p));
+}
 
 /**
  * Trinity Color Assignment Rules:
  * - Yellow (#FFD600): Weighted movements (Volume) - Thrusters, Deadlifts, KB Swings, etc.
  * - Magenta (#FF00E5): Bodyweight & Cardio (Metcon) - Push-ups, Pull-ups, Running, Rowing
- * - Cyan (#00F2FF): Skill/Gymnastics (Sessions) - HSPUs, Muscle-ups, Handstand Walks
+ * - Cyan (#00FFFF): Skill/Gymnastics (Sessions) - HSPUs, Muscle-ups, Handstand Walks
  */
 
 // Movement patterns for color classification
@@ -115,8 +142,10 @@ function getContainerMultiplier(workout: ParsedWorkout, exercise: ParsedExercise
  */
 export function calculateWorkloadBreakdown(
   workout: ParsedWorkout,
-  movementWeights?: Record<string, number>
+  movementWeights?: Record<string, number>,
+  athleteBodyweight?: number
 ): WorkloadBreakdown {
+  const bw = athleteBodyweight && athleteBodyweight > 0 ? athleteBodyweight : DEFAULT_BW;
   // Aggregate movements across all exercises
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
@@ -135,15 +164,28 @@ export function calculateWorkloadBreakdown(
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
-        const reps = (movement.reps || 0) * multiplier;
-        const distance = (movement.distance || 0) * multiplier;
-        const calories = (movement.calories || 0) * multiplier;
+        // perRound defaults to true; if false, movement is done once (buy-in/cash-out)
+        const movMultiplier = movement.perRound === false ? 1 : multiplier;
+        const reps = (movement.reps || 0) * movMultiplier;
+        const distance = (movement.distance || 0) * movMultiplier;
+        const calories = (movement.calories || 0) * movMultiplier;
 
-        // Get weight from movementWeights override or rxWeights
-        const weight = movementWeights?.[movement.name]
+        console.log(`[Workload] "${movement.name}" perRound=${movement.perRound} multiplier=${multiplier} movMultiplier=${movMultiplier} reps=${reps} distance=${distance}`);
+
+        // Get per-implement weight from movementWeights override or rxWeights
+        const perImplementWeight = movementWeights?.[movement.name]
           || movement.rxWeights?.male
           || movement.rxWeights?.female
           || undefined;
+
+        // Apply implement count multiplier (e.g., 2x22.5kg DBs = 45kg effective weight)
+        const implementCount = movement.implementCount || 1;
+        const explicitWeight = perImplementWeight && implementCount > 1
+          ? perImplementWeight * implementCount
+          : perImplementWeight;
+
+        // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
+        const weight = explicitWeight || (isBwVolumeMovement(movement.name) ? bw : undefined);
 
         // Determine unit
         let unit: 'kg' | 'lb' | 'm' | 'cal' | undefined;
@@ -167,6 +209,7 @@ export function calculateWorkloadBreakdown(
             totalCalories: (existing.totalCalories || 0) + calories,
             // Keep the first weight encountered
             weight: existing.weight || weight,
+            implementCount: existing.implementCount || (implementCount > 1 ? implementCount : undefined),
           });
         } else {
           // New movement
@@ -178,6 +221,7 @@ export function calculateWorkloadBreakdown(
             weight,
             unit,
             color,
+            implementCount: implementCount > 1 ? implementCount : undefined,
             distancePerRep: (movement.distance || 0) > 0 ? (movement.distance || 0) : undefined,
           });
         }
@@ -278,8 +322,10 @@ export function calculateWorkloadFromExercises(
     }>;
   }>,
   containerRounds?: number,
-  partnerFactor: number = 1
+  partnerFactor: number = 1,
+  athleteBodyweight?: number
 ): WorkloadBreakdown {
+  const bw = athleteBodyweight && athleteBodyweight > 0 ? athleteBodyweight : DEFAULT_BW;
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
@@ -293,13 +339,15 @@ export function calculateWorkloadFromExercises(
     let exerciseWeight: number | undefined;
     let exerciseDistance = 0;
     let exerciseCalories = 0;
+    const perSetWeights: number[] = [];
 
     for (const set of exercise.sets) {
       if (set.actualReps) {
         exerciseReps += set.actualReps;
       }
-      if (set.weight && !exerciseWeight) {
-        exerciseWeight = set.weight;
+      if (set.weight) {
+        if (!exerciseWeight) exerciseWeight = set.weight;
+        perSetWeights.push(set.weight);
       }
       if (set.distance) {
         exerciseDistance += set.distance;
@@ -309,16 +357,30 @@ export function calculateWorkloadFromExercises(
       }
     }
 
+    // Build weight progression if weights vary across sets
+    const hasVaryingWeights = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
+    const weightProgression = hasVaryingWeights ? perSetWeights : undefined;
+
+    // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
+    if (!exerciseWeight && isBwVolumeMovement(exercise.name)) {
+      exerciseWeight = bw;
+    }
+
     const existing = movementMap.get(key);
     const color = inferColorFromName(exercise.name, exerciseWeight);
 
     if (existing) {
+      // Merge weight progressions if both have them
+      const mergedProgression = existing.weightProgression || weightProgression
+        ? [...(existing.weightProgression || []), ...(weightProgression || [])]
+        : undefined;
       movementMap.set(key, {
         ...existing,
         totalReps: (existing.totalReps || 0) + exerciseReps,
         totalDistance: (existing.totalDistance || 0) + exerciseDistance,
         totalCalories: (existing.totalCalories || 0) + exerciseCalories,
         weight: existing.weight || exerciseWeight,
+        weightProgression: mergedProgression,
       });
     } else {
       const unit = exerciseDistance > 0
@@ -334,6 +396,7 @@ export function calculateWorkloadFromExercises(
         totalDistance: exerciseDistance > 0 ? exerciseDistance : undefined,
         totalCalories: exerciseCalories > 0 ? exerciseCalories : undefined,
         weight: exerciseWeight,
+        weightProgression,
         unit,
         color,
       });

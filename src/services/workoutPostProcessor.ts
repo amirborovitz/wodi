@@ -86,6 +86,26 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'russian kettlebell swing': 'Russian Kettlebell Swing',
   'american swing': 'American Kettlebell Swing',
   'american kb swing': 'American Kettlebell Swing',
+  'kb snatch': 'KB Snatch',
+  'kb snatches': 'KB Snatch',
+  'kettlebell snatch': 'KB Snatch',
+  'kb clean': 'KB Clean',
+  'kb cleans': 'KB Clean',
+  'kettlebell clean': 'KB Clean',
+  'kb press': 'KB Press',
+  'kettlebell press': 'KB Press',
+  'kb thruster': 'KB Thruster',
+  'kb thrusters': 'KB Thruster',
+  'kettlebell thruster': 'KB Thruster',
+  'kb deadlift': 'KB Deadlift',
+  'kettlebell deadlift': 'KB Deadlift',
+  'kb lunge': 'KB Lunge',
+  'kb lunges': 'KB Lunge',
+  'kettlebell lunge': 'KB Lunge',
+  'kb row': 'KB Row',
+  'kettlebell row': 'KB Row',
+  'kb squat': 'KB Squat',
+  'kettlebell squat': 'KB Squat',
   'v-up': 'V-up',
   'vup': 'V-up',
   'v up': 'V-up',
@@ -192,11 +212,6 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     movements: ex.movements ? mergeAlternativeMovements(ex.movements) : undefined,
   }));
 
-  // Try to detect and fix implied supersets that AI missed
-  processedExercises = processedExercises.map(detectImpliedSuperset);
-
-  // Split buy-in/buy-out distance movements out of round-based WODs
-  processedExercises = splitBuyInBuyOut(processedExercises, workout.rawText);
 
   console.warn('🔧 [PostProcessor] RESULT:', {
     originalFormat: workout.format,
@@ -208,12 +223,13 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     title: workout.title,
   });
 
-  return {
+  const result = {
     ...workout,
     type: correctedType,
     format: correctedFormat,
     timeCap,
     partnerWorkout: workout.partnerWorkout || partnerResult.partnerWorkout || undefined,
+    teamSize: workout.teamSize || partnerResult.teamSize || undefined,
     sets: partnerResult.adjustedSets ?? workout.sets,
     exercises: processedExercises.map(ex => ({
       ...ex,
@@ -222,249 +238,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
         : ex.suggestedSets,
     })),
   };
+
+  // Backfill inputType on any movements that the AI missed
+  return backfillInputTypes(result);
 }
 
-/**
- * Split buy-in/buy-out movements from round-based WODs.
- *
- * Analyzes the raw workout text to find movements that sit OUTSIDE
- * the round block. Works for any movement type (distance, reps, cals).
- *
- * Text structure:  [buy-in stuff] N RFT: [round stuff] [buy-out stuff]
- */
-function splitBuyInBuyOut(exercises: ParsedExercise[], rawText?: string): ParsedExercise[] {
-  if (!rawText) return exercises;
-
-  const lower = rawText.toLowerCase();
-
-  // Find the round marker: "8 rft", "8 rounds for time", "8 rounds of:", "8 rounds:", etc.
-  const roundMatch = lower.match(/(\d+)\s*(?:rft|rounds?\s*(?:for\s*time|of)?)\s*:?\s*/);
-  if (!roundMatch || roundMatch.index == null) return exercises;
-
-  const beforeRounds = lower.slice(0, roundMatch.index).trim();
-  const afterRoundMarker = lower.slice(roundMatch.index + roundMatch[0].length);
-
-  const result: ParsedExercise[] = [];
-
-  for (const ex of exercises) {
-    const movements = ex.movements;
-    const rounds = ex.suggestedSets || 1;
-
-    if (ex.type !== 'wod' || rounds < 2 || !movements || movements.length < 2) {
-      result.push(ex);
-      continue;
-    }
-
-    // Check first movement: is its name/distance/reps mentioned BEFORE the round marker?
-    const first = movements[0];
-    const hasBuyIn = beforeRounds.length > 0 && isMovementMentionedInText(first, beforeRounds);
-
-    // Check last movement: is it mentioned after the round content ends?
-    // Look for trailing content after separators: "into", "then", "finish with", or just
-    // the last comma-separated item in the text that matches the last movement
-    const last = movements[movements.length - 1];
-    const hasBuyOut = detectBuyOut(last, afterRoundMarker, movements);
-
-    if (!hasBuyIn && !hasBuyOut) {
-      result.push(ex);
-      continue;
-    }
-
-    const coreStart = hasBuyIn ? 1 : 0;
-    const coreEnd = hasBuyOut ? movements.length - 1 : movements.length;
-    const coreMovements = movements.slice(coreStart, coreEnd);
-
-    if (coreMovements.length === 0) {
-      result.push(ex);
-      continue;
-    }
-
-    console.warn('🔧 [splitBuyInBuyOut] Splitting:', {
-      exercise: ex.name,
-      buyIn: hasBuyIn ? first.name : null,
-      buyOut: hasBuyOut ? last.name : null,
-      coreCount: coreMovements.length,
-    });
-
-    if (hasBuyIn) {
-      result.push(makeSingleSetExercise('Buy-In', first));
-    }
-
-    result.push({
-      ...ex,
-      movements: coreMovements,
-    });
-
-    if (hasBuyOut) {
-      result.push(makeSingleSetExercise('Buy-Out', last));
-    }
-
-    continue;
-  }
-
-  return result;
-}
-
-/** Check if a movement's name, distance, or reps appear in a text fragment */
-function isMovementMentionedInText(mov: ParsedMovement, text: string): boolean {
-  const movLower = mov.name.toLowerCase();
-  // Direct name match
-  if (text.includes(movLower)) return true;
-  // Check common aliases: "run" matches "running", etc.
-  const aliases: Record<string, string[]> = {
-    'run': ['run', 'running'],
-    'row': ['row', 'rowing', 'rower'],
-    'bike': ['bike', 'echo bike', 'assault bike'],
-    'ski': ['ski', 'ski erg', 'skierg'],
-  };
-  for (const [, names] of Object.entries(aliases)) {
-    if (names.some(n => movLower.includes(n)) && names.some(n => text.includes(n))) {
-      return true;
-    }
-  }
-  // Check distance pattern: "600m" in text and movement has distance=600
-  if (mov.distance && mov.distance > 0) {
-    const distPattern = new RegExp(`\\b${mov.distance}\\s*m\\b`);
-    if (distPattern.test(text)) return true;
-  }
-  // Check reps pattern: "50 pull-ups" in text and movement has reps=50
-  if (mov.reps && mov.reps > 0) {
-    const repsPattern = new RegExp(`\\b${mov.reps}\\s+`);
-    if (repsPattern.test(text) && text.includes(movLower)) return true;
-  }
-  return false;
-}
-
-/** Detect if the last movement is a buy-out by checking for trailing text */
-function detectBuyOut(lastMov: ParsedMovement, textAfterRoundMarker: string, allMovements: ParsedMovement[]): boolean {
-  // Look for a buy-out section separator in the text after the round marker
-  // Common patterns: "into:\n600m run", "then 50 pull-ups", "cash out: ..."
-  const buyOutMarker = textAfterRoundMarker.match(/(?:into|then|finish\s*with|cash\s*out|buy\s*out)\s*:?\s*/i);
-
-  if (buyOutMarker && buyOutMarker.index != null) {
-    // Text after the buy-out separator
-    const afterSeparator = textAfterRoundMarker.slice(buyOutMarker.index + buyOutMarker[0].length).trim();
-    if (afterSeparator.length > 0 && isMovementMentionedInText(lastMov, afterSeparator)) {
-      return true;
-    }
-  }
-
-  // Fallback: find where the last round movement is mentioned, then check trailing
-  const roundMovNames = allMovements.slice(0, -1).map(m => m.name.toLowerCase());
-  let lastRoundMentionEnd = 0;
-  for (const name of roundMovNames) {
-    const idx = textAfterRoundMarker.lastIndexOf(name);
-    if (idx >= 0) {
-      lastRoundMentionEnd = Math.max(lastRoundMentionEnd, idx + name.length);
-    }
-  }
-
-  const trailing = textAfterRoundMarker.slice(lastRoundMentionEnd).trim();
-
-  // Look for buy-out separators anywhere in trailing text
-  const buyOutSeparators = /(?:into|then|finish\s*with|cash\s*out|buy\s*out)/i;
-  if (!buyOutSeparators.test(trailing) && trailing.length < 5) return false;
-
-  // Check if the last movement is mentioned in the trailing text
-  return isMovementMentionedInText(lastMov, trailing);
-}
-
-/** Create a 1-set exercise from a single movement */
-function makeSingleSetExercise(prefix: string, mov: ParsedMovement): ParsedExercise {
-  let label = mov.name;
-  if (mov.distance && mov.distance > 0) {
-    const distStr = mov.distance >= 1000 ? `${mov.distance / 1000}km` : `${mov.distance}m`;
-    label = `${distStr} ${mov.name}`;
-  } else if (mov.reps && mov.reps > 0) {
-    label = `${mov.reps} ${mov.name}`;
-  }
-  return {
-    name: `${prefix}: ${label}`,
-    type: 'wod',
-    prescription: label,
-    suggestedSets: 1,
-    movements: [mov],
-  };
-}
-
-/**
- * Detect and restructure implied supersets that AI missed
- * Patterns like "3 sets: exercise1 exercise2" should become a superset with movements
- */
-function detectImpliedSuperset(exercise: ParsedExercise): ParsedExercise {
-  // Skip if already has multiple movements
-  if (exercise.movements && exercise.movements.length > 1) {
-    return exercise;
-  }
-
-  const fullText = `${exercise.name} ${exercise.prescription}`.toLowerCase();
-
-  console.warn('🔧 [detectImpliedSuperset] Checking:', fullText);
-
-  // Pattern: "N sets: exercise1 exercise2" or "N sets of exercise1 exercise2"
-  // Example: "3 sets: 10/10 powell raises 10/10 external rotation"
-  const setsColonPattern = /(\d+)\s*sets?\s*[:\-]\s*(.+)/i;
-  const match = fullText.match(setsColonPattern);
-
-  if (!match) {
-    console.warn('🔧 [detectImpliedSuperset] No sets: pattern found');
-    return exercise;
-  }
-
-  const numSets = parseInt(match[1], 10);
-  const movementsText = match[2].trim();
-
-  console.warn('🔧 [detectImpliedSuperset] Found pattern:', { numSets, movementsText });
-
-  // Split by rep counts: "10/10 exercise1 10/10 exercise2" -> ["", "exercise1 ", "exercise2"]
-  // Use the rep pattern to split
-  const repsSplitPattern = /\d+(?:\/\d+)?(?:\s+(?:reps?|each))?\s+/g;
-  const parts = movementsText.split(repsSplitPattern).filter(p => p.trim().length > 1);
-
-  // Also extract the reps for each movement
-  const repsMatches = [...movementsText.matchAll(/(\d+)(?:\/\d+)?(?:\s+(?:reps?|each))?\s+/g)];
-
-  console.warn('🔧 [detectImpliedSuperset] Split parts:', parts);
-  console.warn('🔧 [detectImpliedSuperset] Reps matches:', repsMatches.map(m => m[1]));
-
-  const movements: ParsedMovement[] = [];
-
-  for (let i = 0; i < parts.length; i++) {
-    const movementName = parts[i].trim();
-    const repsStr = repsMatches[i]?.[1];
-    const reps = repsStr ? parseInt(repsStr, 10) : undefined;
-
-    if (movementName && movementName.length > 1) {
-      movements.push({
-        name: normalizeMovementName(movementName),
-        reps,
-      });
-    }
-  }
-
-  // If we found 2+ movements, restructure as superset
-  if (movements.length >= 2) {
-    console.warn('🔧 [detectImpliedSuperset] Detected superset:', {
-      original: exercise.name,
-      movements: movements.map(m => ({ name: m.name, reps: m.reps })),
-      numSets,
-    });
-
-    const movementNames = movements.map(m => m.name).join(' + ');
-
-    return {
-      ...exercise,
-      name: `Superset: ${movementNames}`,
-      type: 'strength',
-      suggestedSets: numSets,
-      suggestedReps: movements[0].reps,
-      movements,
-    };
-  }
-
-  console.warn('🔧 [detectImpliedSuperset] Not enough movements found:', movements.length);
-  return exercise;
-}
 
 /**
  * Correct workout type to match the corrected format
@@ -1294,6 +1072,7 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
   partnerWorkout: boolean;
   adjustedSets?: number;
   timeCap?: number;
+  teamSize?: number;
 } {
   const text = [
     workout.rawText,
@@ -1303,21 +1082,36 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
 
   const lower = text.toLowerCase();
 
-  // Partner detection patterns
+  // Partner/team detection patterns
   const partnerPatterns = [
     /\bi\s*go\s*you\s*go\b/i,
     /\bigug\b/i,
     /\bin\s+pairs?\b/i,
     /\bwith\s+a\s+partner\b/i,
     /\bpartner\s+wod\b/i,
-    /\bteams?\s+of\s+2\b/i,
+    /\bteams?\s+of\s+\d+\b/i,
     /\bpartner\s+rft\b/i,
+    /\bgroups?\s+of\s+\d+\b/i,
+    /\bin\s+a\s+team\s+of\s+\d+\b/i,
   ];
 
   const isPartner = workout.partnerWorkout || partnerPatterns.some(p => p.test(lower));
 
   if (!isPartner) {
     return { partnerWorkout: false };
+  }
+
+  // Extract team size from "team of N", "group of N", "teams of N"
+  let teamSize = workout.teamSize;
+  if (!teamSize) {
+    const teamMatch = lower.match(/(?:teams?\s+of|groups?\s+of|in\s+a\s+team\s+of)\s+(\d+)/);
+    if (teamMatch) {
+      teamSize = parseInt(teamMatch[1], 10);
+    }
+  }
+  // Default to 2 for pair-style workouts
+  if (!teamSize) {
+    teamSize = 2;
   }
 
   // Extract "(N each)" pattern to get per-person round count
@@ -1327,11 +1121,12 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
     adjustedSets = parseInt(eachMatch[1], 10);
   }
 
-  console.warn('🔧 [detectPartnerWorkout] Detected partner workout:', { adjustedSets });
+  console.warn('🔧 [detectPartnerWorkout] Detected partner workout:', { adjustedSets, teamSize });
 
   return {
     partnerWorkout: true,
     adjustedSets,
+    teamSize,
   };
 }
 
@@ -1446,6 +1241,99 @@ function detectVariableRepScheme(exercise: ParsedExercise): number[] | undefined
   }
 
   return undefined;
+}
+
+/**
+ * Backfill inputType on movements that the AI missed.
+ * Uses the same pattern-matching logic as getMovementInputType in AddWorkoutScreen.
+ */
+const BACKFILL_CARDIO_MACHINES = [
+  'echo bike', 'ecobike', 'assault bike', 'air bike', 'airbike', 'airdyne',
+  'ski erg', 'skierg', 'ski-erg',
+  'rower', 'rowing', 'row erg', 'rowerg', 'row',
+  'bike erg', 'bikeerg',
+];
+
+const BACKFILL_DISTANCE_CARDIO = [
+  'run', 'running', 'sprint',
+  'swim', 'swimming',
+  'sled push', 'sled pull', 'sled drag',
+];
+
+const BACKFILL_BODYWEIGHT = [
+  'pull-up', 'pullup', 'pull up',
+  'push-up', 'pushup', 'push up',
+  'burpee', 'burpees',
+  'air squat', 'airsquat',
+  'sit-up', 'situp', 'sit up',
+  'v-up', 'vup', 'v up',
+  'toes to bar', 't2b', 'ttb',
+  'knees to elbow', 'k2e', 'kte',
+  'muscle-up', 'muscleup', 'muscle up',
+  'handstand push-up', 'hspu',
+  'handstand walk', 'hs walk',
+  'pistol', 'pistols',
+  'box jump', 'box step',
+  'double under', 'du', 'single under', 'su',
+  'rope climb', 'ring dip', 'dip',
+  'wall walk', 'strict toes to bar', 'strict ttb',
+  'hollow rock', 'plank', 'l-sit',
+];
+
+function inferInputType(mov: ParsedMovement): ParsedMovement['inputType'] {
+  const name = mov.name.toLowerCase();
+
+  if (BACKFILL_CARDIO_MACHINES.some(p => name.includes(p))) return 'calories';
+  if (/cal\b|calorie/i.test(name)) return 'calories';
+  if (BACKFILL_DISTANCE_CARDIO.some(p => name.includes(p))) return mov.distance ? 'none' : 'distance';
+  if (BACKFILL_BODYWEIGHT.some(p => name.includes(p))) return 'none';
+  if (/\bbanded?\b|band\b|rotation|hold\b|plank/i.test(name)) return 'none';
+
+  const weightedPatterns = [
+    'carry', 'walk', 'goblet', 'kettlebell', 'kb', 'dumbbell', 'db', 'barbell', 'bb',
+    'press', 'deadlift', 'clean', 'snatch', 'thruster', 'front rack', 'overhead',
+    'squat', 'lunge', 'curl', 'row', 'swing', 'wall ball', 'jerk',
+  ];
+  if (weightedPatterns.some(p => name.includes(p))) return 'weight';
+
+  return 'none';
+}
+
+function backfillInputTypes(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => ({
+      ...ex,
+      movements: ex.movements?.map(mov => ({
+        ...mov,
+        inputType: mov.inputType || inferInputType(mov),
+        implementCount: mov.implementCount || inferImplementCount(mov),
+      })),
+    })),
+  };
+}
+
+/**
+ * Infer implementCount for DB/KB movements when AI didn't provide it.
+ * Returns 1 or 2, or undefined if not a DB/KB movement.
+ */
+function inferImplementCount(mov: ParsedMovement): 1 | 2 | undefined {
+  const name = mov.name.toLowerCase();
+
+  // Only applies to KB/DB movements
+  const isKbDb = /\b(kettlebell|kb|dumbbell|db)\b/.test(name);
+  if (!isKbDb) return undefined;
+
+  // Single-implement patterns → always 1
+  const singlePatterns = ['goblet', 'turkish', 'tgu', 'single arm', 'single-arm', 'one arm', 'suitcase', 'alternate', 'alternating', 'alt '];
+  if (singlePatterns.some(p => name.includes(p))) return 1;
+
+  // Pair patterns → always 2
+  const pairPatterns = ['farmers carry', 'farmer carry', 'front rack'];
+  if (pairPatterns.some(p => name.includes(p))) return 2;
+
+  // Default: 1 (safe default; user can toggle to 2)
+  return 1;
 }
 
 /**

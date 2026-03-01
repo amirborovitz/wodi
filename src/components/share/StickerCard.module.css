@@ -1,65 +1,79 @@
-/* =========================================================================
-   STICKER CARD v2 -- Results-aware, segment-adaptive
-   Shows actual workout results (weights, times, reps).
+/* ==========================================================================
+   STICKER CARD v3 — Full-data, Trinity-aware, screenshot-ready
 
-   Size: 360px wide, dynamic height (min 280, max ~420)
-   Constraints: no backdrop-filter, no transitions, solid rgba glass
-   ========================================================================= */
+   Card is 360px wide (max-width); single-exercise cards are taller than
+   full-workout cards. Both are designed to screenshot well in Stories.
+
+   html2canvas constraints enforced:
+     - No backdrop-filter
+     - No CSS transitions / animations (none in this file)
+     - Solid rgba() backgrounds, not semi-transparent blur
+   ========================================================================== */
 
 /* ---------------------------------------------------------------------------
-   ROOT -- transparent shell for html2canvas capture
+   ROOT — transparent capture shell
    --------------------------------------------------------------------------- */
 .root {
-  width: 360px;
-  min-height: 280px;
-  max-height: 420px;
+  width: 100%;
+  max-width: 360px;
   background: transparent;
   padding: 12px;
   box-sizing: border-box;
 }
 
 /* ---------------------------------------------------------------------------
-   GLASS -- the visible card surface
+   GLASS — the visible card surface
    --------------------------------------------------------------------------- */
 .glass {
   position: relative;
   width: 100%;
-  min-height: 256px;
   border-radius: 20px;
   overflow: hidden;
-  background: rgba(10, 10, 14, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 10, 14, 0.90);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow:
-    0 0 24px rgba(0, 242, 255, 0.08),
-    0 0 48px rgba(255, 0, 229, 0.06),
-    0 8px 24px rgba(0, 0, 0, 0.4);
+    0 0 48px rgba(0, 0, 0, 0.5),
+    0 2px 0   rgba(255, 255, 255, 0.06) inset;
   display: flex;
   flex-direction: column;
-  padding: 18px 20px 0;
-  gap: 0;
+  /* No padding on glass — inner elements own their padding */
 }
 
 /* ---------------------------------------------------------------------------
-   AMBIENT GLOWS
+   AMBIENT GLOWS — decorative, cheap radial-gradients (no blur)
    --------------------------------------------------------------------------- */
 .glowTop {
   position: absolute;
   top: -40px;
   right: -30px;
-  width: 160px;
-  height: 160px;
-  background: radial-gradient(circle, rgba(255, 0, 229, 0.22) 0%, transparent 70%);
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(255, 0, 229, 0.20) 0%, transparent 70%);
   pointer-events: none;
+  z-index: 0;
 }
 
 .glowBottom {
   position: absolute;
   bottom: -30px;
   left: -20px;
-  width: 140px;
-  height: 140px;
-  background: radial-gradient(circle, rgba(0, 242, 255, 0.18) 0%, transparent 70%);
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.15) 0%, transparent 70%);
   pointer-events: none;
+  z-index: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   ACCENT STRIPE — 2px top-edge color band for single-exercise cards
+   --------------------------------------------------------------------------- */
+.accentStripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 2;
 }
 
 /* ---------------------------------------------------------------------------
@@ -68,222 +82,424 @@
 .header {
   position: relative;
   z-index: 1;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-bottom: 12px;
-  flex-shrink: 0;
+  gap: 4px;
 }
 
-.title {
+.headerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.appName {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.headerMeta {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.03em;
+}
+
+/* Full workout title */
+.workoutTitle {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: #ffffff;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.brand {
+/* Single-exercise large title */
+.singleExerciseTitle {
+  margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 10px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.04em;
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+/* Exercise type badge (for single-exercise cards) */
+.exerciseTypeTag {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid;
 }
 
 /* ---------------------------------------------------------------------------
-   EXERCISE LIST -- scrollable area showing exercise results
+   FULL WORKOUT — SECTION LIST
    --------------------------------------------------------------------------- */
-.exerciseList {
+.sectionList {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  padding: 10px 0 4px;
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
-.exerciseBlock {
+.section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  padding: 8px 18px;
+  gap: 0;
 }
 
-.exerciseName {
+/* Section divider: color bar + label */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+
+.sectionAccentBar {
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sectionLabel {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.55);
 }
 
 /* ---------------------------------------------------------------------------
-   SET DISPLAYS -- inline (compact) and detailed modes
+   COMPACT ROW — one exercise in the full-workout card
    --------------------------------------------------------------------------- */
-
-/* Inline: horizontal pill flow for compact/full-workout view */
-.setRowInline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-}
-
-.setPill {
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 2px 7px;
-  white-space: nowrap;
-}
-
-.setOverflow {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
-}
-
-/* Detailed: vertical rows for single-exercise view */
-.setRowsDetailed {
+.compactRow {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  padding: 5px 0 5px 10px;
+  border-left: 2px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
 }
 
-.setRowDetailed {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
+.compactRow:last-child {
+  margin-bottom: 0;
 }
 
-.setLabel {
+.compactName {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.04em;
-  min-width: 40px;
-}
-
-.setData {
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-/* Time hero: large mono number for for_time / amrap */
-.timeHero {
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  font-size: 24px;
   font-weight: 700;
-  color: #FF00E5;
-  text-shadow: 0 0 12px rgba(255, 0, 229, 0.4);
+  color: rgba(255, 255, 255, 0.90);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   line-height: 1;
 }
 
-.timeHeroCompact {
+.compactData {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.compactLines {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Primary data value — colored per Trinity */
+.compactPrimary {
   font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
   font-weight: 700;
-  color: #FF00E5;
-  text-shadow: 0 0 8px rgba(255, 0, 229, 0.3);
+  line-height: 1.25;
+  /* color set inline */
 }
 
-.movementSummary {
+/* Secondary / supporting data — muted */
+.compactSecondary {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.40);
   line-height: 1.3;
 }
 
-/* Rx weight tags */
-.rxTag {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #00F2FF;
-  background: rgba(0, 242, 255, 0.08);
-  border: 1px solid rgba(0, 242, 255, 0.2);
-  border-radius: 4px;
-  padding: 1px 5px;
-  white-space: nowrap;
-}
-
-.rxTagDetailed {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  color: #00F2FF;
-  margin-bottom: 2px;
+/* ---------------------------------------------------------------------------
+   DETAIL BODY — single-exercise expanded view
+   --------------------------------------------------------------------------- */
+.detailBody {
+  position: relative;
+  z-index: 1;
+  padding: 14px 18px 10px;
+  flex: 1;
 }
 
 /* ---------------------------------------------------------------------------
-   STATS ROW -- compact stat chips at bottom
+   STRENGTH DETAIL — set rows with mini bar visualization
+   --------------------------------------------------------------------------- */
+.strengthRows {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.strengthSetRow {
+  display: grid;
+  /* index | weight  | reps  | bar */
+  grid-template-columns: 24px 72px 40px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.setIndex {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.25);
+  line-height: 1;
+}
+
+.setWeight {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  /* color set inline */
+}
+
+.setReps {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.50);
+  line-height: 1;
+}
+
+.setBarTrack {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.setBarFill {
+  height: 100%;
+  border-radius: 2px;
+  /* width and background set inline */
+}
+
+/* ---------------------------------------------------------------------------
+   METCON DETAIL — score hero + movement list
+   --------------------------------------------------------------------------- */
+.metconDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metconScoreBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.metconScoreValue {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+  /* color and textShadow set inline */
+}
+
+.metconScoreLabel {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.movementList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.movementRoundsLine {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.50);
+  margin-bottom: 2px;
+}
+
+.movementLine {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.movementDot {
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  /* color set inline */
+}
+
+.movementText {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.4;
+}
+
+/* Rx weight tag */
+.rxTag {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+  width: fit-content;
+  /* color, borderColor, background set inline */
+}
+
+/* Cardio time sub-tag */
+.cardioTimeTag {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ---------------------------------------------------------------------------
+   STRENGTH CARD — multi-exercise blocks
+   --------------------------------------------------------------------------- */
+.strengthExerciseBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.strengthExerciseBlock:last-child {
+  margin-bottom: 0;
+}
+
+.strengthExerciseName {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------------------
+   METCON CARD — additional exercises below primary
+   --------------------------------------------------------------------------- */
+.additionalExercises {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.additionalExRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.additionalExName {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.additionalExDetail {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  /* color set inline */
+}
+
+/* ---------------------------------------------------------------------------
+   STATS ROW — shared between full and single-exercise cards
    --------------------------------------------------------------------------- */
 .statsRow {
   position: relative;
   z-index: 1;
   display: flex;
   gap: 6px;
-  margin-top: 12px;
+  padding: 10px 18px 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .statChip {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid;
   border-radius: 8px;
   padding: 5px 10px;
+  /* background, borderColor, boxShadow set inline */
 }
 
 .statChipValue {
   font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
   font-weight: 700;
-  color: #00F2FF;
-  text-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
   line-height: 1;
+  /* color and textShadow set inline */
 }
 
 .statChipLabel {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.statChipPR {
-  background: linear-gradient(135deg, rgba(255, 214, 0, 0.12), rgba(255, 138, 0, 0.06));
-  border-color: rgba(255, 214, 0, 0.25);
-}
-
-.statChipPR .statChipValue {
-  color: #FFD600;
-  text-shadow: 0 0 8px rgba(255, 214, 0, 0.4);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 /* ---------------------------------------------------------------------------
-   FOOTER -- Trinity gradient line + "WORKOUT COMPLETE"
+   FOOTER — Trinity gradient line + brand word
    --------------------------------------------------------------------------- */
 .footer {
   position: relative;
@@ -291,24 +507,31 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 0 14px;
-  margin-top: auto;
+  gap: 7px;
+  padding: 10px 18px 14px;
   flex-shrink: 0;
 }
 
 .footerLine {
   width: 100%;
   height: 1.5px;
-  background: linear-gradient(90deg, transparent 0%, #00F2FF 25%, #FF00E5 50%, #FFD600 75%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent   0%,
+    #00FFFF       20%,
+    #FF00E5       50%,
+    #FFD600       80%,
+    transparent  100%
+  );
   border-radius: 1px;
+  opacity: 0.7;
 }
 
-.footerText {
+.footerBrand {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  color: rgba(255, 255, 255, 0.3);
+  font-weight: 800;
+  letter-spacing: 0.30em;
   text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.22);
 }

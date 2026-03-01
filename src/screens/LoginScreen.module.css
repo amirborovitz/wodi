@@ -1,99 +1,156 @@
 .container {
   min-height: 100vh;
   min-height: 100dvh;
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-6);
-  padding-top: calc(var(--space-6) + var(--safe-top));
-  padding-bottom: calc(var(--space-6) + var(--safe-bottom));
-  background: linear-gradient(
-    180deg,
-    var(--color-bg) 0%,
-    var(--color-bg-elevated) 100%
-  );
+  padding: clamp(20px, 5vw, 40px);
+  padding-top: max(clamp(20px, 5vw, 40px), var(--safe-top));
+  padding-bottom: max(clamp(20px, 5vw, 40px), var(--safe-bottom));
+  background:
+    linear-gradient(180deg, #101010 0%, #000000 52%, #000000 100%),
+    #000000;
+}
+
+.logoGlow {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  width: min(62vw, 420px);
+  height: min(62vw, 420px);
+  transform: translateX(-50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.05) 0%, rgba(0, 255, 255, 0) 72%);
+  filter: blur(28px);
 }
 
 .content {
+  position: relative;
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+  z-index: 1;
 }
 
-/* Brand */
 .brand {
-  margin-bottom: var(--space-10);
+  margin-bottom: clamp(42px, 7vh, 64px);
 }
 
-.logo {
-  width: 80px;
-  height: 80px;
-  margin-bottom: var(--space-4);
+.wordmark {
+  margin: 0;
+  color: #ffffff;
+  font-family: 'Montserrat', 'Arial Black', 'Helvetica Neue', sans-serif;
+  font-size: clamp(52px, 14vw, 72px);
+  font-weight: 900;
+  font-style: italic;
+  text-transform: lowercase;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
 }
 
-.logo svg {
-  width: 100%;
-  height: 100%;
-}
-
-.title {
-  font-size: var(--text-4xl);
-  font-weight: var(--font-black);
-  color: var(--color-text);
-  margin: 0 0 var(--space-2) 0;
-  letter-spacing: var(--tracking-tight);
+.iAccent {
+  color: #00ffff;
+  text-shadow: 0 0 14px rgba(0, 255, 255, 0.55);
 }
 
 .tagline {
-  font-size: var(--text-lg);
-  color: var(--color-text-secondary);
-  margin: 0;
+  margin: 10px 0 0;
+  color: #8f9299;
+  font-size: clamp(13px, 3vw, 14px);
+  letter-spacing: 0.035em;
 }
 
-/* Features */
-.features {
-  display: flex;
-  gap: var(--space-6);
-  margin-bottom: var(--space-10);
-}
-
-.feature {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.featureIcon {
-  font-size: var(--text-2xl);
-}
-
-.featureText {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-/* Actions */
 .actions {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 12px;
+}
+
+.appleButton,
+.googleButton {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.appleButton {
+  border: none;
+  background: #ffffff;
+  color: #000000;
+}
+
+.googleButton {
+  border: 1px solid #2c2f36;
+  background: #090909;
+  color: #ffffff;
+}
+
+.appleButton:hover,
+.googleButton:hover {
+  transform: translateY(-1px);
+}
+
+.googleButton:disabled {
+  opacity: 0.75;
+  cursor: default;
+  transform: none;
+}
+
+.emailLink {
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+  color: #b3b7be;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+  cursor: pointer;
 }
 
 .error {
-  color: var(--color-error);
-  font-size: var(--text-sm);
-  margin: 0;
+  color: #ff6b6b;
+  font-size: 13px;
+  margin: 2px 0 0;
 }
 
-/* Footer */
 .footer {
-  margin-top: var(--space-8);
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
+  margin-top: clamp(28px, 5vh, 40px);
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footerLink {
+  color: #666a71;
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.footerLink:hover {
+  color: #8f939a;
+}
+
+@media (max-width: 360px) {
+  .appleButton,
+  .googleButton {
+    min-height: 50px;
+    font-size: 15px;
+  }
 }

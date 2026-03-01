@@ -60,9 +60,21 @@ interface MovementEditorProps {
 
 // Check if a movement requires weight input
 function isWeightedMovement(movement: ParsedMovement): boolean {
+  // Calorie/distance inputs are never weighted (cardio machines)
+  if (movement.inputType === 'calories' || movement.inputType === 'distance') return false;
+
+  // Explicit bodyweight flag from AI — trust it
+  if (movement.isBodyweight) return false;
+  if (movement.inputType === 'none') return false;
+
   if (movement.rxWeights) return true;
 
   const name = movement.name.toLowerCase();
+
+  // Known bodyweight squat variants — never show weight
+  const bodyweightPatterns = ['air squat', 'pistol', 'jump squat', 'squat jump', 'squat thrust'];
+  if (bodyweightPatterns.some(p => name.includes(p))) return false;
+
   const weightedPatterns = [
     'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
     'lunge', 'row', 'swing', 'turkish', 'farmer', 'carry', 'curl',
@@ -200,7 +212,6 @@ export function InlineMovementEditor({
   showWeight,
   readOnly = false,
 }: MovementEditorProps) {
-  console.log('[InlineMovementEditor] Rendering:', movement.name, { showWeight, implementCount, implementFixed, distance: movement.distance, time: movement.time, calories: movement.calories, reps: movement.reps });
   const definedAlternatives = getExerciseAlternatives(movement.name);
   // Include parsed alternative (from OR option like "40 DU / 60 singles") if not already in list
   const parsedAlt = movement.alternative;
@@ -224,6 +235,7 @@ export function InlineMovementEditor({
   const supportsTime = exerciseDef?.supportsUnits?.includes('time') || hasTime;
 
   // Display name (either selected alternative or original)
+  // Prefix with prescribed reps (e.g., "1× Power Clean") — trust the AI
   const displayName = selectedAlternative || movement.name;
   const displayLabel = abbreviateMovementLabel(displayName);
 
@@ -252,9 +264,11 @@ export function InlineMovementEditor({
   const timePrescribedNoDistance = hasTime && hasDistance && !isMachineCardio;
 
   // Determine what metrics to show
-  const showRepsInput = hasReps;
+  // Reps prescribed by the AI are shown as a prefix on the movement name,
+  // not as a separate editable input. Trust the AI's prescription.
+  const showRepsInput = (hasReps || movement.isMaxReps === true) && movement.inputType !== 'calories';
   const showDistanceInput = hasDistance && !timePrescribedNoDistance && !isShuttleRun;
-  const showCaloriesInput = hasCalories || (defaultUnit === 'calories' && !hasReps && !hasDistance);
+  const showCaloriesInput = hasCalories || movement.inputType === 'calories' || (defaultUnit === 'calories' && !hasReps && !hasDistance);
   const showTimeInput = !isShuttleRun && (hasTime || (supportsTime && !showDistanceInput && !hasCalories)) && !(defaultUnit === 'calories' && showCaloriesInput);
   const showWeightInput = isWeighted;
 
@@ -313,12 +327,18 @@ export function InlineMovementEditor({
             disabled={readOnly}
           >
             <option value={movement.name}>{abbreviateMovementLabel(movement.name)}</option>
-            {alternatives.map((alt) => (
-              <option key={alt.name} value={alt.name}>
-                {abbreviateMovementLabel(alt.name)}
-                {alt.type === 'easier' ? ' (scaled)' : alt.type === 'harder' ? ' (Rx+)' : ''}
-              </option>
-            ))}
+            {alternatives.map((alt) => {
+              const altReps = (parsedAlt && alt.name === parsedAlt.name && parsedAlt.reps)
+                ? parsedAlt.reps
+                : undefined;
+              const altPrefix = altReps ? `${altReps}× ` : '';
+              return (
+                <option key={alt.name} value={alt.name}>
+                  {altPrefix}{abbreviateMovementLabel(alt.name)}
+                  {alt.type === 'easier' ? ' (scaled)' : alt.type === 'harder' ? ' (Rx+)' : ''}
+                </option>
+              );
+            })}
           </select>
         ) : (
           <div className={styles.movementName}>
@@ -449,8 +469,56 @@ export function MovementListEditor({
 }: MovementListEditorProps) {
   const keys = getMovementKeys(movements);
 
+  // Detect barbell complex: 2+ weighted movements → single shared weight input
+  const weightedEntries = movements
+    .map((m, i) => ({ movement: m, key: keys[i] }))
+    .filter(({ movement }) => isWeightedMovement(movement));
+  const isBarbellComplex = weightedEntries.length >= 2;
+
+  console.warn('🔍 [MovementListEditor]', {
+    movements: movements.map(m => ({ name: m.name, inputType: m.inputType, rxWeights: m.rxWeights })),
+    weightedEntries: weightedEntries.map(e => e.movement.name),
+    isBarbellComplex,
+  });
+
+  const sharedWeight = isBarbellComplex
+    ? (customWeights[weightedEntries[0].key] ?? undefined)
+    : undefined;
+
+  const handleSharedWeightChange = (val: number) => {
+    weightedEntries.forEach(({ key }) => onWeightChange(key, val));
+  };
+
+  const handleSelectOnFocus = (e: FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+  };
+
   return (
     <div className={styles.movementList}>
+      {isBarbellComplex && (
+        <div className={styles.barbellComplexRow}>
+          <span className={styles.barbellLabel}>Barbell</span>
+          <div className={styles.weightGroup}>
+            {!readOnly ? (
+              <input
+                type="number"
+                inputMode="decimal"
+                enterKeyHint="done"
+                className={styles.weightInput}
+                value={sharedWeight ?? ''}
+                onChange={(e) => handleSharedWeightChange(parseFloat(e.target.value) || 0)}
+                onFocus={handleSelectOnFocus}
+                placeholder={weightedEntries[0].movement.rxWeights?.male?.toString() || ''}
+                min="0"
+                aria-label="Barbell weight in kilograms"
+              />
+            ) : sharedWeight ? (
+              <div className={styles.valueDisplay}>{sharedWeight}</div>
+            ) : null}
+            <span className={styles.unitLabel}>kg</span>
+          </div>
+        </div>
+      )}
       {movements.map((movement, index) => {
         const key = keys[index];
         return (
@@ -475,7 +543,7 @@ export function MovementListEditor({
               onRepsChange={(_name, reps) => onRepsChange(key, reps)}
               onCaloriesChange={onCaloriesChange ? (_name, cal) => onCaloriesChange(key, cal) : undefined}
               onImplementCountChange={onImplementCountChange ? (_name, count) => onImplementCountChange(key, count) : undefined}
-              showWeight={showWeight}
+              showWeight={isBarbellComplex ? false : showWeight}
               readOnly={readOnly}
             />
           </div>

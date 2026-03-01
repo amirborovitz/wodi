@@ -2,14 +2,14 @@
 
 :root {
   /* Colors - Deep Dark Theme */
-  --color-bg: #050505;
+  --color-bg: #000000;
   --color-bg-elevated: #0a0a0a;
   --color-surface: #111111;
   --color-surface-2: #1a1a1a;
   --color-surface-3: #242424;
 
   /* The Trinity Colors */
-  --color-sessions: #00F2FF;  /* Cyan - Sessions/Streak */
+  --color-sessions: #00FFFF;  /* Cyan - Wodi brand / Sessions/Streak */
   --color-metcon: #FF00E5;    /* Magenta - Metcon/Conditioning */
   --color-volume: #FFD600;    /* Yellow/Gold - Volume/Strength */
 
@@ -25,6 +25,9 @@
   --color-warning: #ffb800;
   --color-error: #ff4d4d;
   --color-success: #00d4aa;
+
+  /* Wodi Brand Gradients */
+  --wodi-sunset: linear-gradient(135deg, #FF8E53 0%, #FE6B8B 100%);
 
   /* Level/XP Colors */
   --xp-gold: #FFB800;
@@ -101,7 +104,7 @@
   --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(0, 242, 255, 0.3);
+  --shadow-glow: 0 0 20px rgba(0, 255, 255, 0.3);
 
   /* Blur */
   --blur-sm: 4px;
@@ -129,12 +132,12 @@
   --safe-right: env(safe-area-inset-right, 0px);
 
   /* Ring Colors - Trinity System */
-  --color-ring-sessions: #00F2FF;   /* Cyan - inner ring */
+  --color-ring-sessions: #00FFFF;   /* Cyan - inner ring */
   --color-ring-metcon: #FF00E5;     /* Magenta - middle ring */
   --color-ring-volume: #FFD600;     /* Yellow - outer ring */
 
   /* Glow Effects - Trinity System */
-  --glow-sessions: rgba(0, 242, 255, 0.5);
+  --glow-sessions: rgba(0, 255, 255, 0.5);
   --glow-metcon: rgba(255, 0, 229, 0.5);
   --glow-volume: rgba(255, 214, 0, 0.5);
   --glow-gold: rgba(255, 184, 0, 0.4);
@@ -142,7 +145,7 @@
   /* ========== 2026 HIGH-PERFORMANCE DESIGN SYSTEM ========== */
 
   /* Neon Colors (Trinity aliases) */
-  --neon-cyan: #00F2FF;
+  --neon-cyan: #00FFFF;
   --neon-magenta: #FF00E5;
   --neon-yellow: #FFD600;
   --neon-lime: #39FF14;
@@ -150,8 +153,8 @@
   --neon-pink: #FF1493;
 
   /* Neon Glow Effects */
-  --neon-glow: 0 0 15px rgba(0, 242, 255, 0.4);
-  --neon-glow-sessions: 0 0 20px rgba(0, 242, 255, 0.5);
+  --neon-glow: 0 0 15px rgba(0, 255, 255, 0.4);
+  --neon-glow-sessions: 0 0 20px rgba(0, 255, 255, 0.5);
   --neon-glow-metcon: 0 0 20px rgba(255, 0, 229, 0.5);
   --neon-glow-volume: 0 0 20px rgba(255, 214, 0, 0.5);
 
@@ -263,4 +266,14 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+/* Thumb Zone Utility — keeps primary actions in the bottom 60% of viewport */
+.thumbZone {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100dvh;
+  padding-top: 40dvh;
+  padding-bottom: var(--safe-bottom);
 }

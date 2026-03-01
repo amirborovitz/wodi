@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import styles from './ConcentricRings.module.css';
 
+console.log('[ConcentricRings] v2 loaded — strokeWidth=12, gap=20, mono center font');
+
 interface RingData {
   value: number;
   goal: number;
@@ -39,9 +41,10 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
         cy="50%"
         r={radius}
         fill="none"
-        stroke={`color-mix(in srgb, ${color} 24%, #0b0b0b)`}
+        stroke={color}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
+        opacity={0.1}
       />
       {/* Outer glow layer - soft ambient */}
       <motion.circle
@@ -106,8 +109,8 @@ function Ring({ percentage, radius, strokeWidth, color, glowColor, delay }: Ring
 }
 
 export function ConcentricRings({ sessions, metcon, volume, size = 280 }: ConcentricRingsProps) {
-  const strokeWidth = 16;
-  const gap = 22;
+  const strokeWidth = 12;
+  const gap = 20;
   const center = size / 2;
 
   // Calculate radii (outer to inner)
@@ -176,20 +179,26 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
       <div className={styles.legend}>
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
-          <span className={styles.legendText}>
-            Lift {'\u00b7'} {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
+          <span className={styles.legendLabel}>Lift</span>
+          <span className={styles.legendSep}>{'\u00b7'}</span>
+          <span className={styles.legendValue}>
+            {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
           </span>
         </div>
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
-          <span className={styles.legendText}>
-            Move {'\u00b7'} {metcon.value} / {metcon.goal} min
+          <span className={styles.legendLabel}>Move</span>
+          <span className={styles.legendSep}>{'\u00b7'}</span>
+          <span className={styles.legendValue}>
+            {metcon.value} / {metcon.goal} min
           </span>
         </div>
         <div className={styles.legendItem}>
           <span className={styles.legendDot} style={{ background: 'var(--color-sessions)' }} />
-          <span className={styles.legendText}>
-            Show Up {'\u00b7'} {sessions.value} / {sessions.goal}
+          <span className={styles.legendLabel}>Show Up</span>
+          <span className={styles.legendSep}>{'\u00b7'}</span>
+          <span className={styles.legendValue}>
+            {sessions.value} / {sessions.goal}
           </span>
         </div>
       </div>

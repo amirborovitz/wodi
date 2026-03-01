@@ -91,59 +91,183 @@ function impactScore(mov: MovementTotal): number {
 }
 
 /**
+ * A stat segment part — either a number (white) or symbol/text (muted).
+ */
+type StatPart = { type: 'number'; value: string } | { type: 'text'; value: string };
+
+interface StatSegment {
+  parts: StatPart[];
+}
+
+/**
+ * Extract unique weights in chronological order from a weight progression.
+ */
+function uniqueWeightProgression(weights: number[]): number[] {
+  const seen = new Set<number>();
+  const unique: number[] = [];
+  for (const w of weights) {
+    if (!seen.has(w)) {
+      seen.add(w);
+      unique.push(w);
+    }
+  }
+  return unique;
+}
+
+/**
+ * Build weight parts with progression arrows.
+ * - 1 weight: just the number
+ * - 2-3 unique weights: joined with ➔
+ * - 4+ unique weights: first ➔ ... ➔ last
+ */
+function buildWeightParts(uniqueWeights: number[]): StatPart[] {
+  if (uniqueWeights.length === 1) {
+    return [{ type: 'number', value: `${uniqueWeights[0]}` }];
+  }
+  if (uniqueWeights.length <= 3) {
+    const parts: StatPart[] = [];
+    uniqueWeights.forEach((w, i) => {
+      if (i > 0) parts.push({ type: 'text', value: ' \u27A4 ' });
+      parts.push({ type: 'number', value: `${w}` });
+    });
+    return parts;
+  }
+  // 4+ unique weights: first ➔ ... ➔ last
+  return [
+    { type: 'number', value: `${uniqueWeights[0]}` },
+    { type: 'text', value: ' \u27A4 ... \u27A4 ' },
+    { type: 'number', value: `${uniqueWeights[uniqueWeights.length - 1]}` },
+  ];
+}
+
+/**
  * Build stat segments for a movement row.
- * Each segment has separate `number` and `text` parts for styling.
+ * Each segment has parts array with typed number/text pieces for color coding.
  * Uses pipe "|" separator. No "@" symbol.
  */
-function buildStatSegments(movement: MovementTotal): { number: string; text: string }[] {
-  const segments: { number: string; text: string }[] = [];
+function buildStatSegments(movement: MovementTotal): StatSegment[] {
+  const segments: StatSegment[] = [];
 
-  // Reps
+  const hasWeight = movement.weight && movement.weight > 0;
+  const hasProgression = movement.weightProgression && movement.weightProgression.length > 1;
+
+  // For weighted movements: show volume (reps × weight) instead of raw reps
+  // For bodyweight/unweighted: show reps
   if (movement.totalReps && movement.totalReps > 0) {
-    segments.push({ number: `${movement.totalReps}`, text: ' reps' });
+    if (hasWeight && !hasProgression) {
+      // Show volume = reps × weight
+      const volume = movement.totalReps * movement.weight!;
+      const unit = movement.unit === 'lb' ? 'lb' : 'kg';
+      if (volume >= 1000) {
+        segments.push({
+          parts: [
+            { type: 'number', value: `${(volume / 1000).toFixed(1)}` },
+            { type: 'text', value: `t ${unit === 'lb' ? 'lb' : ''}` },
+          ],
+        });
+      } else {
+        segments.push({
+          parts: [
+            { type: 'number', value: `${Math.round(volume)}` },
+            { type: 'text', value: ` ${unit}` },
+          ],
+        });
+      }
+    } else if (!hasWeight) {
+      // Bodyweight — just show reps
+      segments.push({
+        parts: [
+          { type: 'number', value: `${movement.totalReps}` },
+          { type: 'text', value: ' reps' },
+        ],
+      });
+    }
   }
 
-  // Weight / progression — clean format, no "@"
-  if (movement.weightProgression && movement.weightProgression.length > 1) {
-    const weights = movement.weightProgression;
+  // Weight / progression — show per-set weights for varying loads
+  if (hasProgression) {
+    const weights = movement.weightProgression!;
     const unit = movement.unit === 'lb' ? 'lb' : 'kg';
-    if (weights.every(w => w === weights[0])) {
-      segments.push({ number: `${weights[0]}`, text: ` ${unit}` });
-    } else {
-      const deduped = weights.filter((w, i, arr) => i === 0 || w !== arr[i - 1]);
-      if (deduped.length > 4) {
-        segments.push({ number: `${Math.min(...deduped)}\u2013${Math.max(...deduped)}`, text: ` ${unit}` });
+    const unique = uniqueWeightProgression(weights);
+
+    const weightParts = buildWeightParts(unique);
+    weightParts.push({ type: 'text', value: ` ${unit}` });
+    segments.push({ parts: weightParts });
+
+    // Also show total volume for progressions
+    if (movement.totalReps && movement.totalReps > 0 && hasWeight) {
+      const volume = movement.totalReps * movement.weight!;
+      if (volume >= 1000) {
+        segments.push({
+          parts: [
+            { type: 'number', value: `${(volume / 1000).toFixed(1)}` },
+            { type: 'text', value: 't' },
+          ],
+        });
       } else {
-        segments.push({ number: `${deduped.join('\u2192')}`, text: ` ${unit}` });
+        segments.push({
+          parts: [
+            { type: 'number', value: `${Math.round(volume)}` },
+            { type: 'text', value: ` ${unit}` },
+          ],
+        });
       }
     }
-  } else if (movement.weight && movement.weight > 0) {
+  } else if (hasWeight) {
+    // Show the per-unit weight as context
     const unit = movement.unit === 'lb' ? 'lb' : 'kg';
     if (movement.implementCount && movement.implementCount > 1) {
-      const perImplement = parseFloat((movement.weight / movement.implementCount).toFixed(1));
-      segments.push({ number: `${movement.implementCount}x ${perImplement}`, text: ` ${unit}` });
+      const perImplement = parseFloat((movement.weight! / movement.implementCount).toFixed(1));
+      segments.push({
+        parts: [
+          { type: 'number', value: `${movement.implementCount}x ${perImplement}` },
+          { type: 'text', value: ` ${unit}` },
+        ],
+      });
     } else {
-      segments.push({ number: `${movement.weight}`, text: ` ${unit}` });
+      segments.push({
+        parts: [
+          { type: 'number', value: `${movement.weight}` },
+          { type: 'text', value: ` ${unit}` },
+        ],
+      });
     }
   }
 
   // Distance
   if (movement.totalDistance && movement.totalDistance > 0) {
     if (movement.totalDistance >= 1000) {
-      segments.push({ number: `${(movement.totalDistance / 1000).toFixed(1)}`, text: ' km' });
+      segments.push({
+        parts: [
+          { type: 'number', value: `${(movement.totalDistance / 1000).toFixed(1)}` },
+          { type: 'text', value: ' km' },
+        ],
+      });
     } else {
-      segments.push({ number: `${movement.totalDistance}`, text: ' m' });
+      segments.push({
+        parts: [
+          { type: 'number', value: `${movement.totalDistance}` },
+          { type: 'text', value: ' m' },
+        ],
+      });
     }
   }
 
   // Time
   if (movement.totalTime && movement.totalTime > 0) {
-    segments.push({ number: formatTime(movement.totalTime), text: '' });
+    segments.push({
+      parts: [{ type: 'number', value: formatTime(movement.totalTime) }],
+    });
   }
 
   // Calories
   if (movement.totalCalories && movement.totalCalories > 0) {
-    segments.push({ number: `${movement.totalCalories}`, text: ' cal' });
+    segments.push({
+      parts: [
+        { type: 'number', value: `${movement.totalCalories}` },
+        { type: 'text', value: ' cal' },
+      ],
+    });
   }
 
   return segments;
@@ -262,8 +386,14 @@ function MovementRow({
               <span key={i}>
                 {i > 0 && <span className={styles.statSeparator}>|</span>}
                 <span className={styles.statSegment}>
-                  <span className={styles.statNumber}>{seg.number}</span>
-                  <span className={styles.statText}>{seg.text}</span>
+                  {seg.parts.map((part, j) => (
+                    <span
+                      key={j}
+                      className={part.type === 'number' ? styles.statNumber : styles.statText}
+                    >
+                      {part.value}
+                    </span>
+                  ))}
                 </span>
               </span>
             ))}

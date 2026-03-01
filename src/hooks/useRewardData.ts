@@ -11,6 +11,7 @@ interface WorkoutSummaryInput {
   format?: WorkoutFormat;
   exercises: Exercise[];
   durationMinutes: number;
+  actualTimeMinutes?: number; // Actual completion time (for intensity EP when < programmed time)
   totalVolume: number;
   totalReps: number;
   muscleGroups?: {
@@ -142,6 +143,7 @@ export function useRewardData(): UseRewardDataResult {
           type: workout.type,
           format: workout.format,
           duration: workout.durationMinutes,
+          actualTimeMinutes: workout.actualTimeMinutes,
           exerciseCount: workout.exercises.length,
           totalVolume: workout.totalVolume,
           totalReps: workout.totalReps,

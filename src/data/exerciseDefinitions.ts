@@ -392,3 +392,51 @@ export function getRepRatio(originalName: string, alternativeName: string): numb
   const alt = alternatives.find(a => a.name.toLowerCase() === alternativeName.toLowerCase());
   return alt?.ratio || 1;
 }
+
+// ============================================
+// MOVEMENT CATEGORY CLASSIFICATION (for PR screen)
+// ============================================
+
+export type MovementCategory = 'weightlifting' | 'gymnastics' | 'monostructural' | 'benchmark';
+
+const WEIGHTLIFTING_PATTERNS = [
+  'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
+  'swing', 'lunge', 'curl', 'extension', 'pullover',
+  'kettlebell', 'kb', 'dumbbell', 'db', 'barbell', 'bb',
+  'goblet', 'sumo', 'rdl', 'romanian', 'front rack', 'overhead',
+  'wall ball', 'ball slam', 'med ball', 'sandbag', 'bench',
+];
+
+const GYMNASTICS_CATEGORY_PATTERNS = [
+  'handstand', 'hspu', 'muscle-up', 'muscle up', 'pistol', 'l-sit',
+  'ring', 'rope climb', 'peg board', 'pegboard', 'planche', 'lever',
+  'strict', 'kipping', 'butterfly', 'toes to bar', 't2b',
+  'knees to elbow', 'k2e', 'chest to bar', 'c2b',
+  'pull-up', 'pullup', 'push-up', 'pushup', 'dip',
+  'sit-up', 'situp', 'burpee',
+];
+
+const MONOSTRUCTURAL_PATTERNS = [
+  'run', 'row', 'bike', 'ski', 'swim', 'jump rope',
+  'double under', 'single under', 'du', 'su',
+  'air runner', 'assault bike', 'echo bike',
+];
+
+const BENCHMARK_NAMES = [
+  'fran', 'murph', 'grace', 'diane', 'helen', 'elizabeth',
+  'isabel', 'jackie', 'karen', 'linda', 'nancy', 'annie',
+  'dt', 'cindy', 'mary', 'amanda', 'barbara', 'chelsea',
+  'eva', 'filthy fifty', 'fight gone bad', 'kelly',
+  'king kong', 'the chief', 'nate', 'randy',
+];
+
+export function getMovementCategory(name: string): MovementCategory {
+  const lower = name.toLowerCase().trim();
+
+  if (BENCHMARK_NAMES.some(b => lower === b)) return 'benchmark';
+  if (MONOSTRUCTURAL_PATTERNS.some(p => lower.includes(p))) return 'monostructural';
+  if (GYMNASTICS_CATEGORY_PATTERNS.some(p => lower.includes(p))) return 'gymnastics';
+  if (WEIGHTLIFTING_PATTERNS.some(p => lower.includes(p))) return 'weightlifting';
+
+  return 'weightlifting';
+}

@@ -30,11 +30,11 @@
   background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%);
   color: #000;
   font-weight: var(--font-bold);
-  box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .primary:hover:not(:disabled) {
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
   transform: translateY(-1px);
 }
 

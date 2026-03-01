@@ -7,7 +7,7 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Required for client-side usage
 });
 
-const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit workout parser. Parse this workout image into structured JSON.
+const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit coach and workout parser. You understand workout structure — buy-ins, cash-outs, chippers, EMOMs, intervals, supersets, partner WODs. Parse the workout image into structured JSON, matching the workout's logical blocks.
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON:
@@ -15,7 +15,7 @@ Return ONLY valid JSON:
   "title": "workout name if visible",
   "rawText": "full workout text from the image (OCR-style, line breaks ok)",
   "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
-  "format": "for_time" | "intervals" | "amrap" | "emom" | "strength" | "tabata",
+  "format": "for_time" | "intervals" | "amrap" | "amrap_intervals" | "emom" | "strength" | "tabata",
   "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
   "sets": 5,
   "timeCap": 900,
@@ -24,6 +24,7 @@ Return ONLY valid JSON:
   "benchmarkName": null,
   "benchmarkModified": false,
   "partnerWorkout": false,
+  "teamSize": null,
   "exercises": [
     {
       "name": "Exercise or Block Name",
@@ -33,405 +34,177 @@ Return ONLY valid JSON:
       "suggestedReps": 10,
       "suggestedRepsPerSet": [6, 5, 4, 3, 2],
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+      "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
-        { "name": "Run", "distance": 300, "unit": "m" },
-        { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "alternative": { "name": "Alt Name", "reps": 10 } }
-      ]
+        { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } }
+      ],
+      "cashOut": [{ "name": "Run", "distance": 600, "unit": "m" }]
     }
   ]
 }
 
-## CONTAINER/BENCHMARK RECOGNITION
-Detect nested workout structures like "7 rounds of Cindy" or "3 rounds of DT":
-- **containerRounds**: The OUTER rounds wrapping a benchmark (e.g., 7 in "7 rounds of Cindy")
-- **benchmarkName**: Name of recognized benchmark (Cindy, DT, Fran, Grace, etc.)
-- **benchmarkModified**: true if benchmark has modifications (different weight, scaled reps, etc.)
-
-### PRIORITY RULES FOR BENCHMARKS:
-1. FIRST: If definition is provided in text (e.g., "Cindy = 5/10/15"), use that definition
-2. SECOND: If no definition, use standard benchmark with any noted modifications
-
-### STANDARD BENCHMARKS (use these if not defined in text):
-- **Cindy**: AMRAP 20 of 5 Pull-ups, 10 Push-ups, 15 Air Squats
-- **DT**: 5 rounds of 12 Deadlifts, 9 Hang Power Cleans, 6 Push Jerks @ 70/47.5kg
-- **Fran**: 21-15-9 Thrusters 42.5/30kg, Pull-ups
-- **Grace**: 30 Clean & Jerks @ 60/42.5kg for time
-- **Isabel**: 30 Snatches @ 60/42.5kg for time
-- **Helen**: 3 rounds of 400m Run, 21 KB Swings 24/16kg, 12 Pull-ups
-- **Diane**: 21-15-9 Deadlifts 102/70kg, Handstand Push-ups
-- **Elizabeth**: 21-15-9 Cleans 60/42.5kg, Ring Dips
-- **Jackie**: 1000m Row, 50 Thrusters 20/15kg, 30 Pull-ups for time
-- **Karen**: 150 Wall Balls 9/6kg for time
-- **Annie**: 50-40-30-20-10 Double Unders, Sit-ups
-- **Mary**: AMRAP 20 of 5 HSPUs, 10 Pistols, 15 Pull-ups
-
 ## FORMAT DETECTION (pick exactly one)
-- **amrap_intervals**: "2:30 AMRAP, 1:30 rest x 4", "4 rounds of 3 min AMRAP" → Log ROUNDS PER SET (multiple AMRAPs)
-- **intervals**: "5 sets for time", "every 3:00 x 5", "5 x 500m row" → Log TIME PER SET
-- **for_time**: "for time", "RFT", "rounds for time" without "x sets" → Log TOTAL time
-- **amrap**: "AMRAP 12", "12 min AMRAP" (single AMRAP) → Log rounds + reps
-- **emom**: "EMOM", "every 1:00", "E2MOM" → Log completion per minute
-- **strength**: "5x5", "3x8 @70%", "build to 1RM" → Log weight per set
-- **tabata**: "tabata", "20s on/10s off" → Log reps per interval
-
-## SCORE TYPE (based on format)
-- amrap_intervals → "rounds_reps" (rounds per set)
-- intervals → "time_per_set"
-- for_time → "time"
-- amrap → "rounds_reps"
-- emom → "reps" or "pass_fail"
-- strength → "load"
+| Format | Trigger | scoreType |
+|--------|---------|-----------|
+| amrap_intervals | "2:30 AMRAP x 4", multiple AMRAPs with rest | rounds_reps |
+| intervals | "5 sets for time", "every 3:00 x 5" | time_per_set |
+| for_time | "for time", "RFT" (no "x sets") | time |
+| amrap | "AMRAP 12" (single) | rounds_reps |
+| emom | "EMOM", "every 1:00", "E2MOM" | reps |
+| strength | "5x5", "3x8 @70%", "build to 1RM" | load |
+| tabata | "tabata", "20s on/10s off" | reps |
 
 ## WEIGHT PARSING
-Parse "40/60 kg" as rxWeights: { female: 40, male: 60, unit: "kg" }
-Parse "95/65 lb" as rxWeights: { male: 95, female: 65, unit: "lb" }
-Parse "@60kg" or "60kg" as rxWeights: { male: 60, female: 60, unit: "kg" }
-Parse "2x22.5 kg db" → note in prescription, rxWeights: { male: 22.5, female: 22.5, unit: "kg" }
-IMPORTANT: "twin kb" or "double kb" means 2 kettlebells - DOUBLE the weight for rxWeights
-  e.g., "twin kb 16kg" → rxWeights: { male: 32, female: 32, unit: "kg" } (16×2)
-  e.g., "2 kb 24kg" → rxWeights: { male: 48, female: 48, unit: "kg" } (24×2)
+- "40/60 kg" → rxWeights: { female: 40, male: 60, unit: "kg" } (higher = male)
+- "@60kg" → rxWeights: { male: 60, female: 60, unit: "kg" }
+- "twin kb 16kg" or "2 kb 24kg" → rxWeights: 16 (per implement), implementCount: 2
+
+## MOVEMENT INPUT CLASSIFICATION
+Every movement MUST include "inputType":
+- "weight": barbell/KB/DB movements needing weight logged per set (deadlift, squat, press, clean, snatch, thruster, swing, lunge, wall ball, goblet, row with weight, shoulder to overhead, clean and jerk, etc.)
+- "calories": cardio machines when scored by calories (echo bike, assault bike, row erg, ski erg — "max cal", "15 cal")
+- "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
+- "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed in the rep count
+
+## IMPLEMENT COUNT (DB/KB)
+Every DB or KB movement MUST include "implementCount": 1 or 2.
+- rxWeights is ALWAYS the weight of ONE implement (never pre-doubled)
+- implementCount: 2 when "twin", "double", "2x", "pair" is explicit, OR the movement naturally uses two (DB Thrusters, DB Front Squats, Farmers Carry)
+- implementCount: 1 for single-arm movements (DB Snatch, Alt DB Clean, KB Swing, Goblet Squat, Turkish Get-up)
+- When ambiguous, default to 1
 
 ## MOVEMENT ALIASES (use canonical names)
 Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
-Gymnastics: hspu → Handstand Push-up, t2b → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
+Gymnastics: hspu → Handstand Push-up, t2b/ttb → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
 Cardio: du → Double Under, su → Single Under, cal → Calories
 Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 
-## EXAMPLES
+## KEY GUIDELINES
+1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise.
+2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
+3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
 
-Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
-Output:
-{
-  "title": null,
-  "type": "metcon",
-  "format": "intervals",
-  "scoreType": "time_per_set",
-  "sets": 5,
-  "exercises": [{
-    "name": "5 Sets For Time",
-    "type": "wod",
-    "prescription": "300m Run + 10 Shoulder to Overhead 40/60kg",
-    "suggestedSets": 5,
-    "movements": [
-      { "name": "Run", "distance": 300, "unit": "m" },
-      { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
-    ]
-  }]
-}
-
-Input: "AMRAP 12: 10 thrusters 43/30kg, 15 pull-ups"
-Output:
-{
-  "type": "amrap",
-  "format": "amrap",
-  "scoreType": "rounds_reps",
-  "timeCap": 720,
-  "exercises": [{
-    "name": "AMRAP 12",
-    "type": "wod",
-    "prescription": "10 Thrusters 43/30kg, 15 Pull-ups",
-    "suggestedSets": 1,
-    "movements": [
-      { "name": "Thruster", "reps": 10, "rxWeights": { "male": 43, "female": 30, "unit": "kg" } },
-      { "name": "Pull-up", "reps": 15 }
-    ]
-  }]
-}
-
-Input: "Back Squat 5x5 @75%"
-Output:
-{
-  "type": "strength",
-  "format": "strength",
-  "scoreType": "load",
-  "exercises": [{
-    "name": "Back Squat",
-    "type": "strength",
-    "prescription": "5x5 @75%",
-    "suggestedSets": 5,
-    "suggestedReps": 5
-  }]
-}
-
-Input: "Push Press 5x3"
-Output:
-{
-  "type": "strength",
-  "format": "strength",
-  "scoreType": "load",
-  "exercises": [{
-    "name": "Push Press",
-    "type": "strength",
-    "prescription": "5x3",
-    "suggestedSets": 5,
-    "suggestedReps": 3
-  }]
-}
-
-Input: "2:30 AMRAP, 1:30 rest x 4: 10 heavy russian swings, 25 single unders/50 double unders"
-Output:
-{
-  "type": "metcon",
-  "format": "amrap_intervals",
-  "scoreType": "rounds_reps",
-  "sets": 4,
-  "intervalTime": 150,
-  "restTime": 90,
-  "exercises": [{
-    "name": "4x 2:30 AMRAP",
-    "type": "wod",
-    "prescription": "10 Russian Swings (heavy), 25 SU/50 DU",
-    "suggestedSets": 4,
-    "movements": [
-      { "name": "Russian Kettlebell Swing", "reps": 10 },
-      { "name": "Single Under", "reps": 25, "alternative": { "name": "Double Under", "reps": 50 } }
-    ]
-  }]
-}
-
-Input: "Long Metcon Interval: 8 sets out every 2:30 of 300m run, 5 twin KB clean 32/24"
-Output:
-{
-  "type": "metcon",
-  "format": "intervals",
-  "scoreType": "time_per_set",
-  "sets": 8,
-  "intervalTime": 150,
-  "exercises": [{
-    "name": "Long Metcon - 8 sets every 2:30",
-    "type": "wod",
-    "prescription": "300m Run + 5 Twin KB Clean 32/24kg",
-    "suggestedSets": 8,
-    "movements": [
-      { "name": "Run", "distance": 300, "unit": "m" },
-      { "name": "Kettlebell Clean", "reps": 5, "rxWeights": { "male": 64, "female": 48, "unit": "kg" } }
-    ]
-  }]
-}
-
-Input: "7 rounds of Cindy for time"
-Output:
-{
-  "type": "for_time",
-  "format": "for_time",
-  "scoreType": "time",
-  "containerRounds": 7,
-  "benchmarkName": "Cindy",
-  "benchmarkModified": false,
-  "exercises": [{
-    "name": "7 Rounds of Cindy",
-    "type": "wod",
-    "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats",
-    "suggestedSets": 7,
-    "movements": [
-      { "name": "Pull-up", "reps": 5 },
-      { "name": "Push-up", "reps": 10 },
-      { "name": "Air Squat", "reps": 15 }
-    ]
-  }]
-}
-
-Input: "DT @ 50kg"
-Output:
-{
-  "type": "for_time",
-  "format": "for_time",
-  "scoreType": "time",
-  "containerRounds": 5,
-  "benchmarkName": "DT",
-  "benchmarkModified": true,
-  "exercises": [{
-    "name": "DT @ 50kg",
-    "type": "wod",
-    "prescription": "5 rounds: 12 Deadlifts, 9 Hang Power Cleans, 6 Push Jerks @ 50kg",
-    "suggestedSets": 5,
-    "movements": [
-      { "name": "Deadlift", "reps": 12, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } },
-      { "name": "Hang Power Clean", "reps": 9, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } },
-      { "name": "Push Jerk", "reps": 6, "rxWeights": { "male": 50, "female": 50, "unit": "kg" } }
-    ]
-  }]
-}
-
-Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
-Output:
-{
-  "title": "Cycle 1 - Push",
-  "type": "mixed",
-  "format": "strength",
-  "scoreType": "load",
-  "exercises": [
-    {
-      "name": "Strict Shoulder Press",
-      "type": "strength",
-      "prescription": "5x3",
-      "suggestedSets": 5,
-      "suggestedReps": 3
-    },
-    {
-      "name": "Superset: Goblet Squat + V-ups",
-      "type": "strength",
-      "prescription": "3x12 each movement",
-      "suggestedSets": 3,
-      "suggestedReps": 12,
-      "movements": [
-        { "name": "Goblet Squat", "reps": 12 },
-        { "name": "V-up", "reps": 12 }
-      ]
-    },
-    {
-      "name": "Metcon: Max Cal Ecobike",
-      "type": "cardio",
-      "prescription": "15 min max calories, teams of 5",
-      "suggestedSets": 1,
-      "timeCap": 900
-    }
-  ]
-}
-
-## SKILL / PRACTICE BLOCKS
-"Practice", "build weight", "movement focus" = timed skill work, NOT sets x reps.
-- type: "skill", suggestedSets: 1, NO suggestedReps, NO movements from other blocks
-- Include the time in prescription (e.g., "12 min practice")
-- Do NOT copy reps or movements from the metcon into the skill block
-
-Input: "Movement focus: Barbell cycling C&J. 12 min practice & build weight. Then Partner IGUG 12 RFT (6 each): 8 C&J, 40 DU/60 singles. 16 min TC"
-Output:
-{
-  "type": "mixed",
-  "format": "for_time",
-  "scoreType": "time",
-  "partnerWorkout": true,
-  "timeCap": 960,
-  "exercises": [
-    {
-      "name": "Barbell Cycling - Clean and Jerk",
-      "type": "skill",
-      "prescription": "12 min practice & build weight",
-      "suggestedSets": 1
-    },
-    {
-      "name": "Partner RFT (6 each)",
-      "type": "wod",
-      "prescription": "6 rounds each: 8 C&J, 40 DU/60 Singles, 16 min TC",
-      "suggestedSets": 6,
-      "movements": [
-        { "name": "Clean and Jerk", "reps": 8 },
-        { "name": "Double Under", "reps": 40, "alternative": { "name": "Single Under", "reps": 60 } }
-      ]
-    }
-  ]
-}
+## CONTAINER/BENCHMARK RECOGNITION
+- containerRounds: outer rounds wrapping a benchmark (7 in "7 rounds of Cindy")
+- benchmarkName: Cindy, DT, Fran, Grace, Isabel, Helen, Diane, Elizabeth, Jackie, Karen, Annie, Mary
+- benchmarkModified: true if weight/reps differ from standard
+- If definition is provided in text, use that; otherwise use standard benchmark
 
 ## VARIABLE REP SCHEMES
-When reps vary per set, use "suggestedRepsPerSet" array instead of a single "suggestedReps".
-- "[6-5-4-3-2]" or "6-5-4-3-2" → suggestedRepsPerSet: [6,5,4,3,2], suggestedSets: 5
-- "21-15-9" → suggestedRepsPerSet: [21,15,9], suggestedSets: 3
-- "5-5-3-3-1-1" → suggestedRepsPerSet: [5,5,3,3,1,1], suggestedSets: 6
-- Do NOT use isMaxReps or "(max)" when explicit rep counts are given per set
-- The length of suggestedRepsPerSet MUST equal suggestedSets
+"[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
 
-Example: "Strict Pull-ups 5 sets [6-5-4-3-2]"
-→ suggestedSets: 5, suggestedRepsPerSet: [6,5,4,3,2] (NOT suggestedReps with max)
+## PARTNER / TEAM WORKOUTS
+- "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
+- "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N
+- "(6 each)" → suggestedSets: 6 (per-person count, NOT total).
 
-## PARTNER WORKOUTS
-Detect partner/team workouts and set "partnerWorkout": true at the top level.
-- Keywords: "I go you go", "IGUG", "in pairs", "with a partner", "partner WOD", "teams of 2"
-- "(6 each)" means each partner does 6 rounds → use 6 as round/set count, NOT 12
-- "(N each)" → sets/rounds = N (the per-person count)
-- Set partnerWorkout: true in the top-level workout object
+## SKILL / PRACTICE BLOCKS
+"Practice", "build weight", "movement focus" → type: "skill", suggestedSets: 1, NO suggestedReps, NO movements from other blocks.
 
-## MOVEMENT ALTERNATIVES (OR options)
-When "/" between movements means choose one (OR), use the "alternative" field on the primary movement.
-- "40 D.U. / 60 singles" → primary: Single Under reps:60, alternative: {name: "Double Under", reps: 40}
-- "C2B / Pull-ups" → primary: Pull-up, alternative: {name: "Chest to Bar Pull-up"}
-- "4 B.M.U / 8 pull ups" → primary: Pull-up reps:8, alternative: {name: "Bar Muscle-up", reps: 4}
-- Do NOT create two separate movements for OR options
-- The EASIER/scaled movement should be the primary (default). The harder/Rx movement goes in "alternative".
-- "/" between equipment variants (e.g., "KB's/DB's front squat") is NOT an OR choice — treat as a single movement with the first equipment type.
+## TIME CAP
+"T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.
 
-## RFT + TIME CAP
-- "RFT" or "rounds for time" MUST use format: "for_time", scoreType: "time"
-- "T.C." or "TC" or "time cap" = Time Cap: "16 min T.C." → timeCap: 960
-- Combined example:
+## EXAMPLES
 
-Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 15 Box Jumps. 16 min T.C."
-Output:
-{
-  "type": "for_time",
-  "format": "for_time",
-  "scoreType": "time",
-  "partnerWorkout": true,
-  "sets": 6,
-  "timeCap": 960,
-  "exercises": [{
-    "name": "Partner RFT (6 each)",
-    "type": "wod",
-    "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps",
-    "suggestedSets": 6,
-    "movements": [
-      { "name": "Deadlift", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
-      { "name": "Single Under", "reps": 60, "alternative": { "name": "Double Under", "reps": 40 } },
-      { "name": "Box Jump", "reps": 15 }
-    ]
-  }]
-}
-
-## BUY-IN / BUY-OUT (CRITICAL — movements done once, NOT per round)
-Some workouts have movements done ONCE before or after the main rounds. These are NOT part of the rounds.
-Common terms: "buy-in", "buy in", "buyin", "cash in", "cash out", "buy-out", "buyout", "into X rounds ... into", "then", "finish with".
-Structure: Create SEPARATE exercises for buy-in and buy-out movements (suggestedSets: 1, NOT multiplied by rounds).
-IMPORTANT: Name buy-in exercises "Buy-In: ..." and buy-out exercises "Buy-Out: ..." to distinguish them.
-The buy-in and buy-out can be ANY movement type — distance (runs), reps (pull-ups, burpees), calories, etc.
-"RFT" = "Rounds For Time" — the same as "rounds" but format must be "for_time".
-
+### 1. Buy-in + Rounds + Cash-out
 Input: "For Time: 600m Run (buy in), 8 RFT: 8 Push Press 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run"
 Output:
 {
-  "type": "for_time",
-  "format": "for_time",
-  "scoreType": "time",
+  "type": "for_time", "format": "for_time", "scoreType": "time",
   "exercises": [
-    {
-      "name": "Buy-In: 600m Run",
-      "type": "wod",
-      "prescription": "600m Run",
-      "suggestedSets": 1,
-      "movements": [{ "name": "Run", "distance": 600, "unit": "m" }]
-    },
-    {
-      "name": "8 Rounds For Time",
-      "type": "wod",
-      "prescription": "8 Push Press 40/50kg, 8 TTB, 8 KB Swings 24/16kg",
-      "suggestedSets": 8,
+    { "name": "8 Rounds For Time", "type": "wod", "prescription": "600m Run buy-in, 8 RFT: 8 Push Jerk 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run", "suggestedSets": 8,
+      "buyIn": [{ "name": "Run", "distance": 600, "unit": "m", "inputType": "none" }],
       "movements": [
-        { "name": "Push Press", "reps": 8, "rxWeights": { "male": 50, "female": 40, "unit": "kg" } },
-        { "name": "Toes to Bar", "reps": 8 },
-        { "name": "Kettlebell Swing", "reps": 8, "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
-      ]
-    },
-    {
-      "name": "Buy-Out: 600m Run",
-      "type": "wod",
-      "prescription": "600m Run",
-      "suggestedSets": 1,
-      "movements": [{ "name": "Run", "distance": 600, "unit": "m" }]
+        { "name": "Push Jerk", "reps": 8, "inputType": "weight", "rxWeights": { "male": 50, "female": 40, "unit": "kg" } },
+        { "name": "Toes to Bar", "reps": 8, "inputType": "none" },
+        { "name": "Kettlebell Swing", "reps": 8, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
+      ],
+      "cashOut": [{ "name": "Run", "distance": 600, "unit": "m", "inputType": "none" }]
     }
   ]
 }
 
-## RULES
-1. Keep round-based WODs as ONE exercise with movements array (but separate buy-in/buy-out into their own exercises)
-2. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Buy-in/Buy-out)
-3. Always include "format" and "scoreType" fields
-4. Parse weight notation into rxWeights object
-5. Use canonical movement names
-6. IMPORTANT: Exercise name MUST include set count and interval timing (e.g., "8 sets every 2:30" or "5 Sets For Time")
-7. SETS x REPS PARSING: "AxB" means A sets of B reps (e.g., "5x3" = suggestedSets:5, suggestedReps:3; "3x10" = suggestedSets:3, suggestedReps:10)
-8. If the workout has titled sections (e.g., "Cycle 1 - Push", "Superset x3", "Medium Metcon - Interval"), treat each as a separate exercise block.
-9. Do not duplicate exercises; each block should appear once (except buy-in/buy-out — a 600m Run buy-in and 600m Run buy-out are TWO separate exercises, not duplicates).
-10. MULTI-BLOCK WORKOUTS: When a workout has multiple distinct sections (Cycle, Strength, Superset, Metcon, Finisher, etc.), create a SEPARATE exercise for EACH block. Never merge or skip blocks. Count the blocks in the input and ensure your output has the same number of exercises.
-11. IMPLIED SUPERSETS: When you see "N sets: exercise1 exercise2" or "N sets of exercise1, exercise2" (multiple exercises under one set count), treat it as a superset. Name it "Superset: exercise1 + exercise2" and include both in movements array with their reps. Example: "3 sets: 10/10 powell raises 10/10 external rotation" becomes a superset with 2 movements, each with reps:10.
+### 2. Simple AMRAP
+Input: "AMRAP 12: 10 thrusters 43/30kg, 15 pull-ups"
+Output:
+{
+  "type": "amrap", "format": "amrap", "scoreType": "rounds_reps", "timeCap": 720,
+  "exercises": [{ "name": "AMRAP 12", "type": "wod", "prescription": "10 Thrusters 43/30kg, 15 Pull-ups", "suggestedSets": 1,
+    "movements": [
+      { "name": "Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 43, "female": 30, "unit": "kg" } },
+      { "name": "Pull-up", "reps": 15, "inputType": "none" }
+    ] }]
+}
+
+### 3. Strength
+Input: "Back Squat 5x5 @75%"
+Output:
+{
+  "type": "strength", "format": "strength", "scoreType": "load",
+  "exercises": [{ "name": "Back Squat", "type": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
+}
+
+### 4. Intervals
+Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
+Output:
+{
+  "type": "metcon", "format": "intervals", "scoreType": "time_per_set", "sets": 5,
+  "exercises": [{ "name": "5 Sets For Time", "type": "wod", "prescription": "300m Run + 10 Shoulder to Overhead 40/60kg", "suggestedSets": 5,
+    "movements": [
+      { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" },
+      { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
+    ] }]
+}
+
+### 5. Mixed session (Strength + Superset + Metcon)
+Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
+Output:
+{
+  "title": "Cycle 1 - Push", "type": "mixed", "format": "strength", "scoreType": "load",
+  "exercises": [
+    { "name": "Strict Shoulder Press", "type": "strength", "prescription": "5x3", "suggestedSets": 5, "suggestedReps": 3 },
+    { "name": "Superset: Goblet Squat + V-ups", "type": "strength", "prescription": "3x12 each movement", "suggestedSets": 3, "suggestedReps": 12,
+      "movements": [{ "name": "Goblet Squat", "reps": 12, "inputType": "weight" }, { "name": "V-up", "reps": 12, "inputType": "none" }] },
+    { "name": "Metcon: Max Cal Ecobike", "type": "cardio", "prescription": "15 min max calories", "suggestedSets": 1, "timeCap": 900 }
+  ]
+}
+
+### 6. Partner RFT with time cap
+Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 15 Box Jumps. 16 min T.C."
+Output:
+{
+  "type": "for_time", "format": "for_time", "scoreType": "time", "partnerWorkout": true, "teamSize": 2, "sets": 6, "timeCap": 960,
+  "exercises": [{ "name": "Partner RFT (6 each)", "type": "wod", "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps", "suggestedSets": 6,
+    "movements": [
+      { "name": "Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
+      { "name": "Single Under", "reps": 60, "inputType": "none", "alternative": { "name": "Double Under", "reps": 40 } },
+      { "name": "Box Jump", "reps": 15, "inputType": "none" }
+    ] }]
+}
+
+### 7. Container benchmark
+Input: "7 rounds of Cindy for time"
+Output:
+{
+  "type": "for_time", "format": "for_time", "scoreType": "time", "containerRounds": 7, "benchmarkName": "Cindy", "benchmarkModified": false,
+  "exercises": [{ "name": "7 Rounds of Cindy", "type": "wod", "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats", "suggestedSets": 7,
+    "movements": [{ "name": "Pull-up", "reps": 5, "inputType": "none" }, { "name": "Push-up", "reps": 10, "inputType": "none" }, { "name": "Air Squat", "reps": 15, "inputType": "none" }] }]
+}
+
+### 8. Chipper
+Input: "For time: 50 wall balls 9/6kg, 40 pull-ups, 30 box jumps, 20 thrusters 42.5/30kg, 10 muscle-ups"
+Output:
+{
+  "type": "for_time", "format": "for_time", "scoreType": "time",
+  "exercises": [{ "name": "Chipper For Time", "type": "wod", "prescription": "50 Wall Balls 9/6kg, 40 Pull-ups, 30 Box Jumps, 20 Thrusters 42.5/30kg, 10 Muscle-ups", "suggestedSets": 1,
+    "movements": [
+      { "name": "Wall Ball", "reps": 50, "inputType": "weight", "rxWeights": { "male": 9, "female": 6, "unit": "kg" } },
+      { "name": "Pull-up", "reps": 40, "inputType": "none" },
+      { "name": "Box Jump", "reps": 30, "inputType": "none" },
+      { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 42.5, "female": 30, "unit": "kg" } },
+      { "name": "Muscle-up", "reps": 10, "inputType": "none" }
+    ] }]
+}
 
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
@@ -457,7 +230,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
           ]
         }
       ],
-      max_tokens: 1000,
+      max_tokens: 1500,
       temperature: 0.2 // Lower temperature for more consistent parsing
     });
 
@@ -475,11 +248,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
 
     const parsed = JSON.parse(jsonStr.trim());
 
-    console.log('[OpenAI Parse] Raw AI response:', {
-      exerciseCount: parsed.exercises?.length,
-      exercises: parsed.exercises?.map((e: Record<string, unknown>) => ({ name: e.name, type: e.type })),
-      rawText: (parsed.rawText as string)?.substring(0, 300),
-    });
+    console.warn('🔍 [AI PARSE] Full response:', JSON.stringify(parsed, null, 2));
 
     if (parsed.error) {
       throw new Error(parsed.error);
@@ -491,18 +260,15 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
     // Post-process to fix common AI parsing issues
     const postProcessed = postProcessParsedWorkout(validated);
 
-    console.log('[OpenAI Parse] Post-processed:', {
+    console.log('[OpenAI Parse] Post-processed:', JSON.stringify({
       exercises: postProcessed.exercises?.map(e => ({
         name: e.name,
+        suggestedSets: e.suggestedSets,
         movements: e.movements?.map(m => ({
-          name: m.name,
-          reps: m.reps,
-          time: m.time,
-          distance: m.distance,
-          rxWeights: m.rxWeights,
+          name: m.name, reps: m.reps, distance: m.distance, perRound: m.perRound,
         })),
       })),
-    });
+    }, null, 2));
 
     return postProcessed;
   } catch (error) {
@@ -511,62 +277,14 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
   }
 }
 
-const WORKOUT_REFINE_PROMPT = `You are a workout parser refinement engine. You will receive:
-- rawText: the OCR/visible text
-- parsed: the current parsed JSON
+const WORKOUT_REFINE_PROMPT = `You are a CrossFit workout parser refinement engine. You receive rawText + parsed JSON and return corrected JSON.
 
-Your job: return a corrected ParsedWorkout JSON that:
-1) Preserves the original meaning and structure.
-2) Splits complex, multi-block workouts into correct exercises when needed.
-3) Adds containerRounds / benchmarkName when explicit.
-4) Keeps movements accurate with per-round reps and weights.
-
-CRITICAL: Count the distinct sections in the raw text (look for: Cycle, Strength, Superset, Metcon, Finisher, Interval, AMRAP, EMOM, numbered items like "1.", "2.", "3.", etc.).
-The number of exercises in your output MUST match the number of distinct blocks in the input.
-
-If rawText mentions 3 blocks but parsed only has 2 exercises, you MUST add the missing block.
-If rawText has numbered items (1. Push Press, 2. Superset, 3. Metcon), each numbered item is a SEPARATE exercise.
-
-Return ONLY valid JSON in this schema:
-{
-  "title": "workout name if visible",
-  "rawText": "full raw text",
-  "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
-  "format": "for_time" | "intervals" | "amrap" | "emom" | "strength" | "tabata",
-  "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
-  "sets": 5,
-  "timeCap": 900,
-  "intervalTime": 180,
-  "containerRounds": null,
-  "benchmarkName": null,
-  "benchmarkModified": false,
-  "rawText": "full raw text",
-  "exercises": [
-    {
-      "name": "Exercise or Block Name",
-      "type": "strength" | "cardio" | "skill" | "wod",
-      "prescription": "human-readable prescription",
-      "suggestedSets": 5,
-      "suggestedReps": 10,
-      "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
-      "movements": [
-        { "name": "Run", "distance": 300, "unit": "m" },
-        { "name": "Shoulder to Overhead", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
-      ]
-    }
-  ]
-}
+Return ONLY valid JSON matching the same schema as the parsed input.
 
 Rules:
-- Keep round-based WODs as ONE exercise with movements array unless clearly multiple blocks.
-- BUY-IN / BUY-OUT: Movements done once before/after rounds (buy-in, cash in, buy-out, cash out, "into X rounds into", "then", "finish with") must be SEPARATE exercises with suggestedSets: 1. They are NOT part of the rounds. Name them "Buy-In: ..." and "Buy-Out: ..." respectively. A buy-in and buy-out with the same movement (e.g., two 600m Runs) are NOT duplicates — keep both.
-- If the text defines a benchmark (e.g., "Cindy = 5/10/15"), use that definition.
-- If multiple blocks exist (e.g., "Cindy + DT + Cash-out"), split into separate exercises.
-- Preserve all titled sections (Cycle, Superset, Metcon, Interval, etc.) as distinct exercises.
-- Ensure sets x reps like "5x3" becomes suggestedSets=5 and suggestedReps=3.
-- Never duplicate the same exercise block unless the raw text explicitly repeats it.
-- If you are unsure, preserve the original parsed structure and just correct obvious errors.
-- IMPLIED SUPERSETS: "N sets: exercise1 exercise2" or "N sets of exercise1, exercise2" means superset. Name it "Superset: exercise1 + exercise2" with both in movements array. Example: "3 sets: 10/10 powell raises 10/10 external rotation" = superset with 2 movements (reps:10 each), suggestedSets:3.`;
+- Only split into multiple exercises for truly separate blocks (Strength + Metcon, Skill + WOD).
+- "5x3" = suggestedSets: 5, suggestedReps: 3.
+- Preserve original structure when unsure — only correct obvious errors.`;
 
 export async function refineParsedWorkout(
   parsed: ParsedWorkout,
@@ -648,6 +366,17 @@ function validateMovement(data: unknown): ParsedMovement | null {
     }
   }
 
+  // Validate inputType
+  const validInputTypes = ['weight', 'calories', 'distance', 'none'] as const;
+  const inputType = validInputTypes.includes(raw.inputType as typeof validInputTypes[number])
+    ? (raw.inputType as ParsedMovement['inputType'])
+    : undefined;
+
+  // Validate implementCount (1 or 2)
+  const implementCount = (raw.implementCount === 1 || raw.implementCount === 2)
+    ? raw.implementCount as 1 | 2
+    : undefined;
+
   return {
     name: raw.name,
     reps: typeof raw.reps === 'number' ? raw.reps : undefined,
@@ -656,6 +385,9 @@ function validateMovement(data: unknown): ParsedMovement | null {
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
+    inputType,
+    implementCount,
+    perRound: raw.perRound === false ? false : undefined,
     alternative,
   };
 }
@@ -690,14 +422,43 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
       const exercise = ex as Record<string, unknown>;
       const validExerciseTypes: ExerciseType[] = ['strength', 'cardio', 'skill', 'wod'];
 
-      // Parse movements array if present
-      const movements: ParsedMovement[] = [];
+      // Parse buyIn movements (done once before rounds)
+      const buyInMovements: ParsedMovement[] = [];
+      if (Array.isArray(exercise.buyIn)) {
+        for (const mov of exercise.buyIn) {
+          const validated = validateMovement(mov);
+          if (validated) {
+            validated.perRound = false;
+            validated.name = `Buy-In: ${validated.name}`;
+            buyInMovements.push(validated);
+          }
+        }
+      }
+
+      // Parse main movements array (done per round)
+      const coreMovements: ParsedMovement[] = [];
       if (Array.isArray(exercise.movements)) {
         for (const mov of exercise.movements) {
           const validated = validateMovement(mov);
-          if (validated) movements.push(validated);
+          if (validated) coreMovements.push(validated);
         }
       }
+
+      // Parse cashOut movements (done once after rounds)
+      const cashOutMovements: ParsedMovement[] = [];
+      if (Array.isArray(exercise.cashOut)) {
+        for (const mov of exercise.cashOut) {
+          const validated = validateMovement(mov);
+          if (validated) {
+            validated.perRound = false;
+            validated.name = `Cash-Out: ${validated.name}`;
+            cashOutMovements.push(validated);
+          }
+        }
+      }
+
+      // Combine: buyIn (perRound=false) + core + cashOut (perRound=false)
+      const movements = [...buyInMovements, ...coreMovements, ...cashOutMovements];
 
       const name = String(exercise.name || 'Unknown Exercise');
       const prescription = String(exercise.prescription || '');
@@ -776,6 +537,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
     benchmarkName: typeof raw.benchmarkName === 'string' ? raw.benchmarkName : undefined,
     benchmarkModified: typeof raw.benchmarkModified === 'boolean' ? raw.benchmarkModified : undefined,
     partnerWorkout: typeof raw.partnerWorkout === 'boolean' ? raw.partnerWorkout : undefined,
+    teamSize: typeof raw.teamSize === 'number' && raw.teamSize >= 2 ? raw.teamSize : undefined,
     rawText,
   };
 }
@@ -823,8 +585,8 @@ export async function parseWorkoutImageMock(): Promise<ParsedWorkout> {
         suggestedSets: 5,
         rxWeights: { male: 60, female: 40, unit: 'kg' },
         movements: [
-          { name: "Run", distance: 300, unit: "m" },
-          { name: "Shoulder to Overhead", reps: 10, rxWeights: { male: 60, female: 40, unit: 'kg' } }
+          { name: "Run", distance: 300, unit: "m", inputType: "none" },
+          { name: "Shoulder to Overhead", reps: 10, inputType: "weight", rxWeights: { male: 60, female: 40, unit: 'kg' } }
         ]
       }
     ]

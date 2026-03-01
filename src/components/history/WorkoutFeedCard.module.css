@@ -264,7 +264,7 @@
   font-weight: 700;
   color: #000;
   background: linear-gradient(135deg, var(--neon-lime) 0%, var(--neon-cyan) 100%);
-  box-shadow: 0 0 8px rgba(57, 255, 20, 0.3), 0 0 16px rgba(0, 242, 255, 0.2);
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.3), 0 0 16px rgba(0, 255, 255, 0.2);
 }
 
 /* Footer */

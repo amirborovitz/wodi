@@ -8,6 +8,7 @@ interface CardioCaloriesProps {
   cardioCaloriesPerTurn: string;
   onCaloriesPerTurnChange: (value: string) => void;
   onFocus: (e: FocusEvent<HTMLInputElement>) => void;
+  teamTotal?: number;
 }
 
 interface CardioDistanceProps {
@@ -19,12 +20,49 @@ interface CardioDistanceProps {
   cardioDistanceUnit: 'm' | 'km' | 'mi';
   onDistanceUnitChange: (value: 'm' | 'km' | 'mi') => void;
   onFocus: (e: FocusEvent<HTMLInputElement>) => void;
+  teamTotal?: number;
 }
 
 type CardioInputsProps = CardioCaloriesProps | CardioDistanceProps;
 
 export function CardioInputs(props: CardioInputsProps) {
   if (props.mode === 'calories') {
+    // Team mode: single "Your Calories" input
+    if (props.teamTotal) {
+      const userCals = props.cardioCaloriesPerTurn ? parseInt(props.cardioCaloriesPerTurn) : null;
+      return (
+        <div className={styles.setsContainer}>
+          <div className={styles.setRow}>
+            <div className={styles.setInputs}>
+              <div className={styles.inputGroup}>
+                <label>Your Calories</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  value={props.cardioCaloriesPerTurn}
+                  onChange={(e) => {
+                    props.onCaloriesPerTurnChange(e.target.value);
+                    props.onTurnsChange('1');
+                  }}
+                  onFocus={props.onFocus}
+                  placeholder="e.g. 80"
+                  className={styles.setInput}
+                  min="0"
+                />
+              </div>
+            </div>
+          </div>
+          <div className={styles.totalDisplay}>
+            <span className={styles.totalLabel}>Team total: {props.teamTotal} cal</span>
+            {userCals !== null && (
+              <span className={styles.totalValue}>{userCals} cal</span>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const total = props.cardioTurns && props.cardioCaloriesPerTurn
       ? parseInt(props.cardioTurns) * parseInt(props.cardioCaloriesPerTurn)
       : null;
@@ -76,6 +114,53 @@ export function CardioInputs(props: CardioInputsProps) {
   }
 
   // Distance mode
+  // Team mode: single "Your Distance" input
+  if (props.teamTotal) {
+    const userDist = props.cardioDistancePerTurn ? parseInt(props.cardioDistancePerTurn) : null;
+    return (
+      <div className={styles.setsContainer}>
+        <div className={styles.setRow}>
+          <div className={styles.setInputs}>
+            <div className={styles.inputGroup}>
+              <label>Your Distance</label>
+              <div className={styles.distanceInputWrapper}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  enterKeyHint="done"
+                  value={props.cardioDistancePerTurn}
+                  onChange={(e) => {
+                    props.onDistancePerTurnChange(e.target.value);
+                    props.onTurnsChange('1');
+                  }}
+                  onFocus={props.onFocus}
+                  placeholder="e.g. 200"
+                  className={styles.setInput}
+                  min="0"
+                />
+                <select
+                  value={props.cardioDistanceUnit}
+                  onChange={(e) => props.onDistanceUnitChange(e.target.value as 'm' | 'km' | 'mi')}
+                  className={styles.unitSelect}
+                >
+                  <option value="m">m</option>
+                  <option value="km">km</option>
+                  <option value="mi">mi</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className={styles.totalDisplay}>
+          <span className={styles.totalLabel}>Team total: {props.teamTotal} {props.cardioDistanceUnit}</span>
+          {userDist !== null && (
+            <span className={styles.totalValue}>{userDist} {props.cardioDistanceUnit}</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const total = props.cardioTurns && props.cardioDistancePerTurn
     ? parseInt(props.cardioTurns) * parseInt(props.cardioDistancePerTurn)
     : null;

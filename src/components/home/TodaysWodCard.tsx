@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import styles from './TodaysWodCard.module.css';
 
+console.log('[TodaysWodCard] v2 loaded — compact layout, smaller buttons');
+
 interface TodaysWodCardProps {
   onScanBoard: () => void;
   onUploadImage?: () => void;

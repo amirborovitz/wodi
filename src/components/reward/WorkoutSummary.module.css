@@ -30,7 +30,7 @@
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-sessions);
-  background: rgba(0, 242, 255, 0.12);
+  background: rgba(0, 255, 255, 0.12);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   text-transform: uppercase;
