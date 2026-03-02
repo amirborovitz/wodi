@@ -213,6 +213,7 @@ export interface ParsedExercise {
   suggestedWeight?: number;
   rxWeights?: RxWeights;        // Rx weights (male/female)
   movements?: ParsedMovement[]; // Individual movements (for complex WODs)
+  loggingMode?: ExerciseLoggingMode;  // AI-classified logging UI mode
 }
 
 // Movement substitution tracking during logging

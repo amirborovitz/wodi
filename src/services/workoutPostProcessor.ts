@@ -3,7 +3,7 @@
  * Fixes known issues and normalizes data that AI often gets wrong
  */
 
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, RxWeights } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
 
 /**
@@ -239,8 +239,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     })),
   };
 
+  // Backfill loggingMode on exercises that the AI missed
+  const withLoggingModes = backfillLoggingModes(result);
+
   // Backfill inputType on any movements that the AI missed
-  return backfillInputTypes(result);
+  return backfillInputTypes(withLoggingModes);
 }
 
 
@@ -1297,6 +1300,43 @@ function inferInputType(mov: ParsedMovement): ParsedMovement['inputType'] {
   if (weightedPatterns.some(p => name.includes(p))) return 'weight';
 
   return 'none';
+}
+
+/**
+ * Backfill loggingMode on exercises where AI didn't return it.
+ * Infers from workout-level format/scoreType — runs once at parse time.
+ */
+function backfillLoggingModes(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => {
+      if (ex.loggingMode) return ex; // AI already set it
+
+      let inferred: ExerciseLoggingMode | undefined;
+
+      // Infer from exercise type first
+      if (ex.type === 'strength') {
+        inferred = 'strength';
+      } else if (ex.type === 'cardio') {
+        inferred = 'cardio';
+      }
+
+      // If not inferred from type, use workout-level format
+      if (!inferred) {
+        switch (workout.format) {
+          case 'for_time': inferred = 'for_time'; break;
+          case 'amrap': inferred = 'amrap'; break;
+          case 'amrap_intervals': inferred = 'amrap_intervals'; break;
+          case 'intervals': inferred = 'intervals'; break;
+          case 'emom': inferred = 'emom'; break;
+          case 'strength': inferred = 'strength'; break;
+          case 'tabata': inferred = 'intervals'; break;
+        }
+      }
+
+      return inferred ? { ...ex, loggingMode: inferred } : ex;
+    }),
+  };
 }
 
 function backfillInputTypes(workout: ParsedWorkout): ParsedWorkout {

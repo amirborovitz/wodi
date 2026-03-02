@@ -56,6 +56,8 @@ interface MovementEditorProps {
   // Display options
   showWeight?: boolean;
   readOnly?: boolean;
+  /** When true, reps input shows empty (user enters total), mov.reps becomes placeholder */
+  totalRepsMode?: boolean;
 }
 
 // Check if a movement requires weight input
@@ -211,6 +213,7 @@ export function InlineMovementEditor({
   onImplementCountChange,
   showWeight,
   readOnly = false,
+  totalRepsMode = false,
 }: MovementEditorProps) {
   const definedAlternatives = getExerciseAlternatives(movement.name);
   // Include parsed alternative (from OR option like "40 DU / 60 singles") if not already in list
@@ -244,7 +247,8 @@ export function InlineMovementEditor({
   // Display values (custom or original)
   const displayDistance = customDistance ?? movement.distance;
   const displayTime = customTime ?? movement.time;
-  const displayReps = customReps ?? movement.reps;
+  // In totalRepsMode, don't pre-fill with per-round reps — user enters their total
+  const displayReps = totalRepsMode ? customReps : (customReps ?? movement.reps);
   const displayCalories = customCalories ?? movement.calories;
   const displayUnit = movement.unit || 'm';
 
@@ -359,6 +363,7 @@ export function InlineMovementEditor({
                   enterKeyHint="next"
                   className={styles.valueInput}
                   value={primary.value ?? ''}
+                  placeholder={totalRepsMode && primary.type === 'reps' ? 'total' : ''}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 0;
                     if (primary.type === 'reps') onRepsChange?.(movement.name, val);
@@ -444,6 +449,8 @@ interface MovementListEditorProps {
   showWeight?: boolean;
   readOnly?: boolean;
   labels?: string[];
+  /** When true, reps inputs show empty — user enters total (for IGGU/team exercises) */
+  totalRepsMode?: boolean;
 }
 
 export function MovementListEditor({
@@ -466,6 +473,7 @@ export function MovementListEditor({
   showWeight,
   readOnly = false,
   labels,
+  totalRepsMode = false,
 }: MovementListEditorProps) {
   const keys = getMovementKeys(movements);
 
@@ -495,6 +503,9 @@ export function MovementListEditor({
 
   return (
     <div className={styles.movementList}>
+      {totalRepsMode && (
+        <div className={styles.teamHint}>Log your personal numbers</div>
+      )}
       {isBarbellComplex && (
         <div className={styles.barbellComplexRow}>
           <span className={styles.barbellLabel}>Barbell</span>
@@ -545,6 +556,7 @@ export function MovementListEditor({
               onImplementCountChange={onImplementCountChange ? (_name, count) => onImplementCountChange(key, count) : undefined}
               showWeight={isBarbellComplex ? false : showWeight}
               readOnly={readOnly}
+              totalRepsMode={totalRepsMode}
             />
           </div>
         );

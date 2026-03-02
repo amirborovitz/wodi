@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode } from '../types';
 import { postProcessParsedWorkout } from './workoutPostProcessor';
 
 const openai = new OpenAI({
@@ -29,6 +29,7 @@ Return ONLY valid JSON:
     {
       "name": "Exercise or Block Name",
       "type": "strength" | "cardio" | "skill" | "wod",
+      "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets",
       "prescription": "human-readable prescription",
       "suggestedSets": 5,
       "suggestedReps": 10,
@@ -59,6 +60,11 @@ Return ONLY valid JSON:
 - "@60kg" → rxWeights: { male: 60, female: 60, unit: "kg" }
 - "twin kb 16kg" or "2 kb 24kg" → rxWeights: 16 (per implement), implementCount: 2
 
+## DISTANCE PARSING
+- "~50m" or "approx 50m" → distance: 50 (use the numeric value as-is, ignore ~ / approx)
+- "50m" → distance: 50
+- Carries (farmer carry, suitcase carry, yoke, etc.) with prescribed distance: set distance field, inputType: "none"
+
 ## MOVEMENT INPUT CLASSIFICATION
 Every movement MUST include "inputType":
 - "weight": barbell/KB/DB movements needing weight logged per set (deadlift, squat, press, clean, snatch, thruster, swing, lunge, wall ball, goblet, row with weight, shoulder to overhead, clean and jerk, etc.)
@@ -72,6 +78,21 @@ Every DB or KB movement MUST include "implementCount": 1 or 2.
 - implementCount: 2 when "twin", "double", "2x", "pair" is explicit, OR the movement naturally uses two (DB Thrusters, DB Front Squats, Farmers Carry)
 - implementCount: 1 for single-arm movements (DB Snatch, Alt DB Clean, KB Swing, Goblet Squat, Turkish Get-up)
 - When ambiguous, default to 1
+
+## LOGGING MODE (per exercise)
+Every exercise MUST include "loggingMode" — this determines which logging UI the user sees:
+- "strength": barbell/DB/KB lifts with sets×reps (5x5 Back Squat, 3x8 DB Press)
+- "for_time": complete work ASAP, log total time (RFT, chipper, partner IGUG, team workouts with total cal/rep targets)
+- "amrap": as many rounds as possible in time limit
+- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00)
+- "intervals": repeated sets with individual times (5 sets for time, every 3:00 x 5) — NOT for partner/IGUG/team workouts
+- "emom": every minute on the minute
+- "cardio": machine work scored by calories (single machine, no other movements)
+- "cardio_distance": cardio scored by distance (single machine, no other movements)
+- "bodyweight": reps-only bodyweight work (no weight needed)
+- "sets": generic fallback
+
+CRITICAL: Partner/IGUG/team workouts where teams complete a target (e.g., "300 cal echo bike" or "100 rounds") are ALWAYS "for_time" — even if the word "interval" appears in the text. "intervals" mode means individually-timed sets with rest, NOT partner rotation.
 
 ## MOVEMENT ALIASES (use canonical names)
 Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
@@ -112,7 +133,7 @@ Output:
 {
   "type": "for_time", "format": "for_time", "scoreType": "time",
   "exercises": [
-    { "name": "8 Rounds For Time", "type": "wod", "prescription": "600m Run buy-in, 8 RFT: 8 Push Jerk 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run", "suggestedSets": 8,
+    { "name": "8 Rounds For Time", "type": "wod", "loggingMode": "for_time", "prescription": "600m Run buy-in, 8 RFT: 8 Push Jerk 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run", "suggestedSets": 8,
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m", "inputType": "none" }],
       "movements": [
         { "name": "Push Jerk", "reps": 8, "inputType": "weight", "rxWeights": { "male": 50, "female": 40, "unit": "kg" } },
@@ -129,7 +150,7 @@ Input: "AMRAP 12: 10 thrusters 43/30kg, 15 pull-ups"
 Output:
 {
   "type": "amrap", "format": "amrap", "scoreType": "rounds_reps", "timeCap": 720,
-  "exercises": [{ "name": "AMRAP 12", "type": "wod", "prescription": "10 Thrusters 43/30kg, 15 Pull-ups", "suggestedSets": 1,
+  "exercises": [{ "name": "AMRAP 12", "type": "wod", "loggingMode": "amrap", "prescription": "10 Thrusters 43/30kg, 15 Pull-ups", "suggestedSets": 1,
     "movements": [
       { "name": "Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 43, "female": 30, "unit": "kg" } },
       { "name": "Pull-up", "reps": 15, "inputType": "none" }
@@ -141,7 +162,7 @@ Input: "Back Squat 5x5 @75%"
 Output:
 {
   "type": "strength", "format": "strength", "scoreType": "load",
-  "exercises": [{ "name": "Back Squat", "type": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
+  "exercises": [{ "name": "Back Squat", "type": "strength", "loggingMode": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
 }
 
 ### 4. Intervals
@@ -149,7 +170,7 @@ Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
 Output:
 {
   "type": "metcon", "format": "intervals", "scoreType": "time_per_set", "sets": 5,
-  "exercises": [{ "name": "5 Sets For Time", "type": "wod", "prescription": "300m Run + 10 Shoulder to Overhead 40/60kg", "suggestedSets": 5,
+  "exercises": [{ "name": "5 Sets For Time", "type": "wod", "loggingMode": "intervals", "prescription": "300m Run + 10 Shoulder to Overhead 40/60kg", "suggestedSets": 5,
     "movements": [
       { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" },
       { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
@@ -162,10 +183,10 @@ Output:
 {
   "title": "Cycle 1 - Push", "type": "mixed", "format": "strength", "scoreType": "load",
   "exercises": [
-    { "name": "Strict Shoulder Press", "type": "strength", "prescription": "5x3", "suggestedSets": 5, "suggestedReps": 3 },
-    { "name": "Superset: Goblet Squat + V-ups", "type": "strength", "prescription": "3x12 each movement", "suggestedSets": 3, "suggestedReps": 12,
+    { "name": "Strict Shoulder Press", "type": "strength", "loggingMode": "strength", "prescription": "5x3", "suggestedSets": 5, "suggestedReps": 3 },
+    { "name": "Superset: Goblet Squat + V-ups", "type": "strength", "loggingMode": "sets", "prescription": "3x12 each movement", "suggestedSets": 3, "suggestedReps": 12,
       "movements": [{ "name": "Goblet Squat", "reps": 12, "inputType": "weight" }, { "name": "V-up", "reps": 12, "inputType": "none" }] },
-    { "name": "Metcon: Max Cal Ecobike", "type": "cardio", "prescription": "15 min max calories", "suggestedSets": 1, "timeCap": 900 }
+    { "name": "Metcon: Max Cal Ecobike", "type": "cardio", "loggingMode": "cardio", "prescription": "15 min max calories", "suggestedSets": 1, "timeCap": 900 }
   ]
 }
 
@@ -174,7 +195,7 @@ Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 
 Output:
 {
   "type": "for_time", "format": "for_time", "scoreType": "time", "partnerWorkout": true, "teamSize": 2, "sets": 6, "timeCap": 960,
-  "exercises": [{ "name": "Partner RFT (6 each)", "type": "wod", "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps", "suggestedSets": 6,
+  "exercises": [{ "name": "Partner RFT (6 each)", "type": "wod", "loggingMode": "for_time", "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps", "suggestedSets": 6,
     "movements": [
       { "name": "Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
       { "name": "Single Under", "reps": 60, "inputType": "none", "alternative": { "name": "Double Under", "reps": 40 } },
@@ -187,7 +208,7 @@ Input: "7 rounds of Cindy for time"
 Output:
 {
   "type": "for_time", "format": "for_time", "scoreType": "time", "containerRounds": 7, "benchmarkName": "Cindy", "benchmarkModified": false,
-  "exercises": [{ "name": "7 Rounds of Cindy", "type": "wod", "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats", "suggestedSets": 7,
+  "exercises": [{ "name": "7 Rounds of Cindy", "type": "wod", "loggingMode": "for_time", "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats", "suggestedSets": 7,
     "movements": [{ "name": "Pull-up", "reps": 5, "inputType": "none" }, { "name": "Push-up", "reps": 10, "inputType": "none" }, { "name": "Air Squat", "reps": 15, "inputType": "none" }] }]
 }
 
@@ -196,7 +217,7 @@ Input: "For time: 50 wall balls 9/6kg, 40 pull-ups, 30 box jumps, 20 thrusters 4
 Output:
 {
   "type": "for_time", "format": "for_time", "scoreType": "time",
-  "exercises": [{ "name": "Chipper For Time", "type": "wod", "prescription": "50 Wall Balls 9/6kg, 40 Pull-ups, 30 Box Jumps, 20 Thrusters 42.5/30kg, 10 Muscle-ups", "suggestedSets": 1,
+  "exercises": [{ "name": "Chipper For Time", "type": "wod", "loggingMode": "for_time", "prescription": "50 Wall Balls 9/6kg, 40 Pull-ups, 30 Box Jumps, 20 Thrusters 42.5/30kg, 10 Muscle-ups", "suggestedSets": 1,
     "movements": [
       { "name": "Wall Ball", "reps": 50, "inputType": "weight", "rxWeights": { "male": 9, "female": 6, "unit": "kg" } },
       { "name": "Pull-up", "reps": 40, "inputType": "none" },
@@ -284,6 +305,7 @@ Return ONLY valid JSON matching the same schema as the parsed input.
 Rules:
 - Only split into multiple exercises for truly separate blocks (Strength + Metcon, Skill + WOD).
 - "5x3" = suggestedSets: 5, suggestedReps: 3.
+- Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
 - Preserve original structure when unsure — only correct obvious errors.`;
 
 export async function refineParsedWorkout(
@@ -491,6 +513,12 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         }
       }
 
+      // Validate loggingMode
+      const validLoggingModes: ExerciseLoggingMode[] = ['strength', 'for_time', 'amrap', 'amrap_intervals', 'intervals', 'emom', 'cardio', 'cardio_distance', 'bodyweight', 'sets'];
+      const loggingMode = validLoggingModes.includes(exercise.loggingMode as ExerciseLoggingMode)
+        ? (exercise.loggingMode as ExerciseLoggingMode)
+        : undefined;
+
       exercises.push({
         name,
         type: validExerciseTypes.includes(exercise.type as ExerciseType)
@@ -503,6 +531,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         suggestedWeight: typeof exercise.suggestedWeight === 'number' ? exercise.suggestedWeight : undefined,
         rxWeights: validateRxWeights(exercise.rxWeights),
         movements: movements.length > 0 ? movements : undefined,
+        loggingMode,
       });
     }
   }

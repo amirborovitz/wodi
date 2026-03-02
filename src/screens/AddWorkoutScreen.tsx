@@ -67,6 +67,7 @@ interface ExerciseResult {
   movementAlternatives?: Record<string, string>; // Selected alternatives for movements
   movementDistances?: Record<string, number>; // Per-movement distance overrides
   movementReps?: Record<string, number>; // Per-movement rep overrides
+  movementCalories?: Record<string, number>; // Per-movement calorie overrides
   rounds?: number; // Number of rounds completed (for multi-movement WODs)
   // Cardio tracking (calories)
   cardioTurns?: number; // Number of turns/intervals on cardio machine
@@ -119,7 +120,12 @@ function buildWorkloadBreakdownFromResults(
     parsedWorkout?.rawText || results.map((result) => result.exercise.prescription).join(' ')
   );
 
+  // Detect which exercises are team/partner exercises by checking prescription text
+  const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
+
   results.forEach((result) => {
+    const isTeamExercise = partnerFactor < 1 && TEAM_KEYWORDS.test(result.exercise.prescription || '');
+    const exerciseFactor = isTeamExercise ? partnerFactor : 1;
     const movements = result.exercise.movements;
     const setWeights = result.sets
       .map(set => set.weight)
@@ -166,10 +172,21 @@ function buildWorkloadBreakdownFromResults(
         }
       }
 
-      const perRoundReps = movementLookup(result.movementReps || {}, mk, mov.name) ?? mov.reps ?? 0;
-      const perRoundDistance = movementLookup(result.movementDistances || {}, mk, mov.name) ?? mov.distance ?? 0;
-      const perRoundCalories = mov.calories || 0;
+      // User-entered values are already personal — don't apply partner factor.
+      // AI-prescribed values are team totals — apply partner factor.
+      const userReps = movementLookup(result.movementReps || {}, mk, mov.name);
+      const userDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
+      const userCalories = movementLookup(result.movementCalories || {}, mk, mov.name);
+
+      const perRoundReps = userReps ?? mov.reps ?? 0;
+      const perRoundDistance = userDistance ?? mov.distance ?? 0;
+      const perRoundCalories = userCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
+
+      // Partner factor only applies to AI-prescribed values, not user-entered ones
+      const repsFactor = userReps !== undefined ? 1 : exerciseFactor;
+      const distanceFactor = userDistance !== undefined ? 1 : exerciseFactor;
+      const caloriesFactor = userCalories !== undefined ? 1 : exerciseFactor;
 
       // For cycle tracker workouts, completedCycleReps provides the total reps per movement
       const hasCycleReps = result.completedCycleReps !== undefined && result.completedCycleReps > 0;
@@ -180,12 +197,13 @@ function buildWorkloadBreakdownFromResults(
 
       // perRound=false means movement is done once (buy-in/cash-out), not multiplied by rounds
       const effectiveRounds = mov.perRound === false ? 1 : movementRounds;
-      console.log(`[BuildWorkload] "${mov.name}" perRound=${mov.perRound} rounds=${movementRounds} effective=${effectiveRounds} distance=${perRoundDistance} cycleReps=${result.completedCycleReps}`);
+      console.log(`[BuildWorkload] "${mov.name}" perRound=${mov.perRound} rounds=${movementRounds} effective=${effectiveRounds} reps=${perRoundReps} distance=${perRoundDistance} calories=${perRoundCalories} userEntered=[reps:${userReps !== undefined} dist:${userDistance !== undefined} cal:${userCalories !== undefined}]`);
       // Use cycle tracker total if available (variable rep scheme workouts)
-      const movementReps = hasCycleReps ? result.completedCycleReps! : (perRoundReps * effectiveRounds);
-      const movementDistance = perRoundDistance * effectiveRounds;
-      const movementCalories = perRoundCalories * effectiveRounds;
-      const movementTime = perRoundTime * effectiveRounds;
+      // Apply per-exercise partner factor only to AI-prescribed values
+      const movementReps = Math.round((hasCycleReps ? result.completedCycleReps! : (perRoundReps * effectiveRounds)) * repsFactor);
+      const movementDistance = Math.round(perRoundDistance * effectiveRounds * distanceFactor);
+      const movementCalories = Math.round(perRoundCalories * effectiveRounds * caloriesFactor);
+      const movementTime = Math.round(perRoundTime * effectiveRounds * exerciseFactor);
 
       const movementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
       const wasSubstituted = movementName !== mov.name;
@@ -198,6 +216,7 @@ function buildWorkloadBreakdownFromResults(
         ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
         ?? mov.rxWeights?.male
         ?? mov.rxWeights?.female;
+      console.log(`[BuildWorkload] "${mov.name}" weight: movWeights=${movementLookup(result.movementWeights || {}, mk, mov.name)} rxMale=${mov.rxWeights?.male} rxFemale=${mov.rxWeights?.female} → rawWeight=${rawWeight} | movCals=${movementCalories} | result.movementCalories=`, result.movementCalories);
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
       const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
@@ -366,15 +385,9 @@ function buildWorkloadBreakdownFromResults(
     }
   });
 
-  const factor = partnerFactor || 1;
+  // Partner factor already applied per-exercise above (only to team exercises)
   const movements = Array.from(movementMap.values())
     .filter(m => (m.totalReps && m.totalReps > 0) || (m.totalDistance && m.totalDistance > 0) || (m.totalCalories && m.totalCalories > 0))
-    .map(m => ({
-      ...m,
-      totalReps: m.totalReps !== undefined ? Math.round((m.totalReps || 0) * factor) : undefined,
-      totalDistance: m.totalDistance !== undefined ? Math.round((m.totalDistance || 0) * factor) : undefined,
-      totalCalories: m.totalCalories !== undefined ? Math.round((m.totalCalories || 0) * factor) : undefined,
-    }))
     .sort((a, b) => (b.totalReps || 0) - (a.totalReps || 0));
 
   // Derive grandTotalVolume from the final movements so it always matches
@@ -390,11 +403,11 @@ function buildWorkloadBreakdownFromResults(
 
   return {
     movements,
-    grandTotalReps: Math.round(grandTotalReps * factor),
+    grandTotalReps: Math.round(grandTotalReps),
     grandTotalVolume: Math.round(derivedVolume),
-    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance * factor) : undefined,
-    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance * factor) : undefined,
-    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
+    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
+    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
+    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: parsedWorkout?.containerRounds,
     benchmarkName: parsedWorkout?.benchmarkName,
   };
@@ -826,6 +839,13 @@ function getExerciseLoggingMode(
   exercise: ParsedExercise,
   workoutContext?: { format: string; scoreType: string; exerciseCount: number },
 ): ExerciseLoggingMode {
+  // Trust AI-classified loggingMode when present (set by AI or post-processor backfill)
+  if (exercise.loggingMode) return exercise.loggingMode;
+
+  // ────────────────────────────────────────────────────────────────
+  // FALLBACK: Regex classification for old data without loggingMode
+  // ────────────────────────────────────────────────────────────────
+
   // ────────────────────────────────────────────────────────────────
   // ARCHITECTURE: Each exercise is classified primarily from its own
   // name, prescription, type, and movements.  For multi-exercise
@@ -919,7 +939,17 @@ function getExerciseLoggingMode(
   }
 
   // 5. Intervals — exercise explicitly mentions intervals
+  //    BUT NOT if this is a team/IGUG workout (those are for-time, not split-time intervals)
+  //    and NOT if it just mentions "interval" as context (e.g. "after each interval")
   if (/\binterval/i.test(name) || /\binterval/i.test(prescription)) {
+    const isTeamIGUG = /i\s*go\s*y(ou|o?u?)\s*go|igug|teams?\s+of|in\s+pairs?|partner/i.test(name)
+      || /i\s*go\s*y(ou|o?u?)\s*go|igug|teams?\s+of|in\s+pairs?|partner/i.test(prescription);
+    const hasForTime = /for\s+time/i.test(name) || /for\s+time/i.test(prescription);
+    const hasTimeCap = /\d+\s*min\s*t\.?c|time\s*cap/i.test(prescription);
+    if (isTeamIGUG || hasForTime || hasTimeCap) {
+      console.log('[getExerciseLoggingMode] -> for_time (interval + team/forTime/timeCap)');
+      return 'for_time';
+    }
     console.log('[getExerciseLoggingMode] -> intervals');
     return 'intervals';
   }
@@ -2189,7 +2219,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
         // Reset interval state for next exercise
         setCurrentIntervalSet(1);
-        setIntervalSplitTimes([]);
+        const nextMode = getExerciseLoggingMode(nextExercise, workoutContext);
+        if (nextMode === 'intervals') {
+          const nextIntervalSets = nextExercise.suggestedSets || parsedWorkout?.sets || 1;
+          setIntervalSplitTimes(Array(nextIntervalSets).fill(0));
+        } else {
+          setIntervalSplitTimes([]);
+        }
         setManuallyEditedIntervalSets(new Set());
         setWorkoutWeight('');
         setCompletionMinutes('');
@@ -2289,6 +2325,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCurrentIntervalSet(1);
         setIntervalRounds([]);
         setCurrentRounds('');
+        const nextMode2 = getExerciseLoggingMode(nextExercise, workoutContext);
+        if (nextMode2 === 'intervals') {
+          const nextIntervalSets2 = nextExercise.suggestedSets || parsedWorkout?.sets || 1;
+          setIntervalSplitTimes(Array(nextIntervalSets2).fill(0));
+        } else {
+          setIntervalSplitTimes([]);
+        }
         setWorkoutWeight('');
         setCardioTurns('');
         setCardioCaloriesPerTurn('');
@@ -2685,6 +2728,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       return acc;
     }, {});
 
+    const movCalories = currentExercise.movements?.reduce<Record<string, number>>((acc, mov, i) => {
+      const cals = movementLookup(customCalories, saveMovKeys[i], mov.name) ?? mov.calories;
+      if (cals && cals > 0) {
+        acc[saveMovKeys[i]] = cals;
+      }
+      return acc;
+    }, {});
+
     const effectiveImplementCounts = buildImplementCountsFromPerMovement(currentExercise, movementImplementCounts);
 
     // Cycle tracker: compute total reps per movement from completed cycles + partial
@@ -2710,6 +2761,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       movementWeights: effectiveMovementWeights,
       ...(movementAlternatives && Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
       ...(movementReps && Object.keys(movementReps).length > 0 ? { movementReps } : {}),
+      ...(movCalories && Object.keys(movCalories).length > 0 ? { movementCalories: movCalories } : {}),
       ...(movementDistances && Object.keys(movementDistances).length > 0 ? { movementDistances } : {}),
       rounds: hasRepScheme ? cycleTrackerData.rounds : rounds,
       ...(Object.keys(effectiveImplementCounts).length > 0 ? { implementCounts: { ...effectiveImplementCounts } } : {}),
@@ -2717,6 +2769,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       ...distanceData,
       ...cycleTrackerData,
     };
+
+    console.warn('🔍 [handleNextExercise] Saved result:', {
+      movementWeights: result.movementWeights,
+      movementCalories: result.movementCalories,
+      movementReps: result.movementReps,
+      movementDistances: result.movementDistances,
+      customCaloriesState: customCalories,
+      movCaloriesBuilt: movCalories,
+    });
 
     // Validation before proceeding: check if user forgot to enter key data
     // For AMRAP: check if user typed in the rounds input field (not auto-parsed from prescription)
@@ -2779,6 +2840,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setCurrentRounds('');
         setCompletedCycles(0);
         setPartialReps(undefined);
+
+        // Reset interval state for next exercise
+        setCurrentIntervalSet(1);
+        if (nextMode === 'intervals') {
+          const nextIntervalSets = nextExercise.suggestedSets || parsedWorkout?.sets || 1;
+          setIntervalSplitTimes(Array(nextIntervalSets).fill(0));
+        } else {
+          setIntervalSplitTimes([]);
+        }
+        setIntervalRounds([]);
+        setManuallyEditedIntervalSets(new Set());
 
         // Prefill cardio values divided by team size for team workouts
         if (teamSize > 1 && nextExercise.movements) {
@@ -3759,7 +3831,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           nav = {
             onBack: handleHeaderBack,
             onNext: handleRecordAmrapRounds,
-            nextLabel: isLastInterval ? 'Finish Workout' : 'Next AMRAP',
+            nextLabel: isLastInterval ? 'Save Workout' : 'Next AMRAP',
             nextDisabled: !currentRounds,
             nextVariant: isLastInterval ? 'danger' : 'primary',
             isFinish: isLastInterval,
@@ -3768,7 +3840,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           nav = {
             onBack: handleHeaderBack,
             onNext: handleFinishAllIntervals,
-            nextLabel: 'Finish Workout',
+            nextLabel: 'Save Workout',
             nextDisabled: !intervalSplitTimes.some(t => t > 0),
             nextVariant: 'danger',
             isFinish: true,
@@ -3932,26 +4004,32 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                     onFocus={handleSelectOnFocus}
                   />
                 ) : (
-                  currentExercise?.movements && (
-                    <MovementListEditor
-                      movements={currentExercise.movements}
-                      selectedAlternatives={selectedAlternatives}
-                      customDistances={customDistances}
-                      customTimes={customTimes}
-                      customWeights={movementWeights}
-                      customReps={customReps}
-                      customCalories={customCalories}
-                      movementImplementCounts={movementImplementCounts}
-                      movementImplementFixed={implementFixedMap}
-                      onAlternativeChange={handleSelectAlternative}
-                      onDistanceChange={handleCustomDistanceChange}
-                      onTimeChange={handleTimeChange}
-                      onWeightChange={handleMovementWeightChange}
-                      onRepsChange={handleRepsChange}
-                      onCaloriesChange={handleCaloriesChange}
-                      onImplementCountChange={handleImplementCountChange}
-                    />
-                  )
+                  currentExercise?.movements && (() => {
+                    const isTeamExercise = /i\s*go\s*y(ou|o?u?)\s*go|igug|teams?\s+of|in\s+pairs?|partner/i.test(
+                      (currentExercise.name || '') + ' ' + (currentExercise.prescription || '')
+                    );
+                    return (
+                      <MovementListEditor
+                        movements={currentExercise.movements}
+                        selectedAlternatives={selectedAlternatives}
+                        customDistances={customDistances}
+                        customTimes={customTimes}
+                        customWeights={movementWeights}
+                        customReps={customReps}
+                        customCalories={customCalories}
+                        movementImplementCounts={movementImplementCounts}
+                        movementImplementFixed={implementFixedMap}
+                        onAlternativeChange={handleSelectAlternative}
+                        onDistanceChange={handleCustomDistanceChange}
+                        onTimeChange={handleTimeChange}
+                        onWeightChange={handleMovementWeightChange}
+                        onRepsChange={handleRepsChange}
+                        onCaloriesChange={handleCaloriesChange}
+                        onImplementCountChange={handleImplementCountChange}
+                        totalRepsMode={isTeamExercise}
+                      />
+                    );
+                  })()
                 )}
                 <ForTimeInputs
                   completionMinutes={completionMinutes}
@@ -3990,6 +4068,28 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
                 setCustomDistances={setCustomDistances}
                 movementWeights={movementWeights}
                 onMovementWeightChange={handleMovementWeightChange}
+                onSetCountChange={(count: number) => {
+                  setCurrentSets(prev => {
+                    if (count === prev.length) return prev;
+                    if (count < prev.length) return prev.slice(0, count);
+                    const lastSet = prev[prev.length - 1];
+                    const newSets = [...prev];
+                    for (let i = prev.length; i < count; i++) {
+                      newSets.push({
+                        id: `set-${i}`,
+                        setNumber: i + 1,
+                        targetReps: lastSet?.targetReps,
+                        actualReps: lastSet?.actualReps,
+                        weight: lastSet?.weight,
+                        completed: false,
+                      });
+                    }
+                    return newSets;
+                  });
+                }}
+                onUnifiedFieldChange={(field: keyof ExerciseSet, value: number | undefined) => {
+                  setCurrentSets(prev => prev.map(s => ({ ...s, [field]: value })));
+                }}
               />
             )}
 

@@ -1,4 +1,4 @@
-import type { FocusEvent } from 'react';
+import { useState, type FocusEvent } from 'react';
 import type { ExerciseSet, ParsedMovement, ParsedExercise } from '../../../types';
 import { getMovementKeys } from '../../workouts/InlineMovementEditor';
 import styles from './inputs.module.css';
@@ -28,6 +28,9 @@ interface StrengthInputsProps {
   teamSize?: number;
   currentRounds?: string;
   onRoundsChange?: (value: string) => void;
+  /** Progression chips callbacks */
+  onSetCountChange?: (count: number) => void;
+  onUnifiedFieldChange?: (field: keyof ExerciseSet, value: number | undefined) => void;
 }
 
 /** Composite key for per-movement-per-set weights in supersets */
@@ -53,7 +56,11 @@ export function StrengthInputs({
   teamSize: _teamSize,
   currentRounds: _currentRounds,
   onRoundsChange: _onRoundsChange,
+  onSetCountChange,
+  onUnifiedFieldChange,
 }: StrengthInputsProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const movements = currentExercise?.movements;
   const isSuperset = movements && movements.length > 1;
 
@@ -277,75 +284,170 @@ export function StrengthInputs({
     );
   }
 
+  // ── Single exercise: Progression Chips layout ──
+
+  const hasMaxSets = currentSets.some(s => s.isMax === true);
+  const weights = currentSets.map(s => s.weight);
+  const filledWeights = weights.filter(w => w !== undefined && w !== null && w > 0);
+  const allWeightsSame = filledWeights.length > 0 && filledWeights.every(w => w === filledWeights[0]);
+  const hasVaryingWeights = filledWeights.length > 1 && !allWeightsSame;
+
+  // Auto-expand if AI pre-filled varying weights
+  const showExpanded = isExpanded || hasVaryingWeights || hasMaxSets;
+
+  // Unified reps: first set's reps (used when all reps are the same)
+  const unifiedReps = currentSets[0]?.actualReps ?? currentSets[0]?.targetReps ?? '';
+
   return (
     <>
-      <div className={styles.strengthSetsContainer}>
-        {currentSets.map((set, setIndex) => {
-          const isMaxReps = set.isMax === true;
-          const displayReps = set.actualReps ?? set.targetReps ?? '';
+      {/* Header: [sets] sets x [reps] reps */}
+      <div className={styles.progressionHeader}>
+        <input
+          type="number"
+          inputMode="numeric"
+          value={currentSets.length}
+          onChange={(e) => {
+            const count = e.target.value ? parseInt(e.target.value) : 1;
+            if (count > 0 && count <= 20 && onSetCountChange) {
+              onSetCountChange(count);
+            }
+          }}
+          onFocus={onFocus}
+          className={styles.progressionCountInput}
+          min={1}
+          max={20}
+        />
+        <span className={styles.progressionCountLabel}>sets</span>
+        <span className={styles.strengthSetSeparator}>&times;</span>
+        {!hasMaxSets ? (
+          <>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={unifiedReps}
+              onChange={(e) => {
+                const val = e.target.value ? parseInt(e.target.value) : undefined;
+                if (onUnifiedFieldChange) {
+                  onUnifiedFieldChange('actualReps', val);
+                }
+              }}
+              onFocus={onFocus}
+              placeholder="0"
+              className={styles.progressionCountInput}
+            />
+            <span className={styles.progressionCountLabel}>reps</span>
+          </>
+        ) : (
+          <span className={styles.progressionCountLabel}>max reps</span>
+        )}
+      </div>
 
-          return (
-            <div key={set.id} className={styles.strengthSetCard}>
-              <span className={styles.strengthSetLabel}>
-                Set {set.setNumber}{isMaxReps ? ' (Max)' : ''}
-              </span>
-
-              <div className={styles.strengthSetInputs}>
-                {showWeight && (
-                  <>
-                    <div className={styles.strengthSetField}>
+      {/* Weight chips row */}
+      {showWeight && (
+        <div className={styles.progressionChipsRow}>
+          {(!showExpanded && (allWeightsSame || filledWeights.length <= 1)) ? (
+            <>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={currentSets[0]?.weight ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                  // Set first chip, autofill will handle the rest on blur
+                  updateSet(0, 'weight', val);
+                }}
+                onFocus={onFocus}
+                onBlur={() => {
+                  applySetAutofillFromFirst('weight');
+                }}
+                onClick={() => setIsExpanded(false)}
+                placeholder="0"
+                className={styles.progressionChipCollapsed}
+              />
+              <span className={styles.progressionChipUnit}>kg</span>
+              {currentSets.length > 1 && (
+                <button
+                  className={styles.progressionArrow}
+                  onClick={() => setIsExpanded(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' }}
+                >
+                  ...
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {currentSets.map((set, idx) => (
+                <span key={set.id} style={{ display: 'contents' }}>
+                  {idx > 0 && <span className={styles.progressionArrow}>&rarr;</span>}
+                  <span className={styles.progressionRepBadge}>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={set.weight ?? ''}
+                      onChange={(e) => updateSet(
+                        idx,
+                        'weight',
+                        e.target.value ? parseFloat(e.target.value) : undefined
+                      )}
+                      onFocus={onFocus}
+                      onBlur={() => {
+                        if (idx === 0) {
+                          applySetAutofillFromFirst('weight');
+                        }
+                      }}
+                      placeholder="0"
+                      className={styles.progressionChip}
+                    />
+                    {hasMaxSets && (
                       <input
                         type="number"
-                        inputMode="decimal"
-                        enterKeyHint="next"
-                        value={set.weight ?? ''}
+                        inputMode="numeric"
+                        value={set.actualReps ?? set.targetReps ?? ''}
                         onChange={(e) => updateSet(
-                          setIndex,
-                          'weight',
-                          e.target.value ? parseFloat(e.target.value) : undefined
+                          idx,
+                          'actualReps',
+                          e.target.value ? parseInt(e.target.value) : undefined
                         )}
                         onFocus={onFocus}
-                        onBlur={() => {
-                          if (setIndex === 0) {
-                            applySetAutofillFromFirst('weight');
-                          }
-                        }}
-                        placeholder="0"
-                        className={styles.strengthSetInput}
+                        placeholder="reps"
+                        className={styles.progressionRepBadgeInput}
                       />
-                      <span className={styles.strengthSetUnit}>kg</span>
-                    </div>
-                    <span className={styles.strengthSetSeparator}>&times;</span>
-                  </>
-                )}
-
-                <div className={styles.strengthSetField}>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    enterKeyHint="next"
-                    value={displayReps}
-                    onChange={(e) => updateSet(
-                      setIndex,
-                      'actualReps',
-                      e.target.value ? parseInt(e.target.value) : undefined
                     )}
-                    onFocus={onFocus}
-                    onBlur={() => {
-                      if (setIndex === 0 && !isMaxReps) {
-                        applySetAutofillFromFirst('actualReps');
-                      }
-                    }}
-                    placeholder="0"
-                    className={styles.strengthSetInput}
-                  />
-                  <span className={styles.strengthSetUnit}>reps</span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                  </span>
+                </span>
+              ))}
+              <span className={styles.progressionChipUnit}>kg</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* If no weight shown but has max sets, show per-set rep inputs */}
+      {!showWeight && hasMaxSets && (
+        <div className={styles.progressionChipsRow}>
+          {currentSets.map((set, idx) => (
+            <span key={set.id} style={{ display: 'contents' }}>
+              {idx > 0 && <span className={styles.progressionArrow}>&rarr;</span>}
+              <input
+                type="number"
+                inputMode="numeric"
+                value={set.actualReps ?? set.targetReps ?? ''}
+                onChange={(e) => updateSet(
+                  idx,
+                  'actualReps',
+                  e.target.value ? parseInt(e.target.value) : undefined
+                )}
+                onFocus={onFocus}
+                placeholder="0"
+                className={styles.progressionChip}
+                style={{ borderBottomColor: 'var(--color-sessions)' }}
+              />
+            </span>
+          ))}
+          <span className={styles.progressionChipUnit}>reps</span>
+        </div>
+      )}
 
       <button className={styles.addSetButtonCentered} onClick={onAddSet}>
         + Add Set
