@@ -1,0 +1,120 @@
+/* ═══════════════════════════════════════════
+   ChapterCard — per-exercise battle card
+   ═══════════════════════════════════════════ */
+
+.card {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background var(--duration-normal) var(--ease-out);
+}
+
+.card:active {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Left accent bar — Trinity color */
+.accentBar {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--accent, var(--neon-cyan));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent, var(--neon-cyan)) 40%, transparent);
+}
+
+.content {
+  flex: 1;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.name {
+  font-size: var(--text-base);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+}
+
+.prescription {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Hero metric ── */
+.heroRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.heroValue {
+  font-size: var(--text-3xl);
+  font-weight: var(--font-black);
+  color: var(--color-text);
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tight);
+}
+
+.heroUnit {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--accent, var(--neon-cyan));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.heroLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ── Movement chips ── */
+.movements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-1);
+}
+
+.movementChip {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.movementReps {
+  font-weight: var(--font-bold);
+  color: var(--color-text-tertiary);
+  margin-right: 3px;
+}
+
+/* ── Badges row ── */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-1);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

@@ -1,0 +1,88 @@
+/* ═══════════════════════════════════════════
+   ScoreMovementInputs — compact inline fields
+   for weight/distance in scored exercises
+   ═══════════════════════════════════════════ */
+
+/* Single movement: centered weight field */
+.singleRow {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-2) 0;
+}
+
+/* Multiple movements: stacked rows */
+.multiRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.movField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.movName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Field row: input + unit */
+.fieldRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.input {
+  width: 80px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--field-color, var(--color-volume));
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  font-family: var(--font-family);
+  text-align: center;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+  -moz-appearance: textfield;
+}
+
+.input::-webkit-inner-spin-button,
+.input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.input:focus {
+  border-color: #CCFF00;
+  box-shadow: 0 0 12px rgba(204, 255, 0, 0.25);
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.15);
+  font-weight: var(--font-bold);
+}
+
+.unit {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-medium);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}

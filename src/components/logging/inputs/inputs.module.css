@@ -1,5 +1,217 @@
 /* ========================================
-   AMRAP - Rounds input
+   CHRONICLE CARD SYSTEM — shared foundation
+   ======================================== */
+.chronicleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.chronicleCard {
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  transition: all 180ms var(--ease-out);
+}
+
+.chronicleCardActive {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.04);
+}
+
+/* Left-border identity accent — applied to cards that benefit from it */
+.chronicleCardAccent {
+  border-left: 3px solid var(--chronicle-accent, var(--color-sessions));
+  padding-left: calc(var(--space-4) - 2px);
+}
+
+.chronicleCardConfirmed {
+  background: rgba(255, 255, 255, 0.015);
+  border: none;
+  border-left: 3px solid var(--chronicle-accent, var(--color-volume));
+  padding-left: calc(var(--space-4) - 2px);
+  cursor: pointer;
+}
+
+.chronicleCardConfirmed * {
+  opacity: 0.7;
+}
+
+.chronicleCardPending {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0.3;
+  cursor: pointer;
+}
+
+.chronicleConfirmBtn {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.chronicleConfirmBtn:active {
+  background: rgba(0, 242, 255, 0.15);
+  color: var(--color-sessions);
+  transform: scale(0.95);
+}
+
+.chronicleSummaryLine {
+  font-family: var(--font-family);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chronicleSetLabel {
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ========================================
+   AMRAP - Odometer stepper
+   ======================================== */
+.odometerContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-5) 0;
+}
+
+.odometerValue {
+  font-size: 64px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-shadow: 0 0 12px rgba(255, 0, 229, 0.3);
+  min-width: 80px;
+  text-align: center;
+  overflow: hidden;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.odometerStepper {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 100ms ease;
+  flex-shrink: 0;
+}
+
+.odometerStepper:active {
+  transform: scale(0.95);
+}
+
+.odometerStepperIcon {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1;
+  user-select: none;
+}
+
+.odometerDirectInput {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: none;
+  font-size: 64px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-align: center;
+  text-shadow: 0 0 12px rgba(255, 0, 229, 0.3);
+}
+
+.odometerDirectInput:focus {
+  outline: none;
+}
+
+.odometerDirectInput::placeholder {
+  color: rgba(255, 0, 229, 0.25);
+}
+
+/* ========================================
+   FOR TIME - Hero card
+   ======================================== */
+.forTimeHero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: var(--space-2) 0;
+}
+
+/* ========================================
+   CARDIO - Hero number
+   ======================================== */
+.cardioHero {
+  text-align: center;
+  font-size: 48px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-shadow: 0 0 12px rgba(255, 0, 229, 0.3);
+  line-height: 1.1;
+  padding: var(--space-3) 0;
+}
+
+.cardioHeroUnit {
+  font-size: 14px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-left: var(--space-2);
+}
+
+.cardioHeroSecondary {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin-top: var(--space-1);
+}
+
+.cardioDetailRow {
+  display: flex;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+  justify-content: center;
+}
+
+/* ========================================
+   AMRAP - Rounds input (legacy, kept for hints/splits)
    ======================================== */
 .roundsInputContainer {
   display: flex;
@@ -17,7 +229,7 @@
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-2xl);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -48,6 +260,112 @@
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
   text-align: center;
+}
+
+/* ========================================
+   AMRAP - Inline per-movement weight rows
+   Rendered inside the odometer card, below
+   the stepper. Only for weighted movements.
+   ======================================== */
+.amrapWeightRows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.amrapWeightRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.amrapWeightRow:last-child {
+  border-bottom: none;
+  padding-bottom: var(--space-2);
+}
+
+.amrapWeightName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right side: rx hint + editable input */
+.amrapWeightInputGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Prescribed Rx value shown as a dim reference pill */
+.amrapWeightRx {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 214, 0, 0.35);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* Input + unit glued together */
+.amrapWeightPill {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.amrapWeightInput {
+  width: 52px;
+  padding: var(--space-1) 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(255, 214, 0, 0.4);
+  border-radius: 0;
+  font-size: var(--text-base);
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-volume);
+  text-align: center;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+  transition: border-color 150ms ease, text-shadow 150ms ease;
+}
+
+.amrapWeightInput:focus {
+  outline: none;
+  border-bottom-color: var(--color-volume);
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.35);
+}
+
+.amrapWeightInput::placeholder {
+  color: rgba(255, 214, 0, 0.2);
+  font-weight: var(--font-bold);
+}
+
+.amrapWeightUnit {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Prevent iOS Safari input zoom */
+@media (pointer: coarse) {
+  .amrapWeightInput {
+    font-size: var(--text-base);
+  }
 }
 
 /* Previous AMRAPs / splits display */
@@ -88,7 +406,7 @@
 }
 
 .splitItem span:last-child {
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-semibold);
   color: var(--color-sessions);
 }
@@ -111,12 +429,12 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) 0;
+  padding: var(--space-4) 0 var(--space-2);
   background: transparent;
   border: none;
   border-radius: 0;
   box-shadow: none;
-  margin-top: var(--space-4);
+  margin-top: 0;
 }
 
 .timePillField {
@@ -132,7 +450,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   font-size: var(--text-2xl);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--neon-cyan);
   text-align: center;
@@ -170,7 +488,7 @@
 .intervalSetsContainer {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
 }
 
 .intervalSetsList {
@@ -214,7 +532,7 @@
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-md);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -236,6 +554,30 @@
   font-size: var(--text-md);
   font-weight: var(--font-bold);
   color: var(--color-text-secondary);
+}
+
+/* Filled row — cyan text */
+.intervalSetRowFilled .intervalSetTimeInput {
+  color: var(--neon-cyan);
+}
+
+.intervalSetRowFilled .intervalSetTimeSeparator {
+  color: var(--neon-cyan);
+  opacity: 0.6;
+}
+
+/* Live stats bar */
+.intervalStatsBar {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2) 0;
+}
+
+/* Sparkline */
+.sparkline {
+  width: 100%;
+  height: 40px;
+  margin-top: var(--space-2);
 }
 
 /* ========================================
@@ -293,7 +635,7 @@
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-xl);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -335,29 +677,30 @@
   justify-content: center;
   gap: var(--space-2);
   width: 100%;
-  margin: var(--space-2) 0 0;
+  margin: var(--space-3) 0 0;
   padding: var(--space-3);
-  background: transparent;
-  border: 2px dashed var(--color-border);
-  border-radius: var(--radius-lg);
-  color: var(--color-text-secondary);
+  background: rgba(0, 255, 255, 0.04);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: var(--radius-full);
+  color: var(--color-sessions);
   font-size: var(--text-sm);
-  font-weight: var(--font-medium);
+  font-weight: var(--font-semibold);
   font-family: var(--font-family);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 44px;
 }
 
-.addSetButtonCentered:hover {
-  border-color: var(--color-sessions);
-  color: var(--color-sessions);
+.addSetButtonCentered:active {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.4);
 }
 
 /* Superset UI */
 .supersetMovements {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--space-2);
   width: 100%;
   padding: var(--space-2) 0;
 }
@@ -419,7 +762,7 @@
   border-radius: 0;
   color: var(--color-text);
   font-size: var(--text-base);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   text-align: center;
   transition: border-color var(--duration-fast) ease;
@@ -474,7 +817,7 @@
 
 .strengthSetRepsFixed {
   font-size: var(--text-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-semibold);
   color: var(--color-text-secondary);
   white-space: nowrap;
@@ -493,23 +836,18 @@
 
 .emomPhaseBlock {
   position: relative;
-  padding: var(--space-3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.emomPhaseBlock:last-child {
-  border-bottom: none;
+  padding: var(--space-3) var(--space-2);
 }
 
 .emomPhaseBlock + .emomPhaseBlock {
-  padding-top: var(--space-3);
+  padding-top: var(--space-4);
 }
 
 .emomPhaseHeader {
   padding: 0 0 var(--space-2);
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -545,7 +883,7 @@
 
 .emomRoundNum {
   font-size: 11px;
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text-tertiary);
   width: 16px;
@@ -561,7 +899,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   font-size: var(--text-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -614,32 +952,34 @@
 }
 
 .inputGroup {
-  flex: 1;
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
   background: transparent;
   border-radius: 0;
   padding: 0;
+  min-width: 72px;
 }
 
 .inputGroup label {
-  font-size: var(--text-xs);
-  color: rgba(255, 255, 255, 0.35);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
-  order: 1;
 }
 
 .setInput {
-  width: 100%;
+  width: 80px;
   padding: var(--space-1) 0;
   background: transparent;
   border: none;
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
-  font-size: var(--text-md);
-  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -676,7 +1016,7 @@
 .totalValue {
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   color: var(--color-sessions);
 }
 
@@ -684,10 +1024,11 @@
 .distanceInputWrapper {
   display: flex;
   gap: var(--space-1);
+  align-items: baseline;
 }
 
 .distanceInputWrapper .setInput {
-  flex: 1;
+  width: 64px;
 }
 
 .unitSelect {
@@ -774,7 +1115,7 @@
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-lg);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -818,7 +1159,7 @@
   border-bottom: 2px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-xl);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text);
   text-align: center;
@@ -868,7 +1209,7 @@
   border-bottom: 2px solid var(--color-volume);
   border-radius: 0;
   font-size: var(--text-lg);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-volume);
   text-align: center;
@@ -927,7 +1268,7 @@
   border-bottom: 1px solid var(--color-sessions);
   border-radius: 0;
   font-size: var(--text-xs);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-text-secondary);
   text-align: center;
@@ -936,6 +1277,45 @@
 .progressionRepBadgeInput:focus {
   outline: none;
   color: var(--neon-cyan);
+}
+
+/* ========================================
+   EMOM - Chronicle phase cards
+   ======================================== */
+.emomPhaseChronicle {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid var(--color-sessions);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  padding-left: calc(var(--space-3) - 2px);
+}
+
+.emomPhaseHeaderAccent {
+  color: var(--color-sessions);
+  font-weight: var(--font-bold);
+}
+
+.emomRoundCellFilled {
+  background: rgba(0, 242, 255, 0.06);
+}
+
+.emomRoundCellFilled .emomRoundInput {
+  color: var(--color-sessions);
+}
+
+/* ========================================
+   INTERVALS - Chronicle card states
+   ======================================== */
+.intervalSetRowActive {
+  background: var(--glass-bg);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.06);
+}
+
+.intervalSetRowConfirmed {
+  border-left: 3px solid var(--color-sessions);
+  padding-left: calc(var(--space-3) - 3px);
 }
 
 /* Prevent iOS Safari input zoom */
@@ -947,15 +1327,16 @@
   .emomRoundInput,
   .supersetInput,
   .progressionChip,
-  .progressionCountInput {
+  .progressionCountInput,
+  .odometerDirectInput {
     font-size: var(--text-base);
   }
 }
 
 @media (hover: hover) {
   .addSetButtonCentered:hover {
-    border-color: var(--color-sessions);
-    color: var(--color-sessions);
+    background: rgba(0, 255, 255, 0.08);
+    border-color: rgba(0, 255, 255, 0.35);
   }
 
   .movementWeightRow:hover {
@@ -976,5 +1357,199 @@
 
   .emomRoundUnit {
     display: none;
+  }
+}
+
+/* ========================================
+   PROGRESSIVE WEIGHT ROW
+   Shared barbell weight — flat or start→peak
+   ======================================== */
+
+/* Outer card that replaces complexWeightRow */
+.complexWeightCard {
+  border-radius: var(--radius-md);
+  background: rgba(255, 214, 0, 0.06);
+  border: 1px solid rgba(255, 214, 0, 0.2);
+  overflow: hidden;
+  transition: border-color 200ms var(--ease-out);
+}
+
+.complexWeightCard:focus-within {
+  border-color: rgba(255, 214, 0, 0.45);
+}
+
+/* Top section: label row + mode toggle trigger */
+.complexWeightHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.complexLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-volume);
+  letter-spacing: 0.01em;
+}
+
+/* The small pill that toggles flat ↔ progressive */
+.complexModeToggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  min-height: 28px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 214, 0, 0.25);
+  background: transparent;
+  color: rgba(255, 214, 0, 0.55);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  font-family: var(--font-family);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.complexModeToggle:active {
+  background: rgba(255, 214, 0, 0.12);
+  color: var(--color-volume);
+  border-color: rgba(255, 214, 0, 0.5);
+}
+
+.complexModeToggleActive {
+  background: rgba(255, 214, 0, 0.1);
+  color: var(--color-volume);
+  border-color: rgba(255, 214, 0, 0.4);
+}
+
+.complexModeToggleIcon {
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+/* ── FLAT MODE: single centered input ── */
+.complexFlatBody {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+
+/* ── PROGRESSIVE MODE: two inputs with arrow ── */
+.complexProgressiveBody {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+
+.complexProgressiveField {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.complexProgressiveFieldLabel {
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 214, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.complexProgressiveArrow {
+  font-size: var(--text-base);
+  color: rgba(255, 214, 0, 0.35);
+  flex-shrink: 0;
+  user-select: none;
+  /* nudge to align with input baseline */
+  padding-top: 18px;
+}
+
+/* The weight input used in both modes — yellow accent */
+.complexWeightInput {
+  width: 64px;
+  height: 44px;
+  padding: 0 var(--space-1);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(255, 214, 0, 0.4);
+  border-radius: 0;
+  font-size: var(--text-xl);
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-volume);
+  text-align: center;
+  transition: border-color 150ms ease, text-shadow 150ms ease;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.complexWeightInput:focus {
+  outline: none;
+  border-bottom-color: var(--color-volume);
+  text-shadow: 0 0 10px rgba(255, 214, 0, 0.35);
+}
+
+.complexWeightInput::placeholder {
+  color: rgba(255, 214, 0, 0.22);
+  font-weight: var(--font-bold);
+}
+
+/* Unit label beside or below the input */
+.complexWeightUnit {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
+
+/* ── Summary chip below the inputs ── */
+.complexSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+
+.complexSummaryChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 214, 0, 0.08);
+  border: 1px solid rgba(255, 214, 0, 0.15);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 214, 0, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.complexSummaryDot {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 214, 0, 0.4);
+  flex-shrink: 0;
+}
+
+/* iOS zoom prevention for the new inputs */
+@media (pointer: coarse) {
+  .complexWeightInput {
+    font-size: var(--text-base);
   }
 }

@@ -65,6 +65,12 @@ export interface RxWeights {
   unit: 'kg' | 'lb';
 }
 
+// Rx calorie options for cardio machines (male/female)
+export interface RxCalories {
+  male?: number;
+  female?: number;
+}
+
 export interface Workout {
   id: string;
   userId: string;
@@ -189,6 +195,7 @@ export interface ParsedMovement {
   distance?: number;            // Distance in meters
   time?: number;                // Time in seconds
   calories?: number;            // Calorie target
+  rxCalories?: RxCalories;      // Rx calories for cardio machines (male/female)
   rxWeights?: RxWeights;        // Rx weights (male/female)
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
@@ -214,6 +221,9 @@ export interface ParsedExercise {
   rxWeights?: RxWeights;        // Rx weights (male/female)
   movements?: ParsedMovement[]; // Individual movements (for complex WODs)
   loggingMode?: ExerciseLoggingMode;  // AI-classified logging UI mode
+  loggingHints?: {
+    sharedWeightMovements?: string[];  // movements sharing one barbell/implement
+  };
 }
 
 // Movement substitution tracking during logging

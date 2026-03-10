@@ -1,0 +1,114 @@
+/* ═══════════════════════════════════════════
+   ExerciseRow — single exercise in the story
+   ═══════════════════════════════════════════ */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.04);
+  transition: background var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 56px;
+}
+
+.row:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Left: movement info ── */
+.movementInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.movementName {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+  /* allow 2-line wrap, never truncate */
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.prescription {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family);
+  letter-spacing: 0.02em;
+}
+
+/* ── Right: result pill area ── */
+.resultArea {
+  flex-shrink: 0;
+}
+
+/* ── Row state accents ── */
+/* Left border is block identity — always visible. */
+
+.filled,
+.empty,
+.partial,
+.skipped {
+  border-left: 3px solid var(--row-color, var(--neon-cyan));
+  padding-left: calc(var(--space-4) - 3px);
+}
+
+.filled .movementName {
+  opacity: 0.75;
+}
+
+.partial .movementName {
+  opacity: 0.85;
+}
+
+.skipped {
+  border-left-style: dashed;
+  opacity: 0.5;
+}
+
+/* ── Chevron ── */
+.chevron {
+  flex-shrink: 0;
+  font-size: var(--text-lg);
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
+  line-height: 1;
+}
+
+/* ── Section divider ── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.sectionLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sectionLine {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    transition: none;
+  }
+}

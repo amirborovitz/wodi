@@ -47,15 +47,34 @@ export function isExcludedExercise(ex: Exercise): boolean {
 // ---------------------------------------------------------------------------
 // Exercise type detection (reused across cards)
 // ---------------------------------------------------------------------------
-export type ExerciseDisplayType = 'strength' | 'for_time' | 'amrap' | 'cardio' | 'bodyweight';
+export type ExerciseDisplayType =
+  | 'strength'
+  | 'for_time'
+  | 'amrap'
+  | 'emom'
+  | 'intervals'
+  | 'cardio'
+  | 'bodyweight'
+  | 'skill';
 
 export function detectExerciseDisplayType(exercise: Exercise): ExerciseDisplayType {
+  const rx = (exercise.prescription || '').toLowerCase();
+  const nm = (exercise.name || '').toLowerCase();
+
   if (exercise.type === 'wod') {
-    const rx = (exercise.prescription || '').toLowerCase();
-    if (rx.includes('amrap')) return 'amrap';
+    if (rx.includes('emom') || rx.includes('every minute') || nm.includes('emom')) return 'emom';
+    if (rx.includes('amrap') || nm.includes('amrap')) return 'amrap';
+    if (
+      rx.includes('interval') ||
+      rx.includes('sets for time') ||
+      rx.includes('rounds for time') ||
+      /\d+\s*x\s*\d+/.test(rx)
+    ) return 'intervals';
     return 'for_time';
   }
+
   if (exercise.type === 'cardio') return 'cardio';
+  if (exercise.type === 'skill') return 'skill';
 
   const sets = exercise.sets || [];
   const hasWeight = sets.some(s => s.weight != null && s.weight > 0);
@@ -63,9 +82,14 @@ export function detectExerciseDisplayType(exercise: Exercise): ExerciseDisplayTy
   const hasDist   = sets.some(s => s.distance != null && s.distance > 0);
   const hasTime   = sets.some(s => s.time != null && s.time > 0);
 
-  const rx = (exercise.prescription || '').toLowerCase();
-  if (rx.includes('amrap')) return 'amrap';
+  if (rx.includes('emom') || rx.includes('every minute') || nm.includes('emom')) return 'emom';
+  if (rx.includes('amrap') || nm.includes('amrap')) return 'amrap';
   if (rx.includes('for time') || rx.includes('for_time')) return 'for_time';
+  if (
+    rx.includes('interval') ||
+    rx.includes('sets for time') ||
+    /\d+\s*x\s*\d+/.test(rx)
+  ) return 'intervals';
 
   if (hasWeight) return 'strength';
   if (hasCals || hasDist) return 'cardio';

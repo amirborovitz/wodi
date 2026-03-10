@@ -1,0 +1,163 @@
+/* ═══════════════════════════════════════════
+   StepperInput — Numeric field + Control Block
+   Right-side tall +/− for one-handed thumb use.
+   Each button ≥ 44×44 for shaky-hand accessibility.
+   ═══════════════════════════════════════════ */
+
+/* ── Container ── */
+.stepper {
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out);
+  /* Height driven by control block: 2 × 44px = 88px */
+  height: 88px;
+}
+
+.stepper:focus-within {
+  border-color: var(--stepper-color, var(--neon-cyan));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 15%, transparent);
+}
+
+/* ── Size: sm — still 2 × 44 = 88px tall, narrower buttons ── */
+.stepperSm {
+  height: 88px;
+}
+
+.stepperSm .inputField {
+  font-size: 20px;
+  min-width: 40px;
+}
+
+.stepperSm .unit {
+  font-size: 11px;
+}
+
+.stepperSm .btnColumn {
+  width: 44px;
+}
+
+.stepperSm .btn {
+  font-size: 18px;
+}
+
+/* ── Input area: tappable number + unit ── */
+.inputArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 12px;
+  min-width: 0;
+}
+
+.inputField {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--stepper-color, var(--neon-cyan));
+  font-family: var(--font-family);
+  font-size: 26px;
+  font-weight: var(--font-bold);
+  text-align: center;
+  width: 100%;
+  min-width: 56px;
+  line-height: 1;
+  -moz-appearance: textfield;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inputField::-webkit-inner-spin-button,
+.inputField::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inputField::placeholder {
+  color: rgba(255, 255, 255, 0.15);
+  font-size: 22px;
+}
+
+.unit {
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ── Control Block: tall vertical +/− ── */
+.btnColumn {
+  display: flex;
+  flex-direction: column;
+  width: 52px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--glass-border);
+}
+
+.btn {
+  flex: 1;
+  /* Each button is half of 88px = 44px tall, and 52px wide → ≥ 44×44 */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 20px;
+  font-weight: var(--font-bold);
+  font-family: var(--font-family);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* Divider between + and − */
+.btn:first-child {
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.btn:active {
+  background: color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 14%, transparent);
+  color: var(--stepper-color, var(--neon-cyan));
+}
+
+/* Long-press held state */
+.btnHeld {
+  background: color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 10%, transparent);
+  color: var(--stepper-color, var(--neon-cyan));
+}
+
+/* ── Label above ── */
+.label {
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* ── Wrapper with label ── */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .stepper,
+  .btn {
+    transition: none;
+  }
+}

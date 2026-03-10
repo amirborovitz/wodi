@@ -1,0 +1,27 @@
+/* ═══════════════════════════════════════════
+   AchievementBadge — neon pill chip
+   ═══════════════════════════════════════════ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--badge-color, var(--neon-cyan)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-color, var(--neon-cyan)) 30%, transparent);
+  white-space: nowrap;
+}
+
+.icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: var(--badge-color, var(--neon-cyan));
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}

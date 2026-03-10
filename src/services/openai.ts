@@ -37,9 +37,11 @@ Return ONLY valid JSON:
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
-        { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } }
+        { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
+        { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
       ],
-      "cashOut": [{ "name": "Run", "distance": 600, "unit": "m" }]
+      "cashOut": [{ "name": "Run", "distance": 600, "unit": "m" }],
+      "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] }
     }
   ]
 }
@@ -65,12 +67,20 @@ Return ONLY valid JSON:
 - "50m" → distance: 50
 - Carries (farmer carry, suitcase carry, yoke, etc.) with prescribed distance: set distance field, inputType: "none"
 
+## CARDIO MACHINES IN WODs (Echo Bike, Assault Bike, Row, Ski Erg, etc.)
+Cardio machines are NEVER measured in "reps". They use calories or distance:
+- "7/5 cal Echo Bike" → { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
+- "15 cal Row" → { "name": "Row", "calories": 15, "rxCalories": { "male": 15, "female": 12 }, "inputType": "none" }
+- "500m Row" → { "name": "Row", "distance": 500, "unit": "m", "inputType": "none" }
+- When only one calorie value is given (e.g., "7 cal Echo Bike"), set calories to that value and estimate rxCalories (male=given, female≈70-80% of male, rounded)
+- NEVER put calorie or distance values in the "reps" field for cardio machines
+
 ## MOVEMENT INPUT CLASSIFICATION
 Every movement MUST include "inputType":
 - "weight": barbell/KB/DB movements needing weight logged per set (deadlift, squat, press, clean, snatch, thruster, swing, lunge, wall ball, goblet, row with weight, shoulder to overhead, clean and jerk, etc.)
-- "calories": cardio machines when scored by calories (echo bike, assault bike, row erg, ski erg — "max cal", "15 cal")
+- "calories": cardio machines when the user must LOG calories (standalone cardio — "max cal", open-ended calorie target)
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
-- "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed in the rep count
+- "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
 
 ## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
@@ -94,6 +104,12 @@ Every exercise MUST include "loggingMode" — this determines which logging UI t
 
 CRITICAL: Partner/IGUG/team workouts where teams complete a target (e.g., "300 cal echo bike" or "100 rounds") are ALWAYS "for_time" — even if the word "interval" appears in the text. "intervals" mode means individually-timed sets with rest, NOT partner rotation.
 
+## LOGGING HINTS (per exercise)
+When movements share input fields, add "loggingHints":
+- Barbell complexes ("1 Power Clean + 1 Squat Clean"): set sharedWeightMovements with all movement names that share the same bar.
+- Only for movements physically sharing one implement (barbell, single KB).
+- Do NOT group movements using different implements (barbell squat + KB swing).
+
 ## MOVEMENT ALIASES (use canonical names)
 Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
 Gymnastics: hspu → Handstand Push-up, t2b/ttb → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
@@ -101,7 +117,7 @@ Cardio: du → Double Under, su → Single Under, cal → Calories
 Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 
 ## KEY GUIDELINES
-1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise.
+1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise — UNLESS the workout alternates between different movement blocks (A.1/A.2, odd/even minutes with different movements). Alternating blocks need separate exercises for separate round scores.
 2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
 3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
 
@@ -157,7 +173,20 @@ Output:
     ] }]
 }
 
-### 3. Strength
+### 3. AMRAP with Cardio Machine Calories
+Input: "18 min AMRAP: 7 cal Echo Bike, 10 TTB, 10 Alt DB Devil Press 22.5/15kg"
+Output:
+{
+  "type": "amrap", "format": "amrap", "scoreType": "rounds_reps", "timeCap": 1080,
+  "exercises": [{ "name": "18 min AMRAP", "type": "wod", "loggingMode": "amrap", "prescription": "7 cal Echo Bike, 10 TTB, 10 Alt DB Devil Press 22.5/15kg", "suggestedSets": 1,
+    "movements": [
+      { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" },
+      { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
+      { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
+    ] }]
+}
+
+### 4. Strength
 Input: "Back Squat 5x5 @75%"
 Output:
 {
@@ -165,7 +194,7 @@ Output:
   "exercises": [{ "name": "Back Squat", "type": "strength", "loggingMode": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
 }
 
-### 4. Intervals
+### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
 Output:
 {
@@ -177,7 +206,7 @@ Output:
     ] }]
 }
 
-### 5. Mixed session (Strength + Superset + Metcon)
+### 6. Mixed session (Strength + Superset + Metcon)
 Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
 Output:
 {
@@ -190,7 +219,7 @@ Output:
   ]
 }
 
-### 6. Partner RFT with time cap
+### 7. Partner RFT with time cap
 Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 15 Box Jumps. 16 min T.C."
 Output:
 {
@@ -203,7 +232,7 @@ Output:
     ] }]
 }
 
-### 7. Container benchmark
+### 8. Container benchmark
 Input: "7 rounds of Cindy for time"
 Output:
 {
@@ -212,7 +241,7 @@ Output:
     "movements": [{ "name": "Pull-up", "reps": 5, "inputType": "none" }, { "name": "Push-up", "reps": 10, "inputType": "none" }, { "name": "Air Squat", "reps": 15, "inputType": "none" }] }]
 }
 
-### 8. Chipper
+### 9. Chipper
 Input: "For time: 50 wall balls 9/6kg, 40 pull-ups, 30 box jumps, 20 thrusters 42.5/30kg, 10 muscle-ups"
 Output:
 {
@@ -226,6 +255,53 @@ Output:
       { "name": "Muscle-up", "reps": 10, "inputType": "none" }
     ] }]
 }
+
+### 10. Barbell Complex
+Input: "EMOM 12: 1 Power Clean + 1 Squat Clean @ 80kg"
+Output:
+{
+  "type": "emom", "format": "emom", "scoreType": "reps", "timeCap": 720, "intervalTime": 60,
+  "exercises": [{ "name": "EMOM 12", "type": "wod", "loggingMode": "emom", "prescription": "1 Power Clean + 1 Squat Clean @80kg", "suggestedSets": 12,
+    "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] },
+    "movements": [
+      { "name": "Power Clean", "reps": 1, "inputType": "weight", "rxWeights": { "male": 80, "female": 80, "unit": "kg" } },
+      { "name": "Squat Clean", "reps": 1, "inputType": "weight", "rxWeights": { "male": 80, "female": 80, "unit": "kg" } }
+    ] }]
+}
+
+### 11. Alternating AMRAPs (different blocks)
+Input: "[6:00 min AMRAP, 2:00 min REST] x 4 (alt): A.1: 200m Run, 10 Alt DB Devil Press, 10 Box Jumps. A.2: 6 Pull-ups, 8 Burpees over DB, 10 (5+5) DB Thrusters. DB 15/22.5kg"
+Output:
+{
+  "title": "Lion's Roar", "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps", "timeCap": 1920,
+  "exercises": [
+    { "name": "A.1 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1,
+      "movements": [
+        { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
+        { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
+        { "name": "Box Jump", "reps": 10, "inputType": "none" }
+      ] },
+    { "name": "A.2 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "6 Pull-ups, 8 Burpees over DB, 10 DB Thrusters (5+5)", "suggestedSets": 1,
+      "movements": [
+        { "name": "Pull-up", "reps": 6, "inputType": "none" },
+        { "name": "Burpee over Dumbbell", "reps": 8, "inputType": "none" },
+        { "name": "Dumbbell Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
+      ] },
+    { "name": "A.1 AMRAP 6:00 (Round 2)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1,
+      "movements": [
+        { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
+        { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
+        { "name": "Box Jump", "reps": 10, "inputType": "none" }
+      ] },
+    { "name": "A.2 AMRAP 6:00 (Round 2)", "type": "wod", "loggingMode": "amrap", "prescription": "6 Pull-ups, 8 Burpees over DB, 10 DB Thrusters (5+5)", "suggestedSets": 1,
+      "movements": [
+        { "name": "Pull-up", "reps": 6, "inputType": "none" },
+        { "name": "Burpee over Dumbbell", "reps": 8, "inputType": "none" },
+        { "name": "Dumbbell Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
+      ] }
+  ]
+}
+NOTE: When AMRAPs alternate between DIFFERENT movement blocks (A.1/A.2 or odd/even), split into separate exercises — one per block per attempt. Each exercise gets its own round score. Do NOT merge different blocks into one exercise.
 
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
@@ -306,6 +382,7 @@ Rules:
 - Only split into multiple exercises for truly separate blocks (Strength + Metcon, Skill + WOD).
 - "5x3" = suggestedSets: 5, suggestedReps: 3.
 - Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
+- Preserve "loggingHints" (including sharedWeightMovements) from the original parsed data.
 - Preserve original structure when unsure — only correct obvious errors.`;
 
 export async function refineParsedWorkout(
@@ -399,12 +476,24 @@ function validateMovement(data: unknown): ParsedMovement | null {
     ? raw.implementCount as 1 | 2
     : undefined;
 
+  // Validate rxCalories
+  let rxCalories: ParsedMovement['rxCalories'] = undefined;
+  if (raw.rxCalories && typeof raw.rxCalories === 'object') {
+    const rc = raw.rxCalories as Record<string, unknown>;
+    const male = typeof rc.male === 'number' ? rc.male : undefined;
+    const female = typeof rc.female === 'number' ? rc.female : undefined;
+    if (male !== undefined || female !== undefined) {
+      rxCalories = { male, female };
+    }
+  }
+
   return {
     name: raw.name,
     reps: typeof raw.reps === 'number' ? raw.reps : undefined,
     distance: typeof raw.distance === 'number' ? raw.distance : undefined,
     time: typeof raw.time === 'number' ? raw.time : undefined,
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
+    rxCalories,
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
     inputType,
@@ -519,6 +608,18 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         ? (exercise.loggingMode as ExerciseLoggingMode)
         : undefined;
 
+      // Validate loggingHints
+      let loggingHints: ParsedExercise['loggingHints'] = undefined;
+      if (exercise.loggingHints && typeof exercise.loggingHints === 'object') {
+        const hints = exercise.loggingHints as Record<string, unknown>;
+        if (Array.isArray(hints.sharedWeightMovements)) {
+          const names = hints.sharedWeightMovements.filter((v: unknown) => typeof v === 'string') as string[];
+          if (names.length >= 2) {
+            loggingHints = { sharedWeightMovements: names };
+          }
+        }
+      }
+
       exercises.push({
         name,
         type: validExerciseTypes.includes(exercise.type as ExerciseType)
@@ -532,6 +633,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         rxWeights: validateRxWeights(exercise.rxWeights),
         movements: movements.length > 0 ? movements : undefined,
         loggingMode,
+        loggingHints,
       });
     }
   }

@@ -795,3 +795,135 @@
     font-size: 16px;
   }
 }
+
+/* ========================================
+   NAME WITH SWAP — tappable row
+   ======================================== */
+.nameWithSwap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swapTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(0, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--neon-cyan);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.swapTrigger:active {
+  background: rgba(0, 255, 255, 0.2);
+  transform: scale(0.95);
+}
+
+.substitutedName {
+  color: rgba(255, 200, 100, 0.9);
+}
+
+.scaledBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 5px;
+  background: rgba(255, 200, 100, 0.15);
+  border: 1px solid rgba(255, 200, 100, 0.3);
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 200, 100, 0.9);
+  vertical-align: middle;
+}
+
+/* ========================================
+   ALTERNATIVES BOTTOM SHEET
+   ======================================== */
+.altSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 299;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.altSheet {
+  width: 100%;
+  max-width: 480px;
+  background: #111111;
+  border-radius: 20px 20px 0 0;
+  padding: 8px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: var(--z-modal, 300);
+}
+
+.altSheetHandle {
+  width: 36px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+
+.altSheetTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary, rgba(255,255,255,0.5));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 4px 8px;
+}
+
+.altRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 12px;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text, #fff);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s ease;
+  width: 100%;
+}
+
+.altRow:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.altRowSelected {
+  border-left-color: var(--neon-cyan, #00F2FF);
+  background: rgba(0, 255, 255, 0.06);
+}
+
+.altRowBadge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 200, 100, 0.9);
+  padding: 2px 6px;
+  background: rgba(255, 200, 100, 0.12);
+  border-radius: 4px;
+  flex-shrink: 0;
+}

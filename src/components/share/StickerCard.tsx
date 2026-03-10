@@ -319,6 +319,12 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
       }
     }
 
+    // Detect interval splits
+    const splitTimes = sets.map(s => s.time).filter((t): t is number => t != null && t > 0);
+    const isInterval = splitTimes.length > 1;
+    const splitAvg = isInterval ? Math.round(splitTimes.reduce((a, b) => a + b, 0) / splitTimes.length) : 0;
+    const splitBest = isInterval ? Math.min(...splitTimes) : 0;
+
     // Movements from primary exercise
     const movements = primaryEx?.movements || [];
 
@@ -381,7 +387,7 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
                 className={styles.exerciseTypeTag}
                 style={{ color, borderColor: `${color}44`, background: `${color}10` }}
               >
-                {exType === 'amrap' ? 'AMRAP' : exType === 'cardio' ? 'CARDIO' : 'FOR TIME'}
+                {isInterval ? 'INTERVAL' : exType === 'amrap' ? 'AMRAP' : exType === 'cardio' ? 'CARDIO' : 'FOR TIME'}
               </span>
               <span className={styles.headerMeta}>
                 {userName ? `${userName}  ·  ` : ''}wodi
@@ -392,8 +398,25 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
 
           <div className={styles.detailBody}>
             <div className={styles.metconDetail}>
-              {/* Big score hero */}
-              {scoreText ? (
+              {/* Interval splits or big score hero */}
+              {isInterval ? (
+                <div className={styles.intervalSplitBlock}>
+                  <div className={styles.intervalSplitGrid}>
+                    {splitTimes.map((t, i) => (
+                      <div key={i} className={styles.intervalSplitCell}>
+                        <span className={styles.intervalSplitNum}>S{i + 1}</span>
+                        <span className={styles.intervalSplitTime} style={{ color: t === splitBest ? TRINITY.cyan : undefined }}>
+                          {formatTime(t)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.intervalSplitStats}>
+                    <span>Avg {formatTime(splitAvg)}</span>
+                    <span style={{ color: TRINITY.cyan }}>Best {formatTime(splitBest)}</span>
+                  </div>
+                </div>
+              ) : scoreText ? (
                 <div className={styles.metconScoreBlock}>
                   <span className={styles.metconScoreValue} style={{ color, textShadow: `0 0 20px ${color}66` }}>
                     {scoreText}

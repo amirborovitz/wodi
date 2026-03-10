@@ -1,0 +1,329 @@
+/* ═══════════════════════════════════════════
+   ScoreTimeInput + ScoreRoundsInput
+   ═══════════════════════════════════════════ */
+
+/* ── Shared centering ── */
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+/* ────────────────────────────────────────────
+   ScoreTimeInput — mm:ss with nudge buttons
+   ──────────────────────────────────────────── */
+
+.timeDisplay {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.timeDrum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.timeDrumInput {
+  width: 72px;
+  font-size: 48px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-shadow: 0 0 16px rgba(255, 0, 229, 0.25);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(255, 0, 229, 0.3);
+  text-align: center;
+  outline: none;
+  line-height: 1;
+  padding-bottom: 4px;
+}
+
+.timeDrumInput:focus {
+  border-bottom-color: var(--color-metcon);
+  box-shadow: 0 2px 12px rgba(255, 0, 229, 0.2);
+}
+
+.timeDrumInput::placeholder {
+  color: rgba(255, 255, 255, 0.15);
+}
+
+.timeDrumLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-medium);
+}
+
+.timeSeparator {
+  font-size: 48px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  line-height: 1;
+  padding-bottom: 18px;
+}
+
+/* ────────────────────────────────────────────
+   ScoreRoundsInput — big tap counter
+   ──────────────────────────────────────────── */
+
+.roundsTapZone {
+  width: 180px;
+  height: 180px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  border: 2px solid rgba(255, 0, 229, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.roundsTapZone:active {
+  border-color: rgba(255, 0, 229, 0.5);
+  background: rgba(255, 0, 229, 0.08);
+  transform: scale(0.97);
+}
+
+.roundsNumber {
+  font-size: 64px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-shadow: 0 0 20px rgba(255, 0, 229, 0.3);
+  line-height: 1;
+}
+
+.roundsLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+.roundsTapHint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  max-width: 220px;
+  line-height: var(--leading-normal);
+}
+
+/* Pulse ring on tap */
+.pulseRing {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-metcon);
+  pointer-events: none;
+}
+
+/* Tap row: undo button flanking the circle */
+.tapRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.undoBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text-secondary);
+  font-size: 20px;
+  font-weight: var(--font-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.undoBtn:active {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(0.93);
+}
+
+/* ── Social headline preview ── */
+.headlinePreview {
+  font-size: 14px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+/* ── Partial movements block ─────────────────────── */
+
+.partialBlock {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Trigger pill: muted outlined, secondary to Done */
+.partialTrigger {
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+  padding: 10px 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.partialTrigger:active {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Expandable movement drawer */
+.partialDrawer {
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #161616;
+  border: 1px solid #222222;
+  border-radius: var(--radius-2xl);
+  padding: var(--space-4);
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.drawerTitle {
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.drawerClose {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.drawerClose:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Movement checklist items ── */
+.movementList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.movementItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+  min-height: 48px;
+}
+
+.movementItem:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.movementItemChecked {
+  border-color: rgba(255, 0, 229, 0.3);
+  background: rgba(255, 0, 229, 0.06);
+}
+
+.movementName {
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  line-height: 1.2;
+  text-align: left;
+}
+
+.movementCheck {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.movementItemChecked .movementCheck {
+  border-color: var(--color-metcon);
+  background: rgba(255, 0, 229, 0.15);
+}
+
+.checkMark {
+  font-size: 16px;
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  text-shadow: 0 0 8px rgba(255, 0, 229, 0.4);
+  line-height: 1;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .roundsTapZone,
+  .undoBtn,
+  .partialTrigger,
+  .movementItem,
+  .movementCheck {
+    transition: none;
+  }
+  .roundsTapZone:active,
+  .undoBtn:active {
+    transform: none;
+  }
+}

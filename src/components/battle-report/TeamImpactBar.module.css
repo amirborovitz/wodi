@@ -1,0 +1,96 @@
+/* ═══════════════════════════════════════════
+   TeamImpactBar — team workout contribution
+   ═══════════════════════════════════════════ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  margin: 0 var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Progress bar section ── */
+.barSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.barHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.barTitle {
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.barValue {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+}
+
+.barTrack {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-magenta));
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
+}
+
+/* ── Impact circle ── */
+.impactCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle at center,
+    rgba(0, 255, 255, 0.08) 0%,
+    transparent 70%
+  );
+  border: 2px solid color-mix(in srgb, var(--neon-cyan) 30%, transparent);
+  flex-shrink: 0;
+}
+
+.impactPercent {
+  font-size: var(--text-xl);
+  font-weight: var(--font-black);
+  color: var(--color-text);
+  line-height: var(--leading-none);
+}
+
+.impactLabel {
+  font-size: 8px;
+  font-weight: var(--font-bold);
+  color: var(--neon-cyan);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.impactDetail {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  margin-top: 1px;
+}

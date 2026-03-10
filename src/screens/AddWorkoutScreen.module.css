@@ -1727,3 +1727,120 @@
     font-size: var(--text-base);
   }
 }
+
+/* ========================================
+   WEIGHT SETUP CARD — Interval mode
+   ======================================== */
+.weightSetupCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-3) var(--space-4);
+  margin: 0 12px var(--space-3);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+}
+
+.weightSetupTitle {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  color: var(--color-volume);
+  padding-bottom: var(--space-2);
+}
+
+.weightSetupRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.weightSetupRow:last-child {
+  border-bottom: none;
+}
+
+.weightSetupName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.weightSetupInputGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.weightSetupInput {
+  width: 56px;
+  padding: var(--space-1) 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--color-volume);
+  border-radius: 0;
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  text-align: center;
+  transition: border-color var(--duration-fast) ease;
+  -moz-appearance: textfield;
+}
+
+.weightSetupInput::-webkit-outer-spin-button,
+.weightSetupInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weightSetupInput:focus {
+  outline: none;
+  color: var(--color-volume);
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.3);
+}
+
+.weightSetupInput::placeholder {
+  color: rgba(255, 214, 0, 0.3);
+  opacity: 1;
+}
+
+.weightSetupUnit {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.weightSetupCheck {
+  font-size: 12px;
+  color: var(--color-volume);
+  margin-left: 2px;
+}
+
+/* Ghost rows for non-weighted movements */
+.weightSetupGhost {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.weightSetupGhost:last-child {
+  border-bottom: none;
+}
+
+.weightSetupGhostName {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}

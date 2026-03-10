@@ -1,0 +1,84 @@
+/* ═══════════════════════════════════════════
+   HeadlineResult — hero score display
+   ═══════════════════════════════════════════ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4) var(--space-4);
+  text-align: center;
+}
+
+/* Format pill (AMRAP / FOR TIME / STRENGTH) */
+.formatPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 25%, transparent);
+  color: var(--pill-accent, var(--neon-cyan));
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Primary score row */
+.primaryRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.primaryValue {
+  font-size: var(--text-5xl);
+  font-weight: var(--font-black);
+  color: var(--color-text);
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tighter);
+  text-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+}
+
+/* Partial-progress pill (e.g. "+ 3 TTB") */
+.partialPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--neon-magenta) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neon-magenta) 35%, transparent);
+  color: var(--neon-magenta);
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  white-space: nowrap;
+}
+
+/* EP earned */
+.epRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.epValue {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-black);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+}
+
+.epLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  color: var(--neon-cyan);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

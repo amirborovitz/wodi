@@ -97,6 +97,7 @@
   --radius-md: 10px;
   --radius-lg: 16px;  /* Primary radius for buttons and cards */
   --radius-xl: 20px;
+  --radius-2xl: 24px; /* Chapter cards, premium surfaces */
   --radius-full: 9999px;
 
   /* Shadows */

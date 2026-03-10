@@ -1,4 +1,6 @@
-import type { FocusEvent } from 'react';
+import { useState, type FocusEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { ParsedMovement } from '../../types';
 import { getExerciseAlternatives, findExerciseDefinition, getAlternativeType } from '../../data/exerciseDefinitions';
 import styles from './InlineMovementEditor.module.css';
@@ -194,6 +196,78 @@ function abbreviateMovementLabel(name: string): string {
   return trimmed;
 }
 
+/** Bottom sheet for selecting movement alternatives */
+function AlternativesSheet({
+  movementName,
+  alternatives,
+  parsedAlt,
+  selected,
+  onSelect,
+  onClose,
+}: {
+  movementName: string;
+  alternatives: { name: string; type: 'easier' | 'equivalent' | 'harder' }[];
+  parsedAlt?: { name: string; reps?: number } | null;
+  selected: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+}) {
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        className={styles.altSheetBackdrop}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={onClose}
+      >
+        <motion.div
+          className={styles.altSheet}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className={styles.altSheetHandle} />
+          <div className={styles.altSheetTitle}>Swap Movement</div>
+
+          {/* Original movement */}
+          <button
+            type="button"
+            className={`${styles.altRow} ${selected === movementName ? styles.altRowSelected : ''}`}
+            onClick={() => { onSelect(movementName); onClose(); }}
+          >
+            <span>{abbreviateMovementLabel(movementName)}</span>
+            <span className={styles.altRowBadge} style={{ opacity: 0 }}>Rx</span>
+          </button>
+
+          {/* Alternatives */}
+          {alternatives.map((alt) => {
+            const altReps = (parsedAlt && alt.name === parsedAlt.name && parsedAlt.reps)
+              ? parsedAlt.reps : undefined;
+            const altPrefix = altReps ? `${altReps}x ` : '';
+            const badge = alt.type === 'easier' ? 'SCALED' : alt.type === 'harder' ? 'Rx+' : null;
+            return (
+              <button
+                key={alt.name}
+                type="button"
+                className={`${styles.altRow} ${selected === alt.name ? styles.altRowSelected : ''}`}
+                onClick={() => { onSelect(alt.name); onClose(); }}
+              >
+                <span>{altPrefix}{abbreviateMovementLabel(alt.name)}</span>
+                {badge && <span className={styles.altRowBadge}>{badge}</span>}
+              </button>
+            );
+          })}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body
+  );
+}
+
 export function InlineMovementEditor({
   movement,
   selectedAlternative,
@@ -319,31 +393,39 @@ export function InlineMovementEditor({
 
   const hasImplementToggle = implementCount !== undefined && !implementFixed && !readOnly && onImplementCountChange;
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   return (
     <div className={`${styles.movementCard} ${isSubstituted ? styles.substituted : ''}`}>
       {/* NAME HEADER — full width */}
       <div className={styles.nameColumn}>
-        {hasAlternatives ? (
-          <select
-            className={`${styles.movementSelect} ${isSubstituted ? styles.substitutedSelect : ''}`}
-            value={selectedAlternative || movement.name}
-            onChange={(e) => handleAlternativeSelect(e.target.value)}
-            disabled={readOnly}
-          >
-            <option value={movement.name}>{abbreviateMovementLabel(movement.name)}</option>
-            {alternatives.map((alt) => {
-              const altReps = (parsedAlt && alt.name === parsedAlt.name && parsedAlt.reps)
-                ? parsedAlt.reps
-                : undefined;
-              const altPrefix = altReps ? `${altReps}× ` : '';
-              return (
-                <option key={alt.name} value={alt.name}>
-                  {altPrefix}{abbreviateMovementLabel(alt.name)}
-                  {alt.type === 'easier' ? ' (scaled)' : alt.type === 'harder' ? ' (Rx+)' : ''}
-                </option>
-              );
-            })}
-          </select>
+        {hasAlternatives && !readOnly ? (
+          <div className={styles.nameWithSwap}>
+            <div className={`${styles.movementName} ${isSubstituted ? styles.substitutedName : ''}`}>
+              {displayLabel}
+              {isSubstituted && <span className={styles.scaledBadge}>SCALED</span>}
+            </div>
+            <button
+              type="button"
+              className={styles.swapTrigger}
+              onClick={() => setSheetOpen(true)}
+              aria-label="Swap movement"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+              </svg>
+            </button>
+            {sheetOpen && (
+              <AlternativesSheet
+                movementName={movement.name}
+                alternatives={alternatives}
+                parsedAlt={parsedAlt}
+                selected={selectedAlternative || movement.name}
+                onSelect={handleAlternativeSelect}
+                onClose={() => setSheetOpen(false)}
+              />
+            )}
+          </div>
         ) : (
           <div className={styles.movementName}>
             {displayLabel}
@@ -411,7 +493,7 @@ export function InlineMovementEditor({
                   value={customWeight || ''}
                   onChange={(e) => onWeightChange?.(movement.name, parseFloat(e.target.value) || 0)}
                   onFocus={handleSelectOnFocus}
-                  placeholder={movement.rxWeights?.male?.toString() || ''}
+                  placeholder={movement.rxWeights?.male?.toString() || '0'}
                   min="0"
                 />
               ) : movement.rxWeights ? (

@@ -1,0 +1,174 @@
+/* ═══════════════════════════════════════════
+   SupersetInput — per-movement compact rows
+   ═══════════════════════════════════════════ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Movement row ── */
+.movRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.movRowFilled {
+  border-left: 3px solid var(--mov-color, var(--neon-cyan));
+  padding-left: calc(var(--space-3) - 3px);
+}
+
+/* ── Header: name + prescription hint ── */
+.movHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.movName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+}
+
+.movHint {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Inline input area ── */
+.movInputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Weight inline stepper ── */
+.inlineStepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inlineStepBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  font-weight: var(--font-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.inlineStepBtn:active {
+  background: rgba(255, 214, 0, 0.12);
+  transform: scale(0.92);
+}
+
+.inlineWeight {
+  font-size: var(--text-xl);
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-volume);
+  min-width: 48px;
+  text-align: center;
+  line-height: 1;
+}
+
+.inlineUnit {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* ── Duration chips inline ── */
+.inlineChips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.inlineChip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.inlineChip:active {
+  transform: scale(0.95);
+}
+
+.inlineChipActive {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: rgba(0, 255, 255, 0.35);
+  color: var(--color-sessions);
+}
+
+/* ── Inline text input (distance, calories, weight) ── */
+.inlineInput {
+  width: 72px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family);
+  /* 16px prevents iOS/Android auto-zoom on focus */
+  font-size: 16px;
+  font-weight: var(--font-semibold);
+  text-align: center;
+  outline: none;
+}
+
+.inlineInput:focus {
+  border-color: var(--mov-color, var(--neon-cyan));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--mov-color, var(--neon-cyan)) 25%, transparent);
+}
+
+/* ── Bodyweight confirmed state ── */
+.bwConfirmed {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .inlineStepBtn,
+  .inlineChip {
+    transition: none;
+  }
+  .inlineStepBtn:active,
+  .inlineChip:active {
+    transform: none;
+  }
+}

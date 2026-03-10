@@ -243,7 +243,10 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   const withLoggingModes = backfillLoggingModes(result);
 
   // Backfill inputType on any movements that the AI missed
-  return backfillInputTypes(withLoggingModes);
+  const withInputTypes = backfillInputTypes(withLoggingModes);
+
+  // Backfill loggingHints.sharedWeightMovements for barbell complexes
+  return backfillSharedWeightHints(withInputTypes);
 }
 
 
@@ -271,8 +274,8 @@ function correctWorkoutType(workout: ParsedWorkout, correctedFormat: ParsedWorko
  * AI often returns "strength" for mixed workouts containing AMRAP/EMOM
  */
 function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
-  // Only check title and exercise names for format keywords - not full rawText or prescriptions
-  // This prevents false positives from random word matches in descriptions
+  // prominentText = title + exercise names (high-signal, used for priority checks)
+  // fullText = title + rawText + names + prescriptions (broader, used as fallback)
   const prominentText = [
     workout.title,
     ...workout.exercises.map(e => e.name),
@@ -288,17 +291,17 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
   console.warn('🔧 [correctWorkoutFormat] Checking text:', fullText.slice(0, 200));
   console.warn('🔧 [correctWorkoutFormat] Prominent text contains AMRAP?', prominentText.includes('amrap'));
 
-  // If AI already classified as strength and no AMRAP in title/exercise names, keep it
-  if (workout.format === 'strength' && !prominentText.includes('amrap')) {
+  // If AI already classified as strength and no AMRAP anywhere, keep it
+  if (workout.format === 'strength' && !prominentText.includes('amrap') && !fullText.includes('amrap')) {
     console.warn('🔧 [correctWorkoutFormat] -> Keeping strength format (no AMRAP in title/names)');
     return 'strength';
   }
 
-  // Check for AMRAP patterns - only in prominent text (title, exercise names)
-  if (prominentText.includes('amrap')) {
+  // Check for AMRAP patterns - in prominent text first, then fall back to fullText (prescriptions)
+  if (prominentText.includes('amrap') || fullText.includes('amrap')) {
     // Check for AMRAP intervals (multiple AMRAPs with rest)
     if (/amrap.*x\s*\d/i.test(fullText) || /\d+\s*x\s*amrap/i.test(fullText) ||
-        (prominentText.includes('amrap') && fullText.includes('rest'))) {
+        (fullText.includes('amrap') && fullText.includes('rest'))) {
       console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap_intervals');
       return 'amrap_intervals';
     }
@@ -1374,6 +1377,48 @@ function inferImplementCount(mov: ParsedMovement): 1 | 2 | undefined {
 
   // Default: 1 (safe default; user can toggle to 2)
   return 1;
+}
+
+/**
+ * Backfill loggingHints.sharedWeightMovements for barbell complexes.
+ * Detects when 2+ weighted movements share identical rxWeights and the AI
+ * didn't already provide loggingHints.
+ */
+function backfillSharedWeightHints(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => {
+      // Already has loggingHints — trust the AI
+      if (ex.loggingHints?.sharedWeightMovements) return ex;
+
+      const movements = ex.movements;
+      if (!movements || movements.length < 2) return ex;
+
+      // Find weighted movements
+      const weighted = movements.filter(m => m.inputType === 'weight');
+      if (weighted.length < 2) return ex;
+
+      // Check if all weighted movements share identical rxWeights
+      const first = weighted[0].rxWeights;
+      if (!first) return ex;
+
+      const allSame = weighted.every(m =>
+        m.rxWeights?.male === first.male &&
+        m.rxWeights?.female === first.female &&
+        m.rxWeights?.unit === first.unit
+      );
+      if (!allSame) return ex;
+
+      console.warn('🔧 [PostProcessor] Backfilling sharedWeightMovements:', weighted.map(m => m.name));
+      return {
+        ...ex,
+        loggingHints: {
+          ...ex.loggingHints,
+          sharedWeightMovements: weighted.map(m => m.name),
+        },
+      };
+    }),
+  };
 }
 
 /**

@@ -1,0 +1,158 @@
+/* ═══════════════════════════════════════════
+   RepsSetsInput — bodyweight / reps exercises
+   ═══════════════════════════════════════════ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
+}
+
+/* ── All-complete toggle ── */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.toggleRow:active {
+  background: var(--glass-bg-active);
+}
+
+.toggleLabel {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
+
+.toggleSwitch {
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  position: relative;
+  transition: background var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.toggleOff {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.toggleOn {
+  background: rgba(0, 255, 255, 0.35);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-text);
+  transition: left var(--duration-fast) var(--ease-out);
+}
+
+.toggleKnobOff {
+  left: 2px;
+}
+
+.toggleKnobOn {
+  left: 22px;
+}
+
+/* ── Confirmed big emoji ── */
+.confirmedDisplay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+}
+
+.confirmedEmoji {
+  font-size: 48px;
+}
+
+.confirmedText {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  font-family: var(--font-family);
+}
+
+.confirmedHint {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* ── Sets stepper (when not all completed) ── */
+.setsStepperRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.setsStepperBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: var(--font-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.setsStepperBtn:active {
+  background: rgba(255, 0, 229, 0.12);
+  transform: scale(0.93);
+}
+
+.setsDisplay {
+  text-align: center;
+  min-width: 80px;
+}
+
+.setsNumber {
+  font-size: 36px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-metcon);
+  line-height: 1;
+}
+
+.setsTotal {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .toggleRow,
+  .toggleSwitch,
+  .toggleKnob,
+  .setsStepperBtn {
+    transition: none;
+  }
+  .setsStepperBtn:active {
+    transform: none;
+  }
+}
