@@ -44,11 +44,18 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
   // Check this BEFORE the superset branch so buy-in/RFT/cash-out workouts
   // display their score, not "X/Y moves".
   if (r.kind === 'score_time') {
-    if (r.timeSeconds == null) return { icon: '⏱️', text: 'Add time' };
+    if (r.timeSeconds == null) {
+      // If this scored workout also has weighted movements, "Add time" undersells
+      // what the user needs to enter — use a universal empty-state label instead.
+      const hasWeightInputs = (r.movementResults ?? []).some(
+        mr => mr.kind === 'load' || mr.kind === 'distance'
+      );
+      return { icon: '⏱️', text: hasWeightInputs ? 'Log results' : 'Add time' };
+    }
     return { icon: '⏱️', text: formatTime(r.timeSeconds) };
   }
   if (r.kind === 'score_rounds') {
-    if (r.rounds == null || r.rounds === 0) return { icon: '🔄', text: 'Add rounds' };
+    if (r.rounds == null || r.rounds === 0) return { icon: '🔄', text: 'Log results' };
     const rds = `${r.rounds} rds`;
     // Movement-based partial: "4 rds + Thrusters"
     if (r.partialMovements && r.partialMovements.length > 0) {

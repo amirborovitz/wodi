@@ -20,12 +20,12 @@
   touch-action: pan-y;
 }
 
-/* Reward mode: SINGLE-SCREEN / NO-SCROLL — fits 19.5:9 viewport */
+/* Reward mode: fits viewport, scrolls if content overflows */
 .containerReward {
-  height: 100vh;
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-6) var(--space-6) calc(var(--safe-bottom) + var(--space-4));
   padding-top: calc(var(--safe-top) + var(--space-4));
   gap: clamp(12px, 2dvh, 24px);
@@ -252,7 +252,7 @@
   text-transform: uppercase;
 }
 
-/* Accomplishment story: "42 bike cals · 60 TTB · 60 devil presses" */
+/* Accomplishment story: legacy flat string */
 .heroStoryLine {
   display: block;
   margin-top: 8px;
@@ -261,6 +261,167 @@
   color: rgba(255, 255, 255, 0.38);
   letter-spacing: 0.01em;
   line-height: var(--leading-snug);
+}
+
+/* ============================================
+   Narrative Movement Lines
+   Vertical story beneath the hero score.
+   Two modes: metcon rows and strength progressions.
+   ============================================ */
+
+.heroStoryMovements {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 16px;
+}
+
+/* --- Metcon row: qty | sep | name | total --- */
+
+.heroStoryMovementLine {
+  display: grid;
+  /* Col 1: fixed qty column, right-aligned tabular numbers.
+     Col 2: 1px separator line.
+     Col 3: movement name, takes remaining space.
+     Col 4: ghost total, right-aligned. */
+  grid-template-columns: 44px 1px 1fr auto;
+  align-items: center;
+  column-gap: 0;
+  min-height: 36px;
+  padding: 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle hairline between rows */
+.heroStoryMovementLine + .heroStoryMovementLine {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Progression block also gets the same row separator */
+.heroStoryProgressionBlock + .heroStoryMovementLine,
+.heroStoryMovementLine + .heroStoryProgressionBlock {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Qty — Trinity-colored, monospaced, right-aligned in its column */
+.heroStoryMovementQty {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  padding-right: 10px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.heroStoryQtyMagenta { color: #FF00E5; }
+.heroStoryQtyCyan    { color: #00F2FF; }
+.heroStoryQtyYellow  { color: #FFD600; }
+
+/* Vertical separator line between qty and name */
+.heroStoryMovementSep {
+  display: block;
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.10);
+  flex-shrink: 0;
+}
+
+/* Movement name */
+.heroStoryMovementName {
+  font-size: 14px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.55);
+  padding-left: 10px;
+  padding-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.005em;
+}
+
+/* Ghost total — parenthetical, far right */
+.heroStoryMovementTotal {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.20);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-transform: lowercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Strength progression block --- */
+
+.heroStoryProgressionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0 8px;
+}
+
+.heroStoryProgressionBlock + .heroStoryProgressionBlock {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 10px;
+}
+
+/* Movement name header */
+.heroStoryProgressionName {
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 255, 255, 0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Weight chain row: "60 → 70 → 80 → 90 kg" */
+.heroStoryProgressionChain {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heroStoryProgressionStep {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+/* Arrow between weights — very faint structural element */
+.heroStoryProgressionArrow {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.18);
+  padding: 0 3px;
+  font-family: var(--font-mono);
+}
+
+/* Each weight value in the chain */
+.heroStoryProgressionWeight {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 214, 0, 0.60); /* Yellow at 60% — muted for non-peak */
+  letter-spacing: -0.02em;
+}
+
+/* Peak (last) weight — full yellow, larger */
+.heroStoryProgressionPeak {
+  color: #FFD600;
+  font-size: 20px;
+}
+
+/* Unit label at end of chain: "kg" */
+.heroStoryProgressionUnit {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.30);
+  margin-left: 3px;
+  text-transform: lowercase;
 }
 
 /* ============================================
@@ -364,15 +525,11 @@
 
 .statChipsRow {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: hidden;
-  overflow-y: hidden;
   padding: 2px 0 4px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
 }
 
-.statChipsRow::-webkit-scrollbar { display: none; }
 
 /* Base chip — 3 equal-width columns with vertical stack */
 .statChip {
@@ -380,7 +537,7 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  flex: 1 1 0;
+  flex: 1 0 calc(33.333% - 6px);
   min-width: 0;
   padding: 16px 8px 14px;
   background: #1A1A1A;
@@ -394,7 +551,7 @@
 
 /* Non-primary chips (carry, distance, PR) share space equally */
 .statChip:nth-child(n+4) {
-  flex: 1 1 0;
+  flex: 1 0 calc(33.333% - 6px);
 }
 
 .statChipTappable {

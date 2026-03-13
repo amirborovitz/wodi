@@ -25,26 +25,48 @@ Return ONLY valid JSON:
   "benchmarkModified": false,
   "partnerWorkout": false,
   "teamSize": null,
+  // "sets" is the TOTAL number of working rounds for the main WOD (not counting buy-in / cash-out one-off work).
+  // For structures like "Into, 2 rounds: [block A] Into, 2 rounds: [block B]" the total sets is 4.
   "exercises": [
     {
       "name": "Exercise or Block Name",
       "type": "strength" | "cardio" | "skill" | "wod",
       "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets",
       "prescription": "human-readable prescription",
+      // suggestedSets is the number of working rounds for this exercise (for a for_time WOD this usually matches "sets").
+      // When the workout text says "Into, 2 rounds: [block]" you must set suggestedSets to 2 for that working block.
       "suggestedSets": 5,
       "suggestedReps": 10,
       "suggestedRepsPerSet": [6, 5, 4, 3, 2],
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+      // Buy-in work that happens ONCE before all rounds (e.g. big machine effort before the WOD) goes into "buyIn".
+      // This work is not repeated each round.
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
         { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
         { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
       ],
+      // Cash-out work that happens ONCE after all rounds goes into "cashOut".
       "cashOut": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] }
     }
   ]
 }
+
+## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x [BLOCK] -> CASH-OUT)
+
+- Workouts often have this structure:
+  - Optional buy-in (one-time work, usually a machine or run)
+  - One or more "round" sections like "Into, 2 rounds:" followed by a block of movements
+  - Optional cash-out (one-time work after all rounds)
+- You MUST represent this using:
+  - workout-level "sets": total number of working rounds across all round sections,
+  - per-exercise "suggestedSets": number of working rounds for that block,
+  - "buyIn": movements that happen once at the start (not per round),
+  - "cashOut": movements that happen once at the end (not per round),
+  - "movements": the per-round block of movements for that section.
+- Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
+  Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
 
 ## FORMAT DETECTION (pick exactly one)
 | Format | Trigger | scoreType |
@@ -303,7 +325,111 @@ Output:
 }
 NOTE: When AMRAPs alternate between DIFFERENT movement blocks (A.1/A.2 or odd/even), split into separate exercises — one per block per attempt. Each exercise gets its own round score. Do NOT merge different blocks into one exercise.
 
+### 12. For time with buy-in + multiple round sections (Lion's Roar style)
+Input:
+"Lion's Roar
+A. METCON (Long)
+For time, In pairs (I go you go):
+
+80/100 (7/10) calories echo bike
+Into, 2 rounds:
+600m run (together)
+40 C&J @35/50 kg
+Into, 2 rounds:
+40 Box jumps
+40 Thrusters @35/50 kg"
+
+Output:
+{
+  "title": "Lion's Roar",
+  "rawText": "Lion's Roar\\nA. METCON (Long)\\nFor time, In pairs (I go you go):\\n\\n80/100 (7/10) calories echo bike\\nInto, 2 rounds:\\n600m run (together)\\n40 C&J @35/50 kg\\nInto, 2 rounds:\\n40 Box jumps\\n40 Thrusters @35/50 kg",
+  "type": "for_time",
+  "format": "for_time",
+  "scoreType": "time",
+  "partnerWorkout": true,
+  "teamSize": 2,
+  // Total working rounds = 2 rounds of the first block + 2 rounds of the second block = 4
+  "sets": 4,
+  "exercises": [
+    {
+      "name": "Lion's Roar For Time",
+      "type": "wod",
+      "loggingMode": "for_time",
+      "prescription": "Buy-in: 80/100 (7/10) calories Echo Bike, then 2 rounds of 600m Run (together) + 40 Clean and Jerk 35/50kg, then 2 rounds of 40 Box Jumps + 40 Thrusters 35/50kg",
+      // Total rounds across all blocks
+      "suggestedSets": 4,
+      "buyIn": [
+        {
+          "name": "Echo Bike",
+          "calories": 100,
+          "rxCalories": { "male": 100, "female": 80 },
+          "inputType": "none"
+        }
+      ],
+      // Movements here are PER ROUND. The "rounds" counts (2 + 2) are encoded in suggestedSets / sets.
+      "movements": [
+        {
+          "name": "Run",
+          "distance": 600,
+          "unit": "m",
+          "inputType": "none"
+        },
+        {
+          "name": "Clean and Jerk",
+          "reps": 40,
+          "inputType": "weight",
+          "rxWeights": { "male": 50, "female": 35, "unit": "kg" }
+        },
+        {
+          "name": "Box Jump",
+          "reps": 40,
+          "inputType": "none"
+        },
+        {
+          "name": "Thruster",
+          "reps": 40,
+          "inputType": "weight",
+          "rxWeights": { "male": 50, "female": 35, "unit": "kg" }
+        }
+      ]
+    }
+  ]
+}
+
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
+
+/**
+ * Parse a workout from plain text (no image).
+ * Returns the raw AI JSON string for debugging, plus the parsed result.
+ */
+export async function parseWorkoutText(text: string): Promise<{ raw: string; parsed: ParsedWorkout }> {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: WORKOUT_PARSE_PROMPT },
+          { type: 'text', text: `Here is the workout text to parse:\n\n${text}` },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    temperature: 0.2,
+  });
+
+  const content = response.choices[0]?.message?.content || '';
+  let jsonStr = content;
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) jsonStr = jsonMatch[1];
+
+  const rawJson = jsonStr.trim();
+  const data = JSON.parse(rawJson);
+  const validated = validateParsedWorkout(data);
+  const postProcessed = postProcessParsedWorkout(validated);
+
+  return { raw: rawJson, parsed: postProcessed };
+}
 
 export async function parseWorkoutImage(base64Image: string): Promise<ParsedWorkout> {
   try {

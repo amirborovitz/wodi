@@ -279,6 +279,7 @@ export function StoryLogResults({
   const [results, setResults] = useState<StoryExerciseResult[]>(() =>
     initStoryResults(parsedWorkout, loggingModes, user?.sex)
   );
+  const [hasSeededAmrapIntervals, setHasSeededAmrapIntervals] = useState(false);
 
   // Edit sheet state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -286,9 +287,9 @@ export function StoryLogResults({
 
   // ── Update a single result by merging a patch ──
   const handleResultChange = useCallback((index: number, patch: Partial<StoryExerciseResult>) => {
-    setResults(prev => prev.map((r, i) =>
+    setResults(prev => prev.map((r, i) => (
       i === index ? { ...r, ...patch } : r
-    ));
+    )));
   }, []);
 
   // ── Edit sheet callbacks ──
@@ -301,8 +302,28 @@ export function StoryLogResults({
   }, []);
 
   const handleSheetDone = useCallback(() => {
+    if (
+      editingIndex != null &&
+      parsedWorkout.format === 'amrap_intervals' &&
+      !hasSeededAmrapIntervals
+    ) {
+      const finalRounds = results[editingIndex]?.rounds;
+      if (
+        results[editingIndex]?.kind === 'score_rounds' &&
+        typeof finalRounds === 'number' &&
+        finalRounds > 0
+      ) {
+        setResults(prev => prev.map((r, i) => {
+          if (i === editingIndex) return r;
+          if (r.kind !== 'score_rounds') return r;
+          if ((r.rounds ?? 0) > 0) return r;
+          return { ...r, rounds: finalRounds };
+        }));
+        setHasSeededAmrapIntervals(true);
+      }
+    }
     setEditingIndex(null);
-  }, []);
+  }, [editingIndex, hasSeededAmrapIntervals, parsedWorkout.format, results]);
 
   const handleSheetSkip = useCallback(() => {
     if (editingIndex != null) {

@@ -11,7 +11,7 @@ import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { useAuth } from '../context/AuthContext';
 import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW, EP_METCON_RATE, EP_VOLUME_RATE, EP_DISTANCE_RATE, EP_BODYWEIGHT_RATE, EP_PR_BONUS } from '../utils/xpCalculations';
 import type { EPBreakdown } from '../types';
-import { calculateWorkloadFromExercises, assignMovementColors } from '../services/workloadCalculation';
+import { calculateWorkloadFromExercises, assignMovementColors, isBwVolumeMovement } from '../services/workloadCalculation';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 
 // ============================================
@@ -116,12 +116,23 @@ function formatDurationSplit(minutes: number): { num: string; unit: string } {
 // Hero Result — pick the single best "show-off" number
 // ============================================
 
+interface StoryMovementLine {
+  perRound: string;             // "10" or "200m" or "7 cal"
+  name: string;                 // "Alt DB Devil Press"
+  total: string;                // "(60 Total)" or "(1.2km Total)"
+  color?: 'cyan' | 'magenta' | 'yellow';  // Trinity accent for qty
+  weight?: number;              // e.g. 22.5 — shown as "@22.5kg" after name
+  weightProgression?: number[]; // strength mode: [80, 90, 100, 110]
+  unit?: string;                // weight unit: 'kg' | 'lb'
+}
+
 interface HeroResult {
   value: string;          // "6", "18:42", "NEW PR", "2.12"
   unit?: string;          // "ROUNDS", "TONS", "KG", "EP"
   subtitle?: string;      // "+ 3 TTB" partial context
   formatLine?: string;    // "18 min AMRAP", "For Time", "5×3 Back Squat"
-  storyLine?: string;     // "42 bike cals · 60 TTB · 60 devil presses · 60 box jumps"
+  storyLine?: string;     // legacy flat string fallback
+  storyMovements?: StoryMovementLine[]; // vertical narrative lines
   accentClass: string;    // CSS class for color
 }
 
@@ -148,9 +159,10 @@ function getAmrapPartialContext(exercises: Exercise[]): string | undefined {
   if (movs.length === 0) return `+ ${partialReps} REPS`;
 
   // Calculate where the partial reps fall in the round
+  // Skip distance-based movements (run, row, etc.) — distance ≠ reps
   let remaining = partialReps;
   for (const mov of movs) {
-    const movReps = mov.reps || mov.distance || mov.calories || 0;
+    const movReps = mov.reps || mov.calories || 0;
     if (movReps <= 0) continue;
     if (remaining <= movReps) {
       // Format movement name: abbreviate common names
@@ -172,7 +184,75 @@ function getAmrapPartialContext(exercises: Exercise[]): string | undefined {
   return `+ ${partialReps} REPS`;
 }
 
-/** Build a compact accomplishment story from movement totals.
+/** Build structured vertical narrative lines from movement totals.
+ *
+ *  Metcon line: { perRound: "10", name: "Alt DB Devil Press", total: "(60 Total)", color: "magenta" }
+ *  Strength line: { perRound: "", name: "Back Squat", total: "", weightProgression: [60,70,80,90] }
+ */
+function buildStoryMovements(movements: MovementTotal[], rounds: number): StoryMovementLine[] | undefined {
+  if (!movements || movements.length === 0) return undefined;
+  const lines: StoryMovementLine[] = [];
+
+  for (const m of movements) {
+    const name = m.name;
+    const color = m.color;
+    const unit = m.unit === 'lb' ? 'lb' : 'kg';
+
+    // Strength movement with weight progression: render as progression row
+    if (m.weightProgression && m.weightProgression.length > 0) {
+      lines.push({
+        perRound: '',
+        name,
+        total: '',
+        color,
+        weightProgression: m.weightProgression,
+        unit,
+      });
+      continue;
+    }
+
+    // Strength movement with single weight but no reps data (pure strength)
+    if (m.weight && m.weight > 0 && !m.totalReps && !m.totalCalories && !m.totalDistance) {
+      lines.push({
+        perRound: `${m.weight}`,
+        name,
+        total: '',
+        color: color ?? 'yellow',
+        weight: m.weight,
+        unit,
+      });
+      continue;
+    }
+
+    if (m.totalCalories && m.totalCalories > 0) {
+      const perRound = rounds > 1 ? `${Math.round(m.totalCalories / rounds)} cal` : `${m.totalCalories} cal`;
+      const total = rounds > 1 ? `${m.totalCalories} cal total` : '';
+      lines.push({ perRound, name, total, color: color ?? 'magenta' });
+    } else if (m.totalDistance && m.totalDistance > 0) {
+      const totalDist = m.totalDistance >= 1000
+        ? `${(m.totalDistance / 1000).toFixed(1)}km`
+        : `${Math.round(m.totalDistance)}m`;
+      const perDist = rounds > 1 && m.distancePerRep
+        ? (m.distancePerRep >= 1000
+            ? `${(m.distancePerRep / 1000).toFixed(1)}km`
+            : `${Math.round(m.distancePerRep)}m`)
+        : totalDist;
+      const total = rounds > 1 ? `${totalDist} total` : '';
+      lines.push({ perRound: perDist, name, total, color: color ?? 'magenta' });
+    } else if (m.totalReps && m.totalReps > 0) {
+      const perRound = rounds > 1 ? `${Math.round(m.totalReps / rounds)}` : `${m.totalReps}`;
+      const total = rounds > 1 ? `${m.totalReps} total` : '';
+      // Append weight annotation only for externally-loaded movements (not bodyweight)
+      const isBodyweight = isBwVolumeMovement(name);
+      const displayName = m.weight && m.weight > 0 && !isBodyweight ? `${name} @${m.weight}${unit}` : name;
+      lines.push({ perRound, name: displayName, total, color: color ?? 'magenta', weight: m.weight });
+    }
+  }
+
+  return lines.length > 0 ? lines : undefined;
+}
+
+/** Build a compact accomplishment story from movement totals (legacy flat string).
  *  e.g. "42 bike cals · 60 TTB · 60 devil presses · 60 box jumps" */
 function buildAccomplishmentStory(movements: MovementTotal[]): string | undefined {
   if (!movements || movements.length === 0) return undefined;
@@ -277,27 +357,31 @@ function computeHeroResult(
 
   // 1. PR is always the biggest flex
   if (isPR && prWeight) {
+    const storyMovements = buildStoryMovements(movements, 1);
     return {
       value: `${prWeight}`,
       unit: 'KG PR',
       subtitle: prMovementName?.toUpperCase(),
       formatLine,
       storyLine,
+      storyMovements,
       accentClass: 'accentGold',
     };
   }
 
   // 2. AMRAP: show rounds (the bragging metric)
   if (format === 'amrap' || format === 'amrap_intervals') {
-    const rounds = exercises[0]?.rounds;
-    if (rounds != null && rounds > 0) {
-      const partial = getAmrapPartialContext(exercises);
+    const totalRounds = exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0);
+    if (totalRounds > 0) {
+      const partial = format === 'amrap' ? getAmrapPartialContext(exercises) : undefined;
+      const storyMovements = buildStoryMovements(movements, totalRounds);
       return {
-        value: `${rounds}`,
+        value: `${totalRounds}`,
         unit: 'ROUNDS',
         subtitle: partial,
         formatLine,
         storyLine,
+        storyMovements,
         accentClass: 'accentMagenta',
       };
     }
@@ -309,11 +393,14 @@ function computeHeroResult(
       .flatMap(ex => ex.sets)
       .find(s => s.completed && s.time && s.time > 0)?.time;
     if (firstTime) {
+      const rounds = exercises[0]?.rounds || 1;
+      const storyMovements = buildStoryMovements(movements, rounds);
       return {
         value: fmtTimeSocial(firstTime),
         unit: '',
         formatLine,
         storyLine,
+        storyMovements,
         accentClass: 'accentMagenta',
       };
     }
@@ -326,11 +413,13 @@ function computeHeroResult(
     );
     const peak = Math.max(...allWeights, 0);
     if (peak > 0) {
+      const storyMovements = buildStoryMovements(movements, 1);
       return {
         value: `${peak}`,
         unit: 'KG',
         formatLine,
         storyLine,
+        storyMovements,
         accentClass: 'accentGold',
       };
     }
@@ -338,11 +427,13 @@ function computeHeroResult(
 
   // 5. High volume (over 1 ton is impressive)
   if (totalVolume >= 1000) {
+    const storyMovements = buildStoryMovements(movements, 1);
     return {
       value: `${(totalVolume / 1000).toFixed(2)}`,
       unit: 'TONS',
       formatLine,
       storyLine,
+      storyMovements,
       accentClass: 'accentGold',
     };
   }
@@ -1296,9 +1387,61 @@ export function WorkoutScreen({
           {heroResult.formatLine && (
             <span className={styles.heroFormatLine}>{heroResult.formatLine}</span>
           )}
-          {heroResult.storyLine && (
+          {heroResult.storyMovements ? (
+            <div className={styles.heroStoryMovements}>
+              {heroResult.storyMovements.map((line, i) => {
+                // Strength progression row: "Back Squat — 60 → 90 → 100 kg"
+                if (line.weightProgression && line.weightProgression.length > 0) {
+                  const prog = line.weightProgression;
+                  const start = prog[0];
+                  const peak = prog[prog.length - 1];
+                  const allSame = prog.every(w => w === start);
+                  // Only show start → peak (two values), or just peak when all sets are identical.
+                  const displayProgression = allSame ? [peak] : [start, peak];
+                  return (
+                    <div key={i} className={styles.heroStoryProgressionBlock}>
+                      <span className={styles.heroStoryProgressionName}>{line.name}</span>
+                      <div className={styles.heroStoryProgressionChain}>
+                        {displayProgression.map((w, wi) => (
+                          <span key={wi} className={styles.heroStoryProgressionStep}>
+                            {wi > 0 && (
+                              <span className={styles.heroStoryProgressionArrow}>→</span>
+                            )}
+                            <span className={`${styles.heroStoryProgressionWeight} ${wi === displayProgression.length - 1 ? styles.heroStoryProgressionPeak : ''}`}>
+                              {w}
+                            </span>
+                          </span>
+                        ))}
+                        <span className={styles.heroStoryProgressionUnit}>{line.unit ?? 'kg'}</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Metcon / standard movement row
+                const qtyColorClass = line.color === 'yellow'
+                  ? styles.heroStoryQtyYellow
+                  : line.color === 'cyan'
+                    ? styles.heroStoryQtyCyan
+                    : styles.heroStoryQtyMagenta;
+
+                return (
+                  <div key={i} className={styles.heroStoryMovementLine}>
+                    <span className={`${styles.heroStoryMovementQty} ${qtyColorClass}`}>
+                      {line.perRound}
+                    </span>
+                    <span className={styles.heroStoryMovementSep} aria-hidden="true" />
+                    <span className={styles.heroStoryMovementName}>{line.name}</span>
+                    {line.total && (
+                      <span className={styles.heroStoryMovementTotal}>{line.total}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : heroResult.storyLine ? (
             <span className={styles.heroStoryLine}>{heroResult.storyLine}</span>
-          )}
+          ) : null}
         </motion.div>
       )}
 
@@ -1321,10 +1464,10 @@ export function WorkoutScreen({
       {/* Original link moved to reward context row above */}
 
       {/* -- Exercise Story Cards ───────────────────────────────── */}
-      {exercises.length > 0 && (() => {
+      {!isReward && exercises.length > 0 && (() => {
         const filteredExercises = exercises.filter(ex => !isExcludedExercise(ex));
         return (
-          <div className={isReward ? styles.storyCardsCompact : styles.storyCards}>
+          <div className={styles.storyCards}>
             {filteredExercises.map((ex, i) => {
               // Match breakdown movements to this exercise's movements by name
               const exMovNames = (ex.movements || []).map(m => m.name.toLowerCase());
@@ -1336,13 +1479,11 @@ export function WorkoutScreen({
                 <ExerciseStoryCard
                   key={ex.id || i}
                   exercise={ex}
-                  animationDelay={isReward ? 0.5 + i * 0.12 : 0.3 + i * 0.1}
-                  animated={isReward}
+                  animationDelay={0.3 + i * 0.1}
+                  animated={false}
                   isPR={prMovements.has(ex.name.toLowerCase())}
                   breakdownMovements={matchedBreakdown && matchedBreakdown.length > 0 ? matchedBreakdown : undefined}
-                  compact={isReward}
-                  maxMovements={isReward ? 4 : undefined}
-                  onTap={isReward && hasOverflow ? () => setExpandedCardIndex(i) : undefined}
+                  onTap={hasOverflow ? () => setExpandedCardIndex(i) : undefined}
                 />
               );
             })}
