@@ -40,6 +40,23 @@ interface StoryLogResultsProps {
   onSave: (results: LegacyExerciseResult[]) => void;
   onBack: () => void;
   isSaving?: boolean;
+  /** Pre-filled results for edit mode (skips blank initialization) */
+  initialResults?: StoryExerciseResult[];
+}
+
+// ─── Ladder helpers ─────────────────────────────────────────────
+
+/**
+ * Get the rep value for a ladder rung, extrapolating beyond the prescribed array.
+ * E.g., ladderReps=[4,6,8,10,12], rungIdx=5 → extrapolates step=2 → 14.
+ */
+function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
+  if (rungIdx < ladderReps.length) return ladderReps[rungIdx];
+  // Extrapolate: detect the step between last two values
+  const step = ladderReps.length >= 2
+    ? ladderReps[ladderReps.length - 1] - ladderReps[ladderReps.length - 2]
+    : 2;
+  return ladderReps[ladderReps.length - 1] + step * (rungIdx - ladderReps.length + 1);
 }
 
 // ─── Convert story result → legacy ExerciseResult ───────────────
@@ -55,13 +72,15 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     const movementReps: Record<string, number> = {};
     const movementCalories: Record<string, number> = {};
     const implementCounts: Record<string, number> = {};
+    // Maps original movement name → selected alternative name
+    const movementAlternatives: Record<string, string> = {};
 
     for (const mr of r.movementResults ?? []) {
       const name = mr.movement.name;
       if (mr.kind === 'load' && mr.weight != null && mr.weight > 0) {
         movementWeights[name] = mr.weight;
       }
-      if (mr.kind === 'distance' && mr.distance != null && mr.distance > 0) {
+      if (mr.distance != null && mr.distance > 0) {
         movementDistances[name] = mr.distance;
       }
       if (mr.reps != null && mr.reps > 0) {
@@ -73,6 +92,15 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       if (mr.implementCount && mr.implementCount > 1) {
         implementCounts[name] = mr.implementCount;
       }
+      // Forward substitution: keyed by original name, value is selected alternative
+      if (mr.substitution) {
+        movementAlternatives[mr.substitution.originalName] = mr.substitution.selectedName;
+        // When substitution changes unit type (e.g., Run distance→Echo Bike calories),
+        // explicitly zero out the old type to prevent buildWorkloadBreakdownFromResults
+        // from falling back to the original prescribed values.
+        if (!(mr.distance != null && mr.distance > 0)) movementDistances[name] = 0;
+        if (!(mr.calories != null && mr.calories > 0)) movementCalories[name] = 0;
+      }
     }
 
     return {
@@ -81,6 +109,7 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       ...(Object.keys(movementReps).length > 0 ? { movementReps } : {}),
       ...(Object.keys(movementCalories).length > 0 ? { movementCalories } : {}),
       ...(Object.keys(implementCounts).length > 0 ? { implementCounts } : {}),
+      ...(Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
     };
   }
 
@@ -88,8 +117,9 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   // Must be checked BEFORE the generic superset branch.
   const isScored = r.kind === 'score_time' || r.kind === 'score_rounds';
   const hasMovements = r.movementResults && r.movementResults.length > 1;
+  const hasSingleMovement = r.movementResults && r.movementResults.length === 1;
 
-  if (isScored && hasMovements) {
+  if (isScored && (hasMovements || hasSingleMovement)) {
     // Round count: for score_time, rounds come from the exercise prescription (e.g. "8 RFT" → setsTotal=8).
     // For score_rounds (AMRAP), rounds come from user input (r.rounds).
     const roundCount = r.kind === 'score_time' ? r.setsTotal : r.rounds;
@@ -105,7 +135,40 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         ...buildMovementMaps(),
       };
     } else {
-      // score_rounds (AMRAP)
+      // score_rounds (AMRAP) — includes ladder AMRAP
+      const ladderReps = r.exercise.ladderReps;
+      const isLadder = ladderReps && ladderReps.length > 0 && r.ladderStep != null;
+
+      if (isLadder) {
+        // Ladder AMRAP: one continuous ladder, compute total reps per movement
+        const step = r.ladderStep!;
+        const partial = r.ladderPartial ?? 0;
+        const movementCount = (r.exercise.movements ?? []).filter(m => m.perRound !== false).length || 1;
+        // Total reps per movement = sum of completed rung values + partial
+        let repsPerMovement = 0;
+        // Ladder is open-ended: step can exceed ladderReps.length
+        // For rungs beyond the prescribed array, extrapolate the pattern
+        for (let j = 0; j < step; j++) {
+          repsPerMovement += getLadderRungValue(ladderReps, j);
+        }
+        repsPerMovement += partial;
+        const totalReps = repsPerMovement * movementCount;
+
+        sets.push({
+          id: 'set-0',
+          setNumber: 1,
+          actualReps: totalReps,
+          completed: true,
+        });
+        return {
+          exercise: r.exercise,
+          sets,
+          rounds: step,  // rungs completed as "rounds" equivalent
+          notes: r.notes,
+          ...buildMovementMaps(),
+        };
+      }
+
       sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
       return {
         exercise: r.exercise,
@@ -120,13 +183,42 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
 
   // ── Superset (non-scored): build legacy result from per-movement data ──
   if (hasMovements) {
+    // Find the first weighted movement to extract start/end weight for interpolation
+    const weightedMr = r.movementResults?.find(mr => mr.kind === 'load' && mr.weight != null && mr.weight > 0);
+    const startWeight = weightedMr?.weight;
+    const endWeight = r.weightEnd ?? startWeight;
+    const isRange = r.loadMode === 'range' && startWeight != null && endWeight != null && startWeight !== endWeight;
+
+    const repsPerSet = r.exercise.suggestedRepsPerSet;
     for (let i = 0; i < setsCount; i++) {
+      let weight: number | undefined;
+      if (isRange && startWeight != null && endWeight != null) {
+        const frac = setsCount > 1 ? i / (setsCount - 1) : 0;
+        weight = Math.round((startWeight + frac * (endWeight - startWeight)) * 2) / 2;
+      } else {
+        weight = startWeight;
+      }
+
+      const setReps = repsPerSet?.[i] ?? r.exercise.suggestedReps;
       sets.push({
         id: `set-${i}`,
         setNumber: i + 1,
+        targetReps: setReps,
+        actualReps: setReps,
+        weight,
         completed: true,
       });
     }
+
+    console.warn('🔍 [toLegacy-superset]', r.exercise.name, {
+      setsCount,
+      isRange,
+      startWeight,
+      endWeight,
+      loadMode: r.loadMode,
+      weightEnd: r.weightEnd,
+      setWeights: sets.map(s => s.weight),
+    });
 
     return {
       exercise: r.exercise,
@@ -139,25 +231,44 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
 
   switch (r.kind) {
     case 'load': {
-      for (let i = 0; i < setsCount; i++) {
+      const repsPerSet = r.exercise.suggestedRepsPerSet;
+      const hasMaxSet = repsPerSet && r.setsTotal > repsPerSet.length;
+      const prescribedCount = hasMaxSet ? repsPerSet.length : setsCount;
+
+      for (let i = 0; i < prescribedCount; i++) {
         let weight: number | undefined;
         if (r.loadMode === 'bodyweight') {
           weight = undefined;
         } else if (r.loadMode === 'range' && r.weight != null && r.weightEnd != null) {
-          const frac = setsCount > 1 ? i / (setsCount - 1) : 0;
+          const interpTotal = hasMaxSet ? prescribedCount : setsCount;
+          const frac = interpTotal > 1 ? i / (interpTotal - 1) : 0;
           weight = Math.round((r.weight + frac * (r.weightEnd - r.weight)) * 2) / 2;
         } else {
           weight = r.weight;
         }
+
+        const setReps = repsPerSet?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
         sets.push({
           id: `set-${i}`,
           setNumber: i + 1,
-          targetReps: r.exercise.suggestedReps,
-          actualReps: r.repsPerSet ?? r.exercise.suggestedReps,
+          targetReps: repsPerSet?.[i] ?? r.exercise.suggestedReps,
+          actualReps: setReps,
           weight,
           completed: true,
         });
       }
+
+      // Add max set if user entered data
+      if (hasMaxSet && (r.maxReps || r.maxRepsWeight)) {
+        sets.push({
+          id: `set-${prescribedCount}`,
+          setNumber: prescribedCount + 1,
+          actualReps: r.maxReps ?? 0,
+          weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight,
+          completed: true,
+        });
+      }
+
       return {
         exercise: r.exercise,
         sets,
@@ -254,7 +365,13 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
           completed: true,
         });
       }
-      return { exercise: r.exercise, sets, notes: r.notes };
+      return {
+        exercise: r.exercise,
+        sets,
+        notes: r.notes,
+        rounds: count,
+        ...buildMovementMaps(),
+      };
     }
 
     case 'note':
@@ -273,11 +390,15 @@ export function StoryLogResults({
   onSave,
   onBack,
   isSaving = false,
+  initialResults,
 }: StoryLogResultsProps) {
   const { user } = useAuth();
-  // Story results state — prefill with sex-appropriate Rx values
+  // Story results state — use initialResults for edit mode, otherwise prefill with Rx values
+  const teamSize = parsedWorkout.partnerWorkout ? (parsedWorkout.teamSize ?? 2) : undefined;
   const [results, setResults] = useState<StoryExerciseResult[]>(() =>
-    initStoryResults(parsedWorkout, loggingModes, user?.sex)
+    initialResults && initialResults.length > 0
+      ? initialResults
+      : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize)
   );
   const [hasSeededAmrapIntervals, setHasSeededAmrapIntervals] = useState(false);
 
@@ -371,6 +492,7 @@ export function StoryLogResults({
           <InputRouter
             result={editingResult}
             onChange={handleInputChange}
+            teamSize={teamSize}
           />
         )}
       </EditExerciseSheet>

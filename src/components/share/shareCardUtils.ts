@@ -63,6 +63,8 @@ export function detectExerciseDisplayType(exercise: Exercise): ExerciseDisplayTy
 
   if (exercise.type === 'wod') {
     if (rx.includes('emom') || rx.includes('every minute') || nm.includes('emom')) return 'emom';
+    // "Every 3:00 x 5" style intervals
+    if (/every\s+\d+:\d+/.test(rx) || /every\s+\d+:\d+/.test(nm)) return 'intervals';
     if (rx.includes('amrap') || nm.includes('amrap')) return 'amrap';
     if (
       rx.includes('interval') ||
@@ -178,12 +180,16 @@ export function buildFunStats(data: RewardData): FunStat[] {
   const stats: FunStat[] = [];
   const { workoutSummary, workloadBreakdown, heroAchievement } = data;
 
-  const totalVolume = workloadBreakdown?.grandTotalVolume || workoutSummary.totalVolume || 0;
+  // Partner workouts: breakdown may contain full workout totals (everyone's contribution).
+  // Divide by teamSize so share chips show the athlete's personal share.
+  const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
+
+  const totalVolume = Math.round((workloadBreakdown?.grandTotalVolume || workoutSummary.totalVolume || 0) / teamSize);
   const durationSec = Math.round((workoutSummary.duration || 0) * 60);
-  const totalReps   = workloadBreakdown?.grandTotalReps || workoutSummary.totalReps || 0;
-  const totalDist   = workloadBreakdown?.grandTotalDistance || 0;
-  const totalWeightedDist = workloadBreakdown?.grandTotalWeightedDistance || 0;
-  const totalCals   = workloadBreakdown?.grandTotalCalories || 0;
+  const totalReps   = Math.round((workloadBreakdown?.grandTotalReps || workoutSummary.totalReps || 0) / teamSize);
+  const totalDist   = Math.round((workloadBreakdown?.grandTotalDistance || 0) / teamSize);
+  const totalWeightedDist = Math.round((workloadBreakdown?.grandTotalWeightedDistance || 0) / teamSize);
+  const totalCals   = Math.round((workloadBreakdown?.grandTotalCalories || 0) / teamSize);
   const hasPR       = heroAchievement?.type === 'pr';
 
   // Priority order: VOL, TIME, PR, REPS, CARRY, DIST, CAL

@@ -13,6 +13,7 @@ interface WorkoutFeedCardProps {
   onClick?: () => void;
   onDelete?: () => void;
   onEdit?: () => void;
+  onRename?: (newTitle: string) => void;
   isPR?: boolean;
 }
 
@@ -107,14 +108,24 @@ function formatDistance(meters: number): string {
   return `${Math.round(meters)}m`;
 }
 
-export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onEdit, isPR = false }: WorkoutFeedCardProps) {
+export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onEdit, onRename, isPR = false }: WorkoutFeedCardProps) {
   const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   const style = typeStyles[workout.type] || typeStyles.mixed;
   const duration = workout.duration || 0;
   const workoutTitle = getSmartTitle(workout);
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== workoutTitle) {
+      onRename?.(trimmed);
+    }
+    setIsRenaming(false);
+  };
 
   const bodyweight = user?.weight || DEFAULT_BW;
   const timeCapMinutes = getTimeCapMinutes(workout);
@@ -132,6 +143,12 @@ export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onE
   const handleEdit = () => {
     setIsMenuOpen(false);
     onEdit?.();
+  };
+
+  const handleRename = () => {
+    setIsMenuOpen(false);
+    setRenameValue(workoutTitle);
+    setIsRenaming(true);
   };
 
   const handleDeleteRequest = () => {
@@ -210,7 +227,24 @@ export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onE
               <span className={styles.date}>{formatDate(workout.date)}</span>
 
               {/* Title */}
-              <h3 className={styles.title}>{workoutTitle}</h3>
+              {isRenaming ? (
+                <input
+                  className={styles.titleInput}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    e.stopPropagation();
+                    if (e.key === 'Enter') handleRenameSubmit();
+                    else if (e.key === 'Escape') setIsRenaming(false);
+                  }}
+                  onBlur={handleRenameSubmit}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                  spellCheck={false}
+                />
+              ) : (
+                <h3 className={styles.title}>{workoutTitle}</h3>
+              )}
 
               {/* Stat pills */}
               <div className={styles.statPills}>
@@ -288,6 +322,14 @@ export function WorkoutFeedCard({ workout, index: _index, onClick, onDelete, onE
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
             >
               <div className={styles.menuHandle} />
+              {onRename && (
+                <button className={styles.menuItem} onClick={handleRename}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                  </svg>
+                  Rename
+                </button>
+              )}
               {onEdit && (
                 <button className={styles.menuItem} onClick={handleEdit}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

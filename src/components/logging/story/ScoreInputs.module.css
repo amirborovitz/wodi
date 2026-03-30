@@ -7,8 +7,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
 }
 
 /* ────────────────────────────────────────────
@@ -73,8 +73,8 @@
    ──────────────────────────────────────────── */
 
 .roundsTapZone {
-  width: 180px;
-  height: 180px;
+  width: 126px;
+  height: 126px;
   border-radius: var(--radius-full);
   background: var(--glass-bg);
   border: 2px solid rgba(255, 0, 229, 0.2);
@@ -97,7 +97,7 @@
 }
 
 .roundsNumber {
-  font-size: 64px;
+  font-size: 48px;
   font-family: var(--font-family);
   font-weight: var(--font-bold);
   color: var(--color-metcon);
@@ -164,11 +164,13 @@
 
 /* ── Social headline preview ── */
 .headlinePreview {
-  font-size: 14px;
-  font-weight: var(--font-semibold);
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 18px;
+  font-weight: var(--font-black);
+  color: var(--color-text);
   text-align: center;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 20px rgba(255, 0, 229, 0.3);
 }
 
 /* ── Partial movements block ─────────────────────── */

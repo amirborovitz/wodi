@@ -20,12 +20,14 @@
   touch-action: pan-y;
 }
 
-/* Reward mode: fits viewport, scrolls if content overflows */
+/* Reward mode: fixed viewport height, scrolls internally */
 .containerReward {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   padding: var(--space-6) var(--space-6) calc(var(--safe-bottom) + var(--space-4));
   padding-top: calc(var(--safe-top) + var(--space-4));
   gap: clamp(12px, 2dvh, 24px);
@@ -174,6 +176,35 @@
   line-height: var(--leading-tight);
 }
 
+.heroTitleTappable {
+  cursor: text;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 2px;
+  transition: border-color 0.2s;
+}
+.heroTitleTappable:hover,
+.heroTitleTappable:active {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.heroTitleInput {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 2px;
+  font-family: inherit;
+  font-size: 36px;
+  font-weight: var(--font-bold);
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+  line-height: var(--leading-tight);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(0, 242, 255, 0.6);
+  outline: none;
+  caret-color: var(--color-cyan);
+}
+
 .heroSubtitle {
   display: block;
   margin-top: 6px;
@@ -276,6 +307,57 @@
   margin-top: 16px;
 }
 
+/* --- Section header row: label + hairline --- */
+
+.heroSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+  position: relative;
+  padding-left: 10px;
+}
+
+.heroSectionHeader::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Accent bar color variants */
+.heroSectionHeaderYellow::before { background: rgba(255, 214, 0, 0.70); }
+.heroSectionHeaderMagenta::before { background: rgba(255, 0, 229, 0.70); }
+.heroSectionHeaderCyan::before { background: rgba(0, 242, 255, 0.70); }
+
+.heroSectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  white-space: nowrap;
+}
+.heroSectionLabelYellow { color: rgba(255, 214, 0, 0.55); }
+.heroSectionLabelMagenta { color: rgba(255, 0, 229, 0.55); }
+.heroSectionLabelCyan { color: rgba(0, 242, 255, 0.55); }
+
+.heroSectionLine {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Remove top border from first movement after a section header */
+.heroSectionHeader + .heroStoryMovementLine {
+  border-top: none;
+}
+
 /* --- Metcon row: qty | sep | name | total --- */
 
 .heroStoryMovementLine {
@@ -342,14 +424,57 @@
 }
 
 /* Ghost total — parenthetical, far right */
-.heroStoryMovementTotal {
+.heroStoryPartnerNote {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.20);
+  color: rgba(0, 242, 255, 0.55);
   letter-spacing: 0.01em;
   white-space: nowrap;
-  text-transform: lowercase;
+  font-variant-numeric: tabular-nums;
+  margin-left: 6px;
+}
+
+/* Substitution swap icon: ⇄ next to substituted movement name */
+.heroSubIcon {
+  font-size: 12px;
+  color: rgba(255, 0, 229, 0.7);
+  margin-right: 3px;
+}
+
+/* Volume badge inline: "100 cal Total" */
+.heroVolumeBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* "Substituted for [Original Movement]" label */
+.heroSubLabel {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  padding-left: 10px;
+  line-height: 1.4;
+}
+
+.heroStoryMovementTotal {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -358,8 +483,8 @@
 .heroStoryProgressionBlock {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 0 8px;
+  gap: 8px;
+  padding: 8px 0;
 }
 
 .heroStoryProgressionBlock + .heroStoryProgressionBlock {
@@ -391,12 +516,12 @@
   gap: 2px;
 }
 
-/* Arrow between weights — very faint structural element */
-.heroStoryProgressionArrow {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.18);
-  padding: 0 3px;
-  font-family: var(--font-mono);
+/* SVG arrow between weights — Cyan accent */
+.heroProgressionArrowIcon {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 10px;
+  flex-shrink: 0;
 }
 
 /* Each weight value in the chain */
@@ -408,10 +533,20 @@
   letter-spacing: -0.02em;
 }
 
-/* Peak (last) weight — full yellow, larger */
+/* Peak weight — full yellow, larger, glowing */
 .heroStoryProgressionPeak {
   color: #FFD600;
   font-size: 20px;
+  text-shadow:
+    0 0 12px rgba(255, 214, 0, 0.55),
+    0 0 24px rgba(255, 214, 0, 0.20);
+}
+
+/* Dropset weight — suppressed, smaller */
+.heroStoryProgressionDropset {
+  color: rgba(255, 214, 0, 0.38);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Unit label at end of chain: "kg" */
@@ -422,6 +557,39 @@
   color: rgba(255, 255, 255, 0.30);
   margin-left: 3px;
   text-transform: lowercase;
+}
+
+/* --- Burnout / Max-rep row --- */
+.heroBurnoutRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.heroBurnoutIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.heroBurnoutReps {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: #FF00E5;
+}
+
+.heroBurnoutName {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.50);
+}
+
+/* --- Strength total reps (muted footer) --- */
+.heroStrengthTotalReps {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.25);
 }
 
 /* ============================================
@@ -491,31 +659,45 @@
   font-size: var(--text-2xl);
 }
 
+.workoutTitleTappable {
+  cursor: text;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
+  padding-bottom: 2px;
+  transition: border-color 0.2s;
+}
+.workoutTitleTappable:hover,
+.workoutTitleTappable:active {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.workoutTitleEditWrap {
+  text-align: center;
+  padding: 0 var(--space-4);
+  margin-bottom: -4px;
+}
+
+.workoutTitleInput {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0 0 2px;
+  font-family: inherit;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+  line-height: var(--leading-tight);
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(0, 242, 255, 0.6);
+  outline: none;
+  caret-color: var(--color-cyan);
+}
+
 /* ============================================
    PR Badge
    ============================================ */
-
-.prHeader {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: linear-gradient(135deg, rgba(255, 214, 0, 0.12), rgba(255, 138, 0, 0.08));
-  border: 1px solid rgba(255, 214, 0, 0.25);
-  border-radius: 20px;
-  box-shadow: 0 0 20px rgba(255, 184, 0, 0.1);
-  align-self: center;
-}
-
-.prIcon { font-size: var(--text-xl); }
-
-.prText {
-  font-size: var(--text-base);
-  font-weight: var(--font-bold);
-  color: var(--xp-gold);
-  letter-spacing: 0.01em;
-}
 
 /* ============================================
    Stat Chips Row
@@ -1308,6 +1490,8 @@
     padding-top: calc(var(--safe-top) + var(--space-3));
     padding-bottom: calc(var(--safe-bottom) + var(--space-3));
     gap: clamp(8px, 1.5dvh, 16px);
+    height: 100vh;
+    height: 100dvh;
   }
 
   .heroTitle {

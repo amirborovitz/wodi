@@ -124,13 +124,14 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
   const sessionsPercent = (sessions.value / sessions.goal) * 100;
 
   return (
-    <div className={styles.container} style={{ width: size, height: size }}>
-      <svg
-        viewBox={`0 0 ${size} ${size}`}
-        className={styles.svg}
-        width={size}
-        height={size}
-      >
+    <div className={styles.container}>
+      <div className={styles.ringsWrapper} style={{ width: size, height: size }}>
+        <svg
+          viewBox={`0 0 ${size} ${size}`}
+          className={styles.svg}
+          width={size}
+          height={size}
+        >
         {/* Lift ring (outer - yellow) */}
         <Ring
           percentage={volumePercent}
@@ -160,46 +161,80 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
           glowColor="0 0 20px var(--glow-sessions)"
           delay={0.2}
         />
-      </svg>
+        </svg>
 
-      {/* Center content */}
-      <div className={styles.center}>
-        <motion.span
-          className={styles.centerValue}
-          style={{ color: 'var(--color-sessions)' }}
-          initial={{ scale: 0.8 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {sessions.value}
-        </motion.span>
+        {/* Center content */}
+        <div className={styles.center}>
+          <motion.span
+            className={styles.centerValue}
+            style={{ color: 'var(--color-sessions)' }}
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+          >
+            {sessions.value}
+          </motion.span>
+        </div>
       </div>
 
       {/* Legend */}
       <div className={styles.legend}>
-        <div className={styles.legendItem}>
-          <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
-          <span className={styles.legendLabel}>Lift</span>
-          <span className={styles.legendSep}>{'\u00b7'}</span>
-          <span className={styles.legendValue}>
-            {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
-          </span>
+        <div>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
+            <span className={styles.legendLabel}>Lift</span>
+            <span className={styles.legendSep}>{'\u00b7'}</span>
+            <span className={styles.legendValue}>
+              {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
+            </span>
+          </div>
+          <div className={styles.legendProgress}>
+            <div
+              className={styles.legendProgressFill}
+              style={{
+                width: `${Math.min((volume.value / volume.goal) * 100, 100)}%`,
+                background: 'var(--color-volume)',
+              }}
+            />
+          </div>
         </div>
-        <div className={styles.legendItem}>
-          <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
-          <span className={styles.legendLabel}>Move</span>
-          <span className={styles.legendSep}>{'\u00b7'}</span>
-          <span className={styles.legendValue}>
-            {metcon.value} / {metcon.goal} min
-          </span>
+        <div>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDot} style={{ background: 'var(--color-metcon)' }} />
+            <span className={styles.legendLabel}>Move</span>
+            <span className={styles.legendSep}>{'\u00b7'}</span>
+            <span className={styles.legendValue}>
+              {metcon.value} / {metcon.goal} min
+            </span>
+          </div>
+          <div className={styles.legendProgress}>
+            <div
+              className={styles.legendProgressFill}
+              style={{
+                width: `${Math.min((metcon.value / metcon.goal) * 100, 100)}%`,
+                background: 'var(--color-metcon)',
+              }}
+            />
+          </div>
         </div>
-        <div className={styles.legendItem}>
-          <span className={styles.legendDot} style={{ background: 'var(--color-sessions)' }} />
-          <span className={styles.legendLabel}>Show Up</span>
-          <span className={styles.legendSep}>{'\u00b7'}</span>
-          <span className={styles.legendValue}>
-            {sessions.value} / {sessions.goal}
-          </span>
+        <div>
+          <div className={styles.legendItem}>
+            <span className={styles.legendDot} style={{ background: 'var(--color-sessions)' }} />
+            <span className={styles.legendLabel}>Show Up</span>
+            <span className={styles.legendSep}>{'\u00b7'}</span>
+            <span className={styles.legendValue}>
+              {sessions.value} / {sessions.goal}
+            </span>
+          </div>
+          <div className={styles.legendProgress}>
+            <div
+              className={styles.legendProgressFill}
+              style={{
+                width: `${Math.min((sessions.value / sessions.goal) * 100, 100)}%`,
+                background: 'var(--color-sessions)',
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

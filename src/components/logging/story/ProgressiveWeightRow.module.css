@@ -1,0 +1,206 @@
+/* ═══════════════════════════════════════════
+   ProgressiveWeightRow — Climb-to-peak input
+   ═══════════════════════════════════════════ */
+
+.card {
+  border-radius: var(--radius-md);
+  background: rgba(255, 214, 0, 0.06);
+  border: 1px solid rgba(255, 214, 0, 0.2);
+  overflow: hidden;
+  transition: border-color 200ms var(--ease-out);
+}
+
+.card:focus-within {
+  border-color: rgba(255, 214, 0, 0.45);
+}
+
+/* ── Header: label + total reps badge ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-volume);
+  letter-spacing: 0.01em;
+}
+
+.totalBadge {
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.03em;
+}
+
+/* ── Input row: START — gradient — PEAK ── */
+.inputRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding: var(--space-1) var(--space-2) var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 214, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.weightInput {
+  width: 100%;
+  min-width: 36px;
+  max-width: 56px;
+  height: 44px;
+  padding: 0 2px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid rgba(255, 214, 0, 0.4);
+  border-radius: 0;
+  font-size: 22px;
+  font-family: var(--font-family);
+  font-weight: var(--font-bold);
+  color: var(--color-volume);
+  text-align: center;
+  transition: border-color 150ms ease, text-shadow 150ms ease;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.weightInput:focus {
+  outline: none;
+  border-bottom-color: var(--color-volume);
+  text-shadow: 0 0 10px rgba(255, 214, 0, 0.35);
+}
+
+.weightInput::placeholder {
+  color: rgba(255, 214, 0, 0.22);
+  font-weight: var(--font-bold);
+}
+
+/* Hide number spinners */
+.weightInput::-webkit-inner-spin-button,
+.weightInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ── Input with +/- steppers ── */
+.inputWithSteppers {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.stepBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 214, 0, 0.2);
+  background: rgba(255, 214, 0, 0.06);
+  color: rgba(255, 214, 0, 0.55);
+  font-size: 15px;
+  font-weight: var(--font-bold);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.stepBtn:active {
+  background: rgba(255, 214, 0, 0.18);
+  border-color: rgba(255, 214, 0, 0.45);
+  color: rgba(255, 214, 0, 0.9);
+}
+
+.unit {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* ── Climb gradient bar ── */
+.gradientTrack {
+  flex: 1;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  /* align with input baseline area */
+  padding-bottom: 22px;
+}
+
+.gradientBar {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 0, 0.3),
+    rgba(255, 255, 0, 1.0)
+  );
+}
+
+/* ── Per-set weight preview chips ── */
+.previewRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 var(--space-3) var(--space-3);
+  overflow: hidden;
+  flex-wrap: wrap;
+}
+
+.previewChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 214, 0, 0.08);
+  border: 1px solid rgba(255, 214, 0, 0.15);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 214, 0, 0.7);
+  letter-spacing: 0.02em;
+}
+
+/* ── iOS zoom prevention ── */
+@media (pointer: coarse) {
+  .weightInput {
+    /* Keep 22px on mobile — 16px+ prevents iOS zoom */
+    font-size: 22px;
+  }
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

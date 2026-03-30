@@ -128,10 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: data.displayName || fbUser.displayName || 'Athlete',
           photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
           photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
-          createdAt: data.createdAt?.toDate() || new Date(),
+          createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
-          age: data.age,
+          birthYear: data.birthYear ?? data.age,
           weight: data.weight,
           sex: data.sex,
           onboardingComplete: data.onboardingComplete,
@@ -192,16 +192,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: data.displayName || fbUser.displayName || 'Athlete',
           photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
           photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
-          createdAt: data.createdAt?.toDate() || new Date(),
+          createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
           stats: data.stats || DEFAULT_STATS,
           goals: data.goals,
-          age: data.age,
+          birthYear: data.birthYear ?? data.age,
           weight: data.weight,
           sex: data.sex,
           onboardingComplete: data.onboardingComplete,
         };
         setUser(userData);
         setCachedUser(userData);
+
+        // Stamp last-active (fire-and-forget)
+        setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);

@@ -39,7 +39,7 @@
   width: 100%;
   padding: 14px 20px;
   background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%);
-  border: none;
+  border: 1.5px solid rgba(0, 255, 255, 0.6);
   border-radius: var(--radius-lg);
   color: #000;
   font-size: var(--text-sm);
@@ -47,7 +47,19 @@
   min-height: 48px;
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-out);
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), inset 0 0 8px rgba(0, 255, 255, 0.15);
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(0, 255, 255, 0.4);
+    box-shadow: 0 0 16px rgba(0, 255, 255, 0.25), inset 0 0 6px rgba(0, 255, 255, 0.1);
+  }
+  50% {
+    border-color: rgba(0, 255, 255, 0.8);
+    box-shadow: 0 0 28px rgba(0, 255, 255, 0.45), inset 0 0 10px rgba(0, 255, 255, 0.2);
+  }
 }
 
 .primaryButton:hover {

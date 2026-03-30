@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
+import { getWeightStep } from './types';
 import { StepperInput } from './StepperInput';
 import styles from './LoadInput.module.css';
 
@@ -26,6 +27,12 @@ function getDefaultWeight(result: StoryExerciseResult): number | undefined {
 export function LoadInput({ result, onChange, showImplement = false }: LoadInputProps) {
   const mode = result.loadMode ?? 'same';
   const topTouched = useRef(false);
+  const movName = result.exercise?.movements?.[0]?.name ?? result.exercise?.name ?? '';
+  const weightStep = getWeightStep(movName, result.implementCount);
+
+  // Detect max set pattern (e.g., [8-6-4-2-max] → repsPerSet has 4 items, setsTotal=5)
+  const repsPerSet = result.exercise?.suggestedRepsPerSet;
+  const hasMaxSet = !!(repsPerSet && result.setsTotal > repsPerSet.length);
 
   // Derive display values — fall back to rx weight if no user weight yet
   const startVal = result.weight ?? getDefaultWeight(result) ?? 0;
@@ -96,7 +103,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
             <StepperInput
               value={startVal || undefined}
               onChange={handleStartChange}
-              step={2.5}
+              step={weightStep}
               min={0}
               max={500}
               placeholder="0"
@@ -124,7 +131,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
             <StepperInput
               value={topVal || undefined}
               onChange={(v) => { handleTopFocus(); handleTopChange(v); }}
-              step={2.5}
+              step={weightStep}
               min={0}
               max={500}
               placeholder="0"
@@ -157,6 +164,39 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
                 {count}x
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Max reps set (for [8-6-4-2-max] patterns) */}
+      {hasMaxSet && mode !== 'bodyweight' && (
+        <div className={styles.maxSection}>
+          <span className={styles.maxLabel}>Max set</span>
+          <div className={styles.maxRow}>
+            <StepperInput
+              value={result.maxReps}
+              onChange={(v) => onChange({ maxReps: v != null ? Math.max(0, Math.round(v)) : undefined })}
+              step={1}
+              min={0}
+              max={100}
+              placeholder="0"
+              unit="reps"
+              label="Reps"
+              color="var(--color-volume)"
+              inputMode="numeric"
+            />
+            <StepperInput
+              value={result.maxRepsWeight}
+              onChange={(v) => onChange({ maxRepsWeight: v != null ? clampWeight(v) : undefined })}
+              step={weightStep}
+              min={0}
+              max={500}
+              placeholder={topVal ? String(Math.round(topVal * 0.6 * 2) / 2) : '0'}
+              unit="kg"
+              label="Weight"
+              color="var(--color-volume)"
+              inputMode="decimal"
+            />
           </div>
         </div>
       )}

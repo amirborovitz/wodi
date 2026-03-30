@@ -282,7 +282,7 @@ const StrengthCard = forwardRef<HTMLDivElement, CardInnerProps>(
 // ---------------------------------------------------------------------------
 
 const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
-  function MetconCard({ data: _data, userName, exercises }, ref) {
+  function MetconCard({ data, userName, exercises }, ref) {
     const color = TRINITY.magenta;
     const glow  = TRINITY_GLOW.magenta;
 
@@ -304,7 +304,8 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
       scoreText = timeSet ? formatTime(timeSet.time || 0) : '';
       scoreLabel = 'COMPLETED';
     } else if (exType === 'amrap') {
-      const rounds  = sets.filter(s => s.completed).length;
+      // Prefer exercise.rounds (set by story logging) over counting completed sets
+      const rounds  = primaryEx?.rounds || sets.filter(s => s.completed).length;
       const lastSet = sets[sets.length - 1];
       const extra   = lastSet?.actualReps || 0;
       scoreText = rounds > 0 ? `${rounds} rds${extra > 0 ? ` + ${extra}` : ''}` : '';
@@ -342,16 +343,18 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
       : [];
 
     // Metcon-specific stats
+    // Partner workouts: divide by teamSize for personal share
+    const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
     const metconStats: FunStat[] = [];
-    const totalReps = exercises.reduce((acc, ex) => {
+    const totalReps = Math.round(exercises.reduce((acc, ex) => {
       return acc + (ex.sets || []).reduce((a, s) => a + (s.actualReps || 0), 0);
-    }, 0);
-    const totalDist = exercises.reduce((acc, ex) => {
+    }, 0) / teamSize);
+    const totalDist = Math.round(exercises.reduce((acc, ex) => {
       return acc + (ex.sets || []).reduce((a, s) => a + (s.distance || 0), 0);
-    }, 0);
-    const totalCals = exercises.reduce((acc, ex) => {
+    }, 0) / teamSize);
+    const totalCals = Math.round(exercises.reduce((acc, ex) => {
       return acc + (ex.sets || []).reduce((a, s) => a + (s.calories || 0), 0);
-    }, 0);
+    }, 0) / teamSize);
 
     if (totalReps > 0) metconStats.push({ value: `${totalReps}`, label: 'REPS', color, glow });
     if (totalDist > 0) {
@@ -504,7 +507,7 @@ function getExerciseQuickSummary(ex: Exercise, type: ReturnType<typeof detectExe
     return timeSet ? formatTime(timeSet.time || 0) : ex.prescription || '';
   }
   if (type === 'amrap') {
-    const rounds = sets.filter(s => s.completed).length;
+    const rounds = ex.rounds || sets.filter(s => s.completed).length;
     const lastSet = sets[sets.length - 1];
     const extra = lastSet?.actualReps || 0;
     return rounds > 0 ? `${rounds} rds${extra > 0 ? ` + ${extra}` : ''}` : '';
@@ -565,7 +568,8 @@ function MetconCompact({ exercise, type, color }: { exercise: Exercise; type: 'f
     type === 'for_time'
       ? (() => { const t = sets.find(s => s.time != null && s.time > 0); return t ? formatTime(t.time || 0) : ''; })()
       : (() => {
-          const rounds = sets.filter(s => s.completed).length;
+          // Prefer exercise.rounds (story logging stores rounds there, not as individual sets)
+          const rounds = exercise.rounds || sets.filter(s => s.completed).length;
           const lastSet = sets[sets.length - 1];
           const extra = lastSet?.actualReps || 0;
           return rounds > 0 ? `${rounds} rds${extra > 0 ? ` + ${extra}` : ''}` : '';

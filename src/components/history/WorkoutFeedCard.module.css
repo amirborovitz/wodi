@@ -218,6 +218,22 @@
   hyphens: none;
 }
 
+/* Title inline edit input */
+.titleInput {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  line-height: 1.3;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--neon-cyan, #00F2FF);
+  outline: none;
+  padding: 0 0 2px;
+  font-family: inherit;
+}
+
 /* Stat pills */
 .statPills {
   display: flex;

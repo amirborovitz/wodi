@@ -8,7 +8,7 @@ export interface User {
   createdAt: Date;
   stats: UserStats;
   goals?: UserGoals;
-  age?: number;              // Optional, for calorie calculation
+  birthYear?: number;        // Year of birth, age calculated from this
   weight?: number;           // kg, important for calorie calculation
   sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   onboardingComplete?: boolean;  // Track if user completed onboarding
@@ -108,7 +108,12 @@ export interface Exercise {
   sets: ExerciseSet[];
   rxWeights?: RxWeights;   // Prescribed weight for share display
   movements?: ParsedMovement[];  // Structured movement data (for WODs)
+  sections?: ParsedSection[];    // Structured section blocks (buy-in / rounds / cash-out)
   rounds?: number;         // Number of rounds (for multi-round WODs)
+  ladderReps?: number[];   // Ladder AMRAP rep scheme [4, 6, 8, 10, 12]
+  intervalCount?: number;  // Number of AMRAP intervals
+  ladderStep?: number;     // How many rungs completed (continuous across intervals)
+  ladderPartial?: number;  // Partial reps into next incomplete rung
 }
 
 export interface ExerciseSet {
@@ -170,6 +175,7 @@ export interface MovementTotal {
   substitutionType?: 'easier' | 'harder' | 'equivalent';  // Scaling type
   implementCount?: number;  // 1=single, 2=pair (KB/DB)
   distancePerRep?: number;  // Single-round distance before multiplying by rounds
+  together?: boolean;       // Partner workout: both athletes do full amount (no split)
 }
 
 export interface WorkloadBreakdown {
@@ -202,12 +208,22 @@ export interface ParsedMovement {
   inputType?: 'weight' | 'calories' | 'distance' | 'none';  // AI-classified input type
   implementCount?: 1 | 2;       // 1=single, 2=pair (DB/KB). Default 1 when ambiguous.
   perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
+  role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
+  together?: boolean;           // Partner workouts: true if all partners do this movement together (not split). E.g., "600m run (together)".
   alternative?: {               // OR option (e.g., "40 DU / 60 singles")
     name: string;
     reps?: number;
     distance?: number;
     calories?: number;
   };
+}
+
+export type ParsedSectionType = 'buy_in' | 'rounds' | 'cash_out';
+
+export interface ParsedSection {
+  sectionType: ParsedSectionType;  // buy-in, working rounds block, or cash-out
+  rounds?: number;                 // how many times this block is repeated (default 1 for buy_in/cash_out)
+  movements: ParsedMovement[];     // movements in this block (per round for "rounds" sections)
 }
 
 export interface ParsedExercise {
@@ -220,10 +236,18 @@ export interface ParsedExercise {
   suggestedWeight?: number;
   rxWeights?: RxWeights;        // Rx weights (male/female)
   movements?: ParsedMovement[]; // Individual movements (for complex WODs)
+  // Optional higher-level structure for CrossFit-style workouts:
+  // buy-in -> rounds x [block] -> rounds x [block] -> cash-out.
+  // Each section groups movements that are repeated together.
+  sections?: ParsedSection[];
   loggingMode?: ExerciseLoggingMode;  // AI-classified logging UI mode
   loggingHints?: {
     sharedWeightMovements?: string[];  // movements sharing one barbell/implement
   };
+  ladderReps?: number[];              // ascending rep ladder per interval [4, 6, 8, 10, 12]
+  intervalCount?: number;             // how many AMRAP intervals (e.g. 4 for "x4 rounds")
+  workDuration?: number;              // programmed work time in seconds (e.g. 180 for a 3-min AMRAP)
+  restDuration?: number;              // programmed rest time in seconds between rounds/intervals
 }
 
 // Movement substitution tracking during logging
@@ -235,6 +259,8 @@ export interface MovementSubstitution {
   repMultiplier?: number;         // e.g., 3 for single-unders vs double-unders
   originalValue?: number;         // Original distance/reps
   adjustedValue?: number;         // Adjusted value after multiplier
+  /** The unit the adjusted value is measured in (target movement's default unit) */
+  targetUnit?: 'reps' | 'distance' | 'calories' | 'time';
 }
 
 // App navigation
@@ -326,6 +352,7 @@ export interface RewardData {
   workloadBreakdown?: WorkloadBreakdown;  // Per-movement totals for display
   workoutContext?: string;
   workoutRawText?: string;
+  teamSize?: number;                      // Partner workout team size (2 for pairs, N for teams)
 }
 
 // Weekly stats for consistency ring

@@ -161,8 +161,7 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
       { name: 'Banded Pull-ups', type: 'easier' },
       { name: 'Jumping Pull-ups', type: 'easier' },
       { name: 'Chest-to-Bar', type: 'harder' },
-      { name: 'Muscle-up', type: 'harder' },
-      { name: 'Bar Muscle-up', type: 'harder' },
+      { name: 'Ring Muscle-up', type: 'harder' },
     ],
   },
   {
@@ -178,15 +177,31 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
     ],
   },
   {
-    id: 'muscleup',
-    name: 'Muscle-up',
-    aliases: ['muscle-up', 'muscleup', 'muscle up', 'bar muscle-up', 'bar muscle up', 'bmu', 'b.m.u', 'ring muscle-up', 'ring muscle up', 'rmu'],
+    id: 'ring-muscleup',
+    name: 'Ring Muscle-up',
+    aliases: ['muscle-up', 'muscleup', 'muscle up', 'ring muscle-up', 'ring muscle up', 'rmu'],
     category: 'gymnastics',
     defaultUnit: 'reps',
     alternatives: [
-      { name: 'Pull-up + Dip', ratio: 1, type: 'easier' },
-      { name: 'Chest-to-Bar + Ring Dip', ratio: 1, type: 'easier' },
+      { name: 'Chest-to-Bar Pull-ups', type: 'easier' },
+      { name: 'Banded Muscle-ups', type: 'easier' },
       { name: 'Jumping Muscle-ups', type: 'easier' },
+      { name: 'Pull-ups', ratio: 2, type: 'easier' },
+      { name: 'Bar Muscle-up', type: 'harder' },
+    ],
+  },
+  {
+    id: 'bar-muscleup',
+    name: 'Bar Muscle-up',
+    aliases: ['bar muscle-up', 'bar muscle up', 'bmu', 'b.m.u'],
+    category: 'gymnastics',
+    defaultUnit: 'reps',
+    alternatives: [
+      { name: 'Ring Muscle-up', type: 'easier' },
+      { name: 'Chest-to-Bar Pull-ups', type: 'easier' },
+      { name: 'Banded Muscle-ups', type: 'easier' },
+      { name: 'Jumping Muscle-ups', type: 'easier' },
+      { name: 'Pull-ups', ratio: 2, type: 'easier' },
     ],
   },
   {
@@ -236,8 +251,21 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
     defaultUnit: 'reps',
     alternatives: [
       { name: 'Single-unders', ratio: 3, type: 'easier' },
+      { name: 'Burpees', ratio: 0.3, type: 'easier' },
       { name: 'Penguin Jumps', ratio: 2, type: 'easier' },
       { name: 'Triple-unders', ratio: 0.5, type: 'harder' },
+    ],
+  },
+  {
+    id: 'single-under',
+    name: 'Single-under',
+    aliases: ['single-under', 'su', 'single under', 'singles', 'single-unders'],
+    category: 'skill',
+    defaultUnit: 'reps',
+    alternatives: [
+      { name: 'Burpees', ratio: 0.1, type: 'easier' },
+      { name: 'Penguin Jumps', ratio: 0.67, type: 'easier' },
+      { name: 'Double-unders', ratio: 0.33, type: 'harder' },
     ],
   },
   {

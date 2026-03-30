@@ -130,6 +130,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             imageUrl: data.imageUrl,
             partnerWorkout: data.partnerWorkout,
             partnerFactor: data.partnerFactor,
+            teamSize: data.teamSize,
             workloadBreakdown: data.workloadBreakdown,
             status: data.status,
             exercises: data.exercises || [],

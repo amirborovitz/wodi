@@ -105,6 +105,33 @@ These users are **tired, sweaty, and one-handing their phone** after a workout:
 3. **Prefill everything obvious.** If the workout says "5×3 @60kg", the weight input should already show 60. The user adjusts, not fills.
 4. **Tap-to-adjust > type-to-fill.** Steppers (+/−) with long-press acceleration are always better than empty number inputs for common values.
 5. **One-handed operation.** Right-side controls. Bottom sheets not modals. Large tap zones.
+6. **No instructional text.** Never add "Tap X to do Y" hints. If the UI needs a written explanation, the UI is wrong. Teach through affordances, not labels.
+7. **Everything visible without scroll on iPhone.** Bottom sheets must fit: header + inputs + all movement rows + Done button — all visible on a standard 667pt screen. Kill vertical bloat ruthlessly.
+
+---
+
+## Scored Exercise Input Patterns (AMRAP / For Time / Intervals)
+
+These patterns govern how movement rows render inside scored-exercise bottom sheets:
+
+### Score Circle (AMRAP)
+- **126×126px** — compact enough to leave room for movements + Done button
+- Font: 48px bold magenta, "rounds" label below (L3 style)
+- ±1 buttons flanking the circle (44×44 glass)
+- **No instructional hint text** — the circle's affordance is self-evident
+
+### Movement Row Layout
+Each movement renders as a horizontal row: **name block (left) ↔ stepper input (right)**.
+
+1. **Strip weight from the movement name.** The label reads "Alt DB Snatch", not "22.5kg Alt DB Snatch". Weight belongs in the input box, not the label — showing it in both places is redundant and wastes horizontal space.
+2. **Rx weight as placeholder.** The stepper's placeholder shows the Rx weight (e.g., `22.5`) so the athlete sees the prescribed value even before entering anything.
+3. **Vertical center alignment.** The center of the movement name text must align with the center of its corresponding stepper input. Achieve this with `justify-content: center` on the name block column + `align-items: center` on the row.
+4. **Auto-scale font for long values.** When a weight value exceeds 3 characters (e.g., "135.5"), the stepper input font shrinks by 2px per extra character. This prevents the number from touching the +/− buttons.
+
+### Swap Pills (Substitution Toggles)
+- AI alternative chips: **18px height, 6px horizontal padding, 10px font**
+- Must never push the Done button off-screen — compactness is mandatory
+- Use magenta border/bg at low opacity for the pill chrome
 
 ---
 

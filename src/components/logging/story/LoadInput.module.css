@@ -24,34 +24,46 @@
 
 /* ── Sync icon ── */
 .syncIcon {
-  font-size: 20px;
+  font-size: 16px;
   width: 24px;
   text-align: center;
-  color: var(--color-text-tertiary);
-  margin-bottom: 16px; /* vertically align with input middle */
+  color: rgba(255, 255, 255, 0.25);
+  margin-bottom: 20px;
   flex-shrink: 0;
+  font-weight: var(--font-bold);
 }
 
 .syncIconActive {
-  color: var(--neon-cyan);
+  color: var(--neon-yellow);
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.4);
 }
 
 /* ── BW toggle pill ── */
 .bwPill {
-  background: none;
-  border: none;
-  color: var(--color-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--color-text-secondary);
   font-family: var(--font-family);
-  font-size: var(--text-xs);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
   cursor: pointer;
-  padding: var(--space-1) var(--space-2);
+  min-height: 36px;
   -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
 }
 
 .bwPill:active {
-  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* ── BW banner ── */
@@ -85,20 +97,21 @@
 .implementToggle {
   display: flex;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
-  padding: 2px;
+  padding: 3px;
 }
 
 .implementBtn {
-  height: 32px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 20px;
   border-radius: calc(var(--radius-sm) - 2px);
   border: none;
   background: transparent;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   font-family: var(--font-family);
-  font-size: var(--text-xs);
+  font-size: 13px;
   font-weight: var(--font-bold);
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
@@ -106,8 +119,37 @@
 }
 
 .implementBtnActive {
-  background: rgba(255, 214, 0, 0.12);
+  background: rgba(255, 214, 0, 0.16);
   color: var(--color-volume);
+  box-shadow: 0 0 8px rgba(255, 214, 0, 0.15);
+}
+
+/* ── Max reps section ── */
+.maxSection {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.maxLabel {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-volume);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.maxRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0 var(--space-2);
 }
 
 /* ── Reduced motion ── */

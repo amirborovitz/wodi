@@ -1,22 +1,56 @@
 /* ═══════════════════════════════════════════
-   ExerciseRow — single exercise in the story
+   ExerciseRow — exercise card in the story
+   Premium card: #161616 bg, #222 border,
+   social shadow, Trinity accent
    ═══════════════════════════════════════════ */
 
-.row {
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-2xl);
+  background: #161616;
+  border: 1px solid #222222;
+  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 6%, transparent);
+  transition: all var(--duration-fast) var(--ease-out);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+  position: relative;
+}
+
+.filled {
+  border-color: color-mix(in srgb, var(--row-color, var(--neon-cyan)) 20%, #222222);
+  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 10%, transparent);
+}
+
+.card:active {
+  background: #1a1a1a;
+  transform: scale(0.99);
+}
+
+/* ── Trinity accent strip (top) ── */
+.accentStrip {
+  height: 3px;
+  background: var(--row-color, var(--neon-cyan));
+  opacity: 0.25;
+  transition: opacity var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out),
+              height var(--duration-fast) var(--ease-out);
+}
+
+.filled .accentStrip {
+  height: 4px;
+  opacity: 1;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 55%, transparent);
+}
+
+/* ── Card body ── */
+.cardBody {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.04);
-  transition: background var(--duration-fast) var(--ease-out);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  min-height: 56px;
-}
-
-.row:active {
-  background: rgba(255, 255, 255, 0.08);
+  padding: 16px 20px;
+  min-height: 68px;
 }
 
 /* ── Left: movement info ── */
@@ -25,63 +59,78 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .movementName {
   font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   line-height: var(--leading-tight);
-  /* allow 2-line wrap, never truncate */
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
-.prescription {
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-family);
-  letter-spacing: 0.02em;
-}
-
-/* ── Right: result pill area ── */
-.resultArea {
-  flex-shrink: 0;
-}
-
-/* ── Row state accents ── */
-/* Left border is block identity — always visible. */
-
-.filled,
-.empty,
-.partial,
-.skipped {
-  border-left: 3px solid var(--row-color, var(--neon-cyan));
-  padding-left: calc(var(--space-4) - 3px);
-}
-
 .filled .movementName {
-  opacity: 0.75;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.partial .movementName {
-  opacity: 0.85;
+/* ── Prescription (structured text) ── */
+.prescription {
+  font-size: 13px;
+  font-weight: var(--font-normal);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
-.skipped {
-  border-left-style: dashed;
-  opacity: 0.5;
+.prescriptionLine {
+  display: block;
+}
+
+.prescriptionSep {
+  display: block;
+  height: 6px;
+}
+
+/* ── Right: action area ── */
+.actionArea {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 /* ── Chevron ── */
 .chevron {
   flex-shrink: 0;
-  font-size: var(--text-lg);
+  font-size: 20px;
   color: var(--color-text-tertiary);
-  opacity: 0.5;
+  opacity: 0.35;
   line-height: 1;
+  margin-left: 4px;
+}
+
+.filled .chevron {
+  color: var(--row-color, var(--neon-cyan));
+  opacity: 0.45;
+}
+
+/* ── Row state variants ── */
+
+.skipped {
+  opacity: 0.4;
+}
+
+.skipped .accentStrip {
+  opacity: 0.25;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--row-color, var(--neon-cyan)) 0px,
+    var(--row-color, var(--neon-cyan)) 6px,
+    transparent 6px,
+    transparent 12px
+  );
 }
 
 /* ── Section divider ── */
@@ -89,26 +138,29 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-4) var(--space-2);
+  padding: var(--space-3) var(--space-1) var(--space-2);
 }
 
 .sectionLabel {
-  font-size: var(--text-xs);
+  font-size: 11px;
   font-weight: var(--font-bold);
   color: var(--color-text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
 .sectionLine {
   flex: 1;
   height: 1px;
-  background: var(--color-border);
+  background: #222222;
 }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .row {
+  .card {
     transition: none;
+  }
+  .card:active {
+    transform: none;
   }
 }

@@ -370,12 +370,56 @@
   color: rgba(255, 255, 255, 0.35);
 }
 
+/* Partner share annotation: "your part 50" */
+.boardShareNote {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-medium);
+  color: rgba(0, 242, 255, 0.50);
+  margin-left: 4px;
+}
+
+/* Substitution swap icon: ⇄ next to substituted movement name */
+.boardSubIcon {
+  font-size: 12px;
+  color: rgba(255, 0, 229, 0.7);
+  margin-right: 3px;
+  flex-shrink: 0;
+}
+
+/* Volume badge: "1600m Total" inline after name */
+.boardVolumeBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* "Substituted for [Original Movement]" label */
+.boardSubLabel {
+  display: block;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.35);
+  padding-left: 18px;
+  margin-top: -1px;
+  line-height: 1.4;
+}
+
 /* Total annotation for AMRAP per-round display: "×6 = 42" */
 .boardTotal {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.50);
   margin-left: 4px;
 }
 
@@ -435,6 +479,61 @@
   color: rgba(255, 255, 255, 0.25);
   letter-spacing: 0.11em;
   text-transform: uppercase;
+}
+
+/* ============================================
+   Sectioned Board — buy-in / rounds blocks / cash-out
+   ============================================ */
+
+/* Wrapper for a single section (header + movement lines) */
+.sectionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Indent sectioned lines slightly to show nesting under the header */
+.boardLineIndented {
+  padding-left: 4px;
+}
+
+/* Section header row: label + hairline rule + optional share note */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* L3 label — uppercase, small, muted */
+.sectionHeaderLabel {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sectionHeaderBuyIn  { color: rgba(255, 214, 0,  0.55); }   /* yellow — first effort */
+.sectionHeaderRounds { color: rgba(255, 255, 255, 0.30); }  /* neutral — repeating work */
+.sectionHeaderCashOut { color: rgba(255, 0, 229, 0.50); }  /* magenta — finish line push */
+
+/* Hairline separator filling remaining width */
+.sectionHeaderLine {
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Partner share annotation: "50 cal each (÷2)" */
+.sectionShareNote {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.22);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ============================================

@@ -1,0 +1,97 @@
+/* ═══════════════════════════════════════════
+   LadderHeatmap — Celebration/History visual
+   ═══════════════════════════════════════════ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+}
+
+/* ── Horizontal rung track ── */
+.rungTrack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  padding: 0 var(--space-2);
+}
+
+.rung {
+  min-width: 44px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: var(--font-bold);
+  line-height: 1;
+  padding: 0 8px;
+}
+
+.rungCompleted {
+  background: rgba(255, 0, 229, 0.2);
+  border: 1px solid rgba(255, 0, 229, 0.35);
+  color: var(--color-metcon);
+  text-shadow: 0 0 8px rgba(255, 0, 229, 0.3);
+}
+
+.rungPartial {
+  background: rgba(255, 0, 229, 0.08);
+  border: 1px solid rgba(255, 0, 229, 0.15);
+  color: rgba(255, 0, 229, 0.5);
+}
+
+.rungEmpty {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Movement totals ── */
+.movementTotals {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 var(--space-2);
+}
+
+.movementRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.movementName {
+  font-size: 14px;
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.movementTotal {
+  font-size: 14px;
+  font-weight: var(--font-bold);
+  line-height: 1;
+}
+
+.colorYellow {
+  color: var(--color-volume);
+  text-shadow: 0 0 8px rgba(255, 214, 0, 0.25);
+}
+
+.colorMagenta {
+  color: var(--color-metcon);
+  text-shadow: 0 0 8px rgba(255, 0, 229, 0.25);
+}
+
+.colorCyan {
+  color: var(--color-sessions);
+  text-shadow: 0 0 8px rgba(0, 242, 255, 0.25);
+}

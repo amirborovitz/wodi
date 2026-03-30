@@ -9,7 +9,7 @@ interface ProfileSettingsScreenProps {
   user: User | null;
   onSave: (profile: {
     displayName?: string;
-    age?: number;
+    birthYear?: number;
     weight?: number;
     sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   }) => Promise<void>;
@@ -21,7 +21,7 @@ export function ProfileSettingsScreen({
   onSave,
 }: ProfileSettingsScreenProps) {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [age, setAge] = useState(user?.age?.toString() || '');
+  const [birthYear, setBirthYear] = useState(user?.birthYear?.toString() || '');
   const [weight, setWeight] = useState(user?.weight?.toString() || '');
   const [sex, setSex] = useState<string>(user?.sex || '');
   const [saving, setSaving] = useState(false);
@@ -46,7 +46,7 @@ export function ProfileSettingsScreen({
     try {
       const profile: {
         displayName?: string;
-        age?: number;
+        birthYear?: number;
         weight?: number;
         sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
       } = {};
@@ -55,10 +55,10 @@ export function ProfileSettingsScreen({
         profile.displayName = displayName.trim();
       }
 
-      if (age) {
-        const ageNum = parseInt(age, 10);
-        if (!isNaN(ageNum) && ageNum > 0 && ageNum < 120) {
-          profile.age = ageNum;
+      if (birthYear) {
+        const yearNum = parseInt(birthYear, 10);
+        if (!isNaN(yearNum) && yearNum >= 1900 && yearNum <= new Date().getFullYear()) {
+          profile.birthYear = yearNum;
         }
       }
 
@@ -131,22 +131,21 @@ export function ProfileSettingsScreen({
             />
           </div>
 
-          {/* Age */}
-          <div className={`${styles.field} ${savedField === 'age' ? styles.fieldSaved : ''}`}>
-            <label className={styles.label}>Age</label>
+          {/* Birth Year */}
+          <div className={`${styles.field} ${savedField === 'birthYear' ? styles.fieldSaved : ''}`}>
+            <label className={styles.label}>Year of Birth</label>
             <div className={styles.inputWithUnit}>
               <input
                 type="number"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
                 onFocus={handleSelectOnFocus}
-                onBlur={() => handleFieldBlur('age')}
+                onBlur={() => handleFieldBlur('birthYear')}
                 placeholder="—"
-                min={1}
-                max={120}
+                min={1900}
+                max={new Date().getFullYear()}
                 className={styles.inputNumber}
               />
-              <span className={styles.unit}>years</span>
             </div>
           </div>
 

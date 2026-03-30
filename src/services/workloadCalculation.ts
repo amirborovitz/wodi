@@ -164,8 +164,11 @@ export function calculateWorkloadBreakdown(
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
-        // perRound defaults to true; if false, movement is done once (buy-in/cash-out)
-        const movMultiplier = movement.perRound === false ? 1 : multiplier;
+        // perRound: false means "done once" ONLY for buy-in/cash-out sections.
+        // In ladder AMRAPs, perRound: false means fixed reps every round (not on the ladder).
+        const hasSections = !!(exercise.sections && exercise.sections.length > 0);
+        const isBuyInCashOut = hasSections && movement.perRound === false;
+        const movMultiplier = isBuyInCashOut ? 1 : multiplier;
         const reps = (movement.reps || 0) * movMultiplier;
         const distance = (movement.distance || 0) * movMultiplier;
         const calories = (movement.calories || 0) * movMultiplier;
@@ -330,6 +333,7 @@ export function calculateWorkloadFromExercises(
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
   let grandTotalDistance = 0;
+  let grandTotalRunDistance = 0; // Run distance exempt from partner division
   let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
@@ -339,6 +343,7 @@ export function calculateWorkloadFromExercises(
     let exerciseWeight: number | undefined;
     let exerciseDistance = 0;
     let exerciseCalories = 0;
+    let exerciseVolume = 0;
     const perSetWeights: number[] = [];
 
     for (const set of exercise.sets) {
@@ -348,6 +353,8 @@ export function calculateWorkloadFromExercises(
       if (set.weight) {
         if (!exerciseWeight) exerciseWeight = set.weight;
         perSetWeights.push(set.weight);
+        // Accumulate per-set volume for accurate progressive weight totals
+        exerciseVolume += set.weight * (set.actualReps || 0);
       }
       if (set.distance) {
         exerciseDistance += set.distance;
@@ -360,6 +367,11 @@ export function calculateWorkloadFromExercises(
     // Build weight progression if weights vary across sets
     const hasVaryingWeights = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
     const weightProgression = hasVaryingWeights ? perSetWeights : undefined;
+
+    // Use weighted average weight when progression exists, so volume = avgWeight × totalReps
+    if (hasVaryingWeights && exerciseReps > 0 && exerciseVolume > 0) {
+      exerciseWeight = exerciseVolume / exerciseReps;
+    }
 
     // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
     if (!exerciseWeight && isBwVolumeMovement(exercise.name)) {
@@ -408,6 +420,9 @@ export function calculateWorkloadFromExercises(
     }
     if (exerciseDistance > 0) {
       grandTotalDistance += exerciseDistance;
+      if (/\b(run|running|sprint)\b/i.test(exercise.name)) {
+        grandTotalRunDistance += exerciseDistance;
+      }
       if ((exerciseWeight && exerciseWeight > 0) || isWeightedCarry(exercise.name)) {
         grandTotalWeightedDistance += exerciseDistance;
       }
@@ -420,15 +435,28 @@ export function calculateWorkloadFromExercises(
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
   const factor = partnerFactor || 1;
   const movements = Array.from(movementMap.values())
-    .filter(m => m.totalReps && m.totalReps > 0)
-    .map((movement) => ({
-      ...movement,
-      totalReps: movement.totalReps ? Math.round(movement.totalReps * factor) : movement.totalReps,
-    }))
+    // Keep movements with any meaningful metric: reps, calories, or distance
+    .filter(m => (m.totalReps && m.totalReps > 0)
+      || (m.totalCalories && m.totalCalories > 0)
+      || (m.totalDistance && m.totalDistance > 0))
+    .map((movement) => {
+      // Runs are never divided — each person runs the full distance
+      const isRun = /\b(run|running|sprint)\b/i.test(movement.name);
+      const f = isRun ? 1 : factor;
+      return {
+        ...movement,
+        totalReps: movement.totalReps ? Math.round(movement.totalReps * f) : movement.totalReps,
+        totalCalories: movement.totalCalories ? Math.round(movement.totalCalories * f) : movement.totalCalories,
+        totalDistance: movement.totalDistance ? Math.round(movement.totalDistance * f) : movement.totalDistance,
+      };
+    })
     .sort((a, b) => {
       const colorDiff = (colorOrder[a.color || 'magenta'] || 1) - (colorOrder[b.color || 'magenta'] || 1);
       if (colorDiff !== 0) return colorDiff;
-      return (b.totalReps || 0) - (a.totalReps || 0);
+      // Sort by most meaningful metric
+      const aVal = (a.totalReps || 0) + (a.totalCalories || 0) + (a.totalDistance || 0);
+      const bVal = (b.totalReps || 0) + (b.totalCalories || 0) + (b.totalDistance || 0);
+      return bVal - aVal;
     });
 
   // Derive volume from final movements for consistency with display
@@ -443,7 +471,9 @@ export function calculateWorkloadFromExercises(
     movements,
     grandTotalReps: Math.round(grandTotalReps * factor),
     grandTotalVolume: Math.round(derivedVolume),
-    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance * factor) : undefined,
+    grandTotalDistance: grandTotalDistance > 0
+      ? Math.round((grandTotalDistance - grandTotalRunDistance) * factor + grandTotalRunDistance)
+      : undefined,
     grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance * factor) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
     containerRounds,

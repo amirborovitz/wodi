@@ -8,6 +8,7 @@ interface WorkoutHistoryFeedProps {
   onSelectWorkout?: (id: string) => void;
   onDeleteWorkout?: (id: string) => void;
   onEditWorkout?: (id: string) => void;
+  onRenameWorkout?: (id: string, newTitle: string) => void;
 }
 
 interface WorkoutGroup {
@@ -23,7 +24,7 @@ function formatMonthLabel(date: Date): string {
   });
 }
 
-export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout, onEditWorkout }: WorkoutHistoryFeedProps) {
+export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout, onEditWorkout, onRenameWorkout }: WorkoutHistoryFeedProps) {
   const groups = useMemo<WorkoutGroup[]>(() => {
     const sorted = [...workouts].sort((a, b) => b.date.getTime() - a.date.getTime());
     const byMonth = new Map<string, WorkoutGroup>();
@@ -63,6 +64,7 @@ export function WorkoutHistoryFeed({ workouts, onSelectWorkout, onDeleteWorkout,
                   onClick={onSelectWorkout ? () => onSelectWorkout(workout.id) : undefined}
                   onDelete={onDeleteWorkout ? () => onDeleteWorkout(workout.id) : undefined}
                   onEdit={onEditWorkout ? () => onEditWorkout(workout.id) : undefined}
+                  onRename={onRenameWorkout ? (newTitle: string) => onRenameWorkout(workout.id, newTitle) : undefined}
                 />
               </div>
             ))}

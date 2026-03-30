@@ -14,7 +14,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const { user, updateUserProfile } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState(user?.displayName || '');
-  const [age, setAge] = useState<string>('');
+  const [birthYear, setBirthYear] = useState<string>('');
   const [weight, setWeight] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +40,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     try {
       const profile: {
         displayName: string;
-        age?: number;
+        birthYear?: number;
         weight?: number;
         onboardingComplete: boolean;
       } = {
@@ -48,10 +48,10 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         onboardingComplete: true,
       };
 
-      if (age) {
-        const ageNum = parseInt(age, 10);
-        if (!isNaN(ageNum) && ageNum > 0 && ageNum < 120) {
-          profile.age = ageNum;
+      if (birthYear) {
+        const yearNum = parseInt(birthYear, 10);
+        if (!isNaN(yearNum) && yearNum >= 1900 && yearNum <= new Date().getFullYear()) {
+          profile.birthYear = yearNum;
         }
       }
 
@@ -134,19 +134,18 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       <p className={styles.subtitle}>Let's get to know you a bit better</p>
 
       <div className={styles.fieldGroup}>
-        <label className={styles.label}>How old are you?</label>
+        <label className={styles.label}>What year were you born?</label>
         <div className={styles.inputRow}>
           <input
             type="number"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
+            value={birthYear}
+            onChange={(e) => setBirthYear(e.target.value)}
             onFocus={handleSelectOnFocus}
-            placeholder="Age"
+            placeholder="e.g. 1990"
             className={styles.input}
-            min={1}
-            max={120}
+            min={1900}
+            max={new Date().getFullYear()}
           />
-          <span className={styles.unit}>years</span>
         </div>
         <span className={styles.hint}>Optional - helps personalize your experience</span>
       </div>
@@ -156,7 +155,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           Back
         </button>
         <button className={styles.primaryButton} onClick={handleContinue}>
-          {age ? 'Continue' : 'Skip'}
+          {birthYear ? 'Continue' : 'Skip'}
         </button>
       </div>
     </motion.div>

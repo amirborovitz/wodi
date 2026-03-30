@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType } from '../types';
 import { postProcessParsedWorkout } from './workoutPostProcessor';
 
 const openai = new OpenAI({
@@ -43,12 +43,35 @@ Return ONLY valid JSON:
       // This work is not repeated each round.
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
+        // Each movement can have a "role": "buy_in" (done once before rounds), "cash_out" (done once after rounds), or omit for normal per-round work.
+        // Use "role" when a buy-in/cash-out movement naturally belongs in the movements array (e.g., "200m Run into AMRAP: ...").
         { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
         { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
       ],
       // Cash-out work that happens ONCE after all rounds goes into "cashOut".
       "cashOut": [{ "name": "Run", "distance": 600, "unit": "m" }],
-      "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] }
+      // Optional higher-level structure for CrossFit-style workouts:
+      // sections: buy-in -> rounds x [block] -> rounds x [block] -> cash-out.
+      "sections": [
+        {
+          "sectionType": "buy_in" | "rounds" | "cash_out",
+          "rounds": 1,
+          "movements": [
+            { "name": "Movement Name", "reps": 10, "inputType": "none" }
+          ]
+        }
+      ],
+      "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] },
+      // workDuration: programmed work time for THIS EXERCISE in SECONDS.
+      // If the exercise represents one block: total work time for that block.
+      // Examples: "AMRAP 12" (single block) → 720, "AMRAP 3:00 x 4" (single exercise, 4 intervals) → 720 (180*4),
+      //   "A.1 AMRAP 6:00 (Round 1)" (one of 4 split exercises) → 360, "EMOM 15" → 900, "10 min for time" → 600
+      // Omit for strength / sets-for-quality with no time component.
+      "workDuration": 720,
+      // restDuration: programmed rest time for THIS EXERCISE in SECONDS.
+      // Examples: "AMRAP 3:00 x 4" with 1:00 rest (single exercise) → 240 (60*4),
+      //   "A.1 AMRAP 6:00 (Round 1)" with 2:00 rest (one of 4 split) → 120. Omit when no prescribed rest.
+      "restDuration": 240
     }
   ]
 }
@@ -71,8 +94,8 @@ Return ONLY valid JSON:
 ## FORMAT DETECTION (pick exactly one)
 | Format | Trigger | scoreType |
 |--------|---------|-----------|
-| amrap_intervals | "2:30 AMRAP x 4", multiple AMRAPs with rest | rounds_reps |
-| intervals | "5 sets for time", "every 3:00 x 5" | time_per_set |
+| amrap_intervals | "2:30 AMRAP x 4", multiple AMRAPs with rest, "every X:XX → buy-in + AMRAP" | rounds_reps |
+| intervals | "5 sets for time", "every 3:00 x 5" (NO "AMRAP" or "into AMRAP" in text) | time_per_set |
 | for_time | "for time", "RFT" (no "x sets") | time |
 | amrap | "AMRAP 12" (single) | rounds_reps |
 | emom | "EMOM", "every 1:00", "E2MOM" | reps |
@@ -116,8 +139,8 @@ Every exercise MUST include "loggingMode" — this determines which logging UI t
 - "strength": barbell/DB/KB lifts with sets×reps (5x5 Back Squat, 3x8 DB Press)
 - "for_time": complete work ASAP, log total time (RFT, chipper, partner IGUG, team workouts with total cal/rep targets)
 - "amrap": as many rounds as possible in time limit
-- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00)
-- "intervals": repeated sets with individual times (5 sets for time, every 3:00 x 5) — NOT for partner/IGUG/team workouts
+- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00) OR "every X:XX" with a buy-in then AMRAP for remaining time
+- "intervals": repeated sets with individual times (5 sets for time, every 3:00 x 5) — NOT when "AMRAP" or "into AMRAP" appears in the text
 - "emom": every minute on the minute
 - "cardio": machine work scored by calories (single machine, no other movements)
 - "cardio_distance": cardio scored by distance (single machine, no other movements)
@@ -155,7 +178,9 @@ Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 ## PARTNER / TEAM WORKOUTS
 - "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N
-- "(6 each)" → suggestedSets: 6 (per-person count, NOT total).
+- "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
+- CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
+- "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
 
 ## SKILL / PRACTICE BLOCKS
 "Practice", "build weight", "movement focus" → type: "skill", suggestedSets: 1, NO suggestedReps, NO movements from other blocks.
@@ -188,7 +213,7 @@ Input: "AMRAP 12: 10 thrusters 43/30kg, 15 pull-ups"
 Output:
 {
   "type": "amrap", "format": "amrap", "scoreType": "rounds_reps", "timeCap": 720,
-  "exercises": [{ "name": "AMRAP 12", "type": "wod", "loggingMode": "amrap", "prescription": "10 Thrusters 43/30kg, 15 Pull-ups", "suggestedSets": 1,
+  "exercises": [{ "name": "AMRAP 12", "type": "wod", "loggingMode": "amrap", "prescription": "10 Thrusters 43/30kg, 15 Pull-ups", "suggestedSets": 1, "workDuration": 720,
     "movements": [
       { "name": "Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 43, "female": 30, "unit": "kg" } },
       { "name": "Pull-up", "reps": 15, "inputType": "none" }
@@ -200,7 +225,7 @@ Input: "18 min AMRAP: 7 cal Echo Bike, 10 TTB, 10 Alt DB Devil Press 22.5/15kg"
 Output:
 {
   "type": "amrap", "format": "amrap", "scoreType": "rounds_reps", "timeCap": 1080,
-  "exercises": [{ "name": "18 min AMRAP", "type": "wod", "loggingMode": "amrap", "prescription": "7 cal Echo Bike, 10 TTB, 10 Alt DB Devil Press 22.5/15kg", "suggestedSets": 1,
+  "exercises": [{ "name": "18 min AMRAP", "type": "wod", "loggingMode": "amrap", "prescription": "7 cal Echo Bike, 10 TTB, 10 Alt DB Devil Press 22.5/15kg", "suggestedSets": 1, "workDuration": 1080,
     "movements": [
       { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" },
       { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
@@ -283,7 +308,7 @@ Input: "EMOM 12: 1 Power Clean + 1 Squat Clean @ 80kg"
 Output:
 {
   "type": "emom", "format": "emom", "scoreType": "reps", "timeCap": 720, "intervalTime": 60,
-  "exercises": [{ "name": "EMOM 12", "type": "wod", "loggingMode": "emom", "prescription": "1 Power Clean + 1 Squat Clean @80kg", "suggestedSets": 12,
+  "exercises": [{ "name": "EMOM 12", "type": "wod", "loggingMode": "emom", "prescription": "1 Power Clean + 1 Squat Clean @80kg", "suggestedSets": 12, "workDuration": 720,
     "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] },
     "movements": [
       { "name": "Power Clean", "reps": 1, "inputType": "weight", "rxWeights": { "male": 80, "female": 80, "unit": "kg" } },
@@ -297,7 +322,7 @@ Output:
 {
   "title": "Lion's Roar", "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps", "timeCap": 1920,
   "exercises": [
-    { "name": "A.1 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1,
+    { "name": "A.1 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1, "workDuration": 360, "restDuration": 120,
       "movements": [
         { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
         { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
@@ -325,7 +350,27 @@ Output:
 }
 NOTE: When AMRAPs alternate between DIFFERENT movement blocks (A.1/A.2 or odd/even), split into separate exercises — one per block per attempt. Each exercise gets its own round score. Do NOT merge different blocks into one exercise.
 
-### 12. For time with buy-in + multiple round sections (Lion's Roar style)
+### 12. Every X:XX with buy-in + AMRAP (interval AMRAP)
+Input: "Every 04:00 min x 3 rounds: 200m run, Into AMRAP: 4 B.M.U / 6 chest to bar pull ups, 8 boxjumps, 10 KB swings @24/32kg"
+Output:
+{
+  "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps",
+  "intervalTime": 240, "restTime": 0, "sets": 3,
+  "exercises": [{ "name": "Every 4:00 x 3 AMRAP", "type": "wod", "loggingMode": "amrap_intervals", "prescription": "200m Run buy-in, then AMRAP: 4 Bar Muscle-up, 8 Box Jumps, 10 KB Swings @24/32kg", "suggestedSets": 3, "workDuration": 720, "restDuration": 0,
+    "buyIn": [{ "name": "Run", "distance": 200, "unit": "m", "inputType": "none" }],
+    "movements": [
+      { "name": "Bar Muscle-up", "reps": 4, "inputType": "none", "alternative": { "name": "Chest to Bar Pull-up", "reps": 6 } },
+      { "name": "Box Jump", "reps": 8, "inputType": "none" },
+      { "name": "Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 32, "female": 24, "unit": "kg" }, "implementCount": 1 }
+    ] }]
+}
+NOTE: "Every X:XX + AMRAP" = amrap_intervals, NOT intervals/emom. The run is a buyIn (repeated each interval). User scores total rounds+reps across all intervals.
+IMPORTANT: If you place a buy-in movement inside "movements" instead of "buyIn", you MUST set "role": "buy_in" on it so the app knows it's not repeated per AMRAP round.
+Equivalent alternatives (both are correct):
+  Option A: "buyIn": [{ "name": "Run", "distance": 200 }], "movements": [{ "name": "BMU", "reps": 4 }, ...]
+  Option B: "movements": [{ "name": "Run", "distance": 200, "role": "buy_in" }, { "name": "BMU", "reps": 4 }, ...]
+
+### 13. For time with buy-in + multiple round sections (Lion's Roar style)
 Input:
 "Lion's Roar
 A. METCON (Long)
@@ -390,6 +435,57 @@ Output:
           "reps": 40,
           "inputType": "weight",
           "rxWeights": { "male": 50, "female": 35, "unit": "kg" }
+        }
+      ],
+      // Sections explicitly group which movements are repeated together and how many times.
+      "sections": [
+        {
+          "sectionType": "buy_in",
+          "rounds": 1,
+          "movements": [
+            {
+              "name": "Echo Bike",
+              "calories": 100,
+              "rxCalories": { "male": 100, "female": 80 },
+              "inputType": "none"
+            }
+          ]
+        },
+        {
+          "sectionType": "rounds",
+          "rounds": 2,
+          "movements": [
+            {
+              "name": "Run",
+              "distance": 600,
+              "unit": "m",
+              "inputType": "none",
+              "together": true
+            },
+            {
+              "name": "Clean and Jerk",
+              "reps": 40,
+              "inputType": "weight",
+              "rxWeights": { "male": 50, "female": 35, "unit": "kg" }
+            }
+          ]
+        },
+        {
+          "sectionType": "rounds",
+          "rounds": 2,
+          "movements": [
+            {
+              "name": "Box Jump",
+              "reps": 40,
+              "inputType": "none"
+            },
+            {
+              "name": "Thruster",
+              "reps": 40,
+              "inputType": "weight",
+              "rxWeights": { "male": 50, "female": 35, "unit": "kg" }
+            }
+          ]
         }
       ]
     }
@@ -509,6 +605,7 @@ Rules:
 - "5x3" = suggestedSets: 5, suggestedReps: 3.
 - Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
 - Preserve "loggingHints" (including sharedWeightMovements) from the original parsed data.
+- Preserve "workDuration" and "restDuration" from the original parsed data.
 - Preserve original structure when unsure — only correct obvious errors.`;
 
 export async function refineParsedWorkout(
@@ -624,8 +721,11 @@ function validateMovement(data: unknown): ParsedMovement | null {
     unit: validateMeasurementUnit(raw.unit),
     inputType,
     implementCount,
-    perRound: raw.perRound === false ? false : undefined,
+    // "role": "buy_in" or "cash_out" from AI means this movement is not repeated per round
+    perRound: raw.perRound === false || raw.role === 'buy_in' || raw.role === 'cash_out' ? false : undefined,
     alternative,
+    // Preserve role so downstream code can distinguish buy-in from cash-out
+    ...(raw.role === 'buy_in' || raw.role === 'cash_out' ? { role: raw.role as 'buy_in' | 'cash_out' } : {}),
   };
 }
 
@@ -677,7 +777,15 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
       if (Array.isArray(exercise.movements)) {
         for (const mov of exercise.movements) {
           const validated = validateMovement(mov);
-          if (validated) coreMovements.push(validated);
+          if (validated) {
+            // AI used "role" field to mark buy-in/cash-out inline — add name prefix
+            if (validated.role === 'buy_in' && !validated.name.startsWith('Buy-In:')) {
+              validated.name = `Buy-In: ${validated.name}`;
+            } else if (validated.role === 'cash_out' && !validated.name.startsWith('Cash-Out:')) {
+              validated.name = `Cash-Out: ${validated.name}`;
+            }
+            coreMovements.push(validated);
+          }
         }
       }
 
@@ -697,20 +805,71 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
       // Combine: buyIn (perRound=false) + core + cashOut (perRound=false)
       const movements = [...buyInMovements, ...coreMovements, ...cashOutMovements];
 
+      // Validate optional sections (buy-in / rounds blocks / cash-out)
+      let sections: ParsedSection[] | undefined = undefined;
+      if (Array.isArray((exercise as any).sections)) {
+        const rawSections = (exercise as any).sections as unknown[];
+        const parsedSections: ParsedSection[] = [];
+
+        for (const sec of rawSections) {
+          if (!sec || typeof sec !== 'object') continue;
+          const rawSec = sec as Record<string, unknown>;
+
+          const rawType = rawSec.sectionType;
+          const sectionType: ParsedSectionType =
+            rawType === 'buy_in' || rawType === 'cash_out' || rawType === 'rounds'
+              ? rawType
+              : 'rounds';
+
+          const rounds =
+            typeof rawSec.rounds === 'number'
+              ? rawSec.rounds
+              : sectionType === 'rounds'
+                ? 1
+                : undefined;
+
+          const sectionMovements: ParsedMovement[] = [];
+          if (Array.isArray(rawSec.movements)) {
+            for (const mov of rawSec.movements) {
+              const validated = validateMovement(mov);
+              if (validated) {
+                sectionMovements.push(validated);
+              }
+            }
+          }
+
+          if (sectionMovements.length > 0) {
+            parsedSections.push({
+              sectionType,
+              rounds,
+              movements: sectionMovements,
+            });
+          }
+        }
+
+        if (parsedSections.length > 0) {
+          sections = parsedSections;
+        }
+      }
+
       const name = String(exercise.name || 'Unknown Exercise');
       const prescription = String(exercise.prescription || '');
       let suggestedSets = typeof exercise.suggestedSets === 'number' ? exercise.suggestedSets : 1;
       let suggestedReps = typeof exercise.suggestedReps === 'number' ? exercise.suggestedReps : undefined;
 
-      const setsRepsMatch = `${name} ${prescription}`.match(/(\d+)\s*[x]\s*(\d+)/i)
-        || `${name} ${prescription}`.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-      if (setsRepsMatch) {
-        const parsedSets = parseInt(setsRepsMatch[1], 10);
-        const parsedReps = parseInt(setsRepsMatch[2], 10);
-        if (!Number.isNaN(parsedSets) && !Number.isNaN(parsedReps)) {
-          if (suggestedSets !== parsedSets || suggestedReps !== parsedReps) {
-            suggestedSets = parsedSets;
-            suggestedReps = parsedReps;
+      // Only infer sets×reps from text when the AI didn't provide them.
+      // Trust AI values — regex overrides have caused bugs (e.g., "4:00 x 3" → sets=0).
+      const aiProvidedSets = typeof exercise.suggestedSets === 'number' && exercise.suggestedSets > 0;
+      const aiProvidedReps = typeof exercise.suggestedReps === 'number' && exercise.suggestedReps > 0;
+      if (!aiProvidedSets || !aiProvidedReps) {
+        const setsRepsMatch = `${name} ${prescription}`.match(/(\d+)\s*[x]\s*(\d+)/i)
+          || `${name} ${prescription}`.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
+        if (setsRepsMatch) {
+          const parsedSets = parseInt(setsRepsMatch[1], 10);
+          const parsedReps = parseInt(setsRepsMatch[2], 10);
+          if (!Number.isNaN(parsedSets) && !Number.isNaN(parsedReps) && parsedSets > 0) {
+            if (!aiProvidedSets) suggestedSets = parsedSets;
+            if (!aiProvidedReps) suggestedReps = parsedReps;
           }
         }
       }
@@ -721,8 +880,10 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         const arr = exercise.suggestedRepsPerSet.filter((v: unknown) => typeof v === 'number' && v > 0) as number[];
         if (arr.length > 0) {
           suggestedRepsPerSet = arr;
-          // Ensure suggestedSets matches array length
-          if (suggestedSets !== arr.length) {
+          // Only adjust suggestedSets UP to match array length.
+          // When suggestedSets > arr.length, the extra sets are likely "max" sets
+          // (e.g., [8,6,4,2,max] → arr=[8,6,4,2], suggestedSets=5).
+          if (suggestedSets < arr.length) {
             suggestedSets = arr.length;
           }
         }
@@ -758,8 +919,11 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         suggestedWeight: typeof exercise.suggestedWeight === 'number' ? exercise.suggestedWeight : undefined,
         rxWeights: validateRxWeights(exercise.rxWeights),
         movements: movements.length > 0 ? movements : undefined,
+        sections,
         loggingMode,
         loggingHints,
+        workDuration: typeof exercise.workDuration === 'number' && exercise.workDuration > 0 ? exercise.workDuration : undefined,
+        restDuration: typeof exercise.restDuration === 'number' && exercise.restDuration > 0 ? exercise.restDuration : undefined,
       });
     }
   }

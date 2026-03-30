@@ -33,8 +33,8 @@
 }
 
 .title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
   color: var(--color-text);
   margin: 0;
   line-height: var(--leading-tight);
@@ -42,7 +42,7 @@
 
 .name {
   color: var(--color-text);
-  font-weight: var(--font-bold);
+  font-weight: var(--font-black);
 }
 
 .avatar {
@@ -50,7 +50,8 @@
   height: 44px;
   border-radius: var(--radius-full);
   object-fit: cover;
-  border: 2px solid var(--glass-border);
+  border: 2px solid var(--color-sessions);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.25);
 }
 
 .avatarButton {
@@ -74,7 +75,8 @@
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.08);
-  border: 2px solid var(--glass-border);
+  border: 2px solid var(--color-sessions);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.25);
   color: var(--color-text);
   font-weight: var(--font-bold);
   font-size: var(--text-sm);

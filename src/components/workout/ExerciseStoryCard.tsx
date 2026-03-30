@@ -1,11 +1,17 @@
 import { motion } from 'framer-motion';
 import styles from './ExerciseStoryCard.module.css';
-import type { Exercise, MovementTotal } from '../../types';
+import type { Exercise, MovementTotal, ParsedSectionType } from '../../types';
 import { detectExerciseDisplayType, getCompletedSets } from '../share/shareCardUtils';
 
 // ============================================
 // Props
 // ============================================
+
+/** Partner context — when a workout is done with others */
+interface PartnerContext {
+  teamSize: number;       // 2 for pairs, 3 for teams of 3, etc.
+  partnerFactor: number;  // 1/teamSize — personal share multiplier
+}
 
 interface ExerciseStoryCardProps {
   exercise: Exercise;
@@ -14,6 +20,8 @@ interface ExerciseStoryCardProps {
   isPR?: boolean;
   /** Actual logged movement totals from WorkloadBreakdown (overrides prescription values) */
   breakdownMovements?: MovementTotal[];
+  /** Partner workout context — used to annotate buy-in/cash-out personal share */
+  partnerContext?: PartnerContext;
   /** Compact mode: adaptive sizing for single-screen fit */
   compact?: boolean;
   /** Max movements to show before "+ X more" overflow label */
@@ -44,6 +52,15 @@ function fmtDist(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
 
+/** Find a breakdown entry by movement name, also checking originalMovement for substitutions */
+function findBreakdownMatch(breakdownMovements: MovementTotal[] | undefined, movName: string): MovementTotal | undefined {
+  if (!breakdownMovements) return undefined;
+  const lower = movName.toLowerCase();
+  return breakdownMovements.find(
+    bm => bm.name.toLowerCase() === lower || bm.originalMovement?.toLowerCase() === lower
+  );
+}
+
 // ============================================
 // Movement Line Formatter
 // Produces structured parts: quantity · name · load
@@ -55,6 +72,10 @@ interface MovementLineParts {
   name: string;       // "Echo Bike", "Toes to Bar"
   load: string;       // "17.5kg", "" — only when meaningful
   totalNote?: string; // "×6 = 42" — for AMRAP per-round display
+  shareNote?: string; // "your part 50" — partner workout personal share
+  wasSubstituted?: boolean;
+  originalMovement?: string;
+  substitutionType?: 'easier' | 'harder' | 'equivalent';
 }
 
 function buildMovementLineParts(
@@ -88,6 +109,181 @@ function buildMovementLineParts(
   return { quantity, name: movName, load };
 }
 
+// ============================================
+// Section-aware board data structures
+// ============================================
+
+interface SectionBoardGroup {
+  sectionType: ParsedSectionType;
+  rounds: number;           // 1 for buy_in/cash_out, N for rounds blocks
+  label: string;            // "BUY-IN", "×2 ROUNDS", "CASH-OUT"
+  lines: MovementLineParts[];
+  /** Personal share annotation for partner workouts (buy_in / cash_out) */
+  shareNote?: string;       // e.g. "your share: 50 cal" or "50 cal each"
+}
+
+/** Human-readable section header label */
+function buildSectionLabel(type: ParsedSectionType, rounds: number): string {
+  if (type === 'buy_in') return 'BUY-IN';
+  if (type === 'cash_out') return 'CASH-OUT';
+  return `\u00d7${rounds} ROUNDS`;
+}
+
+/**
+ * Build a personal share note for a movement line in a partner workout.
+ * Returns e.g. "your part 50 cal" or "your part 300 m".
+ */
+function buildLineShareNote(
+  line: MovementLineParts,
+  partnerContext: PartnerContext,
+): string | undefined {
+  const { partnerFactor, teamSize } = partnerContext;
+  if (teamSize <= 1) return undefined;
+
+  // Quantity patterns: "50 cal", "300 m", "1.2 km", "21"
+  const calMatch = line.quantity.match(/^(\d+(?:\.\d+)?)\s*cal$/i);
+  if (calMatch) {
+    const personal = Math.round(parseFloat(calMatch[1]) * partnerFactor);
+    return `your part ${personal} cal`;
+  }
+  const mMatch = line.quantity.match(/^(\d+(?:\.\d+)?)\s*m$/i);
+  if (mMatch) {
+    const personal = Math.round(parseFloat(mMatch[1]) * partnerFactor);
+    return `your part ${personal} m`;
+  }
+  const kmMatch = line.quantity.match(/^(\d+(?:\.\d+)?)\s*km$/i);
+  if (kmMatch) {
+    const personalM = parseFloat(kmMatch[1]) * 1000 * partnerFactor;
+    const display = personalM >= 1000 ? `${(personalM / 1000).toFixed(1)} km` : `${Math.round(personalM)} m`;
+    return `your part ${display}`;
+  }
+  const repMatch = line.quantity.match(/^(\d+)$/);
+  if (repMatch) {
+    const personal = Math.round(parseInt(repMatch[1], 10) * partnerFactor);
+    return `your part ${personal}`;
+  }
+  return undefined;
+}
+
+/**
+ * Build section groups from ParsedSection[] (exercise.sections).
+ * Each group has a label + the movement lines for that block.
+ */
+function buildSectionedBoardGroups(
+  exercise: Exercise,
+  breakdownMovements?: MovementTotal[],
+  _displayType?: string,
+  partnerContext?: PartnerContext,
+): SectionBoardGroup[] | null {
+  if (!exercise.sections || exercise.sections.length === 0) return null;
+  if (exercise.sections.length === 1) return null; // single section = no visual grouping needed
+
+  const groups: SectionBoardGroup[] = [];
+
+  for (const section of exercise.sections) {
+    const rounds = section.rounds ?? 1;
+    // For partner workouts: use prescription values (workout totals) so share notes
+    // can correctly divide to personal share. Breakdown values already have partnerFactor
+    // applied and would cause double-division.
+    const useRx = partnerContext && partnerContext.teamSize > 1;
+    const sectionLines = section.movements.map(mov => {
+      const bm = findBreakdownMatch(breakdownMovements, mov.name);
+      const actual = !useRx ? bm : undefined;
+      // Always look up breakdown for substitution data (even in partner mode)
+      const breakdownMatch = bm;
+      // Use substituted name if available
+      const displayName = breakdownMatch?.wasSubstituted ? breakdownMatch.name : mov.name;
+      // For rounds blocks: show per-round quantities (divide total by rounds)
+      if (section.sectionType === 'rounds' && rounds > 1 && actual) {
+        const perCals = actual.totalCalories && actual.totalCalories > 0
+          ? Math.round(actual.totalCalories / rounds) : undefined;
+        const perDist = actual.totalDistance && actual.totalDistance > 0
+          ? Math.round(actual.totalDistance / rounds) : undefined;
+        const perReps = !perCals && !perDist && actual.totalReps && actual.totalReps > 0
+          ? Math.round(actual.totalReps / rounds) : undefined;
+        const parts = buildMovementLineParts(
+          displayName,
+          perCals ? undefined : perReps,
+          perDist,
+          perCals,
+          actual.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female),
+          actual.unit || mov.rxWeights?.unit,
+        );
+        if (breakdownMatch?.wasSubstituted) {
+          parts.wasSubstituted = true;
+          parts.originalMovement = breakdownMatch.originalMovement;
+          parts.substitutionType = breakdownMatch.substitutionType;
+        }
+        return parts;
+      }
+      // Use actual totals or fall back to prescription
+      if (actual) {
+        const parts = buildMovementLineParts(
+          displayName,
+          actual.totalReps && actual.totalReps > 0 ? actual.totalReps : mov.reps,
+          actual.totalDistance ?? mov.distance,
+          actual.totalCalories ?? mov.calories,
+          actual.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female),
+          actual.unit || mov.rxWeights?.unit,
+        );
+        if (actual.wasSubstituted) {
+          parts.wasSubstituted = true;
+          parts.originalMovement = actual.originalMovement;
+          parts.substitutionType = actual.substitutionType;
+        }
+        return parts;
+      }
+      const rxW = mov.rxWeights?.male || mov.rxWeights?.female;
+      const parts = buildMovementLineParts(mov.name, mov.reps, mov.distance, mov.calories, rxW, mov.rxWeights?.unit);
+      if (breakdownMatch?.wasSubstituted) {
+        parts.wasSubstituted = true;
+        parts.originalMovement = breakdownMatch.originalMovement;
+        parts.substitutionType = breakdownMatch.substitutionType;
+      }
+      return parts;
+    });
+
+    const label = buildSectionLabel(section.sectionType, rounds);
+    const group: SectionBoardGroup = { sectionType: section.sectionType, rounds, label, lines: sectionLines };
+
+    // Partner share annotation: applies to ALL sections in partner workouts
+    // For "rounds" sections (IGUG): partners alternate rounds, each doing full reps per round.
+    // So annotate the section header with halved rounds, NOT each movement with halved reps.
+    // For buy_in/cash_out: partners split the work, so annotate each movement line.
+    if (partnerContext && partnerContext.teamSize > 1) {
+      if (section.sectionType === 'rounds' && rounds > 1) {
+        // IGUG: each person does their share of rounds with full reps
+        const personalRounds = Math.round(rounds * partnerContext.partnerFactor);
+        group.shareNote = `your part ×${personalRounds}`;
+      } else if (sectionLines.length === 1) {
+        const mov = section.movements[0];
+        group.shareNote = mov.together ? 'together' : buildLineShareNote(sectionLines[0], partnerContext);
+      } else {
+        section.movements.forEach((mov, li) => {
+          if (li < sectionLines.length) {
+            sectionLines[li].shareNote = mov.together
+              ? 'together'
+              : buildLineShareNote(sectionLines[li], partnerContext);
+          }
+        });
+      }
+    }
+
+    groups.push(group);
+  }
+
+  return groups;
+}
+
+/** Extrapolate a ladder rung value beyond the prescribed array */
+function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
+  if (rungIdx < ladderReps.length) return ladderReps[rungIdx];
+  const step = ladderReps.length >= 2
+    ? ladderReps[ladderReps.length - 1] - ladderReps[ladderReps.length - 2]
+    : 2;
+  return ladderReps[ladderReps.length - 1] + step * (rungIdx - ladderReps.length + 1);
+}
+
 /** Build structured movement lines using actual logged values from breakdown when available */
 function buildBoardLineParts(
   exercise: Exercise,
@@ -105,28 +301,83 @@ function buildBoardLineParts(
   const sets = getCompletedSets(exercise);
   const exRounds = exercise.rounds || 1;
   const isAmrap = displayType === 'amrap';
+  const isIntervalLike = displayType === 'emom' || displayType === 'intervals';
+  const isStrength = displayType === 'strength';
+  // Use completed sets as round count for interval exercises
+  const intervalRounds = isIntervalLike ? (sets.length || exRounds) : exRounds;
 
-  // For AMRAP: show per-round prescription values with total annotation
-  if (isAmrap && exRounds > 1) {
+  // Ladder AMRAP: show progression range "4→14" for ladder movements, fixed count for non-ladder
+  const ladderReps = exercise.ladderReps;
+  const ladderStep = exercise.ladderStep;
+  if (ladderReps && ladderReps.length > 0 && ladderStep != null && ladderStep > 0) {
+    const firstRung = ladderReps[0];
+    const lastRung = getLadderRungValue(ladderReps, ladderStep - 1);
     return movements.map(mov => {
-      const actual = breakdownMovements?.find(
-        bm => bm.name.toLowerCase() === mov.name.toLowerCase()
+      const actual = findBreakdownMatch(breakdownMovements, mov.name);
+      const displayName = actual?.wasSubstituted ? actual.name : mov.name;
+      const isLadderMov = mov.perRound !== false; // non-ladder movements (e.g., DU "after each round") are fixed
+
+      let quantity: string;
+      let totalNote: string | undefined;
+      if (isLadderMov) {
+        // Show progression range in magenta accent
+        quantity = `${firstRung}\u2192${lastRung}`;
+        // Total from breakdown
+        const total = actual?.totalReps;
+        if (total && total > 0) {
+          totalNote = `= ${total} reps`;
+        }
+      } else {
+        // Fixed movement: show per-round value × intervals
+        const perRound = mov.calories || mov.reps || 0;
+        const total = actual?.totalReps || actual?.totalCalories;
+        quantity = mov.calories ? `${mov.calories} cal` : `${mov.reps || ''}`;
+        if (total && total > 0 && perRound > 0) {
+          const unit = mov.calories ? ' cal' : '';
+          totalNote = `\u00d7${Math.round(total / perRound)} = ${total}${unit}`;
+        }
+      }
+
+      const parts = buildMovementLineParts(
+        displayName,
+        undefined, // we override quantity below
+        undefined,
+        undefined,
+        actual?.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female),
+        actual?.unit || mov.rxWeights?.unit,
       );
+      parts.quantity = quantity;
+      parts.totalNote = totalNote;
+      if (actual?.wasSubstituted) {
+        parts.wasSubstituted = true;
+        parts.originalMovement = actual.originalMovement;
+        parts.substitutionType = actual.substitutionType;
+      }
+      return parts;
+    });
+  }
+
+  // For AMRAP/EMOM/Intervals: show per-round prescription values with total annotation
+  if ((isAmrap && exRounds > 1) || (isIntervalLike && intervalRounds > 1)) {
+    const effectiveRounds = isIntervalLike ? intervalRounds : exRounds;
+    return movements.map(mov => {
+      const actual = findBreakdownMatch(breakdownMovements, mov.name);
       // Total from breakdown (actual logged)
       const totalReps = actual?.totalReps;
       const totalCals = actual?.totalCalories;
       const totalDist = actual?.totalDistance;
+      const displayName = actual?.wasSubstituted ? actual.name : mov.name;
 
       // Per-round values: prefer prescription, fall back to breakdown÷rounds
-      const perRoundCals = mov.calories || (totalCals && totalCals > 0 ? Math.round(totalCals / exRounds) : undefined);
-      const perRoundDist = mov.distance || (totalDist && totalDist > 0 ? Math.round(totalDist / exRounds) : undefined);
+      const perRoundCals = mov.calories || (totalCals && totalCals > 0 ? Math.round(totalCals / effectiveRounds) : undefined);
+      const perRoundDist = mov.distance || (totalDist && totalDist > 0 ? Math.round(totalDist / effectiveRounds) : undefined);
       // Only use reps if no cals/distance (avoid showing "7" as reps when it's really 7 cal)
       const perRoundReps = !perRoundCals && !perRoundDist
-        ? (mov.reps || (totalReps && totalReps > 0 ? Math.round(totalReps / exRounds) : undefined))
+        ? (mov.reps || (totalReps && totalReps > 0 ? Math.round(totalReps / effectiveRounds) : undefined))
         : mov.reps;
 
       const parts = buildMovementLineParts(
-        mov.name,
+        displayName,
         perRoundCals ? undefined : perRoundReps, // Don't pass reps if we have calories
         perRoundDist,
         perRoundCals,
@@ -134,39 +385,68 @@ function buildBoardLineParts(
         actual?.unit || mov.rxWeights?.unit,
       );
 
-      // Add total annotation with unit: "×6 = 42 cal"
+      // Add total annotation with unit: "×5 = 100"
       const total = totalCals || totalDist || totalReps;
       const perRound = perRoundCals || perRoundDist || perRoundReps;
-      if (total && total > 0 && perRound && perRound > 0 && exRounds > 1) {
+      if (total && total > 0 && perRound && perRound > 0 && effectiveRounds > 1) {
         const totalUnit = totalCals ? ' cal' : totalDist ? (totalDist >= 1000 ? ' km' : ' m') : '';
-        parts.totalNote = `\u00d7${exRounds} = ${totalCals ? total : totalDist && totalDist >= 1000 ? (totalDist / 1000).toFixed(1) : total}${totalUnit}`;
+        parts.totalNote = `\u00d7${effectiveRounds} = ${totalCals ? total : totalDist && totalDist >= 1000 ? (totalDist / 1000).toFixed(1) : total}${totalUnit}`;
+      }
+      // Carry substitution data
+      if (actual?.wasSubstituted) {
+        parts.wasSubstituted = true;
+        parts.originalMovement = actual.originalMovement;
+        parts.substitutionType = actual.substitutionType;
       }
       return parts;
     });
   }
 
+  const setsRounds = sets.length || 1;
+
   if (breakdownMovements && breakdownMovements.length > 0) {
-    const setsRounds = sets.length || 1;
     return movements.map(mov => {
-      const actual = breakdownMovements.find(
-        bm => bm.name.toLowerCase() === mov.name.toLowerCase()
-      );
+      const actual = findBreakdownMatch(breakdownMovements, mov.name);
       if (actual) {
+        const displayName = actual.wasSubstituted ? actual.name : mov.name;
         // Use breakdown data, but fall back to prescription reps if breakdown has 0
         const reps = (actual.totalReps && actual.totalReps > 0) ? actual.totalReps : undefined;
         const fallbackReps = !reps && mov.reps ? mov.reps * setsRounds : undefined;
-        return buildMovementLineParts(
-          mov.name,
+
+        // For strength: show weight as average when progression exists
+        let displayWeight = actual.weight ?? undefined;
+        if (isStrength && actual.weightProgression && actual.weightProgression.length > 1) {
+          const avg = actual.weightProgression.reduce((s, w) => s + w, 0) / actual.weightProgression.length;
+          displayWeight = Math.round(avg * 2) / 2; // round to 0.5kg
+        }
+
+        const parts = buildMovementLineParts(
+          displayName,
           reps || fallbackReps,
           actual.totalDistance ?? undefined,
           actual.totalCalories ?? undefined,
-          actual.weight ?? undefined,
+          displayWeight,
           actual.unit,
         );
+
+        // For strength exercises: show sets×reps format (e.g. "4×14")
+        if (isStrength && setsRounds > 1) {
+          const perSetReps = mov.reps || (reps ? Math.round(reps / setsRounds) : undefined);
+          if (perSetReps && perSetReps > 0) {
+            parts.quantity = `${setsRounds}×${perSetReps}`;
+          }
+        }
+
+        if (actual.wasSubstituted) {
+          parts.wasSubstituted = true;
+          parts.originalMovement = actual.originalMovement;
+          parts.substitutionType = actual.substitutionType;
+        }
+        return parts;
       }
       // No breakdown match — use prescription values
       const rxW = mov.rxWeights?.male || mov.rxWeights?.female;
-      return buildMovementLineParts(
+      const parts = buildMovementLineParts(
         mov.name,
         mov.reps,
         mov.distance,
@@ -174,13 +454,18 @@ function buildBoardLineParts(
         rxW,
         mov.rxWeights?.unit,
       );
+      // Strength: show sets×reps even without breakdown
+      if (isStrength && setsRounds > 1 && mov.reps) {
+        parts.quantity = `${setsRounds}×${mov.reps}`;
+      }
+      return parts;
     });
   }
 
   // No breakdown — use prescription values
   return movements.map(mov => {
     const rxW = mov.rxWeights?.male || mov.rxWeights?.female;
-    return buildMovementLineParts(
+    const parts = buildMovementLineParts(
       mov.name,
       mov.reps,
       mov.distance,
@@ -188,6 +473,10 @@ function buildBoardLineParts(
       rxW,
       mov.rxWeights?.unit,
     );
+    if (isStrength && setsRounds > 1 && mov.reps) {
+      parts.quantity = `${setsRounds}×${mov.reps}`;
+    }
+    return parts;
   });
 }
 
@@ -263,6 +552,11 @@ function extractHero(exercise: Exercise, displayType: string): {
   }
 
   if (displayType === 'amrap') {
+    // Ladder AMRAP: show total reps as hero instead of rounds
+    if (exercise.ladderReps && exercise.ladderReps.length > 0 && exercise.ladderStep != null) {
+      const totalReps = sets.reduce((sum, s) => sum + (s.actualReps || 0), 0);
+      if (totalReps > 0) return { value: `${totalReps}`, unit: 'reps', color: 'magenta' };
+    }
     // actualReps stores total reps (rounds × repsPerRound), NOT round count.
     // Use exercise.rounds (saved from AMRAP input) for the actual round count.
     if (exercise.rounds && exercise.rounds > 0) {
@@ -337,6 +631,9 @@ function extractProgression(exercise: Exercise): number[] | null {
 }
 
 // ============================================
+// Max Set Extraction (for [8-6-4-2-max] patterns)
+// Detects when the last set has notably more reps at lower weight.
+// ============================================
 // Footer Stats Extraction (strength only)
 // Shows supporting info: Volume and Set count.
 // Peak weight is now the hero so we don't repeat it here.
@@ -351,17 +648,23 @@ function extractFooterStats(
   const stats: Array<{ value: string; label: string }> = [];
 
   if (displayType === 'strength') {
-    // Prefer breakdown movements (correctly accounts for rounds × reps × weight per movement)
+    // Per-set calculation is most accurate (handles progressive weights correctly)
     let totalVol = 0;
-    if (breakdownMovements && breakdownMovements.length > 0) {
+    const setsWithWeight = sets.filter(s => s.weight && s.weight > 0);
+    if (setsWithWeight.length > 0) {
+      totalVol = sets.reduce((sum, s) => sum + (s.weight || 0) * (s.actualReps || s.targetReps || 0), 0);
+    } else if (breakdownMovements && breakdownMovements.length > 0) {
+      // Fallback to breakdown when sets don't carry weight
       totalVol = breakdownMovements.reduce((sum, m) => {
         if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-          return sum + m.weight * m.totalReps;
+          // Use average weight when progression exists
+          const avgWeight = m.weightProgression && m.weightProgression.length > 1
+            ? m.weightProgression.reduce((s, w) => s + w, 0) / m.weightProgression.length
+            : m.weight;
+          return sum + avgWeight * m.totalReps;
         }
         return sum;
       }, 0);
-    } else {
-      totalVol = sets.reduce((sum, s) => sum + (s.weight || 0) * (s.actualReps || s.targetReps || 0), 0);
     }
 
     if (totalVol > 0) {
@@ -482,10 +785,20 @@ const META: Record<string, CardMeta> = {
 // Main Component
 // ============================================
 
-export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, breakdownMovements, compact, maxMovements, onTap }: ExerciseStoryCardProps) {
+export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, breakdownMovements, partnerContext, compact, maxMovements, onTap }: ExerciseStoryCardProps) {
   const displayType = detectExerciseDisplayType(exercise);
-  const { color, label } = META[displayType] ?? META.for_time;
-  const lineParts = buildBoardLineParts(exercise, breakdownMovements, displayType);
+  const meta = META[displayType] ?? META.for_time;
+  // Ladder AMRAP: use magenta accent to signal "movement" progression
+  const isLadder = exercise.ladderReps && exercise.ladderReps.length > 0 && exercise.ladderStep != null;
+  const color = isLadder ? 'magenta' as CardColor : meta.color;
+  const label = isLadder ? 'LADDER AMRAP' : meta.label;
+
+  // Try to build section groups first; fall back to flat line list
+  const sectionGroups = buildSectionedBoardGroups(exercise, breakdownMovements, displayType, partnerContext);
+  const lineParts = sectionGroups
+    ? [] // section groups replace the flat list — handled separately in JSX
+    : buildBoardLineParts(exercise, breakdownMovements, displayType);
+
   const hero = extractHero(exercise, displayType);
   const progression = extractProgression(exercise);
   const footer = extractFooterStats(exercise, displayType, breakdownMovements);
@@ -500,11 +813,16 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
   // Show progression bars only when weights actually vary (true progression)
   const hasVaryingWeights = progression !== null && progression.length >= 2;
 
-  // Movement limiting for compact mode
+  // Movement limiting for compact mode (flat list only; sections are always shown in full)
   const visibleLines = maxMovements && lineParts.length > maxMovements
     ? lineParts.slice(0, maxMovements)
     : lineParts;
   const overflowCount = maxMovements ? Math.max(0, lineParts.length - maxMovements) : 0;
+
+  // Total movement count across all sections (for overflow calculation in section mode)
+  const totalSectionLines = sectionGroups
+    ? sectionGroups.reduce((sum, g) => sum + g.lines.length, 0)
+    : 0;
 
   // In compact mode, hide progression bars & set bars to save vertical space
   const showProgression = hasVaryingWeights && !compact;
@@ -634,8 +952,82 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
         </motion.div>
       )}
 
-      {/* ── Movement list: structured quantity · name · load ── */}
-      {visibleLines.length > 0 && (
+      {/* ── Movement list: sectioned or flat ── */}
+      {sectionGroups ? (
+        /* ── Sectioned board: group movements under section headers ── */
+        <div className={`${styles.board} ${compact ? styles.boardCompact : ''}`}>
+          {sectionGroups.map((group, gi) => (
+            <div key={gi} className={styles.sectionGroup}>
+              {/* Section header: "BUY-IN", "×2 ROUNDS", "CASH-OUT" */}
+              <div className={styles.sectionHeader}>
+                <span className={`${styles.sectionHeaderLabel} ${
+                  group.sectionType === 'buy_in' ? styles.sectionHeaderBuyIn :
+                  group.sectionType === 'cash_out' ? styles.sectionHeaderCashOut :
+                  styles.sectionHeaderRounds
+                }`}>
+                  {group.label}
+                </span>
+                <span className={styles.sectionHeaderLine} aria-hidden="true" />
+                {group.shareNote && (
+                  <span className={styles.sectionShareNote}>{group.shareNote}</span>
+                )}
+              </div>
+
+              {/* Movements within this section */}
+              {group.lines.map((parts, li) => {
+                const lineIndex = gi * 100 + li; // stable animation index
+                return (
+                  <motion.div
+                    key={li}
+                    className={`${styles.boardLine} ${styles.boardLineIndented}`}
+                    initial={animated ? { opacity: 0, x: -6 } : false}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={animated ? { delay: d + 0.14 + lineIndex * 0.03 } : undefined}
+                  >
+                    <span className={`${styles.boardDot} ${styles[`dot_${color}`]}`} />
+                    <span className={styles.boardContent}>
+                      {parts.quantity && (
+                        <span className={`${styles.boardQuantity} ${styles[`qty_${color}`]}`}>
+                          {parts.quantity}
+                        </span>
+                      )}
+                      {parts.quantity && (
+                        <span className={styles.boardSep}> · </span>
+                      )}
+                      {parts.wasSubstituted && <span className={styles.boardSubIcon} aria-label="Substituted">⇄</span>}
+                      <span className={styles.boardName}>{parts.name}</span>
+                      {parts.load && (
+                        <>
+                          <span className={styles.boardSep}> — </span>
+                          <span className={styles.boardLoad}>{parts.load}</span>
+                        </>
+                      )}
+                      {parts.wasSubstituted && parts.quantity && (
+                        <span className={styles.boardVolumeBadge}>{parts.quantity} Total</span>
+                      )}
+                      {parts.shareNote && (
+                        <span className={styles.boardShareNote}> ({parts.shareNote})</span>
+                      )}
+                      {parts.totalNote && (
+                        <span className={styles.boardTotal}> {parts.totalNote}</span>
+                      )}
+                    </span>
+                    {parts.wasSubstituted && parts.originalMovement && (
+                      <span className={styles.boardSubLabel}>Substituted for {parts.originalMovement}</span>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          ))}
+          {maxMovements && totalSectionLines > maxMovements && (
+            <span className={`${styles.boardOverflow} ${styles[`label_${color}`]}`}>
+              + {totalSectionLines - maxMovements} more
+            </span>
+          )}
+        </div>
+      ) : visibleLines.length > 0 ? (
+        /* ── Flat board: classic single-level movement list ── */
         <div className={`${styles.board} ${compact ? styles.boardCompact : ''}`}>
           {visibleLines.map((parts, i) => (
             <motion.div
@@ -655,6 +1047,7 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
                 {parts.quantity && (
                   <span className={styles.boardSep}> · </span>
                 )}
+                {parts.wasSubstituted && <span className={styles.boardSubIcon} aria-label="Substituted">⇄</span>}
                 <span className={styles.boardName}>{parts.name}</span>
                 {parts.load && (
                   <>
@@ -662,10 +1055,16 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
                     <span className={styles.boardLoad}>{parts.load}</span>
                   </>
                 )}
+                {parts.wasSubstituted && parts.quantity && (
+                  <span className={styles.boardVolumeBadge}>{parts.quantity} Total</span>
+                )}
                 {parts.totalNote && (
                   <span className={styles.boardTotal}> {parts.totalNote}</span>
                 )}
               </span>
+              {parts.wasSubstituted && parts.originalMovement && (
+                <span className={styles.boardSubLabel}>Substituted for {parts.originalMovement}</span>
+              )}
             </motion.div>
           ))}
           {overflowCount > 0 && (
@@ -674,10 +1073,10 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
             </span>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Fallback: raw prescription when no movements parsed */}
-      {lineParts.length === 0 && exercise.prescription && (
+      {!sectionGroups && lineParts.length === 0 && exercise.prescription && (
         <p className={styles.rawPrescription}>{exercise.prescription}</p>
       )}
 

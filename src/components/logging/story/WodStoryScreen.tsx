@@ -6,6 +6,8 @@ import {
   type StoryExerciseResult,
   getRowState,
   createBlankResult,
+  isResultEmpty,
+  getMissingLabel,
 } from './types';
 import styles from './WodStoryScreen.module.css';
 
@@ -24,10 +26,9 @@ interface WodStoryScreenProps {
 }
 
 // ─── Section grouping ───────────────────────────────────────────
-// Detect "A) ...", "B) ...", "Part A", etc. in exercise names.
 
 interface ExerciseGroup {
-  label: string | null; // null = ungrouped
+  label: string | null;
   indices: number[];
 }
 
@@ -43,7 +44,6 @@ function groupExercises(workout: ParsedWorkout): ExerciseGroup[] {
     const label = match ? match[1].toUpperCase() : null;
 
     if (label !== currentLabel && label != null) {
-      // Flush previous group
       if (currentIndices.length > 0) {
         groups.push({ label: currentLabel, indices: currentIndices });
       }
@@ -54,7 +54,6 @@ function groupExercises(workout: ParsedWorkout): ExerciseGroup[] {
     }
   });
 
-  // Flush last group
   if (currentIndices.length > 0) {
     groups.push({ label: currentLabel, indices: currentIndices });
   }
@@ -81,6 +80,36 @@ function calcProgress(results: StoryExerciseResult[]): StoryProgress {
   return { filled, partial, total: results.length };
 }
 
+// ─── Format label helper ────────────────────────────────────────
+
+function getFormatDisplay(format?: string): string {
+  if (!format) return '';
+  return format.replace(/_/g, ' ').toUpperCase();
+}
+
+function getFormatColor(format?: string): string {
+  if (format === 'strength') return 'var(--color-volume)';
+  if (format === 'emom' || format === 'intervals') return 'var(--color-sessions)';
+  return 'var(--color-metcon)';
+}
+
+// ─── Derive a meaningful title ──────────────────────────────────
+// If exercise names are just the format name, skip the title to avoid repetition.
+
+function deriveTitle(workout: ParsedWorkout): string | null {
+  const names = workout.exercises.map(e => e.name);
+  const format = getFormatDisplay(workout.format);
+
+  // If all exercise names match the format label, don't show a separate title
+  const allMatchFormat = names.every(n =>
+    n.toUpperCase().replace(/[^A-Z]/g, '') === format.replace(/[^A-Z]/g, '')
+  );
+  if (allMatchFormat) return null;
+
+  const joined = names.join(' & ');
+  return joined || null;
+}
+
 // ─── Component ──────────────────────────────────────────────────
 
 export function WodStoryScreen({
@@ -95,13 +124,24 @@ export function WodStoryScreen({
   const progress = useMemo(() => calcProgress(results), [results]);
 
   const canSave = progress.filled > 0 || progress.partial > 0;
-  const allFilled = progress.filled === progress.total;
+  const allDone = progress.filled === progress.total && progress.total > 0;
+  const progressPercent = progress.total > 0
+    ? ((progress.filled + progress.partial * 0.5) / progress.total) * 100
+    : 0;
+
+  const [missingPopup, setMissingPopup] = useState<{ label: string } | null>(null);
 
   const handleSave = useCallback(() => {
-    if (!isSaving) onSave();
-  }, [isSaving, onSave]);
+    if (isSaving) return;
+    const emptyResult = results.find(r => isResultEmpty(r));
+    if (emptyResult) {
+      setMissingPopup({ label: getMissingLabel(emptyResult.kind) });
+      return;
+    }
+    onSave();
+  }, [isSaving, results, onSave]);
 
-  // One-time hint arrow — plays once, never again
+  // One-time hint arrow
   const HINT_KEY = 'wodi_story_hint_shown';
   const [showHint, setShowHint] = useState(() => {
     try { return !localStorage.getItem(HINT_KEY); } catch { return false; }
@@ -115,17 +155,24 @@ export function WodStoryScreen({
     }
   }, [showHint, results.length]);
 
-  const title = parsedWorkout.title || parsedWorkout.benchmarkName || 'Workout';
+  const title = deriveTitle(parsedWorkout);
+  const formatLabel = getFormatDisplay(parsedWorkout.format);
+  const formatColor = getFormatColor(parsedWorkout.format);
 
-  // Format subtitle
-  const formatLabel = parsedWorkout.format?.replace(/_/g, ' ').toUpperCase() ?? '';
-  const exerciseCount = `${parsedWorkout.exercises.length} exercise${parsedWorkout.exercises.length !== 1 ? 's' : ''}`;
+  // CTA label
+  const ctaLabel = isSaving
+    ? 'Saving...'
+    : allDone
+      ? 'Save workout'
+      : canSave
+        ? 'Save workout'
+        : 'Log results to save';
 
   return (
     <div className={styles.container}>
       {/* ── Header ── */}
       <div className={styles.header}>
-        <div className={styles.headerTop}>
+        <div className={styles.headerRow}>
           <button
             type="button"
             className={styles.backButton}
@@ -135,53 +182,42 @@ export function WodStoryScreen({
             ←
           </button>
 
-          <div className={styles.progressChips}>
-            {results.map((r, i) => {
-              const s = getRowState(r);
-              const dotClass =
-                s === 'filled'  ? styles.progressDotFilled :
-                s === 'partial' ? styles.progressDotPartial :
-                '';
-              return (
-                <div
-                  key={i}
-                  className={`${styles.progressDot} ${dotClass}`}
-                />
-              );
-            })}
+          {formatLabel && (
+            <span
+              className={styles.formatPill}
+              style={{ '--pill-accent': formatColor } as React.CSSProperties}
+            >
+              {formatLabel}
+            </span>
+          )}
+
+          <div className={styles.progressBar} style={{ '--progress-color': formatColor } as React.CSSProperties}>
+            <div className={styles.progressTrack}>
+              <motion.div
+                className={styles.progressFill}
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPercent}%` }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </div>
             <span className={styles.progressLabel}>
               {progress.filled}/{progress.total}
             </span>
           </div>
         </div>
 
-        <motion.h1
-          className={styles.title}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {title}
-        </motion.h1>
-
-        {formatLabel && (
-          <span
-            className={styles.formatPill}
-            style={{
-              '--pill-accent': parsedWorkout.format === 'strength'
-                ? 'var(--color-volume)'
-                : parsedWorkout.format === 'emom' || parsedWorkout.format === 'intervals'
-                  ? 'var(--color-sessions)'
-                  : 'var(--color-metcon)',
-            } as React.CSSProperties}
-          >
-            {formatLabel}
-          </span>
+        {title && (
+          <div className={styles.titleArea}>
+            <motion.h1
+              className={styles.title}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {title}
+            </motion.h1>
+          </div>
         )}
-
-        <span className={styles.subtitle}>
-          <span>{exerciseCount}</span>
-        </span>
       </div>
 
       {/* ── Exercise List ── */}
@@ -235,21 +271,60 @@ export function WodStoryScreen({
 
       {/* ── Save CTA ── */}
       <div className={styles.saveDock}>
-        {!allFilled && (
-          <span className={styles.loggedLabel}>
-            {progress.filled}/{progress.total} logged
-          </span>
-        )}
         <motion.button
           type="button"
           className={`${styles.saveButton} ${canSave ? styles.saveEnabled : styles.saveNotReady}`}
           onClick={handleSave}
-          disabled={isSaving}
-          whileTap={{ scale: 0.97 }}
+          disabled={isSaving || !canSave}
+          whileTap={canSave ? { scale: 0.97 } : undefined}
         >
-          {isSaving ? 'Saving...' : 'Done for today →'}
+          {ctaLabel}
         </motion.button>
       </div>
+
+      {/* ── Missing data confirmation popup ── */}
+      <AnimatePresence>
+        {missingPopup && (
+          <motion.div
+            className={styles.popupBackdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setMissingPopup(null)}
+          >
+            <motion.div
+              className={styles.popupCard}
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className={styles.popupTitle}>No {missingPopup.label} entered</p>
+              <p className={styles.popupBody}>
+                Save without it, or go back and add it?
+              </p>
+              <div className={styles.popupActions}>
+                <button
+                  type="button"
+                  className={styles.popupBtnSecondary}
+                  onClick={() => setMissingPopup(null)}
+                >
+                  Go back
+                </button>
+                <button
+                  type="button"
+                  className={styles.popupBtnPrimary}
+                  onClick={() => { setMissingPopup(null); onSave(); }}
+                >
+                  Save anyway
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -260,9 +335,10 @@ export function initStoryResults(
   workout: ParsedWorkout,
   loggingModes: ExerciseLoggingMode[],
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
+  teamSize?: number,
 ): StoryExerciseResult[] {
   return workout.exercises.map((ex, i) => {
     const mode = ex.loggingMode ?? loggingModes[i] ?? 'strength';
-    return createBlankResult(ex, i, mode, userSex);
+    return createBlankResult(ex, i, mode, userSex, teamSize);
   });
 }

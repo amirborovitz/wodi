@@ -206,10 +206,6 @@ export function ScoreRoundsInput({ result, onChange }: ScoreRoundsInputProps) {
         </button>
       </div>
 
-      <span className={styles.roundsTapHint}>
-        Tap the circle to count each completed round
-      </span>
-
       {/* Social headline preview */}
       {headlinePreview && (
         <motion.div

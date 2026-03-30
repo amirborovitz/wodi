@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useAuth } from '../context/AuthContext';
 import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
@@ -32,6 +34,15 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
 
   const handleDeleteWorkout = async (workoutId: string) => {
     await deleteWorkout(workoutId);
+  };
+
+  const handleRenameWorkout = async (workoutId: string, newTitle: string) => {
+    try {
+      const workoutRef = doc(db, 'workouts', workoutId);
+      await setDoc(workoutRef, { title: newTitle }, { merge: true });
+    } catch (err) {
+      console.error('Failed to rename workout:', err);
+    }
   };
 
   const handleEditWorkout = (workoutId: string) => {
@@ -116,6 +127,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
           }
           onDeleteWorkout={handleDeleteWorkout}
           onEditWorkout={handleEditWorkout}
+          onRenameWorkout={handleRenameWorkout}
         />
       )}
     </div>

@@ -28,6 +28,8 @@ import {
   getDistanceMultiplier,
 } from '../data/exerciseDefinitions';
 import { StoryLogResults } from '../components/logging/story/StoryLogResults';
+import type { StoryExerciseResult } from '../components/logging/story/types';
+import { createBlankResult } from '../components/logging/story/types';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
 
@@ -113,51 +115,170 @@ function buildWorkloadBreakdownFromResults(
   const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
 
   results.forEach((result) => {
-    const isTeamExercise = partnerFactor < 1 && TEAM_KEYWORDS.test(result.exercise.prescription || '');
+    // Check if this exercise is a team/partner exercise.
+    // For single-exercise workouts (common with sectioned WODs), trust the workout-level
+    // partnerFactor since the exercise prescription may not repeat the "in pairs" keyword.
+    const isSingleExercise = results.length === 1;
+    const isTeamExercise = partnerFactor < 1 && (
+      isSingleExercise || TEAM_KEYWORDS.test(result.exercise.prescription || '')
+    );
     const exerciseFactor = isTeamExercise ? partnerFactor : 1;
     const movements = result.exercise.movements;
     const setWeights = result.sets
       .map(set => set.weight)
       .filter((weight): weight is number => typeof weight === 'number' && weight > 0);
-    const weightFromSets = setWeights.length > 0
-      ? parseFloat((setWeights.reduce((sum, weight) => sum + weight, 0) / setWeights.length).toFixed(2))
-      : undefined;
     // Build weight progression if weights vary across sets
     const hasVaryingSetWeights = setWeights.length > 1 && !setWeights.every(w => w === setWeights[0]);
     const setWeightProgression = hasVaryingSetWeights ? setWeights : undefined;
-    if (movements && movements.length > 0) {
-      const repsPerRound = movements.reduce((sum, mov) => {
-        const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
-        return sum + reps;
-      }, 0);
-      const explicitRounds = result.rounds || result.sets.length || 1;
-      let totalRounds = explicitRounds;
-
-      if (!result.rounds && repsPerRound > 0) {
-        const roundCountsFromSets: number[] = [];
-        result.sets.forEach((set) => {
-          if (set.actualReps && set.actualReps > 0) {
-            roundCountsFromSets.push(set.actualReps / repsPerRound);
-          }
-        });
-        if (roundCountsFromSets.length > 0) {
-          totalRounds = roundCountsFromSets.reduce((sum, rounds) => sum + rounds, 0);
+    // Compute weighted average (weight × reps per set) when progression exists
+    let weightFromSets: number | undefined;
+    if (hasVaryingSetWeights) {
+      let totalVol = 0;
+      let totalReps = 0;
+      for (const set of result.sets) {
+        if (set.weight && set.weight > 0) {
+          const reps = set.actualReps || result.exercise.suggestedReps || 1;
+          totalVol += set.weight * reps;
+          totalReps += reps;
         }
+      }
+      weightFromSets = totalReps > 0
+        ? parseFloat((totalVol / totalReps).toFixed(2))
+        : undefined;
+    } else {
+      weightFromSets = setWeights.length > 0
+        ? parseFloat((setWeights.reduce((sum, weight) => sum + weight, 0) / setWeights.length).toFixed(2))
+        : undefined;
+    }
+    // ── Ladder AMRAP: compute reps from sets (each set = one interval's total) ──
+    const isLadderAmrap = result.exercise.ladderReps && result.exercise.ladderReps.length > 0;
+    if (isLadderAmrap && movements && movements.length > 0) {
+      // Total reps across all intervals already baked into sets by toLegacyResult
+      const totalRepsFromSets = result.sets.reduce((sum, s) => sum + (s.actualReps || 0), 0);
+      const ladderMovements = movements.filter(m => m.perRound !== false);
+      const movCount = ladderMovements.length || 1;
+      const repsPerMovement = Math.round(totalRepsFromSets / movCount);
+
+      const movKeys = getMovementKeys(movements);
+      movements.forEach((mov, movIdx) => {
+        const mk = movKeys[movIdx];
+        const isBuyInOrCashOut = mov.role === 'buy_in' || mov.role === 'cash_out' || /^(?:buy-in|cash-out):/i.test(mov.name);
+        const isFixed = isBuyInOrCashOut || mov.perRound === false; // buy-in/cash-out or "after each round" movements
+        // Buy-in/cash-out repeat per interval (suggestedSets), not per ladder rung (rounds).
+        // Other fixed movements repeat every ladder rung (round).
+        const fixedMultiplier = isBuyInOrCashOut
+          ? (result.exercise.intervalCount || result.exercise.suggestedSets || result.sets.length)
+          : (result.rounds || result.exercise.intervalCount || result.exercise.suggestedSets || result.sets.length);
+        const movReps = isFixed
+          ? (mov.reps || 0) * fixedMultiplier
+          : repsPerMovement;
+
+        const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
+        const movementName = rawMovementName.replace(/^(?:Buy-In|Cash-Out):\s*/i, '');
+        const key = movementName.toLowerCase();
+
+        const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
+          ?? mov.rxWeights?.male
+          ?? mov.rxWeights?.female;
+        const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
+        const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
+        const weight = explicitWeight || (isBwVolumeMovement(movementName) ? bw : undefined);
+        const movementCalories = isFixed
+          ? (mov.calories || 0) * fixedMultiplier
+          : 0;
+        const movementDistance = isFixed
+          ? (mov.distance || 0) * fixedMultiplier
+          : 0;
+
+        const unit = movementDistance > 0 ? (mov.unit || 'm')
+          : movementCalories > 0 ? 'cal'
+          : weight ? (mov.rxWeights?.unit || 'kg')
+          : undefined;
+
+        const existing = movementMap.get(key);
+        if (existing) {
+          movementMap.set(key, {
+            ...existing,
+            totalReps: (existing.totalReps || 0) + movReps,
+            totalDistance: (existing.totalDistance || 0) + movementDistance,
+            totalCalories: (existing.totalCalories || 0) + movementCalories,
+            weight: existing.weight || weight,
+          });
+        } else {
+          movementMap.set(key, {
+            name: movementName,
+            totalReps: movReps > 0 ? movReps : undefined,
+            totalDistance: movementDistance > 0 ? movementDistance : undefined,
+            totalCalories: movementCalories > 0 ? movementCalories : undefined,
+            weight,
+            unit,
+            implementCount: implementCount > 1 ? implementCount : undefined,
+          });
+        }
+
+        grandTotalReps += movReps;
+        if (weight && movReps > 0) grandTotalVolume += weight * movReps;
+        if (movementDistance > 0) grandTotalDistance += movementDistance;
+        if (movementCalories > 0) grandTotalCalories += movementCalories;
+      });
+      return; // skip standard path for this exercise
+    }
+
+    if (movements && movements.length > 0) {
+      // When exercise has sections, the flat movements[] only contains UNIQUE movements
+      // (e.g., 5 entries for a 4-section workout). We need to iterate the section-expanded
+      // list instead so each movement appears once per section with the correct round count.
+      const hasSections = result.exercise.sections && result.exercise.sections.length > 0;
+      let iterationMovements: ParsedMovement[];
+      let perMovementRounds: number[];
+
+      if (hasSections) {
+        // Flatten sections: each movement appears once per section, with that section's rounds
+        iterationMovements = [];
+        perMovementRounds = [];
+        for (const sec of result.exercise.sections!) {
+          for (const m of sec.movements) {
+            iterationMovements.push(m);
+            perMovementRounds.push(sec.rounds ?? 1);
+          }
+        }
+      } else {
+        iterationMovements = movements;
+        const repsPerRound = movements.reduce((sum, mov) => {
+          const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
+          return sum + reps;
+        }, 0);
+        const explicitRounds = result.rounds || result.sets.length || 1;
+        let totalRounds = explicitRounds;
+
+        if (!result.rounds && repsPerRound > 0) {
+          const roundCountsFromSets: number[] = [];
+          result.sets.forEach((set) => {
+            if (set.actualReps && set.actualReps > 0) {
+              roundCountsFromSets.push(set.actualReps / repsPerRound);
+            }
+          });
+          if (roundCountsFromSets.length > 0) {
+            totalRounds = roundCountsFromSets.reduce((sum, rounds) => sum + rounds, 0);
+          }
+        }
+        perMovementRounds = movements.map(() => totalRounds);
       }
 
     // Use the same unique-key system that the save path uses (getMovementKeys),
     // so duplicate movement names (e.g. two "Run" entries) resolve independently.
     // movementLookup tries the unique key first, falls back to plain name.
-    const movKeys = getMovementKeys(movements);
-    movements.forEach((mov, movIdx) => {
+    const movKeys = getMovementKeys(iterationMovements);
+    iterationMovements.forEach((mov, movIdx) => {
       const mk = movKeys[movIdx];
       const lowerName = mov.name.toLowerCase();
-      let movementRounds = totalRounds;
-      if (roundOverrides) {
+      let movementRounds = perMovementRounds[movIdx];
+      if (!hasSections && roundOverrides) {
         if (CINDY_MOVEMENTS.some((name) => lowerName.includes(name))) {
-          movementRounds = roundOverrides.cindyRounds || totalRounds;
+          movementRounds = roundOverrides.cindyRounds || movementRounds;
         } else if (DT_MOVEMENTS.some((name) => lowerName.includes(name))) {
-          movementRounds = roundOverrides.dtRounds || totalRounds;
+          movementRounds = roundOverrides.dtRounds || movementRounds;
         }
       }
 
@@ -172,24 +293,37 @@ function buildWorkloadBreakdownFromResults(
       const perRoundCalories = userCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
 
-      // Partner factor only applies to AI-prescribed values, not user-entered ones
-      const repsFactor = userReps !== undefined ? 1 : exerciseFactor;
-      const distanceFactor = userDistance !== undefined ? 1 : exerciseFactor;
-      const caloriesFactor = userCalories !== undefined ? 1 : exerciseFactor;
+      // Partner factor only applies to AI-prescribed values, not user-entered ones.
+      // "Together" movements (both partners do the full amount) skip partner factor entirely.
+      const isTogether = mov.together ?? false;
+      const repsFactor = userReps !== undefined || isTogether ? 1 : exerciseFactor;
+      const distanceFactor = userDistance !== undefined || isTogether ? 1 : exerciseFactor;
+      const caloriesFactor = userCalories !== undefined || isTogether ? 1 : exerciseFactor;
 
       // For cycle tracker workouts, completedCycleReps provides the total reps per movement
       const hasCycleReps = result.completedCycleReps !== undefined && result.completedCycleReps > 0;
 
       if (!hasCycleReps && perRoundReps <= 0 && perRoundDistance <= 0 && perRoundCalories <= 0 && perRoundTime <= 0) {
+        console.warn('🔍 [BREAKDOWN-SKIP]', mov.name, {
+          perRoundReps, perRoundDistance, perRoundCalories, perRoundTime,
+          movReps: mov.reps, userReps,
+          exerciseName: result.exercise.name,
+          hasSections,
+        });
         return;
       }
 
-      // perRound=false means movement is done once (buy-in/cash-out), not multiplied by rounds
-      const effectiveRounds = mov.perRound === false ? 1 : movementRounds;
+      // Buy-in/cash-out detection: done once per interval, not per AMRAP round.
+      // Detect via: AI role field, name prefix, or perRound=false (most reliable — survives serialization).
+      const isBuyInCashOut = mov.role === 'buy_in' || mov.role === 'cash_out' ||
+        /^(?:buy-in|cash-out):/i.test(mov.name) || mov.perRound === false;
+      const effectiveRounds = isBuyInCashOut
+        ? (result.exercise.suggestedSets || result.exercise.intervalCount || result.sets.length || 1)
+        : movementRounds;
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round
       const isPartialMove = result.partialMovements?.includes(mov.name) ?? false;
-      const partialExtra = (isPartialMove && mov.perRound !== false) ? 1 : 0;
+      const partialExtra = (isPartialMove && !isBuyInCashOut) ? 1 : 0;
       const totalEffectiveRounds = effectiveRounds + partialExtra;
 
       console.log(`[BuildWorkload] "${mov.name}" perRound=${mov.perRound} rounds=${movementRounds} effective=${effectiveRounds} partial=${partialExtra} reps=${perRoundReps} distance=${perRoundDistance} calories=${perRoundCalories} userEntered=[reps:${userReps !== undefined} dist:${userDistance !== undefined} cal:${userCalories !== undefined}]`);
@@ -208,11 +342,14 @@ function buildWorkloadBreakdownFromResults(
       const originalMovement = wasSubstituted ? mov.name : undefined;
       const key = movementName.toLowerCase();
 
-      // Weight priority: user-entered per-movement > user-entered per-set > parsed Rx
-      const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
-        ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
-        ?? mov.rxWeights?.male
-        ?? mov.rxWeights?.female;
+      // Weight priority: weighted avg from sets (when progressive) > user-entered per-movement > user-entered per-set > parsed Rx
+      // When weights vary across sets, use the weighted average so volume = avgWeight × totalReps
+      const rawWeight = (hasVaryingSetWeights && weightFromSets && isWeightedMovement(mov))
+        ? weightFromSets
+        : (movementLookup(result.movementWeights || {}, mk, mov.name)
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
+          ?? mov.rxWeights?.male
+          ?? mov.rxWeights?.female);
       console.log(`[BuildWorkload] "${mov.name}" weight: movWeights=${movementLookup(result.movementWeights || {}, mk, mov.name)} rxMale=${mov.rxWeights?.male} rxFemale=${mov.rxWeights?.female} → rawWeight=${rawWeight} | movCals=${movementCalories} | result.movementCalories=`, result.movementCalories);
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
@@ -230,6 +367,19 @@ function buildWorkloadBreakdownFromResults(
 
       // Only attach weight progression to weighted movements
       const movWeightProgression = weight && setWeightProgression ? setWeightProgression : undefined;
+      if (mov.name.toLowerCase().includes('lunge')) {
+        console.warn('🔍 [BREAKDOWN-LUNGE]', {
+          movName: mov.name,
+          weight,
+          rawWeight,
+          weightFromSets,
+          hasVaryingSetWeights,
+          setWeightProgression,
+          movWeightProgression,
+          movementWeightsLookup: movementLookup(result.movementWeights || {}, mk, mov.name),
+          exerciseName: result.exercise.name,
+        });
+      }
 
       if (existing) {
         movementMap.set(key, {
@@ -245,6 +395,7 @@ function buildWorkloadBreakdownFromResults(
           originalMovement: existing.originalMovement || originalMovement,
           substitutionType: existing.substitutionType || substitutionType,
           implementCount: existing.implementCount || implementCount,
+          together: existing.together && isTogether, // only if ALL merged entries are together
         });
       } else {
         movementMap.set(key, {
@@ -261,6 +412,7 @@ function buildWorkloadBreakdownFromResults(
           substitutionType,
           implementCount: implementCount > 1 ? implementCount : undefined,
           distancePerRep: perRoundDistance > 0 ? perRoundDistance : undefined,
+          together: isTogether || undefined,
         });
       }
 
@@ -379,6 +531,47 @@ function buildWorkloadBreakdownFromResults(
 
       grandTotalReps += exerciseReps;
       grandTotalVolume += exerciseVolume;
+    }
+  });
+
+  // ── Post-process: patch weight progression for superset exercises ──
+  // When a superset exercise has interpolated weights across sets (e.g., 35→45kg),
+  // the per-movement loop may not correctly assign weightProgression because the
+  // Lunge movement might be added by a different exercise or code path.
+  // Fix: iterate results, find exercises with varying set weights, and patch
+  // the corresponding movement entry in the map.
+  results.forEach((result) => {
+    const movements = result.exercise.movements;
+    if (!movements || movements.length === 0) return;
+    const setWeights = result.sets
+      .map(s => s.weight)
+      .filter((w): w is number => typeof w === 'number' && w > 0);
+    if (setWeights.length <= 1 || setWeights.every(w => w === setWeights[0])) return;
+
+    // This exercise has varying set weights — find weighted movements and patch
+    let totalVol = 0;
+    let totalR = 0;
+    for (const s of result.sets) {
+      if (s.weight && s.weight > 0) {
+        const reps = s.actualReps || result.exercise.suggestedReps || 1;
+        totalVol += s.weight * reps;
+        totalR += reps;
+      }
+    }
+    const weightedAvg = totalR > 0 ? parseFloat((totalVol / totalR).toFixed(2)) : undefined;
+
+    for (const mov of movements) {
+      if (!isWeightedMovement(mov)) continue;
+      const key = mov.name.toLowerCase();
+      const entry = movementMap.get(key);
+      if (!entry) continue;
+      if (entry.weightProgression && entry.weightProgression.length > 1) continue; // already set
+      // Patch: set progression and correct weight to weighted average
+      movementMap.set(key, {
+        ...entry,
+        weightProgression: setWeights,
+        weight: weightedAvg ?? entry.weight,
+      });
     }
   });
 
@@ -1237,6 +1430,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
   const [savedWorkoutMeta, setSavedWorkoutMeta] = useState<{ id: string; totalVolume: number; date: Date } | null>(null);
   const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
+  const [editInitialResults, setEditInitialResults] = useState<StoryExerciseResult[] | undefined>(undefined);
   const isPartnerWorkout = Boolean(
     parsedWorkout?.partnerWorkout ||
     parsedWorkout?.rawText?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of \d+\b|\b\d+[- ]person\b|\bigug\b|\bi\s*go\s*you\s*go\b|\bgroups? of \d+\b/i) ||
@@ -1330,131 +1524,104 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       }),
     };
 
-    // Build per-movement weight/rep maps from workloadBreakdown if available
-    const breakdownMovements = editWorkout.workloadBreakdown?.movements || [];
-
-    // Convert stored exercises back to ExerciseResult format
-    const restoredResults: ExerciseResult[] = editWorkout.exercises.map((ex, index) => {
-      // Get completion time from sets if available
-      const completionTime = ex.sets.find(s => s.time)?.time;
-
-      // Get total calories from sets
-      const totalCalories = ex.sets.reduce((sum, s) => sum + (s.calories || 0), 0);
-
-      // Get total distance from sets
-      const totalDistance = ex.sets.reduce((sum, s) => sum + (s.distance || 0), 0);
-
-      // Parse rounds from prescription if available (e.g., "5 rounds")
-      const roundsMatch = ex.prescription.match(/(\d+)\s*rounds?/i);
-      const rounds = roundsMatch ? parseInt(roundsMatch[1], 10) : ex.sets.length || 1;
-
-      // Restore per-movement weights, reps, distances from workloadBreakdown
-      const parsedExercise = editParsedWorkout.exercises[index];
-      const movementWeights: Record<string, number> = {};
-      const movementReps: Record<string, number> = {};
-      const movementDistances: Record<string, number> = {};
-
-      if (parsedExercise.movements) {
-        const mKeys = getMovementKeys(parsedExercise.movements);
-        for (let mi = 0; mi < parsedExercise.movements.length; mi++) {
-          const mov = parsedExercise.movements[mi];
-          const mKey = mKeys[mi];
-          const bm = breakdownMovements.find(
-            m => m.name.toLowerCase() === mov.name.toLowerCase()
-          );
-          // Only assign weight if the movement itself declares weight (rxWeights)
-          if (bm?.weight && bm.weight > 0 && mov.rxWeights) {
-            movementWeights[mKey] = bm.weight;
-          }
-          if (bm?.totalReps && bm.totalReps > 0 && rounds > 0) {
-            movementReps[mKey] = Math.round(bm.totalReps / rounds);
-          }
-          if (bm?.totalDistance && bm.totalDistance > 0 && rounds > 0) {
-            movementDistances[mKey] = Math.round(bm.totalDistance / rounds);
-          }
-        }
-      }
-
-      const result: ExerciseResult = {
-        exercise: parsedExercise,
-        sets: ex.sets,
-        completionTime,
-        rounds,
-        ...(Object.keys(movementWeights).length > 0 && { movementWeights }),
-        ...(Object.keys(movementReps).length > 0 && { movementReps }),
-        ...(Object.keys(movementDistances).length > 0 && { movementDistances }),
-        ...(totalCalories > 0 && {
-          totalCalories,
-          cardioTurns: ex.sets.length,
-          cardioCaloriesPerTurn: ex.sets[0]?.calories,
-        }),
-        ...(totalDistance > 0 && {
-          totalDistance,
-          distanceTurns: ex.sets.length,
-          distancePerTurn: ex.sets[0]?.distance,
-        }),
-      };
-
-      return result;
-    });
-
-    // Set up all state for editing
+    // Set up parsed workout and flags
     setParsedWorkout(editParsedWorkout);
-    setExerciseResults(restoredResults);
     setImageUrl(editWorkout.imageUrl || null);
     setError(null);
     setIsEditingAfterSave(true); // Flag to update instead of create
 
-    // Pre-fill the first exercise's state (mirrors hydrateExerciseState logic)
-    if (restoredResults.length > 0) {
-      const firstResult = restoredResults[0];
-      setCurrentSets(firstResult.sets);
+    // Build StoryExerciseResult[] from saved data for pre-population
+    const breakdownMovements = editWorkout.workloadBreakdown?.movements || [];
+    const storyResults: StoryExerciseResult[] = editParsedWorkout.exercises.map((parsedEx, i) => {
+      const savedEx = editWorkout.exercises[i];
+      const mode = parsedEx.loggingMode ?? 'strength';
+      if (!savedEx) return createBlankResult(parsedEx, i, mode, user?.sex);
 
-      // Restore completion time
-      if (firstResult.completionTime) {
-        const mins = Math.floor(firstResult.completionTime / 60);
-        const secs = firstResult.completionTime % 60;
-        setCompletionMinutes(mins > 0 ? mins.toString() : '');
-        setCompletionSeconds(secs > 0 ? secs.toString() : '');
-      }
+      // Start with blank to get correct kind, movements, setsTotal, etc.
+      const blank = createBlankResult(parsedEx, i, mode, user?.sex);
+      const result: StoryExerciseResult = { ...blank };
 
-      // Restore cardio calories state
-      if (firstResult.cardioTurns) {
-        setCardioTurns(firstResult.cardioTurns.toString());
-        setCardioCaloriesPerTurn(firstResult.cardioCaloriesPerTurn?.toString() || '');
-      }
-
-      // Restore cardio distance state
-      if (firstResult.distanceTurns) {
-        setCardioDistanceTurns(firstResult.distanceTurns.toString());
-        setCardioDistancePerTurn(firstResult.distancePerTurn?.toString() || '');
-        if (firstResult.distanceUnit) {
-          setCardioDistanceUnit(firstResult.distanceUnit);
+      // Overlay saved values based on kind
+      switch (result.kind) {
+        case 'load': {
+          const firstWeight = savedEx.sets[0]?.weight;
+          const lastWeight = savedEx.sets[savedEx.sets.length - 1]?.weight;
+          if (firstWeight != null) result.weight = firstWeight;
+          if (lastWeight != null && lastWeight !== firstWeight) {
+            result.weightEnd = lastWeight;
+            result.loadMode = 'range';
+          } else if (firstWeight == null) {
+            result.loadMode = 'bodyweight';
+          } else {
+            result.loadMode = 'same';
+          }
+          result.setsCompleted = savedEx.sets.length;
+          break;
+        }
+        case 'reps': {
+          const reps = savedEx.sets[0]?.actualReps;
+          if (reps != null) result.repsPerSet = reps;
+          result.setsCompleted = savedEx.sets.length;
+          break;
+        }
+        case 'duration': {
+          const time = savedEx.sets[0]?.time;
+          if (time != null) result.durationSeconds = time;
+          result.setsCompleted = savedEx.sets.length;
+          break;
+        }
+        case 'distance': {
+          const dist = savedEx.sets[0]?.distance;
+          if (dist != null) result.distanceValue = dist;
+          break;
+        }
+        case 'score_time': {
+          const time = savedEx.sets[0]?.time;
+          if (time != null) result.timeSeconds = time;
+          break;
+        }
+        case 'score_rounds': {
+          if (savedEx.rounds != null) result.rounds = savedEx.rounds;
+          const partialReps = savedEx.sets[0]?.actualReps;
+          if (partialReps != null) result.partialReps = partialReps;
+          if (savedEx.ladderStep != null) result.ladderStep = savedEx.ladderStep;
+          if (savedEx.ladderPartial != null) result.ladderPartial = savedEx.ladderPartial;
+          break;
+        }
+        case 'intervals': {
+          result.intervalsCompleted = savedEx.sets.length;
+          result.intervalsTotal = savedEx.sets.length;
+          const iw = savedEx.sets[0]?.weight;
+          if (iw != null) result.intervalWeight = iw;
+          break;
         }
       }
 
-      // Restore weight input from sets
-      const firstWeight = firstResult.sets?.[0]?.weight;
-      if (firstWeight !== undefined) {
-        setWorkoutWeight(firstWeight.toString());
+      // Restore per-movement data from workloadBreakdown
+      if (result.movementResults && breakdownMovements.length > 0) {
+        result.movementResults = result.movementResults.map(mr => {
+          const bm = breakdownMovements.find(
+            m => m.name.toLowerCase() === mr.movement.name.toLowerCase()
+          );
+          if (!bm) return mr;
+          const patched = { ...mr };
+          if (bm.weight && bm.weight > 0) patched.weight = bm.weight;
+          if (bm.totalCalories && bm.totalCalories > 0) patched.calories = bm.totalCalories;
+          if (bm.totalDistance && bm.totalDistance > 0) patched.distance = bm.totalDistance;
+          if (bm.totalReps && bm.totalReps > 0) {
+            const rounds = savedEx.rounds || savedEx.sets.length || 1;
+            patched.reps = Math.round(bm.totalReps / rounds);
+          }
+          return patched;
+        });
       }
 
-      // Restore per-movement weights, reps, distances
-      setMovementWeights(firstResult.movementWeights || {});
-      setCustomReps(firstResult.movementReps || {});
-      setCustomDistances(firstResult.movementDistances || {});
-      setSelectedAlternatives(firstResult.movementAlternatives || {});
-      setMovementImplementCounts((firstResult.implementCounts || {}) as Record<string, 1 | 2>);
+      return result;
+    });
 
-      // Restore rounds for AMRAP exercises
-      if (firstResult.rounds && firstResult.rounds > 0) {
-        setCurrentRounds(firstResult.rounds.toString());
-      }
-    }
-
-    // Skip directly to log-results so user can see and edit their values
+    setEditInitialResults(storyResults);
     setStep('log-results');
-    console.log('[EditWorkout] Pre-filled results:', restoredResults);
+    console.log('[EditWorkout] Pre-filled story results:', storyResults);
   }, [editWorkout]);
 
   // Run smart classification for exercises with low confidence when entering log-results
@@ -2399,6 +2566,26 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
     setStep('log-results');
   };
 
+  // Handle renaming the workout title from the reward screen
+  const handleRenameWorkout = async (newTitle: string) => {
+    // Update local state
+    if (rewardData) {
+      setRewardData({
+        ...rewardData,
+        workoutSummary: { ...rewardData.workoutSummary, title: newTitle },
+      });
+    }
+    // Persist to Firestore
+    if (savedWorkoutMeta?.id) {
+      try {
+        const workoutRef = doc(db, 'workouts', savedWorkoutMeta.id);
+        await setDoc(workoutRef, { title: newTitle }, { merge: true });
+      } catch (err) {
+        console.error('Failed to rename workout:', err);
+      }
+    }
+  };
+
   // Handle renaming a movement from the reward screen
   const handleRenameMovement = (oldName: string, newName: string) => {
     if (!rewardData?.workloadBreakdown) return;
@@ -2670,6 +2857,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           sets,
           rxWeights: result.exercise.rxWeights,
           ...(movementsForSave && movementsForSave.length > 0 && { movements: movementsForSave }),
+          ...(result.exercise.sections && result.exercise.sections.length > 0 && { sections: result.exercise.sections }),
           ...(rounds > 1 && { rounds }),
         };
       });
@@ -2688,7 +2876,60 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       const emomSeconds = (parsedWorkout.intervalTime && (parsedWorkout.sets || parsedWorkout.containerRounds))
         ? parsedWorkout.intervalTime * (parsedWorkout.containerRounds || parsedWorkout.sets || 0)
         : 0;
-      const programmedDuration = Math.max(timeCapSeconds, emomSeconds);
+
+      // Primary: use AI-returned workDuration/restDuration per exercise (reliable, no regex).
+      // Each exercise returns its own total work + rest seconds — just sum them.
+      let perExerciseDuration = 0;
+      for (const r of results) {
+        const ex = r.exercise;
+        if (ex.workDuration && ex.workDuration > 0) {
+          perExerciseDuration += ex.workDuration + (ex.restDuration || 0);
+        }
+      }
+
+      // Fallback: regex extraction from exercise name/prescription (for older AI responses)
+      if (perExerciseDuration === 0 && timeCapSeconds === 0 && emomSeconds === 0) {
+        for (const r of results) {
+          const rx = (r.exercise.prescription || '').toLowerCase() + ' ' + (r.exercise.name || '').toLowerCase();
+          // "Every 3:00 x 5" or "Every 03:00 min x 5 rounds"
+          const emomMatch = rx.match(/every\s+(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)/i);
+          if (emomMatch) {
+            const mins = parseInt(emomMatch[1], 10);
+            const secs = parseInt(emomMatch[2], 10);
+            const sets = parseInt(emomMatch[3], 10);
+            perExerciseDuration += (mins * 60 + secs) * sets;
+            continue;
+          }
+          // "03:00 min AMRAP, 01:00 min REST x 4 rounds" or "[03:00 min AMRAP, 01:00 min REST] x 4"
+          const intervalAmrap = rx.match(/\[?(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*amrap[^,]*,\s*(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*rest\]?\s*[x×]\s*(\d+)/i);
+          if (intervalAmrap) {
+            const workSecs = parseInt(intervalAmrap[1], 10) * 60 + parseInt(intervalAmrap[2], 10);
+            const restSecs = parseInt(intervalAmrap[3], 10) * 60 + parseInt(intervalAmrap[4], 10);
+            const rounds = parseInt(intervalAmrap[5], 10);
+            perExerciseDuration += (workSecs + restSecs) * rounds;
+            continue;
+          }
+          // "AMRAP 3:00", "03:00 min AMRAP" — MM:SS format
+          const capMMSS = rx.match(/(?:amrap|emom)\s+(\d+):(\d+)/i)
+            || rx.match(/(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*(?:amrap|emom)/i);
+          if (capMMSS) {
+            perExerciseDuration += parseInt(capMMSS[1], 10) * 60 + parseInt(capMMSS[2], 10);
+            continue;
+          }
+          // "AMRAP 12", "18 min AMRAP", "EMOM 15" — plain minutes
+          const capMatch = rx.match(/(?:amrap|emom)\s+(\d+)/i)
+            || rx.match(/(\d+)\s*(?:min(?:ute)?s?)\s*(?:amrap|emom)/i);
+          if (capMatch) {
+            perExerciseDuration += parseInt(capMatch[1], 10) * 60;
+          }
+        }
+      }
+
+      // When AI workDuration is available (perExerciseDuration from primary path),
+      // trust it over timeCap which can be wrong (e.g., AI confusing 200m with 200 minutes).
+      const programmedDuration = perExerciseDuration > 0
+        ? perExerciseDuration
+        : Math.max(timeCapSeconds, emomSeconds);
       const effectiveDuration = Math.max(totalDuration, programmedDuration);
       const durationMinutes = effectiveDuration > 0 ? effectiveDuration / 60 : 0;
 
@@ -2698,6 +2939,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         format: parsedWorkout.format,
         timeCap: parsedWorkout.timeCap,
         timeCapSeconds,
+        emomSeconds,
+        perExerciseDuration,
         totalDuration,
         effectiveDuration,
         durationMinutes,
@@ -2842,6 +3085,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         workloadBreakdown,
         workoutContext: workoutContextLine || undefined,
         workoutRawText: parsedWorkout.rawText?.trim() || undefined,
+        ...(teamSize > 1 && { teamSize }),
       });
       if (skipPersistence) {
         setIsEditingAfterSave(false);
@@ -2860,20 +3104,22 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
   return (
     <div className={styles.container} ref={containerRef}>
-      {/* Header */}
-      <header className={styles.header}>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleHeaderBack}
-          icon={<BackIcon />}
-          className={styles.backButton}
-        >
-          Back
-        </Button>
-        <h1 className={styles.title}>Add Workout</h1>
-        <div className={styles.spacer} />
-      </header>
+      {/* Header — hidden during full-screen steps (story, reward, saving) */}
+      {step !== 'log-results' && step !== 'reward' && step !== 'saving' && (
+        <header className={styles.header}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleHeaderBack}
+            icon={<BackIcon />}
+            className={styles.backButton}
+          >
+            Back
+          </Button>
+          <h1 className={styles.title}>Add Workout</h1>
+          <div className={styles.spacer} />
+        </header>
+      )}
 
       {/* Content based on step */}
       {step === 'capture' && (
@@ -3135,8 +3381,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             return getExerciseLoggingMode(ex, workoutCtx);
           })}
           onSave={(results) => saveWorkout(results as unknown as ExerciseResult[])}
-          onBack={() => setStep('preview')}
+          onBack={() => editWorkout ? onBack() : setStep('preview')}
           isSaving={false}
+          initialResults={editInitialResults}
         />
       )}
 
@@ -3161,6 +3408,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           onEdit={handleEditFromReward}
           onRenameMovement={handleRenameMovement}
           onDeleteMovement={handleDeleteMovement}
+          onRenameWorkout={handleRenameWorkout}
+          originalTitle={parsedWorkout?.title}
         />
       )}
     </div>

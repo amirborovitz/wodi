@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   WodStoryScreen — scrollable workout story
+   WodStoryScreen — premium workout logging
    ═══════════════════════════════════════════ */
 
 .container {
@@ -12,93 +12,114 @@
   scroll-padding-bottom: 120px;
 }
 
-/* ── Story Header ── */
+/* ── Header ── */
 .header {
-  padding: var(--space-6) var(--space-4) var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.headerTop {
+.headerRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .backButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-full);
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--color-text-secondary);
   font-size: var(--text-lg);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: all var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
 }
 
 .backButton:active {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.1);
   transform: scale(0.95);
 }
 
-.progressChips {
+/* ── Format pill in header ── */
+.formatPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 25%, transparent);
+  color: var(--pill-accent, var(--neon-cyan));
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Progress bar ── */
+.progressBar {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.progressDot {
-  width: 8px;
-  height: 8px;
+.progressTrack {
+  flex: 1;
+  height: 6px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.12);
-  transition: all var(--duration-normal) var(--ease-out);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
 
-.progressDotFilled {
-  background: var(--neon-cyan);
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
-}
-
-.progressDotPartial {
-  background: rgba(0, 255, 255, 0.4);
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--progress-color, var(--neon-cyan));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--progress-color, var(--neon-cyan)) 55%, transparent);
+  transition: width 0.4s var(--ease-out);
 }
 
 .progressLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: var(--font-bold);
+  color: var(--color-text-secondary);
   font-family: var(--font-family);
-  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Title area ── */
+.titleArea {
+  padding: 0 var(--space-1);
 }
 
 .title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
+  font-size: 30px;
+  font-weight: var(--font-black);
   color: var(--color-text);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-}
-
-.subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
 }
 
 /* ── Exercise List ── */
 .exerciseList {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 0 0 var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-4);
 }
 
 /* ── Save CTA (sticky bottom) ── */
@@ -148,36 +169,9 @@
 }
 
 .saveNotReady {
-  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
-  color: var(--color-bg);
-  opacity: 0.4;
-}
-
-/* ── Logged count label ── */
-.loggedLabel {
-  display: block;
-  text-align: center;
-  font-size: var(--text-xs);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--color-text-tertiary);
-  margin-bottom: var(--space-2);
-}
-
-/* ── Format pill ── */
-.formatPill {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--pill-accent, var(--neon-cyan)) 25%, transparent);
-  color: var(--pill-accent, var(--neon-cyan));
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  width: fit-content;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 /* ── First-time hint arrow ── */
@@ -200,9 +194,87 @@
   font-size: var(--text-sm);
 }
 
+/* ── Missing data confirmation popup ── */
+.popupBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: calc(var(--z-modal) + 10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.popupCard {
+  width: 100%;
+  max-width: 320px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.popupTitle {
+  font-size: var(--text-base);
+  font-weight: var(--font-bold);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+}
+
+.popupBody {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.popupActions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.popupBtnSecondary,
+.popupBtnPrimary {
+  flex: 1;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: none;
+  font-family: var(--font-family);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.popupBtnSecondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+}
+
+.popupBtnSecondary:active {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.popupBtnPrimary {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta));
+  color: var(--color-bg);
+}
+
+.popupBtnPrimary:active {
+  filter: brightness(0.88);
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .progressDot,
+  .progressFill,
   .backButton,
   .saveButton {
     transition: none;

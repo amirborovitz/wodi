@@ -239,14 +239,217 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     })),
   };
 
+  // Detect ladder rep patterns (e.g., "4-6-8-10-12") on amrap exercises
+  const withLadder = detectLadderReps(result);
+
+  // Backfill "together" flag from rawText when AI missed it
+  const withTogether = backfillTogetherFlag(withLadder);
+
   // Backfill loggingMode on exercises that the AI missed
-  const withLoggingModes = backfillLoggingModes(result);
+  const withLoggingModes = backfillLoggingModes(withTogether);
 
   // Backfill inputType on any movements that the AI missed
   const withInputTypes = backfillInputTypes(withLoggingModes);
 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
-  return backfillSharedWeightHints(withInputTypes);
+  const withSharedWeight = backfillSharedWeightHints(withInputTypes);
+
+  // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
+  return detectMisplacedBuyIns(withSharedWeight);
+}
+
+/**
+ * Detect buy-in movements that the AI placed in movements[] instead of buyIn[].
+ * For amrap_intervals workouts with prescriptions like "200m run Into AMRAP: ...",
+ * the first movement (before "into AMRAP") is a buy-in done once per interval,
+ * not every AMRAP round. Flag it with perRound=false and "Buy-In: " prefix.
+ */
+function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
+  if (workout.format !== 'amrap_intervals') return workout;
+
+  let changed = false;
+  const exercises = workout.exercises.map(ex => {
+    if (!ex.movements || ex.movements.length < 2) return ex;
+    // Already has buy-in movements — nothing to fix
+    if (ex.movements.some(m => m.perRound === false || m.role === 'buy_in' || /^buy-in:/i.test(m.name))) return ex;
+
+    const rx = ((ex.name || '') + ' ' + (ex.prescription || '')).toLowerCase();
+    // Pattern: "into AMRAP", "buy-in", or "then AMRAP" in prescription
+    const hasBuyInPattern = /\binto\s+amrap\b|\bbuy[\s-]?in\b|\bthen\s+amrap\b/i.test(rx);
+
+    // For amrap_intervals, also detect by structure: first movement is cardio (distance/calories, no reps)
+    // followed by rep-based AMRAP movements — this is the classic buy-in pattern.
+    const firstMov = ex.movements[0];
+    const firstIsCardio = firstMov && (firstMov.distance || firstMov.calories) && !firstMov.reps;
+    const restHaveReps = ex.movements.slice(1).some(m => m.reps && m.reps > 0);
+
+    if (!hasBuyInPattern && !(firstIsCardio && restHaveReps)) return ex;
+
+    // Find the buy-in: first movement with distance/calories but no reps
+    const buyInIdx = ex.movements.findIndex(m =>
+      (m.distance || m.calories) && !m.reps
+    );
+    // Fallback: if prescription mentions "into AMRAP", the first movement is the buy-in
+    const targetIdx = buyInIdx >= 0 ? buyInIdx : (hasBuyInPattern ? 0 : -1);
+    if (targetIdx < 0) return ex;
+
+    changed = true;
+    const newMovements = ex.movements.map((m, i) => {
+      if (i !== targetIdx) return m;
+      return {
+        ...m,
+        perRound: false as const,
+        name: m.name.startsWith('Buy-In:') ? m.name : `Buy-In: ${m.name}`,
+      };
+    });
+    return { ...ex, movements: newMovements };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
+}
+
+/**
+ * Detect ladder rep patterns on AMRAP exercises.
+ * A ladder is a strictly ascending rep sequence (e.g., [4, 6, 8, 10, 12]).
+ * Sources: suggestedRepsPerSet, or an ascending number pattern in the prescription text.
+ *
+ * Also extracts intervalCount from the workout or exercise metadata
+ * (e.g., "x 4 rounds" → intervalCount: 4).
+ */
+function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
+  // Only applies to amrap / amrap_intervals workouts
+  const isAmrapFormat = workout.format === 'amrap' || workout.format === 'amrap_intervals';
+
+  // Regex to match ascending number sequences like "4-6-8-10-12" in prescription
+  const LADDER_PATTERN = /\b(\d{1,3}(?:\s*[-–]\s*\d{1,3}){2,})\b/;
+
+  // "after each round" pattern — marks a movement as fixed (not part of the ladder)
+  const AFTER_EACH_PATTERN = /after\s+(?:each|every)\s+(?:round|interval|set)/i;
+
+  const exercises = workout.exercises.map(ex => {
+    // Already has ladder data
+    if (ex.ladderReps && ex.ladderReps.length > 0) return ex;
+
+    const isAmrapExercise = ex.loggingMode === 'amrap' || ex.loggingMode === 'amrap_intervals' || isAmrapFormat;
+    if (!isAmrapExercise) return ex;
+
+    let ladderReps: number[] | undefined;
+    let intervalCount: number | undefined;
+
+    // Source 1: suggestedRepsPerSet that is strictly ascending
+    if (ex.suggestedRepsPerSet && ex.suggestedRepsPerSet.length >= 3) {
+      const rps = ex.suggestedRepsPerSet;
+      const isAscending = rps.every((v, i) => i === 0 || v > rps[i - 1]);
+      if (isAscending) {
+        ladderReps = rps;
+        const ic = workout.sets || ex.suggestedSets || 1;
+        intervalCount = ic > 1 ? ic : undefined;
+        console.log(`[PostProcessor] Detected ladder from suggestedRepsPerSet: [${rps}], intervals: ${ic}`);
+      }
+    }
+
+    // Source 2: ascending number pattern in prescription text or rawText
+    if (!ladderReps) {
+      const searchTexts = [ex.prescription || '', workout.rawText || ''];
+      for (const text of searchTexts) {
+        const match = text.match(LADDER_PATTERN);
+        if (match) {
+          const nums = match[1].split(/\s*[-–]\s*/).map(Number).filter(n => n > 0);
+          if (nums.length >= 3) {
+            const isAscending = nums.every((v, i) => i === 0 || v > nums[i - 1]);
+            if (isAscending) {
+              const roundsMatch = text.match(/x\s*(\d+)\s*rounds?/i);
+              const ic = roundsMatch
+                ? parseInt(roundsMatch[1], 10)
+                : (workout.sets || ex.suggestedSets || 1);
+              ladderReps = nums;
+              intervalCount = ic > 1 ? ic : undefined;
+              console.log(`[PostProcessor] Detected ladder from text: [${nums}], intervals: ${ic}`);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!ladderReps) return ex;
+
+    // Mark "after each round" movements as perRound: false
+    // These are fixed per interval, not part of the ladder.
+    // Detection: "after each round" in rawText/prescription near the movement name,
+    // OR the movement's reps don't match the first ladder value.
+    const rawText = (workout.rawText || '') + ' ' + (ex.prescription || '');
+    const hasAfterEach = AFTER_EACH_PATTERN.test(rawText);
+    const movements = ex.movements?.map(mov => {
+      if (mov.perRound === false) return mov; // already marked
+
+      // If rawText has "after each round" and this movement's reps differ from ladder values,
+      // it's likely the fixed movement (e.g., "30 DU after each round").
+      if (hasAfterEach && mov.reps && !ladderReps!.includes(mov.reps)) {
+        console.log(`[PostProcessor] Marking "${mov.name}" as perRound=false (${mov.reps} reps, not in ladder [${ladderReps}])`);
+        return { ...mov, perRound: false as const };
+      }
+      return mov;
+    });
+
+    return {
+      ...ex,
+      ladderReps,
+      intervalCount,
+      ...(movements && { movements }),
+    };
+  });
+
+  return { ...workout, exercises };
+}
+
+/**
+ * Backfill `together` flag on movements when the raw text says "(together)"
+ * but the AI didn't set the flag. Scans rawText and prescription for patterns
+ * like "300m run (together)" and sets together=true on matching movements.
+ */
+function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
+  const rawText = (workout.rawText || '').toLowerCase();
+  if (!rawText.includes('together')) return workout;
+
+  // Build a set of movement names that appear with "(together)" in the raw text
+  // Pattern: "300m run (together)", "run together", "run (together)"
+  const togetherNames = new Set<string>();
+  for (const ex of workout.exercises) {
+    const allMovements = [
+      ...(ex.movements || []),
+      ...(ex.sections?.flatMap(s => s.movements) || []),
+    ];
+    for (const mov of allMovements) {
+      if (mov.together) continue; // already set
+      const pattern = new RegExp(
+        mov.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\(?together\\)?',
+        'i'
+      );
+      if (pattern.test(rawText) || pattern.test(ex.prescription || '')) {
+        togetherNames.add(mov.name.toLowerCase());
+      }
+    }
+  }
+
+  if (togetherNames.size === 0) return workout;
+
+  const setFlag = (mov: ParsedMovement): ParsedMovement =>
+    !mov.together && togetherNames.has(mov.name.toLowerCase())
+      ? { ...mov, together: true }
+      : mov;
+
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => ({
+      ...ex,
+      movements: ex.movements?.map(setFlag),
+      sections: ex.sections?.map(s => ({
+        ...s,
+        movements: s.movements.map(setFlag),
+      })),
+    })),
+  };
 }
 
 
@@ -299,9 +502,10 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
 
   // Check for AMRAP patterns - in prominent text first, then fall back to fullText (prescriptions)
   if (prominentText.includes('amrap') || fullText.includes('amrap')) {
-    // Check for AMRAP intervals (multiple AMRAPs with rest)
+    // Check for AMRAP intervals (multiple AMRAPs with rest, or "every X:XX + AMRAP")
     if (/amrap.*x\s*\d/i.test(fullText) || /\d+\s*x\s*amrap/i.test(fullText) ||
-        (fullText.includes('amrap') && fullText.includes('rest'))) {
+        (fullText.includes('amrap') && fullText.includes('rest')) ||
+        (fullText.includes('amrap') && /every\s+\d+/i.test(fullText))) {
       console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap_intervals');
       return 'amrap_intervals';
     }
@@ -820,6 +1024,8 @@ function postProcessMovements(
  */
 // Movement modifiers that should be preserved as prefixes during name normalization
 const PRESERVED_PREFIXES: Record<string, string> = {
+  'buy-in:': 'Buy-In:',
+  'cash-out:': 'Cash-Out:',
   'alternate': 'Alt',
   'alternating': 'Alt',
   'alt': 'Alt',

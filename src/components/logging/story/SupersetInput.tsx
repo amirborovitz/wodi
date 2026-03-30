@@ -1,8 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { StoryExerciseResult, MovementResult } from './types';
-import { kindToTrinityColor } from './types';
+import { kindToTrinityColor, getWeightStep } from './types';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import { StepperInput } from './StepperInput';
+import { SubstitutionSheet } from './SubstitutionSheet';
+import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
+import type { MovementSubstitution } from '../../../types';
 import styles from './SupersetInput.module.css';
 
 interface SupersetInputProps {
@@ -18,7 +21,8 @@ interface SupersetInputProps {
 export function SupersetInput({ result, onChange }: SupersetInputProps) {
   const movements = result.movementResults ?? [];
 
-  // Detect barbell complex: AI hint or fallback (2+ weighted movements)
+  // Detect barbell complex or single weighted movement needing Start/Top.
+  // Show ProgressiveWeightRow when 1+ weighted movements exist with multiple sets.
   const { isComplex, weightedIndices } = useMemo(() => {
     const hints = result.exercise.loggingHints?.sharedWeightMovements;
     if (hints && hints.length >= 2) {
@@ -26,14 +30,15 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
       const indices = movements
         .map((mr, i) => hints.some(h => mr.movement.name === h) ? i : -1)
         .filter(i => i >= 0);
-      return { isComplex: indices.length >= 2, weightedIndices: indices };
+      return { isComplex: indices.length >= 1, weightedIndices: indices };
     }
-    // Fallback: 2+ load-kind movements → treat as complex
+    // Fallback: 1+ load-kind movements with multiple sets → show Start/Top
     const indices = movements
       .map((mr, i) => mr.kind === 'load' ? i : -1)
       .filter(i => i >= 0);
-    return { isComplex: indices.length >= 2, weightedIndices: indices };
-  }, [movements, result.exercise.loggingHints]);
+    const hasMutiSets = result.setsTotal > 1;
+    return { isComplex: indices.length >= 1 && hasMutiSets, weightedIndices: indices };
+  }, [movements, result.exercise.loggingHints, result.setsTotal]);
 
   const updateMovement = useCallback((index: number, patch: Partial<MovementResult>) => {
     const next = [...(result.movementResults ?? [])];
@@ -59,27 +64,118 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
   const sharedPlaceholder = isComplex && weightedIndices.length > 0
     ? movements[weightedIndices[0]]?.movement.rxWeights?.male
     : undefined;
+  // Label: use movement name when single weighted, "Barbell" for multi
+  const progressiveLabel = weightedIndices.length === 1
+    ? movements[weightedIndices[0]]?.movement.name ?? 'Weight'
+    : 'Barbell';
+  // Reps per set for "TOTAL REPS" badge
+  const progressiveReps = weightedIndices.length > 0
+    ? movements[weightedIndices[0]]?.movement.reps ?? result.exercise.suggestedReps
+    : undefined;
+
+  const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
+  const swapMr = swapOpenKey != null
+    ? movements.find(m => m.movementKey === swapOpenKey) ?? null
+    : null;
+
+  const handleSubstitution = useCallback((sub: MovementSubstitution | null) => {
+    if (!swapMr) return;
+    const idx = movements.indexOf(swapMr);
+    if (idx < 0) return;
+    const patch: Partial<MovementResult> = { substitution: sub };
+    if (sub?.adjustedValue != null) {
+      if (sub.targetUnit) {
+        if (sub.targetUnit === 'distance') {
+          patch.distance = sub.adjustedValue;
+          patch.calories = undefined;
+        } else if (sub.targetUnit === 'calories') {
+          patch.calories = sub.adjustedValue;
+          patch.distance = undefined;
+        }
+      } else {
+        // Legacy fallback
+        const originIsDistance = swapMr.kind === 'distance'
+          || (swapMr.movement.distance != null && swapMr.movement.distance > 0);
+        const originIsCal = !originIsDistance && (
+          swapMr.movement.inputType === 'calories' ||
+          (swapMr.movement.calories != null && swapMr.movement.calories > 0)
+        );
+        if (originIsDistance) {
+          patch.distance = sub.adjustedValue;
+          patch.calories = undefined;
+        } else if (originIsCal) {
+          patch.calories = sub.adjustedValue;
+          patch.distance = undefined;
+        } else {
+          const targetDef = findExerciseDefinition(sub.selectedName);
+          const targetUsesCal = targetDef?.defaultUnit === 'calories';
+          if (targetUsesCal) {
+            patch.calories = sub.adjustedValue;
+          } else if (swapMr.movement.distance != null) {
+            patch.distance = sub.adjustedValue;
+          }
+        }
+      }
+    } else if (!sub) {
+      const isCal = swapMr.movement.inputType === 'calories' || (swapMr.movement.calories != null && swapMr.movement.calories > 0);
+      if (isCal) patch.calories = swapMr.movement.calories ?? undefined;
+      else if (swapMr.movement.distance != null) {
+        patch.distance = swapMr.movement.distance;
+        patch.calories = undefined;
+      }
+    }
+    updateMovement(idx, patch);
+    setSwapOpenKey(null);
+  }, [swapMr, movements, updateMovement]);
 
   return (
-    <div className={styles.container}>
-      {isComplex && (
-        <ProgressiveWeightRow
-          weight={sharedWeight}
-          placeholder={sharedPlaceholder}
-          setsTotal={result.setsTotal}
-          onChange={handleProgressiveChange}
+    <>
+      <div className={styles.container}>
+        {isComplex && (
+          <ProgressiveWeightRow
+            weight={sharedWeight}
+            placeholder={sharedPlaceholder}
+            setsTotal={result.setsTotal}
+            repsPerSet={progressiveReps}
+            onChange={handleProgressiveChange}
+            label={progressiveLabel}
+          />
+        )}
+        {movements.map((mr, i) => {
+          // Skip rendering weighted movements whose weight is already shown
+          // in the ProgressiveWeightRow (avoids redundant row with no inputs)
+          const isHandledByProgressive = isComplex && weightedIndices.includes(i);
+          if (isHandledByProgressive && mr.kind === 'load') return null;
+
+          return (
+            <MovementRow
+              key={mr.movementKey}
+              mr={mr}
+              index={i}
+              hideWeight={isHandledByProgressive}
+              onUpdate={(patch) => updateMovement(i, patch)}
+              onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
+                ? () => setSwapOpenKey(mr.movementKey)
+                : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {swapMr && (
+        <SubstitutionSheet
+          open={swapOpenKey != null}
+          originalName={swapMr.movement.name}
+          originalReps={swapMr.movement.reps}
+          originalDistance={swapMr.movement.distance}
+          originalCalories={swapMr.movement.calories}
+          currentSubstitution={swapMr.substitution}
+          aiAlternative={swapMr.movement.alternative}
+          onSelect={handleSubstitution}
+          onClose={() => setSwapOpenKey(null)}
         />
       )}
-      {movements.map((mr, i) => (
-        <MovementRow
-          key={mr.movementKey}
-          mr={mr}
-          index={i}
-          hideWeight={isComplex && weightedIndices.includes(i)}
-          onUpdate={(patch) => updateMovement(i, patch)}
-        />
-      ))}
-    </div>
+    </>
   );
 }
 
@@ -90,14 +186,18 @@ interface MovementRowProps {
   index: number;
   hideWeight?: boolean;
   onUpdate: (patch: Partial<MovementResult>) => void;
+  onSwapTap?: () => void;
 }
 
-function MovementRow({ mr, hideWeight, onUpdate }: MovementRowProps) {
+function MovementRow({ mr, hideWeight, onUpdate, onSwapTap }: MovementRowProps) {
   const color = kindToTrinityColor(mr.kind);
   const isFilled = isMovementRowFilled(mr);
+  const isSubstituted = mr.substitution != null;
 
   // Build prescription hint
   const hint = buildHint(mr);
+
+  const displayName = isSubstituted ? mr.substitution!.selectedName : mr.movement.name;
 
   return (
     <div
@@ -105,7 +205,34 @@ function MovementRow({ mr, hideWeight, onUpdate }: MovementRowProps) {
       style={{ '--mov-color': color } as React.CSSProperties}
     >
       <div className={styles.movHeader}>
-        <span className={styles.movName}>{mr.movement.name}</span>
+        <div className={styles.movNameGroup}>
+          {isSubstituted && (
+            <span className={styles.movNameOriginalStruck}>{mr.movement.name}</span>
+          )}
+          <span className={`${styles.movName} ${isSubstituted ? styles.movNameSubstituted : ''}`}>
+            {displayName}
+          </span>
+          {isSubstituted && (
+            <span className={`${styles.supBadge} ${
+              mr.substitution!.substitutionType === 'easier' ? styles.supBadgeScaled :
+              mr.substitution!.substitutionType === 'harder' ? styles.supBadgeRxPlus :
+              styles.supBadgeEqual
+            }`}>
+              {mr.substitution!.substitutionType === 'easier' ? 'SCALED' :
+               mr.substitution!.substitutionType === 'harder' ? 'RX+' : 'EQUAL'}
+            </span>
+          )}
+        </div>
+        {onSwapTap && (
+          <button
+            type="button"
+            className={styles.swapBtn}
+            onClick={onSwapTap}
+            aria-label={`Scale ${mr.movement.name}`}
+          >
+            <SwapIcon />
+          </button>
+        )}
         {hint && <span className={styles.movHint}>{hint}</span>}
       </div>
 
@@ -119,6 +246,20 @@ function MovementRow({ mr, hideWeight, onUpdate }: MovementRowProps) {
   );
 }
 
+function SwapIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M2 4.5h8M8 2.5l2 2-2 2M12 9.5H4M4 7.5l-2 2 2 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // ─── Inline inputs ──────────────────────────────────────────────
 
 function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Partial<MovementResult>) => void }) {
@@ -129,7 +270,7 @@ function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Part
     <StepperInput
       value={mr.weight}
       onChange={(v) => onUpdate({ weight: v != null ? Math.max(0, v) : undefined })}
-      step={2.5}
+      step={getWeightStep(mr.movement.name, mr.implementCount)}
       min={0}
       max={500}
       placeholder={placeholder}

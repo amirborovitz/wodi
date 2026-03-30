@@ -25,12 +25,23 @@
   padding-left: calc(var(--space-3) - 3px);
 }
 
-/* ── Header: name + prescription hint ── */
+/* ── Header: name group + swap + prescription hint ── */
 .movHeader {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Name group: original (struck) + selected, inline */
+.movNameGroup {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .movName {
@@ -38,6 +49,75 @@
   font-weight: var(--font-semibold);
   color: var(--color-text);
   line-height: var(--leading-tight);
+}
+
+/* When substituted, the selected name gets full white */
+.movNameSubstituted {
+  color: #ffffff;
+}
+
+/* Original name: struck through, muted */
+.movNameOriginalStruck {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+/* Scaling badges (inside superset rows) */
+.supBadge {
+  font-size: 9px;
+  font-weight: var(--font-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  line-height: 1.4;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.supBadgeScaled {
+  background: rgba(255, 0, 229, 0.12);
+  color: var(--neon-magenta);
+}
+
+.supBadgeRxPlus {
+  background: rgba(255, 214, 0, 0.12);
+  color: var(--neon-yellow);
+}
+
+.supBadgeEqual {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--color-text-secondary);
+}
+
+/* Swap icon button */
+.swapBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+  transition: color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+  margin-left: auto;
+}
+
+.swapBtn:active {
+  color: var(--neon-magenta);
+  background: rgba(255, 0, 229, 0.1);
 }
 
 .movHint {

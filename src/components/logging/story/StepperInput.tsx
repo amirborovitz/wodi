@@ -76,7 +76,7 @@ export function StepperInput({
     holdStartRef.current = Date.now();
     heldBtnRef.current = direction;
     scheduleNext(direction);
-  }, [adjust, step, scheduleNext]);
+  }, [adjust, step, scheduleNext, label, unit, value]);
 
   const handlePointerUp = useCallback(() => {
     if (timerRef.current) {
@@ -103,6 +103,12 @@ export function StepperInput({
 
   const sizeClass = size === 'sm' ? styles.stepperSm : '';
 
+  // Auto-scale font: shrink by 2px per extra character beyond 3
+  const displayStr = value != null ? String(value) : '';
+  const baseFont = size === 'sm' ? 20 : 26;
+  const overflowChars = Math.max(0, displayStr.length - 3);
+  const fontSize = overflowChars > 0 ? baseFont - overflowChars * 2 : undefined;
+
   const content = (
     <div
       className={`${styles.stepper} ${sizeClass}`}
@@ -113,13 +119,14 @@ export function StepperInput({
           type="number"
           inputMode={inputMode}
           className={styles.inputField}
-          value={value != null ? String(value) : ''}
+          value={displayStr}
           placeholder={placeholder}
           onFocus={(e) => e.target.select()}
           onChange={(e) => handleInputChange(e.target.value)}
           min={min}
           max={max}
           step={step}
+          style={fontSize != null ? { fontSize: `${fontSize}px` } : undefined}
         />
         {unit && <span className={styles.unit}>{unit}</span>}
       </div>

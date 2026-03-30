@@ -1,6 +1,7 @@
 import type { StoryExerciseResult, MovementResult } from './types';
 import { LoadInput } from './LoadInput';
 import { ScoreTimeInput, ScoreRoundsInput } from './ScoreInputs';
+import { LadderInput } from './LadderInput';
 import { RepsSetsInput } from './RepsSetsInput';
 import { DurationInput, DistanceInput, IntervalsInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
@@ -9,6 +10,7 @@ import { ScoreMovementInputs } from './ScoreMovementInputs';
 interface InputRouterProps {
   result: StoryExerciseResult;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
+  teamSize?: number;
 }
 
 /**
@@ -19,7 +21,7 @@ interface InputRouterProps {
  * If a movement says inputType: "weight", we show a weight input —
  * regardless of whether the exercise is scored, single, or superset.
  */
-export function InputRouter({ result, onChange }: InputRouterProps) {
+export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
 
@@ -29,23 +31,31 @@ export function InputRouter({ result, onChange }: InputRouterProps) {
     const inputMovements = movements.filter(
       mr => mr.kind === 'load' || mr.kind === 'distance'
     );
-    // DEBUG: trace why weight inputs may not appear
-    console.log('[InputRouter] score mode:', kind, 'movements:', movements.length, 'inputMovements:', inputMovements.length, movements.map(m => `${m.movement.name}→${m.kind}`));
+    // Show ScoreMovementInputs whenever there are movements —
+    // even if none need weight/distance input, they may have substitution alternatives.
+    const showMovements = movements.length > 0;
+    // Ladder AMRAP: use step sliders instead of round counter
+    const isLadder = kind === 'score_rounds' && result.exercise.ladderReps && result.exercise.ladderReps.length > 0;
+
     return (
       <>
         {kind === 'score_time'
           ? <ScoreTimeInput result={result} onChange={onChange} />
-          : <ScoreRoundsInput result={result} onChange={onChange} />
+          : isLadder
+            ? <LadderInput result={result} onChange={onChange} />
+            : <ScoreRoundsInput result={result} onChange={onChange} />
         }
-        {inputMovements.length > 0 && (
+        {showMovements && (
           <ScoreMovementInputs
             movements={movements}
             inputMovements={inputMovements}
+            teamSize={teamSize}
             onChange={(index: number, patch: Partial<MovementResult>) => {
               const next = [...movements];
               next[index] = { ...next[index], ...patch };
               onChange({ movementResults: next });
             }}
+            onBatch={(next) => onChange({ movementResults: next })}
           />
         )}
       </>
@@ -53,7 +63,8 @@ export function InputRouter({ result, onChange }: InputRouterProps) {
   }
 
   // Superset: multiple movements → dedicated per-movement input
-  if (movements.length > 1) {
+  // (but NOT for intervals — those get handled in the switch below)
+  if (movements.length > 1 && kind !== 'intervals') {
     return <SupersetInput result={result} onChange={onChange} />;
   }
 
@@ -61,11 +72,6 @@ export function InputRouter({ result, onChange }: InputRouterProps) {
   const hasImplement = result.exercise.movements?.some(
     m => m.implementCount != null && m.implementCount > 0
   ) ?? false;
-
-  // Detect if this interval has weighted movements
-  const hasIntervalWeight = kind === 'intervals' && result.exercise.movements?.some(
-    m => m.rxWeights != null || m.inputType === 'weight'
-  );
 
   switch (kind) {
     case 'load':
@@ -76,8 +82,30 @@ export function InputRouter({ result, onChange }: InputRouterProps) {
       return <DurationInput result={result} onChange={onChange} />;
     case 'distance':
       return <DistanceInput result={result} onChange={onChange} />;
-    case 'intervals':
-      return <IntervalsInput result={result} onChange={onChange} showWeight={!!hasIntervalWeight} />;
+    case 'intervals': {
+      // Show per-movement weight/distance inputs for interval exercises with movements
+      const intervalInputMovements = movements.filter(
+        mr => mr.kind === 'load' || mr.kind === 'distance'
+      );
+      return (
+        <>
+          <IntervalsInput result={result} onChange={onChange} showWeight={false} />
+          {intervalInputMovements.length > 0 && (
+            <ScoreMovementInputs
+              movements={movements}
+              inputMovements={intervalInputMovements}
+              teamSize={teamSize}
+              onChange={(index: number, patch: Partial<MovementResult>) => {
+                const next = [...movements];
+                next[index] = { ...next[index], ...patch };
+                onChange({ movementResults: next });
+              }}
+              onBatch={(next) => onChange({ movementResults: next })}
+            />
+          )}
+        </>
+      );
+    }
     case 'note':
       return <NoteInput result={result} onChange={onChange} />;
     default:

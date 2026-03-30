@@ -17,7 +17,6 @@ function formatTime(totalSeconds: number): string {
 
 function formatWeight(kg: number, implement?: 1 | 2): string {
   const prefix = implement === 2 ? '2x' : '';
-  // Show decimal only if not a whole number
   const display = kg % 1 === 0 ? String(kg) : kg.toFixed(1);
   return `${prefix}${display}kg`;
 }
@@ -31,45 +30,38 @@ function formatDistance(value: number, unit?: string): string {
 }
 
 // ─── Format a result into a compact string ──────────────────────
-// Target: ≤22 characters. Never truncate — wrap to 2 lines if needed.
+// No emoji — clean text labels per design system.
 
 interface FormattedPill {
-  icon: string;
   text: string;
-  secondary?: string; // second part after arrow (for ranges)
+  secondary?: string;
 }
 
 function formatResult(r: StoryExerciseResult): FormattedPill {
   // Scored exercises always show time/rounds — even with multiple movements.
-  // Check this BEFORE the superset branch so buy-in/RFT/cash-out workouts
-  // display their score, not "X/Y moves".
   if (r.kind === 'score_time') {
     if (r.timeSeconds == null) {
-      // If this scored workout also has weighted movements, "Add time" undersells
-      // what the user needs to enter — use a universal empty-state label instead.
       const hasWeightInputs = (r.movementResults ?? []).some(
         mr => mr.kind === 'load' || mr.kind === 'distance'
       );
-      return { icon: '⏱️', text: hasWeightInputs ? 'Log results' : 'Add time' };
+      return { text: hasWeightInputs ? 'Log results' : 'Add time' };
     }
-    return { icon: '⏱️', text: formatTime(r.timeSeconds) };
+    return { text: formatTime(r.timeSeconds) };
   }
   if (r.kind === 'score_rounds') {
-    if (r.rounds == null || r.rounds === 0) return { icon: '🔄', text: 'Log results' };
+    if (r.rounds == null || r.rounds === 0) return { text: 'Log results' };
     const rds = `${r.rounds} rds`;
-    // Movement-based partial: "4 rds + Thrusters"
     if (r.partialMovements && r.partialMovements.length > 0) {
       const last = r.partialMovements[r.partialMovements.length - 1]
         .replace(/^Alt(?:ernating)?\s+/i, '')
         .replace(/^Single\s+/i, '');
-      // Truncate long names for the pill
-      const short = last.length > 12 ? last.slice(0, 11) + '…' : last;
-      return { icon: '🔄', text: `${rds} + ${short}` };
+      const short = last.length > 12 ? last.slice(0, 11) + '\u2026' : last;
+      return { text: `${rds} + ${short}` };
     }
     if (r.partialReps != null && r.partialReps > 0) {
-      return { icon: '🔄', text: `${rds} + ${r.partialReps}` };
+      return { text: `${rds} + ${r.partialReps}` };
     }
-    return { icon: '🔄', text: rds };
+    return { text: rds };
   }
 
   // Superset: show filled count
@@ -84,61 +76,52 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
         default: return true;
       }
     }).length;
-    if (filled === total) return { icon: '✅', text: `${total}/${total} moves` };
-    if (filled > 0) return { icon: '📝', text: `${filled}/${total} moves` };
-    return { icon: '➕', text: `${total} moves` };
+    if (filled === total) return { text: `${total}/${total} done` };
+    if (filled > 0) return { text: `${filled}/${total} done` };
+    return { text: `${total} moves` };
   }
 
   switch (r.kind) {
     case 'load': {
-      if (r.loadMode === 'bodyweight') {
-        return { icon: '🏋️', text: 'BW' };
-      }
-      if (r.weight == null) return { icon: '🏋️', text: 'Add weight' };
-
+      if (r.loadMode === 'bodyweight') return { text: 'BW' };
+      if (r.weight == null) return { text: 'Add weight' };
       const start = formatWeight(r.weight, r.implementCount);
       if (r.loadMode === 'range' && r.weightEnd != null && r.weightEnd !== r.weight) {
-        return {
-          icon: '🏋️',
-          text: start,
-          secondary: formatWeight(r.weightEnd, r.implementCount),
-        };
+        return { text: start, secondary: formatWeight(r.weightEnd, r.implementCount) };
       }
-      return { icon: '🏋️', text: start };
+      return { text: start };
     }
 
     case 'reps': {
       const done = r.setsCompleted ?? r.setsTotal;
       const total = r.setsTotal;
-      if (done === total) return { icon: '✅', text: `${done}/${total} sets` };
-      return { icon: '📝', text: `${done}/${total} sets` };
+      if (done === total) return { text: `${done}/${total} sets` };
+      return { text: `${done}/${total} sets` };
     }
 
     case 'duration': {
-      if (r.durationSeconds == null) return { icon: '⏱️', text: 'Add time' };
-      return { icon: '⏱️', text: `${r.durationSeconds}s` };
+      if (r.durationSeconds == null) return { text: 'Add time' };
+      return { text: `${r.durationSeconds}s` };
     }
 
     case 'distance': {
-      if (r.distanceValue == null) return { icon: '📏', text: 'Add distance' };
-      return { icon: '📏', text: formatDistance(r.distanceValue, r.distanceUnit) };
+      if (r.distanceValue == null) return { text: 'Add dist' };
+      return { text: formatDistance(r.distanceValue, r.distanceUnit) };
     }
-
-    // score_time and score_rounds are handled above (before superset check)
 
     case 'intervals': {
       const done = r.intervalsCompleted ?? 0;
       const total = r.intervalsTotal ?? r.setsTotal;
-      return { icon: '⚡', text: `${done}/${total}` };
+      return { text: `${done}/${total}` };
     }
 
     case 'note': {
-      if (r.notes && r.notes.trim()) return { icon: '📝', text: 'Noted' };
-      return { icon: '📝', text: 'Add note' };
+      if (r.notes && r.notes.trim()) return { text: 'Noted' };
+      return { text: 'Add note' };
     }
 
     default:
-      return { icon: '➕', text: 'Add result' };
+      return { text: 'Log' };
   }
 }
 
@@ -147,7 +130,7 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
 export function ResultPill({ result, onClick }: ResultPillProps) {
   const state = getRowState(result);
   const color = kindToTrinityColor(result.kind);
-  const { icon, text, secondary } = formatResult(result);
+  const { text, secondary } = formatResult(result);
 
   const stateClass =
     state === 'filled'  ? styles.filled :
@@ -161,11 +144,10 @@ export function ResultPill({ result, onClick }: ResultPillProps) {
       style={{ '--pill-color': color } as React.CSSProperties}
       onClick={onClick}
     >
-      <span className={styles.icon}>{icon}</span>
       <span className={styles.value}>{text}</span>
       {secondary && (
         <>
-          <span className={styles.arrow}>→</span>
+          <span className={styles.arrow}>&rarr;</span>
           <span className={styles.value}>{secondary}</span>
         </>
       )}

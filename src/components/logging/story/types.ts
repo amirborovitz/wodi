@@ -4,6 +4,7 @@ import type {
   Exercise,
   ParsedExercise,
   ParsedMovement,
+  ParsedSectionType,
   MeasurementUnit,
 } from '../../../types';
 
@@ -53,6 +54,8 @@ export interface StoryExerciseResult {
   weightEnd?: number;                 // end weight (range mode only)
   loadMode?: LoadMode;                // how weight was captured
   implementCount?: 1 | 2;            // single or pair (KB/DB)
+  maxReps?: number;                   // reps completed in "max" set (for [8-6-4-2-max] patterns)
+  maxRepsWeight?: number;             // weight used for the "max" set
 
   // reps
   repsPerSet?: number;                // if all sets same
@@ -72,6 +75,11 @@ export interface StoryExerciseResult {
   rounds?: number;                    // full rounds completed
   partialReps?: number;               // extra reps in incomplete round (legacy / derived)
   partialMovements?: string[];        // movement names completed in partial round (social-ready)
+
+  // ladder AMRAP (score_rounds + ladderReps on exercise)
+  // Single continuous ladder — you pick up where you left off across intervals
+  ladderStep?: number;                // how many rungs completed (e.g., 3 = completed through rung index 2)
+  ladderPartial?: number;             // partial reps into the next incomplete rung
 
   // intervals
   intervalsCompleted?: number;        // how many intervals done
@@ -96,6 +104,12 @@ export interface MovementResult {
   calories?: number;
   durationSeconds?: number;
   implementCount?: 1 | 2;
+  // Section grouping (populated when exercise has sections)
+  sectionType?: ParsedSectionType;  // 'buy_in' | 'rounds' | 'cash_out'
+  sectionRounds?: number;           // how many times this section repeats
+  sectionIndex?: number;            // which section (0, 1, 2...) for display grouping
+  // Substitution state (null = no sub, undefined = not yet considered)
+  substitution?: import('../../../types').MovementSubstitution | null;
 }
 
 // ─── Movement → Kind classification ─────────────────────────────
@@ -239,7 +253,13 @@ export function getRowState(result: StoryExerciseResult): RowState {
 
   switch (result.kind) {
     case 'load':
-      if (result.weight != null && result.weight > 0) return 'filled';
+      if (result.weight != null && result.weight > 0) {
+        // If this exercise has a max set, check if max reps are entered too
+        const rps = result.exercise?.suggestedRepsPerSet;
+        const hasMax = rps && result.setsTotal > rps.length;
+        if (hasMax && !result.maxReps) return 'partial';
+        return 'filled';
+      }
       if (result.loadMode === 'bodyweight') return 'filled';
       return 'empty';
 
@@ -260,6 +280,9 @@ export function getRowState(result: StoryExerciseResult): RowState {
       return 'empty';
 
     case 'score_rounds':
+      // Ladder AMRAP: filled if any interval has progress
+      if (result.ladderStep != null && result.ladderStep > 0) return 'filled';
+      if (result.ladderPartial != null && result.ladderPartial > 0) return 'partial';
       if (result.rounds != null && result.rounds > 0) return 'filled';
       if (result.partialReps != null && result.partialReps > 0) return 'partial';
       if (result.partialMovements != null && result.partialMovements.length > 0) return 'partial';
@@ -318,6 +341,20 @@ export function kindToTrinityColor(kind: ExerciseKind): string {
   }
 }
 
+// ─── Weight step size ────────────────────────────────────────────
+// KB movements use 2kg steps (standard jumps: 8,10,12,16,20,24…)
+// DB movements use 2.5kg steps
+// Barbell movements use 2.5kg (plate increments)
+
+const KB_PATTERN = /\b(kb|kettlebell)\b/i;
+const DB_PATTERN = /\b(db|dumbbell)\b/i;
+
+export function getWeightStep(movementName: string, implementCount?: number): number {
+  if (KB_PATTERN.test(movementName)) return 2;
+  if (DB_PATTERN.test(movementName) || implementCount === 2) return 2.5;
+  return 2.5;
+}
+
 // ─── Firestore mapper ───────────────────────────────────────────
 // Converts the new StoryExerciseResult → existing Exercise format.
 // No Firestore schema changes needed.
@@ -328,25 +365,44 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
 
   switch (kind) {
     case 'load': {
+      const repsPerSet = exercise.suggestedRepsPerSet;
+      const hasMaxSet = repsPerSet && result.setsTotal > repsPerSet.length;
+      // Prescribed sets (excluding max set if present)
+      const prescribedCount = hasMaxSet ? repsPerSet.length : (result.setsCompleted ?? result.setsTotal);
       const total = result.setsCompleted ?? result.setsTotal;
-      for (let i = 0; i < total; i++) {
+
+      for (let i = 0; i < prescribedCount; i++) {
         let weight: number | undefined;
         if (result.loadMode === 'bodyweight') {
           weight = undefined;
         } else if (result.loadMode === 'range' && result.weight != null && result.weightEnd != null) {
-          // Interpolate weight across sets
-          const fraction = total > 1 ? i / (total - 1) : 0;
+          // Interpolate weight across prescribed sets
+          const interpTotal = hasMaxSet ? prescribedCount : total;
+          const fraction = interpTotal > 1 ? i / (interpTotal - 1) : 0;
           weight = Math.round((result.weight + fraction * (result.weightEnd - result.weight)) * 2) / 2;
         } else {
           weight = result.weight;
         }
 
+        const setReps = repsPerSet?.[i] ?? result.repsPerSet ?? exercise.suggestedReps;
         sets.push({
           id: `set-${i}`,
           setNumber: i + 1,
-          targetReps: exercise.suggestedReps,
-          actualReps: result.repsPerSet ?? exercise.suggestedReps,
+          targetReps: repsPerSet?.[i] ?? exercise.suggestedReps,
+          actualReps: setReps,
           weight,
+          completed: true,
+        });
+      }
+
+      // Add max set if present and user entered data
+      if (hasMaxSet && (result.maxReps || result.maxRepsWeight)) {
+        sets.push({
+          id: `set-${prescribedCount}`,
+          setNumber: prescribedCount + 1,
+          targetReps: undefined, // max = no target
+          actualReps: result.maxReps ?? 0,
+          weight: result.maxRepsWeight ?? result.weightEnd ?? result.weight,
           completed: true,
         });
       }
@@ -442,7 +498,12 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
     sets,
     rxWeights: exercise.rxWeights,
     movements: exercise.movements,
+    sections: exercise.sections,
     rounds: result.rounds,
+    ...(exercise.ladderReps && { ladderReps: exercise.ladderReps }),
+    ...(exercise.intervalCount && { intervalCount: exercise.intervalCount }),
+    ...(result.ladderStep != null && { ladderStep: result.ladderStep }),
+    ...(result.ladderPartial != null && { ladderPartial: result.ladderPartial }),
   };
 }
 
@@ -481,6 +542,11 @@ export function fillMinimalResult(result: StoryExerciseResult): StoryExerciseRes
       }
       break;
     case 'score_rounds':
+      // Ladder AMRAP: mark first rung of each interval as done
+      if (patched.exercise.ladderReps && (patched.ladderStep == null || patched.ladderStep === 0)) {
+        patched.ladderStep = 1;
+        break;
+      }
       if (!patched.rounds) {
         patched.rounds = 1;
       }
@@ -517,22 +583,90 @@ export function createBlankResult(
   index: number,
   loggingMode: ExerciseLoggingMode,
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
+  teamSize?: number,
 ): StoryExerciseResult {
   const kind = loggingModeToKind(loggingMode);
+
+  // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
+  const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
+  const hasMaxInText = /\bmax\b/i.test(prescriptionText);
+  const rps = exercise.suggestedRepsPerSet;
+  // If prescription mentions "max" and repsPerSet exists but doesn't cover all sets, add 1 for the max set
+  let setsTotal = exercise.suggestedSets || 1;
+  if (hasMaxInText && rps && rps.length > 0 && setsTotal <= rps.length) {
+    setsTotal = rps.length + 1; // extra set for "max"
+  }
 
   const base: StoryExerciseResult = {
     kind,
     exerciseIndex: index,
     exercise,
-    setsTotal: exercise.suggestedSets || 1,
+    setsTotal,
   };
+
+  // Ladder AMRAP: initialize to zero
+  if (exercise.ladderReps && exercise.ladderReps.length > 0 && kind === 'score_rounds') {
+    base.ladderStep = 0;
+    base.ladderPartial = 0;
+  }
 
   // Always initialize per-movement results when movements exist.
   // Trust the AI: each movement carries inputType, rxWeights, etc.
   // that determine what inputs the UI should render.
-  if (exercise.movements && exercise.movements.length > 0) {
+  //
+  // When sections are available, build from sections to preserve
+  // section grouping metadata (buy-in / rounds blocks / cash-out).
+  const isFemale = userSex === 'female';
+  const hasSections = exercise.sections && exercise.sections.length > 0;
+  const movementSource: Array<{ mov: ParsedMovement; sectionType?: ParsedSectionType; sectionRounds?: number; sectionIndex?: number }> = [];
+
+  if (hasSections) {
+    exercise.sections!.forEach((section, sIdx) => {
+      for (const mov of section.movements) {
+        movementSource.push({
+          mov,
+          sectionType: section.sectionType,
+          sectionRounds: section.rounds ?? 1,
+          sectionIndex: sIdx,
+        });
+      }
+    });
+  } else if (exercise.movements && exercise.movements.length > 0) {
+    // Detect buy-in/cash-out movements via: role field, perRound=false, or "Buy-In:"/"Cash-Out:" name prefix
+    const isBuyInMov = (m: typeof exercise.movements[0]) =>
+      m.role === 'buy_in' || m.role === 'cash_out' || m.perRound === false || /^(?:buy-in|cash-out):/i.test(m.name);
+    const hasBuyInOrCashOut = exercise.movements.some(isBuyInMov);
+    // Find indices to distinguish buy-in (before core) vs cash-out (after core)
+    const firstCoreIdx = exercise.movements.findIndex(m => !isBuyInMov(m));
+    let sIdx = 0;
+    for (let mIdx = 0; mIdx < exercise.movements.length; mIdx++) {
+      const mov = exercise.movements[mIdx];
+      if (hasBuyInOrCashOut && isBuyInMov(mov)) {
+        // Use role field, name prefix, or position to determine buy-in vs cash-out
+        const isBuyIn = mov.role === 'buy_in' || mov.name.startsWith('Buy-In:') || mov.name.startsWith('Buy-In ') ||
+          (mov.role !== 'cash_out' && firstCoreIdx >= 0 && mIdx < firstCoreIdx);
+        movementSource.push({
+          mov,
+          sectionType: isBuyIn ? 'buy_in' : 'cash_out',
+          sectionRounds: 1,
+          sectionIndex: sIdx++,
+        });
+      } else if (hasBuyInOrCashOut) {
+        movementSource.push({
+          mov,
+          sectionType: 'rounds',
+          sectionRounds: exercise.suggestedSets || 1,
+          sectionIndex: sIdx,
+        });
+      } else {
+        movementSource.push({ mov });
+      }
+    }
+  }
+
+  if (movementSource.length > 0) {
     const seen = new Map<string, number>();
-    base.movementResults = exercise.movements.map((mov) => {
+    base.movementResults = movementSource.map(({ mov, sectionType, sectionRounds, sectionIndex }) => {
       const count = seen.get(mov.name) ?? 0;
       seen.set(mov.name, count + 1);
       const movementKey = count > 0 ? `${mov.name}::${count}` : mov.name;
@@ -543,8 +677,21 @@ export function createBlankResult(
         movement: mov,
         kind: movKind,
       };
+      // Attach section grouping metadata
+      if (sectionType != null) {
+        mr.sectionType = sectionType;
+        mr.sectionRounds = sectionRounds;
+        mr.sectionIndex = sectionIndex;
+      }
+      // Partner division: all movements are split among the team in IGUG workouts.
+      // Each person logs their personal share (total ÷ teamSize).
+      // Exception: "together" movements — everyone does the full amount.
+      const isPartner = teamSize && teamSize > 1;
+      // Runs are never divided — each person runs the full distance
+      const isRun = /\b(run|running|sprint)\b/i.test(mov.name);
+      const shareDivisor = (isPartner && !mov.together && !isRun) ? teamSize : 1;
+
       // Pre-fill from prescription, using user's sex for Rx selection
-      const isFemale = userSex === 'female';
       if (movKind === 'load') {
         mr.loadMode = 'same';
         const rxW = mov.rxWeights;
@@ -560,12 +707,13 @@ export function createBlankResult(
           // Use sex-appropriate Rx calories if available
           const rxCal = mov.rxCalories;
           if (rxCal) {
-            mr.calories = isFemale ? (rxCal.female ?? rxCal.male) : (rxCal.male ?? rxCal.female);
+            const baseCal = isFemale ? (rxCal.female ?? rxCal.male) : (rxCal.male ?? rxCal.female);
+            mr.calories = baseCal != null ? Math.round(baseCal / shareDivisor) : undefined;
           } else if (mov.calories) {
-            mr.calories = mov.calories;
+            mr.calories = Math.round(mov.calories / shareDivisor);
           }
         } else if (mov.distance) {
-          mr.distance = mov.distance;
+          mr.distance = Math.round(mov.distance / shareDivisor);
         }
       }
       if (mov.implementCount) {

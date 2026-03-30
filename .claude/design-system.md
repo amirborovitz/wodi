@@ -141,11 +141,21 @@ Number transitions: Framer Motion `popLayout` with `y: ±12px` slide.
 - **Right-side controls**: Put steppers on the right for right-thumb one-handed operation
 - **No iOS zoom**: Input font-size ≥ 16px to prevent auto-zoom on focus
 - **Bottom sheets > modals**: Always slide up from bottom, never center-screen
+- **No instructional text**: Never "Tap X to do Y" — teach through affordances, not labels
+- **Strip weight from labels**: Movement names omit weight info (e.g., "Alt DB Snatch" not "22.5kg Alt DB Snatch") — weight belongs in the stepper placeholder
+- **Auto-scale font**: Stepper values >3 chars shrink by 2px per extra character to avoid touching +/− buttons
 
 ### Data Display
 - Human-friendly formats: `2.1 tons` not `2134 kg`, `18:42` not `1122 seconds`
 - AMRAP shows rounds (from `exercise.rounds`), not total reps
 - Score formatting: `6 ROUNDS + 3 TTB` not `6 rounds + 3 reps on movement 4`
+
+### Scored Exercise Sheets (AMRAP / For Time / Intervals)
+- **Score circle**: 126×126px, 48px bold magenta number, "rounds" L3 label below
+- **Movement rows**: name block (left, vertically centered) ↔ stepper input (right, 88px tall)
+- **Swap pills**: 18px height, 6px padding, 10px font — compact enough to never push Done off-screen
+- **Row gap**: `--space-2` between movement rows, `--space-1` container padding
+- **Everything on one screen**: header + score input + all movements + sticky Done — no scroll on iPhone
 
 ## Component Patterns
 
@@ -163,6 +173,8 @@ Number transitions: Framer Motion `popLayout` with `y: ±12px` slide.
 - Long-press acceleration: 400ms → 150ms → 60ms
 - Trinity color theming via `--stepper-color`
 - Two sizes: md (88px tall) and sm (88px tall, narrower)
+- **Auto-scale font**: values >3 chars shrink by 2px/char (base: 26px md, 20px sm)
+- **Rx placeholder**: show prescribed weight as placeholder so athlete sees Rx before typing
 
 ### Navigation (FloatingDock)
 - Fixed bottom, centered pill shape

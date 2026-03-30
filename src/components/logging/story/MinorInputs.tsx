@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
+import { getWeightStep } from './types';
 import type { MeasurementUnit } from '../../../types';
 import { StepperInput } from './StepperInput';
 import styles from './MinorInputs.module.css';
@@ -230,7 +231,7 @@ export function IntervalsInput({ result, onChange, showWeight = false }: Interva
           <StepperInput
             value={result.intervalWeight}
             onChange={(v) => onChange({ intervalWeight: v })}
-            step={2.5}
+            step={getWeightStep(result.exercise?.movements?.[0]?.name ?? result.exercise?.name ?? '', result.implementCount)}
             min={0}
             max={500}
             placeholder={rxWeight ? String(rxWeight) : '0'}

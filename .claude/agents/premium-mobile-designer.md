@@ -65,6 +65,11 @@ Athletes are **tired, sweaty, one-handing their phone** post-workout:
 3. **Steppers > empty inputs.** +/− with long-press acceleration. Right-side vertical control block. Each button ≥ 44×44px.
 4. **Bottom of screen > top.** Primary actions in thumb zone.
 5. **Human-friendly data.** `2.1 tons` not `2134 kg`. `6 ROUNDS + 3 TTB` not `180 reps`.
+6. **No instructional text.** Never "Tap X to do Y" — if the UI needs a written explanation, the UI is wrong.
+7. **Everything on one screen.** Bottom sheets must fit header + inputs + movements + Done button on a 667pt iPhone without scrolling. Kill vertical bloat.
+8. **Strip weight from labels.** Movement names omit weight (e.g., "Alt DB Snatch" not "22.5kg Alt DB Snatch") — Rx weight goes in the stepper placeholder instead.
+9. **Auto-scale stepper font.** Values >3 chars shrink by 2px/char so they never touch the +/− buttons.
+10. **Compact swap pills.** Substitution toggles: 18px height, 6px padding, 10px font — must never push primary actions off-screen.
 
 ## Trinity Colors (Semantic, Not Decorative)
 

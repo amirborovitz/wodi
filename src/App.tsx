@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -107,6 +109,16 @@ function AppContent() {
             workout={selectedWorkout}
             onBack={() => setCurrentScreen('history')}
             onEditWorkout={() => handleEditWorkout(selectedWorkout)}
+            onRenameWorkoutDetail={async (newTitle: string) => {
+              if (!selectedWorkout?.id) return;
+              try {
+                const workoutRef = doc(db, 'workouts', selectedWorkout.id);
+                await setDoc(workoutRef, { title: newTitle }, { merge: true });
+                setSelectedWorkout({ ...selectedWorkout, title: newTitle });
+              } catch (err) {
+                console.error('Failed to rename workout:', err);
+              }
+            }}
           />
         ) : (
           <HistoryScreen
