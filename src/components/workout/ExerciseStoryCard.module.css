@@ -298,6 +298,22 @@
    Format: [quantity · ] name [ · load]
    ============================================ */
 
+/* ── Board prescription header ──
+   Shows above the movement list: "18 MIN AMRAP", "3 ROUNDS FOR TIME", etc.
+   Reads like the top of a whiteboard — tracked, muted Trinity color, rule beneath. */
+.boardPrescription {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding-bottom: 9px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.boardPrescription_yellow  { color: rgba(255, 214,   0, 0.45); }
+.boardPrescription_magenta { color: rgba(255,   0, 229, 0.42); }
+.boardPrescription_cyan    { color: rgba(  0, 242, 255, 0.42); }
+
 .board {
   display: flex;
   flex-direction: column;
@@ -414,13 +430,13 @@
   line-height: 1.4;
 }
 
-/* Total annotation for AMRAP per-round display: "×6 = 42" */
+/* Total annotation for AMRAP per-round display: "×6 = 42" — secondary, don't compete with movement name */
 .boardTotal {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.50);
-  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.26);
+  margin-left: 6px;
 }
 
 /* Overflow label — "+ X more" for truncated movement lists */

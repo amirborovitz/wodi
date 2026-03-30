@@ -760,6 +760,24 @@ function extractMetconRecap(exercise: Exercise, displayType: string): MetconReca
 }
 
 // ============================================
+// Board Prescription Header
+// Shows the format descriptor above the movement list so the card
+// reads like the whiteboard: "18 MIN AMRAP" → movements → your result.
+// Only shown when the prescription adds info not already in the exercise name.
+// ============================================
+
+function extractBoardHeader(exercise: Exercise): string | null {
+  const rx = exercise.prescription?.trim();
+  if (!rx) return null;
+  // Take the segment before any colon or newline — that's the format descriptor
+  const first = rx.split(/[:\n]/)[0].trim();
+  if (!first || first.length > 55) return null;
+  // Skip when it just restates the exercise name
+  if (first.toLowerCase() === exercise.name.trim().toLowerCase()) return null;
+  return first.toUpperCase();
+}
+
+// ============================================
 // Color + Label mapping
 // ============================================
 
@@ -804,6 +822,7 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
   const footer = extractFooterStats(exercise, displayType, breakdownMovements);
   const metconRecap = extractMetconRecap(exercise, displayType);
   const vibe = getWorkoutVibe(exercise, displayType);
+  const boardHeader = extractBoardHeader(exercise);
 
   const d = animationDelay;
   const anim = (delay: number) => animated
@@ -952,6 +971,13 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
         </motion.div>
       )}
 
+      {/* ── Board prescription header — "18 MIN AMRAP", "3 ROUNDS FOR TIME", etc. ── */}
+      {boardHeader && !compact && (
+        <div className={`${styles.boardPrescription} ${styles[`boardPrescription_${color}`]}`}>
+          {boardHeader}
+        </div>
+      )}
+
       {/* ── Movement list: sectioned or flat ── */}
       {sectionGroups ? (
         /* ── Sectioned board: group movements under section headers ── */
@@ -980,9 +1006,9 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
                   <motion.div
                     key={li}
                     className={`${styles.boardLine} ${styles.boardLineIndented}`}
-                    initial={animated ? { opacity: 0, x: -6 } : false}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={animated ? { delay: d + 0.14 + lineIndex * 0.03 } : undefined}
+                    initial={animated ? { opacity: 0, y: 8 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={animated ? { type: 'spring', stiffness: 500, damping: 32, delay: d + 0.1 + lineIndex * 0.05 } : undefined}
                   >
                     <span className={`${styles.boardDot} ${styles[`dot_${color}`]}`} />
                     <span className={styles.boardContent}>
@@ -1033,9 +1059,9 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
             <motion.div
               key={i}
               className={styles.boardLine}
-              initial={animated ? { opacity: 0, x: -6 } : false}
-              animate={{ opacity: 1, x: 0 }}
-              transition={animated ? { delay: d + 0.14 + i * 0.04 } : undefined}
+              initial={animated ? { opacity: 0, y: 8 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={animated ? { type: 'spring', stiffness: 500, damping: 32, delay: d + 0.1 + i * 0.05 } : undefined}
             >
               <span className={`${styles.boardDot} ${styles[`dot_${color}`]}`} />
               <span className={styles.boardContent}>
