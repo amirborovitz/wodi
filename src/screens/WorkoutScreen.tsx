@@ -1,12 +1,9 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import styles from './WorkoutScreen.module.css';
-import type { RewardData, MovementTotal, WorkloadBreakdown as WorkloadBreakdownType, Exercise, ParsedSection } from '../types';
+import type { RewardData, MovementTotal, WorkloadBreakdown as WorkloadBreakdownType, Exercise, ParsedSection, WorkoutFormat } from '../types';
 import { ShareLaunchSheet } from '../components/share/ShareLaunchSheet';
-import { ExerciseStoryCard } from '../components/workout';
-import { LadderHeatmap } from '../components/workout/LadderHeatmap';
-import { isExcludedExercise } from '../components/share/shareCardUtils';
-import { Button } from '../components/ui';
+
 import { useCountUp } from '../hooks/useCountUp';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { useAuth } from '../context/AuthContext';
@@ -302,9 +299,8 @@ function buildStoryMovements(movements: MovementTotal[], rounds: number, teamSiz
       const perRound = rounds > 1 ? `${Math.round(workoutTotalReps / rounds)}` : `${workoutTotalReps}`;
       const total = rounds > 1 ? `${workoutTotalReps} total` : '';
       const isBodyweight = isBwVolumeMovement(name);
-      const displayName = m.weight && m.weight > 0 && !isBodyweight ? `${name} @${m.weight}${unit}` : name;
       const partnerNote = showPartnerNote ? `your part ${personalReps}` : undefined;
-      lines.push({ perRound, name: displayName, total, color: color ?? 'magenta', weight: m.weight, partnerNote, wasSubstituted, originalMovement, substitutionType, substitutedPerRound });
+      lines.push({ perRound, name, total, color: color ?? 'magenta', weight: m.weight, unit: !isBodyweight ? unit : undefined, partnerNote, wasSubstituted, originalMovement, substitutionType, substitutedPerRound });
     }
   }
 
@@ -319,6 +315,7 @@ function buildSectionedStoryMovements(
   sections: ParsedSection[],
   movements: MovementTotal[],
   teamSize?: number,
+  exerciseIndex?: number,
 ): StoryMovementLine[] | undefined {
   if (!sections || sections.length <= 1) return undefined;
 
@@ -326,9 +323,17 @@ function buildSectionedStoryMovements(
 
   for (const section of sections) {
     const rounds = section.rounds ?? 1;
+    const isPartnerSection = teamSize && teamSize > 1;
+    // IGUG / alternating rounds: split is at the round level, not per-rep.
+    // Each partner does ALL reps per round; the "your part" is N rounds out of total.
+    const isIGUG = isPartnerSection && section.sectionType === 'rounds' && rounds > 1;
+    const personalRounds = isIGUG ? Math.round(rounds / (teamSize as number)) : rounds;
+
     const headerLabel = section.sectionType === 'buy_in' ? 'BUY-IN'
       : section.sectionType === 'cash_out' ? 'CASH-OUT'
-      : `\u00d7${rounds} ROUNDS`;
+      : isIGUG
+        ? `\u00d7${rounds} ROUNDS (${personalRounds} each)`
+        : `\u00d7${rounds} ROUNDS`;
 
     // Add section header line
     lines.push({
@@ -341,10 +346,7 @@ function buildSectionedStoryMovements(
     // Add movements in this section
     for (const mov of section.movements) {
       // Look up breakdown by name OR originalMovement (for substitutions)
-      const actual = movements.find(
-        m => m.name.toLowerCase() === mov.name.toLowerCase()
-          || m.originalMovement?.toLowerCase() === mov.name.toLowerCase()
-      );
+      const actual = findMovementTotal(movements, mov.name, exerciseIndex);
       // Use substituted name when available
       const name = actual?.wasSubstituted ? actual.name : mov.name;
       const unit = actual?.unit === 'lb' ? 'lb' : 'kg';
@@ -362,8 +364,11 @@ function buildSectionedStoryMovements(
         continue;
       }
 
-      // Partner workouts: show the TOTAL prescription as the main value,
-      // with a "your part X" annotation. Applies to all sections in IGUG workouts.
+      // Partner workouts: show the TOTAL prescription as the main value.
+      // IGUG (rounds > 1): split is at round level — each partner does full reps per round.
+      //   → no per-movement "your part" note; section header already shows "(N each)".
+      // Non-IGUG partner sections (buy-in, cash-out, single-round): split is per-rep.
+      //   → show per-movement "your part X" annotation.
       // "Together" movements: everyone does the full amount — show "together" instead of splitting.
       // Check both the parsed movement's together flag AND the breakdown's together flag.
       const isPartner = teamSize && teamSize > 1;
@@ -391,30 +396,34 @@ function buildSectionedStoryMovements(
 
       if (mov.calories && mov.calories > 0) {
         const totalCal = mov.calories;
-        const personalCal = isPartner && !isTogether ? Math.round(totalCal / teamSize) : totalCal;
-        const partnerNote = isPartner
+        // IGUG: each partner does full cals per round — no per-rep split; use personalRounds for total
+        const personalCal = (!isIGUG && isPartner && !isTogether) ? Math.round(totalCal / (teamSize as number)) : totalCal;
+        const partnerNote = isPartner && !isIGUG
           ? (isTogether ? 'together' : `your part ${personalCal} cal`)
           : undefined;
+        const totalCalLine = rounds > 1 ? `${totalCal * personalRounds} cal total` : '';
         lines.push({
           perRound: `${totalCal} cal`,
           name,
-          total: rounds > 1 ? `${totalCal * rounds} cal total` : '',
+          total: totalCalLine,
           color: color ?? 'magenta',
           partnerNote,
           wasSubstituted, originalMovement, substitutionType, substitutedPerRound,
         });
       } else if (mov.distance && mov.distance > 0) {
         const totalDist = mov.distance;
-        const personalDist = isPartner && !isTogether ? Math.round(totalDist / teamSize) : totalDist;
+        // IGUG: each partner runs full distance per round — no per-rep split
+        const personalDist = (!isIGUG && isPartner && !isTogether) ? Math.round(totalDist / (teamSize as number)) : totalDist;
         const fmtTotal = totalDist >= 1000 ? `${(totalDist / 1000).toFixed(1)}km` : `${totalDist}m`;
         const fmtPersonal = personalDist >= 1000 ? `${(personalDist / 1000).toFixed(1)}km` : `${personalDist}m`;
-        const partnerNote = isPartner
+        const partnerNote = isPartner && !isIGUG
           ? (isTogether ? 'together' : `your part ${fmtPersonal}`)
           : undefined;
+        const distPersonalTotal = totalDist * personalRounds;
         const totalLine = rounds > 1
-          ? (totalDist * rounds >= 1000
-            ? `${((totalDist * rounds) / 1000).toFixed(1)}km total`
-            : `${totalDist * rounds}m total`)
+          ? (distPersonalTotal >= 1000
+            ? `${(distPersonalTotal / 1000).toFixed(1)}km total`
+            : `${distPersonalTotal}m total`)
           : '';
         lines.push({
           perRound: fmtTotal,
@@ -426,17 +435,18 @@ function buildSectionedStoryMovements(
         });
       } else if (mov.reps && mov.reps > 0) {
         const totalReps = mov.reps;
-        const personalReps = isPartner && !isTogether ? Math.round(totalReps / teamSize) : totalReps;
-        const partnerNote = isPartner
-          ? (isTogether ? 'together' : `your part ${personalReps}`)
+        // IGUG: each partner does full reps per round — no per-rep split
+        const personalRepsDisplay = (!isIGUG && isPartner && !isTogether) ? Math.round(totalReps / (teamSize as number)) : totalReps;
+        const partnerNote = isPartner && !isIGUG
+          ? (isTogether ? 'together' : `your part ${personalRepsDisplay}`)
           : undefined;
-        const displayName = rxW && !isBodyweight ? `${name} @${rxW}${unit}` : name;
         lines.push({
           perRound: `${totalReps}`,
-          name: displayName,
-          total: rounds > 1 ? `${totalReps * rounds} total` : '',
+          name,
+          total: rounds > 1 ? `${totalReps * personalRounds} total` : '',
           color: color ?? 'magenta',
           weight: rxW || undefined,
+          unit: !isBodyweight ? unit : undefined,
           partnerNote,
           wasSubstituted, originalMovement, substitutionType, substitutedPerRound,
         });
@@ -445,6 +455,31 @@ function buildSectionedStoryMovements(
   }
 
   return lines.length > 0 ? lines : undefined;
+}
+
+/**
+ * Find a MovementTotal by name, preferring an exercise-index-scoped match.
+ * Falls back to name-only matching for backward compatibility with stored data
+ * that doesn't have exerciseIndex.
+ */
+function findMovementTotal(
+  movements: MovementTotal[],
+  movName: string,
+  exerciseIndex?: number,
+): MovementTotal | undefined {
+  const lower = movName.toLowerCase();
+  // Prefer scoped match (same exercise block)
+  if (exerciseIndex !== undefined) {
+    const scoped = movements.find(
+      m => m.exerciseIndex === exerciseIndex &&
+        (m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower)
+    );
+    if (scoped) return scoped;
+  }
+  // Fallback: name-only (for legacy stored data without exerciseIndex)
+  return movements.find(
+    m => m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower
+  );
 }
 
 /**
@@ -457,7 +492,8 @@ function buildMixedStoryMovements(
 ): StoryMovementLine[] | undefined {
   const lines: StoryMovementLine[] = [];
 
-  for (const ex of exercises) {
+  for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+    const ex = exercises[exIdx];
     // Detect exercise format from name/prescription/type
     const rx = ((ex.name || '') + ' ' + (ex.prescription || '')).toLowerCase();
     const isStrength = ex.type === 'strength';
@@ -507,7 +543,11 @@ function buildMixedStoryMovements(
       headerLabel = cleanName.toUpperCase();
       headerColor = 'magenta';
     } else if (isStrength) {
-      headerLabel = `STRENGTH · ${cleanName.toUpperCase()}`;
+      // Use the first movement name (e.g., "Romanian Deadlift") instead of the exercise
+      // category label (e.g., "Strength (Hinge)") for the section header.
+      const strengthMovName = ex.movements?.[0]?.name
+        || cleanName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+      headerLabel = `STRENGTH · ${(strengthMovName || cleanName).toUpperCase()}`;
       headerColor = 'yellow';
     } else {
       headerLabel = cleanName.toUpperCase();
@@ -529,10 +569,7 @@ function buildMixedStoryMovements(
     if (exMovements.length > 0) {
       // Exercise with movements (metcon/EMOM/intervals)
       for (const mov of exMovements) {
-        const actual = movements.find(
-          m => m.name.toLowerCase() === mov.name.toLowerCase()
-            || m.originalMovement?.toLowerCase() === mov.name.toLowerCase()
-        );
+        const actual = findMovementTotal(movements, mov.name, exIdx);
         const displayName = actual?.wasSubstituted ? actual.name : mov.name;
         const totalReps = actual?.totalReps;
         const totalCals = actual?.totalCalories;
@@ -591,13 +628,13 @@ function buildMixedStoryMovements(
           });
         } else if (perRoundReps > 0 || totalReps) {
           const perVal = perRoundReps || (totalReps ? Math.round(totalReps / rounds) : 0);
-          const weightedName = weight && !isBodyweight ? `${displayName} @${weight}${unit}` : displayName;
           lines.push({
             perRound: `${perVal}`,
-            name: weightedName,
+            name: displayName,
             total: totalReps && rounds > 1 ? `${totalReps} total` : '',
             color: color ?? 'magenta',
-            weight,
+            weight: !isBodyweight ? weight : undefined,
+            unit: !isBodyweight ? unit : undefined,
           });
         }
       }
@@ -641,7 +678,7 @@ function buildMixedStoryMovements(
         });
       } else if (perSetWeights.length > 0) {
         // Single weight — show it
-        const matched = movements.find(m => m.name.toLowerCase() === ex.name.toLowerCase());
+        const matched = findMovementTotal(movements, ex.name, exIdx);
         lines.push({
           perRound: `${perSetWeights[0]}`,
           name: ex.name,
@@ -742,7 +779,10 @@ function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined
   }
 
   if (hasAmrap) {
-    const capMatch = rx.match(/amrap\s+(\d+)/i) || rx.match(/(\d+)\s*(?:min(?:ute)?s?)?\s*amrap/i);
+    // Prefer explicit "N min AMRAP" first. Fallback: "AMRAP N" only for 1-2 digit numbers
+    // not followed by 'm' (meters) — prevents "200m run" from being read as 200-min AMRAP.
+    const capMatch = rx.match(/(\d+)\s*min(?:ute)?s?\s*amrap/i)
+      || rx.match(/amrap\s*:?\s*(\d{1,2})(?!\d|m)/i);
     const mins = capMatch ? parseInt(capMatch[1], 10) : 0;
     return mins > 0 ? `${mins} min AMRAP` : 'AMRAP';
   }
@@ -985,7 +1025,7 @@ function computeHeroResult(
       return buildLadderStoryMovements(ex, movements);
     }
     if (ex?.sections && ex.sections.length > 1) {
-      return buildSectionedStoryMovements(ex.sections, movements, teamSize);
+      return buildSectionedStoryMovements(ex.sections, movements, teamSize, 0);
     }
     return buildStoryMovements(movements, rounds, teamSize);
   }
@@ -1547,7 +1587,7 @@ export function WorkoutScreen({
   const [isVolumeSheetOpen, setIsVolumeSheetOpen] = useState(false);
   const [isDistanceSheetOpen, setIsDistanceSheetOpen] = useState(false);
   const [isEPSheetOpen, setIsEPSheetOpen] = useState(false);
-  const [expandedCardIndex, setExpandedCardIndex] = useState<number | null>(null);
+
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
 
@@ -1632,22 +1672,6 @@ export function WorkoutScreen({
     return null;
   }, [isReward, rewardData?.workloadBreakdown, workout?.exercises, workout?.partnerWorkout, workout?.partnerFactor, workout?.workloadBreakdown, user?.weight]);
 
-  // Partner context — used by ExerciseStoryCard and celebration story to annotate personal shares
-  const partnerContext = useMemo(() => {
-    if (isReward) {
-      // Reward mode: get teamSize from RewardData
-      const teamSize = rewardData?.teamSize;
-      if (!teamSize || teamSize <= 1) return undefined;
-      return { teamSize, partnerFactor: 1 / teamSize };
-    }
-    // Detail mode: get from workout
-    const isPartner = workout?.partnerWorkout ?? false;
-    const teamSize = workout?.teamSize;
-    const partnerFactor = workout?.partnerFactor ?? (isPartner ? 0.5 : undefined);
-    if (!isPartner || !teamSize || !partnerFactor) return undefined;
-    return { teamSize, partnerFactor };
-  }, [isReward, rewardData, workout]);
-
   // Totals
   const totalVolume = isReward
     ? (rewardData?.workloadBreakdown?.grandTotalVolume || rewardData?.workoutSummary?.totalVolume || 0)
@@ -1704,22 +1728,28 @@ export function WorkoutScreen({
     ? (rewardData?.exercises || [])
     : (workout?.exercises || []);
 
-  // -- Hero Result (reward mode) — pick the single best show-off number ──
+  // -- Hero Result — pick the single best show-off number (both reward + detail) ──
 
   const heroResult = useMemo((): HeroResult | null => {
-    if (!isReward) return null;
+    let format: WorkoutFormat | undefined;
+    let prMovementName: string | undefined;
+    let prWeight: number | undefined;
+    let teamSize: number | undefined;
 
-    // Find PR info from achievements
-    const prAch = rewardData?.achievements?.find(a => a.type === 'pr' && a.movement && a.value);
-    const prMovementName = prAch?.movement;
-    const prWeight = prAch?.value;
-    const format = rewardData?.workoutSummary?.format;
+    if (isReward) {
+      // Find PR info from achievements
+      const prAch = rewardData?.achievements?.find(a => a.type === 'pr' && a.movement && a.value);
+      prMovementName = prAch?.movement;
+      prWeight = prAch?.value;
+      format = rewardData?.workoutSummary?.format;
+      // Only use explicit teamSize — don't infer from partnerWorkout flag alone
+      teamSize = rewardData?.teamSize ?? workout?.teamSize;
+    } else {
+      format = workout?.format;
+      teamSize = workout?.teamSize;
+    }
+
     const movements = workloadBreakdown?.movements || [];
-
-    // Get teamSize from reward data or workout (detail mode)
-    // Only use explicit teamSize — don't infer from partnerWorkout flag alone
-    // (AI parser may set partnerWorkout on solo-logged workouts)
-    const rewardTeamSize = rewardData?.teamSize ?? workout?.teamSize;
 
     return computeHeroResult(
       exercises,
@@ -1729,12 +1759,12 @@ export function WorkoutScreen({
       durationMinutes,
       isPR || false,
       movements,
-      undefined, // timeCap — not available on RewardData directly, formatLine will use durationMinutes
+      undefined,
       prMovementName,
       prWeight,
-      rewardTeamSize,
+      teamSize,
     );
-  }, [isReward, rewardData, exercises, totalVolume, totalEP, durationMinutes, isPR, workloadBreakdown]);
+  }, [isReward, rewardData, workout, exercises, totalVolume, totalEP, durationMinutes, isPR, workloadBreakdown]);
 
   // -- Animated counters (reward mode) ───────────────────────────────
 
@@ -1829,18 +1859,6 @@ export function WorkoutScreen({
   // Cap at 2 max
   const displayPills = achievementPills.slice(0, 2);
 
-  // -- PR movements (for badge display) ────────────────────────────────
-
-  const prMovements = useMemo(() => {
-    const allAchievements = rewardData?.achievements || [];
-    const names = new Set<string>();
-    for (const ach of allAchievements) {
-      if (ach.type === 'pr' && ach.movement) {
-        names.add(ach.movement.toLowerCase());
-      }
-    }
-    return names;
-  }, [rewardData?.achievements]);
 
   // -- Share adapter for detail mode ─────────────────────────────────
 
@@ -1935,176 +1953,93 @@ export function WorkoutScreen({
 
   const sharedBody = (
     <>
-      {/* -- Reward-mode: header row + hero + hero result ──────── */}
-      {isReward && (
-        <>
-          {/* Header row: Back · date · View Original */}
-          <motion.div
-            className={styles.rewardHeaderRow}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: d, duration: 0.35 }}
+      {/* -- Header row: Back · date · View Original (both modes) ── */}
+      <motion.div
+        className={styles.rewardHeaderRow}
+        initial={isReward ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        transition={{ delay: d, duration: 0.35 }}
+      >
+        <button
+          className={styles.rewardBackBtn}
+          onClick={isReward ? onDone : onBack}
+          aria-label="Back"
+        >
+          <BackIcon />
+        </button>
+        <span className={styles.rewardDate}>
+          {isReward
+            ? new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+            : headerDateStr}
+        </span>
+        {rawText && (
+          <button
+            className={styles.viewOriginalPill}
+            onClick={() => setIsRawTextOpen(true)}
           >
-            {onDone && (
-              <button
-                className={styles.rewardBackBtn}
-                onClick={onDone}
-                aria-label="Back"
-              >
-                <BackIcon />
-              </button>
-            )}
-            <span className={styles.rewardDate}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-            {rawText && (
-              <button
-                className={styles.viewOriginalPill}
-                onClick={() => setIsRawTextOpen(true)}
-              >
-                Original WOD
-              </button>
-            )}
-          </motion.div>
+            Original WOD
+          </button>
+        )}
+      </motion.div>
 
-          {/* Hero: Title + "Workout Complete" */}
-          <motion.div
-            className={styles.heroHeader}
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: d + 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {isEditingTitle ? (
-              <input
-                className={styles.heroTitleInput}
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const trimmed = editedTitle.trim();
-                    if (trimmed && trimmed !== title) {
-                      setRenamedTitle(trimmed);
-                      onRenameWorkout?.(trimmed);
-                    }
-                    setIsEditingTitle(false);
-                  } else if (e.key === 'Escape') {
-                    setIsEditingTitle(false);
-                  }
-                }}
-                onBlur={() => {
-                  const trimmed = editedTitle.trim();
-                  if (trimmed && trimmed !== title) {
-                    setRenamedTitle(trimmed);
-                    onRenameWorkout?.(trimmed);
-                  }
-                  setIsEditingTitle(false);
-                }}
-                autoFocus
-                spellCheck={false}
-              />
-            ) : (
-              <h1
-                className={`${styles.heroTitle} ${onRenameWorkout ? styles.heroTitleTappable : ''}`}
-                onClick={() => {
-                  if (onRenameWorkout) {
-                    setEditedTitle(title);
-                    setIsEditingTitle(true);
-                  }
-                }}
-              >
-                {title}
-              </h1>
-            )}
-            <span className={styles.heroSubtitle}>Workout Complete</span>
-          </motion.div>
-
-        </>
-      )}
-
-      {/* -- Detail-mode: compact nav row ──────────────────────── */}
-      {!isReward && workout && (
-        <>
-          <header className={styles.header}>
-            <Button variant="ghost" size="sm" onClick={onBack} icon={<BackIcon />} className={styles.backButton}>
-              Back
-            </Button>
-            <span className={styles.headerTitle}>
-              <span className={styles.headerTitleAccent}>Today's Work</span>
-              {' \u00b7 '}
-              {headerDateStr}
-            </span>
-            {rawText && (
-              <button
-                className={styles.headerOriginalLink}
-                onClick={() => setIsRawTextOpen(true)}
-              >
-                Original ›
-              </button>
-            )}
-          </header>
-
-        </>
-      )}
-
-      {/* -- Workout Title (detail mode only — reward uses hero) ── */}
-      {!isReward && (
-        isEditingTitle ? (
-          <motion.div
-            className={styles.workoutTitleEditWrap}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: d + 0.15 }}
-          >
-            <input
-              className={styles.workoutTitleInput}
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  const trimmed = editedTitle.trim();
-                  if (trimmed && trimmed !== title) {
-                    setRenamedTitle(trimmed);
-                    onRenameWorkoutDetail?.(trimmed);
-                  }
-                  setIsEditingTitle(false);
-                } else if (e.key === 'Escape') {
-                  setIsEditingTitle(false);
-                }
-              }}
-              onBlur={() => {
+      {/* -- Hero: Title (+ "Workout Complete" subtitle for reward) ── */}
+      <motion.div
+        className={styles.heroHeader}
+        initial={isReward ? { opacity: 0, y: -12 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: d + 0.05, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {isEditingTitle ? (
+          <input
+            className={styles.heroTitleInput}
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
                 const trimmed = editedTitle.trim();
                 if (trimmed && trimmed !== title) {
                   setRenamedTitle(trimmed);
-                  onRenameWorkoutDetail?.(trimmed);
+                  if (isReward) onRenameWorkout?.(trimmed);
+                  else onRenameWorkoutDetail?.(trimmed);
                 }
                 setIsEditingTitle(false);
-              }}
-              autoFocus
-              spellCheck={false}
-            />
-          </motion.div>
+              } else if (e.key === 'Escape') {
+                setIsEditingTitle(false);
+              }
+            }}
+            onBlur={() => {
+              const trimmed = editedTitle.trim();
+              if (trimmed && trimmed !== title) {
+                setRenamedTitle(trimmed);
+                if (isReward) onRenameWorkout?.(trimmed);
+                else onRenameWorkoutDetail?.(trimmed);
+              }
+              setIsEditingTitle(false);
+            }}
+            autoFocus
+            spellCheck={false}
+          />
         ) : (
-          <motion.h1
-            className={`${styles.workoutTitle} ${styles.workoutTitleLarge} ${onRenameWorkoutDetail ? styles.workoutTitleTappable : ''}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: d + 0.15 }}
+          <h1
+            className={`${styles.heroTitle} ${(isReward ? onRenameWorkout : onRenameWorkoutDetail) ? styles.heroTitleTappable : ''}`}
             onClick={() => {
-              if (onRenameWorkoutDetail) {
+              const renameFn = isReward ? onRenameWorkout : onRenameWorkoutDetail;
+              if (renameFn) {
                 setEditedTitle(title);
                 setIsEditingTitle(true);
               }
             }}
           >
             {title}
-          </motion.h1>
-        )
-      )}
+          </h1>
+        )}
+        {isReward && <span className={styles.heroSubtitle}>Workout Complete</span>}
+      </motion.div>
 
       {/* -- Stat Chips Row ─────────────────────────────────────────── */}
       {<motion.div
         className={styles.statChipsRow}
-        initial={{ opacity: 0, y: 10 }}
+        initial={isReward ? { opacity: 0, y: 10 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: d + 0.20, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       >
@@ -2204,11 +2139,27 @@ export function WorkoutScreen({
 
       </motion.div>}
 
-      {/* -- Hero Result (reward only) — the dominant show-off number ─ */}
-      {isReward && heroResult && (
+      {/* -- Achievement Layer (reward only) — anchored to accomplishment zone ─ */}
+      {isReward && displayPills.length > 0 && (
+        <motion.div
+          className={styles.achievementLayer}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: d + 0.45, duration: 0.3 }}
+        >
+          {displayPills.map((pill, i) => (
+            <span key={`ach-${i}`} className={styles.achievementPill}>
+              {pill.label}
+            </span>
+          ))}
+        </motion.div>
+      )}
+
+      {/* -- Hero Result — the dominant show-off number (both modes) ─ */}
+      {heroResult && (
         <motion.div
           className={styles.heroResultBlock}
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={isReward ? { opacity: 0, scale: 0.95 } : false}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: d + 0.30, duration: 0.5, type: 'spring', stiffness: 300, damping: 25 }}
         >
@@ -2223,9 +2174,7 @@ export function WorkoutScreen({
           {heroResult.subtitle && (
             <span className={styles.heroResultSubtitle}>{heroResult.subtitle}</span>
           )}
-          {heroResult.formatLine && (
-            <span className={styles.heroFormatLine}>{heroResult.formatLine}</span>
-          )}
+          {/* formatLine subtitle removed — redundant with section headers */}
           {heroResult.storyMovements ? (
             <div className={styles.heroStoryMovements}>
               {heroResult.storyMovements.map((line, i) => {
@@ -2322,6 +2271,9 @@ export function WorkoutScreen({
                     <span className={styles.heroStoryMovementName}>
                       {line.wasSubstituted && <span className={styles.heroSubIcon} aria-label="Substituted">⇄</span>}
                       {line.name}
+                      {line.weight && line.weight > 0 && (
+                        <span className={styles.heroStoryMovementWeight}>@{line.weight}{line.unit ?? 'kg'}</span>
+                      )}
                       {line.wasSubstituted && line.total && (
                         <span className={styles.heroVolumeBadge}>{line.total}</span>
                       )}
@@ -2349,77 +2301,12 @@ export function WorkoutScreen({
         </motion.div>
       )}
 
-      {/* -- Achievement Layer (reward only) — max 2 subtle labels ─ */}
-      {isReward && displayPills.length > 0 && (
-        <motion.div
-          className={styles.achievementLayer}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: d + 0.45, duration: 0.3 }}
-        >
-          {displayPills.map((pill, i) => (
-            <span key={`ach-${i}`} className={styles.achievementPill}>
-              {pill.label}
-            </span>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Original link moved to reward context row above */}
-
-      {/* -- Exercise Story Cards (detail only — reward uses hero story narrative) ── */}
-      {!isReward && exercises.length > 0 && (() => {
-        const filteredExercises = exercises.filter(ex => !isExcludedExercise(ex));
-        // Check for ladder AMRAP exercises
-        const ladderExercise = filteredExercises.find(ex => ex.ladderReps && ex.ladderReps.length > 0 && ex.ladderStep != null);
-        // In reward mode, stagger after the hero/achievements
-        const cardBaseDelay = isReward ? d + 0.55 : 0.3;
-        return (
-          <motion.div
-            className={styles.storyCards}
-            initial={isReward ? { opacity: 0, y: 12 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={isReward ? { delay: cardBaseDelay, duration: 0.4, ease: [0.16, 1, 0.3, 1] } : undefined}
-          >
-            {/* Ladder AMRAP heatmap */}
-            {ladderExercise && ladderExercise.ladderReps && ladderExercise.ladderStep != null && (
-              <LadderHeatmap
-                ladderReps={ladderExercise.ladderReps}
-                ladderStep={ladderExercise.ladderStep}
-                ladderPartial={ladderExercise.ladderPartial}
-                movements={activeBreakdown?.movements || []}
-              />
-            )}
-            {filteredExercises.map((ex, i) => {
-              // Match breakdown movements to this exercise's movements by name
-              const exMovNames = (ex.movements || []).map(m => m.name.toLowerCase());
-              const matchedBreakdown = exMovNames.length > 0 && activeBreakdown?.movements
-                ? activeBreakdown.movements.filter(bm => exMovNames.includes(bm.name.toLowerCase()))
-                : undefined;
-              const hasOverflow = (ex.movements || []).length > 4;
-              return (
-                <ExerciseStoryCard
-                  key={ex.id || i}
-                  exercise={ex}
-                  animationDelay={isReward ? cardBaseDelay + 0.1 + i * 0.08 : 0.3 + i * 0.1}
-                  animated={isReward}
-                  isPR={prMovements.has(ex.name.toLowerCase())}
-                  breakdownMovements={matchedBreakdown && matchedBreakdown.length > 0 ? matchedBreakdown : undefined}
-                  partnerContext={partnerContext}
-                  onTap={hasOverflow ? () => setExpandedCardIndex(i) : undefined}
-                />
-              );
-            })}
-          </motion.div>
-        );
-      })()}
-
       {/* -- Action Bar ─────────────────────────────────────────── */}
       <motion.div
         className={`${styles.shareBar} ${isReward ? styles.shareBarCompact : ''}`}
-        initial={{ opacity: 0, y: 18 }}
+        initial={isReward ? { opacity: 0, y: 18 } : false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: isReward ? 1.1 : 0.6, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ delay: isReward ? 1.1 : 0, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       >
         {isReward ? (
           <>
@@ -2495,54 +2382,6 @@ export function WorkoutScreen({
         ep={isReward ? (rewardEP || { base: 0, time: 0, volume: 0, bodyweight: 0, distance: 0, intensity: 0, pr: 0, total: 0 }) : (detailEP || { base: 0, time: 0, volume: 0, bodyweight: 0, distance: 0, intensity: 0, pr: 0, total: 0 })}
       />
 
-      {/* Card Detail Overlay — scrollable full exercise detail */}
-      <AnimatePresence>
-        {expandedCardIndex !== null && (() => {
-          const filteredExercises = exercises.filter(ex => !isExcludedExercise(ex));
-          const ex = filteredExercises[expandedCardIndex];
-          if (!ex) return null;
-          const exMovNames = (ex.movements || []).map(m => m.name.toLowerCase());
-          const matchedBreakdown = exMovNames.length > 0 && activeBreakdown?.movements
-            ? activeBreakdown.movements.filter(bm => exMovNames.includes(bm.name.toLowerCase()))
-            : undefined;
-          return (
-            <>
-              <motion.div
-                className={styles.cardDetailBackdrop}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setExpandedCardIndex(null)}
-              />
-              <motion.div
-                className={styles.cardDetailSheet}
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
-                transition={{ type: 'spring', damping: 32, stiffness: 380 }}
-              >
-                <div className={styles.rawTextDragHandle} aria-hidden="true" />
-                <ExerciseStoryCard
-                  exercise={ex}
-                  animationDelay={0}
-                  animated={false}
-                  isPR={prMovements.has(ex.name.toLowerCase())}
-                  breakdownMovements={matchedBreakdown && matchedBreakdown.length > 0 ? matchedBreakdown : undefined}
-                  partnerContext={partnerContext}
-                />
-                <button
-                  className={styles.rawTextDismiss}
-                  onClick={() => setExpandedCardIndex(null)}
-                  type="button"
-                  style={{ marginTop: '16px' }}
-                >
-                  Dismiss
-                </button>
-              </motion.div>
-            </>
-          );
-        })()}
-      </AnimatePresence>
     </>
   );
 

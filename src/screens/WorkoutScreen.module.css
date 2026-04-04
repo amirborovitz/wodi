@@ -362,11 +362,11 @@
 
 .heroStoryMovementLine {
   display: grid;
-  /* Col 1: fixed qty column, right-aligned tabular numbers.
+  /* Col 1: fits content (e.g. "200m", "7 cal") — no fixed cap so nothing wraps.
      Col 2: 1px separator line.
      Col 3: movement name, takes remaining space.
      Col 4: ghost total, right-aligned. */
-  grid-template-columns: 44px 1px 1fr auto;
+  grid-template-columns: max-content 1px 1fr auto;
   align-items: center;
   column-gap: 0;
   min-height: 36px;
@@ -393,6 +393,8 @@
   text-align: right;
   padding-right: 10px;
   flex-shrink: 0;
+  white-space: nowrap;
+  min-width: max-content;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
@@ -421,6 +423,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.005em;
+}
+
+/* Weight suffix: "@17.5kg" — muted, truncates after the name */
+.heroStoryMovementWeight {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.28);
+  margin-left: 5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 /* Ghost total — parenthetical, far right */
@@ -598,22 +610,24 @@
 
 .achievementLayer {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .achievementPill {
   display: inline-flex;
   align-items: center;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px; /* Internal chip radius per spec */
-  font-size: 12px;
-  font-weight: var(--font-medium);
-  color: rgba(255, 255, 255, 0.55);
-  letter-spacing: 0.02em;
+  padding: 5px 12px;
+  background: rgba(0, 242, 255, 0.08);
+  border: 1px solid rgba(0, 242, 255, 0.25);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 242, 255, 0.9);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .dismissButton {
