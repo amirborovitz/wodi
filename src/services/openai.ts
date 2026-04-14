@@ -127,6 +127,11 @@ Every movement MUST include "inputType":
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
 
+## ROTATING STATION LABELS
+When an interval workout has labeled stations (A, B, C… or Station 1, 2, 3…), set "stationLabel" on the FIRST movement of each station only.
+- "A. MAX BIKE\nB. 10 Renegade Row + MAX Step Up\nC. MAX ROW" → Bike gets stationLabel "A", Renegade Row gets stationLabel "B" (Step Up omits it), Row gets stationLabel "C"
+- Only emit stationLabel when the workout explicitly uses letters/numbers to label rotating stations.
+
 ## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
 - rxWeights is ALWAYS the weight of ONE implement (never pre-doubled)
@@ -252,6 +257,23 @@ Output:
       { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } }
     ] }]
 }
+
+### 5b. Rotating station intervals (labeled A/B/C/D)
+Input: "1.50 MIN X 16 ROUNDS\nA. MAX BIKE\nB. 10 RENEGADE ROW + MAX STEP UP\nC. MAX ROW\nD. 20 DUMBBELL SNATCH + MAX ROPE JUMP"
+Output:
+{
+  "type": "metcon", "format": "intervals", "scoreType": "time_per_set", "sets": 16, "intervalTime": 90,
+  "exercises": [{ "name": "1.50 Min x 16 Rounds", "type": "wod", "loggingMode": "intervals", "prescription": "A. Max Bike, B. 10 Renegade Row + Max Step Up, C. Max Row, D. 20 Dumbbell Snatch + Max Rope Jump", "suggestedSets": 16,
+    "movements": [
+      { "name": "Bike", "inputType": "none", "stationLabel": "A" },
+      { "name": "Renegade Row", "reps": 10, "inputType": "weight", "implementCount": 1, "stationLabel": "B" },
+      { "name": "Step Up", "inputType": "none" },
+      { "name": "Row", "inputType": "none", "stationLabel": "C" },
+      { "name": "Dumbbell Snatch", "reps": 20, "inputType": "weight", "implementCount": 1, "stationLabel": "D" },
+      { "name": "Rope Jump", "inputType": "none" }
+    ] }]
+}
+NOTE: stationLabel goes on the first movement of each station only. "Renegade Row" is a weighted movement (inputType: "weight"), not a cardio machine.
 
 ### 6. Mixed session (Strength + Superset + Metcon)
 Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"

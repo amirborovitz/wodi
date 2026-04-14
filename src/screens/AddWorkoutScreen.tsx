@@ -2853,6 +2853,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           id: `exercise-${index}`,
           name: result.exercise.name,
           type: result.exercise.type,
+          ...(result.exercise.stationRotation && { stationRotation: true }),
           prescription: result.exercise.prescription,
           sets,
           rxWeights: result.exercise.rxWeights,
@@ -2959,6 +2960,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         date: workoutDate,
         title: workoutTitle,
         type: parsedWorkout.type,
+        ...(parsedWorkout.stationRotation && { stationRotation: true }),
         partnerWorkout: isPartnerWorkout,
         partnerFactor,
         ...(teamSize > 1 && { teamSize }),
@@ -3062,7 +3064,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       try {
         const workoutId = savedWorkoutMeta?.id || 'unsaved';
         const newPRs = extractNewPRs(
-          { id: workoutId, exercises, date: workoutDate },
+          { id: workoutId, title: workoutTitle, exercises, date: workoutDate },
           fetchedPRs
         );
         for (const pr of newPRs) {

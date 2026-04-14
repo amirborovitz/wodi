@@ -146,6 +146,7 @@ const BODYWEIGHT_NAME_PATTERNS = [
 const CARDIO_MACHINE_PATTERNS = [
   'echo bike', 'assault bike', 'air bike', 'airbike', 'airdyne',
   'ski erg', 'skierg', 'rower', 'rowing', 'row erg', 'bike erg', 'bikeerg',
+  'bike',  // plain "Bike" = cardio machine (Echo/Assault/Air)
 ];
 
 const DISTANCE_CARDIO_PATTERNS = [
@@ -156,6 +157,11 @@ const DISTANCE_CARDIO_PATTERNS = [
 function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_machine' | 'distance_cardio' | 'unknown' {
   const n = name.toLowerCase();
   if (CARDIO_MACHINE_PATTERNS.some(p => n.includes(p))) return 'cardio_machine';
+  // Standalone "Row" = Concept2 rower (cardio machine). Weighted rows (Renegade Row,
+  // Bent-over Row, DB Row, etc.) are distinguished by their qualifier words.
+  if (/\brow\b/.test(n) && !/renegade|bent[-\s]over|pendlay|dumbbell|\bdb\b|kettlebell|\bkb\b|barbell/.test(n)) {
+    return 'cardio_machine';
+  }
   // Check bodyweight BEFORE weighted (e.g., "chest to bar" shouldn't match "bar")
   if (BODYWEIGHT_NAME_PATTERNS.some(p => n.includes(p))) return 'bodyweight';
   if (/\bbanded?\b|band\b|rotation|hold\b/i.test(n)) return 'bodyweight';
@@ -168,8 +174,12 @@ export function movementToKind(mov: ParsedMovement): ExerciseKind {
   const nameClass = classifyMovementName(mov.name);
 
   // Hard override: cardio machines → calories (distance-like)
+  // Exception 1: AI explicitly says it's weighted.
+  // Exception 2: prescribed reps with no calories/distance → weighted movement with a
+  // misleading name (e.g., AI truncated "Renegade Row" to "Row").
   if (nameClass === 'cardio_machine') {
-    if (mov.inputType === 'calories' || (mov.calories && mov.calories > 0)) return 'distance';
+    if (mov.inputType === 'weight') return 'load';
+    if (mov.reps && mov.reps > 0 && !mov.calories && !mov.distance) return 'load';
     return 'distance';
   }
 

@@ -4,6 +4,8 @@ interface AchievementContext {
   workout: {
     title: string;
     duration?: number;
+    type?: string;
+    format?: string;
     exercises: Exercise[];
   };
   allTimeRecords: PersonalRecord[];
@@ -22,7 +24,7 @@ export async function detectAllAchievements(
   const achievements: Achievement[] = [];
 
   // Priority 1: Check for new PRs
-  const prAchievements = detectPRs(context.workout.exercises, context.allTimeRecords);
+  const prAchievements = detectPRs(context.workout, context.allTimeRecords);
   achievements.push(...prAchievements);
 
   // Priority 2: Check for benchmark WOD achievements
@@ -91,6 +93,23 @@ const PR_EXCLUDED_PATTERNS = [
   'kb', 'kettlebell',
 ];
 
+const BENCHMARK_WODS = [
+  'fran', 'grace', 'helen', 'diane', 'elizabeth', 'murph',
+  'cindy', 'annie', 'karen', 'jackie', 'isabel', 'nancy',
+  'kelly', 'eva', 'lynne', 'amanda', 'mary', 'chelsea'
+];
+
+function isBenchmarkWorkout(title: string): boolean {
+  const workoutName = title.toLowerCase();
+  return BENCHMARK_WODS.some(name => workoutName.includes(name));
+}
+
+function isPureStrengthExercise(exercise: Exercise): boolean {
+  if (exercise.type === 'strength') return true;
+  return (!exercise.movements || exercise.movements.length === 0)
+    && exercise.sets.some(set => (set.weight || 0) > 0);
+}
+
 function isPREligible(movementName: string): boolean {
   const lower = movementName.toLowerCase();
   if (PR_EXCLUDED_PATTERNS.some(p => lower.includes(p))) return false;
@@ -146,12 +165,14 @@ function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight:
  * Detect PRs from the workout exercises
  */
 function detectPRs(
-  exercises: Exercise[],
+  workout: { title: string; exercises: Exercise[] },
   allTimeRecords: PersonalRecord[]
 ): Achievement[] {
   const achievements: Achievement[] = [];
+  const allowMetconPRs = isBenchmarkWorkout(workout.title);
 
-  for (const exercise of exercises) {
+  for (const exercise of workout.exercises) {
+    if (!allowMetconPRs && !isPureStrengthExercise(exercise)) continue;
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
@@ -187,14 +208,8 @@ function detectBenchmarkAchievement(
   workout: { title: string; duration?: number },
   recentWorkouts: Workout[]
 ): Achievement | null {
-  const benchmarkWods = [
-    'fran', 'grace', 'helen', 'diane', 'elizabeth', 'murph',
-    'cindy', 'annie', 'karen', 'jackie', 'isabel', 'nancy',
-    'kelly', 'eva', 'lynne', 'amanda', 'mary', 'chelsea'
-  ];
-
   const workoutName = workout.title.toLowerCase();
-  const isBenchmark = benchmarkWods.some(name => workoutName.includes(name));
+  const isBenchmark = isBenchmarkWorkout(workout.title);
 
   if (!isBenchmark) return null;
 
@@ -309,12 +324,14 @@ function formatTime(minutes: number): string {
  * Extract PRs from a workout to save to the PR collection
  */
 export function extractNewPRs(
-  workout: { id: string; exercises: Exercise[]; date: Date },
+  workout: { id: string; title: string; exercises: Exercise[]; date: Date },
   existingPRs: PersonalRecord[]
 ): PersonalRecord[] {
   const newPRs: PersonalRecord[] = [];
+  const allowMetconPRs = isBenchmarkWorkout(workout.title);
 
   for (const exercise of workout.exercises) {
+    if (!allowMetconPRs && !isPureStrengthExercise(exercise)) continue;
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {

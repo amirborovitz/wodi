@@ -77,6 +77,7 @@ export interface Workout {
   date: Date;
   title: string;
   type: WorkoutType;
+  stationRotation?: boolean;   // Rotating interval/station workout (A/B/C/D repeating)
   imageUrl?: string;
   partnerWorkout?: boolean;
   partnerFactor?: number;
@@ -104,6 +105,7 @@ export interface Exercise {
   id: string;
   name: string;
   type: ExerciseType;
+  stationRotation?: boolean;    // This exercise is one station in a rotating interval workout
   prescription: string;    // "3x8" or "21-15-9" or "AMRAP 12"
   sets: ExerciseSet[];
   rxWeights?: RxWeights;   // Prescribed weight for share display
@@ -145,6 +147,7 @@ export interface ParsedWorkout {
   type: WorkoutType;
   format: WorkoutFormat;        // How to log this workout
   scoreType: ScoreType;         // What the user logs
+  stationRotation?: boolean;    // Rotating interval/station workout (A/B/C/D repeating)
   exercises: ParsedExercise[];
   sets?: number;                // Number of sets/rounds for interval workouts
   timeCap?: number;             // Time cap in seconds if specified
@@ -161,6 +164,7 @@ export interface ParsedWorkout {
 // Workload breakdown types
 export interface MovementTotal {
   name: string;
+  exerciseIndex?: number;      // Optional exercise scope for mixed/sectioned workouts
   totalReps?: number;
   totalDistance?: number;
   totalCalories?: number;
@@ -210,6 +214,7 @@ export interface ParsedMovement {
   perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
   role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
   together?: boolean;           // Partner workouts: true if all partners do this movement together (not split). E.g., "600m run (together)".
+  stationLabel?: string;        // Rotating interval station label (e.g., "A", "B", "C"). First movement of each station gets this.
   alternative?: {               // OR option (e.g., "40 DU / 60 singles")
     name: string;
     reps?: number;
@@ -230,6 +235,7 @@ export interface ParsedExercise {
   name: string;
   type: ExerciseType;
   prescription: string;
+  stationRotation?: boolean;    // This exercise is one station in a rotating interval workout
   suggestedSets: number;
   suggestedReps?: number;
   suggestedRepsPerSet?: number[]; // Variable reps per set (e.g., [6, 5, 4, 3, 2])

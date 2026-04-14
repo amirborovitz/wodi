@@ -51,13 +51,14 @@ The user snaps a photo of the whiteboard or pastes a screenshot. The AI parses i
 ### Act 2: Log (fun, fast, tactile)
 **Emotion: "This is satisfying"**
 
-The user taps through each exercise, logging their actual performance. This should feel like a game, not a form.
+The user taps through each exercise, logging their actual performance. **This must feel like a game, not an accounting app.** The logging screen is not a form — it is an interaction. Every element on it must justify its presence by contributing to speed or delight. If it doesn't make logging faster or more satisfying, remove it.
 
 - **Steppers over keyboards.** Tap +/− to adjust weight. Tap the circle to count rounds. Long-press to accelerate. Physical, thumb-friendly, one-handed.
 - **Smart defaults.** Rx weight pre-filled. Reps pre-filled. The user's job is to *adjust*, not to *fill*.
 - **Progressive disclosure.** Show the essentials first (rounds, weight). Partial movements, substitutions, notes — available but not in your face.
 - **Per-exercise, not per-field.** Each exercise is a card/sheet you tap into. You log it, hit Done, move to the next. Not a giant scrollable form with 20 fields.
 - **Substitutions feel social.** Scaling to singles instead of double-unders isn't shameful — it's just a quick swap pill. No judgment in the UI.
+- **No redundant information on logging screens.** The workout description is already visible above. Repeating movement lists, station lists, or any re-display of parsed data is clutter. Remove it. The logging screen shows only what the user needs to *interact with* — not what they already read.
 
 ### Act 3: Celebrate (proud, shareable)
 **Emotion: "I want to screenshot this"**
@@ -125,6 +126,8 @@ Every pixel on a mobile screen is premium real estate. If an element doesn't dir
 | Raw numbers without context | "2134 kg" means nothing emotionally | "2.1 TONS" — human-scale, impressive |
 | Modal dialogs in the center of the screen | Desktop pattern, hostile on mobile | Bottom sheets that slide up |
 | Long scrolling forms | Fatiguing, feels like work | Per-exercise sheets, progressive disclosure |
+| Repeating info on logging screen | Movement lists, station lists, re-displaying what the description already shows — it's clutter that makes logging feel like admin | Show only what the user interacts with; the description is already above |
+| Accounting-app logging | Any UI that makes logging feel like data entry — too many fields, too much text, no tactile feedback | One big interaction (stepper/counter), smart defaults, done |
 | Generic success states ("Saved!") | Boring, doesn't celebrate | The recap screen IS the success state |
 | Settings-heavy configuration | Makes it feel like enterprise software | Smart defaults, learn from behavior |
 | Timestamps in ISO format | "2026-03-21T14:30:00Z" is for machines | "Friday" or "Mar 21" — human time |

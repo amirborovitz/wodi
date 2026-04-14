@@ -25,3 +25,4 @@ dist-ssr
 
 # Claude session state
 .claude-state.md
+.claude/worktrees/

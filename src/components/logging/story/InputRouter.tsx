@@ -1,9 +1,8 @@
 import type { StoryExerciseResult, MovementResult } from './types';
 import { LoadInput } from './LoadInput';
-import { ScoreTimeInput, ScoreRoundsInput } from './ScoreInputs';
-import { LadderInput } from './LadderInput';
+import { ScoreTimeInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
-import { DurationInput, DistanceInput, IntervalsInput, NoteInput } from './MinorInputs';
+import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
 import { ScoreMovementInputs } from './ScoreMovementInputs';
 
@@ -25,26 +24,19 @@ export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
 
-  // Scored exercises: score input is primary, then compact inline
-  // inputs for any movements the AI tagged as needing user input.
+  // Scored exercises: for_time keeps the time input; AMRAP drops the round counter —
+  // movement-level inputs (weight, cal, reps) are the actual logging story.
   if (kind === 'score_time' || kind === 'score_rounds') {
     const inputMovements = movements.filter(
       mr => mr.kind === 'load' || mr.kind === 'distance'
     );
-    // Show ScoreMovementInputs whenever there are movements —
-    // even if none need weight/distance input, they may have substitution alternatives.
     const showMovements = movements.length > 0;
-    // Ladder AMRAP: use step sliders instead of round counter
-    const isLadder = kind === 'score_rounds' && result.exercise.ladderReps && result.exercise.ladderReps.length > 0;
 
     return (
       <>
-        {kind === 'score_time'
-          ? <ScoreTimeInput result={result} onChange={onChange} />
-          : isLadder
-            ? <LadderInput result={result} onChange={onChange} />
-            : <ScoreRoundsInput result={result} onChange={onChange} />
-        }
+        {kind === 'score_time' && (
+          <ScoreTimeInput result={result} onChange={onChange} />
+        )}
         {showMovements && (
           <ScoreMovementInputs
             movements={movements}
@@ -83,27 +75,19 @@ export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
     case 'distance':
       return <DistanceInput result={result} onChange={onChange} />;
     case 'intervals': {
-      // Show per-movement weight/distance inputs for interval exercises with movements
-      const intervalInputMovements = movements.filter(
-        mr => mr.kind === 'load' || mr.kind === 'distance'
-      );
+      // Just show per-movement inputs — the interval count is fixed and redundant.
       return (
-        <>
-          <IntervalsInput result={result} onChange={onChange} showWeight={false} />
-          {intervalInputMovements.length > 0 && (
-            <ScoreMovementInputs
-              movements={movements}
-              inputMovements={intervalInputMovements}
-              teamSize={teamSize}
-              onChange={(index: number, patch: Partial<MovementResult>) => {
-                const next = [...movements];
-                next[index] = { ...next[index], ...patch };
-                onChange({ movementResults: next });
-              }}
-              onBatch={(next) => onChange({ movementResults: next })}
-            />
-          )}
-        </>
+        <ScoreMovementInputs
+          movements={movements}
+          inputMovements={movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance')}
+          teamSize={teamSize}
+          onChange={(index: number, patch: Partial<MovementResult>) => {
+            const next = [...movements];
+            next[index] = { ...next[index], ...patch };
+            onChange({ movementResults: next });
+          }}
+          onBatch={(next) => onChange({ movementResults: next })}
+        />
       );
     }
     case 'note':

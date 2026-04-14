@@ -123,6 +123,8 @@ export function useRewardData(): UseRewardDataResult {
         workout: {
           title: workout.title,
           duration: workout.durationMinutes,
+          type: workout.type,
+          format: workout.format,
           exercises: workout.exercises,
         },
         allTimeRecords,

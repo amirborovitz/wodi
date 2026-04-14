@@ -59,6 +59,12 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'dumbbell squat': 'DB Squat',
   'db deadlift': 'DB Deadlift',
   'dumbbell deadlift': 'DB Deadlift',
+  'renegade row': 'Renegade Row',
+  'renegade rows': 'Renegade Row',
+  'bent over row': 'Bent Over Row',
+  'bent-over row': 'Bent Over Row',
+  'pendlay row': 'Pendlay Row',
+  'barbell row': 'Barbell Row',
   'db row': 'DB Row',
   'db rows': 'DB Row',
   'dumbbell row': 'DB Row',
@@ -254,8 +260,50 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
   const withSharedWeight = backfillSharedWeightHints(withInputTypes);
 
+  // Detect rotating interval "station" workouts (A/B/C/D repeated across outer rounds)
+  const withStationRotation = detectStationRotation(withSharedWeight);
+
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
-  return detectMisplacedBuyIns(withSharedWeight);
+  return detectMisplacedBuyIns(withStationRotation);
+}
+
+function detectStationRotation(workout: ParsedWorkout): ParsedWorkout {
+  if (workout.exercises.length < 2) return workout;
+
+  const rawText = workout.rawText || '';
+  const combinedText = [
+    rawText,
+    ...workout.exercises.map(ex => `${ex.name} ${ex.prescription}`),
+  ].join(' ');
+  const lower = combinedText.toLowerCase();
+
+  const hasIntervalShape = workout.format === 'emom'
+    || workout.format === 'intervals'
+    || /every\s+\d+(?::\d{2})?/i.test(lower)
+    || /\b\d+(?::\d{2}|\.\d{2})\s*(?:min(?:ute)?s?)?\s*[x×]\s*\d+\s*rounds?\b/i.test(lower);
+
+  const hasStationLabels = /(?:^|\n)\s*[A-H][).:]\s+/m.test(rawText)
+    || workout.exercises.every(ex => /^[A-H][).:\s-]+/i.test(ex.name.trim()));
+
+  const stationSetCounts = workout.exercises
+    .map(ex => ex.suggestedSets)
+    .filter((count): count is number => typeof count === 'number' && count > 0);
+  const repeatedStationSets = stationSetCounts.length === workout.exercises.length
+    && new Set(stationSetCounts).size === 1
+    && stationSetCounts[0] > 1;
+
+  if (!hasIntervalShape || (!hasStationLabels && !repeatedStationSets)) {
+    return workout;
+  }
+
+  return {
+    ...workout,
+    stationRotation: true,
+    exercises: workout.exercises.map(ex => ({
+      ...ex,
+      stationRotation: true,
+    })),
+  };
 }
 
 /**

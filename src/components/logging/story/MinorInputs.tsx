@@ -180,20 +180,6 @@ export function IntervalsInput({ result, onChange, showWeight = false }: Interva
 
   return (
     <div className={styles.center}>
-      {/* Station list */}
-      {movements && movements.length > 0 && (
-        <div className={styles.stationList}>
-          {movements.map((mov, i) => (
-            <div key={i} className={styles.stationItem}>
-              <span className={styles.stationNumber}>{i + 1}</span>
-              <span className={styles.stationName}>
-                {mov.reps ? `${mov.reps} ` : ''}{mov.name}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className={styles.intervalsDisplay}>
         <AnimatePresence mode="popLayout">
           <motion.span

@@ -446,19 +446,35 @@ export function ScoreMovementInputs({ movements, inputMovements: _inputMovements
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
     return (
-      <div key={mr.movementKey} className={styles.movField}>
-        <MovName
-          mr={mr}
-          teamSize={teamSize}
-          onSwapTap={() => openSwap(mr.movementKey)}
-          onChange={(patch) => onChange(globalIndex, patch)}
-        />
-        {mr.kind === 'load' && (
-          <WeightField mr={mr} onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)} />
+      <div key={mr.movementKey}>
+        {mr.movement.stationLabel && (
+          <div className={styles.stationDivider}>
+            <span className={styles.stationLabel}>{mr.movement.stationLabel}</span>
+            <span className={styles.sectionLine} />
+          </div>
         )}
-        {mr.kind === 'distance' && (
-          <DistanceField mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
-        )}
+        <div className={styles.movField}>
+          <MovName
+            mr={mr}
+            teamSize={teamSize}
+            onSwapTap={() => openSwap(mr.movementKey)}
+            onChange={(patch) => onChange(globalIndex, patch)}
+          />
+          {mr.kind === 'load' && (
+            <WeightField mr={mr} onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)} />
+          )}
+          {mr.kind === 'distance' && (
+            <DistanceField mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+          )}
+          {/* MAX bodyweight: no prescribed quantity of any kind → let user log their score.
+              Guard is strict: distance or calories present means display-only (e.g. 400m Run, 7 cal Bike). */}
+          {mr.kind === 'reps'
+            && mr.movement.reps == null
+            && mr.movement.distance == null
+            && mr.movement.calories == null && (
+            <RepsField mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+          )}
+        </div>
       </div>
     );
   };
@@ -530,7 +546,11 @@ function WeightField({ mr, onChange }: { mr: MovementResult; onChange: (p: Parti
 }
 
 function DistanceField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial<MovementResult>) => void }) {
-  const isCal = mr.movement.inputType === 'calories' || (mr.movement.calories != null && mr.movement.calories > 0);
+  // Cardio machines (bike, row, ski) measure in calories when AI didn't prescribe distance.
+  const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
+  const isCal = mr.movement.inputType === 'calories'
+    || (mr.movement.calories != null && mr.movement.calories > 0)
+    || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
   const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
   const value = isCal ? mr.calories : mr.distance;
   const placeholder = isCal
@@ -551,6 +571,22 @@ function DistanceField({ mr, onChange }: { mr: MovementResult; onChange: (p: Par
       unit={unit}
       color={kindToTrinityColor('distance')}
       inputMode="decimal"
+      size="sm"
+    />
+  );
+}
+
+function RepsField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial<MovementResult>) => void }) {
+  return (
+    <StepperInput
+      value={mr.reps}
+      onChange={(v) => onChange({ reps: v != null ? Math.max(0, v) : undefined })}
+      step={1}
+      min={0}
+      placeholder="0"
+      unit="reps"
+      color={kindToTrinityColor('reps')}
+      inputMode="numeric"
       size="sm"
     />
   );

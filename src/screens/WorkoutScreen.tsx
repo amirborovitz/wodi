@@ -482,6 +482,177 @@ function findMovementTotal(
   );
 }
 
+function deriveStationRotationMeta(
+  exercises: Exercise[],
+  rawText?: string,
+): { intervalLabel?: string; totalRounds?: number; stationLoops?: number } {
+  const text = rawText || `${exercises.map(ex => `${ex.name} ${ex.prescription}`).join(' ')}`;
+  const normalized = text.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+
+  const intervalMatch = normalized.match(/(?:every\s+)?(\d+:\d{2})\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)\s*rounds?/i);
+  if (intervalMatch) {
+    const totalRounds = parseInt(intervalMatch[2], 10);
+    const stationCount = exercises.length || 1;
+    return {
+      intervalLabel: intervalMatch[1],
+      totalRounds,
+      stationLoops: totalRounds > 0 ? Math.max(1, Math.round(totalRounds / stationCount)) : undefined,
+    };
+  }
+
+  const sharedRounds = exercises
+    .map(ex => ex.rounds)
+    .filter((rounds): rounds is number => typeof rounds === 'number' && rounds > 0);
+  if (sharedRounds.length === exercises.length && new Set(sharedRounds).size === 1) {
+    const stationLoops = sharedRounds[0];
+    return {
+      totalRounds: stationLoops * exercises.length,
+      stationLoops,
+    };
+  }
+
+  return {};
+}
+
+function isStationRotationWorkout(exercises: Exercise[], rawText?: string): boolean {
+  if (exercises.some(ex => ex.stationRotation)) return true;
+  if (exercises.length < 2) return false;
+
+  const namesAreLettered = exercises.every(ex => /^[A-H][).:\s-]+/i.test(ex.name.trim()));
+  if (!namesAreLettered && !(rawText && /(?:^|\n)\s*[A-H][).:]\s+/m.test(rawText))) {
+    return false;
+  }
+
+  const meta = deriveStationRotationMeta(exercises, rawText);
+  return Boolean(meta.totalRounds || meta.intervalLabel);
+}
+
+function formatMovementStoryTotal(movement?: MovementTotal): string {
+  if (!movement) return '';
+  if (movement.totalCalories && movement.totalCalories > 0) {
+    return `${movement.totalCalories} cal total`;
+  }
+  if (movement.totalDistance && movement.totalDistance > 0) {
+    return movement.totalDistance >= 1000
+      ? `${(movement.totalDistance / 1000).toFixed(1)}km total`
+      : `${movement.totalDistance}m total`;
+  }
+  if (movement.totalReps && movement.totalReps > 0) {
+    return `${movement.totalReps} total`;
+  }
+  return '';
+}
+
+function cleanStationLabel(name: string, index: number): string {
+  const letterMatch = name.trim().match(/^([A-H])[).:\s-]+/i);
+  const letter = letterMatch?.[1]?.toUpperCase() ?? String.fromCharCode(65 + index);
+  return `STATION ${letter}`;
+}
+
+function stripStationPrefix(name: string): string {
+  return name.replace(/^[A-H][).:\s-]+/i, '').trim();
+}
+
+function buildStationRotationStoryMovements(
+  exercises: Exercise[],
+  movements: MovementTotal[],
+  rawText?: string,
+): StoryMovementLine[] | undefined {
+  const lines: StoryMovementLine[] = [];
+  const meta = deriveStationRotationMeta(exercises, rawText);
+
+  if (meta.totalRounds || meta.intervalLabel) {
+    const headerBits = [
+      meta.totalRounds ? `${meta.totalRounds} ROUNDS` : undefined,
+      meta.intervalLabel ? `${meta.intervalLabel} STATIONS` : 'ROTATING STATIONS',
+    ].filter(Boolean);
+    lines.push({
+      perRound: '',
+      name: '',
+      total: '',
+      sectionHeader: headerBits.join(' · '),
+      sectionColor: 'cyan',
+    });
+  }
+
+  for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+    const ex = exercises[exIdx];
+    const stationLoops = ex.rounds || meta.stationLoops;
+    const stationHeader = stationLoops && stationLoops > 1
+      ? `${cleanStationLabel(ex.name, exIdx)} · ×${stationLoops}`
+      : cleanStationLabel(ex.name, exIdx);
+
+    lines.push({
+      perRound: '',
+      name: '',
+      total: '',
+      sectionHeader: stationHeader,
+      sectionColor: 'magenta',
+    });
+
+    for (const mov of ex.movements || []) {
+      const actual = findMovementTotal(movements, mov.name, exIdx);
+      const displayName = actual?.wasSubstituted ? actual.name : mov.name;
+      const cleanName = stripStationPrefix(displayName).replace(/\bmax\s+/i, '').trim();
+      const isBodyweight = isBwVolumeMovement(displayName);
+      const weight = actual?.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female);
+      const unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit || 'kg');
+      const total = formatMovementStoryTotal(actual);
+      const color = actual?.color ?? 'magenta';
+
+      const isMaxMovement = Boolean(mov.isMaxReps) || /\bmax\b/i.test(mov.name);
+      if (isMaxMovement) {
+        lines.push({
+          perRound: 'MAX',
+          name: cleanName,
+          total,
+          color,
+          weight: !isBodyweight ? weight : undefined,
+          unit: !isBodyweight ? unit : undefined,
+        });
+        continue;
+      }
+
+      if ((mov.calories || 0) > 0 || (actual?.totalCalories || 0) > 0) {
+        const perVal = mov.calories || ((actual?.totalCalories && stationLoops) ? Math.round(actual.totalCalories / stationLoops) : 0);
+        lines.push({
+          perRound: `${perVal} cal`,
+          name: cleanName,
+          total,
+          color,
+        });
+        continue;
+      }
+
+      if ((mov.distance || 0) > 0 || (actual?.totalDistance || 0) > 0) {
+        const perVal = mov.distance || ((actual?.totalDistance && stationLoops) ? Math.round(actual.totalDistance / stationLoops) : 0);
+        const distanceLabel = perVal >= 1000 ? `${(perVal / 1000).toFixed(1)}km` : `${perVal}m`;
+        lines.push({
+          perRound: distanceLabel,
+          name: cleanName,
+          total,
+          color,
+        });
+        continue;
+      }
+
+      if ((mov.reps || 0) > 0 || (actual?.totalReps || 0) > 0) {
+        const perVal = mov.reps || ((actual?.totalReps && stationLoops) ? Math.round(actual.totalReps / stationLoops) : 0);
+        lines.push({
+          perRound: `${perVal}`,
+          name: cleanName,
+          total,
+          color,
+          weight: !isBodyweight ? weight : undefined,
+          unit: !isBodyweight ? unit : undefined,
+        });
+      }
+    }
+  }
+
+  return lines.length > 0 ? lines : undefined;
+}
+
 /**
  * Build story movements for mixed workouts (Strength + Metcon).
  * Groups movements under exercise headers so the celebration shows the full workout structure.
@@ -489,7 +660,12 @@ function findMovementTotal(
 function buildMixedStoryMovements(
   exercises: Exercise[],
   movements: MovementTotal[],
+  rawText?: string,
 ): StoryMovementLine[] | undefined {
+  if (isStationRotationWorkout(exercises, rawText)) {
+    return buildStationRotationStoryMovements(exercises, movements, rawText);
+  }
+
   const lines: StoryMovementLine[] = [];
 
   for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
@@ -1005,6 +1181,7 @@ function computeHeroResult(
   prMovementName?: string,
   prWeight?: number,
   teamSize?: number,
+  rawText?: string,
 ): HeroResult {
   const storyLine = buildAccomplishmentStory(movements);
   const formatLine = buildFormatLine(format, exercises, durationMinutes, timeCap, teamSize);
@@ -1017,7 +1194,7 @@ function computeHeroResult(
    */
   function buildStory(rounds: number = 1): ReturnType<typeof buildStoryMovements> {
     if (isMixed) {
-      return buildMixedStoryMovements(exercises, movements);
+      return buildMixedStoryMovements(exercises, movements, rawText);
     }
     const ex = exercises[0];
     // Ladder AMRAP: show progression ranges instead of averaged per-round values
@@ -1763,6 +1940,7 @@ export function WorkoutScreen({
       prMovementName,
       prWeight,
       teamSize,
+      isReward ? rewardData?.workoutRawText : workout?.rawText,
     );
   }, [isReward, rewardData, workout, exercises, totalVolume, totalEP, durationMinutes, isPR, workloadBreakdown]);
 
