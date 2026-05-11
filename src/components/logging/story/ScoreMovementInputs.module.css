@@ -10,12 +10,12 @@
   padding: var(--space-2) 0;
 }
 
-/* Multiple movements: stacked rows */
+/* Multiple movements: stacked tiles */
 .multiRow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-1) 0;
+  gap: 10px;
+  padding: 2px 0;
 }
 
 /* ── Movement field row ── */
@@ -122,11 +122,11 @@
   line-height: 1.2;
 }
 
-/* Selected alternative name: white, full weight */
+/* Selected alternative name: warm white, full weight */
 .movNameSelected {
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  color: var(--color-text);
+  color: var(--wodi-white);
   line-height: var(--leading-tight);
 }
 
@@ -252,7 +252,7 @@
   width: 80px;
   height: 44px;
   border-radius: var(--radius-lg);
-  border: 2px solid var(--glass-border);
+  border: 2px solid var(--wodi-line2);
   background: rgba(255, 255, 255, 0.04);
   color: var(--field-color, var(--color-volume));
   font-size: var(--text-xl);
@@ -272,8 +272,8 @@
 }
 
 .input:focus {
-  border-color: #CCFF00;
-  box-shadow: 0 0 12px rgba(204, 255, 0, 0.25);
+  border-color: var(--wodi-yellow);
+  box-shadow: 0 0 12px rgba(245, 194, 0, 0.25);
 }
 
 .input::placeholder {
@@ -291,7 +291,7 @@
 .sectionGroup {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 10px;
 }
 
 .sectionHeader {
@@ -312,7 +312,7 @@
 .sectionLine {
   flex: 1;
   height: 1px;
-  background: var(--glass-border);
+  background: var(--wodi-line2);
 }
 
 /* ── Station divider (A / B / C / D) ── */
@@ -321,18 +321,225 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: 4px;
   margin-bottom: 2px;
 }
 
 .stationLabel {
   font-size: 11px;
   font-weight: var(--font-bold);
-  color: var(--color-sessions);
+  color: var(--wodi-dim);
   letter-spacing: 0.08em;
-  font-family: var(--font-mono);
+  font-family: var(--font-barlow);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* ── Arcade Dashboard: Chunky Tile ── */
+.tile {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04));
+  border-radius: 22px;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  scroll-margin-bottom: 220px;
+}
+
+/* Tile header: movement name + badges + swap icon */
+.tileHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+
+.tileName {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--wodi-yellow, #f5c200);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Substituted state inside tile header */
+.tileNameSubstituted {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tileNameOriginal {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.tileSwapIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Station divider already defined above — reused via .stationDivider / .stationLabel */
+
+/* AMRAP interval shape: log likely reps per work interval, not load. */
+.intervalPrompt {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 194, 0, 0.22);
+  border-radius: 10px;
+  background: rgba(245, 194, 0, 0.05);
+  color: rgba(244, 241, 232, 0.76);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.intervalList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intervalTile {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.intervalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.intervalTitleBlock {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.intervalName {
+  color: var(--wodi-yellow, #f5c200);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  line-height: 1.05;
+}
+
+.intervalOriginal {
+  color: rgba(244, 241, 232, 0.32);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-decoration: line-through;
+}
+
+.intervalMeta {
+  color: rgba(244, 241, 232, 0.42);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.intervalControl {
+  display: grid;
+  grid-template-columns: 52px 1fr auto 52px;
+  align-items: center;
+  min-height: 54px;
+  overflow: hidden;
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.intervalStep {
+  height: 54px;
+  border: 0;
+  background: transparent;
+  color: var(--wodi-yellow, #f5c200);
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.intervalStep:active {
+  background: rgba(245, 194, 0, 0.12);
+}
+
+.intervalValue {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text, #f4f1e8);
+  font-family: var(--font-family);
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.intervalValue::-webkit-inner-spin-button,
+.intervalValue::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.intervalUnit {
+  padding-right: 8px;
+  color: rgba(244, 241, 232, 0.35);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.intervalTrack {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(244, 241, 232, 0.10);
+  overflow: hidden;
+}
+
+.intervalFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wodi-yellow, #f5c200);
+}
+
+.intervalFootnote {
+  margin-top: 10px;
+  color: rgba(244, 241, 232, 0.38);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 /* Reduced motion */

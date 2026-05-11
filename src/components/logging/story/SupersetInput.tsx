@@ -24,21 +24,12 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
   // Detect barbell complex or single weighted movement needing Start/Top.
   // Show ProgressiveWeightRow when 1+ weighted movements exist with multiple sets.
   const { isComplex, weightedIndices } = useMemo(() => {
-    const hints = result.exercise.loggingHints?.sharedWeightMovements;
-    if (hints && hints.length >= 2) {
-      // AI told us which movements share weight — find their indices
-      const indices = movements
-        .map((mr, i) => hints.some(h => mr.movement.name === h) ? i : -1)
-        .filter(i => i >= 0);
-      return { isComplex: indices.length >= 1, weightedIndices: indices };
-    }
-    // Fallback: 1+ load-kind movements with multiple sets → show Start/Top
     const indices = movements
       .map((mr, i) => mr.kind === 'load' ? i : -1)
       .filter(i => i >= 0);
     const hasMutiSets = result.setsTotal > 1;
     return { isComplex: indices.length >= 1 && hasMutiSets, weightedIndices: indices };
-  }, [movements, result.exercise.loggingHints, result.setsTotal]);
+  }, [movements, result.setsTotal]);
 
   const updateMovement = useCallback((index: number, patch: Partial<MovementResult>) => {
     const next = [...(result.movementResults ?? [])];
@@ -134,6 +125,7 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
         {isComplex && (
           <ProgressiveWeightRow
             weight={sharedWeight}
+            peakWeight={result.weightEnd}
             placeholder={sharedPlaceholder}
             setsTotal={result.setsTotal}
             repsPerSet={progressiveReps}
@@ -145,7 +137,7 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
           // Skip rendering weighted movements whose weight is already shown
           // in the ProgressiveWeightRow (avoids redundant row with no inputs)
           const isHandledByProgressive = isComplex && weightedIndices.includes(i);
-          if (isHandledByProgressive && mr.kind === 'load') return null;
+          if (isHandledByProgressive) return null;
 
           return (
             <MovementRow

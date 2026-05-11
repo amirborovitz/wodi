@@ -2,6 +2,7 @@ import type {
   ExerciseLoggingMode,
   ExerciseSet,
   Exercise,
+  IntensityRating,
   ParsedExercise,
   ParsedMovement,
   ParsedSectionType,
@@ -88,6 +89,12 @@ export interface StoryExerciseResult {
 
   // Superset / multi-movement support
   movementResults?: MovementResult[]; // per-movement overrides for supersets
+
+  // User-entered name for this metcon/WOD block (stored as aiPartName on the Exercise)
+  metconName?: string;
+
+  // User-entered one-tap vibe check for metcon/WOD blocks only
+  intensity?: IntensityRating | null;
 }
 
 // Per-movement result within a superset or complex exercise
@@ -229,6 +236,107 @@ const LOGGING_MODE_TO_KIND: Record<ExerciseLoggingMode, ExerciseKind> = {
 
 export function loggingModeToKind(mode: ExerciseLoggingMode): ExerciseKind {
   return LOGGING_MODE_TO_KIND[mode] ?? 'note';
+}
+
+function shouldLogCelebrationDebug(): boolean {
+  return typeof window !== 'undefined'
+    && window.localStorage.getItem('wodi:debugCelebration') === '1';
+}
+
+export function getPrescribedSetCount(
+  exercise: ParsedExercise,
+  kind?: ExerciseKind,
+): number | undefined {
+  const repsPerSet = exercise.suggestedRepsPerSet;
+  if (repsPerSet && repsPerSet.length > 0) {
+    if (shouldLogCelebrationDebug()) {
+      console.log('[CelebrationDebug] prescribed count from repsPerSet', {
+        exercise: exercise.name,
+        kind,
+        repsPerSet,
+        count: repsPerSet.length,
+      });
+    }
+    return repsPerSet.length;
+  }
+
+  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/\s+/g, ' ');
+  const explicitSets = text.match(/\b(\d+)\s*sets?\b/i);
+  if (explicitSets) {
+    const count = parseInt(explicitSets[1], 10);
+    if (shouldLogCelebrationDebug()) {
+      console.log('[CelebrationDebug] prescribed count from sets text', {
+        exercise: exercise.name,
+        kind,
+        text,
+        count,
+      });
+    }
+    return count;
+  }
+
+  const canUseRoundCount =
+    kind === 'intervals'
+    || kind === 'score_time'
+    || exercise.loggingMode === 'emom'
+    || exercise.loggingMode === 'intervals'
+    || exercise.loggingMode === 'for_time';
+
+  if (!canUseRoundCount) return undefined;
+
+  const roundsAfterMultiplier = text.match(/(?:[xX]|\u00d7)\s*(\d+)\s*(?:sets?|rounds?)\b/i);
+  if (roundsAfterMultiplier) {
+    const count = parseInt(roundsAfterMultiplier[1], 10);
+    if (shouldLogCelebrationDebug()) {
+      console.log('[CelebrationDebug] prescribed count from multiplier text', {
+        exercise: exercise.name,
+        kind,
+        text,
+        count,
+      });
+    }
+    return count;
+  }
+
+  const rftMatch = text.match(/\b(\d+)\s*rft\b/i);
+  if (rftMatch) {
+    const count = parseInt(rftMatch[1], 10);
+    if (shouldLogCelebrationDebug()) {
+      console.log('[CelebrationDebug] prescribed count from RFT text', {
+        exercise: exercise.name,
+        kind,
+        text,
+        count,
+      });
+    }
+    return count;
+  }
+
+  const roundsForTime = text.match(/\b(\d+)\s*rounds?\s+for\s+time\b/i);
+  if (roundsForTime) {
+    const count = parseInt(roundsForTime[1], 10);
+    if (shouldLogCelebrationDebug()) {
+      console.log('[CelebrationDebug] prescribed count from rounds-for-time text', {
+        exercise: exercise.name,
+        kind,
+        text,
+        count,
+      });
+    }
+    return count;
+  }
+
+  if (shouldLogCelebrationDebug()) {
+    console.log('[CelebrationDebug] no prescribed count override', {
+      exercise: exercise.name,
+      kind,
+      suggestedSets: exercise.suggestedSets,
+      loggingMode: exercise.loggingMode,
+      text,
+    });
+  }
+
+  return undefined;
 }
 
 // ─── Row state derivation ───────────────────────────────────────
@@ -376,9 +484,10 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
   switch (kind) {
     case 'load': {
       const repsPerSet = exercise.suggestedRepsPerSet;
-      const hasMaxSet = repsPerSet && result.setsTotal > repsPerSet.length;
+      const prescriptionText = `${exercise.name ?? ''} ${exercise.prescription ?? ''}`;
+      const hasMaxSet = /\bmax\b/i.test(prescriptionText) || !!(repsPerSet && result.setsTotal > repsPerSet.length);
       // Prescribed sets (excluding max set if present)
-      const prescribedCount = hasMaxSet ? repsPerSet.length : (result.setsCompleted ?? result.setsTotal);
+      const prescribedCount = hasMaxSet ? (repsPerSet?.length ?? result.setsTotal) : (result.setsCompleted ?? result.setsTotal);
       const total = result.setsCompleted ?? result.setsTotal;
 
       for (let i = 0; i < prescribedCount; i++) {
@@ -602,7 +711,7 @@ export function createBlankResult(
   const hasMaxInText = /\bmax\b/i.test(prescriptionText);
   const rps = exercise.suggestedRepsPerSet;
   // If prescription mentions "max" and repsPerSet exists but doesn't cover all sets, add 1 for the max set
-  let setsTotal = exercise.suggestedSets || 1;
+  let setsTotal = getPrescribedSetCount(exercise, kind) ?? exercise.suggestedSets ?? 1;
   if (hasMaxInText && rps && rps.length > 0 && setsTotal <= rps.length) {
     setsTotal = rps.length + 1; // extra set for "max"
   }
@@ -613,6 +722,19 @@ export function createBlankResult(
     exercise,
     setsTotal,
   };
+
+  if (shouldLogCelebrationDebug()) {
+    console.log('[CelebrationDebug] createBlankResult', {
+      exercise: exercise.name,
+      kind,
+      loggingMode,
+      suggestedSets: exercise.suggestedSets,
+      suggestedReps: exercise.suggestedReps,
+      suggestedRepsPerSet: exercise.suggestedRepsPerSet,
+      setsTotal,
+      movementCount: exercise.movements?.length ?? 0,
+    });
+  }
 
   // Ladder AMRAP: initialize to zero
   if (exercise.ladderReps && exercise.ladderReps.length > 0 && kind === 'score_rounds') {
@@ -708,6 +830,9 @@ export function createBlankResult(
         if (rxW) {
           mr.weight = isFemale ? (rxW.female ?? rxW.male) : (rxW.male ?? rxW.female);
         }
+        if (exercise.loggingMode === 'amrap_intervals' && mov.reps != null) {
+          mr.reps = Math.round(mov.reps / shareDivisor);
+        }
       }
       if (movKind === 'duration' && mov.time) {
         mr.durationSeconds = mov.time;
@@ -729,6 +854,13 @@ export function createBlankResult(
       if (mov.implementCount) {
         mr.implementCount = mov.implementCount;
       }
+      if (
+        exercise.loggingMode === 'amrap_intervals' &&
+        movKind === 'reps' &&
+        mov.reps != null
+      ) {
+        mr.reps = Math.round(mov.reps / shareDivisor);
+      }
       return mr;
     });
   }
@@ -745,8 +877,8 @@ export function createBlankResult(
       break;
 
     case 'intervals':
-      base.intervalsTotal = exercise.suggestedSets || 1;
-      base.intervalsCompleted = exercise.suggestedSets || 1; // Default: all completed
+      base.intervalsTotal = setsTotal;
+      base.intervalsCompleted = setsTotal; // Default: all completed
       break;
 
     case 'score_time': {
@@ -760,7 +892,9 @@ export function createBlankResult(
     }
 
     case 'score_rounds':
-      // AMRAP: nothing to pre-fill (user enters rounds)
+      if (exercise.loggingMode === 'amrap_intervals') {
+        base.rounds = exercise.intervalCount ?? setsTotal;
+      }
       break;
   }
 

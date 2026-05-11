@@ -78,7 +78,7 @@
 .bwText {
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
-  color: var(--color-text);
+  color: var(--wodi-white);
 }
 
 /* ── Implement count toggle (1x / 2x) ── */

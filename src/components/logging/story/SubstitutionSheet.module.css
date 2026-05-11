@@ -21,13 +21,12 @@
 .sheet {
   width: 100%;
   max-width: 480px;
-  background: #161616;
+  background: var(--wodi-card);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  border-top: 1px solid #222222;
-  /* Social shadow: magenta at 6% — substitution is a metcon-adjacent action */
+  border-top: 1px solid var(--wodi-line2);
   box-shadow:
-    0 -4px 40px rgba(255, 0, 229, 0.06),
-    0 -1px 0 #222222;
+    0 -4px 40px rgba(245, 194, 0, 0.04),
+    0 -1px 0 var(--wodi-line2);
   padding: var(--space-2) var(--space-4) 0;
   display: flex;
   flex-direction: column;
@@ -74,7 +73,7 @@
 .headerLabel {
   font-size: 11px;
   font-weight: var(--font-semibold);
-  color: var(--color-text-tertiary);
+  color: var(--wodi-dim);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -83,7 +82,7 @@
 .headerTitle {
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
-  color: var(--color-text);
+  color: var(--wodi-white);
   line-height: var(--leading-tight);
   letter-spacing: -0.02em;
 }
@@ -131,7 +130,7 @@
 .sectionDividerLine {
   flex: 1;
   height: 1px;
-  background: #222222;
+  background: var(--wodi-line2);
 }
 
 .sectionDividerLabel {
@@ -187,10 +186,10 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Selected state: magenta border + magenta-tinted background */
+/* Selected state: yellow border + yellow-tinted background */
 .optionRowSelected {
-  background: rgba(255, 0, 229, 0.07);
-  border-color: rgba(255, 0, 229, 0.3);
+  background: rgba(245, 194, 0, 0.07);
+  border-color: rgba(245, 194, 0, 0.3);
 }
 
 /* ── Option left: name + conversion ── */
@@ -205,14 +204,14 @@
 .optionName {
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: var(--color-text);
+  color: var(--wodi-white);
   line-height: var(--leading-tight);
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
 .optionRowSelected .optionName {
-  color: #ffffff;
+  color: var(--wodi-white);
 }
 
 /* Conversion hint: "→ 60 reps" or "→ 500m" */
@@ -226,7 +225,7 @@
 }
 
 .optionRowSelected .optionConversion {
-  color: rgba(255, 0, 229, 0.7);
+  color: var(--wodi-dim);
 }
 
 /* ── Option right: badge + checkmark ── */
@@ -249,11 +248,11 @@
   white-space: nowrap;
 }
 
-/* RX — cyan, default/goal state */
+/* RX — yellow, goal/achievement state */
 .badgeRx {
-  background: rgba(0, 242, 255, 0.12);
-  color: var(--neon-cyan);
-  border: 1px solid rgba(0, 242, 255, 0.25);
+  background: rgba(245, 194, 0, 0.12);
+  color: var(--wodi-yellow);
+  border: 1px solid rgba(245, 194, 0, 0.25);
 }
 
 /* SCALED — magenta, scaled-down */
@@ -294,7 +293,7 @@
 .optionCheck {
   font-size: var(--text-base);
   font-weight: var(--font-bold);
-  color: var(--neon-magenta);
+  color: var(--wodi-yellow);
   width: 20px;
   text-align: center;
   opacity: 0;
@@ -322,7 +321,7 @@
   gap: 0;
   height: 40px;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 0, 229, 0.25);
+  border: 1px solid var(--wodi-line2);
   background: rgba(255, 255, 255, 0.03);
   overflow: hidden;
 }
@@ -348,8 +347,8 @@
 }
 
 .inlineBtn:active {
-  background: rgba(255, 0, 229, 0.12);
-  color: var(--neon-magenta);
+  background: rgba(245, 194, 0, 0.12);
+  color: var(--wodi-yellow);
 }
 
 .inlineValueArea {
@@ -367,7 +366,7 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--neon-magenta);
+  color: var(--wodi-yellow);
   font-family: var(--font-family);
   font-size: 18px;
   font-weight: var(--font-bold);
@@ -407,14 +406,14 @@
 }
 
 .bottomAdjustLabel {
-  font-family: var(--font-family);
+  font-family: var(--font-barlow);
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
-  color: #ffffff;
+  color: var(--wodi-white);
 }
 
 .bottomAdjustHint {
-  color: rgba(255, 0, 229, 0.7);
+  color: var(--wodi-dim);
   font-weight: var(--font-medium);
   font-size: var(--text-xs);
   margin-left: var(--space-2);
@@ -424,7 +423,7 @@
 /* ── Done bar — sticky bottom ── */
 .doneBar {
   padding: var(--space-3) var(--space-4) calc(var(--space-4) + var(--safe-bottom));
-  border-top: 1px solid #222222;
+  border-top: 1px solid var(--wodi-line2);
   flex-shrink: 0;
 }
 
@@ -433,11 +432,11 @@
   height: 52px;
   border-radius: var(--radius-xl);
   border: none;
-  background: var(--neon-magenta);
-  color: #000000;
-  font-family: var(--font-family);
-  font-size: var(--text-base);
-  font-weight: var(--font-bold);
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+  font-family: var(--font-barlow);
+  font-size: 17px;
+  font-weight: 900;
   letter-spacing: -0.01em;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;

@@ -71,6 +71,10 @@ export interface RxCalories {
   female?: number;
 }
 
+/** How the athlete felt about the metcon portion of a workout. */
+export type IntensityRating = 'smoked' | 'cooked' | 'locked_in';
+export type FeelRating = IntensityRating;
+
 export interface Workout {
   id: string;
   userId: string;
@@ -91,6 +95,11 @@ export interface Workout {
   rawText?: string;
   timeCap?: number;        // seconds, from parsedWorkout.timeCap
   format?: WorkoutFormat;  // workout format for EP recalculation
+  difficultyLevel?: number; // AI-assessed programmed difficulty 1–10
+  feelRating?: FeelRating;  // user-entered metcon feel rating
+  heroAchievement?: Achievement;
+  achievements?: Achievement[];
+  isPR?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -112,10 +121,14 @@ export interface Exercise {
   movements?: ParsedMovement[];  // Structured movement data (for WODs)
   sections?: ParsedSection[];    // Structured section blocks (buy-in / rounds / cash-out)
   rounds?: number;         // Number of rounds (for multi-round WODs)
+  suggestedRepsPerSet?: number[]; // Variable rep scheme (e.g., [40, 30, 20, 10])
   ladderReps?: number[];   // Ladder AMRAP rep scheme [4, 6, 8, 10, 12]
   intervalCount?: number;  // Number of AMRAP intervals
   ladderStep?: number;     // How many rungs completed (continuous across intervals)
   ladderPartial?: number;  // Partial reps into next incomplete rung
+  intensity?: IntensityRating | null; // user-entered metcon block intensity
+  aiPartName?: string;     // Generated poster wordmark for this workout part
+  partNameOverride?: string; // User-edited poster wordmark override
 }
 
 export interface ExerciseSet {
@@ -139,6 +152,7 @@ export interface PersonalRecord {
   weight: number;
   date: Date;
   workoutId: string;
+  workoutContext?: string;
 }
 
 // AI Parsing types
@@ -159,6 +173,7 @@ export interface ParsedWorkout {
   benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
   partnerWorkout?: boolean;     // Detected partner workout (IGUG, "in pairs", etc.)
   teamSize?: number;            // Team size (2 for pairs, N for "team of N")
+  difficultyLevel?: number;     // AI-assessed programmed difficulty 1–10
 }
 
 // Workload breakdown types
@@ -195,6 +210,8 @@ export interface WorkloadBreakdown {
 
 // Unit types for measurements
 export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
+export type MovementCountingMode = 'per_round' | 'per_interval' | 'per_station_visit' | 'once';
+export type MovementScoreEntryMode = 'per_round' | 'total';
 
 // Individual movement within a workout
 export interface ParsedMovement {
@@ -215,6 +232,9 @@ export interface ParsedMovement {
   role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
   together?: boolean;           // Partner workouts: true if all partners do this movement together (not split). E.g., "600m run (together)".
   stationLabel?: string;        // Rotating interval station label (e.g., "A", "B", "C"). First movement of each station gets this.
+  stationIndex?: number;        // Explicit 0-based station index for rotating station workouts.
+  countingMode?: MovementCountingMode;   // How the movement scales: per round, per interval, per station visit, or once overall.
+  scoreEntryMode?: MovementScoreEntryMode; // Whether user-entered score values are totals or per-round values.
   alternative?: {               // OR option (e.g., "40 DU / 60 singles")
     name: string;
     reps?: number;
@@ -254,6 +274,7 @@ export interface ParsedExercise {
   intervalCount?: number;             // how many AMRAP intervals (e.g. 4 for "x4 rounds")
   workDuration?: number;              // programmed work time in seconds (e.g. 180 for a 3-min AMRAP)
   restDuration?: number;              // programmed rest time in seconds between rounds/intervals
+  aiPartName?: string;                // Generated poster wordmark for this workout part
 }
 
 // Movement substitution tracking during logging
@@ -359,6 +380,8 @@ export interface RewardData {
   workoutContext?: string;
   workoutRawText?: string;
   teamSize?: number;                      // Partner workout team size (2 for pairs, N for teams)
+  workoutId?: string;                     // Persisted workout id for poster edits
+  difficultyLevel?: number;               // AI-assessed programmed difficulty 1–10
 }
 
 // Weekly stats for consistency ring
@@ -377,6 +400,7 @@ export interface EPBreakdown {
   distance: number;    // distance_meters × EP_DISTANCE_RATE (× carry multiplier)
   intensity: number;   // Bonus for beating the time cap (timeCap / actualTime ratio)
   pr: number;          // EP_PR_BONUS per PR
+  difficulty: number;  // Difficulty multiplier bonus/penalty (0 when no difficultyLevel)
   total: number;
 }
 

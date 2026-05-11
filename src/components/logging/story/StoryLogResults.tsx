@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
-import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet } from '../../../types';
+import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet, IntensityRating } from '../../../types';
 import { WodStoryScreen, initStoryResults } from './WodStoryScreen';
 import { EditExerciseSheet } from './EditExerciseSheet';
 import { InputRouter } from './InputRouter';
 import type { StoryExerciseResult } from './types';
+import { getPrescribedSetCount } from './types';
 import { useAuth } from '../../../context/AuthContext';
+import styles from './WodStoryScreen.module.css';
 
 // ─── Bridge type ────────────────────────────────────────────────
 // The old ExerciseResult interface used by AddWorkoutScreen.saveWorkout()
@@ -29,7 +31,34 @@ interface LegacyExerciseResult {
   totalDistance?: number;
   distanceUnit?: 'm' | 'km' | 'mi';
   implementCounts?: Record<string, number>;
+  completedCycleReps?: number;
+  completedCycles?: number;
+  partialReps?: number;
   partialMovements?: string[];
+  ladderStep?: number;
+  ladderPartial?: number;
+  metconName?: string;
+  intensity?: IntensityRating | null;
+}
+
+const INTENSITY_OPTIONS: { id: IntensityRating; emoji: string; label: string }[] = [
+  { id: 'smoked', emoji: '💀', label: 'Smoked' },
+  { id: 'cooked', emoji: '🔥', label: 'Cooked' },
+  { id: 'locked_in', emoji: '💪', label: 'Locked in' },
+];
+
+function isMetconIntensityResult(result: StoryExerciseResult, mode?: ExerciseLoggingMode): boolean {
+  if (result.exercise.type === 'strength' || mode === 'strength' || result.kind === 'load') return false;
+  return result.kind === 'score_time'
+    || result.kind === 'score_rounds'
+    || result.kind === 'intervals'
+    || mode === 'for_time'
+    || mode === 'amrap'
+    || mode === 'amrap_intervals'
+    || mode === 'emom'
+    || mode === 'intervals'
+    || result.exercise.type === 'wod'
+    || result.exercise.type === 'cardio';
 }
 
 // ─── Props ──────────────────────────────────────────────────────
@@ -63,7 +92,37 @@ function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
 
 function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const sets: ExerciseSet[] = [];
-  const setsCount = r.setsCompleted ?? r.setsTotal;
+  const prescribedCount = getPrescribedSetCount(r.exercise, r.kind);
+  const effectiveSetsTotal = Math.max(r.setsTotal || 1, prescribedCount ?? 0);
+  const setsCount = r.setsCompleted ?? effectiveSetsTotal;
+  const debugCelebration = typeof window !== 'undefined'
+    && window.localStorage.getItem('wodi:debugCelebration') === '1';
+
+  if (debugCelebration) {
+    console.log('[CelebrationDebug] toLegacyResult start', {
+      exercise: r.exercise.name,
+      kind: r.kind,
+      setsTotal: r.setsTotal,
+      setsCompleted: r.setsCompleted,
+      intervalsTotal: r.intervalsTotal,
+      intervalsCompleted: r.intervalsCompleted,
+      prescribedCount,
+      effectiveSetsTotal,
+      setsCount,
+      movements: r.movementResults?.map((mr) => ({
+        name: mr.movement.name,
+        reps: mr.movement.reps,
+        distance: mr.movement.distance,
+        calories: mr.movement.calories,
+        scoreEntryMode: mr.movement.scoreEntryMode,
+        countingMode: mr.movement.countingMode,
+        enteredReps: mr.reps,
+        enteredDistance: mr.distance,
+        enteredCalories: mr.calories,
+        substitution: mr.substitution,
+      })),
+    });
+  }
 
   // ── Helper: extract per-movement data from movementResults ──
   function buildMovementMaps() {
@@ -120,17 +179,27 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const hasSingleMovement = r.movementResults && r.movementResults.length === 1;
 
   if (isScored && (hasMovements || hasSingleMovement)) {
-    // Round count: for score_time, rounds come from the exercise prescription (e.g. "8 RFT" → setsTotal=8).
-    // For score_rounds (AMRAP), rounds come from user input (r.rounds).
-    const roundCount = r.kind === 'score_time' ? r.setsTotal : r.rounds;
+    // Round count: for score_time, use setsCompleted when user marked a partial finish
+    // (e.g. time-capped on set 3 of [20-16-12-8-4]), otherwise prescribed total.
+    const roundCount = r.kind === 'score_time'
+      ? (r.setsCompleted ?? effectiveSetsTotal)
+      : r.rounds;
 
     if (r.kind === 'score_time') {
+      const repsPerSet = r.exercise.suggestedRepsPerSet;
+      const completedCycleReps = repsPerSet && repsPerSet.length > 1
+        ? repsPerSet.slice(0, roundCount ?? repsPerSet.length).reduce((sum, reps) => sum + reps, 0)
+        : undefined;
       sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
       return {
         exercise: r.exercise,
         sets,
         completionTime: r.timeSeconds,
         rounds: roundCount,
+        ...(completedCycleReps ? {
+          completedCycleReps,
+          completedCycles: roundCount,
+        } : {}),
         notes: r.notes,
         ...buildMovementMaps(),
       };
@@ -163,8 +232,10 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         return {
           exercise: r.exercise,
           sets,
-          rounds: step,  // rungs completed as "rounds" equivalent
+          rounds: step,
           notes: r.notes,
+          ladderStep: step,
+          ...(partial > 0 && { ladderPartial: partial }),
           ...buildMovementMaps(),
         };
       }
@@ -232,7 +303,7 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   switch (r.kind) {
     case 'load': {
       const repsPerSet = r.exercise.suggestedRepsPerSet;
-      const hasMaxSet = repsPerSet && r.setsTotal > repsPerSet.length;
+      const hasMaxSet = repsPerSet && effectiveSetsTotal > repsPerSet.length;
       const prescribedCount = hasMaxSet ? repsPerSet.length : setsCount;
 
       for (let i = 0; i < prescribedCount; i++) {
@@ -334,7 +405,7 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         exercise: r.exercise,
         sets,
         completionTime: r.timeSeconds,
-        rounds: r.setsTotal > 1 ? r.setsTotal : undefined,
+        rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined,
         notes: r.notes,
       };
     }
@@ -356,7 +427,22 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     }
 
     case 'intervals': {
-      const count = r.intervalsCompleted ?? r.intervalsTotal ?? 0;
+      const effectiveIntervalsTotal = Math.max(
+        r.intervalsTotal ?? 0,
+        effectiveSetsTotal,
+      );
+      const count = r.intervalsCompleted === r.intervalsTotal && effectiveIntervalsTotal > (r.intervalsTotal ?? 0)
+        ? effectiveIntervalsTotal
+        : (r.intervalsCompleted ?? effectiveIntervalsTotal);
+      if (debugCelebration) {
+        console.log('[CelebrationDebug] intervals legacy count', {
+          exercise: r.exercise.name,
+          intervalsTotal: r.intervalsTotal,
+          intervalsCompleted: r.intervalsCompleted,
+          effectiveIntervalsTotal,
+          count,
+        });
+      }
       for (let i = 0; i < count; i++) {
         sets.push({
           id: `set-${i}`,
@@ -401,6 +487,7 @@ export function StoryLogResults({
       : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize)
   );
   const [hasSeededAmrapIntervals, setHasSeededAmrapIntervals] = useState(false);
+  const [pendingIntensityIndex, setPendingIntensityIndex] = useState<number | null>(null);
 
   // Edit sheet state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -455,10 +542,49 @@ export function StoryLogResults({
 
 
   // ── Save: convert to legacy format and pass up ──
-  const handleSave = useCallback(() => {
-    const legacy = results.map(toLegacyResult);
+  const findNextIntensityIndex = useCallback((startIndex: number, source: StoryExerciseResult[]) => {
+    for (let i = startIndex; i < source.length; i += 1) {
+      if (isMetconIntensityResult(source[i], loggingModes[i]) && source[i].intensity === undefined) {
+        return i;
+      }
+    }
+    return null;
+  }, [loggingModes]);
+
+  const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
+    const legacy = source.map(r => ({
+      ...toLegacyResult(r),
+      metconName: r.metconName,
+      intensity: r.intensity ?? null,
+    }));
     onSave(legacy);
-  }, [results, onSave]);
+  }, [onSave]);
+
+  const handleSave = useCallback(() => {
+    const nextIntensityIndex = findNextIntensityIndex(0, results);
+    if (nextIntensityIndex != null) {
+      setPendingIntensityIndex(nextIntensityIndex);
+      return;
+    }
+    saveLegacyResults(results);
+  }, [findNextIntensityIndex, results, saveLegacyResults]);
+
+  const completeIntensityPrompt = useCallback((value: IntensityRating | null) => {
+    if (pendingIntensityIndex == null) return;
+    const nextResults = results.map((r, i) => (
+      i === pendingIntensityIndex ? { ...r, intensity: value } : r
+    ));
+    setResults(nextResults);
+
+    const nextIndex = findNextIntensityIndex(pendingIntensityIndex + 1, nextResults);
+    if (nextIndex != null) {
+      setPendingIntensityIndex(nextIndex);
+      return;
+    }
+
+    setPendingIntensityIndex(null);
+    saveLegacyResults(nextResults);
+  }, [findNextIntensityIndex, pendingIntensityIndex, results, saveLegacyResults]);
 
   // ── Input change handler for the editing result ──
   // Also clears 'skipped' flag when user enters new data
@@ -487,6 +613,8 @@ export function StoryLogResults({
         onClose={handleSheetClose}
         onDone={handleSheetDone}
         onSkip={handleSheetSkip}
+        exerciseIndex={editingIndex != null ? editingIndex + 1 : undefined}
+        exerciseTotal={results.length}
       >
         {editingResult && (
           <InputRouter
@@ -496,6 +624,37 @@ export function StoryLogResults({
           />
         )}
       </EditExerciseSheet>
+
+      {pendingIntensityIndex != null && (
+        <div className={styles.intensityScreen}>
+          <div className={styles.intensityInner}>
+            <p className={styles.intensityEyebrow}>
+              {results[pendingIntensityIndex]?.exercise.name || 'Metcon'}
+            </p>
+            <h2 className={styles.intensityTitle}>How'd that feel?</h2>
+            <div className={styles.intensityOptions}>
+              {INTENSITY_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={styles.intensityCard}
+                  onClick={() => completeIntensityPrompt(option.id)}
+                >
+                  <span className={styles.intensityEmoji}>{option.emoji}</span>
+                  <span className={styles.intensityLabel}>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.intensitySkip}
+              onClick={() => completeIntensityPrompt(null)}
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

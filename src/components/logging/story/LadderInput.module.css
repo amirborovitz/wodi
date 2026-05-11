@@ -23,8 +23,8 @@
   font-size: 40px;
   font-family: var(--font-family);
   font-weight: var(--font-bold);
-  color: var(--color-metcon);
-  text-shadow: 0 0 20px rgba(255, 0, 229, 0.3);
+  color: var(--wodi-yellow);
+  text-shadow: 0 0 20px rgba(245, 194, 0, 0.3);
   line-height: 1;
 }
 
@@ -72,14 +72,14 @@
 }
 
 .stepBtnActive {
-  background: rgba(255, 0, 229, 0.12);
-  border-color: rgba(255, 0, 229, 0.25);
+  background: rgba(245, 194, 0, 0.12);
+  border-color: rgba(245, 194, 0, 0.25);
 }
 
 .stepBtnCurrent {
-  background: rgba(255, 0, 229, 0.22);
-  border-color: rgba(255, 0, 229, 0.45);
-  box-shadow: 0 0 12px rgba(255, 0, 229, 0.15);
+  background: rgba(245, 194, 0, 0.22);
+  border-color: rgba(245, 194, 0, 0.45);
+  box-shadow: 0 0 12px rgba(245, 194, 0, 0.15);
 }
 
 .stepBtnExtra {
@@ -95,13 +95,13 @@
 }
 
 .stepBtnActive .stepValue {
-  color: var(--color-metcon);
-  text-shadow: 0 0 8px rgba(255, 0, 229, 0.3);
+  color: var(--wodi-yellow);
+  text-shadow: 0 0 8px rgba(245, 194, 0, 0.3);
 }
 
 .stepBtnCurrent .stepValue {
   color: #fff;
-  text-shadow: 0 0 12px rgba(255, 0, 229, 0.5);
+  text-shadow: 0 0 12px rgba(245, 194, 0, 0.5);
 }
 
 /* ── Partial trigger pill ── */
@@ -171,7 +171,7 @@
 .partialCount {
   font-size: 16px;
   font-weight: var(--font-bold);
-  color: var(--color-metcon);
+  color: var(--wodi-yellow);
   min-width: 24px;
   text-align: center;
 }

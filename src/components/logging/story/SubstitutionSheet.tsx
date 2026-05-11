@@ -6,6 +6,7 @@ import {
   type ExerciseAlternative,
 } from '../../../data/exerciseDefinitions';
 import type { MovementSubstitution } from '../../../types';
+import { CustomNumpadSheet } from './CustomNumpadSheet';
 import styles from './SubstitutionSheet.module.css';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -169,6 +170,9 @@ export function SubstitutionSheet({
   const harder = useMemo(() => alternatives.filter(a => a.type === 'harder'), [alternatives]);
 
   const [pending, setPending] = useState<PendingSelection | null>(null);
+  const [numpadOpen, setNumpadOpen] = useState(false);
+  const [numpadValue, setNumpadValue] = useState('');
+  const [replaceOnDigit, setReplaceOnDigit] = useState(true);
 
   // The original rep/distance/calorie value (whichever is relevant)
   const originalValue = originalReps ?? originalDistance ?? originalCalories;
@@ -293,6 +297,37 @@ export function SubstitutionSheet({
     setPending(null);
     onClose();
   }, [onClose]);
+
+  // Open numpad for value adjustment
+  const openNumpad = useCallback(() => {
+    setNumpadValue(pending?.adjustedValue != null ? String(pending.adjustedValue) : '');
+    setReplaceOnDigit(true);
+    setNumpadOpen(true);
+  }, [pending?.adjustedValue]);
+
+  const commitNumpadValue = useCallback((raw: string) => {
+    const cleaned = raw.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    if (cleaned === '') { handleAdjust(undefined); setNumpadValue(''); return; }
+    const num = parseInt(cleaned, 10);
+    if (!isNaN(num) && num >= 0) {
+      handleAdjust(num);
+      setNumpadValue(String(num));
+    }
+  }, [handleAdjust]);
+
+  const handleNumpadDigit = useCallback((digit: string) => {
+    const next = replaceOnDigit ? digit : `${numpadValue}${digit}`;
+    setReplaceOnDigit(false);
+    setNumpadValue(next);
+    commitNumpadValue(next);
+  }, [replaceOnDigit, numpadValue, commitNumpadValue]);
+
+  const handleNumpadBackspace = useCallback(() => {
+    const next = replaceOnDigit ? '' : numpadValue.slice(0, -1);
+    setReplaceOnDigit(false);
+    setNumpadValue(next);
+    commitNumpadValue(next);
+  }, [replaceOnDigit, numpadValue, commitNumpadValue]);
 
   // Check if AI alternative is in the alternatives list already (avoid duplicate)
   const aiAltIsKnown = aiAlternative
@@ -470,21 +505,10 @@ export function SubstitutionSheet({
                         className={styles.inlineBtn}
                         onClick={() => handleAdjust(Math.max(1, (pending.adjustedValue ?? 0) - getAdjustStep(pending.targetUnit)))}
                       >−</button>
-                      <div className={styles.inlineValueArea}>
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          className={styles.inlineInput}
-                          value={pending.adjustedValue != null ? String(pending.adjustedValue) : ''}
-                          placeholder="0"
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (raw === '') { handleAdjust(undefined); return; }
-                            const num = parseInt(raw, 10);
-                            if (!isNaN(num) && num >= 0) handleAdjust(num);
-                          }}
-                        />
+                      <div className={styles.inlineValueArea} onClick={openNumpad}>
+                        <span className={styles.inlineInput}>
+                          {pending.adjustedValue != null ? pending.adjustedValue : '0'}
+                        </span>
                         <span className={styles.inlineUnit}>{unitLabel(pending.targetUnit)}</span>
                       </div>
                       <button
@@ -506,6 +530,18 @@ export function SubstitutionSheet({
               </motion.div>
             )}
           </motion.div>
+          <CustomNumpadSheet
+            open={numpadOpen}
+            label={pending?.name ?? ''}
+            value={numpadValue}
+            unit={unitLabel(pending?.targetUnit)}
+            accentColor="#f5c200"
+            showDecimal={false}
+            onDigit={handleNumpadDigit}
+            onBackspace={handleNumpadBackspace}
+            onNext={() => { setNumpadOpen(false); }}
+            onClose={() => { setNumpadOpen(false); }}
+          />
         </motion.div>
       )}
     </AnimatePresence>

@@ -49,8 +49,8 @@
 }
 
 .toggleOn {
-  background: rgba(0, 255, 255, 0.35);
-  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+  background: rgba(245, 194, 0, 0.35);
+  box-shadow: 0 0 12px rgba(245, 194, 0, 0.2);
 }
 
 .toggleKnob {
@@ -121,7 +121,7 @@
 }
 
 .setsStepperBtn:active {
-  background: rgba(255, 0, 229, 0.12);
+  background: rgba(245, 194, 0, 0.12);
   transform: scale(0.93);
 }
 
@@ -132,9 +132,9 @@
 
 .setsNumber {
   font-size: 36px;
-  font-family: var(--font-family);
-  font-weight: var(--font-bold);
-  color: var(--color-metcon);
+  font-family: var(--font-display);
+  font-weight: 900;
+  color: var(--wodi-yellow);
   line-height: 1;
 }
 

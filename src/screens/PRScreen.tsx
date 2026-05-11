@@ -18,7 +18,8 @@ interface PRScreenProps {
 // Standard CrossFit movements for autocomplete
 const MOVEMENT_CATALOGUE = [
   'Back Squat', 'Front Squat', 'Overhead Squat',
-  'Deadlift', 'Sumo Deadlift',
+  'Deadlift', 'Romanian Deadlift', 'Sumo Deadlift', 'Stiff Leg Deadlift',
+  'Single Leg Deadlift', 'Deficit Deadlift', 'Trap Bar Deadlift',
   'Clean', 'Power Clean', 'Squat Clean', 'Clean & Jerk',
   'Snatch', 'Power Snatch', 'Squat Snatch',
   'Bench Press', 'Strict Press', 'Push Press', 'Push Jerk', 'Split Jerk',
@@ -115,11 +116,9 @@ export function PRScreen({ onBack }: PRScreenProps) {
 
   // Action sheet state
   const [actionPR, setActionPR] = useState<PersonalRecord | null>(null);
-  const [deleteConfirming, setDeleteConfirming] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const valueInputRef = useRef<HTMLInputElement>(null);
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Best per movement, sorted by weight desc
   const uniquePRs = useMemo(() => {
@@ -158,41 +157,17 @@ export function PRScreen({ onBack }: PRScreenProps) {
     }
   }, [selectedMovement]);
 
-  // Clear delete confirm timer on unmount
-  useEffect(() => {
-    return () => {
-      if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    };
-  }, []);
-
   // --- Action Sheet ---
 
   const openActionSheet = (pr: PersonalRecord) => {
     setActionPR(pr);
-    setDeleteConfirming(false);
   };
 
   const closeActionSheet = useCallback(() => {
     setActionPR(null);
-    setDeleteConfirming(false);
-    if (deleteTimerRef.current) {
-      clearTimeout(deleteTimerRef.current);
-      deleteTimerRef.current = null;
-    }
   }, []);
 
   const handleDeleteTap = async () => {
-    if (!deleteConfirming) {
-      // First tap — arm confirmation
-      setDeleteConfirming(true);
-      // Auto-reset after 3 seconds
-      deleteTimerRef.current = setTimeout(() => {
-        setDeleteConfirming(false);
-      }, 3000);
-      return;
-    }
-
-    // Second tap — execute delete
     if (!actionPR || !user) return;
     setSaving(true);
     try {
@@ -385,15 +360,11 @@ export function PRScreen({ onBack }: PRScreenProps) {
                   Edit Record
                 </button>
                 <button
-                  className={`${styles.actionBtn} ${styles.actionBtnDelete} ${deleteConfirming ? styles.actionBtnDeleteConfirm : ''}`}
+                  className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
                   onClick={handleDeleteTap}
                   disabled={saving}
                 >
-                  {saving
-                    ? 'Deleting...'
-                    : deleteConfirming
-                    ? 'Tap again to confirm'
-                    : 'Delete Record'}
+                  {saving ? 'Deleting...' : 'Delete Record'}
                 </button>
               </div>
 

@@ -1,12 +1,26 @@
-import { useCallback, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import styles from './ProgressiveWeightRow.module.css';
 
+function selectAllInput(target: HTMLInputElement | null) {
+  if (!target) return;
+  requestAnimationFrame(() => {
+    target.focus();
+    target.setSelectionRange(0, target.value.length);
+  });
+}
+
 const STEP = 2.5;
+const DRAG_THRESHOLD = 6;   // px before drag mode activates
+const PX_PER_STEP = 16;     // px of drag per 2.5kg step
+
+/** Round up to nearest multiple of 5 */
+function suggestPeak(start: number | undefined): number | undefined {
+  if (!start || start <= 0) return undefined;
+  return Math.ceil(start * 1.3 / 5) * 5;
+}
 
 // ─── Weight interpolation utilities ──────────────────────────────
 
-/** Linearly interpolate weights across N sets, rounded to nearest 2.5kg */
 export function interpolateWeights(start: number, peak: number, sets: number): number[] {
   if (sets <= 1) return [start];
   return Array.from({ length: sets }, (_, i) => {
@@ -16,7 +30,6 @@ export function interpolateWeights(start: number, peak: number, sets: number): n
   });
 }
 
-/** Get weight for a specific set index */
 export function getWeightForSet(start: number, peak: number, sets: number, setIndex: number): number {
   if (sets <= 1) return start;
   const fraction = setIndex / (sets - 1);
@@ -24,39 +37,64 @@ export function getWeightForSet(start: number, peak: number, sets: number, setIn
   return Math.round(raw / 2.5) * 2.5;
 }
 
-// ─── Component ───────────────────────────────────────────────────
+// ─── Icons ───────────────────────────────────────────────────────
+
+function ChevronUp() {
+  return (
+    <svg width="26" height="15" viewBox="0 0 26 15" fill="none" aria-hidden="true">
+      <path d="M2 13L13 2L24 13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg width="26" height="15" viewBox="0 0 26 15" fill="none" aria-hidden="true">
+      <path d="M2 2L13 13L24 2" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+// ─── Props ───────────────────────────────────────────────────────
 
 interface ProgressiveWeightRowProps {
-  /** Current start weight */
   weight: number | undefined;
-  /** Rx placeholder */
+  peakWeight?: number;
   placeholder?: number;
-  /** Total sets for the summary chip */
   setsTotal: number;
-  /** Reps per set (for "X TOTAL REPS" badge) */
   repsPerSet?: number;
-  /** Called with (startWeight, peakWeight | undefined) on every change */
   onChange: (start: number | undefined, peak: number | undefined) => void;
-  /** Optional label override (defaults to "Barbell") */
   label?: string;
+  footer?: ReactNode;
 }
+
+// ─── Component ───────────────────────────────────────────────────
 
 export function ProgressiveWeightRow({
   weight,
+  peakWeight,
   placeholder,
   setsTotal,
   repsPerSet,
   onChange,
   label = 'Barbell',
+  footer,
 }: ProgressiveWeightRowProps) {
   const peakTouched = useRef(false);
-  const peakRef = useRef<number | undefined>(undefined);
+  const peakRef = useRef<number | undefined>(peakWeight);
+  const weightRef = useRef<number | undefined>(weight);
+  const startInputRef = useRef<HTMLInputElement>(null);
+  const peakInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    weightRef.current = weight;
+  }, [weight]);
+
+  useEffect(() => {
+    peakRef.current = peakWeight;
+  }, [peakWeight]);
 
   const placeholderStr = placeholder ? String(placeholder) : '0';
-
-  const startVal = weight ?? 0;
-  const peakVal = peakRef.current ?? startVal;
-  const isRange = peakVal !== startVal;
 
   const parseInput = (raw: string): number | undefined => {
     const v = parseFloat(raw);
@@ -65,9 +103,11 @@ export function ProgressiveWeightRow({
 
   const handleStartChange = useCallback((raw: string) => {
     const value = parseInput(raw);
+    weightRef.current = value;
     if (!peakTouched.current) {
-      peakRef.current = value;
-      onChange(value, value);
+      const peak = suggestPeak(value);
+      peakRef.current = peak;
+      onChange(value, peak);
     } else {
       onChange(value, peakRef.current);
     }
@@ -81,43 +121,36 @@ export function ProgressiveWeightRow({
     peakTouched.current = true;
     const value = parseInput(raw);
     peakRef.current = value;
-    onChange(weight, value);
-  }, [weight, onChange]);
+    onChange(weightRef.current, value);
+  }, [onChange]);
 
-  const hasSummary = startVal > 0 || peakVal > 0;
   const totalReps = repsPerSet && setsTotal > 0 ? setsTotal * repsPerSet : undefined;
 
-  // Build per-set weight preview when range is active
-  const setPreview = useMemo(() => {
-    if (!isRange || startVal <= 0) return null;
-    return interpolateWeights(startVal, peakVal, setsTotal);
-  }, [isRange, startVal, peakVal, setsTotal]);
-
+  // ── Chevron steppers (with long-press) ──
   const stepStart = useCallback((delta: number) => {
-    const next = Math.max(0, (weight ?? 0) + delta);
+    const next = Math.max(0, (weightRef.current ?? 0) + delta);
+    weightRef.current = next;
     if (!peakTouched.current) {
-      peakRef.current = next;
-      onChange(next, next);
+      const peak = suggestPeak(next);
+      peakRef.current = peak;
+      onChange(next, peak);
     } else {
       onChange(next, peakRef.current);
     }
-  }, [weight, onChange]);
+  }, [onChange]);
 
   const stepPeak = useCallback((delta: number) => {
     peakTouched.current = true;
-    const next = Math.max(0, (peakRef.current ?? weight ?? 0) + delta);
+    const next = Math.max(0, (peakRef.current ?? weightRef.current ?? 0) + delta);
     peakRef.current = next;
-    onChange(weight, next);
-  }, [weight, onChange]);
+    onChange(weightRef.current, next);
+  }, [onChange]);
 
-  // Long-press support for rapid stepping
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startHold = useCallback((fn: () => void) => {
     fn();
-    const timeout = setTimeout(() => {
-      intervalRef.current = setInterval(fn, 100);
-    }, 400);
-    intervalRef.current = timeout as unknown as ReturnType<typeof setInterval>;
+    const t = setTimeout(() => { intervalRef.current = setInterval(fn, 100); }, 400);
+    intervalRef.current = t as unknown as ReturnType<typeof setInterval>;
   }, []);
   const stopHold = useCallback(() => {
     if (intervalRef.current != null) {
@@ -127,110 +160,169 @@ export function ProgressiveWeightRow({
     }
   }, []);
 
+  // ── Roller drag on oval ──
+  const dragRef = useRef<{
+    startY: number;
+    baseWeight: number;
+    field: 'start' | 'peak';
+    didDrag: boolean;
+  } | null>(null);
+
+  const onOvalDown = useCallback((e: React.PointerEvent<HTMLDivElement>, field: 'start' | 'peak') => {
+    if (e.target instanceof HTMLInputElement) return;
+    const baseWeight = field === 'start'
+      ? (weightRef.current ?? 0)
+      : (peakRef.current ?? weightRef.current ?? 0);
+    dragRef.current = { startY: e.clientY, baseWeight, field, didDrag: false };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  }, []);
+
+  const onOvalMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    const dy = dragRef.current.startY - e.clientY; // up = positive = increase
+    if (!dragRef.current.didDrag && Math.abs(dy) > DRAG_THRESHOLD) {
+      dragRef.current.didDrag = true;
+    }
+    if (!dragRef.current.didDrag) return;
+
+    const steps = Math.round(dy / PX_PER_STEP);
+    const newWeight = Math.max(0, dragRef.current.baseWeight + steps * STEP);
+    const field = dragRef.current.field;
+
+    if (field === 'start') {
+      if (!peakTouched.current) {
+        const peak = suggestPeak(newWeight || undefined);
+        weightRef.current = newWeight || undefined;
+        peakRef.current = peak;
+        onChange(newWeight || undefined, peak);
+      } else {
+        weightRef.current = newWeight || undefined;
+        onChange(newWeight || undefined, peakRef.current);
+      }
+    } else {
+      peakTouched.current = true;
+      peakRef.current = newWeight || undefined;
+      onChange(weightRef.current, newWeight || undefined);
+    }
+  }, [onChange]);
+
+  const onOvalUp = useCallback((_e: React.PointerEvent<HTMLDivElement>, field: 'start' | 'peak') => {
+    if (!dragRef.current) return;
+    const { didDrag } = dragRef.current;
+    dragRef.current = null;
+    if (!didDrag) {
+      if (field === 'start') selectAllInput(startInputRef.current);
+      else { handlePeakFocus(); selectAllInput(peakInputRef.current); }
+    }
+  }, [handlePeakFocus]);
+
+  const badge = totalReps != null && totalReps > 0
+    ? `${totalReps} REPS`
+    : setsTotal > 0 ? `${setsTotal} SETS` : null;
+
   return (
     <div className={styles.card}>
       {/* Header */}
       <div className={styles.header}>
-        <span className={styles.label}>{label}</span>
-        {totalReps != null && totalReps > 0 && (
-          <span className={styles.totalBadge}>{totalReps} TOTAL REPS</span>
-        )}
+        <span className={styles.label}>{label.toUpperCase()}</span>
+        <div className={styles.headerFlow}>
+          <span className={styles.headerPole}>START</span>
+          <span className={styles.headerArrow}>→</span>
+          <span className={styles.headerPole}>PEAK</span>
+        </div>
+        {badge && <span className={styles.totalBadge}>{badge}</span>}
       </div>
 
-      {/* Dual inputs with climb gradient */}
-      <div className={styles.inputRow}>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>Start</span>
-          <div className={styles.inputWithSteppers}>
-            <button
-              className={styles.stepBtn}
-              onPointerDown={() => startHold(() => stepStart(-STEP))}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              aria-label="Decrease start weight"
-              type="button"
-            >−</button>
+      {/* Two oval columns */}
+      <div className={styles.columnsRow}>
+        {/* START */}
+        <div className={styles.column}>
+          <button className={styles.chevron}
+            onPointerDown={() => startHold(() => stepStart(STEP))}
+            onPointerUp={stopHold} onPointerLeave={stopHold}
+            type="button" aria-label="Increase start weight">
+            <ChevronUp />
+          </button>
+
+          <div className={styles.oval}
+            onPointerDown={(e) => onOvalDown(e, 'start')}
+            onPointerMove={onOvalMove}
+            onPointerUp={(e) => onOvalUp(e, 'start')}
+            onPointerCancel={() => { dragRef.current = null; }}>
             <input
-              type="number"
-              inputMode="decimal"
-              enterKeyHint="next"
-              className={styles.weightInput}
-              value={weight ?? ''}
-              placeholder={placeholderStr}
-              onFocus={(e) => e.target.select()}
+              ref={startInputRef}
+              type="text" inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="next"
+              className={styles.ovalInput}
+              value={weight ?? ''} placeholder={placeholderStr}
+              onFocus={(e) => selectAllInput(e.currentTarget)}
+              onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => handleStartChange(e.target.value)}
-              min={0}
+              aria-label="Start weight in kg"
             />
-            <button
-              className={styles.stepBtn}
-              onPointerDown={() => startHold(() => stepStart(STEP))}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              aria-label="Increase start weight"
-              type="button"
-            >+</button>
           </div>
-          <span className={styles.unit}>kg</span>
+          <span className={styles.unit}>KG</span>
+
+          <button className={styles.chevron}
+            onPointerDown={() => startHold(() => stepStart(-STEP))}
+            onPointerUp={stopHold} onPointerLeave={stopHold}
+            type="button" aria-label="Decrease start weight">
+            <ChevronDown />
+          </button>
         </div>
 
-        {/* Climb gradient bar */}
-        <div className={styles.gradientTrack}>
-          <div className={styles.gradientBar} />
-        </div>
+        <div className={styles.columnDivider} />
 
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>Peak</span>
-          <div className={styles.inputWithSteppers}>
-            <button
-              className={styles.stepBtn}
-              onPointerDown={() => startHold(() => stepPeak(-STEP))}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              aria-label="Decrease peak weight"
-              type="button"
-            >−</button>
+        {/* PEAK */}
+        <div className={styles.column}>
+          <button className={styles.chevron}
+            onPointerDown={() => startHold(() => stepPeak(STEP))}
+            onPointerUp={stopHold} onPointerLeave={stopHold}
+            type="button" aria-label="Increase peak weight">
+            <ChevronUp />
+          </button>
+
+          <div className={styles.oval}
+            onPointerDown={(e) => onOvalDown(e, 'peak')}
+            onPointerMove={onOvalMove}
+            onPointerUp={(e) => onOvalUp(e, 'peak')}
+            onPointerCancel={() => { dragRef.current = null; }}>
             <input
-              type="number"
-              inputMode="decimal"
-              enterKeyHint="done"
-              className={styles.weightInput}
-              value={peakRef.current ?? ''}
+              ref={peakInputRef}
+              type="text" inputMode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done"
+              className={styles.ovalInput}
+              value={peakWeight ?? peakRef.current ?? ''}
               placeholder={weight ? String(weight) : placeholderStr}
-              onFocus={(e) => { e.target.select(); handlePeakFocus(); }}
+              onFocus={(e) => {
+                handlePeakFocus();
+                selectAllInput(e.currentTarget);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => handlePeakChange(e.target.value)}
-              min={0}
+              aria-label="Peak weight in kg"
             />
-            <button
-              className={styles.stepBtn}
-              onPointerDown={() => startHold(() => stepPeak(STEP))}
-              onPointerUp={stopHold}
-              onPointerLeave={stopHold}
-              aria-label="Increase peak weight"
-              type="button"
-            >+</button>
           </div>
-          <span className={styles.unit}>kg</span>
+          <span className={styles.unit}>KG</span>
+
+          <button className={styles.chevron}
+            onPointerDown={() => startHold(() => stepPeak(-STEP))}
+            onPointerUp={stopHold} onPointerLeave={stopHold}
+            type="button" aria-label="Decrease peak weight">
+            <ChevronDown />
+          </button>
         </div>
       </div>
 
-      {/* Per-set preview chips when range is active */}
-      <AnimatePresence>
-        {hasSummary && setPreview && (
-          <motion.div
-            className={styles.previewRow}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 36 }}
-          >
-            {setPreview.map((w, i) => (
-              <span key={i} className={styles.previewChip}>
-                {w}
-              </span>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {footer && (
+        <div className={styles.footer}>
+          <div className={styles.footerHeader}>
+            <span className={styles.footerLabel}>Max set</span>
+            <span className={styles.footerSub}>· reps + weight</span>
+          </div>
+          <div className={styles.footerRow}>{footer}</div>
+        </div>
+      )}
     </div>
   );
 }

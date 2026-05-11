@@ -3,7 +3,20 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-console.log('🚀 APP LOADED - BUILD VERSION 4')
+const WODI_BUILD_ID = '2026-05-07-chipper-weighted-sticker-fallback-v29'
+
+declare global {
+  interface Window {
+    __WODI_BUILD_ID__?: string
+  }
+}
+
+console.warn(`[WODI BUILD] ${WODI_BUILD_ID}`)
+console.log('APP LOADED', { build: WODI_BUILD_ID })
+
+if (typeof window !== 'undefined') {
+  window.__WODI_BUILD_ID__ = WODI_BUILD_ID
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

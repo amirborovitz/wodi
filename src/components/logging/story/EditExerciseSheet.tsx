@@ -10,6 +10,8 @@ interface EditExerciseSheetProps {
   onDone: () => void;
   onSkip: () => void;
   children: React.ReactNode;
+  exerciseIndex?: number;
+  exerciseTotal?: number;
 }
 
 export function EditExerciseSheet({
@@ -19,6 +21,8 @@ export function EditExerciseSheet({
   onDone,
   onSkip: _onSkip,
   children,
+  exerciseIndex,
+  exerciseTotal,
 }: EditExerciseSheetProps) {
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
@@ -52,8 +56,22 @@ export function EditExerciseSheet({
                     : 'var(--neon-cyan)',
             } as React.CSSProperties}
           >
-            {/* Drag handle */}
-            <div className={styles.handle} />
+            {/* Nav row: close + exercise counter */}
+            <div className={styles.headerNav}>
+              <button
+                type="button"
+                className={styles.closeBtn}
+                onClick={onClose}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              {exerciseIndex != null && exerciseTotal != null && (
+                <span className={styles.exerciseCounter}>
+                  {exerciseIndex} / {exerciseTotal}
+                </span>
+              )}
+            </div>
 
             {/* Header */}
             <div className={styles.header}>

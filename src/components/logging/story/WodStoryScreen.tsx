@@ -87,12 +87,6 @@ function getFormatDisplay(format?: string): string {
   return format.replace(/_/g, ' ').toUpperCase();
 }
 
-function getFormatColor(format?: string): string {
-  if (format === 'strength') return 'var(--color-volume)';
-  if (format === 'emom' || format === 'intervals') return 'var(--color-sessions)';
-  return 'var(--color-metcon)';
-}
-
 // ─── Derive a meaningful title ──────────────────────────────────
 // If exercise names are just the format name, skip the title to avoid repetition.
 
@@ -115,6 +109,7 @@ function deriveTitle(workout: ParsedWorkout): string | null {
 export function WodStoryScreen({
   parsedWorkout,
   results,
+  onResultChange,
   onEditExercise,
   onSave,
   onBack,
@@ -157,7 +152,6 @@ export function WodStoryScreen({
 
   const title = deriveTitle(parsedWorkout);
   const formatLabel = getFormatDisplay(parsedWorkout.format);
-  const formatColor = getFormatColor(parsedWorkout.format);
 
   // CTA label
   const ctaLabel = isSaving
@@ -183,15 +177,12 @@ export function WodStoryScreen({
           </button>
 
           {formatLabel && (
-            <span
-              className={styles.formatPill}
-              style={{ '--pill-accent': formatColor } as React.CSSProperties}
-            >
+            <span className={styles.formatPill}>
               {formatLabel}
             </span>
           )}
 
-          <div className={styles.progressBar} style={{ '--progress-color': formatColor } as React.CSSProperties}>
+          <div className={styles.progressBar}>
             <div className={styles.progressTrack}>
               <motion.div
                 className={styles.progressFill}
@@ -241,25 +232,57 @@ export function WodStoryScreen({
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {groups.map((group) => (
-            <div key={group.label ?? 'ungrouped'}>
-              {group.label && (
-                <SectionHeader label={`Part ${group.label}`} />
-              )}
-              {group.indices.map((idx) => {
-                const result = results[idx];
-                if (!result) return null;
-                return (
-                  <ExerciseRow
-                    key={idx}
-                    result={result}
-                    index={idx}
-                    onEdit={() => onEditExercise(idx)}
-                  />
-                );
-              })}
-            </div>
-          ))}
+          {groups.map((group) => {
+            // Detect if this group is a metcon/WOD block (not pure strength)
+            const isMetconGroup = group.indices.some(idx => {
+              const ex = parsedWorkout.exercises[idx];
+              return ex?.type === 'wod' || ex?.type === 'cardio';
+            });
+            // Metcon name is stored on the first exercise result in the group
+            const firstIdx = group.indices[0];
+            const firstResult = firstIdx != null ? results[firstIdx] : null;
+            const currentName = firstResult?.metconName ?? '';
+
+            return (
+              <div key={group.label ?? 'ungrouped'}>
+                {group.label && (
+                  <SectionHeader label={`Part ${group.label}`} />
+                )}
+
+                {/* WOD name input — only for metcon/WOD groups */}
+                {isMetconGroup && firstResult && (
+                  <div className={styles.metconNameRow}>
+                    <input
+                      type="text"
+                      className={styles.metconNameInput}
+                      value={currentName}
+                      placeholder="What did your box call this? (optional)"
+                      maxLength={40}
+                      onChange={e => {
+                        onResultChange(firstIdx!, {
+                          ...firstResult,
+                          metconName: e.target.value,
+                        });
+                      }}
+                    />
+                  </div>
+                )}
+
+                {group.indices.map((idx) => {
+                  const result = results[idx];
+                  if (!result) return null;
+                  return (
+                    <ExerciseRow
+                      key={idx}
+                      result={result}
+                      index={idx}
+                      onEdit={() => onEditExercise(idx)}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
         </AnimatePresence>
 
         {results.length === 0 && (

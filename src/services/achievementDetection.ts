@@ -106,6 +106,12 @@ function isBenchmarkWorkout(title: string): boolean {
 
 function isPureStrengthExercise(exercise: Exercise): boolean {
   if (exercise.type === 'strength') return true;
+  // Barbell complex: all movements are PR-eligible weighted lifts
+  if (exercise.movements && exercise.movements.length > 0) {
+    const allPREligible = exercise.movements.every(m => isPREligible(m.name));
+    const hasSetsWithWeight = exercise.sets.some(set => (set.weight || 0) > 0);
+    if (allPREligible && hasSetsWithWeight) return true;
+  }
   return (!exercise.movements || exercise.movements.length === 0)
     && exercise.sets.some(set => (set.weight || 0) > 0);
 }
@@ -114,6 +120,10 @@ function isPREligible(movementName: string): boolean {
   const lower = movementName.toLowerCase();
   if (PR_EXCLUDED_PATTERNS.some(p => lower.includes(p))) return false;
   return PR_ELIGIBLE_PATTERNS.some(p => lower.includes(p));
+}
+
+function normalizePRMovementName(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -126,27 +136,23 @@ function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight:
   // If exercise has individual movements (WODs, AMRAPs, etc.), use those
   if (exercise.movements && exercise.movements.length > 0) {
     const candidates: Array<{ name: string; weight: number }> = [];
+
+    // Find peak set weight — for complexes all movements share one bar,
+    // so the peak set weight is the PR candidate weight for every movement.
+    let maxSetWeight = 0;
+    for (const set of exercise.sets) {
+      if (set.weight && set.weight > maxSetWeight) maxSetWeight = set.weight;
+    }
+
     for (const m of exercise.movements) {
-      const w = m.rxWeights?.male ?? m.rxWeights?.female ?? 0;
+      const rxW = m.rxWeights?.male ?? m.rxWeights?.female ?? 0;
+      // Prefer peak actual weight over prescribed Rx weight
+      const w = maxSetWeight > 0 ? maxSetWeight : rxW;
       if (w > 0 && isPREligible(m.name)) {
         candidates.push({ name: m.name, weight: w });
       }
     }
-    // If we found weighted movements, use them
-    if (candidates.length > 0) {
-      // If there's exactly one weighted movement, prefer the max set weight
-      // (the user may have scaled up/down from rx)
-      if (candidates.length === 1) {
-        let maxSetWeight = 0;
-        for (const set of exercise.sets) {
-          if (set.weight && set.weight > maxSetWeight) maxSetWeight = set.weight;
-        }
-        if (maxSetWeight > 0) {
-          candidates[0].weight = maxSetWeight;
-        }
-      }
-      return candidates;
-    }
+    if (candidates.length > 0) return candidates;
   }
 
   // Fallback: simple exercise — use exercise name + max set weight
@@ -177,7 +183,7 @@ function detectPRs(
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
       const existingPR = allTimeRecords.find(
-        pr => pr.movement.toLowerCase() === movementName.toLowerCase()
+        pr => normalizePRMovementName(pr.movement) === normalizePRMovementName(movementName)
       );
 
       if (!existingPR || bestWeight > existingPR.weight) {
@@ -336,7 +342,7 @@ export function extractNewPRs(
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
       const existingPR = existingPRs.find(
-        pr => pr.movement.toLowerCase() === movementName.toLowerCase()
+        pr => normalizePRMovementName(pr.movement) === normalizePRMovementName(movementName)
       );
 
       if (!existingPR || bestWeight > existingPR.weight) {

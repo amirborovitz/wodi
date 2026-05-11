@@ -27,13 +27,14 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutWithStats | null>(null);
   const [editingWorkout, setEditingWorkout] = useState<WorkoutWithStats | null>(null);
-  // Note: prWorkoutId can be used in the future to navigate directly to a workout from PRScreen
-  const [_prWorkoutId, setPrWorkoutId] = useState<string | null>(null);
-
+  const [workoutList, setWorkoutList] = useState<WorkoutWithStats[]>([]);
+  const [navDir, setNavDir] = useState<'up' | 'down' | null>(null);
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
+    setShowRecentWorkoutsOnOpen(false);
     setEditingWorkout(null); // Clear any editing state
     setCurrentScreen('add-workout');
   };
@@ -41,6 +42,7 @@ function AppContent() {
   const handleEditWorkout = (workout: WorkoutWithStats) => {
     setEditingWorkout(workout);
     setPendingImage(null); // Clear any pending image
+    setShowRecentWorkoutsOnOpen(false);
     setCurrentScreen('add-workout');
   };
 
@@ -65,8 +67,7 @@ function AppContent() {
 
   // Check if user needs onboarding (new users only)
   // Existing users without onboardingComplete field are treated as complete
-  const isNewUser = user.createdAt && (Date.now() - user.createdAt.getTime() < 60000); // Created within last minute
-  const needsOnboarding = isNewUser && !user.onboardingComplete;
+  const needsOnboarding = user.onboardingComplete === false;
 
   if (needsOnboarding) {
     return (
@@ -89,25 +90,33 @@ function AppContent() {
           <AddWorkoutScreen
             onBack={() => {
               setPendingImage(null);
+              setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
             onWorkoutCreated={() => {
               setPendingImage(null);
+              setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setHomeRingsKey((prev) => prev + 1);
               setCurrentScreen('home');
             }}
             initialImage={pendingImage}
+            showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
           />
         );
-      case 'workout-detail':
+      case 'workout-detail': {
+        const selectedIdx = workoutList.findIndex(w => w.id === selectedWorkout?.id);
+        const enterFrom = navDir === 'up' ? 'bottom' : navDir === 'down' ? 'top' : undefined;
         return selectedWorkout ? (
           <WorkoutScreen
+            key={selectedWorkout.id}
             mode="detail"
+            posterMode
+            enterFrom={enterFrom}
             workout={selectedWorkout}
-            onBack={() => setCurrentScreen('history')}
+            onBack={() => { setNavDir(null); setCurrentScreen('history'); }}
             onEditWorkout={() => handleEditWorkout(selectedWorkout)}
             onRenameWorkoutDetail={async (newTitle: string) => {
               if (!selectedWorkout?.id) return;
@@ -119,20 +128,32 @@ function AppContent() {
                 console.error('Failed to rename workout:', err);
               }
             }}
+            onPrevWorkout={selectedIdx > 0 ? () => {
+              setNavDir('down');
+              setSelectedWorkout(workoutList[selectedIdx - 1]);
+            } : undefined}
+            onNextWorkout={selectedIdx < workoutList.length - 1 ? () => {
+              setNavDir('up');
+              setSelectedWorkout(workoutList[selectedIdx + 1]);
+            } : undefined}
           />
         ) : (
           <HistoryScreen
-            onSelectWorkout={(workout) => {
+            onSelectWorkout={(workout, sortedList) => {
               setSelectedWorkout(workout);
+              setWorkoutList(sortedList);
               setCurrentScreen('workout-detail');
             }}
           />
         );
+      }
       case 'history':
         return (
           <HistoryScreen
-            onSelectWorkout={(workout) => {
+            onSelectWorkout={(workout, sortedList) => {
+              setNavDir(null);
               setSelectedWorkout(workout);
+              setWorkoutList(sortedList);
               setCurrentScreen('workout-detail');
             }}
           />
@@ -175,7 +196,7 @@ function AppContent() {
           <PRScreen
             onBack={() => setCurrentScreen('profile')}
             onSelectWorkout={(workoutId) => {
-              setPrWorkoutId(workoutId);
+              void workoutId;
               // Navigate to workout detail - we'll need to fetch the workout
               setCurrentScreen('history');
             }}
@@ -187,15 +208,23 @@ function AppContent() {
           <HomeScreen
             onAddWorkout={() => {
               setEditingWorkout(null);
+              setShowRecentWorkoutsOnOpen(false);
               setCurrentScreen('add-workout');
             }}
             onImageSelected={handleImageSelected}
             onUsePastWorkout={() => {
               setEditingWorkout(null);
               setPendingImage(null);
+              setShowRecentWorkoutsOnOpen(true);
               setCurrentScreen('add-workout');
             }}
             onOpenProfile={() => setCurrentScreen('profile')}
+            onSelectWorkout={(workout, sortedList) => {
+              setNavDir(null);
+              setSelectedWorkout(workout);
+              setWorkoutList(sortedList);
+              setCurrentScreen('workout-detail');
+            }}
             ringsKey={homeRingsKey}
           />
         );

@@ -8,9 +8,9 @@
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-2xl);
-  background: #161616;
-  border: 1px solid #222222;
-  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 6%, transparent);
+  background: var(--wodi-card);
+  border: 1px solid var(--wodi-line2);
+  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--wodi-yellow)) 6%, transparent);
   transition: all var(--duration-fast) var(--ease-out);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -19,19 +19,19 @@
 }
 
 .filled {
-  border-color: color-mix(in srgb, var(--row-color, var(--neon-cyan)) 20%, #222222);
-  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--row-color, var(--wodi-yellow)) 20%, var(--wodi-line2));
+  box-shadow: 0 2px 20px color-mix(in srgb, var(--row-color, var(--wodi-yellow)) 10%, transparent);
 }
 
 .card:active {
-  background: #1a1a1a;
+  background: var(--wodi-card2);
   transform: scale(0.99);
 }
 
 /* ── Trinity accent strip (top) ── */
 .accentStrip {
   height: 3px;
-  background: var(--row-color, var(--neon-cyan));
+  background: var(--row-color, var(--wodi-yellow));
   opacity: 0.25;
   transition: opacity var(--duration-fast) var(--ease-out),
               box-shadow var(--duration-normal) var(--ease-out),
@@ -41,7 +41,7 @@
 .filled .accentStrip {
   height: 4px;
   opacity: 1;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--row-color, var(--neon-cyan)) 55%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--row-color, var(--wodi-yellow)) 55%, transparent);
 }
 
 /* ── Card body ── */
@@ -65,14 +65,14 @@
 .movementName {
   font-size: var(--text-base);
   font-weight: var(--font-bold);
-  color: var(--color-text);
+  color: var(--wodi-white);
   line-height: var(--leading-tight);
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
 .filled .movementName {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--wodi-white);
 }
 
 /* ── Prescription (structured text) ── */
@@ -112,7 +112,7 @@
 }
 
 .filled .chevron {
-  color: var(--row-color, var(--neon-cyan));
+  color: var(--row-color, var(--wodi-yellow));
   opacity: 0.45;
 }
 
@@ -126,8 +126,8 @@
   opacity: 0.25;
   background: repeating-linear-gradient(
     90deg,
-    var(--row-color, var(--neon-cyan)) 0px,
-    var(--row-color, var(--neon-cyan)) 6px,
+    var(--row-color, var(--wodi-yellow)) 0px,
+    var(--row-color, var(--wodi-yellow)) 6px,
     transparent 6px,
     transparent 12px
   );
@@ -152,7 +152,7 @@
 .sectionLine {
   flex: 1;
   height: 1px;
-  background: #222222;
+  background: var(--wodi-line2);
 }
 
 /* ── Reduced motion ── */

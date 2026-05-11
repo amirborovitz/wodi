@@ -3,7 +3,7 @@
  * Fixes known issues and normalizes data that AI often gets wrong
  */
 
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, RxWeights, ExerciseLoggingMode } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSectionType, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
 
 /**
@@ -85,13 +85,41 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'hang power snatch': 'Hang Power Snatch',
 
   // KB (Kettlebell) movements
-  'kb swing': 'Kettlebell Swing',
-  'kettlebell swing': 'Kettlebell Swing',
+  'kb swing': 'American Kettlebell Swing',
+  'kb swings': 'American Kettlebell Swing',
+  'kettlebell swing': 'American Kettlebell Swing',
+  'kettlebell swings': 'American Kettlebell Swing',
   'russian swing': 'Russian Kettlebell Swing',
+  'russian swings': 'Russian Kettlebell Swing',
   'russian kb swing': 'Russian Kettlebell Swing',
+  'russian kb swings': 'Russian Kettlebell Swing',
   'russian kettlebell swing': 'Russian Kettlebell Swing',
+  'russian kettlebell swings': 'Russian Kettlebell Swing',
   'american swing': 'American Kettlebell Swing',
+  'american swings': 'American Kettlebell Swing',
   'american kb swing': 'American Kettlebell Swing',
+  'american kb swings': 'American Kettlebell Swing',
+  'american kettlebell swing': 'American Kettlebell Swing',
+  'american kettlebell swings': 'American Kettlebell Swing',
+  // Shorthand notation: "A.KB" = American KB (overhead/360°), NOT "Alternating"
+  'a.kb swing': 'American Kettlebell Swing',
+  'a.kb swings': 'American Kettlebell Swing',
+  'a. kb swing': 'American Kettlebell Swing',
+  'a. kb swings': 'American Kettlebell Swing',
+  'aks': 'American Kettlebell Swing',
+  'akbs': 'American Kettlebell Swing',
+  // AI misparse: "Alt Kettlebell Swing" from "A.KB" → correct to American
+  'alt kettlebell swing': 'American Kettlebell Swing',
+  'alt kettlebell swings': 'American Kettlebell Swing',
+  'alt kb swing': 'American Kettlebell Swing',
+  'alt kb swings': 'American Kettlebell Swing',
+  // Russian KB shorthand
+  'r.kb swing': 'Russian Kettlebell Swing',
+  'r.kb swings': 'Russian Kettlebell Swing',
+  'r. kb swing': 'Russian Kettlebell Swing',
+  'r. kb swings': 'Russian Kettlebell Swing',
+  'rks': 'Russian Kettlebell Swing',
+  'rkbs': 'Russian Kettlebell Swing',
   'kb snatch': 'KB Snatch',
   'kb snatches': 'KB Snatch',
   'kettlebell snatch': 'KB Snatch',
@@ -149,7 +177,23 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'handstand push-up': 'Handstand Push-up',
   'handstand pushup': 'Handstand Push-up',
   'thruster': 'Thruster',
+  'rdl': 'Romanian Deadlift',
+  'rdls': 'Romanian Deadlift',
+  'romanian deadlift': 'Romanian Deadlift',
+  'romanian deadlifts': 'Romanian Deadlift',
+  'stiff leg deadlift': 'Stiff Leg Deadlift',
+  'stiff leg deadlifts': 'Stiff Leg Deadlift',
+  'stiff-leg deadlift': 'Stiff Leg Deadlift',
+  'stiff-legged deadlift': 'Stiff Leg Deadlift',
+  'single leg deadlift': 'Single Leg Deadlift',
+  'single-leg deadlift': 'Single Leg Deadlift',
+  'deficit deadlift': 'Deficit Deadlift',
+  'sumo deadlift': 'Sumo Deadlift',
+  'sumo deadlifts': 'Sumo Deadlift',
+  'trap bar deadlift': 'Trap Bar Deadlift',
   'deadlift': 'Deadlift',
+  'deadlifts': 'Deadlift',
+  'dl': 'Deadlift',
   'clean': 'Clean',
   'power clean': 'Power Clean',
   'squat clean': 'Squat Clean',
@@ -163,6 +207,18 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'back squat': 'Back Squat',
   'air squat': 'Air Squat',
   'goblet squat': 'Goblet Squat',
+  'goblet lunge': 'Goblet Lunge',
+  'goblet lunges': 'Goblet Lunge',
+  'goblet alt lunge': 'Goblet Alt Lunge',
+  'goblet alt lunges': 'Goblet Alt Lunge',
+  "goblet alt' lunge": 'Goblet Alt Lunge',
+  "goblet alt' lunges": 'Goblet Alt Lunge',
+  'golbet lunge': 'Goblet Lunge',
+  'golbet lunges': 'Goblet Lunge',
+  'golbet alt lunge': 'Goblet Alt Lunge',
+  'golbet alt lunges': 'Goblet Alt Lunge',
+  "golbet alt' lunge": 'Goblet Alt Lunge',
+  "golbet alt' lunges": 'Goblet Alt Lunge',
   'wall ball': 'Wall Ball',
   'wb': 'Wall Ball',
   'clean and jerk': 'Clean and Jerk',
@@ -260,16 +316,131 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
   const withSharedWeight = backfillSharedWeightHints(withInputTypes);
 
+  // Backfill Min 1 / Min 2 / ... labels on rotating EMOM stations when the AI
+  // parsed the movements but missed the station metadata.
+  const withEmomMinuteStations = backfillEmomMinuteStations(withSharedWeight);
+
   // Detect rotating interval "station" workouts (A/B/C/D repeated across outer rounds)
-  const withStationRotation = detectStationRotation(withSharedWeight);
+  const withStationRotation = detectStationRotation(withEmomMinuteStations);
 
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
-  return detectMisplacedBuyIns(withStationRotation);
+  const withBuyIns = detectMisplacedBuyIns(withStationRotation);
+
+  // Normalize explicit movement semantics so downstream math can trust structure
+  return backfillMovementSemantics(withBuyIns);
+}
+
+function inferScoreEntryMode(
+  movement: ParsedMovement,
+  loggingMode?: ExerciseLoggingMode
+): ParsedMovement['scoreEntryMode'] {
+  if (movement.scoreEntryMode) return movement.scoreEntryMode;
+
+  const isScoredMode = loggingMode === 'for_time'
+    || loggingMode === 'intervals'
+    || loggingMode === 'amrap'
+    || loggingMode === 'amrap_intervals'
+    || loggingMode === 'emom'
+    || loggingMode === 'cardio'
+    || loggingMode === 'cardio_distance'
+    || loggingMode === 'bodyweight';
+
+  if (!isScoredMode) return undefined;
+
+  if (movement.countingMode === 'per_station_visit' || movement.stationIndex != null || movement.stationLabel) {
+    return 'per_round';
+  }
+
+  const isUserEnteredTotal = movement.inputType === 'calories'
+    || movement.inputType === 'distance'
+    || movement.isMaxReps === true
+    || (!movement.reps && !movement.distance && !movement.calories && !movement.time);
+
+  return isUserEnteredTotal ? 'total' : 'per_round';
+}
+
+function inferCountingMode(
+  movement: ParsedMovement,
+  exercise: ParsedExercise,
+  workout: ParsedWorkout,
+  sectionType?: ParsedSectionType
+): ParsedMovement['countingMode'] {
+  if (movement.countingMode) return movement.countingMode;
+  if (movement.stationIndex != null) return 'per_station_visit';
+  if (movement.stationLabel) return 'per_station_visit';
+  const hasExplicitStationStructure = workout.exercises.length > 1
+    || (exercise.sections?.filter(section => section.sectionType === 'rounds').length ?? 0) > 1;
+  if ((exercise.stationRotation || workout.stationRotation) && hasExplicitStationStructure) {
+    return 'per_station_visit';
+  }
+
+  const buyOrCash = movement.role === 'buy_in' || movement.role === 'cash_out'
+    || sectionType === 'buy_in' || sectionType === 'cash_out';
+
+  if (buyOrCash) {
+    return workout.format === 'amrap_intervals' || exercise.loggingMode === 'amrap_intervals'
+      ? 'per_interval'
+      : 'once';
+  }
+
+  if (movement.perRound === false) {
+    return workout.format === 'amrap_intervals' || exercise.loggingMode === 'amrap_intervals'
+      ? 'per_interval'
+      : 'once';
+  }
+
+  return 'per_round';
+}
+
+function annotateMovementSemantics(
+  movements: ParsedMovement[] | undefined,
+  exercise: ParsedExercise,
+  workout: ParsedWorkout,
+  sectionType?: ParsedSectionType
+): ParsedMovement[] | undefined {
+  if (!movements || movements.length === 0) return movements;
+
+  let currentStationIndex = -1;
+
+  return movements.map((movement) => {
+    const stationIndex = movement.stationIndex != null
+      ? movement.stationIndex
+      : (() => {
+          if (movement.stationLabel) currentStationIndex += 1;
+          return currentStationIndex >= 0 ? currentStationIndex : undefined;
+        })();
+
+    const next: ParsedMovement = {
+      ...movement,
+      ...(stationIndex != null ? { stationIndex } : {}),
+    };
+
+    const countingMode = inferCountingMode(next, exercise, workout, sectionType);
+    const scoreEntryMode = inferScoreEntryMode(next, exercise.loggingMode);
+
+    return {
+      ...next,
+      ...(countingMode ? { countingMode } : {}),
+      ...(scoreEntryMode ? { scoreEntryMode } : {}),
+    };
+  });
+}
+
+function backfillMovementSemantics(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => ({
+      ...exercise,
+      movements: annotateMovementSemantics(exercise.movements, exercise, workout),
+      sections: exercise.sections?.map((section) => ({
+        ...section,
+        movements: annotateMovementSemantics(section.movements, exercise, workout, section.sectionType) || section.movements,
+      })),
+    })),
+  };
 }
 
 function detectStationRotation(workout: ParsedWorkout): ParsedWorkout {
-  if (workout.exercises.length < 2) return workout;
-
   const rawText = workout.rawText || '';
   const combinedText = [
     rawText,
@@ -283,16 +454,28 @@ function detectStationRotation(workout: ParsedWorkout): ParsedWorkout {
     || /\b\d+(?::\d{2}|\.\d{2})\s*(?:min(?:ute)?s?)?\s*[x×]\s*\d+\s*rounds?\b/i.test(lower);
 
   const hasStationLabels = /(?:^|\n)\s*[A-H][).:]\s+/m.test(rawText)
-    || workout.exercises.every(ex => /^[A-H][).:\s-]+/i.test(ex.name.trim()));
+    || workout.exercises.every(ex => /^[A-H][).:\s-]+/i.test(ex.name.trim()))
+    || workout.exercises.some(ex =>
+      ex.movements?.some(mov => Boolean(mov.stationLabel?.trim()))
+      || ex.sections?.some(section =>
+        section.movements.some(mov => Boolean(mov.stationLabel?.trim()))
+      )
+    );
 
   const stationSetCounts = workout.exercises
     .map(ex => ex.suggestedSets)
     .filter((count): count is number => typeof count === 'number' && count > 0);
-  const repeatedStationSets = stationSetCounts.length === workout.exercises.length
+  const repeatedStationSets = workout.exercises.length > 1
+    && stationSetCounts.length === workout.exercises.length
     && new Set(stationSetCounts).size === 1
     && stationSetCounts[0] > 1;
 
-  if (!hasIntervalShape || (!hasStationLabels && !repeatedStationSets)) {
+  const hasRotatingSections = workout.exercises.some(ex => {
+    const roundSections = ex.sections?.filter(section => section.sectionType === 'rounds') || [];
+    return roundSections.length > 1;
+  });
+
+  if (!hasIntervalShape || (!hasStationLabels && !repeatedStationSets && !hasRotatingSections)) {
     return workout;
   }
 
@@ -303,6 +486,47 @@ function detectStationRotation(workout: ParsedWorkout): ParsedWorkout {
       ...ex,
       stationRotation: true,
     })),
+  };
+}
+
+function hasEmomMinuteStationCue(text: string): boolean {
+  const labels = [...text.matchAll(/\bmin(?:ute)?\.?\s*(\d{1,2})\b/gi)]
+    .map((match) => parseInt(match[1], 10))
+    .filter((value) => value > 0 && value <= 20);
+  const uniqueLabels = new Set(labels);
+  return uniqueLabels.has(1) && uniqueLabels.size >= 2;
+}
+
+function backfillEmomMinuteStations(workout: ParsedWorkout): ParsedWorkout {
+  const workoutText = workout.rawText || '';
+  const isEmomWorkout = workout.format === 'emom'
+    || workout.type === 'emom'
+    || /\bemom\b|\be\d+mom\b|every\s+minute/i.test(workoutText);
+
+  if (!isEmomWorkout) return workout;
+
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => {
+      const movements = exercise.movements;
+      if (!movements || movements.length <= 1) return exercise;
+      if (movements.some((movement) => movement.stationLabel?.trim())) return exercise;
+
+      const exerciseText = `${exercise.name} ${exercise.prescription} ${workoutText}`;
+      if (!hasEmomMinuteStationCue(exerciseText)) return exercise;
+
+      return {
+        ...exercise,
+        stationRotation: true,
+        movements: movements.map((movement, index) => ({
+          ...movement,
+          stationLabel: `Min ${index + 1}`,
+          stationIndex: movement.stationIndex ?? index,
+          countingMode: movement.countingMode ?? 'per_station_visit',
+          scoreEntryMode: movement.scoreEntryMode ?? 'per_round',
+        })),
+      };
+    }),
   };
 }
 
@@ -680,11 +904,32 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     suggestedRepsPerSet = detectVariableRepScheme(exercise);
   }
 
+  // Trust explicit set/round counts in the prescription over the AI-returned
+  // suggestedSets. Guards against the AI misreading "hinge & pull" as two sets
+  // or interval duration text as the set count.
+  let finalSuggestedSets = suggestedRepsPerSet
+    ? suggestedRepsPerSet.length
+    : exercise.suggestedSets;
+
+  if (!suggestedRepsPerSet) {
+    const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
+    const setsMatch = prescriptionText.match(/\b(\d+)\s*sets?\b/i)
+      || prescriptionText.match(/[x×]\s*(\d+)\s*(?:sets?|rounds?)\b/i)
+      || prescriptionText.match(/\b(\d+)\s*rft\b/i);
+    const shouldTrustRounds = exercise.loggingMode === 'emom'
+      || exercise.loggingMode === 'intervals'
+      || exercise.loggingMode === 'for_time';
+    if (setsMatch && (/\bsets?\b/i.test(setsMatch[0]) || shouldTrustRounds)) {
+      const fromPrescription = parseInt(setsMatch[1], 10);
+      if (fromPrescription > 0) finalSuggestedSets = fromPrescription;
+    }
+  }
+
   return {
     ...exercise,
     suggestedReps,
     suggestedRepsPerSet,
-    suggestedSets: suggestedRepsPerSet ? suggestedRepsPerSet.length : exercise.suggestedSets,
+    suggestedSets: finalSuggestedSets,
     rxWeights: exercise.rxWeights || prescriptionWeights,
     movements: processedMovements,
   };
@@ -891,6 +1136,29 @@ function parseMovementFromText(text: string): ParsedMovement | null {
 function enrichMovementFromPrescription(normalizedName: string, fullText: string): string {
   const lower = normalizedName.toLowerCase();
   const text = fullText.toLowerCase();
+  const textMentionsMovement = (patterns: RegExp[]): boolean => {
+    const compactName = lower
+      .replace(/\b(?:american|russian)\b/g, '')
+      .replace(/\bkettlebell\b/g, 'kb')
+      .replace(/\bdumbbell\b/g, 'db')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const movementWords = compactName
+      .split(/\s+/)
+      .filter(word => !['alt', 'single', 'arm'].includes(word));
+    const clauses = text
+      .split(/[,;\n]+/)
+      .map(clause => clause.trim())
+      .filter(Boolean);
+
+    return clauses.some(clause => {
+      const normalizedClause = clause
+        .replace(/\bkettlebells?\b/g, 'kb')
+        .replace(/\bdumbbells?\b/g, 'db');
+      if (!patterns.some(pattern => pattern.test(normalizedClause))) return false;
+      return movementWords.every(word => new RegExp(`\\b${escapeRegex(word)}s?\\b`, 'i').test(normalizedClause));
+    });
+  };
 
   // Map: modifier patterns in text → prefix to add to name, and which base names they apply to
   const modifierRules: Array<{ patterns: RegExp[]; prefix: string; appliesTo: (name: string) => boolean }> = [
@@ -921,7 +1189,7 @@ function enrichMovementFromPrescription(normalizedName: string, fullText: string
     if (!rule.appliesTo(lower)) continue;
     // Check if the prefix is already in the name
     if (lower.startsWith(rule.prefix.toLowerCase())) continue;
-    if (rule.patterns.some(p => p.test(text))) {
+    if (textMentionsMovement(rule.patterns)) {
       return `${rule.prefix} ${normalizedName}`;
     }
   }
@@ -1082,6 +1350,49 @@ const PRESERVED_PREFIXES: Record<string, string> = {
   'one arm': 'Single Arm',
 };
 
+function titleCaseMovementName(name: string): string {
+  return name.split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function preserveDeadliftVariant(name: string): string | undefined {
+  const lower = name.toLowerCase().trim();
+  if (!/\bdeadlifts?\b/i.test(lower)) return undefined;
+  if (/^(?:deadlifts?|dl)$/i.test(lower)) return undefined;
+  if (/^(?:db|dumbbell|kb|kettlebell)\s+deadlifts?$/i.test(lower)) return undefined;
+  return titleCaseMovementName(
+    name
+      .replace(/\bdeadlifts\b/gi, 'deadlift')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+function normalizeSingleMovementName(name: string): string {
+  const lower = name.toLowerCase().trim();
+  if (!lower) return '';
+
+  if (MOVEMENT_ALIASES[lower]) {
+    return MOVEMENT_ALIASES[lower];
+  }
+
+  const preservedDeadlift = preserveDeadliftVariant(name);
+  if (preservedDeadlift) return preservedDeadlift;
+
+  const sortedAliases = Object.entries(MOVEMENT_ALIASES)
+    .sort((a, b) => b[0].length - a[0].length);
+
+  for (const [alias, canonical] of sortedAliases) {
+    const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
+    if (regex.test(lower)) {
+      return canonical;
+    }
+  }
+
+  return titleCaseMovementName(name);
+}
+
 function normalizeMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
   console.log('[normalizeMovementName] input:', name, '→ lower:', lower);
@@ -1103,6 +1414,19 @@ function normalizeMovementName(name: string): string {
       break;
     }
   }
+
+  const compoundParts = strippedLower
+    .split(/\s*(?:\+|and)\s*/i)
+    .map(part => part.trim())
+    .filter(Boolean);
+  if (compoundParts.length > 1) {
+    return prefix + compoundParts
+      .map(part => normalizeSingleMovementName(part))
+      .join(' + ');
+  }
+
+  const preservedDeadlift = preserveDeadliftVariant(strippedLower);
+  if (preservedDeadlift) return prefix + preservedDeadlift;
 
   // 2. Check for word-boundary matches (safer than substring)
   // Sort aliases by length (longest first) to match more specific ones
@@ -1128,9 +1452,7 @@ function normalizeMovementName(name: string): string {
   }
 
   // 3. Default: capitalize first letter of each word
-  return name.split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
+  return titleCaseMovementName(name);
 }
 
 /**

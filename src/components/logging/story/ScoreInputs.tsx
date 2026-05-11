@@ -1,7 +1,14 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
 import styles from './ScoreInputs.module.css';
+
+function selectAllInput(target: HTMLInputElement) {
+  requestAnimationFrame(() => {
+    target.focus();
+    target.setSelectionRange(0, target.value.length);
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // ScoreTimeInput — mm:ss completion time
@@ -16,41 +23,77 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
   const totalSeconds = result.timeSeconds ?? 0;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
+  const minRef = useRef<HTMLInputElement>(null);
   const secRef = useRef<HTMLInputElement>(null);
+  const activeFieldRef = useRef<'minutes' | 'seconds' | null>(null);
+  const [minuteText, setMinuteText] = useState(() => (totalSeconds > 0 ? String(minutes) : ''));
+  const [secondText, setSecondText] = useState(() => (totalSeconds > 0 ? String(seconds).padStart(2, '0') : ''));
 
   const setTime = useCallback((m: number, s: number) => {
-    const clamped = Math.max(0, m * 60 + s);
+    const nextMinutes = Math.max(0, m);
+    const nextSeconds = Math.max(0, Math.min(59, s));
+    const clamped = nextMinutes * 60 + nextSeconds;
     onChange({ timeSeconds: clamped });
   }, [onChange]);
 
+  useEffect(() => {
+    if (activeFieldRef.current) return;
+    setMinuteText(totalSeconds > 0 ? String(minutes) : '');
+    setSecondText(totalSeconds > 0 ? String(seconds).padStart(2, '0') : '');
+  }, [totalSeconds, minutes, seconds]);
+
+  const normalizeTimeFields = useCallback(() => {
+    const parsedMinutes = parseInt(minuteText.replace(/\D/g, '') || '0', 10) || 0;
+    const parsedSeconds = Math.min(59, parseInt(secondText.replace(/\D/g, '') || '0', 10) || 0);
+    const hasAnyTime = parsedMinutes > 0 || parsedSeconds > 0;
+    setMinuteText(hasAnyTime ? String(parsedMinutes).padStart(2, '0') : '');
+    setSecondText(hasAnyTime ? String(parsedSeconds).padStart(2, '0') : '');
+  }, [minuteText, secondText]);
+
   const handleMinutesChange = useCallback((value: string) => {
-    const m = parseInt(value) || 0;
-    setTime(m, seconds);
-  }, [seconds, setTime]);
+    const digits = value.replace(/\D/g, '');
+    const nextMinuteText = digits.slice(0, 2);
+    setMinuteText(nextMinuteText);
+    setTime(parseInt(nextMinuteText || '0', 10) || 0, parseInt(secondText.replace(/\D/g, '') || '0', 10) || 0);
+  }, [secondText, setTime]);
 
   const handleSecondsChange = useCallback((value: string) => {
-    const s = Math.min(59, parseInt(value) || 0);
-    setTime(minutes, s);
-  }, [minutes, setTime]);
+    const digits = value.replace(/\D/g, '');
+    const nextSecondText = digits.slice(0, 2);
+    setSecondText(nextSecondText);
+    setTime(
+      parseInt(minuteText.replace(/\D/g, '') || '0', 10) || 0,
+      Math.min(59, parseInt(nextSecondText || '0', 10) || 0),
+    );
+  }, [minuteText, setTime]);
 
   return (
     <div className={styles.center}>
       <div className={styles.timeDisplay}>
         <div className={styles.timeDrum}>
           <input
-            type="number"
+            ref={minRef}
+            type="text"
             inputMode="numeric"
+            pattern="[0-9]*"
             className={styles.timeDrumInput}
-            value={totalSeconds > 0 ? String(minutes) : ''}
+            value={minuteText}
             placeholder="00"
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => {
+              activeFieldRef.current = 'minutes';
+              selectAllInput(e.currentTarget);
+            }}
+            onPointerUp={(e) => selectAllInput(e.currentTarget)}
             onChange={(e) => handleMinutesChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || (e.key >= '0' && e.key <= '9' && (e.currentTarget.value.length >= 2))) {
                 secRef.current?.focus();
               }
             }}
-            min={0}
+            onBlur={() => {
+              activeFieldRef.current = null;
+              normalizeTimeFields();
+            }}
           />
           <span className={styles.timeDrumLabel}>min</span>
         </div>
@@ -60,15 +103,22 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
         <div className={styles.timeDrum}>
           <input
             ref={secRef}
-            type="number"
+            type="text"
             inputMode="numeric"
+            pattern="[0-9]*"
             className={styles.timeDrumInput}
-            value={totalSeconds > 0 ? String(seconds).padStart(2, '0') : ''}
+            value={secondText}
             placeholder="00"
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => {
+              activeFieldRef.current = 'seconds';
+              selectAllInput(e.currentTarget);
+            }}
+            onPointerUp={(e) => selectAllInput(e.currentTarget)}
             onChange={(e) => handleSecondsChange(e.target.value)}
-            min={0}
-            max={59}
+            onBlur={() => {
+              activeFieldRef.current = null;
+              normalizeTimeFields();
+            }}
           />
           <span className={styles.timeDrumLabel}>sec</span>
         </div>

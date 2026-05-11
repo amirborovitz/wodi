@@ -1,73 +1,92 @@
 /* ═══════════════════════════════════════════
-   SupersetInput — per-movement compact rows
+   SupersetInput — movement ingredient list
    ═══════════════════════════════════════════ */
 
 .container {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
-/* ── Movement row ── */
+/* ── Movement row: receipt-style ── */
+/* No card background — these are supporting cast, not hero elements.
+   A hairline top separator and left-rail color dot are all the structure
+   they need. */
 .movRow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  transition: border-color var(--duration-fast) var(--ease-out);
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+  position: relative;
+  transition: background var(--duration-fast) var(--ease-out);
 }
 
-.movRowFilled {
-  border-left: 3px solid var(--mov-color, var(--neon-cyan));
-  padding-left: calc(var(--space-3) - 3px);
+/* Left-rail accent — a 2px strip flush left, only when filled */
+.movRow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  border-radius: 0 1px 1px 0;
+  background: var(--mov-color, transparent);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-/* ── Header: name group + swap + prescription hint ── */
+.movRowFilled::before {
+  opacity: 1;
+}
+
+/* ── Header: name group + swap icon + prescription hint ── */
 .movHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
 }
 
 /* Name group: original (struck) + selected, inline */
 .movNameGroup {
   display: flex;
   align-items: baseline;
-  gap: var(--space-1);
+  gap: 6px;
   flex: 1;
   min-width: 0;
-  flex-wrap: wrap;
+  overflow: hidden;
 }
 
 .movName {
   font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  color: var(--color-text);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
   line-height: var(--leading-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* When substituted, the selected name gets full white */
+/* When substituted, selected name is fully white */
 .movNameSubstituted {
-  color: #ffffff;
+  color: var(--color-text);
+  font-weight: var(--font-semibold);
 }
 
-/* Original name: struck through, muted */
+/* Original struck name: smaller, muted */
 .movNameOriginalStruck {
   font-size: 11px;
   font-weight: var(--font-medium);
   color: var(--color-text-tertiary);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.2);
+  text-decoration-color: rgba(255, 255, 255, 0.15);
   line-height: 1.2;
   flex-shrink: 0;
 }
 
-/* Scaling badges (inside superset rows) */
+/* ── Scaling badges ── */
 .supBadge {
   font-size: 9px;
   font-weight: var(--font-bold);
@@ -81,25 +100,38 @@
 }
 
 .supBadgeScaled {
-  background: rgba(255, 0, 229, 0.12);
+  background: rgba(255, 0, 229, 0.10);
   color: var(--neon-magenta);
 }
 
 .supBadgeRxPlus {
-  background: rgba(255, 214, 0, 0.12);
+  background: rgba(255, 214, 0, 0.10);
   color: var(--neon-yellow);
 }
 
 .supBadgeEqual {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--color-text-secondary);
 }
 
-/* Swap icon button */
+/* Prescription hint — right-aligned, small, muted */
+.movHint {
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+  margin-left: auto;
+}
+
+/* Swap icon button — ghost, 44px tap target */
 .swapBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Visual: 28px; tap target extended via margin trick */
   width: 28px;
   height: 28px;
   border-radius: var(--radius-full);
@@ -110,144 +142,79 @@
   padding: 0;
   -webkit-tap-highlight-color: transparent;
   flex-shrink: 0;
+  margin: -8px -8px -8px 0;
   transition: color var(--duration-fast) var(--ease-out),
               background var(--duration-fast) var(--ease-out);
-  margin-left: auto;
 }
 
 .swapBtn:active {
   color: var(--neon-magenta);
-  background: rgba(255, 0, 229, 0.1);
-}
-
-.movHint {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-  font-family: var(--font-family);
-  white-space: nowrap;
-  flex-shrink: 0;
+  background: rgba(255, 0, 229, 0.10);
+  border-radius: var(--radius-full);
 }
 
 /* ── Inline input area ── */
 .movInputRow {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 8px;
 }
 
-/* ── Weight inline stepper ── */
-.inlineStepper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.inlineStepBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-size: 16px;
-  font-weight: var(--font-bold);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: all var(--duration-fast) var(--ease-out);
-}
-
-.inlineStepBtn:active {
-  background: rgba(255, 214, 0, 0.12);
-  transform: scale(0.92);
-}
-
-.inlineWeight {
-  font-size: var(--text-xl);
-  font-family: var(--font-family);
-  font-weight: var(--font-bold);
-  color: var(--color-volume);
-  min-width: 48px;
-  text-align: center;
-  line-height: 1;
-}
-
-.inlineUnit {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-}
-
-/* ── Duration chips inline ── */
+/* ── Duration chips — compact pill row ── */
 .inlineChips {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
 }
 
+/* Height: 18px per Wodi compact swap pill spec */
 .inlineChip {
-  height: 32px;
-  padding: 0 12px;
+  height: 28px;
+  padding: 0 10px;
   border-radius: var(--radius-full);
   border: 1px solid var(--glass-border);
   background: transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-family);
-  font-size: var(--text-xs);
+  font-size: 11px;
   font-weight: var(--font-semibold);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: all var(--duration-fast) var(--ease-out);
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+  letter-spacing: 0.02em;
 }
 
 .inlineChip:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .inlineChipActive {
-  background: rgba(0, 255, 255, 0.12);
-  border-color: rgba(0, 255, 255, 0.35);
-  color: var(--color-sessions);
-}
-
-/* ── Inline text input (distance, calories, weight) ── */
-.inlineInput {
-  width: 72px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--color-text);
-  font-family: var(--font-family);
-  /* 16px prevents iOS/Android auto-zoom on focus */
-  font-size: 16px;
-  font-weight: var(--font-semibold);
-  text-align: center;
-  outline: none;
-}
-
-.inlineInput:focus {
-  border-color: var(--mov-color, var(--neon-cyan));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--mov-color, var(--neon-cyan)) 25%, transparent);
+  background: rgba(245, 194, 0, 0.10);
+  border-color: rgba(245, 194, 0, 0.30);
+  color: var(--wodi-yellow);
 }
 
 /* ── Bodyweight confirmed state ── */
 .bwConfirmed {
   font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 6px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
 }
 
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .inlineStepBtn,
+  .movRow::before,
+  .swapBtn,
   .inlineChip {
     transition: none;
   }
-  .inlineStepBtn:active,
   .inlineChip:active {
     transform: none;
   }

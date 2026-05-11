@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MovementResult } from './types';
 import type { ParsedSectionType } from '../../../types';
-import { kindToTrinityColor, getWeightStep } from './types';
+import { getWeightStep } from './types';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
+import { CustomNumpadSheet } from './CustomNumpadSheet';
 import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
@@ -13,6 +14,8 @@ interface ScoreMovementInputsProps {
   movements: MovementResult[];
   inputMovements: MovementResult[];
   onChange: (index: number, patch: Partial<MovementResult>) => void;
+  variant?: 'default' | 'amrap_intervals';
+  roundsTotal?: number;
   /** Called when multiple movements need to update atomically (e.g. weight propagation). */
   onBatch?: (next: MovementResult[]) => void;
   /** Team size for partner workouts. When > 1, buy-in/cash-out movements
@@ -69,6 +72,51 @@ function partnerAnnotation(mr: MovementResult, teamSize: number): string | null 
   return null;
 }
 
+function getIntervalValue(mr: MovementResult): number {
+  if (mr.kind === 'distance') {
+    const isCal = mr.movement.inputType === 'calories'
+      || (mr.movement.calories != null && mr.movement.calories > 0);
+    return isCal
+      ? (mr.calories ?? mr.movement.calories ?? 0)
+      : (mr.distance ?? mr.movement.distance ?? 0);
+  }
+  return mr.reps ?? mr.movement.reps ?? 0;
+}
+
+function getIntervalUnit(mr: MovementResult): string {
+  if (mr.kind === 'distance') {
+    const isCal = mr.movement.inputType === 'calories'
+      || (mr.movement.calories != null && mr.movement.calories > 0);
+    return isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
+  }
+  return 'reps';
+}
+
+function getIntervalRx(mr: MovementResult): number {
+  if (mr.kind === 'distance') {
+    const isCal = mr.movement.inputType === 'calories'
+      || (mr.movement.calories != null && mr.movement.calories > 0);
+    return isCal ? (mr.movement.calories ?? 0) : (mr.movement.distance ?? 0);
+  }
+  return mr.movement.reps ?? 0;
+}
+
+function formatLoadNote(mr: MovementResult): string | null {
+  const weight = mr.weight ?? mr.movement.rxWeights?.male ?? mr.movement.rxWeights?.female;
+  if (weight == null || weight <= 0) return null;
+  return mr.implementCount === 2 ? `@ ${weight}kg each` : `@ ${weight}kg`;
+}
+
+function getIntervalPatch(mr: MovementResult, value: number): Partial<MovementResult> {
+  const nextValue = Math.max(0, Math.round(value));
+  if (mr.kind === 'distance') {
+    const isCal = mr.movement.inputType === 'calories'
+      || (mr.movement.calories != null && mr.movement.calories > 0);
+    return isCal ? { calories: nextValue } : { distance: nextValue };
+  }
+  return { reps: nextValue };
+}
+
 // ─── Strip weight from movement name for display ─────────────────
 // Removes leading/trailing weight patterns like "22.5kg", "95lb", "135#"
 // so the label reads "Alt DB Snatch" instead of "22.5kg Alt DB Snatch".
@@ -81,6 +129,17 @@ function stripWeightFromName(name: string): string {
     // Parenthetical: "Thruster (95lb)" → "Thruster"
     .replace(/\s*\(\d+(\.\d+)?\s*(kg|lb|lbs|#)\)/i, '')
     .trim();
+}
+
+function cleanTileLabel(name: string): string {
+  return stripWeightFromName(name)
+    .replace(/^(?:(?:for\s+)?(?:max|amrap)\s+)+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function clampValue(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
 // ─── Substitution state summary ───────────────────────────────────
@@ -173,115 +232,78 @@ function AiAlternativeToggle({ mr, onChange }: AiToggleProps) {
 // Returns the inline prescribed value (e.g. "10", "400m", "15 cal")
 // and its Trinity color class for display next to the movement name.
 
-interface PrescribedTag {
-  label: string;
-  colorClass: string;
+interface TileConfig {
+  field: 'weight' | 'distance' | 'calories' | 'reps';
+  value: number | undefined;
+  placeholder: string;
+  unit?: string;
+  color: string;
+  step: number;
+  min: number;
+  max: number;
+  inputMode: 'decimal' | 'numeric';
 }
 
-function getPrescribedTag(mr: MovementResult): PrescribedTag | null {
-  const mov = mr.movement;
+const LOAD_TILE_COLOR = '#FFD700';
+const METRIC_TILE_COLOR = '#FF00FF';
 
-  // Calories (cardio machines)
-  if (mov.inputType === 'calories' || (mov.calories != null && mov.calories > 0)) {
-    const val = mov.calories;
-    if (val != null && val > 0) return { label: `${val} cal`, colorClass: styles.rxMagenta };
+function getTileConfig(mr: MovementResult): TileConfig | null {
+  const isMaxBodyweight =
+    mr.kind === 'reps' &&
+    mr.movement.reps == null &&
+    mr.movement.distance == null &&
+    mr.movement.calories == null;
+
+  if (mr.kind === 'load') {
+    return {
+      field: 'weight',
+      value: mr.weight,
+      placeholder: mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0',
+      unit: mr.implementCount === 2 ? '2× kg' : 'kg',
+      color: LOAD_TILE_COLOR,
+      step: getWeightStep(mr.movement.name, mr.implementCount),
+      min: 0,
+      max: 500,
+      inputMode: 'decimal',
+    };
   }
 
-  // Distance
-  if (mov.distance != null && mov.distance > 0) {
-    const d = mov.distance;
-    const unit = mov.unit ?? 'm';
-    const fmt = unit === 'km' || d >= 1000
-      ? `${d >= 1000 ? (d / 1000).toFixed(1) : d}${unit === 'km' || d >= 1000 ? 'km' : unit}`
-      : `${d}${unit}`;
-    return { label: fmt, colorClass: styles.rxCyan };
+  if (mr.kind === 'distance') {
+    const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
+    const isCal = mr.movement.inputType === 'calories'
+      || (mr.movement.calories != null && mr.movement.calories > 0)
+      || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
+    const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
+    return {
+      field: isCal ? 'calories' : 'distance',
+      value: isCal ? mr.calories : mr.distance,
+      placeholder: isCal
+        ? (mr.movement.calories ? String(mr.movement.calories) : '0')
+        : (mr.movement.distance ? String(mr.movement.distance) : '0'),
+      unit,
+      color: METRIC_TILE_COLOR,
+      step: isCal ? 1 : (unit === 'km' ? 0.5 : unit === 'mi' ? 0.1 : 50),
+      min: 0,
+      max: isCal ? 999 : 99999,
+      inputMode: 'decimal',
+    };
   }
 
-  // Reps (bodyweight / gymnastics)
-  if (mov.reps != null && mov.reps > 0) {
-    return { label: `${mov.reps}`, colorClass: styles.rxMagenta };
-  }
-
-  // Weight (if Rx weights prescribed but no reps/distance/cal)
-  if (mov.rxWeights) {
-    const w = mov.rxWeights.male ?? mov.rxWeights.female;
-    if (w != null && w > 0) return { label: `${w}kg`, colorClass: styles.rxYellow };
+  if (isMaxBodyweight) {
+    return {
+      field: 'reps',
+      value: mr.reps,
+      placeholder: '0',
+      unit: 'reps',
+      color: METRIC_TILE_COLOR,
+      step: 1,
+      min: 0,
+      max: 999,
+      inputMode: 'numeric',
+    };
   }
 
   return null;
-}
-
-// ─── Movement name block ──────────────────────────────────────────
-// Renders the movement name, sub badge, partner annotation, AI toggle,
-// and the swap icon affordance when alternatives exist.
-
-interface MovNameProps {
-  mr: MovementResult;
-  teamSize?: number;
-  onSwapTap: () => void;
-  onChange: (patch: Partial<MovementResult>) => void;
-}
-
-function MovName({ mr, teamSize, onSwapTap, onChange }: MovNameProps) {
-  const annotation = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
-  const sub = getSubState(mr);
-  const hasAlts = hasAlternatives(mr.movement.name) || !!mr.movement.alternative;
-  const rxTag = getPrescribedTag(mr);
-
-  return (
-    <div className={styles.movNameBlock}>
-      {/* Name row: entire area tappable to open substitution sheet */}
-      <div
-        className={`${styles.movNameRow} ${hasAlts ? styles.movNameRowTappable : ''}`}
-        onClick={hasAlts ? onSwapTap : undefined}
-        role={hasAlts ? 'button' : undefined}
-        tabIndex={hasAlts ? 0 : undefined}
-      >
-        {/* Prescribed value tag (reps / distance / calories) */}
-        {rxTag && (
-          <span className={`${styles.rxTag} ${rxTag.colorClass}`}>{rxTag.label}</span>
-        )}
-
-        {sub.isSubstituted ? (
-          <div className={styles.movNameSubstituted}>
-            {/* Original name struck through */}
-            <span className={styles.movNameOriginal}>{stripWeightFromName(mr.movement.name)}</span>
-            {/* Selected alternative */}
-            <span className={styles.movNameSelected}>{stripWeightFromName(sub.displayName)}</span>
-          </div>
-        ) : (
-          <span className={styles.movName}>{stripWeightFromName(mr.movement.name)}</span>
-        )}
-
-        {/* Scaling badge — show conversion when available, type label as fallback */}
-        {sub.badgeType && (
-          <span className={`${styles.subBadge} ${styles[`subBadge_${sub.badgeType}`]}`}>
-            {sub.badgeType === 'scaled' ? 'SCALED' : sub.badgeType === 'rx-plus' ? 'RX+' : 'SWAP'}
-          </span>
-        )}
-
-        {/* Swap icon — shown when alternatives exist */}
-        {hasAlts && (
-          <span className={styles.swapBtn} aria-hidden="true">
-            <SwapIcon />
-          </span>
-        )}
-      </div>
-
-      {/* Conversion note: "400m → 1200m" */}
-      {sub.conversionNote && (
-        <span className={styles.conversionNote}>{sub.conversionNote}</span>
-      )}
-
-      {/* AI quick-toggle chip */}
-      <AiAlternativeToggle mr={mr} onChange={onChange} />
-
-      {/* Partner annotation */}
-      {annotation && (
-        <span className={styles.partnerAnnotation}>{annotation}</span>
-      )}
-    </div>
-  );
 }
 
 // ─── Swap icon (two-arrow cycle symbol) ─────────────────────────
@@ -334,7 +356,15 @@ function groupBySections(mrs: MovementResult[]): SectionGroup[] | null {
  * When an AI-detected alternative is present, shows a quick-toggle chip.
  * When teamSize > 1, buy-in/cash-out movements show "100 cal total ÷2".
  */
-export function ScoreMovementInputs({ movements, inputMovements: _inputMovements, onChange, onBatch, teamSize }: ScoreMovementInputsProps) {
+export function ScoreMovementInputs({
+  movements,
+  inputMovements: _inputMovements,
+  onChange,
+  variant = 'default',
+  roundsTotal,
+  onBatch,
+  teamSize,
+}: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
   const manuallyEditedRef = useRef<Set<string>>(new Set());
@@ -391,8 +421,10 @@ export function ScoreMovementInputs({ movements, inputMovements: _inputMovements
           } else if (sub.targetUnit === 'calories') {
             patch.calories = sub.adjustedValue;
             patch.distance = undefined;
+          } else if (sub.targetUnit === 'reps') {
+            patch.reps = sub.adjustedValue;
           }
-          // reps/time: no special field to set
+          // time: no special field to set
         } else {
           // Legacy fallback: detect from origin movement
           const originIsDistance = swapMr.kind === 'distance'
@@ -442,40 +474,354 @@ export function ScoreMovementInputs({ movements, inputMovements: _inputMovements
     closeSwap();
   };
 
-  // Render a single movField row
+  const editableTiles = useMemo(() => (
+    movements.flatMap((mr, globalIndex) => {
+      const config = getTileConfig(mr);
+      if (!config) return [];
+      const sub = getSubState(mr);
+      const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
+      const cleaned = cleanTileLabel(labelSource) || stripWeightFromName(labelSource) || labelSource;
+      return [{
+        tileId: mr.movementKey,
+        globalIndex,
+        mr,
+        label: cleaned.toUpperCase(),
+        config,
+      }];
+    })
+  ), [movements]);
+
+  const tileRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [activeTileId, setActiveTileId] = useState<string | null>(null);
+  const [numpadValue, setNumpadValue] = useState('');
+  const [replaceOnDigit, setReplaceOnDigit] = useState(true);
+
+  const activeTile = activeTileId != null
+    ? editableTiles.find((tile) => tile.tileId === activeTileId) ?? null
+    : null;
+
+  const closeNumpad = useCallback(() => {
+    setActiveTileId(null);
+    setNumpadValue('');
+    setReplaceOnDigit(true);
+  }, []);
+
+  const openTile = useCallback((tileId: string) => {
+    const tile = editableTiles.find((entry) => entry.tileId === tileId);
+    if (!tile) return;
+    setActiveTileId(tileId);
+    setNumpadValue(tile.config.value != null ? String(tile.config.value) : '');
+    setReplaceOnDigit(true);
+  }, [editableTiles]);
+
+  useEffect(() => {
+    if (activeTileId == null) return;
+    if (!editableTiles.some((tile) => tile.tileId === activeTileId)) {
+      closeNumpad();
+    }
+  }, [activeTileId, closeNumpad, editableTiles]);
+
+  useEffect(() => {
+    if (activeTileId == null) return;
+    tileRefs.current[activeTileId]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [activeTileId]);
+
+  const commitTileValue = useCallback((tileId: string, rawValue: string) => {
+    const tile = editableTiles.find((entry) => entry.tileId === tileId);
+    if (!tile) return;
+
+    const sanitized = tile.config.inputMode === 'decimal'
+      ? rawValue.replace(/[^0-9.]/g, '')
+      : rawValue.replace(/\D/g, '');
+    const deduped = tile.config.inputMode === 'decimal'
+      ? sanitized.replace(/(\..*)\./g, '$1')
+      : sanitized;
+    const nextRaw = deduped.replace(/^0+(?=\d)/, '');
+    if (nextRaw === '') {
+      setNumpadValue('');
+      switch (tile.config.field) {
+        case 'weight':
+          handleWeightChange(tile.globalIndex, tile.mr, undefined);
+          return;
+        case 'distance':
+          onChange(tile.globalIndex, { distance: undefined });
+          return;
+        case 'calories':
+          onChange(tile.globalIndex, { calories: undefined });
+          return;
+        case 'reps':
+          onChange(tile.globalIndex, { reps: undefined });
+          return;
+      }
+    }
+
+    const parsed = Number(nextRaw);
+    if (Number.isNaN(parsed)) return;
+    const clamped = clampValue(parsed, tile.config.min, tile.config.max);
+    const displayValue = tile.config.inputMode === 'decimal' && nextRaw.endsWith('.')
+      ? `${clamped}.`
+      : String(clamped);
+    setNumpadValue(displayValue);
+
+    switch (tile.config.field) {
+      case 'weight':
+        handleWeightChange(tile.globalIndex, tile.mr, clamped);
+        return;
+      case 'distance':
+        onChange(tile.globalIndex, { distance: clamped });
+        return;
+      case 'calories':
+        onChange(tile.globalIndex, { calories: clamped });
+        return;
+      case 'reps':
+        onChange(tile.globalIndex, { reps: clamped });
+        return;
+    }
+  }, [editableTiles, handleWeightChange, onChange]);
+
+  const handleNumpadDigit = useCallback((digit: string) => {
+    if (!activeTileId) return;
+    const tile = editableTiles.find((entry) => entry.tileId === activeTileId);
+    if (!tile) return;
+    if (digit === '.' && tile.config.inputMode !== 'decimal') return;
+    if (digit === '.' && (replaceOnDigit ? numpadValue === '.' : numpadValue.includes('.'))) return;
+    const normalizedDigit = digit === '.' && replaceOnDigit ? '0.' : digit;
+    const nextRaw = replaceOnDigit ? normalizedDigit : `${numpadValue}${digit}`;
+    setReplaceOnDigit(false);
+    commitTileValue(activeTileId, nextRaw);
+  }, [activeTileId, commitTileValue, editableTiles, numpadValue, replaceOnDigit]);
+
+  const handleNumpadBackspace = useCallback(() => {
+    if (!activeTileId) return;
+    const nextRaw = replaceOnDigit ? '' : numpadValue.slice(0, -1);
+    setReplaceOnDigit(false);
+    commitTileValue(activeTileId, nextRaw);
+  }, [activeTileId, commitTileValue, numpadValue, replaceOnDigit]);
+
+  const handleNumpadNext = useCallback(() => {
+    if (!activeTileId) return;
+    const currentIndex = editableTiles.findIndex((tile) => tile.tileId === activeTileId);
+    const nextTile = currentIndex >= 0 ? editableTiles[currentIndex + 1] : null;
+    if (!nextTile) {
+      closeNumpad();
+      return;
+    }
+    openTile(nextTile.tileId);
+  }, [activeTileId, closeNumpad, editableTiles, openTile]);
+
+  const renderIntervalField = (mr: MovementResult) => {
+    const globalIndex = movements.indexOf(mr);
+    const sub = getSubState(mr);
+    const hasAlts = hasAlternatives(mr.movement.name) || !!mr.movement.alternative;
+    const label = (
+      cleanTileLabel(sub.isSubstituted ? sub.displayName : mr.movement.name)
+      || stripWeightFromName(sub.isSubstituted ? sub.displayName : mr.movement.name)
+      || (sub.isSubstituted ? sub.displayName : mr.movement.name)
+    ).toUpperCase();
+    const value = getIntervalValue(mr);
+    const rx = getIntervalRx(mr);
+    const unit = getIntervalUnit(mr);
+    const loadNote = formatLoadNote(mr);
+    const progress = rx > 0 ? clampValue((value / rx) * 100, 0, 140) : (value > 0 ? 100 : 0);
+
+    const setValue = (next: number) => onChange(globalIndex, getIntervalPatch(mr, next));
+    const handleInput = (raw: string) => {
+      const parsed = parseInt(raw.replace(/\D/g, ''), 10);
+      setValue(Number.isNaN(parsed) ? 0 : parsed);
+    };
+
+    return (
+      <div key={mr.movementKey} className={styles.intervalTile}>
+        <div
+          className={styles.intervalHeader}
+          onClick={hasAlts ? () => openSwap(mr.movementKey) : undefined}
+          role={hasAlts ? 'button' : undefined}
+        >
+          <div className={styles.intervalTitleBlock}>
+            {sub.isSubstituted && (
+              <span className={styles.intervalOriginal}>
+                {(cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name).toUpperCase()}
+              </span>
+            )}
+            <span className={styles.intervalName}>{label}</span>
+            <span className={styles.intervalMeta}>
+              {rx > 0 ? `${rx} rx` : 'per round'}
+              {loadNote ? ` - ${loadNote}` : ''}
+            </span>
+          </div>
+          {hasAlts && (
+            <span className={styles.tileSwapIcon} aria-hidden="true">
+              <SwapIcon />
+            </span>
+          )}
+        </div>
+
+        <div className={styles.intervalControl}>
+          <button
+            type="button"
+            className={styles.intervalStep}
+            onClick={() => setValue(value - 1)}
+            aria-label={`Decrease ${label}`}
+          >
+            -
+          </button>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            className={styles.intervalValue}
+            value={String(value)}
+            onChange={(event) => handleInput(event.target.value)}
+            aria-label={`${label} per round`}
+          />
+          <span className={styles.intervalUnit}>{unit}</span>
+          <button
+            type="button"
+            className={styles.intervalStep}
+            onClick={() => setValue(value + 1)}
+            aria-label={`Increase ${label}`}
+          >
+            +
+          </button>
+        </div>
+
+        <div className={styles.intervalTrack} aria-hidden="true">
+          <span
+            className={styles.intervalFill}
+            style={{ width: `${Math.min(progress, 100)}%` }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  if (variant === 'amrap_intervals') {
+    const roundLabel = roundsTotal && roundsTotal > 0
+      ? `${roundsTotal} rounds - totals calculated from your per-round reps`
+      : 'Totals calculated from your per-round reps';
+
+    return (
+      <>
+        <div className={styles.intervalPrompt}>
+          Roughly how many of each did you hit per round?
+        </div>
+        <div className={styles.intervalList}>
+          {movements.map(renderIntervalField)}
+        </div>
+        <div className={styles.intervalFootnote}>{roundLabel}</div>
+
+        {swapMr && (
+          <SubstitutionSheet
+            open={swapOpenKey != null}
+            originalName={swapMr.movement.name}
+            originalReps={swapMr.movement.reps}
+            originalDistance={swapMr.movement.distance}
+            originalCalories={swapMr.movement.calories}
+            currentSubstitution={swapMr.substitution}
+            aiAlternative={swapMr.movement.alternative}
+            onSelect={handleSubstitution}
+            onClose={closeSwap}
+          />
+        )}
+      </>
+    );
+  }
+
+  // ── Arcade tile renderer ─────────────────────────────────────────
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
+    const sub = getSubState(mr);
+    const hasAlts = hasAlternatives(mr.movement.name) || !!mr.movement.alternative;
+    const tileName = (
+      cleanTileLabel(sub.isSubstituted ? sub.displayName : mr.movement.name)
+      || stripWeightFromName(sub.isSubstituted ? sub.displayName : mr.movement.name)
+      || (sub.isSubstituted ? sub.displayName : mr.movement.name)
+    ).toUpperCase();
+
+    const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
+
     return (
-      <div key={mr.movementKey}>
+      <React.Fragment key={mr.movementKey}>
         {mr.movement.stationLabel && (
           <div className={styles.stationDivider}>
             <span className={styles.stationLabel}>{mr.movement.stationLabel}</span>
             <span className={styles.sectionLine} />
           </div>
         )}
-        <div className={styles.movField}>
-          <MovName
-            mr={mr}
-            teamSize={teamSize}
-            onSwapTap={() => openSwap(mr.movementKey)}
-            onChange={(patch) => onChange(globalIndex, patch)}
-          />
+        <div
+          className={styles.tile}
+          ref={(node) => {
+            tileRefs.current[mr.movementKey] = node;
+          }}
+        >
+          {/* Tile header: name + optional sub badge + swap affordance — tappable for substitution */}
+          <div
+            className={styles.tileHeader}
+            onClick={hasAlts ? () => openSwap(mr.movementKey) : undefined}
+            role={hasAlts ? 'button' : undefined}
+            style={hasAlts ? { cursor: 'pointer' } : undefined}
+          >
+            {sub.isSubstituted ? (
+              <div className={styles.tileNameSubstituted}>
+                <span className={styles.tileNameOriginal}>
+                  {(cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name).toUpperCase()}
+                </span>
+                <span className={styles.tileName}>{tileName}</span>
+              </div>
+            ) : (
+              <span className={styles.tileName}>{tileName}</span>
+            )}
+            {sub.badgeType && (
+              <span className={`${styles.subBadge} ${styles[`subBadge_${sub.badgeType}`]}`}>
+                {sub.badgeType === 'scaled' ? 'SCALED' : sub.badgeType === 'rx-plus' ? 'RX+' : 'SWAP'}
+              </span>
+            )}
+            {sub.conversionNote && (
+              <span className={styles.conversionNote}>{sub.conversionNote}</span>
+            )}
+            {hasAlts && (
+              <span className={styles.tileSwapIcon} aria-hidden="true">
+                <SwapIcon />
+              </span>
+            )}
+          </div>
+
+          {/* Partner annotation */}
+          {partnerNote && (
+            <span className={styles.partnerAnnotation}>{partnerNote}</span>
+          )}
+
+          {/* AI quick-toggle chip */}
+          <AiAlternativeToggle mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+
+          {/* Input: arcade stepper or nothing for prescribed-reps display movements */}
           {mr.kind === 'load' && (
-            <WeightField mr={mr} onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)} />
+            <WeightField
+              mr={mr}
+              onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)}
+              onCenterPress={() => openTile(mr.movementKey)}
+              active={activeTileId === mr.movementKey}
+            />
           )}
           {mr.kind === 'distance' && (
-            <DistanceField mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+            <DistanceField
+              mr={mr}
+              onChange={(patch) => onChange(globalIndex, patch)}
+              onCenterPress={() => openTile(mr.movementKey)}
+              active={activeTileId === mr.movementKey}
+            />
           )}
-          {/* MAX bodyweight: no prescribed quantity of any kind → let user log their score.
-              Guard is strict: distance or calories present means display-only (e.g. 400m Run, 7 cal Bike). */}
-          {mr.kind === 'reps'
-            && mr.movement.reps == null
-            && mr.movement.distance == null
-            && mr.movement.calories == null && (
-            <RepsField mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+          {/* MAX bodyweight: no prescribed quantity → let user log their score */}
+          {getTileConfig(mr)?.field === 'reps' && (
+            <RepsField
+              mr={mr}
+              onChange={(patch) => onChange(globalIndex, patch)}
+              onCenterPress={() => openTile(mr.movementKey)}
+              active={activeTileId === mr.movementKey}
+            />
           )}
         </div>
-      </div>
+      </React.Fragment>
     );
   };
 
@@ -520,11 +866,34 @@ export function ScoreMovementInputs({ movements, inputMovements: _inputMovements
           onClose={closeSwap}
         />
       )}
+
+      <CustomNumpadSheet
+        open={activeTile != null}
+        label={activeTile?.label ?? ''}
+        value={numpadValue}
+        unit={activeTile?.config.unit}
+        accentColor="#00F2FF"
+        showDecimal={activeTile?.config.inputMode === 'decimal'}
+        onDigit={handleNumpadDigit}
+        onBackspace={handleNumpadBackspace}
+        onNext={handleNumpadNext}
+        onClose={closeNumpad}
+      />
     </>
   );
 }
 
-function WeightField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial<MovementResult>) => void }) {
+function WeightField({
+  mr,
+  onChange,
+  onCenterPress,
+  active,
+}: {
+  mr: MovementResult;
+  onChange: (p: Partial<MovementResult>) => void;
+  onCenterPress: () => void;
+  active: boolean;
+}) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
   const unitLabel = mr.implementCount === 2 ? '2× kg' : 'kg';
   const step = getWeightStep(mr.movement.name, mr.implementCount);
@@ -538,14 +907,26 @@ function WeightField({ mr, onChange }: { mr: MovementResult; onChange: (p: Parti
       max={500}
       placeholder={placeholder}
       unit={unitLabel}
-      color={kindToTrinityColor('load')}
+      color={LOAD_TILE_COLOR}
       inputMode="decimal"
-      size="sm"
+      size="arcade"
+      onCenterPress={onCenterPress}
+      active={active}
     />
   );
 }
 
-function DistanceField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial<MovementResult>) => void }) {
+function DistanceField({
+  mr,
+  onChange,
+  onCenterPress,
+  active,
+}: {
+  mr: MovementResult;
+  onChange: (p: Partial<MovementResult>) => void;
+  onCenterPress: () => void;
+  active: boolean;
+}) {
   // Cardio machines (bike, row, ski) measure in calories when AI didn't prescribe distance.
   const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
   const isCal = mr.movement.inputType === 'calories'
@@ -569,14 +950,26 @@ function DistanceField({ mr, onChange }: { mr: MovementResult; onChange: (p: Par
       min={0}
       placeholder={placeholder}
       unit={unit}
-      color={kindToTrinityColor('distance')}
+      color={METRIC_TILE_COLOR}
       inputMode="decimal"
-      size="sm"
+      size="arcade"
+      onCenterPress={onCenterPress}
+      active={active}
     />
   );
 }
 
-function RepsField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial<MovementResult>) => void }) {
+function RepsField({
+  mr,
+  onChange,
+  onCenterPress,
+  active,
+}: {
+  mr: MovementResult;
+  onChange: (p: Partial<MovementResult>) => void;
+  onCenterPress: () => void;
+  active: boolean;
+}) {
   return (
     <StepperInput
       value={mr.reps}
@@ -585,9 +978,11 @@ function RepsField({ mr, onChange }: { mr: MovementResult; onChange: (p: Partial
       min={0}
       placeholder="0"
       unit="reps"
-      color={kindToTrinityColor('reps')}
+      color={METRIC_TILE_COLOR}
       inputMode="numeric"
-      size="sm"
+      size="arcade"
+      onCenterPress={onCenterPress}
+      active={active}
     />
   );
 }

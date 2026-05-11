@@ -20,11 +20,11 @@
 }
 
 .stepper:focus-within {
-  border-color: var(--stepper-color, var(--neon-cyan));
+  border-color: var(--stepper-color, var(--wodi-yellow));
   background: rgba(255, 255, 255, 0.05);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 20%, transparent),
-    0 0 16px color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 20%, transparent),
+    0 0 16px color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 18%, transparent);
 }
 
 /* ── Size: sm — still 2 × 44 = 88px tall, narrower buttons ── */
@@ -64,7 +64,7 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--stepper-color, var(--neon-cyan));
+  color: var(--stepper-color, var(--wodi-yellow));
   font-family: var(--font-family);
   font-size: 28px;
   font-weight: 800;
@@ -117,7 +117,7 @@
   justify-content: center;
   background: transparent;
   border: none;
-  color: var(--stepper-color, var(--neon-cyan));
+  color: var(--stepper-color, var(--wodi-yellow));
   opacity: 0.5;
   font-size: 22px;
   font-weight: var(--font-bold);
@@ -137,17 +137,17 @@
 }
 
 .btn:active {
-  background: color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 18%, transparent);
-  color: var(--stepper-color, var(--neon-cyan));
+  background: color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 18%, transparent);
+  color: var(--stepper-color, var(--wodi-yellow));
   opacity: 1;
 }
 
 /* Long-press held state */
 .btnHeld {
-  background: color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 14%, transparent);
-  color: var(--stepper-color, var(--neon-cyan));
+  background: color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 14%, transparent);
+  color: var(--stepper-color, var(--wodi-yellow));
   opacity: 1;
-  box-shadow: inset 0 0 8px color-mix(in srgb, var(--stepper-color, var(--neon-cyan)) 15%, transparent);
+  box-shadow: inset 0 0 8px color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 15%, transparent);
 }
 
 /* ── Label above ── */
@@ -176,6 +176,120 @@
 @media (prefers-reduced-motion: reduce) {
   .stepper,
   .btn {
+    transition: none;
+  }
+}
+
+/* ── Arcade mode: horizontal [−] [value] [+] ── */
+
+.arcadeStepper {
+  display: grid;
+  grid-template-columns: minmax(0, 30%) minmax(0, 40%) minmax(0, 30%);
+  align-items: stretch;
+  width: 100%;
+  min-height: 60px;
+  border-radius: 16px;
+  overflow: hidden;
+  touch-action: manipulation;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.arcadeZone {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--stepper-color, var(--wodi-yellow));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition: background var(--duration-fast) var(--ease-out),
+              transform var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+  padding: 0 8px;
+}
+
+.arcadeZone:first-child {
+  justify-content: flex-start;
+}
+
+.arcadeZone:last-child {
+  justify-content: flex-end;
+}
+
+.arcadeIcon {
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.arcadeZone:active {
+  background: rgba(255, 255, 255, 0.05);
+  transform: scale(0.97);
+}
+
+/* Long-press held state for arcade zones */
+.arcadeZoneHeld {
+  background: rgba(255, 255, 255, 0.05);
+  color: color-mix(in srgb, var(--stepper-color, var(--wodi-yellow)) 88%, white);
+}
+
+.arcadeCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 6px;
+  min-width: 0;
+}
+
+.arcadeValueButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.arcadeValueButtonActive {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  transform: scale(0.98);
+}
+
+.arcadeValue {
+  background: transparent;
+  color: var(--wodi-white);
+  font-family: var(--font-family);
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+  width: 100%;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.arcadeUnit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arcadeZone {
     transition: none;
   }
 }

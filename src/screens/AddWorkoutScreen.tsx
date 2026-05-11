@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
-import { parseWorkoutImage, refineParsedWorkout } from '../services/openai';
-import { assignMovementColors, isBwVolumeMovement } from '../services/workloadCalculation';
+import { parseWorkoutImage, parseWorkoutText, refineParsedWorkout } from '../services/openai';
+import { assignMovementColors, getStationVisitCountsForExercise } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -11,7 +11,7 @@ import {
   recordPatternUsage,
   getDefaultFields,
 } from '../services/loggingPatternLearning';
-import type { LoggingGuidanceResponse, ExerciseLoggingMode } from '../types';
+import type { LoggingGuidanceResponse, ExerciseLoggingMode, IntensityRating } from '../types';
 import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +20,7 @@ import { extractNewPRs } from '../services/achievementDetection';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
+import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
 import {
@@ -43,10 +44,11 @@ interface AddWorkoutScreenProps {
   onBack: () => void;
   onWorkoutCreated: () => void;
   initialImage?: File | null;
+  showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
 }
 
-type Step = 'capture' | 'processing' | 'preview' | 'log-results' | 'saving' | 'reward';
+type Step = 'capture' | 'voice' | 'processing' | 'preview' | 'log-results' | 'saving' | 'reward';
 
 interface ExerciseResult {
   exercise: ParsedExercise;
@@ -73,7 +75,13 @@ interface ExerciseResult {
   completedCycles?: number; // Number of completed cycles (for restore)
   partialReps?: number; // Partial reps in next cycle (for restore)
   partialMovements?: string[]; // Movement names completed in AMRAP partial round
+  ladderStep?: number;
+  ladderPartial?: number;
+  metconName?: string;
+  intensity?: IntensityRating | null;
 }
+
+const ADMIN_EMAIL = 'aborovitz@gmail.com';
 
 const CINDY_MOVEMENTS = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat'];
 const DT_MOVEMENTS = ['deadlift', 'hang clean', 'hang power clean', 'shoulder to overhead', 'push jerk'];
@@ -94,13 +102,119 @@ function isWeightedCarry(name: string): boolean {
   return WEIGHTED_CARRY_PATTERNS.some(p => lower.includes(p));
 }
 
+function getStationVisitCount(totalIntervals: number, stationCount: number, stationIndex: number): number {
+  if (totalIntervals <= 0 || stationCount <= 0) return 1;
+  const baseVisits = Math.floor(totalIntervals / stationCount);
+  const remainder = totalIntervals % stationCount;
+  return baseVisits + (stationIndex < remainder ? 1 : 0);
+}
+
+function inferStationVisitCounts(
+  exercise: ParsedExercise,
+  totalIntervals: number
+): number[] | null {
+  if (totalIntervals <= 0) return null;
+
+  if (exercise.sections && exercise.sections.length > 1) {
+    const roundSections = exercise.sections
+      .map((section, sectionIndex) => ({ section, sectionIndex }))
+      .filter(({ section }) => section.sectionType === 'rounds');
+
+    if (roundSections.length > 1) {
+      const stationCount = roundSections.length;
+      const visitsBySectionIndex = new Map<number, number>();
+      roundSections.forEach(({ sectionIndex }, roundIndex) => {
+        visitsBySectionIndex.set(
+          sectionIndex,
+          getStationVisitCount(totalIntervals, stationCount, roundIndex)
+        );
+      });
+
+      const flattened: number[] = [];
+      exercise.sections.forEach((section, sectionIndex) => {
+        const visits = section.sectionType === 'rounds'
+          ? (visitsBySectionIndex.get(sectionIndex) ?? 1)
+          : 1;
+        section.movements.forEach(() => flattened.push(visits));
+      });
+      return flattened;
+    }
+  }
+
+  const movements = exercise.movements;
+  if (!movements || movements.length === 0) return null;
+
+  const stationLabels = movements
+    .map((mov) => mov.stationLabel?.trim())
+    .filter((label): label is string => Boolean(label));
+
+  if (stationLabels.length > 0) {
+    const stationOrder = new Map<string, number>();
+    const movementStationIndices: number[] = [];
+    let currentStationIndex = 0;
+
+    for (const mov of movements) {
+      if (mov.stationLabel) {
+        const label = mov.stationLabel.trim();
+        if (!stationOrder.has(label)) {
+          stationOrder.set(label, stationOrder.size);
+        }
+        currentStationIndex = stationOrder.get(label) ?? currentStationIndex;
+      }
+      movementStationIndices.push(currentStationIndex);
+    }
+
+    const stationCount = Math.max(stationOrder.size, 1);
+    return movementStationIndices.map((stationIndex) =>
+      getStationVisitCount(totalIntervals, stationCount, stationIndex)
+    );
+  }
+
+  return null;
+}
+
+function getMovementEffectiveRounds(
+  movement: ParsedMovement,
+  movementRounds: number,
+  stationVisits: number | undefined,
+  exercise: ParsedExercise,
+  result: ExerciseResult,
+  parsedWorkout?: ParsedWorkout
+): number {
+  const intervalMultiplier = exercise.intervalCount
+    || exercise.suggestedSets
+    || result.sets.length
+    || result.rounds
+    || parsedWorkout?.sets
+    || parsedWorkout?.containerRounds
+    || movementRounds
+    || 1;
+
+  switch (movement.countingMode) {
+    case 'once':
+      return 1;
+    case 'per_interval':
+      return intervalMultiplier;
+    case 'per_station_visit':
+      return stationVisits ?? intervalMultiplier;
+    case 'per_round':
+    default:
+      break;
+  }
+
+  const isBuyInCashOut = movement.role === 'buy_in' || movement.role === 'cash_out' ||
+    /^(?:buy-in|cash-out):/i.test(movement.name) || movement.perRound === false;
+
+  return isBuyInCashOut
+    ? 1
+    : (stationVisits ?? movementRounds);
+}
+
 function buildWorkloadBreakdownFromResults(
   results: ExerciseResult[],
   parsedWorkout?: ParsedWorkout,
   partnerFactor: number = 1,
-  athleteBodyweight?: number
 ): WorkloadBreakdown {
-  const bw = athleteBodyweight && athleteBodyweight > 0 ? athleteBodyweight : 75; // DEFAULT_BW
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
@@ -114,7 +228,7 @@ function buildWorkloadBreakdownFromResults(
   // Detect which exercises are team/partner exercises by checking prescription text
   const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
 
-  results.forEach((result) => {
+  results.forEach((result, resultIndex) => {
     // Check if this exercise is a team/partner exercise.
     // For single-exercise workouts (common with sectioned WODs), trust the workout-level
     // partnerFactor since the exercise prescription may not repeat the "in pairs" keyword.
@@ -183,7 +297,7 @@ function buildWorkloadBreakdownFromResults(
           ?? mov.rxWeights?.female;
         const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
         const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
-        const weight = explicitWeight || (isBwVolumeMovement(movementName) ? bw : undefined);
+        const weight = explicitWeight;
         const movementCalories = isFixed
           ? (mov.calories || 0) * fixedMultiplier
           : 0;
@@ -266,6 +380,16 @@ function buildWorkloadBreakdownFromResults(
         perMovementRounds = movements.map(() => totalRounds);
       }
 
+      const explicitRounds = result.rounds || result.sets.length || result.exercise.suggestedSets || parsedWorkout?.sets || parsedWorkout?.containerRounds || 1;
+      // Station EMOM: use getStationVisitCountsForExercise as the primary path — it has the
+      // corrected totalIntervals formula that handles both "suggestedSets = cycles" (4) and
+      // "suggestedSets = total-minutes" (16) encodings by computing cycles × stationCount.
+      // Do NOT call inferStationVisitCounts(exercise, result.rounds) first: when the AI sets
+      // suggestedSets=4 (cycles), result.rounds=4 and 4÷4 stations = 1 visit (wrong).
+      const stationVisitCounts = parsedWorkout
+        ? getStationVisitCountsForExercise(parsedWorkout, result.exercise, resultIndex)
+        : inferStationVisitCounts(result.exercise, explicitRounds);
+
     // Use the same unique-key system that the save path uses (getMovementKeys),
     // so duplicate movement names (e.g. two "Run" entries) resolve independently.
     // movementLookup tries the unique key first, falls back to plain name.
@@ -315,23 +439,42 @@ function buildWorkloadBreakdownFromResults(
 
       // Buy-in/cash-out detection: done once per interval, not per AMRAP round.
       // Detect via: AI role field, name prefix, or perRound=false (most reliable — survives serialization).
-      const isBuyInCashOut = mov.role === 'buy_in' || mov.role === 'cash_out' ||
-        /^(?:buy-in|cash-out):/i.test(mov.name) || mov.perRound === false;
-      const effectiveRounds = isBuyInCashOut
-        ? (result.exercise.suggestedSets || result.exercise.intervalCount || result.sets.length || 1)
-        : movementRounds;
+      const stationVisits = stationVisitCounts?.[movIdx];
+      const effectiveRounds = getMovementEffectiveRounds(
+        mov,
+        movementRounds,
+        stationVisits,
+        result.exercise,
+        result,
+        parsedWorkout
+      );
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round
       const isPartialMove = result.partialMovements?.includes(mov.name) ?? false;
-      const partialExtra = (isPartialMove && !isBuyInCashOut) ? 1 : 0;
+      const partialExtra = (isPartialMove && mov.countingMode !== 'once' && mov.countingMode !== 'per_interval' && stationVisits == null) ? 1 : 0;
       const totalEffectiveRounds = effectiveRounds + partialExtra;
 
       console.log(`[BuildWorkload] "${mov.name}" perRound=${mov.perRound} rounds=${movementRounds} effective=${effectiveRounds} partial=${partialExtra} reps=${perRoundReps} distance=${perRoundDistance} calories=${perRoundCalories} userEntered=[reps:${userReps !== undefined} dist:${userDistance !== undefined} cal:${userCalories !== undefined}]`);
       // Use cycle tracker total if available (variable rep scheme workouts)
       // Apply per-exercise partner factor only to AI-prescribed values
-      const movementReps = Math.round((hasCycleReps ? result.completedCycleReps! : (perRoundReps * totalEffectiveRounds)) * repsFactor);
-      const movementDistance = Math.round(perRoundDistance * totalEffectiveRounds * distanceFactor);
-      const movementCalories = Math.round(perRoundCalories * totalEffectiveRounds * caloriesFactor);
+      const useUserTotalsDirectly = mov.scoreEntryMode === 'total';
+      const movementReps = Math.round((
+        hasCycleReps
+          ? result.completedCycleReps!
+          : (userReps !== undefined && useUserTotalsDirectly
+            ? perRoundReps
+            : (perRoundReps * totalEffectiveRounds))
+      ) * repsFactor);
+      const movementDistance = Math.round((
+        userDistance !== undefined && useUserTotalsDirectly
+          ? perRoundDistance
+          : (perRoundDistance * totalEffectiveRounds)
+      ) * distanceFactor);
+      const movementCalories = Math.round((
+        userCalories !== undefined && useUserTotalsDirectly
+          ? perRoundCalories
+          : (perRoundCalories * totalEffectiveRounds)
+      ) * caloriesFactor);
       const movementTime = Math.round(perRoundTime * totalEffectiveRounds * exerciseFactor);
 
       const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
@@ -354,8 +497,7 @@ function buildWorkloadBreakdownFromResults(
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
       const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
-      // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
-      const weight = explicitWeight || (isBwVolumeMovement(movementName) ? bw : undefined);
+      const weight = explicitWeight;
       const unit = movementDistance > 0
         ? (mov.unit || 'm')
         : movementCalories > 0
@@ -503,11 +645,6 @@ function buildWorkloadBreakdownFromResults(
     const hasVaryingWeights = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
     const weightProgression = hasVaryingWeights ? perSetWeights : undefined;
 
-    // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
-    if (!exerciseWeight && isBwVolumeMovement(result.exercise.name)) {
-      exerciseWeight = bw;
-      exerciseVolume = bw * exerciseReps;
-    }
 
     if (exerciseReps > 0) {
       const key = result.exercise.name.toLowerCase();
@@ -584,8 +721,14 @@ function buildWorkloadBreakdownFromResults(
   // what the breakdown displays (weight × totalReps per movement).
   // The per-set/per-loop accumulator can drift when a set is missing weight
   // or the rounds calculation is off by one.
+  // Deduplicate barbell complexes: when multiple movements share the exact same
+  // weight AND rep count they are a single-bar complex — count volume once.
+  const complexKeys = new Set<string>();
   const derivedVolume = movements.reduce((sum, m) => {
     if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
+      const key = `${m.weight}:${m.totalReps}`;
+      if (complexKeys.has(key)) return sum;
+      complexKeys.add(key);
       return sum + m.weight * m.totalReps;
     }
     return sum;
@@ -1354,10 +1497,11 @@ async function refineWorkoutIfNeeded(
   }
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showRecentOnOpen, editWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
+  const isAdmin = user?.email === ADMIN_EMAIL;
   const { calculateRewardData } = useRewardData();
-  const { workouts: recentWorkouts } = useWorkouts(10); // For dev mode
+  const { workouts: recentWorkouts } = useWorkouts(10);
   const [step, setStep] = useState<Step>('capture');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
@@ -1365,8 +1509,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  // Voice input state
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   // DEV MODE - temporary for testing
-  const [showDevWorkouts, setShowDevWorkouts] = useState(false);
+  const [showDevWorkouts, setShowDevWorkouts] = useState(Boolean(showRecentOnOpen && isAdmin));
 
   // Wizard state
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
@@ -1445,6 +1593,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
   useEffect(() => {
     setSavedWorkouts(readSavedWorkouts());
   }, []);
+
+  useEffect(() => {
+    if (showRecentOnOpen && isAdmin) {
+      setShowDevWorkouts(true);
+    }
+  }, [showRecentOnOpen, isAdmin]);
 
   // Process initial image if provided (from HomeScreen file picker)
   useEffect(() => {
@@ -1540,6 +1694,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       // Start with blank to get correct kind, movements, setsTotal, etc.
       const blank = createBlankResult(parsedEx, i, mode, user?.sex);
       const result: StoryExerciseResult = { ...blank };
+      result.intensity = savedEx.intensity ?? undefined;
 
       // Overlay saved values based on kind
       switch (result.kind) {
@@ -1854,6 +2009,58 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       setError('Failed to parse workout. Please try again or enter manually.');
       setStep('capture');
     }
+  };
+
+  const handleVoiceParse = async (text: string) => {
+    if (!text.trim()) return;
+    setStep('processing');
+    setError(null);
+    try {
+      const { parsed } = await parseWorkoutText(text.trim());
+      const refined = await refineWorkoutIfNeeded(parsed, user?.id);
+      setParsedWorkout(refined);
+      addSavedWorkout(refined);
+      setStep('preview');
+    } catch (err) {
+      console.error('Error parsing voice workout:', err);
+      setError('Could not parse workout. Try editing the text and trying again.');
+      setStep('voice');
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError('Voice input is not supported in this browser. Type your workout below.');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event: any) => {
+      let final = '';
+      let interim = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript + ' ';
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      setVoiceTranscript((final + interim).trim());
+    };
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -2697,7 +2904,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
       const skipPersistence = isEditingAfterSave;
       // Calculate total duration (totals computed after exercises map)
       let totalDuration = 0; // in seconds
-      const exercises: Exercise[] = results.map((result, index) => {
+      const builtExercises: Exercise[] = results.map((result, index) => {
         const rounds = result.rounds || 1;
         const baseMovements = result.exercise.movements;
         const fsKeys = getMovementKeys(baseMovements || []);
@@ -2859,11 +3066,26 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
           rxWeights: result.exercise.rxWeights,
           ...(movementsForSave && movementsForSave.length > 0 && { movements: movementsForSave }),
           ...(result.exercise.sections && result.exercise.sections.length > 0 && { sections: result.exercise.sections }),
+          ...(result.exercise.suggestedRepsPerSet && result.exercise.suggestedRepsPerSet.length > 0 && { suggestedRepsPerSet: result.exercise.suggestedRepsPerSet }),
           ...(rounds > 1 && { rounds }),
+          ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),
+          ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
+          ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
+          ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
+          ...(result.exercise.type !== 'strength' && result.intensity ? { intensity: result.intensity } : {}),
+          // User-entered WOD name during logging takes priority; AI-generated name is fallback
+          ...((result.metconName || result.exercise.aiPartName) && {
+            aiPartName: result.metconName || result.exercise.aiPartName,
+          }),
         };
       });
 
-      const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor, user?.weight);
+      const exercises = await addGeneratedPartNames(builtExercises, {
+        format: parsedWorkout.format,
+        recentNames: getRecentPartNames(recentWorkouts),
+      });
+
+      const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
       breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);
       const totalVolume = breakdownFromResults.grandTotalVolume;
       const totalReps = breakdownFromResults.grandTotalReps;
@@ -2973,6 +3195,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         rawText: parsedWorkout.rawText?.trim() || null,
         timeCap: effectiveDuration > 0 ? effectiveDuration : (parsedWorkout.timeCap || null),
         format: parsedWorkout.format || null,
+        ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         updatedAt: serverTimestamp(),
       };
 
@@ -2981,8 +3204,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         createdAt: serverTimestamp(),
       };
 
+      let persistedWorkoutId = savedWorkoutMeta?.id;
+
       if (!skipPersistence) {
         const docRef = await addDoc(collection(db, 'workouts'), removeUndefined(workoutCreateData));
+        persistedWorkoutId = docRef.id;
 
         // Update user stats
         const userRef = doc(db, 'users', user.id);
@@ -2995,6 +3221,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         setSavedWorkoutMeta({ id: docRef.id, totalVolume, date: workoutDate });
       } else if (savedWorkoutMeta?.id) {
         const workoutRef = doc(db, 'workouts', savedWorkoutMeta.id);
+        persistedWorkoutId = savedWorkoutMeta.id;
         await setDoc(workoutRef, removeUndefined(workoutBase), { merge: true });
         const volumeDelta = totalVolume - (savedWorkoutMeta.totalVolume || 0);
         if (volumeDelta !== 0) {
@@ -3062,11 +3289,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
 
       // Write new PRs to Firestore
       try {
-        const workoutId = savedWorkoutMeta?.id || 'unsaved';
+        const workoutId = persistedWorkoutId || 'unsaved';
         const newPRs = extractNewPRs(
           { id: workoutId, title: workoutTitle, exercises, date: workoutDate },
           fetchedPRs
         );
+        // Detect barbell complex: all PR-eligible weighted movements in one exercise
+        const isBarbellComplex = exercises.length === 1 &&
+          exercises[0].movements && exercises[0].movements.length > 1 &&
+          exercises[0].movements.every(m =>
+            (m.rxWeights?.male ?? m.rxWeights?.female ?? 0) > 0
+          );
+        const prContext = isBarbellComplex ? 'Complex Training' : undefined;
+
         for (const pr of newPRs) {
           const prDocId = `${user.id}_${pr.movement.toLowerCase().replace(/\s+/g, '_')}`;
           await setDoc(doc(db, 'personalRecords', prDocId), {
@@ -3075,10 +3310,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             weight: pr.weight,
             date: workoutDate,
             workoutId,
+            ...(prContext && { workoutContext: prContext }),
           });
         }
       } catch (prErr) {
         console.warn('Failed to save PRs (non-blocking):', prErr);
+      }
+
+      if (persistedWorkoutId) {
+        const hasPR = reward.achievements?.some(achievement => achievement.type === 'pr') || reward.heroAchievement?.type === 'pr';
+        await setDoc(doc(db, 'workouts', persistedWorkoutId), removeUndefined({
+          heroAchievement: reward.heroAchievement,
+          achievements: reward.achievements,
+          isPR: hasPR,
+        }), { merge: true });
       }
 
       // Add workload breakdown to reward data
@@ -3088,6 +3333,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
         workoutContext: workoutContextLine || undefined,
         workoutRawText: parsedWorkout.rawText?.trim() || undefined,
         ...(teamSize > 1 && { teamSize }),
+        ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
+        ...(persistedWorkoutId && { workoutId: persistedWorkoutId }),
       });
       if (skipPersistence) {
         setIsEditingAfterSave(false);
@@ -3190,6 +3437,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
               >
                 Upload Image
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => { setVoiceTranscript(''); setStep('voice'); }}
+                size="lg"
+                fullWidth
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                }
+              >
+                Speak your WOD
+              </Button>
             </div>
           </Card>
 
@@ -3245,38 +3506,94 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, editW
             </div>
           )}
 
-          {/* DEV MODE - Recent workouts for quick testing (TEMPORARY) */}
-          <button
-            className={styles.devModeToggle}
-            onClick={() => setShowDevWorkouts(!showDevWorkouts)}
-          >
-            {showDevWorkouts ? 'Hide' : 'Show'} Recent WODs (Dev)
-          </button>
+          {isAdmin && (
+            <>
+              <button
+                className={styles.devModeToggle}
+                onClick={() => setShowDevWorkouts(!showDevWorkouts)}
+              >
+                {showDevWorkouts ? 'Hide' : 'Load from Recent'}
+              </button>
 
-          {showDevWorkouts && recentWorkouts.length > 0 && (
-            <div className={styles.devSection}>
-              <h3 className={styles.devTitle}>Recent WODs (Dev Mode)</h3>
-              <div className={styles.devList}>
-                {recentWorkouts.map((workout) => (
-                  <button
-                    key={workout.id}
-                    className={styles.devItem}
-                    onClick={() => handleSelectDevWorkout(workout)}
-                  >
-                    <span className={styles.devItemTitle}>{workout.title}</span>
-                    <span className={styles.devItemMeta}>
-                      {workout.type} - {workout.exercises.length} exercises
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
+              {showDevWorkouts && recentWorkouts.length > 0 && (
+                <div className={styles.devSection}>
+                  <h3 className={styles.devTitle}>Recent WODs</h3>
+                  <div className={styles.devList}>
+                    {recentWorkouts.map((workout) => (
+                      <button
+                        key={workout.id}
+                        className={styles.devItem}
+                        onClick={() => handleSelectDevWorkout(workout)}
+                      >
+                        <span className={styles.devItemTitle}>{workout.title}</span>
+                        <span className={styles.devItemMeta}>
+                          {workout.type} - {workout.exercises.length} exercises
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Manual entry option */}
           <button type="button" className={styles.manualLink} onClick={handleManualEntry}>
             Or enter manually
           </button>
+        </motion.div>
+      )}
+
+      {step === 'voice' && (
+        <motion.div
+          className={styles.voiceContainer}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <button className={styles.voiceBackBtn} onClick={() => { recognitionRef.current?.stop(); setIsListening(false); setStep('capture'); }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+              <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <div className={styles.voiceHeader}>
+            <h2 className={styles.voiceTitle}>Speak your WOD</h2>
+            <p className={styles.voiceSubtitle}>Say the workout out loud, then edit if needed</p>
+          </div>
+
+          <button
+            className={`${styles.voiceMicBtn} ${isListening ? styles.voiceMicBtnActive : ''}`}
+            onClick={toggleListening}
+            aria-label={isListening ? 'Stop listening' : 'Start listening'}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="32" height="32">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <p className={styles.voiceStatus}>
+            {isListening ? 'Listening… tap to stop' : voiceTranscript ? 'Tap mic to continue' : 'Tap to speak'}
+          </p>
+
+          <textarea
+            className={styles.voiceTextarea}
+            value={voiceTranscript}
+            onChange={e => setVoiceTranscript(e.target.value)}
+            placeholder="Your spoken workout will appear here — or type directly"
+            rows={6}
+          />
+
+          {error && <p className={styles.voiceError}>{error}</p>}
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            disabled={!voiceTranscript.trim()}
+            onClick={() => handleVoiceParse(voiceTranscript)}
+          >
+            Parse this WOD
+          </Button>
         </motion.div>
       )}
 

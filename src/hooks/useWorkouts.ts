@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import type { Workout, WorkoutType } from '../types';
+import type { Achievement, Workout, WorkoutType } from '../types';
 
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
@@ -114,12 +114,35 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
           .map((doc) => doc.data().workoutId as string | undefined)
           .filter((id): id is string => Boolean(id))
       );
+      const prAchievementsByWorkoutId = new Map<string, Achievement[]>();
+      prSnapshot.docs.forEach((prDoc) => {
+        const pr = prDoc.data();
+        const workoutId = pr.workoutId as string | undefined;
+        const movement = pr.movement as string | undefined;
+        const weight = pr.weight as number | undefined;
+        if (!workoutId || !movement || !weight) return;
+        const achievement: Achievement = {
+          type: 'pr',
+          title: 'New PR!',
+          subtitle: `${weight}kg ${movement}`,
+          movement,
+          value: weight,
+          icon: 'trophy',
+        };
+        const existing = prAchievementsByWorkoutId.get(workoutId) || [];
+        existing.push(achievement);
+        prAchievementsByWorkoutId.set(workoutId, existing);
+      });
       console.log('Found documents:', snapshot.size);
 
       const fetchedWorkouts: WorkoutWithStats[] = snapshot.docs
         .map((doc) => {
           const data = doc.data();
           console.log('Workout doc:', doc.id, data);
+          const prAchievements = prAchievementsByWorkoutId.get(doc.id) || [];
+          const achievements = (data.achievements as Achievement[] | undefined) || prAchievements;
+          const heroAchievement = (data.heroAchievement as Achievement | undefined) || achievements[0];
+          const isPR = Boolean(data.isPR || data.hasPR || data.pr || prWorkoutIds.has(doc.id) || achievements.some(a => a.type === 'pr'));
 
           const workout: Workout = {
             id: doc.id,
@@ -138,12 +161,17 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             duration: data.duration,
             notes: data.notes,
             rawText: data.rawText || undefined,
+            timeCap: data.timeCap,
+            format: data.format,
+            difficultyLevel: typeof data.difficultyLevel === 'number' ? data.difficultyLevel : undefined,
+            heroAchievement,
+            achievements,
+            isPR,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
           };
 
           const stats = calculateWorkoutStats(workout);
-          const isPR = Boolean(data.isPR || data.hasPR || data.pr || prWorkoutIds.has(doc.id));
           return { ...workout, ...stats, isPR };
         })
         // Filter completed workouts and sort by date (newest first)

@@ -1,6 +1,13 @@
 import { useCallback, useRef } from 'react';
 import styles from './StepperInput.module.css';
 
+function selectAllInput(target: HTMLInputElement) {
+  requestAnimationFrame(() => {
+    target.focus();
+    target.setSelectionRange(0, target.value.length);
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // StepperInput — Numeric field with right-side vertical +/−
 //
@@ -23,8 +30,10 @@ interface StepperInputProps {
   /** CSS variable value for Trinity color theming */
   color?: string;
   inputMode?: 'decimal' | 'numeric';
-  /** Compact size for inline use */
-  size?: 'sm' | 'md';
+  /** Compact size for inline use; 'arcade' = full-width horizontal dashboard tile */
+  size?: 'sm' | 'md' | 'arcade';
+  onCenterPress?: () => void;
+  active?: boolean;
 }
 
 // Long-press acceleration schedule
@@ -44,6 +53,8 @@ export function StepperInput({
   color,
   inputMode = 'numeric',
   size = 'md',
+  onCenterPress,
+  active = false,
 }: StepperInputProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdStartRef = useRef<number>(0);
@@ -54,10 +65,10 @@ export function StepperInput({
   }, [min, max]);
 
   const adjust = useCallback((delta: number) => {
-    const current = value ?? 0;
+    const current = value ?? min;
     const next = clamp(current + delta);
     onChange(next);
-  }, [value, clamp, onChange]);
+  }, [value, min, clamp, onChange]);
 
   // ── Long-press logic ──
   const scheduleNext = useCallback((direction: 'plus' | 'minus') => {
@@ -101,10 +112,63 @@ export function StepperInput({
     ? { '--stepper-color': color } as React.CSSProperties
     : undefined;
 
+  const displayStr = value != null ? String(value) : '';
+
+  // ── Arcade mode: horizontal [−] [value] [+] ──────────────────────
+  if (size === 'arcade') {
+    const arcadeContent = (
+      <div className={styles.arcadeStepper} style={containerStyle}>
+        <button
+          type="button"
+          className={`${styles.arcadeZone} ${heldBtnRef.current === 'minus' ? styles.arcadeZoneHeld : ''}`}
+          onPointerDown={() => handlePointerDown('minus')}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          aria-label="Decrease"
+        >
+          <span className={styles.arcadeIcon} aria-hidden="true">−</span>
+        </button>
+        <div className={styles.arcadeCenter}>
+          <button
+            type="button"
+            className={`${styles.arcadeValueButton} ${active ? styles.arcadeValueButtonActive : ''}`}
+            onClick={onCenterPress}
+            aria-label={label ? `Edit ${label}` : 'Edit value'}
+          >
+            <span className={styles.arcadeValue}>{displayStr || placeholder}</span>
+          </button>
+          {unit && <span className={styles.arcadeUnit}>{unit}</span>}
+        </div>
+        <button
+          type="button"
+          className={`${styles.arcadeZone} ${heldBtnRef.current === 'plus' ? styles.arcadeZoneHeld : ''}`}
+          onPointerDown={() => handlePointerDown('plus')}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          aria-label="Increase"
+        >
+          <span className={styles.arcadeIcon} aria-hidden="true">+</span>
+        </button>
+      </div>
+    );
+
+    if (label) {
+      return (
+        <div className={styles.wrapper}>
+          <span className={styles.label}>{label}</span>
+          {arcadeContent}
+        </div>
+      );
+    }
+    return arcadeContent;
+  }
+
+  // ── Standard sm / md mode ─────────────────────────────────────────
   const sizeClass = size === 'sm' ? styles.stepperSm : '';
 
   // Auto-scale font: shrink by 2px per extra character beyond 3
-  const displayStr = value != null ? String(value) : '';
   const baseFont = size === 'sm' ? 20 : 26;
   const overflowChars = Math.max(0, displayStr.length - 3);
   const fontSize = overflowChars > 0 ? baseFont - overflowChars * 2 : undefined;
@@ -116,16 +180,15 @@ export function StepperInput({
     >
       <div className={styles.inputArea}>
         <input
-          type="number"
+          type="text"
           inputMode={inputMode}
+          pattern={inputMode === 'decimal' ? '[0-9]*[.,]?[0-9]*' : '[0-9]*'}
           className={styles.inputField}
           value={displayStr}
           placeholder={placeholder}
-          onFocus={(e) => e.target.select()}
+          onFocus={(e) => selectAllInput(e.currentTarget)}
+          onPointerUp={(e) => selectAllInput(e.currentTarget)}
           onChange={(e) => handleInputChange(e.target.value)}
-          min={min}
-          max={max}
-          step={step}
           style={fontSize != null ? { fontSize: `${fontSize}px` } : undefined}
         />
         {unit && <span className={styles.unit}>{unit}</span>}

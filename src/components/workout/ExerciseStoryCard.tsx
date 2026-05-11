@@ -769,12 +769,37 @@ function extractMetconRecap(exercise: Exercise, displayType: string): MetconReca
 function extractBoardHeader(exercise: Exercise): string | null {
   const rx = exercise.prescription?.trim();
   if (!rx) return null;
-  // Take the segment before any colon or newline — that's the format descriptor
-  const first = rx.split(/[:\n]/)[0].trim();
+  // Split on colons NOT preceded by a digit (avoids breaking "03:00" time formats)
+  // and on newlines. "Every 03:00 min x 5" stays intact; "METCON: moves" splits cleanly.
+  const first = rx.split(/(?<!\d):|\n/)[0].trim();
   if (!first || first.length > 55) return null;
   // Skip when it just restates the exercise name
   if (first.toLowerCase() === exercise.name.trim().toLowerCase()) return null;
   return first.toUpperCase();
+}
+
+/**
+ * For interval workouts, extract the cadence descriptor from name+prescription.
+ * Returns a canonical string like "EVERY 3:00 × 5 ROUNDS" so the card always
+ * tells the full story-structure even when the exercise name omits the timing.
+ */
+function extractIntervalCadence(exercise: Exercise): string | null {
+  const text = `${exercise.name} ${exercise.prescription}`;
+  // "Every 03:00 min x 5 rounds" | "Every 3:00 x 5"
+  const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?\s*[x×]\s*(\d+)\s*(?:rounds?|sets?)?/i);
+  if (mmss) {
+    const mins = parseInt(mmss[1]);
+    const secs = parseInt(mmss[2]);
+    const count = parseInt(mmss[3]);
+    const timeStr = secs === 0 ? `${mins} MIN` : `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `EVERY ${timeStr} × ${count} ROUNDS`;
+  }
+  // "Every 3 min x 5" | "Every 1.5 min x 8"
+  const simple = text.match(/every\s+(\d+(?:\.\d+)?)\s*(?:min(?:utes?)?)?\s*[x×]\s*(\d+)\s*(?:rounds?|sets?)?/i);
+  if (simple) {
+    return `EVERY ${simple[1]} MIN × ${simple[2]} ROUNDS`;
+  }
+  return null;
 }
 
 // ============================================
@@ -823,6 +848,12 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
   const metconRecap = extractMetconRecap(exercise, displayType);
   const vibe = getWorkoutVibe(exercise, displayType);
   const boardHeader = extractBoardHeader(exercise);
+  // For interval workouts: surface the cadence ("EVERY 3:00 × 5 ROUNDS") in the board
+  // header area so the card always tells the full story-structure even when the
+  // exercise name omits the timing (e.g., "5 Rounds" with no "every 3 min").
+  const intervalCadence = (displayType === 'intervals' || displayType === 'emom')
+    ? extractIntervalCadence(exercise)
+    : null;
 
   const d = animationDelay;
   const anim = (delay: number) => animated
@@ -971,10 +1002,11 @@ export function ExerciseStoryCard({ exercise, animationDelay, animated, isPR, br
         </motion.div>
       )}
 
-      {/* ── Board prescription header — "18 MIN AMRAP", "3 ROUNDS FOR TIME", etc. ── */}
-      {boardHeader && !compact && (
+      {/* ── Board prescription header — "18 MIN AMRAP", "EVERY 3:00 × 5 ROUNDS", etc.
+           For interval/emom: intervalCadence takes priority to always surface the timing. ── */}
+      {(intervalCadence || boardHeader) && !compact && (
         <div className={`${styles.boardPrescription} ${styles[`boardPrescription_${color}`]}`}>
-          {boardHeader}
+          {intervalCadence ?? boardHeader}
         </div>
       )}
 

@@ -133,12 +133,12 @@ function abbreviateMovementLabel(name: string): string {
     'dumbbell curl': 'DB Curl',
 
     // Kettlebell movements
-    'russian kettlebell swing': 'KB Swings',
-    'russian kettlebell swings': 'KB Swings',
-    'kettlebell swing': 'KB Swings',
-    'kettlebell swings': 'KB Swings',
-    'american kettlebell swing': 'KB Swings',
-    'american kettlebell swings': 'KB Swings',
+    'russian kettlebell swing': 'Russian KB Swings',
+    'russian kettlebell swings': 'Russian KB Swings',
+    'kettlebell swing': 'American KB Swings',
+    'kettlebell swings': 'American KB Swings',
+    'american kettlebell swing': 'American KB Swings',
+    'american kettlebell swings': 'American KB Swings',
 
     // Gymnastics
     'v-up': 'V-ups',

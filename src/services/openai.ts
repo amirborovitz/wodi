@@ -12,7 +12,7 @@ const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit coach and workout parse
 ## OUTPUT FORMAT
 Return ONLY valid JSON:
 {
-  "title": "workout name if visible",
+  "title": "workout name — see TITLE RULES below",
   "rawText": "full workout text from the image (OCR-style, line breaks ok)",
   "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
   "format": "for_time" | "intervals" | "amrap" | "amrap_intervals" | "emom" | "strength" | "tabata",
@@ -25,6 +25,10 @@ Return ONLY valid JSON:
   "benchmarkModified": false,
   "partnerWorkout": false,
   "teamSize": null,
+  // difficultyLevel: 1–10 rating of programmed difficulty (not the athlete's fitness level).
+  // 1 = very easy recovery/active rest, 5 = moderate (benchmark), 8 = hard, 10 = brutal.
+  // Base this on load relative to body weight, volume, workout duration, and movement complexity.
+  "difficultyLevel": 5,
   // "sets" is the TOTAL number of working rounds for the main WOD (not counting buy-in / cash-out one-off work).
   // For structures like "Into, 2 rounds: [block A] Into, 2 rounds: [block B]" the total sets is 4.
   "exercises": [
@@ -38,6 +42,7 @@ Return ONLY valid JSON:
       "suggestedSets": 5,
       "suggestedReps": 10,
       "suggestedRepsPerSet": [6, 5, 4, 3, 2],
+      "ladderReps": [2, 4, 6, 8, 10],
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
       // Buy-in work that happens ONCE before all rounds (e.g. big machine effort before the WOD) goes into "buyIn".
       // This work is not repeated each round.
@@ -90,6 +95,14 @@ Return ONLY valid JSON:
   - "movements": the per-round block of movements for that section.
 - Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
   Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
+- CRITICAL — CHIPPER RULE: In for_time workouts where the same movement appears on
+  multiple separate lines WITHOUT an explicit "X rounds" or "X sets" wrapper, you MUST
+  preserve EVERY line as its own movement entry, in order, even when the name and quantity
+  are identical across occurrences.
+  Example: "50 cal Echo Bike / 50 Thrusters / 50 cal Echo Bike / 50 Thrusters /
+  50 cal Echo Bike" → 5 separate movement entries in movements[], NOT 2.
+  The absence of "X rounds" / "X sets" language IS the signal that each line is distinct
+  work and must be logged separately. DO NOT collapse repeated movements into one entry.
 
 ## FORMAT DETECTION (pick exactly one)
 | Format | Trigger | scoreType |
@@ -132,11 +145,29 @@ When an interval workout has labeled stations (A, B, C… or Station 1, 2, 3…)
 - "A. MAX BIKE\nB. 10 Renegade Row + MAX Step Up\nC. MAX ROW" → Bike gets stationLabel "A", Renegade Row gets stationLabel "B" (Step Up omits it), Row gets stationLabel "C"
 - Only emit stationLabel when the workout explicitly uses letters/numbers to label rotating stations.
 
+## MOVEMENT SEMANTICS
+When the workout structure makes counting explicit, every movement SHOULD include:
+- "countingMode": one of "per_round", "per_interval", "per_station_visit", "once"
+- "scoreEntryMode": one of "per_round", "total"
+- "stationIndex": 0-based station index for rotating station workouts when known
+
+Rules:
+- Standard WOD movements repeated each round → countingMode: "per_round"
+- Buy-in / cash-out done once for the whole workout → countingMode: "once"
+- Buy-in repeated at the start of every interval block → countingMode: "per_interval"
+- Rotating station workouts → countingMode: "per_station_visit" for station movements
+- In rotating station workouts, the athlete logs one result per station visit pattern, so MAX bike cal / MAX row cal / MAX step-ups / MAX rope jumps should usually use scoreEntryMode: "per_round"
+- Use scoreEntryMode: "total" only when the athlete is explicitly entering one final total for the whole workout or whole block
+- Prescribed per-round values that should still be multiplied by rounds/visits (e.g. 10 Renegade Row, 20 DB Snatch) also use scoreEntryMode: "per_round"
+
 ## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
 - rxWeights is ALWAYS the weight of ONE implement (never pre-doubled)
 - implementCount: 2 when "twin", "double", "2x", "pair" is explicit, OR the movement naturally uses two (DB Thrusters, DB Front Squats, Farmers Carry)
-- implementCount: 1 for single-arm movements (DB Snatch, Alt DB Clean, KB Swing, Goblet Squat, Turkish Get-up)
+- implementCount: 1 for single-arm or single-implement movements (DB Snatch, Alt DB Clean, American Kettlebell Swing, Goblet Squat, Turkish Get-up)
+- "KB Swing(s)" without Russian specified means "American Kettlebell Swing"; Russian/American swing labels only apply to kettlebell swings.
+- "A.KB", "A. KB", "AKS", "AKBS" = "American Kettlebell Swing" (overhead / 360°). NOT "Alt" or "Alternating".
+- "R.KB", "R. KB", "RKS", "RKBS" = "Russian Kettlebell Swing" (eye/chest height / 180°).
 - When ambiguous, default to 1
 
 ## LOGGING MODE (per exercise)
@@ -165,11 +196,24 @@ Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat,
 Gymnastics: hspu → Handstand Push-up, t2b/ttb → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
 Cardio: du → Double Under, su → Single Under, cal → Calories
 Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
+CRITICAL: Compound movements written as "X to Y" or "X + Y" (e.g., "Power Clean to Push Press", "Hang Clean to Overhead", "Deadlift to Hang Power Clean") are a SINGLE movement. Preserve the FULL compound name — do NOT simplify to just the first movement ("Power Clean to Push Press" is NOT "Power Clean").
+CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walking, Alternating/Alt. "20 goblet alt lunges" → "Goblet Alt Lunge", not plain "Lunge".
+
+## TITLE RULES
+- If a workout name is clearly written/printed on the board (e.g. "RIFT", "MURPH", "WEDNESDAY WOD"), use it exactly as written.
+- If no name is visible, invent a **short, punchy 1–2 word name** that captures the workout's character — CrossFit benchmark style. Never use a description or sentence.
+  - Heavy/barbell: FORGE, ANVIL, PRESS, IRON, CRUSH
+  - Fast/cardio: SURGE, VOLT, BURN, BLAZE, SPARK
+  - Long/grinding: GRIND, HAUL, CARRY, CLIMB
+  - Explosive/mixed: RIFT, STORM, BURST, SHATTER
+  - Two-word combos (when one word isn't enough): DEAD HEAT, COLD IRON, HARD STOP
+- NEVER return "Today's Workout", a format label ("For Time"), a description ("8 Round Barbell Metcon"), or any sentence.
 
 ## KEY GUIDELINES
 1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise — UNLESS the workout alternates between different movement blocks (A.1/A.2, odd/even minutes with different movements). Alternating blocks need separate exercises for separate round scores.
 2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
 3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
+4. ALWAYS include "difficultyLevel" (1–10) at the top level. Rate the programmed difficulty, not athlete fitness. Use the full range: 1=active recovery, 3=easy, 5=moderate benchmark pace, 7=hard, 8=very hard, 10=brutal. Consider load relative to body weight, total volume, time cap, and movement complexity. Example: "50 cal Echo Bike + 50 Thrusters @30kg × 3 rounds" = 8.
 
 ## CONTAINER/BENCHMARK RECOGNITION
 - containerRounds: outer rounds wrapping a benchmark (7 in "7 rounds of Cindy")
@@ -179,6 +223,15 @@ Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 
 ## VARIABLE REP SCHEMES
 "[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
+Bracket notation like "[20-16-12-8-4]" in a for_time workout → suggestedRepsPerSet: [20, 16, 12, 8, 4], suggestedSets: 5.
+CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.
+
+## ASCENDING LADDER REP SCHEMES
+When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to the sequence.
+- "2-4-6-8-10---" → ladderReps: [2, 4, 6, 8, 10], loggingMode: "amrap"
+- "1-2-3-4-5 each" → ladderReps: [1, 2, 3, 4, 5], loggingMode: "amrap"
+- "21-15-9" is NOT a ladder (descending) → suggestedRepsPerSet: [21, 15, 9], NO ladderReps
+- ladderReps applies ONLY to ascending sequences in AMRAP workouts. Do not set it for strength or for_time.
 
 ## PARTNER / TEAM WORKOUTS
 - "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
@@ -206,7 +259,7 @@ Output:
       "movements": [
         { "name": "Push Jerk", "reps": 8, "inputType": "weight", "rxWeights": { "male": 50, "female": 40, "unit": "kg" } },
         { "name": "Toes to Bar", "reps": 8, "inputType": "none" },
-        { "name": "Kettlebell Swing", "reps": 8, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
+        { "name": "American Kettlebell Swing", "reps": 8, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
       ],
       "cashOut": [{ "name": "Run", "distance": 600, "unit": "m", "inputType": "none" }]
     }
@@ -265,12 +318,12 @@ Output:
   "type": "metcon", "format": "intervals", "scoreType": "time_per_set", "sets": 16, "intervalTime": 90,
   "exercises": [{ "name": "1.50 Min x 16 Rounds", "type": "wod", "loggingMode": "intervals", "prescription": "A. Max Bike, B. 10 Renegade Row + Max Step Up, C. Max Row, D. 20 Dumbbell Snatch + Max Rope Jump", "suggestedSets": 16,
     "movements": [
-      { "name": "Bike", "inputType": "none", "stationLabel": "A" },
-      { "name": "Renegade Row", "reps": 10, "inputType": "weight", "implementCount": 1, "stationLabel": "B" },
-      { "name": "Step Up", "inputType": "none" },
-      { "name": "Row", "inputType": "none", "stationLabel": "C" },
-      { "name": "Dumbbell Snatch", "reps": 20, "inputType": "weight", "implementCount": 1, "stationLabel": "D" },
-      { "name": "Rope Jump", "inputType": "none" }
+      { "name": "Bike", "inputType": "none", "stationLabel": "A", "stationIndex": 0, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" },
+      { "name": "Renegade Row", "reps": 10, "inputType": "weight", "implementCount": 1, "stationLabel": "B", "stationIndex": 1, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" },
+      { "name": "Step Up", "inputType": "none", "stationIndex": 1, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" },
+      { "name": "Row", "inputType": "none", "stationLabel": "C", "stationIndex": 2, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" },
+      { "name": "Dumbbell Snatch", "reps": 20, "inputType": "weight", "implementCount": 1, "stationLabel": "D", "stationIndex": 3, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" },
+      { "name": "Rope Jump", "inputType": "none", "stationIndex": 3, "countingMode": "per_station_visit", "scoreEntryMode": "per_round" }
     ] }]
 }
 NOTE: stationLabel goes on the first movement of each station only. "Renegade Row" is a weighted movement (inputType: "weight"), not a cardio machine.
@@ -383,7 +436,7 @@ Output:
     "movements": [
       { "name": "Bar Muscle-up", "reps": 4, "inputType": "none", "alternative": { "name": "Chest to Bar Pull-up", "reps": 6 } },
       { "name": "Box Jump", "reps": 8, "inputType": "none" },
-      { "name": "Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 32, "female": 24, "unit": "kg" }, "implementCount": 1 }
+      { "name": "American Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 32, "female": 24, "unit": "kg" }, "implementCount": 1 }
     ] }]
 }
 NOTE: "Every X:XX + AMRAP" = amrap_intervals, NOT intervals/emom. The run is a buyIn (repeated each interval). User scores total rounds+reps across all intervals.
@@ -606,7 +659,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
         name: e.name,
         suggestedSets: e.suggestedSets,
         movements: e.movements?.map(m => ({
-          name: m.name, reps: m.reps, distance: m.distance, perRound: m.perRound,
+          name: m.name, reps: m.reps, distance: m.distance, calories: m.calories, perRound: m.perRound,
         })),
       })),
     }, null, 2));
@@ -716,6 +769,16 @@ function validateMovement(data: unknown): ParsedMovement | null {
     ? (raw.inputType as ParsedMovement['inputType'])
     : undefined;
 
+  const validCountingModes = ['per_round', 'per_interval', 'per_station_visit', 'once'] as const;
+  const countingMode = validCountingModes.includes(raw.countingMode as typeof validCountingModes[number])
+    ? (raw.countingMode as ParsedMovement['countingMode'])
+    : undefined;
+
+  const validScoreEntryModes = ['per_round', 'total'] as const;
+  const scoreEntryMode = validScoreEntryModes.includes(raw.scoreEntryMode as typeof validScoreEntryModes[number])
+    ? (raw.scoreEntryMode as ParsedMovement['scoreEntryMode'])
+    : undefined;
+
   // Validate implementCount (1 or 2)
   const implementCount = (raw.implementCount === 1 || raw.implementCount === 2)
     ? raw.implementCount as 1 | 2
@@ -743,8 +806,14 @@ function validateMovement(data: unknown): ParsedMovement | null {
     unit: validateMeasurementUnit(raw.unit),
     inputType,
     implementCount,
+    isMaxReps: raw.isMaxReps === true ? true : undefined,
     // "role": "buy_in" or "cash_out" from AI means this movement is not repeated per round
     perRound: raw.perRound === false || raw.role === 'buy_in' || raw.role === 'cash_out' ? false : undefined,
+    countingMode,
+    scoreEntryMode,
+    stationLabel: typeof raw.stationLabel === 'string' ? raw.stationLabel : undefined,
+    stationIndex: typeof raw.stationIndex === 'number' ? raw.stationIndex : undefined,
+    together: raw.together === true ? true : undefined,
     alternative,
     // Preserve role so downstream code can distinguish buy-in from cash-out
     ...(raw.role === 'buy_in' || raw.role === 'cash_out' ? { role: raw.role as 'buy_in' | 'cash_out' } : {}),
@@ -902,12 +971,19 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         const arr = exercise.suggestedRepsPerSet.filter((v: unknown) => typeof v === 'number' && v > 0) as number[];
         if (arr.length > 0) {
           suggestedRepsPerSet = arr;
-          // Only adjust suggestedSets UP to match array length.
-          // When suggestedSets > arr.length, the extra sets are likely "max" sets
-          // (e.g., [8,6,4,2,max] → arr=[8,6,4,2], suggestedSets=5).
           if (suggestedSets < arr.length) {
             suggestedSets = arr.length;
           }
+        }
+      }
+
+      // Validate ladderReps — AI-returned ascending rep sequence for ladder AMRAPs
+      let ladderReps: number[] | undefined = undefined;
+      if (Array.isArray(exercise.ladderReps)) {
+        const arr = exercise.ladderReps.filter((v: unknown) => typeof v === 'number' && v > 0) as number[];
+        if (arr.length >= 3) {
+          const isAscending = arr.every((v, i) => i === 0 || v > arr[i - 1]);
+          if (isAscending) ladderReps = arr;
         }
       }
 
@@ -946,6 +1022,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         loggingHints,
         workDuration: typeof exercise.workDuration === 'number' && exercise.workDuration > 0 ? exercise.workDuration : undefined,
         restDuration: typeof exercise.restDuration === 'number' && exercise.restDuration > 0 ? exercise.restDuration : undefined,
+        ...(ladderReps && { ladderReps }),
       });
     }
   }
@@ -982,6 +1059,9 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
     partnerWorkout: typeof raw.partnerWorkout === 'boolean' ? raw.partnerWorkout : undefined,
     teamSize: typeof raw.teamSize === 'number' && raw.teamSize >= 2 ? raw.teamSize : undefined,
     rawText,
+    difficultyLevel: typeof raw.difficultyLevel === 'number' && raw.difficultyLevel >= 1 && raw.difficultyLevel <= 10
+      ? Math.round(raw.difficultyLevel)
+      : undefined,
   };
 }
 

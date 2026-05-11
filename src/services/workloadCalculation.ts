@@ -1,31 +1,27 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
-import { isWeightedCarry, DEFAULT_BW } from '../utils/xpCalculations';
+import { isWeightedCarry } from '../utils/xpCalculations';
 
 /**
- * Bodyweight-volume movements: pull-up/dip variations where the athlete
- * moves their own bodyweight through a full range of motion.
- * Volume = bodyweight × reps (when no external load is logged).
+ * Bodyweight movements that should not show a weight annotation in the UI
+ * (pull-ups, dips, muscle-ups, rope climbs). These never use athlete bodyweight
+ * for volume calculations — only an explicitly logged weight counts.
  */
-const BW_VOLUME_PATTERNS = [
-  // Pull-up family
+const BW_DISPLAY_PATTERNS = [
   'pull-up', 'pullup', 'pull up', 'chin-up', 'chinup', 'chin up',
   'chest-to-bar', 'chest to bar', 'c2b', 'ctb',
-  // Muscle-up family (pull + dip)
   'muscle-up', 'muscle up', 'muscleup',
   'bar muscle-up', 'ring muscle-up',
-  // Dip family
   'dip', 'ring dip', 'bar dip',
-  // Rope climb (pulling full BW)
   'rope climb',
 ];
 
 /**
- * Check if a movement should use athlete bodyweight for volume calculation
- * (pull-ups, dips, muscle-ups, and their variations).
+ * Check if a movement is an unweighted bodyweight pulling/pressing pattern.
+ * Used only for display suppression — does NOT affect volume calculation.
  */
 export function isBwVolumeMovement(movementName: string): boolean {
   const name = movementName.toLowerCase();
-  return BW_VOLUME_PATTERNS.some(p => name.includes(p));
+  return BW_DISPLAY_PATTERNS.some(p => name.includes(p));
 }
 
 /**
@@ -137,15 +133,173 @@ function getContainerMultiplier(workout: ParsedWorkout, exercise: ParsedExercise
   return sets;
 }
 
+function getStationVisitCount(totalIntervals: number, stationCount: number, stationIndex: number): number {
+  if (totalIntervals <= 0 || stationCount <= 0) return 1;
+  const baseVisits = Math.floor(totalIntervals / stationCount);
+  const remainder = totalIntervals % stationCount;
+  return baseVisits + (stationIndex < remainder ? 1 : 0);
+}
+
+export function getStationVisitCountsForExercise(
+  workout: ParsedWorkout,
+  exercise: ParsedExercise,
+  exerciseIndex: number
+): number[] | null {
+  // Allow exercises with stationLabel on movements to bypass the stationRotation flag —
+  // EMOM minute-station workouts use stationLabel without setting stationRotation.
+  const hasMovementStationLabels = exercise.movements?.some(m => m.stationLabel);
+  if (!(workout.stationRotation || exercise.stationRotation || hasMovementStationLabels)) return null;
+
+  // For exercises with movement-level station labels (EMOM stations):
+  // Compute totalIntervals = cycles × stationCount so each station gets (cycles) visits.
+  // e.g. 4 rounds × 4 stations → totalIntervals=16, each station visited 16÷4=4 times.
+  // The AI may encode suggestedSets as either total-minutes (16) or complete-cycles (4);
+  // deriving it from stationCount avoids that ambiguity when workout.sets = cycles.
+  let totalIntervals: number;
+  if (hasMovementStationLabels) {
+    const stationLabelsInExercise = new Set(
+      (exercise.movements || []).map(m => m.stationLabel?.trim()).filter(Boolean)
+    );
+    const stationCount = stationLabelsInExercise.size || 1;
+    const cycles = getContainerMultiplier(workout, exercise);
+    const suggestedSets = exercise.suggestedSets || 0;
+    // Heuristic: if suggestedSets is clearly the total-interval count (> stationCount, divisible),
+    // use it directly (e.g. suggestedSets=16 for a 16-min EMOM with 4 stations → 4 visits).
+    // Otherwise treat cycles as complete-cycle count and multiply: 4 cycles × 4 stations = 16.
+    totalIntervals = (suggestedSets > stationCount && suggestedSets % stationCount === 0)
+      ? suggestedSets
+      : cycles * stationCount;
+  } else {
+    totalIntervals = getContainerMultiplier(workout, exercise);
+  }
+  if (totalIntervals <= 0) return null;
+
+  // Section-based station rotation (only when stationRotation is explicitly set)
+  if ((workout.stationRotation || exercise.stationRotation) && exercise.sections && exercise.sections.length > 1) {
+    const roundSections = exercise.sections
+      .map((section, sectionIndex) => ({ section, sectionIndex }))
+      .filter(({ section }) => section.sectionType === 'rounds');
+
+    if (roundSections.length > 1) {
+      const stationCount = roundSections.length;
+      const visitsBySectionIndex = new Map<number, number>();
+      roundSections.forEach(({ sectionIndex }, roundIndex) => {
+        visitsBySectionIndex.set(
+          sectionIndex,
+          getStationVisitCount(totalIntervals, stationCount, roundIndex)
+        );
+      });
+
+      const flattened: number[] = [];
+      exercise.sections.forEach((section, sectionIndex) => {
+        const visits = section.sectionType === 'rounds'
+          ? (visitsBySectionIndex.get(sectionIndex) ?? 1)
+          : 1;
+        section.movements.forEach(() => flattened.push(visits));
+      });
+      return flattened;
+    }
+  }
+
+  // Movement-level station labels: distribute totalIntervals evenly across stations.
+  // Handles EMOM with "Min 1 / Min 2 / ..." station labels — each station is visited
+  // totalIntervals / stationCount times (e.g., 16 min EMOM / 4 stations = 4 visits each).
+  const movements = exercise.movements;
+  if (movements && movements.length > 0) {
+    const stationLabels = movements
+      .map((mov) => mov.stationLabel?.trim())
+      .filter((label): label is string => Boolean(label));
+
+    if (stationLabels.length > 0) {
+      const stationOrder = new Map<string, number>();
+      const movementStationIndices: number[] = [];
+      let currentStationIndex = 0;
+
+      for (const mov of movements) {
+        if (mov.stationLabel) {
+          const label = mov.stationLabel.trim();
+          if (!stationOrder.has(label)) {
+            stationOrder.set(label, stationOrder.size);
+          }
+          currentStationIndex = stationOrder.get(label) ?? currentStationIndex;
+        }
+        movementStationIndices.push(currentStationIndex);
+      }
+
+      const stationCount = Math.max(stationOrder.size, 1);
+      return movementStationIndices.map((stationIndex) =>
+        getStationVisitCount(totalIntervals, stationCount, stationIndex)
+      );
+    }
+  }
+
+  // Exercise-level station rotation: each exercise is one station (only for stationRotation workouts)
+  if ((workout.stationRotation || exercise.stationRotation) && workout.exercises.length > 1) {
+    const stationCount = workout.exercises.length;
+    const visits = getStationVisitCount(totalIntervals, stationCount, exerciseIndex);
+    return movements && movements.length > 0 ? movements.map(() => visits) : [visits];
+  }
+
+  return null;
+}
+
+function getMovementMultiplier(
+  movement: ParsedMovement,
+  movementIndex: number,
+  exercise: ParsedExercise,
+  workout: ParsedWorkout,
+  fallbackMultiplier: number,
+  stationVisitCounts: number[] | null
+): number {
+  const intervalMultiplier = exercise.intervalCount || exercise.suggestedSets || workout.sets || workout.containerRounds || fallbackMultiplier || 1;
+
+  switch (movement.countingMode) {
+    case 'once':
+      return 1;
+    case 'per_interval':
+      return intervalMultiplier;
+    case 'per_station_visit':
+      if (movement.stationIndex != null) {
+        const stationCount = Math.max(
+          ...((exercise.movements || []).map((mov) => mov.stationIndex ?? -1)),
+          ...((exercise.sections?.flatMap((section) => section.movements.map((mov) => mov.stationIndex ?? -1)) || [-1]))
+        ) + 1;
+        if (stationCount > 0) {
+          return getStationVisitCount(intervalMultiplier, stationCount, movement.stationIndex);
+        }
+      }
+      return stationVisitCounts?.[movementIndex] ?? intervalMultiplier;
+    case 'per_round':
+    default:
+      break;
+  }
+
+  // Legacy fallback for old workouts
+  const hasSections = !!(exercise.sections && exercise.sections.length > 0);
+  const isBuyInCashOut = hasSections && movement.perRound === false;
+  return isBuyInCashOut
+    ? 1
+    : (stationVisitCounts?.[movementIndex] ?? fallbackMultiplier);
+}
+
+function getVariableSchemeMovementReps(
+  movement: ParsedMovement,
+  exercise: ParsedExercise,
+): number | undefined {
+  const scheme = exercise.suggestedRepsPerSet;
+  if (!scheme || scheme.length <= 1 || !movement.reps || movement.reps !== scheme[0]) {
+    return undefined;
+  }
+  return scheme.reduce((sum, reps) => sum + reps, 0);
+}
+
 /**
  * Calculate the workload breakdown from a parsed workout
  */
 export function calculateWorkloadBreakdown(
   workout: ParsedWorkout,
   movementWeights?: Record<string, number>,
-  athleteBodyweight?: number
 ): WorkloadBreakdown {
-  const bw = athleteBodyweight && athleteBodyweight > 0 ? athleteBodyweight : DEFAULT_BW;
   // Aggregate movements across all exercises
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
@@ -154,22 +308,29 @@ export function calculateWorkloadBreakdown(
   let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
-  for (const exercise of workout.exercises) {
+  workout.exercises.forEach((exercise, exerciseIndex) => {
     const multiplier = getContainerMultiplier(workout, exercise);
+    const stationVisitCounts = getStationVisitCountsForExercise(workout, exercise, exerciseIndex);
 
     // If exercise has movements array, use those
     if (exercise.movements && exercise.movements.length > 0) {
-      for (const movement of exercise.movements) {
+      exercise.movements.forEach((movement, movementIndex) => {
         const key = movement.name.toLowerCase();
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
         // perRound: false means "done once" ONLY for buy-in/cash-out sections.
         // In ladder AMRAPs, perRound: false means fixed reps every round (not on the ladder).
-        const hasSections = !!(exercise.sections && exercise.sections.length > 0);
-        const isBuyInCashOut = hasSections && movement.perRound === false;
-        const movMultiplier = isBuyInCashOut ? 1 : multiplier;
-        const reps = (movement.reps || 0) * movMultiplier;
+        const movMultiplier = getMovementMultiplier(
+          movement,
+          movementIndex,
+          exercise,
+          workout,
+          multiplier,
+          stationVisitCounts
+        );
+        const schemeReps = getVariableSchemeMovementReps(movement, exercise);
+        const reps = schemeReps ?? ((movement.reps || 0) * movMultiplier);
         const distance = (movement.distance || 0) * movMultiplier;
         const calories = (movement.calories || 0) * movMultiplier;
 
@@ -187,8 +348,7 @@ export function calculateWorkloadBreakdown(
           ? perImplementWeight * implementCount
           : perImplementWeight;
 
-        // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
-        const weight = explicitWeight || (isBwVolumeMovement(movement.name) ? bw : undefined);
+        const weight = explicitWeight;
 
         // Determine unit
         let unit: 'kg' | 'lb' | 'm' | 'cal' | undefined;
@@ -243,10 +403,11 @@ export function calculateWorkloadBreakdown(
         if (calories > 0) {
           grandTotalCalories += calories;
         }
-      }
+      });
     } else {
       // Exercise without movements array - use exercise itself
-      const reps = (exercise.suggestedReps || 0) * (exercise.suggestedSets || 1);
+      const stationVisits = stationVisitCounts?.[0] ?? (exercise.suggestedSets || 1);
+      const reps = (exercise.suggestedReps || 0) * stationVisits;
       const weight = exercise.suggestedWeight
         || exercise.rxWeights?.male
         || exercise.rxWeights?.female;
@@ -277,7 +438,7 @@ export function calculateWorkloadBreakdown(
         grandTotalVolume += weight * reps;
       }
     }
-  }
+  });
 
   // Convert map to array and sort by color priority (yellow first, then magenta, then cyan)
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
@@ -326,9 +487,7 @@ export function calculateWorkloadFromExercises(
   }>,
   containerRounds?: number,
   partnerFactor: number = 1,
-  athleteBodyweight?: number
 ): WorkloadBreakdown {
-  const bw = athleteBodyweight && athleteBodyweight > 0 ? athleteBodyweight : DEFAULT_BW;
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
@@ -373,10 +532,6 @@ export function calculateWorkloadFromExercises(
       exerciseWeight = exerciseVolume / exerciseReps;
     }
 
-    // For pull-ups, dips, muscle-ups: use athlete bodyweight when no external load
-    if (!exerciseWeight && isBwVolumeMovement(exercise.name)) {
-      exerciseWeight = bw;
-    }
 
     const existing = movementMap.get(key);
     const color = inferColorFromName(exercise.name, exerciseWeight);

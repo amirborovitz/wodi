@@ -95,28 +95,8 @@ function getBodyweightTier(movementName: string): number {
 }
 
 /**
- * Movements that use athlete bodyweight for volume calculation
- * (pull-ups, dips, muscle-ups). These get volume EP instead of bodyweight EP.
- * Mirrors BW_VOLUME_PATTERNS in workloadCalculation.ts.
- */
-const BW_VOLUME_PATTERNS = [
-  'pull-up', 'pullup', 'pull up', 'chin-up', 'chinup', 'chin up',
-  'chest-to-bar', 'chest to bar', 'c2b', 'ctb',
-  'muscle-up', 'muscle up', 'muscleup',
-  'bar muscle-up', 'ring muscle-up',
-  'dip', 'ring dip', 'bar dip',
-  'rope climb',
-];
-
-function isBwVolumeMovement(movementName: string): boolean {
-  const name = movementName.toLowerCase();
-  return BW_VOLUME_PATTERNS.some(p => name.includes(p));
-}
-
-/**
  * Calculate bodyweight EP from unweighted movements in the breakdown.
  * Only counts movements that have reps but no weight.
- * Skips BW volume movements (pull-ups, dips, etc.) — they now get volume EP.
  */
 export function calculateBodyweightEP(
   movements: Array<{ name: string; totalReps?: number; weight?: number }>
@@ -126,8 +106,6 @@ export function calculateBodyweightEP(
     if (!mov.totalReps || mov.totalReps <= 0) continue;
     // Skip weighted movements — they're already counted in volume EP
     if (mov.weight && mov.weight > 0) continue;
-    // Skip BW volume movements — they now get volume EP via bodyweight
-    if (isBwVolumeMovement(mov.name)) continue;
     const tier = getBodyweightTier(mov.name);
     if (tier <= 0) continue;
     virtualVolume += mov.totalReps * tier;
@@ -151,7 +129,8 @@ export function calculateWorkoutEP(
   bodyweight: number,
   isPR: boolean = false,
   movements?: Array<{ name: string; totalReps?: number; totalDistance?: number; weight?: number }>,
-  actualTimeMinutes?: number
+  actualTimeMinutes?: number,
+  difficultyLevel?: number
 ): EPBreakdown {
   const bw = bodyweight > 0 ? bodyweight : DEFAULT_BW;
   const time = Math.floor(timeCapMinutes * EP_METCON_RATE);
@@ -172,6 +151,15 @@ export function calculateWorkoutEP(
 
   const pr = isPR ? EP_PR_BONUS : 0;
 
+  // Difficulty multiplier: 1.0 at level 5, ±4% per level away from 5.
+  // Range: level 1 → 0.84×, level 5 → 1.00×, level 8 → 1.12×, level 10 → 1.20×
+  const subtotal = EP_BASE + time + volume + bwEP + distance + intensity + pr;
+  let difficulty = 0;
+  if (difficultyLevel && difficultyLevel >= 1 && difficultyLevel <= 10) {
+    const multiplier = 1.0 + (difficultyLevel - 5) * 0.04;
+    difficulty = Math.round(subtotal * multiplier) - subtotal;
+  }
+
   return {
     base: EP_BASE,
     time,
@@ -180,7 +168,8 @@ export function calculateWorkoutEP(
     distance,
     intensity,
     pr,
-    total: EP_BASE + time + volume + bwEP + distance + intensity + pr,
+    difficulty,
+    total: subtotal + difficulty,
   };
 }
 
@@ -261,6 +250,7 @@ export function calculateWorkoutXP(
     distance: 0,
     intensity: 0,
     pr,
+    difficulty: 0,
     total: base + volume + time + pr,
   };
 }
