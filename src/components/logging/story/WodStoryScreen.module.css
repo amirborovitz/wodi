@@ -182,6 +182,97 @@
   pointer-events: none;
 }
 
+/* ── Close button (wizard mode) ── */
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid var(--wodi-line2);
+  color: var(--wodi-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.closeButton:active {
+  background: rgba(242, 240, 235, 0.12);
+}
+
+/* ── Wizard progress dots ── */
+.wizardDots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  justify-content: center;
+}
+
+.dotActive {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--wodi-yellow);
+  box-shadow: 0 0 8px rgba(245, 194, 0, 0.5);
+  flex-shrink: 0;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.dotDone {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--wodi-yellow);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.dotEmpty {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--wodi-dim);
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
+/* ── Wizard sub-row: format pill + progress bar ── */
+.wizardSubrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-1);
+  margin-top: var(--space-1);
+}
+
+/* ── Mark as done (no details) link ── */
+.markDoneLink {
+  display: block;
+  margin: var(--space-2) auto 0;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: var(--text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-align: center;
+}
+
+.markDoneLink:active {
+  color: var(--wodi-white);
+}
+
 /* ── Metcon name input ── */
 .metconNameRow {
   padding: 0 var(--space-4) var(--space-2);
@@ -299,6 +390,246 @@
 
 /* ── Reduced motion ── */
 /* Intensity prompt */
+/* Dots shown inside the intensity screen */
+.intensityDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+}
+
+.intensityTopBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: calc(var(--safe-top) + 8px) 16px 8px;
+  z-index: 2;
+}
+
+.intensityBackBtn,
+.intensityCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid var(--wodi-line2);
+  color: var(--wodi-dim);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.intensityBackBtn {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+}
+
+.intensityCloseBtn {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.intensityBackBtn:active,
+.intensityCloseBtn:active {
+  background: rgba(242, 240, 235, 0.12);
+}
+
+.alternateScreen {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 18);
+  background: var(--wodi-bg, #0c0d0f);
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--safe-top) + 12px) var(--space-4) calc(var(--safe-bottom) + var(--space-5));
+}
+
+.alternateInner {
+  width: 100%;
+  max-width: 420px;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-5);
+}
+
+.alternateTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.alternateBackBtn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--wodi-line2);
+  background: rgba(242, 240, 235, 0.06);
+  color: rgba(242, 240, 235, 0.7);
+  font-size: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.alternateProgress {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.alternateStepText {
+  color: rgba(242, 240, 235, 0.7);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.alternateDots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.alternateBody {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+}
+
+.alternateExerciseContext {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--wodi-line2);
+}
+
+.alternateBlockIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.alternateBlockChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  background: var(--wodi-card);
+  color: rgba(242, 240, 235, 0.85);
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.alternateBlockName {
+  min-width: 0;
+  color: rgba(242, 240, 235, 0.7);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alternateExerciseName {
+  margin: 0;
+  color: var(--wodi-white);
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.alternatePrescription {
+  margin: 0;
+  color: rgba(242, 240, 235, 0.7);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.alternateEyebrow {
+  margin: 0;
+  color: var(--wodi-white);
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.alternateCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.alternateCard {
+  width: 100%;
+  min-height: 94px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: var(--radius-lg);
+  background: var(--wodi-card);
+  color: var(--wodi-white);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 20px;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.alternateCard:active {
+  transform: scale(0.985);
+  border-color: rgba(245, 194, 0, 0.45);
+  background: rgba(242, 240, 235, 0.08);
+}
+
+.alternateChoiceTitle {
+  color: var(--wodi-white);
+  font-family: var(--font-barlow);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.alternateChoiceMeta {
+  color: rgba(242, 240, 235, 0.7);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
 .intensityScreen {
   position: fixed;
   inset: 0;
@@ -307,7 +638,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-4);
+  padding: calc(var(--safe-top) + 72px) var(--space-4) var(--space-4);
 }
 
 .intensityInner {

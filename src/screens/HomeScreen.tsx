@@ -624,6 +624,16 @@ export function HomeScreen({ onAddWorkout, onImageSelected, onUsePastWorkout, on
     return () => window.clearTimeout(timer);
   }, [shareMessage]);
 
+  const anySheetOpen = captureSheetOpen || !!activeSheetCard || !!drilldownCard;
+  useEffect(() => {
+    if (anySheetOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [anySheetOpen]);
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';

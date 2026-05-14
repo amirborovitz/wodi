@@ -1,16 +1,29 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet, IntensityRating } from '../../../types';
-import { WodStoryScreen, initStoryResults } from './WodStoryScreen';
+import { initStoryResults } from './WodStoryScreen';
 import { EditExerciseSheet } from './EditExerciseSheet';
 import { InputRouter } from './InputRouter';
+import { WizardOverview } from './WizardOverview';
+import { WizardExerciseScreen } from './WizardExerciseScreen';
+import { WrapFlash } from './WrapFlash';
 import type { StoryExerciseResult } from './types';
 import { getPrescribedSetCount } from './types';
 import { useAuth } from '../../../context/AuthContext';
+import { calculateWorkoutEP, DEFAULT_BW } from '../../../utils/xpCalculations';
 import styles from './WodStoryScreen.module.css';
 
+// ─── Public type for WizardOverview ─────────────────────────────
+
+export interface WizardBlock {
+  groupLabel: string | null;
+  exerciseIndices: number[];
+  isMetcon: boolean;
+  typeLabel: string;
+  displayName: string;
+}
+
 // ─── Bridge type ────────────────────────────────────────────────
-// The old ExerciseResult interface used by AddWorkoutScreen.saveWorkout()
-// We reproduce it here so StoryLogResults can feed the existing save pipeline.
 
 interface LegacyExerciseResult {
   exercise: import('../../../types').ParsedExercise;
@@ -41,25 +54,130 @@ interface LegacyExerciseResult {
   intensity?: IntensityRating | null;
 }
 
+// ─── Intensity options ───────────────────────────────────────────
+
 const INTENSITY_OPTIONS: { id: IntensityRating; emoji: string; label: string }[] = [
   { id: 'smoked', emoji: '💀', label: 'Smoked' },
   { id: 'cooked', emoji: '🔥', label: 'Cooked' },
   { id: 'locked_in', emoji: '💪', label: 'Locked in' },
 ];
 
-function isMetconIntensityResult(result: StoryExerciseResult, mode?: ExerciseLoggingMode): boolean {
-  if (result.exercise.type === 'strength' || mode === 'strength' || result.kind === 'load') return false;
-  return result.kind === 'score_time'
-    || result.kind === 'score_rounds'
-    || result.kind === 'intervals'
-    || mode === 'for_time'
-    || mode === 'amrap'
-    || mode === 'amrap_intervals'
-    || mode === 'emom'
-    || mode === 'intervals'
-    || result.exercise.type === 'wod'
-    || result.exercise.type === 'cardio';
+// ─── Block computation ───────────────────────────────────────────
+
+const PART_PATTERN = /^(?:part\s+)?([A-Z])[).:\s-]/i;
+
+const NON_PRIMARY_PATTERN = /\b(warm[\s-]?up|cool[\s-]?down|accessor(?:y|ies)|mobility|stretch|primer|activation|skill\s*work|practice)\b/i;
+
+function getModeForExercise(
+  workout: ParsedWorkout,
+  loggingModes: ExerciseLoggingMode[],
+  index: number,
+): ExerciseLoggingMode | undefined {
+  return workout.exercises[index]?.loggingMode ?? loggingModes[index];
 }
+
+function isPrimaryExercise(
+  workout: ParsedWorkout,
+  loggingModes: ExerciseLoggingMode[],
+  index: number,
+): boolean {
+  const ex = workout.exercises[index];
+  if (!ex) return false;
+  const text = `${ex.name || ''} ${ex.prescription || ''}`.toLowerCase();
+  if (NON_PRIMARY_PATTERN.test(text)) return false;
+
+  const mode = getModeForExercise(workout, loggingModes, index);
+  return (
+    ex.type === 'strength' ||
+    ex.type === 'wod' ||
+    mode === 'strength' ||
+    mode === 'sets' ||
+    mode === 'for_time' ||
+    mode === 'amrap' ||
+    mode === 'amrap_intervals' ||
+    mode === 'emom' ||
+    mode === 'intervals'
+  );
+}
+
+function getExerciseBlockKey(
+  workout: ParsedWorkout,
+  loggingModes: ExerciseLoggingMode[],
+  index: number,
+): string {
+  const ex = workout.exercises[index];
+  const mode = getModeForExercise(workout, loggingModes, index);
+  if (ex?.type === 'strength' || mode === 'strength' || mode === 'sets') return 'strength';
+  if (mode === 'for_time') return 'for_time';
+  if (mode === 'amrap' || mode === 'amrap_intervals') return 'amrap';
+  if (mode === 'emom') return 'emom';
+  if (mode === 'intervals') return 'interval';
+  if (ex?.type === 'wod') return `metcon-${index}`;
+  return `primary-${index}`;
+}
+
+function computeWizardBlocks(
+  workout: ParsedWorkout,
+  loggingModes: ExerciseLoggingMode[],
+): WizardBlock[] {
+  type RawGroup = { label: string | null; indices: number[] };
+  const rawGroups: RawGroup[] = [];
+  let currentLabel: string | null = null;
+  let currentKey: string | null = null;
+  let currentIndices: number[] = [];
+
+  workout.exercises.forEach((ex, i) => {
+    if (!isPrimaryExercise(workout, loggingModes, i)) return;
+
+    const match = ex.name.match(PART_PATTERN);
+    const label = match ? match[1].toUpperCase() : null;
+    const key = label ? `part-${label}` : getExerciseBlockKey(workout, loggingModes, i);
+    if (currentIndices.length > 0 && (key !== currentKey || (label != null && label !== currentLabel))) {
+      if (currentIndices.length > 0) rawGroups.push({ label: currentLabel, indices: currentIndices });
+      currentLabel = label;
+      currentKey = key;
+      currentIndices = [i];
+    } else {
+      currentLabel = label;
+      currentKey = key;
+      currentIndices.push(i);
+    }
+  });
+  if (currentIndices.length > 0) rawGroups.push({ label: currentLabel, indices: currentIndices });
+
+  return rawGroups.map((g) => {
+    const exercises = g.indices.map((i) => workout.exercises[i]).filter(Boolean);
+
+    const isMetcon = exercises.some((ex, li) => {
+      const mode = getModeForExercise(workout, loggingModes, g.indices[li]);
+      return (
+        ex.type === 'wod' ||
+        mode === 'for_time' || mode === 'amrap' || mode === 'amrap_intervals' ||
+        mode === 'emom' || mode === 'intervals'
+      );
+    });
+
+    const firstEx = exercises[0];
+    const firstMode = getModeForExercise(workout, loggingModes, g.indices[0]);
+    let typeLabel = 'WORKOUT';
+    if (firstEx?.type === 'strength' || firstMode === 'strength' || firstMode === 'sets') typeLabel = 'STRENGTH';
+    else if (firstMode === 'amrap' || firstMode === 'amrap_intervals') typeLabel = 'AMRAP';
+    else if (firstMode === 'for_time') typeLabel = 'FOR TIME';
+    else if (firstMode === 'emom') typeLabel = 'EMOM';
+    else if (firstMode === 'intervals') typeLabel = 'INTERVAL';
+    else if (firstEx?.type === 'wod') typeLabel = 'METCON';
+
+    const displayName = g.label
+      ? `Part ${g.label}`
+      : (firstEx?.name && firstEx.name.length <= 22 ? firstEx.name : typeLabel);
+
+    return { groupLabel: g.label, exerciseIndices: g.indices, isMetcon, typeLabel, displayName };
+  });
+}
+
+// ─── Wizard phase ────────────────────────────────────────────────
+
+type WizardPhase = 'overview' | 'logging' | 'intensity' | 'wrap';
 
 // ─── Props ──────────────────────────────────────────────────────
 
@@ -69,19 +187,13 @@ interface StoryLogResultsProps {
   onSave: (results: LegacyExerciseResult[]) => void;
   onBack: () => void;
   isSaving?: boolean;
-  /** Pre-filled results for edit mode (skips blank initialization) */
   initialResults?: StoryExerciseResult[];
 }
 
-// ─── Ladder helpers ─────────────────────────────────────────────
+// ─── Ladder helper ───────────────────────────────────────────────
 
-/**
- * Get the rep value for a ladder rung, extrapolating beyond the prescribed array.
- * E.g., ladderReps=[4,6,8,10,12], rungIdx=5 → extrapolates step=2 → 14.
- */
 function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
   if (rungIdx < ladderReps.length) return ladderReps[rungIdx];
-  // Extrapolate: detect the step between last two values
   const step = ladderReps.length >= 2
     ? ladderReps[ladderReps.length - 1] - ladderReps[ladderReps.length - 2]
     : 2;
@@ -95,376 +207,116 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const prescribedCount = getPrescribedSetCount(r.exercise, r.kind);
   const effectiveSetsTotal = Math.max(r.setsTotal || 1, prescribedCount ?? 0);
   const setsCount = r.setsCompleted ?? effectiveSetsTotal;
-  const debugCelebration = typeof window !== 'undefined'
-    && window.localStorage.getItem('wodi:debugCelebration') === '1';
 
-  if (debugCelebration) {
-    console.log('[CelebrationDebug] toLegacyResult start', {
-      exercise: r.exercise.name,
-      kind: r.kind,
-      setsTotal: r.setsTotal,
-      setsCompleted: r.setsCompleted,
-      intervalsTotal: r.intervalsTotal,
-      intervalsCompleted: r.intervalsCompleted,
-      prescribedCount,
-      effectiveSetsTotal,
-      setsCount,
-      movements: r.movementResults?.map((mr) => ({
-        name: mr.movement.name,
-        reps: mr.movement.reps,
-        distance: mr.movement.distance,
-        calories: mr.movement.calories,
-        scoreEntryMode: mr.movement.scoreEntryMode,
-        countingMode: mr.movement.countingMode,
-        enteredReps: mr.reps,
-        enteredDistance: mr.distance,
-        enteredCalories: mr.calories,
-        substitution: mr.substitution,
-      })),
-    });
-  }
-
-  // ── Helper: extract per-movement data from movementResults ──
-  function buildMovementMaps() {
-    const movementWeights: Record<string, number> = {};
-    const movementDistances: Record<string, number> = {};
-    const movementReps: Record<string, number> = {};
-    const movementCalories: Record<string, number> = {};
-    const implementCounts: Record<string, number> = {};
-    // Maps original movement name → selected alternative name
-    const movementAlternatives: Record<string, string> = {};
-
-    for (const mr of r.movementResults ?? []) {
-      const name = mr.movement.name;
-      if (mr.kind === 'load' && mr.weight != null && mr.weight > 0) {
-        movementWeights[name] = mr.weight;
-      }
-      if (mr.distance != null && mr.distance > 0) {
-        movementDistances[name] = mr.distance;
-      }
-      if (mr.reps != null && mr.reps > 0) {
-        movementReps[name] = mr.reps;
-      }
-      if (mr.calories != null && mr.calories > 0) {
-        movementCalories[name] = mr.calories;
-      }
-      if (mr.implementCount && mr.implementCount > 1) {
-        implementCounts[name] = mr.implementCount;
-      }
-      // Forward substitution: keyed by original name, value is selected alternative
-      if (mr.substitution) {
-        movementAlternatives[mr.substitution.originalName] = mr.substitution.selectedName;
-        // When substitution changes unit type (e.g., Run distance→Echo Bike calories),
-        // explicitly zero out the old type to prevent buildWorkloadBreakdownFromResults
-        // from falling back to the original prescribed values.
-        if (!(mr.distance != null && mr.distance > 0)) movementDistances[name] = 0;
-        if (!(mr.calories != null && mr.calories > 0)) movementCalories[name] = 0;
+  function buildMaps() {
+    const mw: Record<string, number> = {}, md: Record<string, number> = {},
+          mr: Record<string, number> = {}, mc: Record<string, number> = {},
+          ic: Record<string, number> = {}, ma: Record<string, string> = {};
+    for (const m of r.movementResults ?? []) {
+      const n = m.movement.name;
+      if (m.kind === 'load' && m.weight != null && m.weight > 0) mw[n] = m.weight;
+      if (m.distance != null && m.distance > 0) md[n] = m.distance;
+      if (m.reps != null && m.reps > 0) mr[n] = m.reps;
+      if (m.calories != null && m.calories > 0) mc[n] = m.calories;
+      if (m.implementCount && m.implementCount > 1) ic[n] = m.implementCount;
+      if (m.substitution) {
+        ma[m.substitution.originalName] = m.substitution.selectedName;
+        if (!(m.distance != null && m.distance > 0)) md[n] = 0;
+        if (!(m.calories != null && m.calories > 0)) mc[n] = 0;
       }
     }
-
     return {
-      ...(Object.keys(movementWeights).length > 0 ? { movementWeights } : {}),
-      ...(Object.keys(movementDistances).length > 0 ? { movementDistances } : {}),
-      ...(Object.keys(movementReps).length > 0 ? { movementReps } : {}),
-      ...(Object.keys(movementCalories).length > 0 ? { movementCalories } : {}),
-      ...(Object.keys(implementCounts).length > 0 ? { implementCounts } : {}),
-      ...(Object.keys(movementAlternatives).length > 0 ? { movementAlternatives } : {}),
+      ...(Object.keys(mw).length > 0 ? { movementWeights: mw } : {}),
+      ...(Object.keys(md).length > 0 ? { movementDistances: md } : {}),
+      ...(Object.keys(mr).length > 0 ? { movementReps: mr } : {}),
+      ...(Object.keys(mc).length > 0 ? { movementCalories: mc } : {}),
+      ...(Object.keys(ic).length > 0 ? { implementCounts: ic } : {}),
+      ...(Object.keys(ma).length > 0 ? { movementAlternatives: ma } : {}),
     };
   }
 
-  // ── Scored exercises with movements: score is primary, movements are secondary ──
-  // Must be checked BEFORE the generic superset branch.
   const isScored = r.kind === 'score_time' || r.kind === 'score_rounds';
-  const hasMovements = r.movementResults && r.movementResults.length > 1;
-  const hasSingleMovement = r.movementResults && r.movementResults.length === 1;
+  const hasM = (r.movementResults?.length ?? 0) >= 1;
 
-  if (isScored && (hasMovements || hasSingleMovement)) {
-    // Round count: for score_time, use setsCompleted when user marked a partial finish
-    // (e.g. time-capped on set 3 of [20-16-12-8-4]), otherwise prescribed total.
-    const roundCount = r.kind === 'score_time'
-      ? (r.setsCompleted ?? effectiveSetsTotal)
-      : r.rounds;
-
+  if (isScored && hasM) {
+    const rc = r.kind === 'score_time' ? (r.setsCompleted ?? effectiveSetsTotal) : r.rounds;
     if (r.kind === 'score_time') {
-      const repsPerSet = r.exercise.suggestedRepsPerSet;
-      const completedCycleReps = repsPerSet && repsPerSet.length > 1
-        ? repsPerSet.slice(0, roundCount ?? repsPerSet.length).reduce((sum, reps) => sum + reps, 0)
-        : undefined;
+      const rps = r.exercise.suggestedRepsPerSet;
+      const ccr = rps && rps.length > 1 ? rps.slice(0, rc ?? rps.length).reduce((s, x) => s + x, 0) : undefined;
       sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
-      return {
-        exercise: r.exercise,
-        sets,
-        completionTime: r.timeSeconds,
-        rounds: roundCount,
-        ...(completedCycleReps ? {
-          completedCycleReps,
-          completedCycles: roundCount,
-        } : {}),
-        notes: r.notes,
-        ...buildMovementMaps(),
-      };
-    } else {
-      // score_rounds (AMRAP) — includes ladder AMRAP
-      const ladderReps = r.exercise.ladderReps;
-      const isLadder = ladderReps && ladderReps.length > 0 && r.ladderStep != null;
-
-      if (isLadder) {
-        // Ladder AMRAP: one continuous ladder, compute total reps per movement
-        const step = r.ladderStep!;
-        const partial = r.ladderPartial ?? 0;
-        const movementCount = (r.exercise.movements ?? []).filter(m => m.perRound !== false).length || 1;
-        // Total reps per movement = sum of completed rung values + partial
-        let repsPerMovement = 0;
-        // Ladder is open-ended: step can exceed ladderReps.length
-        // For rungs beyond the prescribed array, extrapolate the pattern
-        for (let j = 0; j < step; j++) {
-          repsPerMovement += getLadderRungValue(ladderReps, j);
-        }
-        repsPerMovement += partial;
-        const totalReps = repsPerMovement * movementCount;
-
-        sets.push({
-          id: 'set-0',
-          setNumber: 1,
-          actualReps: totalReps,
-          completed: true,
-        });
-        return {
-          exercise: r.exercise,
-          sets,
-          rounds: step,
-          notes: r.notes,
-          ladderStep: step,
-          ...(partial > 0 && { ladderPartial: partial }),
-          ...buildMovementMaps(),
-        };
-      }
-
-      sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
-      return {
-        exercise: r.exercise,
-        sets,
-        rounds: roundCount,
-        notes: r.notes,
-        ...buildMovementMaps(),
-        ...(r.partialMovements && r.partialMovements.length > 0 ? { partialMovements: r.partialMovements } : {}),
-      };
+      return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: rc, ...(ccr ? { completedCycleReps: ccr, completedCycles: rc } : {}), notes: r.notes, ...buildMaps() };
     }
+    const lr = r.exercise.ladderReps;
+    if (lr && lr.length > 0 && r.ladderStep != null) {
+      const step = r.ladderStep, partial = r.ladderPartial ?? 0;
+      const mc2 = (r.exercise.movements ?? []).filter(m => m.perRound !== false).length || 1;
+      let rpm = 0;
+      for (let j = 0; j < step; j++) rpm += getLadderRungValue(lr, j);
+      rpm += partial;
+      sets.push({ id: 'set-0', setNumber: 1, actualReps: rpm * mc2, completed: true });
+      return { exercise: r.exercise, sets, rounds: step, notes: r.notes, ladderStep: step, ...(partial > 0 && { ladderPartial: partial }), ...buildMaps() };
+    }
+    sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
+    return { exercise: r.exercise, sets, rounds: rc, notes: r.notes, ...buildMaps(), ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}) };
   }
 
-  // ── Superset (non-scored): build legacy result from per-movement data ──
-  if (hasMovements) {
-    // Find the first weighted movement to extract start/end weight for interpolation
-    const weightedMr = r.movementResults?.find(mr => mr.kind === 'load' && mr.weight != null && mr.weight > 0);
-    const startWeight = weightedMr?.weight;
-    const endWeight = r.weightEnd ?? startWeight;
-    const isRange = r.loadMode === 'range' && startWeight != null && endWeight != null && startWeight !== endWeight;
-
-    const repsPerSet = r.exercise.suggestedRepsPerSet;
+  if ((r.movementResults?.length ?? 0) > 1) {
+    const wmr = r.movementResults?.find(m => m.kind === 'load' && m.weight != null && m.weight > 0);
+    const sw = wmr?.weight, ew = r.weightEnd ?? sw;
+    const isRange = r.loadMode === 'range' && sw != null && ew != null && sw !== ew;
+    const rps = r.exercise.suggestedRepsPerSet;
     for (let i = 0; i < setsCount; i++) {
       let weight: number | undefined;
-      if (isRange && startWeight != null && endWeight != null) {
-        const frac = setsCount > 1 ? i / (setsCount - 1) : 0;
-        weight = Math.round((startWeight + frac * (endWeight - startWeight)) * 2) / 2;
-      } else {
-        weight = startWeight;
-      }
-
-      const setReps = repsPerSet?.[i] ?? r.exercise.suggestedReps;
-      sets.push({
-        id: `set-${i}`,
-        setNumber: i + 1,
-        targetReps: setReps,
-        actualReps: setReps,
-        weight,
-        completed: true,
-      });
+      if (isRange && sw != null && ew != null) { const f = setsCount > 1 ? i / (setsCount - 1) : 0; weight = Math.round((sw + f * (ew - sw)) * 2) / 2; }
+      else weight = sw;
+      const sr = rps?.[i] ?? r.exercise.suggestedReps;
+      sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: sr, actualReps: sr, weight, completed: true });
     }
-
-    console.warn('🔍 [toLegacy-superset]', r.exercise.name, {
-      setsCount,
-      isRange,
-      startWeight,
-      endWeight,
-      loadMode: r.loadMode,
-      weightEnd: r.weightEnd,
-      setWeights: sets.map(s => s.weight),
-    });
-
-    return {
-      exercise: r.exercise,
-      sets,
-      rounds: setsCount,
-      notes: r.notes,
-      ...buildMovementMaps(),
-    };
+    return { exercise: r.exercise, sets, rounds: setsCount, notes: r.notes, ...buildMaps() };
   }
 
   switch (r.kind) {
     case 'load': {
-      const repsPerSet = r.exercise.suggestedRepsPerSet;
-      const hasMaxSet = repsPerSet && effectiveSetsTotal > repsPerSet.length;
-      const prescribedCount = hasMaxSet ? repsPerSet.length : setsCount;
-
-      for (let i = 0; i < prescribedCount; i++) {
+      const rps = r.exercise.suggestedRepsPerSet;
+      const hasMax = rps && effectiveSetsTotal > rps.length;
+      const pc = hasMax ? rps.length : setsCount;
+      for (let i = 0; i < pc; i++) {
         let weight: number | undefined;
-        if (r.loadMode === 'bodyweight') {
-          weight = undefined;
-        } else if (r.loadMode === 'range' && r.weight != null && r.weightEnd != null) {
-          const interpTotal = hasMaxSet ? prescribedCount : setsCount;
-          const frac = interpTotal > 1 ? i / (interpTotal - 1) : 0;
-          weight = Math.round((r.weight + frac * (r.weightEnd - r.weight)) * 2) / 2;
-        } else {
-          weight = r.weight;
-        }
-
-        const setReps = repsPerSet?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
-        sets.push({
-          id: `set-${i}`,
-          setNumber: i + 1,
-          targetReps: repsPerSet?.[i] ?? r.exercise.suggestedReps,
-          actualReps: setReps,
-          weight,
-          completed: true,
-        });
+        if (r.loadMode === 'bodyweight') weight = undefined;
+        else if (r.loadMode === 'range' && r.weight != null && r.weightEnd != null) {
+          const it = hasMax ? pc : setsCount;
+          weight = Math.round((r.weight + (it > 1 ? i / (it - 1) : 0) * (r.weightEnd - r.weight)) * 2) / 2;
+        } else weight = r.weight;
+        const sr = rps?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
+        sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: rps?.[i] ?? r.exercise.suggestedReps, actualReps: sr, weight, completed: true });
       }
-
-      // Add max set if user entered data
-      if (hasMaxSet && (r.maxReps || r.maxRepsWeight)) {
-        sets.push({
-          id: `set-${prescribedCount}`,
-          setNumber: prescribedCount + 1,
-          actualReps: r.maxReps ?? 0,
-          weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight,
-          completed: true,
-        });
-      }
-
-      return {
-        exercise: r.exercise,
-        sets,
-        notes: r.notes,
-        ...(r.implementCount && r.implementCount > 1 ? {
-          implementCounts: r.exercise.movements?.reduce((acc, mov) => {
-            acc[mov.name] = r.implementCount!;
-            return acc;
-          }, {} as Record<string, number>),
-        } : {}),
-      };
+      if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, completed: true });
+      return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount && r.implementCount > 1 ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
     }
-
-    case 'reps': {
-      for (let i = 0; i < setsCount; i++) {
-        sets.push({
-          id: `set-${i}`,
-          setNumber: i + 1,
-          targetReps: r.exercise.suggestedReps,
-          actualReps: r.repsPerSet ?? r.repsTotal ?? r.exercise.suggestedReps,
-          completed: true,
-        });
-      }
+    case 'reps':
+      for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: r.exercise.suggestedReps, actualReps: r.repsPerSet ?? r.repsTotal ?? r.exercise.suggestedReps, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes };
-    }
-
-    case 'duration': {
-      for (let i = 0; i < setsCount; i++) {
-        sets.push({
-          id: `set-${i}`,
-          setNumber: i + 1,
-          time: r.durationSeconds,
-          completed: true,
-        });
-      }
+    case 'duration':
+      for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, time: r.durationSeconds, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes };
-    }
-
-    case 'distance': {
-      sets.push({
-        id: 'set-0',
-        setNumber: 1,
-        distance: r.distanceValue,
-        completed: true,
-      });
-      return {
-        exercise: r.exercise,
-        sets,
-        notes: r.notes,
-        totalDistance: r.distanceValue,
-        distanceUnit: r.distanceUnit as 'm' | 'km' | 'mi' | undefined,
-      };
-    }
-
-    case 'score_time': {
-      sets.push({
-        id: 'set-0',
-        setNumber: 1,
-        time: r.timeSeconds,
-        completed: true,
-      });
-      return {
-        exercise: r.exercise,
-        sets,
-        completionTime: r.timeSeconds,
-        rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined,
-        notes: r.notes,
-      };
-    }
-
-    case 'score_rounds': {
-      sets.push({
-        id: 'set-0',
-        setNumber: 1,
-        actualReps: r.partialReps ?? 0,
-        completed: true,
-      });
-      return {
-        exercise: r.exercise,
-        sets,
-        rounds: r.rounds,
-        notes: r.notes,
-        ...(r.partialMovements && r.partialMovements.length > 0 ? { partialMovements: r.partialMovements } : {}),
-      };
-    }
-
+    case 'distance':
+      sets.push({ id: 'set-0', setNumber: 1, distance: r.distanceValue, completed: true });
+      return { exercise: r.exercise, sets, notes: r.notes, totalDistance: r.distanceValue, distanceUnit: r.distanceUnit as 'm' | 'km' | 'mi' | undefined };
+    case 'score_time':
+      sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
+      return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined, notes: r.notes };
+    case 'score_rounds':
+      sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
+      return { exercise: r.exercise, sets, rounds: r.rounds, notes: r.notes, ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}) };
     case 'intervals': {
-      const effectiveIntervalsTotal = Math.max(
-        r.intervalsTotal ?? 0,
-        effectiveSetsTotal,
-      );
-      const count = r.intervalsCompleted === r.intervalsTotal && effectiveIntervalsTotal > (r.intervalsTotal ?? 0)
-        ? effectiveIntervalsTotal
-        : (r.intervalsCompleted ?? effectiveIntervalsTotal);
-      if (debugCelebration) {
-        console.log('[CelebrationDebug] intervals legacy count', {
-          exercise: r.exercise.name,
-          intervalsTotal: r.intervalsTotal,
-          intervalsCompleted: r.intervalsCompleted,
-          effectiveIntervalsTotal,
-          count,
-        });
-      }
-      for (let i = 0; i < count; i++) {
-        sets.push({
-          id: `set-${i}`,
-          setNumber: i + 1,
-          weight: r.intervalWeight,
-          completed: true,
-        });
-      }
-      return {
-        exercise: r.exercise,
-        sets,
-        notes: r.notes,
-        rounds: count,
-        ...buildMovementMaps(),
-      };
+      const eit = Math.max(r.intervalsTotal ?? 0, effectiveSetsTotal);
+      const count = r.intervalsCompleted === r.intervalsTotal && eit > (r.intervalsTotal ?? 0) ? eit : (r.intervalsCompleted ?? eit);
+      for (let i = 0; i < count; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, weight: r.intervalWeight, completed: true });
+      return { exercise: r.exercise, sets, notes: r.notes, rounds: count, ...buildMaps() };
     }
-
-    case 'note':
-    default: {
+    default:
       sets.push({ id: 'set-0', setNumber: 1, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes };
-    }
   }
 }
 
@@ -475,185 +327,329 @@ export function StoryLogResults({
   loggingModes,
   onSave,
   onBack,
-  isSaving = false,
+  isSaving: _isSaving = false,
   initialResults,
 }: StoryLogResultsProps) {
   const { user } = useAuth();
-  // Story results state — use initialResults for edit mode, otherwise prefill with Rx values
   const teamSize = parsedWorkout.partnerWorkout ? (parsedWorkout.teamSize ?? 2) : undefined;
+
   const [results, setResults] = useState<StoryExerciseResult[]>(() =>
     initialResults && initialResults.length > 0
       ? initialResults
-      : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize)
+      : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize),
   );
+
+  const wizardBlocks = useMemo(
+    () => computeWizardBlocks(parsedWorkout, loggingModes),
+    [parsedWorkout, loggingModes],
+  );
+
+  // ── Wizard state ──
+  const [wizardPhase, setWizardPhase] = useState<WizardPhase>(
+    wizardBlocks.length > 1 ? 'overview' : wizardBlocks.length === 1 ? 'logging' : 'wrap',
+  );
+  const [blockOrder, setBlockOrder] = useState<number[]>(() => wizardBlocks.map((_, i) => i));
+  const [currentStep, setCurrentStep] = useState(0);
+  // Which exercise within the current block we're logging
+  const [blockExerciseStep, setBlockExerciseStep] = useState(0);
+  const [isSubstitutionOpen, setIsSubstitutionOpen] = useState(false);
+
   const [hasSeededAmrapIntervals, setHasSeededAmrapIntervals] = useState(false);
-  const [pendingIntensityIndex, setPendingIntensityIndex] = useState<number | null>(null);
+  const [showIntensityCloseConfirm, setShowIntensityCloseConfirm] = useState(false);
 
-  // Edit sheet state
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const editingResult = editingIndex != null ? results[editingIndex] : null;
+  // ── Derived ──
+  const currentBlockIdx = blockOrder[currentStep] ?? 0;
+  const currentBlock = wizardBlocks[currentBlockIdx];
+  const isLastBlock = currentStep >= blockOrder.length - 1;
 
-  // ── Update a single result by merging a patch ──
-  const handleResultChange = useCallback((index: number, patch: Partial<StoryExerciseResult>) => {
-    setResults(prev => prev.map((r, i) => (
-      i === index ? { ...r, ...patch } : r
-    )));
-  }, []);
+  const currentGlobalIdx = currentBlock?.exerciseIndices[blockExerciseStep] ?? 0;
+  const currentResult = results[currentGlobalIdx] ?? null;
+  const isLastExercise = blockExerciseStep >= (currentBlock?.exerciseIndices.length ?? 1) - 1;
 
-  // ── Edit sheet callbacks ──
-  const handleEditExercise = useCallback((index: number) => {
-    setEditingIndex(index);
-  }, []);
+  // ── Result change for current exercise ──
+  const handleInputChange = useCallback((patch: Partial<StoryExerciseResult>) => {
+    setResults(prev => prev.map((r, i) =>
+      i === currentGlobalIdx ? { ...r, ...patch, skipped: undefined } : r,
+    ));
+  }, [currentGlobalIdx]);
 
-  const handleSheetClose = useCallback(() => {
-    setEditingIndex(null);
-  }, []);
+  // ── Save pipeline ──
+  const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
+    onSave(source.map(r => ({ ...toLegacyResult(r), metconName: r.metconName, intensity: r.intensity ?? null })));
+  }, [onSave]);
 
-  const handleSheetDone = useCallback(() => {
-    if (
-      editingIndex != null &&
-      parsedWorkout.format === 'amrap_intervals' &&
-      !hasSeededAmrapIntervals
-    ) {
-      const finalRounds = results[editingIndex]?.rounds;
-      if (
-        results[editingIndex]?.kind === 'score_rounds' &&
-        typeof finalRounds === 'number' &&
-        finalRounds > 0
-      ) {
+  // ── Block advance ──
+  const goToNextBlock = useCallback((latestResults: StoryExerciseResult[]) => {
+    void latestResults;
+    if (isLastBlock) {
+      setWizardPhase('wrap');
+    } else {
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      setBlockExerciseStep(0);
+      setIsSubstitutionOpen(false);
+      setWizardPhase('logging');
+    }
+  }, [currentStep, isLastBlock]);
+
+  const handleBlockAdvance = useCallback(() => {
+    if (!currentBlock) { saveLegacyResults(results); return; }
+    if (currentBlock.isMetcon) {
+      const needsIntensity = currentBlock.exerciseIndices.some(i => results[i]?.intensity === undefined);
+      if (needsIntensity) { setWizardPhase('intensity'); return; }
+    }
+    goToNextBlock(results);
+  }, [currentBlock, goToNextBlock, results, saveLegacyResults]);
+
+  // ── Exercise advance (within block) ──
+  const handleExerciseDone = useCallback(() => {
+    // AMRAP interval seeding
+    if (parsedWorkout.format === 'amrap_intervals' && !hasSeededAmrapIntervals) {
+      const finalRounds = results[currentGlobalIdx]?.rounds;
+      if (results[currentGlobalIdx]?.kind === 'score_rounds' && typeof finalRounds === 'number' && finalRounds > 0) {
         setResults(prev => prev.map((r, i) => {
-          if (i === editingIndex) return r;
-          if (r.kind !== 'score_rounds') return r;
-          if ((r.rounds ?? 0) > 0) return r;
+          if (i === currentGlobalIdx || r.kind !== 'score_rounds' || (r.rounds ?? 0) > 0) return r;
           return { ...r, rounds: finalRounds };
         }));
         setHasSeededAmrapIntervals(true);
       }
     }
-    setEditingIndex(null);
-  }, [editingIndex, hasSeededAmrapIntervals, parsedWorkout.format, results]);
 
-  const handleSheetSkip = useCallback(() => {
-    if (editingIndex != null) {
-      handleResultChange(editingIndex, { skipped: true });
+    if (!isLastExercise) {
+      setBlockExerciseStep(s => s + 1);
+    } else {
+      handleBlockAdvance();
     }
-    setEditingIndex(null);
-  }, [editingIndex, handleResultChange]);
+  }, [parsedWorkout.format, hasSeededAmrapIntervals, results, currentGlobalIdx, isLastExercise, handleBlockAdvance]);
 
-
-  // ── Save: convert to legacy format and pass up ──
-  const findNextIntensityIndex = useCallback((startIndex: number, source: StoryExerciseResult[]) => {
-    for (let i = startIndex; i < source.length; i += 1) {
-      if (isMetconIntensityResult(source[i], loggingModes[i]) && source[i].intensity === undefined) {
-        return i;
-      }
+  const handleExerciseMarkDone = useCallback(() => {
+    if (!isLastExercise) {
+      setBlockExerciseStep(s => s + 1);
+    } else {
+      goToNextBlock(results);
     }
-    return null;
-  }, [loggingModes]);
+  }, [isLastExercise, results, goToNextBlock]);
 
-  const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
-    const legacy = source.map(r => ({
-      ...toLegacyResult(r),
-      metconName: r.metconName,
-      intensity: r.intensity ?? null,
-    }));
-    onSave(legacy);
-  }, [onSave]);
-
-  const handleSave = useCallback(() => {
-    const nextIntensityIndex = findNextIntensityIndex(0, results);
-    if (nextIntensityIndex != null) {
-      setPendingIntensityIndex(nextIntensityIndex);
-      return;
+  const handleExerciseBack = useCallback(() => {
+    if (blockExerciseStep > 0) {
+      setBlockExerciseStep(s => s - 1);
+    } else if (currentStep > 0) {
+      setCurrentStep(s => s - 1);
+      const prevBlock = wizardBlocks[blockOrder[currentStep - 1]];
+      setBlockExerciseStep((prevBlock?.exerciseIndices.length ?? 1) - 1);
+      setWizardPhase('logging');
+    } else if (wizardBlocks.length > 1) {
+      setWizardPhase('overview');
+    } else {
+      onBack();
     }
-    saveLegacyResults(results);
-  }, [findNextIntensityIndex, results, saveLegacyResults]);
+  }, [blockExerciseStep, currentStep, wizardBlocks, blockOrder, onBack]);
 
-  const completeIntensityPrompt = useCallback((value: IntensityRating | null) => {
-    if (pendingIntensityIndex == null) return;
-    const nextResults = results.map((r, i) => (
-      i === pendingIntensityIndex ? { ...r, intensity: value } : r
-    ));
+  const handleIntensityBack = useCallback(() => {
+    if (!currentBlock) return;
+    setBlockExerciseStep(Math.max(0, currentBlock.exerciseIndices.length - 1));
+    setWizardPhase('logging');
+  }, [currentBlock]);
+
+  // Intensity
+  const completeIntensity = useCallback((value: IntensityRating | null) => {
+    if (!currentBlock) return;
+    const nextResults = results.map((r, i) =>
+      currentBlock.exerciseIndices.includes(i) ? { ...r, intensity: value } : r,
+    );
     setResults(nextResults);
+    goToNextBlock(nextResults);
+  }, [currentBlock, results, goToNextBlock]);
 
-    const nextIndex = findNextIntensityIndex(pendingIntensityIndex + 1, nextResults);
-    if (nextIndex != null) {
-      setPendingIntensityIndex(nextIndex);
-      return;
+  const handleWrapDone = useCallback(() => saveLegacyResults(results), [results, saveLegacyResults]);
+
+  // Overview
+  const handleOverviewSelect = useCallback((selectedBlockIdx: number) => {
+    const newOrder: number[] = [selectedBlockIdx];
+    for (let i = 0; i < wizardBlocks.length; i++) if (i !== selectedBlockIdx) newOrder.push(i);
+    setBlockOrder(newOrder);
+    setCurrentStep(0);
+    setBlockExerciseStep(0);
+    setIsSubstitutionOpen(false);
+    setWizardPhase('logging');
+  }, [wizardBlocks.length]);
+
+  const handleOverviewSkipAll = useCallback(() => {
+    saveLegacyResults(results);
+  }, [results, saveLegacyResults]);
+
+  const wrapLabel = useMemo(
+    () => [...new Set(wizardBlocks.map(b => b.typeLabel))].join(' + '),
+    [wizardBlocks],
+  );
+
+  const wrapEp = useMemo(() => {
+    const legacyResults = results.map(toLegacyResult);
+    let totalVolume = 0;
+    let totalSeconds = 0;
+
+    for (const result of legacyResults) {
+      for (const set of result.sets) {
+        if ((set.weight ?? 0) > 0 && (set.actualReps ?? 0) > 0) {
+          totalVolume += (set.weight ?? 0) * (set.actualReps ?? 0);
+        }
+        if ((set.time ?? 0) > 0) totalSeconds += set.time ?? 0;
+      }
+      if ((result.completionTime ?? 0) > 0) totalSeconds += result.completionTime ?? 0;
     }
 
-    setPendingIntensityIndex(null);
-    saveLegacyResults(nextResults);
-  }, [findNextIntensityIndex, pendingIntensityIndex, results, saveLegacyResults]);
+    const timeCapMinutes = parsedWorkout.timeCap && parsedWorkout.timeCap > 0
+      ? parsedWorkout.timeCap / 60
+      : totalSeconds > 0
+        ? totalSeconds / 60
+        : 0;
+    const actualTimeMinutes = totalSeconds > 0 ? totalSeconds / 60 : undefined;
 
-  // ── Input change handler for the editing result ──
-  // Also clears 'skipped' flag when user enters new data
-  const handleInputChange = useCallback((patch: Partial<StoryExerciseResult>) => {
-    if (editingIndex != null) {
-      handleResultChange(editingIndex, { ...patch, skipped: undefined });
-    }
-  }, [editingIndex, handleResultChange]);
+    return calculateWorkoutEP(
+      totalVolume,
+      timeCapMinutes,
+      user?.weight || DEFAULT_BW,
+      false,
+      undefined,
+      actualTimeMinutes,
+      parsedWorkout.difficultyLevel,
+    ).total;
+  }, [parsedWorkout.difficultyLevel, parsedWorkout.timeCap, results, user?.weight]);
+
+  // ── Render ──────────────────────────────────────────────────────
 
   return (
     <>
-      <WodStoryScreen
-        parsedWorkout={parsedWorkout}
-        results={results}
-        onResultChange={handleResultChange}
-        onEditExercise={handleEditExercise}
-        onSave={handleSave}
-        onBack={onBack}
-        loggingModes={loggingModes}
-        isSaving={isSaving}
-      />
-
-      <EditExerciseSheet
-        open={editingIndex != null}
-        result={editingResult}
-        onClose={handleSheetClose}
-        onDone={handleSheetDone}
-        onSkip={handleSheetSkip}
-        exerciseIndex={editingIndex != null ? editingIndex + 1 : undefined}
-        exerciseTotal={results.length}
-      >
-        {editingResult && (
-          <InputRouter
-            result={editingResult}
-            onChange={handleInputChange}
-            teamSize={teamSize}
+      <AnimatePresence mode="wait">
+        {wizardPhase === 'overview' && (
+          <WizardOverview
+            key="overview"
+            blocks={wizardBlocks}
+            onSelect={handleOverviewSelect}
+            onSkipAll={handleOverviewSkipAll}
+            onBack={onBack}
           />
         )}
-      </EditExerciseSheet>
 
-      {pendingIntensityIndex != null && (
-        <div className={styles.intensityScreen}>
-          <div className={styles.intensityInner}>
-            <p className={styles.intensityEyebrow}>
-              {results[pendingIntensityIndex]?.exercise.name || 'Metcon'}
-            </p>
-            <h2 className={styles.intensityTitle}>How'd that feel?</h2>
-            <div className={styles.intensityOptions}>
-              {INTENSITY_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={styles.intensityCard}
-                  onClick={() => completeIntensityPrompt(option.id)}
-                >
-                  <span className={styles.intensityEmoji}>{option.emoji}</span>
-                  <span className={styles.intensityLabel}>{option.label}</span>
+        {wizardPhase === 'logging' && currentResult && (
+          <WizardExerciseScreen
+            key={`exercise-${currentStep}-${blockExerciseStep}`}
+            result={currentResult}
+            exerciseIndex={blockExerciseStep + 1}
+            exerciseTotal={currentBlock?.exerciseIndices.length ?? 1}
+            blockIndex={currentStep}
+            blockTotal={wizardBlocks.length}
+            blockType={currentBlock?.typeLabel ?? 'WORKOUT'}
+            blockName={currentBlock?.displayName ?? currentResult.exercise.name}
+            isLastExercise={isLastExercise}
+            isLastBlock={isLastBlock}
+            hideFooter={isSubstitutionOpen}
+            onDone={handleExerciseDone}
+            onBack={handleExerciseBack}
+            onClose={onBack}
+            onMarkDone={handleExerciseMarkDone}
+          >
+            <InputRouter
+              result={currentResult}
+              onChange={handleInputChange}
+              teamSize={teamSize}
+              onSubstitutionOpenChange={setIsSubstitutionOpen}
+            />
+          </WizardExerciseScreen>
+        )}
+
+        {wizardPhase === 'wrap' && (
+          <WrapFlash key="wrap" ep={wrapEp} workoutLabel={wrapLabel} onDone={handleWrapDone} />
+        )}
+      </AnimatePresence>
+
+      {/* Intensity prompt */}
+      <AnimatePresence>
+        {wizardPhase === 'intensity' && currentBlock && (
+          <motion.div
+            key="intensity"
+            className={styles.intensityScreen}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <div className={styles.intensityInner}>
+              <div className={styles.intensityTopBar}>
+                <button type="button" className={styles.intensityBackBtn} onClick={handleIntensityBack} aria-label="Back">
+                  {'<'}
                 </button>
-              ))}
+                <div className={styles.intensityDots}>
+                  {blockOrder.map((_, i) => (
+                    <span key={i} className={i < currentStep ? styles.dotDone : i === currentStep ? styles.dotActive : styles.dotEmpty} />
+                  ))}
+                </div>
+                <button type="button" className={styles.intensityCloseBtn} onClick={() => setShowIntensityCloseConfirm(true)} aria-label="Close">
+                  x
+                </button>
+              </div>
+              <p className={styles.intensityEyebrow}>{currentBlock.displayName}</p>
+              <h2 className={styles.intensityTitle}>How'd that feel?</h2>
+              <div className={styles.intensityOptions}>
+                {INTENSITY_OPTIONS.map(opt => (
+                  <button key={opt.id} type="button" className={styles.intensityCard} onClick={() => completeIntensity(opt.id)}>
+                    <span className={styles.intensityEmoji}>{opt.emoji}</span>
+                    <span className={styles.intensityLabel}>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className={styles.intensitySkip} onClick={() => completeIntensity(null)}>Skip</button>
             </div>
-            <button
-              type="button"
-              className={styles.intensitySkip}
-              onClick={() => completeIntensityPrompt(null)}
-            >
-              Skip
-            </button>
-          </div>
-        </div>
+
+            <AnimatePresence>
+              {showIntensityCloseConfirm && (
+                <motion.div
+                  className={styles.popupBackdrop}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={() => setShowIntensityCloseConfirm(false)}
+                >
+                  <motion.div
+                    className={styles.popupCard}
+                    initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <p className={styles.popupTitle}>Discard this workout?</p>
+                    <p className={styles.popupBody}>Your progress won't be saved.</p>
+                    <div className={styles.popupActions}>
+                      <button type="button" className={styles.popupBtnSecondary} onClick={() => setShowIntensityCloseConfirm(false)}>
+                        Keep going
+                      </button>
+                      <button type="button" className={styles.popupBtnPrimary} onClick={() => { setShowIntensityCloseConfirm(false); onBack(); }}>
+                        Discard
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Legacy edit sheet — used only outside wizard (e.g. re-editing after logging) */}
+      {wizardPhase !== 'logging' && wizardPhase !== 'overview' && wizardPhase !== 'wrap' && (
+        <EditExerciseSheet
+          open={false}
+          result={null}
+          onClose={() => {}}
+          onDone={() => {}}
+          onSkip={() => {}}
+          exerciseIndex={undefined}
+          exerciseTotal={results.length}
+        >
+          {null}
+        </EditExerciseSheet>
       )}
     </>
   );

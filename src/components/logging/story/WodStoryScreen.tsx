@@ -13,6 +13,20 @@ import styles from './WodStoryScreen.module.css';
 
 // ─── Props ──────────────────────────────────────────────────────
 
+/** When provided, WodStoryScreen renders in wizard mode */
+export interface WizardContext {
+  /** 0-based index of this block within the overall wizard */
+  blockIndex: number;
+  /** Total number of primary blocks in the wizard */
+  blockTotal: number;
+  /** True when this is the final block */
+  isLast: boolean;
+  /** Fired by the × close button — should confirm and exit */
+  onClose: () => void;
+  /** Fired by the "Mark as done (no details)" link */
+  onMarkDone: () => void;
+}
+
 interface WodStoryScreenProps {
   parsedWorkout: ParsedWorkout;
   results: StoryExerciseResult[];
@@ -23,6 +37,8 @@ interface WodStoryScreenProps {
   /** Override logging modes (from AI guidance or user override) */
   loggingModes?: ExerciseLoggingMode[];
   isSaving?: boolean;
+  /** When present, switches to wizard mode (dots, close button, always-on CTA) */
+  wizard?: WizardContext;
 }
 
 // ─── Section grouping ───────────────────────────────────────────
@@ -114,27 +130,34 @@ export function WodStoryScreen({
   onSave,
   onBack,
   isSaving = false,
+  wizard,
 }: WodStoryScreenProps) {
   const groups = useMemo(() => groupExercises(parsedWorkout), [parsedWorkout]);
   const progress = useMemo(() => calcProgress(results), [results]);
 
-  const canSave = progress.filled > 0 || progress.partial > 0;
+  const canSave = wizard != null || progress.filled > 0 || progress.partial > 0;
   const allDone = progress.filled === progress.total && progress.total > 0;
   const progressPercent = progress.total > 0
     ? ((progress.filled + progress.partial * 0.5) / progress.total) * 100
     : 0;
 
   const [missingPopup, setMissingPopup] = useState<{ label: string } | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
   const handleSave = useCallback(() => {
     if (isSaving) return;
+    // In wizard mode, always advance without popup
+    if (wizard != null) {
+      onSave();
+      return;
+    }
     const emptyResult = results.find(r => isResultEmpty(r));
     if (emptyResult) {
       setMissingPopup({ label: getMissingLabel(emptyResult.kind) });
       return;
     }
     onSave();
-  }, [isSaving, results, onSave]);
+  }, [isSaving, results, onSave, wizard]);
 
   // One-time hint arrow
   const HINT_KEY = 'wodi_story_hint_shown';
@@ -156,11 +179,13 @@ export function WodStoryScreen({
   // CTA label
   const ctaLabel = isSaving
     ? 'Saving...'
-    : allDone
-      ? 'Save workout'
-      : canSave
+    : wizard != null
+      ? (wizard.isLast ? 'Done for today →' : 'Next block →')
+      : allDone
         ? 'Save workout'
-        : 'Log results to save';
+        : canSave
+          ? 'Save workout'
+          : 'Log results to save';
 
   return (
     <div className={styles.container}>
@@ -176,26 +201,80 @@ export function WodStoryScreen({
             ←
           </button>
 
-          {formatLabel && (
-            <span className={styles.formatPill}>
-              {formatLabel}
-            </span>
-          )}
+          {/* Wizard mode: progress dots (center) + close button (right) */}
+          {wizard != null ? (
+            <>
+              {wizard.blockTotal > 1 && (
+                <div className={styles.wizardDots}>
+                  {Array.from({ length: wizard.blockTotal }, (_, i) => (
+                    <span
+                      key={i}
+                      className={
+                        i < wizard.blockIndex
+                          ? styles.dotDone
+                          : i === wizard.blockIndex
+                            ? styles.dotActive
+                            : styles.dotEmpty
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={() => setShowCloseConfirm(true)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </>
+          ) : (
+            <>
+              {formatLabel && (
+                <span className={styles.formatPill}>
+                  {formatLabel}
+                </span>
+              )}
 
-          <div className={styles.progressBar}>
-            <div className={styles.progressTrack}>
-              <motion.div
-                className={styles.progressFill}
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              />
-            </div>
-            <span className={styles.progressLabel}>
-              {progress.filled}/{progress.total}
-            </span>
-          </div>
+              <div className={styles.progressBar}>
+                <div className={styles.progressTrack}>
+                  <motion.div
+                    className={styles.progressFill}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progressPercent}%` }}
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                  />
+                </div>
+                <span className={styles.progressLabel}>
+                  {progress.filled}/{progress.total}
+                </span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* In wizard mode, show format pill + exercise progress below the nav row */}
+        {wizard != null && (
+          <div className={styles.wizardSubrow}>
+            {formatLabel && (
+              <span className={styles.formatPill}>{formatLabel}</span>
+            )}
+            <div className={styles.progressBar}>
+              <div className={styles.progressTrack}>
+                <motion.div
+                  className={styles.progressFill}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                />
+              </div>
+              <span className={styles.progressLabel}>
+                {progress.filled}/{progress.total}
+              </span>
+            </div>
+          </div>
+        )}
 
         {title && (
           <div className={styles.titleArea}>
@@ -303,6 +382,15 @@ export function WodStoryScreen({
         >
           {ctaLabel}
         </motion.button>
+        {wizard != null && (
+          <button
+            type="button"
+            className={styles.markDoneLink}
+            onClick={wizard.onMarkDone}
+          >
+            Mark as done (no details)
+          </button>
+        )}
       </div>
 
       {/* ── Missing data confirmation popup ── */}
@@ -342,6 +430,49 @@ export function WodStoryScreen({
                   onClick={() => { setMissingPopup(null); onSave(); }}
                 >
                   Save anyway
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ── Close-confirm popup (wizard mode only) ── */}
+      <AnimatePresence>
+        {showCloseConfirm && (
+          <motion.div
+            className={styles.popupBackdrop}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setShowCloseConfirm(false)}
+          >
+            <motion.div
+              className={styles.popupCard}
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className={styles.popupTitle}>Discard this workout?</p>
+              <p className={styles.popupBody}>
+                Your progress won't be saved.
+              </p>
+              <div className={styles.popupActions}>
+                <button
+                  type="button"
+                  className={styles.popupBtnSecondary}
+                  onClick={() => setShowCloseConfirm(false)}
+                >
+                  Keep going
+                </button>
+                <button
+                  type="button"
+                  className={styles.popupBtnPrimary}
+                  onClick={() => { setShowCloseConfirm(false); wizard?.onClose(); }}
+                >
+                  Discard
                 </button>
               </div>
             </motion.div>

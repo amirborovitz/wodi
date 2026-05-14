@@ -1,0 +1,166 @@
+/* ═══════════════════════════════════════════
+   WizardOverview — block picker entry screen
+   ═══════════════════════════════════════════ */
+
+.container {
+  position: fixed;
+  inset: 0;
+  background: var(--wodi-bg);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+/* Back button (top-left) */
+.backBtn {
+  position: absolute;
+  top: calc(var(--safe-top) + 12px);
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid var(--wodi-line2);
+  color: var(--wodi-dim);
+  font-size: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.backBtn:active {
+  background: rgba(242, 240, 235, 0.10);
+}
+
+/* Inner content — centered, max-width constrained */
+.inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--safe-top) + 80px) 24px calc(var(--safe-bottom) + 24px);
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Eyebrow */
+.eyebrow {
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.7);
+  margin: 0 0 12px;
+}
+
+/* Title */
+.title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--wodi-white);
+  line-height: 1.08;
+  letter-spacing: 0;
+  margin: 0 0 28px;
+  text-transform: none;
+}
+
+/* Block list */
+.blockList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+/* Individual block card */
+.blockCard {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  background: var(--wodi-card);
+  border: 1px solid var(--wodi-line2);
+  border-radius: 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+
+.blockCard:active {
+  background: var(--wodi-card2);
+  border-color: rgba(245, 194, 0, 0.3);
+}
+
+.blockLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Type chip: "STRENGTH", "AMRAP" etc */
+.blockType {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(242, 240, 235, 0.08);
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.85);
+}
+
+/* Block display name */
+.blockName {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--wodi-white);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+/* Chevron */
+.blockChevron {
+  font-size: 24px;
+  color: var(--wodi-dim);
+  flex-shrink: 0;
+  margin-left: 12px;
+  line-height: 1;
+}
+
+/* Skip all link */
+.skipAll {
+  margin-top: 28px;
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 16px;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.skipAll:active {
+  color: var(--wodi-white);
+}

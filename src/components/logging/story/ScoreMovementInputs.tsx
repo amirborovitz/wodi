@@ -18,6 +18,7 @@ interface ScoreMovementInputsProps {
   roundsTotal?: number;
   /** Called when multiple movements need to update atomically (e.g. weight propagation). */
   onBatch?: (next: MovementResult[]) => void;
+  onSubstitutionOpenChange?: (open: boolean) => void;
   /** Team size for partner workouts. When > 1, buy-in/cash-out movements
    *  show a "{total} {unit} total ÷{teamSize}" annotation below the movement
    *  name so the athlete knows they are logging their personal share. */
@@ -28,9 +29,63 @@ interface ScoreMovementInputsProps {
 // Barbell movements only propagate to other barbell movements, not KB or DB.
 function getEquipmentType(name: string): 'barbell' | 'kb' | 'db' {
   const lower = name.toLowerCase();
-  if (/\bkb\b|kettlebell/.test(lower)) return 'kb';
   if (/\bdb\b|dumbbell/.test(lower)) return 'db';
+  if (/\bkb\b|kettlebell|\bgoblet\b/.test(lower)) return 'kb';
   return 'barbell';
+}
+
+function getEquipmentLabel(type: 'barbell' | 'kb' | 'db'): string {
+  if (type === 'kb') return 'KB';
+  if (type === 'db') return 'DB';
+  return 'Barbell';
+}
+
+function getLegalWeightStep(mr: MovementResult): number {
+  const equipmentType = getEquipmentType(mr.movement.name);
+  if (equipmentType === 'kb') return 2;
+  if (equipmentType === 'db') return 1;
+  return getWeightStep(mr.movement.name, mr.implementCount);
+}
+
+function roundToLegalWeight(value: number, mr: MovementResult): number {
+  const step = getLegalWeightStep(mr);
+  if (step <= 0) return value;
+  const rounded = Math.round(value / step) * step;
+  return Math.max(0, Math.round(rounded * 10) / 10);
+}
+
+function getRxWeight(mr: MovementResult): number | undefined {
+  const rx = mr.movement.rxWeights?.male ?? mr.movement.rxWeights?.female;
+  return rx && rx > 0 ? rx : undefined;
+}
+
+function getDefaultMetconWeight(mr: MovementResult): number | undefined {
+  const rx = getRxWeight(mr);
+  if (!rx) return undefined;
+  return roundToLegalWeight(rx * 0.8, mr);
+}
+
+function getFallbackWeight(type: 'barbell' | 'kb' | 'db'): number {
+  if (type === 'kb') return 16;
+  if (type === 'db') return 10;
+  return 40;
+}
+
+function getMovementCaptionName(mr: MovementResult): string {
+  const name = cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name;
+  return name
+    .replace(/\bKettlebell\b/gi, 'KB')
+    .replace(/\bDumbbell\b/gi, 'DB')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function movementHasAlternate(mr: MovementResult): boolean {
+  return hasAlternatives(mr.movement.name) || !!mr.movement.alternative || !!mr.substitution;
+}
+
+function movementHasInput(mr: MovementResult): boolean {
+  return getTileConfig(mr) != null;
 }
 
 // Human-readable labels for section types
@@ -363,11 +418,48 @@ export function ScoreMovementInputs({
   variant = 'default',
   roundsTotal,
   onBatch,
+  onSubstitutionOpenChange,
   teamSize,
 }: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
   const manuallyEditedRef = useRef<Set<string>>(new Set());
+  const [separateWeightGroups, setSeparateWeightGroups] = useState<Set<string>>(() => new Set());
+  const seededDefaultsRef = useRef(false);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const loadGroups = useMemo(() => {
+    const groups = new Map<'barbell' | 'kb' | 'db', { type: 'barbell' | 'kb' | 'db'; movements: MovementResult[] }>();
+    movements.forEach((mr) => {
+      if (mr.kind !== 'load') return;
+      const type = getEquipmentType(mr.movement.name);
+      const group = groups.get(type) ?? { type, movements: [] };
+      group.movements.push(mr);
+      groups.set(type, group);
+    });
+    return [...groups.values()];
+  }, [movements]);
+
+  const sharedWeightKeys = useMemo(() => {
+    const keys = new Set<string>();
+    loadGroups.forEach((group) => {
+      if (separateWeightGroups.has(group.type)) return;
+      group.movements.forEach((mr) => keys.add(mr.movementKey));
+    });
+    return keys;
+  }, [loadGroups, separateWeightGroups]);
+
+  const alternateMovements = useMemo(() => {
+    const seen = new Set<string>();
+    return movements.filter((mr) => {
+      if (!movementHasAlternate(mr)) return false;
+      const key = cleanTileLabel(mr.movement.name).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [movements]);
 
   const handleWeightChange = useCallback((globalIndex: number, mr: MovementResult, weight: number | undefined) => {
     const w = weight != null ? Math.max(0, weight) : undefined;
@@ -391,11 +483,79 @@ export function ScoreMovementInputs({
     }
   }, [movements, onChange, onBatch]);
 
+  const handleSharedWeightChange = useCallback((equipmentType: 'barbell' | 'kb' | 'db', weight: number | undefined) => {
+    const w = weight != null ? Math.max(0, weight) : undefined;
+    const next = movements.map((mr) => {
+      if (mr.kind !== 'load') return mr;
+      if (getEquipmentType(mr.movement.name) !== equipmentType) return mr;
+      return { ...mr, weight: w };
+    });
+    if (onBatch) {
+      onBatch(next);
+      return;
+    }
+    next.forEach((mr, index) => {
+      if (mr !== movements[index]) onChange(index, { weight: mr.weight });
+    });
+  }, [movements, onBatch, onChange]);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const startLongPress = useCallback((onLongPress: () => void) => {
+    clearLongPress();
+    longPressFiredRef.current = false;
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      onLongPress();
+    }, 420);
+  }, [clearLongPress]);
+
+  const runClickUnlessLongPressed = useCallback((onClick: () => void) => {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
+    onClick();
+  }, []);
+
+  useEffect(() => {
+    if (seededDefaultsRef.current) return;
+    const next = movements.map((mr) => {
+      if (mr.kind !== 'load' || mr.weight != null) return mr;
+      const defaultWeight = getDefaultMetconWeight(mr) ?? getFallbackWeight(getEquipmentType(mr.movement.name));
+      return defaultWeight != null ? { ...mr, weight: defaultWeight } : mr;
+    });
+    const changed = next.some((mr, i) => mr !== movements[i]);
+    if (!changed) {
+      seededDefaultsRef.current = true;
+      return;
+    }
+    seededDefaultsRef.current = true;
+    if (onBatch) {
+      onBatch(next);
+      return;
+    }
+    next.forEach((mr, index) => {
+      if (mr !== movements[index]) onChange(index, { weight: mr.weight });
+    });
+  }, [movements, onBatch, onChange]);
+
   // Which movement key has the substitution sheet open
   const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
 
-  const openSwap = (key: string) => setSwapOpenKey(key);
-  const closeSwap = () => setSwapOpenKey(null);
+  const openSwap = (key: string) => {
+    setSwapOpenKey(key);
+    onSubstitutionOpenChange?.(true);
+  };
+  const closeSwap = () => {
+    setSwapOpenKey(null);
+    onSubstitutionOpenChange?.(false);
+  };
 
   // Find the movement currently being swapped (for the sheet)
   const swapMr = swapOpenKey != null
@@ -470,7 +630,19 @@ export function ScoreMovementInputs({
       }
     }
 
-    onChange(globalIndex, patch);
+    const sameMovementIndices = movements
+      .map((mr, index) => ({ mr, index }))
+      .filter(({ mr }) => cleanTileLabel(mr.movement.name).toLowerCase() === cleanTileLabel(swapMr.movement.name).toLowerCase())
+      .map(({ index }) => index);
+
+    if (onBatch && sameMovementIndices.length > 1) {
+      const next = movements.map((mr, index) => (
+        sameMovementIndices.includes(index) ? { ...mr, ...patch } : mr
+      ));
+      onBatch(next);
+    } else {
+      onChange(globalIndex, patch);
+    }
     closeSwap();
   };
 
@@ -739,6 +911,7 @@ export function ScoreMovementInputs({
     ).toUpperCase();
 
     const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
+    const isSharedWeight = sharedWeightKeys.has(mr.movementKey);
 
     return (
       <React.Fragment key={mr.movementKey}>
@@ -795,7 +968,7 @@ export function ScoreMovementInputs({
           <AiAlternativeToggle mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
 
           {/* Input: arcade stepper or nothing for prescribed-reps display movements */}
-          {mr.kind === 'load' && (
+          {mr.kind === 'load' && !isSharedWeight && (
             <WeightField
               mr={mr}
               onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)}
@@ -825,16 +998,191 @@ export function ScoreMovementInputs({
     );
   };
 
-  // Show ALL movements so users can see swap affordances on every movement,
-  // not just the ones that need weight/distance input.
-  // Try section grouping on all movements first
-  const sectionGroups = groupBySections(movements);
+  const focusedLoadGroup = loadGroups[0] ?? null;
+  const renderFocusedLoadStep = () => {
+    if (!focusedLoadGroup) return null;
+
+    const isSeparate = separateWeightGroups.has(focusedLoadGroup.type);
+    const firstWithValue = focusedLoadGroup.movements.find(mr => mr.weight != null);
+    const firstRx = focusedLoadGroup.movements.find(mr => getRxWeight(mr) != null);
+    const base = firstWithValue ?? firstRx ?? focusedLoadGroup.movements[0];
+    const currentWeight = base?.weight ?? getDefaultMetconWeight(base) ?? getFallbackWeight(focusedLoadGroup.type);
+    const rx = getRxWeight(base);
+    const step = getLegalWeightStep(base);
+    const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' · ');
+    const groupLabel = getEquipmentLabel(focusedLoadGroup.type);
+
+    const setSharedValue = (next: number) => {
+      handleSharedWeightChange(focusedLoadGroup.type, roundToLegalWeight(next, base));
+    };
+    const nudgeShared = (direction: -1 | 1, multiplier = 1) => {
+      setSharedValue(currentWeight + direction * step * multiplier);
+    };
+
+    if (isSeparate) {
+      return (
+        <div className={styles.implementWeightScreen}>
+          <div className={styles.implementWeightHeader}>
+            <span className={styles.implementEyebrow}>{groupLabel} WEIGHTS</span>
+            <span className={styles.implementCaption}>Set each movement separately</span>
+          </div>
+          <div className={styles.separateWeightList}>
+            {focusedLoadGroup.movements.map((mr) => {
+              const globalIndex = movements.indexOf(mr);
+              const value = mr.weight ?? getDefaultMetconWeight(mr) ?? getFallbackWeight(focusedLoadGroup.type);
+              const movementStep = getLegalWeightStep(mr);
+              return (
+                <div key={mr.movementKey} className={styles.separateWeightRow}>
+                  <span className={styles.separateWeightName}>{getMovementCaptionName(mr)}</span>
+                  <div className={styles.separateStepper}>
+                    <button
+                      type="button"
+                      className={styles.separateStepButton}
+                      onClick={() => handleWeightChange(globalIndex, mr, roundToLegalWeight(value - movementStep, mr))}
+                      aria-label={`Decrease ${getMovementCaptionName(mr)} weight`}
+                    >
+                      -
+                    </button>
+                    <span className={styles.separateWeightValue}>
+                      {value}
+                      <span>kg</span>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.separateStepButton}
+                      onClick={() => handleWeightChange(globalIndex, mr, roundToLegalWeight(value + movementStep, mr))}
+                      aria-label={`Increase ${getMovementCaptionName(mr)} weight`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            className={styles.differentWeightsLink}
+            onClick={() => {
+              setSeparateWeightGroups(prev => {
+                const next = new Set(prev);
+                next.delete(focusedLoadGroup.type);
+                return next;
+              });
+            }}
+          >
+            Use one {groupLabel} weight {'->'}
+          </button>
+        </div>
+      );
+    }
+
+    const isRx = rx != null && Math.abs(currentWeight - rx) < 0.001;
+
+    return (
+      <div className={styles.implementWeightScreen}>
+        <div className={styles.implementWeightHeader}>
+          <span className={styles.implementEyebrow}>{groupLabel} WEIGHT</span>
+          <span className={styles.implementCaption}>Used for {caption}</span>
+        </div>
+
+        <div className={styles.heroWeightStepper} aria-label={`${groupLabel} weight`}>
+          <button
+            type="button"
+            className={styles.heroWeightButton}
+            onPointerDown={() => startLongPress(() => nudgeShared(-1, 2))}
+            onPointerUp={clearLongPress}
+            onPointerCancel={clearLongPress}
+            onPointerLeave={clearLongPress}
+            onClick={() => runClickUnlessLongPressed(() => nudgeShared(-1))}
+            onDoubleClick={() => nudgeShared(-1, 2)}
+            aria-label={`Decrease ${groupLabel} weight`}
+          >
+            -
+          </button>
+          <div className={styles.heroWeightCenter}>
+            <span className={styles.heroWeightValue}>{currentWeight}</span>
+            <span className={styles.heroWeightUnit}>kg</span>
+            {rx != null && (
+              <span className={`${styles.rxHint} ${isRx ? styles.rxHit : ''}`}>
+                {isRx ? 'Rx ✓' : `Rx is ${rx}kg`}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className={styles.heroWeightButton}
+            onPointerDown={() => startLongPress(() => nudgeShared(1, 2))}
+            onPointerUp={clearLongPress}
+            onPointerCancel={clearLongPress}
+            onPointerLeave={clearLongPress}
+            onClick={() => runClickUnlessLongPressed(() => nudgeShared(1))}
+            onDoubleClick={() => nudgeShared(1, 2)}
+            aria-label={`Increase ${groupLabel} weight`}
+          >
+            +
+          </button>
+        </div>
+
+        {focusedLoadGroup.movements.length > 1 && (
+          <button
+            type="button"
+            className={styles.differentWeightsLink}
+            onClick={() => {
+              setSeparateWeightGroups(prev => {
+                const next = new Set(prev);
+                next.add(focusedLoadGroup.type);
+                return next;
+              });
+            }}
+          >
+            Use different weights for each {'->'}
+          </button>
+        )}
+
+        {alternateMovements.length > 0 && (
+          <div className={styles.inlineAlternateList}>
+            {alternateMovements.map((mr) => {
+              const sub = getSubState(mr);
+              const isActive = sub.isSubstituted;
+              return (
+                <button
+                  key={mr.movementKey}
+                  type="button"
+                  className={`${styles.inlineAlternateRow} ${isActive ? styles.inlineAlternateRowActive : ''}`}
+                  onClick={() => openSwap(mr.movementKey)}
+                >
+                  <span className={styles.inlineAlternateText}>
+                    <span className={styles.inlineAlternateName}>
+                      {cleanTileLabel(isActive ? sub.displayName : mr.movement.name)}
+                    </span>
+                    <span className={styles.inlineAlternateMeta}>
+                      {isActive ? (sub.conversionNote ?? 'alternate selected') : 'tap to scale / alternate'}
+                    </span>
+                  </span>
+                  <span className={styles.inlineAlternateIcon} aria-hidden="true">
+                    <SwapIcon />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Only stop on movements where the athlete can actually change something.
+  // Plain bodyweight movements with no alternate are omitted from this input step.
+  const visibleMovements = movements.filter(mr => movementHasInput(mr) || movementHasAlternate(mr));
+  const visibleSectionGroups = groupBySections(visibleMovements);
+  const focusedLoadStep = renderFocusedLoadStep();
 
   return (
     <>
-      {sectionGroups ? (
+      {focusedLoadStep ?? (visibleSectionGroups ? (
         <div className={styles.multiRow}>
-          {sectionGroups.map((group) => (
+          {visibleSectionGroups.map((group) => (
             <div key={group.sectionIndex} className={styles.sectionGroup}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionLabel}>
@@ -848,9 +1196,9 @@ export function ScoreMovementInputs({
         </div>
       ) : (
         <div className={styles.multiRow}>
-          {movements.map(renderMovField)}
+          {visibleMovements.map(renderMovField)}
         </div>
-      )}
+      ))}
 
       {/* Substitution sheet — single instance, driven by swapOpenKey */}
       {swapMr && (

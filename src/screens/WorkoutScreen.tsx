@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'framer-motion';
 import { doc, setDoc } from 'firebase/firestore';
 import styles from './WorkoutScreen.module.css';
@@ -3513,6 +3514,57 @@ export function WorkoutScreen({
       </span>
     );
   };
+
+  const getIntensityDisplay = (exercise?: Exercise | null) => {
+    if (!exercise || exercise.type === 'strength' || !exercise.intensity) return null;
+    const selected = INTENSITY_OPTIONS.find(option => option.id === exercise.intensity);
+    if (!selected) return null;
+    if (selected.id === 'smoked') {
+      return {
+        ...selected,
+        color: '#c566ff',
+        bg: 'rgba(197, 102, 255, 0.14)',
+        border: 'rgba(197, 102, 255, 0.52)',
+        vibe: 'VIBE 9',
+      };
+    }
+    if (selected.id === 'cooked') {
+      return {
+        ...selected,
+        color: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.13)',
+        border: 'rgba(239, 68, 68, 0.48)',
+        vibe: 'VIBE 8',
+      };
+    }
+    return {
+      ...selected,
+      color: 'var(--wodi-yellow)',
+      bg: 'rgba(245, 194, 0, 0.12)',
+      border: 'rgba(245, 194, 0, 0.45)',
+      vibe: 'VIBE 7',
+    };
+  };
+
+  const renderIntensityStamp = (exercise?: Exercise | null, compact = false) => {
+    const selected = getIntensityDisplay(exercise);
+    if (!selected) return null;
+    return (
+      <div
+        className={`${styles.vibeStamp} ${compact ? styles.vibeStampCompact : ''}`}
+        style={{
+          '--vibe-color': selected.color,
+          '--vibe-bg': selected.bg,
+          '--vibe-border': selected.border,
+        } as CSSProperties}
+      >
+        <span className={styles.vibeStampRing} />
+        <span className={styles.vibeStampEmoji}>{selected.emoji}</span>
+        <span className={styles.vibeStampLabel}>{selected.label}</span>
+        <span className={styles.vibeStampMeta}>{selected.vibe}</span>
+      </div>
+    );
+  };
   void renderFeelRating;
 
   // True when any exercise has EMOM minute-station labeled movements
@@ -4399,7 +4451,6 @@ export function WorkoutScreen({
         <div className={styles.chipperMetaRow}>
           <div className={styles.posterMetaChips}>
             <span className={styles.posterVibeTag}>FOR TIME</span>
-            {renderIntensityChip(exercise)}
           </div>
           <span className={styles.posterDate}>
             {isReward
@@ -4423,15 +4474,18 @@ export function WorkoutScreen({
               {chipperWordmark}
             </h2>
             {chipperStructure && (
-              <span className={styles.chipperStructure}>{chipperStructure}</span>
+              <span className={styles.chipperStructure}>
+                {chipperStructure}
+                {heroResult ? (
+                  <>
+                    {' · '}
+                    <span className={styles.chipperStructureResult}>{heroResult.value}</span>
+                  </>
+                ) : null}
+              </span>
             )}
           </div>
-          {heroResult && (
-            <div className={styles.chipperScoreBlock}>
-              <span className={styles.chipperScoreLabel}>FINISH TIME</span>
-              <span className={styles.chipperScoreValue}>{heroResult.value}</span>
-            </div>
-          )}
+          {renderIntensityStamp(exercise)}
         </div>
 
         {descLadderData && (
@@ -4716,23 +4770,34 @@ export function WorkoutScreen({
                     <div className={styles.cPageHeader}>
                       <div className={styles.cPageChips}>
                         <span className={styles.posterVibeTag}>{formatLabel}</span>
-                        {renderIntensityChip(page.exercise)}
                       </div>
                       <span className={styles.posterDate}>{cardDateStr}</span>
                     </div>
 
                     {/* Big exercise name headline */}
-                    <span
-                      className={styles.cPageHeadline}
-                      onPointerDown={() => startPartNamePress(i)}
-                      onPointerUp={cancelPartNamePress}
-                      onPointerLeave={cancelPartNamePress}
-                      onPointerCancel={cancelPartNamePress}
-                      onDoubleClick={() => renamePart(i)}
-                      title="Long press to rename"
-                    >
-                      {partWordmark}
-                    </span>
+                    <div className={styles.cPageHeroRow}>
+                      <div className={styles.cPageHeroTitleBlock}>
+                        <span
+                          className={styles.cPageHeadline}
+                          onPointerDown={() => startPartNamePress(i)}
+                          onPointerUp={cancelPartNamePress}
+                          onPointerLeave={cancelPartNamePress}
+                          onPointerCancel={cancelPartNamePress}
+                          onDoubleClick={() => renamePart(i)}
+                          title="Long press to rename"
+                        >
+                          {partWordmark}
+                        </span>
+                        {heroResult && !page.isStrength && i === carouselPage && (
+                          <span className={styles.cPageResultLine}>
+                            {section?.blueprint || formatLabel}
+                            {' · '}
+                            <span>{heroResult.value}</span>
+                          </span>
+                        )}
+                      </div>
+                      {renderIntensityStamp(page.exercise, true)}
+                    </div>
 
                     {/* Divider */}
                     <div className={styles.cPageDivider} />
@@ -4819,7 +4884,6 @@ export function WorkoutScreen({
                 <span className={styles.posterVibeTag}>
                   {getPosterFormatLabel(workoutFormat, !!ladderData) || rewardVibeLabel}
                 </span>
-                {renderIntensityChip(exercises[0])}
               </div>
               <span className={styles.posterDate}>
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

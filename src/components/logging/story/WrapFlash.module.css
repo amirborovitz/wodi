@@ -1,0 +1,43 @@
+/* ═══════════════════════════════════════════
+   WrapFlash — "That's a wrap" transition moment
+   ═══════════════════════════════════════════ */
+
+.container {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 0 32px;
+  text-align: center;
+}
+
+.hero {
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 900;
+  color: var(--wodi-yellow);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-shadow: 0 0 40px rgba(245, 194, 0, 0.35);
+  margin: 0;
+}
+
+.sub {
+  font-family: var(--font-barlow);
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(242, 240, 235, 0.7);
+  letter-spacing: 0.04em;
+  margin: 0;
+}

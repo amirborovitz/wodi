@@ -12,6 +12,7 @@ interface InputRouterProps {
   result: StoryExerciseResult;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
   teamSize?: number;
+  onSubstitutionOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -22,7 +23,7 @@ interface InputRouterProps {
  * If a movement says inputType: "weight", we show a weight input —
  * regardless of whether the exercise is scored, single, or superset.
  */
-export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
+export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
 
@@ -70,6 +71,7 @@ export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
             variant={isAmrapIntervals ? 'amrap_intervals' : 'default'}
             roundsTotal={isAmrapIntervals ? (result.exercise.intervalCount ?? result.setsTotal) : undefined}
             teamSize={teamSize}
+            onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {
               const next = [...movements];
               const key = visibleMovements[index]?.movementKey;
@@ -123,6 +125,7 @@ export function InputRouter({ result, onChange, teamSize }: InputRouterProps) {
           movements={movements}
           inputMovements={movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance')}
           teamSize={teamSize}
+          onSubstitutionOpenChange={onSubstitutionOpenChange}
           onChange={(index: number, patch: Partial<MovementResult>) => {
             const next = [...movements];
             next[index] = { ...next[index], ...patch };
