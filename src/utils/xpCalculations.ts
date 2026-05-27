@@ -180,15 +180,13 @@ export function calculateWorkoutEP(
 export function getTimeCapMinutes(workout: Workout): number {
   const { type, timeCap, duration } = workout;
 
-  // Strength workouts: no metcon component
-  if (type === 'strength') return 0;
-
-  // Use persisted timeCap (seconds → minutes) when available
+  // Explicit timeCap always wins — even strength-typed workouts may have a metcon component
   if (timeCap && timeCap > 0) {
     return timeCap / 60;
   }
 
-  // Fallback to duration (already in minutes)
+  // No explicit timeCap: pure strength has no time component; others fall back to duration
+  if (type === 'strength') return 0;
   return duration || 0;
 }
 

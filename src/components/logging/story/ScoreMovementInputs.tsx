@@ -30,7 +30,7 @@ interface ScoreMovementInputsProps {
 function getEquipmentType(name: string): 'barbell' | 'kb' | 'db' {
   const lower = name.toLowerCase();
   if (/\bdb\b|dumbbell/.test(lower)) return 'db';
-  if (/\bkb\b|kettlebell|\bgoblet\b/.test(lower)) return 'kb';
+  if (/\bkb\b|kettlebell|\bgoblet\b|\bsuitcase\b|\bfarmer'?s?\b|\bcarry\b/.test(lower)) return 'kb';
   return 'barbell';
 }
 
@@ -41,9 +41,6 @@ function getEquipmentLabel(type: 'barbell' | 'kb' | 'db'): string {
 }
 
 function getLegalWeightStep(mr: MovementResult): number {
-  const equipmentType = getEquipmentType(mr.movement.name);
-  if (equipmentType === 'kb') return 2;
-  if (equipmentType === 'db') return 1;
   return getWeightStep(mr.movement.name, mr.implementCount);
 }
 
@@ -885,7 +882,7 @@ export function ScoreMovementInputs({
         {swapMr && (
           <SubstitutionSheet
             open={swapOpenKey != null}
-            originalName={swapMr.movement.name}
+            originalName={swapMr.movement.name.replace(/^(Buy-In|Cash-Out):\s*/i, '')}
             originalReps={swapMr.movement.reps}
             originalDistance={swapMr.movement.distance}
             originalCalories={swapMr.movement.calories}
@@ -903,11 +900,15 @@ export function ScoreMovementInputs({
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
     const sub = getSubState(mr);
-    const hasAlts = hasAlternatives(mr.movement.name) || !!mr.movement.alternative;
+    const rawMovName = sub.isSubstituted ? sub.displayName : mr.movement.name;
+    // Strip AI-generated "Buy-In:"/"Cash-Out:" prefix from display — these labels can be
+    // misparsed for the first movement of a numbered AMRAP block.
+    const displayMovName = rawMovName.replace(/^(Buy-In|Cash-Out):\s*/i, '');
+    const hasAlts = hasAlternatives(displayMovName) || !!mr.movement.alternative;
     const tileName = (
-      cleanTileLabel(sub.isSubstituted ? sub.displayName : mr.movement.name)
-      || stripWeightFromName(sub.isSubstituted ? sub.displayName : mr.movement.name)
-      || (sub.isSubstituted ? sub.displayName : mr.movement.name)
+      cleanTileLabel(displayMovName)
+      || stripWeightFromName(displayMovName)
+      || displayMovName
     ).toUpperCase();
 
     const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
@@ -937,7 +938,7 @@ export function ScoreMovementInputs({
             {sub.isSubstituted ? (
               <div className={styles.tileNameSubstituted}>
                 <span className={styles.tileNameOriginal}>
-                  {(cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name).toUpperCase()}
+                  {(cleanTileLabel(displayMovName) || stripWeightFromName(displayMovName) || displayMovName).toUpperCase()}
                 </span>
                 <span className={styles.tileName}>{tileName}</span>
               </div>
@@ -1095,7 +1096,6 @@ export function ScoreMovementInputs({
             onPointerCancel={clearLongPress}
             onPointerLeave={clearLongPress}
             onClick={() => runClickUnlessLongPressed(() => nudgeShared(-1))}
-            onDoubleClick={() => nudgeShared(-1, 2)}
             aria-label={`Decrease ${groupLabel} weight`}
           >
             -
@@ -1117,7 +1117,6 @@ export function ScoreMovementInputs({
             onPointerCancel={clearLongPress}
             onPointerLeave={clearLongPress}
             onClick={() => runClickUnlessLongPressed(() => nudgeShared(1))}
-            onDoubleClick={() => nudgeShared(1, 2)}
             aria-label={`Increase ${groupLabel} weight`}
           >
             +
@@ -1154,7 +1153,7 @@ export function ScoreMovementInputs({
                 >
                   <span className={styles.inlineAlternateText}>
                     <span className={styles.inlineAlternateName}>
-                      {cleanTileLabel(isActive ? sub.displayName : mr.movement.name)}
+                      {cleanTileLabel((isActive ? sub.displayName : mr.movement.name).replace(/^(Buy-In|Cash-Out):\s*/i, ''))}
                     </span>
                     <span className={styles.inlineAlternateMeta}>
                       {isActive ? (sub.conversionNote ?? 'alternate selected') : 'tap to scale / alternate'}
@@ -1204,7 +1203,7 @@ export function ScoreMovementInputs({
       {swapMr && (
         <SubstitutionSheet
           open={swapOpenKey != null}
-          originalName={swapMr.movement.name}
+          originalName={swapMr.movement.name.replace(/^(Buy-In|Cash-Out):\s*/i, '')}
           originalReps={swapMr.movement.reps}
           originalDistance={swapMr.movement.distance}
           originalCalories={swapMr.movement.calories}

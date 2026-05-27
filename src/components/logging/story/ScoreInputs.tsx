@@ -128,7 +128,7 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ScoreRoundsInput — big tap counter + partial movement checklist
+// ScoreRoundsInput — big tap counter + half-round toggle
 // ═══════════════════════════════════════════════════════════════════
 
 interface ScoreRoundsInputProps {
@@ -136,73 +136,31 @@ interface ScoreRoundsInputProps {
   onChange: (patch: Partial<StoryExerciseResult>) => void;
 }
 
-/** Abbreviate movement names for social-ready display */
-function abbreviateMovement(name: string): string {
-  return name
-    .replace(/^Alt(?:ernating)?\s+/i, '')
-    .replace(/^Single\s+/i, '')
-    .replace(/Toes[- ]to[- ]Bar/i, 'TTB')
-    .replace(/Chest[- ]to[- ]Bar/i, 'C2B')
-    .replace(/Handstand Push[- ]?Ups?/i, 'HSPU')
-    .replace(/Pull[- ]?Ups?/i, 'Pull-Ups')
-    .replace(/Push[- ]?Ups?/i, 'Push-Ups')
-    .replace(/Wall[- ]?Balls?/i, 'Wall Balls')
-    .replace(/Box[- ]?Jumps?/i, 'Box Jumps')
-    .replace(/Muscle[- ]?Ups?/i, 'MU')
-    .replace(/Double[- ]?Unders?/i, 'DU')
-    .replace(/Burpees?.*$/i, 'Burpees');
+function formatRoundsDisplay(rounds: number): string {
+  const intPart = Math.floor(rounds);
+  if (rounds % 1 !== 0) return intPart === 0 ? '½' : `${intPart}½`;
+  return `${intPart}`;
 }
 
 export function ScoreRoundsInput({ result, onChange }: ScoreRoundsInputProps) {
   const rounds = result.rounds ?? 0;
-  const [drawerOpen, setDrawerOpen] = useState(
-    () => (result.partialMovements ?? []).length > 0
-  );
-
-  // Get the movements from the exercise prescription
-  const movements = result.exercise.movements ?? [];
-  const checkedMoves = result.partialMovements ?? [];
-
+  const intPart = Math.floor(rounds);
+  const isHalf = rounds % 1 !== 0;
 
   const handleTap = useCallback(() => {
-    onChange({ rounds: rounds + 1 });
-  }, [rounds, onChange]);
+    onChange({ rounds: intPart + 1 });
+  }, [intPart, onChange]);
 
   const adjustRounds = useCallback((delta: number) => {
-    onChange({ rounds: Math.max(0, rounds + delta) });
-  }, [rounds, onChange]);
+    onChange({ rounds: Math.max(0, intPart + delta) });
+  }, [intPart, onChange]);
 
-  const toggleMovement = useCallback((movName: string) => {
-    const current = result.partialMovements ?? [];
-    let next: string[];
-    if (current.includes(movName)) {
-      next = current.filter(n => n !== movName);
-    } else {
-      next = [...current, movName];
-    }
-
-    // Derive partialReps from checked movements for legacy save compatibility
-    let partialReps = 0;
-    for (const mov of movements) {
-      if (next.includes(mov.name)) {
-        partialReps += mov.reps || mov.calories || mov.distance || 1;
-      } else {
-        break; // Stop at first unchecked — movements are sequential in a round
-      }
-    }
-
-    onChange({
-      partialMovements: next.length > 0 ? next : undefined,
-      partialReps: partialReps > 0 ? partialReps : undefined,
-    });
-  }, [result.partialMovements, movements, onChange]);
-
-  // Build the social headline preview
-  const headlinePreview = buildPartialHeadline(rounds, checkedMoves);
+  const toggleHalf = useCallback(() => {
+    onChange({ rounds: isHalf ? intPart : intPart + 0.5 });
+  }, [intPart, isHalf, onChange]);
 
   return (
     <div className={styles.center}>
-      {/* Big tap zone — tap to add a round */}
       <div className={styles.tapRow}>
         <button
           type="button"
@@ -227,12 +185,11 @@ export function ScoreRoundsInput({ result, onChange }: ScoreRoundsInputProps) {
               exit={{ y: -20, opacity: 0 }}
               transition={{ duration: 0.12 }}
             >
-              {rounds}
+              {formatRoundsDisplay(rounds)}
             </motion.span>
           </AnimatePresence>
           <span className={styles.roundsLabel}>rounds</span>
 
-          {/* Pulse ring animation on tap */}
           <AnimatePresence>
             {rounds > 0 && (
               <motion.div
@@ -256,107 +213,13 @@ export function ScoreRoundsInput({ result, onChange }: ScoreRoundsInputProps) {
         </button>
       </div>
 
-      {/* Social headline preview */}
-      {headlinePreview && (
-        <motion.div
-          className={styles.headlinePreview}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {headlinePreview}
-        </motion.div>
-      )}
-
-      {/* Partial movements: trigger pill + expandable drawer */}
-      {movements.length > 0 && (
-        <div className={styles.partialBlock}>
-          {!drawerOpen ? (
-            <motion.button
-              type="button"
-              className={styles.partialTrigger}
-              onClick={() => setDrawerOpen(true)}
-              whileTap={{ scale: 0.97 }}
-            >
-              + Add partial moves
-            </motion.button>
-          ) : (
-            <AnimatePresence>
-              <motion.div
-                className={styles.partialDrawer}
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div className={styles.drawerHeader}>
-                  <span className={styles.drawerTitle}>
-                    Into round {rounds + 1}
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.drawerClose}
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      // Clear selections when closing
-                      if (checkedMoves.length > 0) {
-                        onChange({ partialMovements: undefined, partialReps: undefined });
-                      }
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className={styles.movementList}>
-                  {movements.map((mov) => {
-                    const isChecked = checkedMoves.includes(mov.name);
-                    return (
-                      <motion.button
-                        key={mov.name}
-                        type="button"
-                        className={`${styles.movementItem} ${isChecked ? styles.movementItemChecked : ''}`}
-                        onClick={() => toggleMovement(mov.name)}
-                        whileTap={{ scale: 0.97 }}
-                      >
-                        <span className={styles.movementName}>
-                          {abbreviateMovement(mov.name)}
-                        </span>
-                        <span className={styles.movementCheck}>
-                          {isChecked && (
-                            <motion.span
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                              className={styles.checkMark}
-                            >
-                              ✓
-                            </motion.span>
-                          )}
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          )}
-        </div>
-      )}
+      <button
+        type="button"
+        className={`${styles.halfRoundBtn} ${isHalf ? styles.halfRoundBtnActive : ''}`}
+        onClick={toggleHalf}
+      >
+        ½ round
+      </button>
     </div>
   );
-}
-
-// ─── Headline builder ────────────────────────────────────────────
-
-function buildPartialHeadline(rounds: number, checkedMoves: string[]): string | null {
-  if (rounds <= 0) return null;
-
-  const base = `${rounds} ROUNDS`;
-  if (checkedMoves.length === 0) return base;
-
-  // Show the LAST checked movement as the partial context
-  const lastMove = checkedMoves[checkedMoves.length - 1];
-  const abbreviated = abbreviateMovement(lastMove).toUpperCase();
-  return `${base} + ${abbreviated}`;
 }

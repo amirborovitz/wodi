@@ -169,6 +169,9 @@ function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_m
   if (/\brow\b/.test(n) && !/renegade|bent[-\s]over|pendlay|dumbbell|\bdb\b|kettlebell|\bkb\b|barbell/.test(n)) {
     return 'cardio_machine';
   }
+  // Implement prefix (dumbbell/db/kettlebell/kb) means always weighted — even if the movement
+  // name also contains a bodyweight word (e.g., "Dumbbell Burpee to Deadlift").
+  if (/\b(dumbbell|dumbell|db|kettlebell|kb)\s+\w/i.test(n)) return 'weight';
   // Check bodyweight BEFORE weighted (e.g., "chest to bar" shouldn't match "bar")
   if (BODYWEIGHT_NAME_PATTERNS.some(p => n.includes(p))) return 'bodyweight';
   if (/\bbanded?\b|band\b|rotation|hold\b/i.test(n)) return 'bodyweight';
@@ -236,6 +239,38 @@ const LOGGING_MODE_TO_KIND: Record<ExerciseLoggingMode, ExerciseKind> = {
 
 export function loggingModeToKind(mode: ExerciseLoggingMode): ExerciseKind {
   return LOGGING_MODE_TO_KIND[mode] ?? 'note';
+}
+
+const DURATION_HOLD_PATTERNS = [
+  'wall sit',
+  'wall hold',
+  'plank',
+  'hollow hold',
+  'l-sit',
+  'l sit',
+  'ring hold',
+  'ring support',
+];
+
+function getDurationOverrideKind(exercise: ParsedExercise): ExerciseKind | undefined {
+  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.toLowerCase();
+  const hasHoldPattern = DURATION_HOLD_PATTERNS.some((pattern) => text.includes(pattern));
+  const hasTimePrescription = /\b\d+(?:\s*[-–]\s*\d+)?\s*(?:sec(?:onds?)?|s\b|min(?:utes?)?)\b/i.test(text)
+    || exercise.movements?.some((movement) => (movement.time ?? 0) > 0);
+  const hasExplicitLoad = !!exercise.rxWeights || /\b\d+(?:\.\d+)?\s*(?:kg|lb|lbs)\b/i.test(text);
+
+  return hasHoldPattern && hasTimePrescription && !hasExplicitLoad ? 'duration' : undefined;
+}
+
+function getPrescribedDurationSeconds(exercise: ParsedExercise): number | undefined {
+  const movementTime = exercise.movements?.find((movement) => (movement.time ?? 0) > 0)?.time;
+  if (movementTime) return movementTime;
+
+  const text = `${exercise.name || ''} ${exercise.prescription || ''}`;
+  const match = text.match(/\b(\d+)(?:\s*[-–]\s*\d+)?\s*(sec(?:onds?)?|s\b|min(?:utes?)?)\b/i);
+  if (!match) return undefined;
+  const amount = parseInt(match[1], 10);
+  return /^m/i.test(match[2]) ? amount * 60 : amount;
 }
 
 function shouldLogCelebrationDebug(): boolean {
@@ -704,7 +739,7 @@ export function createBlankResult(
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
   teamSize?: number,
 ): StoryExerciseResult {
-  const kind = loggingModeToKind(loggingMode);
+  const kind = getDurationOverrideKind(exercise) ?? loggingModeToKind(loggingMode);
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
@@ -764,9 +799,10 @@ export function createBlankResult(
       }
     });
   } else if (exercise.movements && exercise.movements.length > 0) {
-    // Detect buy-in/cash-out movements via: role field, perRound=false, or "Buy-In:"/"Cash-Out:" name prefix
+    // Legacy fallback when sections are missing: use structured movement fields only.
+    // Do not infer buy-in/cash-out from labels; gyms use too many names for these roles.
     const isBuyInMov = (m: typeof exercise.movements[0]) =>
-      m.role === 'buy_in' || m.role === 'cash_out' || m.perRound === false || /^(?:buy-in|cash-out):/i.test(m.name);
+      m.role === 'buy_in' || m.role === 'cash_out' || m.perRound === false;
     const hasBuyInOrCashOut = exercise.movements.some(isBuyInMov);
     // Find indices to distinguish buy-in (before core) vs cash-out (after core)
     const firstCoreIdx = exercise.movements.findIndex(m => !isBuyInMov(m));
@@ -774,8 +810,8 @@ export function createBlankResult(
     for (let mIdx = 0; mIdx < exercise.movements.length; mIdx++) {
       const mov = exercise.movements[mIdx];
       if (hasBuyInOrCashOut && isBuyInMov(mov)) {
-        // Use role field, name prefix, or position to determine buy-in vs cash-out
-        const isBuyIn = mov.role === 'buy_in' || mov.name.startsWith('Buy-In:') || mov.name.startsWith('Buy-In ') ||
+        // Use role field or position relative to core work to determine buy-in vs cash-out.
+        const isBuyIn = mov.role === 'buy_in' ||
           (mov.role !== 'cash_out' && firstCoreIdx >= 0 && mIdx < firstCoreIdx);
         movementSource.push({
           mov,
@@ -874,6 +910,10 @@ export function createBlankResult(
 
     case 'reps':
       base.repsPerSet = exercise.suggestedReps;
+      break;
+
+    case 'duration':
+      base.durationSeconds = getPrescribedDurationSeconds(exercise);
       break;
 
     case 'intervals':

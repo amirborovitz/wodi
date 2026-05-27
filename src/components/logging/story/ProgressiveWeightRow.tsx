@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import styles from './ProgressiveWeightRow.module.css';
 
 function selectAllInput(target: HTMLInputElement | null) {
@@ -85,6 +85,8 @@ export function ProgressiveWeightRow({
   const weightRef = useRef<number | undefined>(weight);
   const startInputRef = useRef<HTMLInputElement>(null);
   const peakInputRef = useRef<HTMLInputElement>(null);
+  const [startDraft, setStartDraft] = useState<string | null>(null);
+  const [peakDraft, setPeakDraft] = useState<string | null>(null);
 
   useEffect(() => {
     weightRef.current = weight;
@@ -123,6 +125,18 @@ export function ProgressiveWeightRow({
     peakRef.current = value;
     onChange(weightRef.current, value);
   }, [onChange]);
+
+  const commitStartDraft = useCallback(() => {
+    if (startDraft == null) return;
+    handleStartChange(startDraft);
+    setStartDraft(null);
+  }, [handleStartChange, startDraft]);
+
+  const commitPeakDraft = useCallback(() => {
+    if (peakDraft == null) return;
+    handlePeakChange(peakDraft);
+    setPeakDraft(null);
+  }, [handlePeakChange, peakDraft]);
 
   const totalReps = repsPerSet && setsTotal > 0 ? setsTotal * repsPerSet : undefined;
 
@@ -225,11 +239,6 @@ export function ProgressiveWeightRow({
       {/* Header */}
       <div className={styles.header}>
         <span className={styles.label}>{label.toUpperCase()}</span>
-        <div className={styles.headerFlow}>
-          <span className={styles.headerPole}>START</span>
-          <span className={styles.headerArrow}>→</span>
-          <span className={styles.headerPole}>PEAK</span>
-        </div>
         {badge && <span className={styles.totalBadge}>{badge}</span>}
       </div>
 
@@ -237,6 +246,7 @@ export function ProgressiveWeightRow({
       <div className={styles.columnsRow}>
         {/* START */}
         <div className={styles.column}>
+          <span className={styles.columnLabel}>Start weight</span>
           <button className={styles.chevron}
             onPointerDown={() => startHold(() => stepStart(STEP))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
@@ -254,10 +264,14 @@ export function ProgressiveWeightRow({
               type="text" inputMode="decimal"
               pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="next"
               className={styles.ovalInput}
-              value={weight ?? ''} placeholder={placeholderStr}
-              onFocus={(e) => selectAllInput(e.currentTarget)}
+              value={startDraft ?? weight ?? ''} placeholder={placeholderStr}
+              onFocus={(e) => {
+                setStartDraft(weight != null ? String(weight) : '');
+                selectAllInput(e.currentTarget);
+              }}
               onPointerDown={(e) => e.stopPropagation()}
-              onChange={(e) => handleStartChange(e.target.value)}
+              onChange={(e) => setStartDraft(e.target.value)}
+              onBlur={commitStartDraft}
               aria-label="Start weight in kg"
             />
           </div>
@@ -275,6 +289,7 @@ export function ProgressiveWeightRow({
 
         {/* PEAK */}
         <div className={styles.column}>
+          <span className={styles.columnLabel}>Peak weight</span>
           <button className={styles.chevron}
             onPointerDown={() => startHold(() => stepPeak(STEP))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
@@ -292,14 +307,16 @@ export function ProgressiveWeightRow({
               type="text" inputMode="decimal"
               pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done"
               className={styles.ovalInput}
-              value={peakWeight ?? peakRef.current ?? ''}
+              value={peakDraft ?? peakWeight ?? peakRef.current ?? ''}
               placeholder={weight ? String(weight) : placeholderStr}
               onFocus={(e) => {
                 handlePeakFocus();
+                setPeakDraft(peakWeight != null ? String(peakWeight) : peakRef.current != null ? String(peakRef.current) : '');
                 selectAllInput(e.currentTarget);
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              onChange={(e) => handlePeakChange(e.target.value)}
+              onChange={(e) => setPeakDraft(e.target.value)}
+              onBlur={commitPeakDraft}
               aria-label="Peak weight in kg"
             />
           </div>

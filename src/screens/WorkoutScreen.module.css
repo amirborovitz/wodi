@@ -27,9 +27,9 @@
   overflow: hidden;
   align-items: center;
   justify-content: center;
-  padding: 10px;
+  padding: 0;
   touch-action: none;
-  background: var(--wodi-bg);
+  background: #0c0d0f;
   gap: 0;
   isolation: isolate;
 }
@@ -38,57 +38,47 @@
   content: '';
   position: absolute;
   inset: 0;
-  background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.06) 0.6px, transparent 0.8px),
-    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.05) 0.7px, transparent 0.9px),
-    radial-gradient(circle at 30% 75%, rgba(255, 255, 255, 0.04) 0.5px, transparent 0.8px),
-    radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.05) 0.6px, transparent 0.9px);
-  background-size: 11px 11px, 13px 13px, 17px 17px, 19px 19px;
-  opacity: 0.07;
-  mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  opacity: 0.065;
+  mix-blend-mode: soft-light;
   pointer-events: none;
-  z-index: 0;
+  z-index: 3;
 }
 
 .posterFrame {
   position: relative;
   z-index: 1;
-  width: min(100%, 430px);
-  max-height: calc(100dvh - 20px);
-  aspect-ratio: 9 / 16;
+  width: 100%;
+  max-width: 430px;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
   overflow: hidden;
   border-radius: 0;
-  padding: 18px 16px 20px;
-  background: var(--wodi-card);
-  border: 1px solid var(--wodi-line2);
-  box-shadow:
-    0 20px 80px rgba(0,0,0,0.6),
-    0 0 0 1px rgba(255,255,255,0.02) inset;
+  box-sizing: border-box;
+  padding: 20px 20px 24px 20px;
+  background: #0c0d0f;
+  border: 0;
+  box-shadow: none;
+}
+
+.posterBodyLock {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  overflow: hidden;
 }
 
 /* Film-grain noise overlay — high-contrast chalky gym floor texture */
-.posterFrame::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 28px;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.8'/%3E%3C/svg%3E");
-  background-size: 120px 120px;
-  opacity: 0.075;
-  pointer-events: none;
-  z-index: 99;
-  mix-blend-mode: overlay;
-}
-
 .posterFrame::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 250, 232, 0.025), transparent 28%, rgba(255, 210, 0, 0.012));
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 
 .posterToolbar {
@@ -102,16 +92,45 @@
 }
 
 .posterBackBtn {
-  width: 48px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #22221f;
-  border: 1px solid rgba(255,255,255,0.03);
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid rgba(242, 240, 235, 0.10);
   border-radius: 999px;
-  color: rgba(255,255,255,0.72);
+  color: rgba(242, 240, 235, 0.72);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
 }
+.posterBackBtn svg { width: 18px; height: 18px; }
+.posterBackBtn:hover  { background: rgba(242, 240, 235, 0.10); color: #f2f0eb; }
+.posterBackBtn:active { transform: scale(0.93); }
+
+.posterShareBtn {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 0 10px;
+  background: var(--wodi-yellow);
+  border: 0;
+  border-radius: 999px;
+  color: #0c0d0f;
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.posterShareBtn svg { width: 16px; height: 16px; stroke: #0c0d0f; }
+.posterShareBtn:active { transform: scale(0.95); opacity: 0.85; }
 
 .posterBrandMark {
   position: absolute;
@@ -160,8 +179,7 @@
 }
 
 .posterHeroBlock {
-  position: relative;
-  z-index: 4;
+  position: static;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -184,118 +202,176 @@
 .posterVibeTag {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 8px 18px;
+  min-height: auto;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  color: rgba(242, 240, 235, 0.85);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  color: transparent;
+  font-family: var(--font-display);
+  font-size: clamp(36px, 10vw, 48px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: var(--wodi-card, #141618);
+  background: transparent;
+  -webkit-text-stroke: 1px var(--wodi-yellow);
 }
 
 .posterIntensityChip {
+  position: absolute;
+  top: 15%;
+  right: 16px;
+  z-index: 10;
+  pointer-events: none;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--wodi-line2, rgba(242, 240, 235, 0.12));
-  background: transparent;
-  color: rgba(242, 240, 235, 0.85);
-  font-family: var(--font-barlow);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  justify-content: center;
+  gap: 1px;
+  width: 82px;
+  min-height: 82px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--wodi-yellow);
+  color: #0c0d0f;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  line-height: 1.2;
+  line-height: 0.95;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  transform: rotate(-6deg);
 }
 
 .posterIntensityEmoji {
-  color: var(--wodi-white, #f2f0eb);
-  opacity: 1;
+  color: #0c0d0f;
+  opacity: 0.45;
   letter-spacing: 0;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .vibeStamp {
-  --vibe-color: var(--wodi-yellow);
-  --vibe-bg: rgba(245, 194, 0, 0.12);
-  --vibe-border: rgba(245, 194, 0, 0.45);
-  position: relative;
-  width: 116px;
-  height: 116px;
+  --vibe-color: var(--wodi-yellow, #f5c200);
+  --vibe-bg: transparent;
+  --vibe-border: var(--wodi-yellow, #f5c200);
+  --sticker-tilt: -6deg;
+  position: absolute;
+  left: 0;
+  bottom: -58px;
+  z-index: 8;
+  width: 126px;
+  min-height: 106px;
   flex: 0 0 auto;
-  border-radius: 50%;
-  border: 3px solid var(--vibe-color);
-  background:
-    radial-gradient(circle at 30% 25%, var(--vibe-bg), rgba(12, 13, 15, 0.96) 72%);
+  padding: 10px 11px 9px;
+  border: 2px solid var(--vibe-border);
+  border-radius: 32% 40% 34% 42% / 34% 30% 44% 38%;
+  background: var(--vibe-bg, transparent);
+  color: var(--vibe-color);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  transform: rotate(-8deg);
-  filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--vibe-color) 34%, transparent));
+  gap: 2px;
+  transform: rotate(var(--sticker-tilt));
+  box-shadow: none;
+  isolation: isolate;
+  margin: 0;
+  pointer-events: none;
+}
+
+.vibeStamp::before {
+  display: none;
+}
+
+.vibeStamp::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(0, 0, 0, 0.18) 0 1px, transparent 1.3px),
+    radial-gradient(circle at 70% 34%, rgba(0, 0, 0, 0.12) 0 1px, transparent 1.2px),
+    radial-gradient(circle at 42% 82%, rgba(255, 255, 255, 0.22) 0 1px, transparent 1.2px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 42%, rgba(0, 0, 0, 0.1));
+  background-size: 18px 18px, 23px 23px, 15px 15px, 100% 100%;
+  mix-blend-mode: overlay;
+  opacity: 0.18;
   pointer-events: none;
 }
 
 .vibeStampRing {
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  border: 1px dashed var(--vibe-border);
+  display: none;
+}
+
+.vibeStampFigure {
+  position: relative;
+  z-index: 2;
+  width: 84px;
+  height: auto;
+  fill: var(--wodi-yellow);
+  margin-bottom: 1px;
 }
 
 .vibeStampEmoji {
   position: relative;
-  z-index: 1;
-  font-size: 38px;
+  z-index: 2;
+  color: var(--wodi-yellow);
+  font-size: 34px;
+  filter: grayscale(1) contrast(1.35);
   line-height: 1;
   margin-bottom: 2px;
 }
 
 .vibeStampLabel {
   position: relative;
-  z-index: 1;
-  color: var(--vibe-color);
+  z-index: 2;
+  color: var(--wodi-yellow);
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 900;
-  letter-spacing: 0.03em;
-  line-height: 1;
+  letter-spacing: 0.04em;
+  line-height: 0.92;
   text-transform: uppercase;
+}
+
+.vibeStampSmoked .vibeStampLabel {
+  font-size: 25px;
 }
 
 .vibeStampMeta {
   position: relative;
-  z-index: 1;
-  margin-top: 3px;
-  color: var(--vibe-color);
+  z-index: 2;
+  margin-top: 1px;
+  color: rgba(245, 194, 0, 0.72);
   font-family: var(--font-barlow);
   font-size: 7px;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.2em;
   line-height: 1;
-  opacity: 0.72;
   text-transform: uppercase;
 }
 
 .vibeStampCompact {
-  width: 104px;
-  height: 104px;
-  border-width: 3px;
-  margin-top: 4px;
-  margin-right: -4px;
+  width: 112px;
+  min-height: 96px;
+  padding: 9px 10px 8px;
+  bottom: -48px;
+}
+
+.vibeStampCompact .vibeStampFigure {
+  width: 74px;
 }
 
 .vibeStampCompact .vibeStampEmoji {
-  font-size: 32px;
+  font-size: 30px;
 }
 
 .vibeStampCompact .vibeStampLabel {
-  font-size: 20px;
+  font-size: 22px;
 }
 
 .posterDate {
@@ -322,19 +398,20 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 16px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .posterVibeHeadline {
   display: block;
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: clamp(5rem, 21vw, 7.5rem);
-  line-height: 0.88;
-  font-weight: 900;
-  letter-spacing: -0.02em;
+  color: rgba(242, 240, 235, 0.38);
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
+  max-width: 90%;
 }
 
 .posterProgressionLabel {
@@ -346,23 +423,30 @@
 }
 
 .posterProgressionHero {
-  color: #FFD600;
-  font-family: var(--font-mono);
-  font-size: clamp(2.65rem, 12vw, 4.2rem);
-  font-weight: 950;
-  line-height: 0.92;
+  color: var(--wodi-white, #f2f0eb);
+  font-family: var(--font-display);
+  font-size: clamp(48px, 12vw, 64px);
+  font-weight: 900;
+  line-height: 1.1;
   letter-spacing: 0;
-  text-shadow: 0 0 16px rgba(255, 214, 0, 0.24);
+  text-shadow: none;
   max-width: min(100%, 390px);
-  white-space: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .posterProgressionNote {
-  color: rgba(245, 239, 220, 0.27);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
+  color: rgba(242, 240, 235, 0.75);
+  font-family: var(--font-barlow);
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
   text-transform: uppercase;
+  max-width: 85%;
+  margin: 12px auto 0;
+  text-align: center;
 }
 
 .posterMetconResult {
@@ -522,10 +606,11 @@
   z-index: 3;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(245, 239, 220, 0.08);
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 0;
 }
 
 .posterResultHeader {
@@ -559,7 +644,9 @@
 .posterProgressionRow {
   display: flex;
   align-items: flex-end;
+  justify-content: center;
   gap: 8px;
+  width: 100%;
 }
 
 .posterProgressionCount {
@@ -660,26 +747,56 @@
   gap: 10px;
 }
 
+/* Part name — small dim eyebrow above the hero score */
 .cPageHeadline {
   display: block;
-  font-family: var(--font-display);
-  font-size: clamp(2.8rem, 12vw, 4.4rem);
-  font-weight: 900;
-  color: var(--wodi-white);
-  line-height: 0.88;
-  letter-spacing: -0.02em;
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(242, 240, 235, 0.55);
+  line-height: 1.2;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
-  margin-top: 6px;
+  margin-top: 0;
   cursor: text;
   user-select: none;
+}
+
+/* Hero score — the single dominant element */
+.cPageHeroScore {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(48px, 12vw, 64px);
+  font-weight: 900;
+  color: var(--wodi-white, #f2f0eb);
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Metadata description — small dim prescription lines */
+.cPageDescLine {
+  color: rgba(242, 240, 235, 0.75);
+  font-family: var(--font-barlow);
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  max-width: 85%;
+  margin: 12px auto 0;
+  text-align: center;
 }
 
 .cPageHeroRow {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-  min-height: 112px;
+  min-height: 0;
   position: relative;
   z-index: 3;
 }
@@ -689,37 +806,55 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
 
+/* Legacy combined result line — kept for any remaining references */
 .cPageResultLine {
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: 0.02em;
-  line-height: 1;
+  color: rgba(242, 240, 235, 0.75);
+  font-family: var(--font-barlow);
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
   text-transform: uppercase;
+  max-width: 85%;
+  margin: 12px auto 0;
+  text-align: center;
 }
 
 .cPageResultLine span {
-  color: var(--wodi-yellow);
+  color: rgba(242, 240, 235, 0.75);
+}
+
+/* Sticker wrapper — normal flow after movement list, no dead space */
+.carouselStickerWrapper {
+  position: relative;
+  margin-top: 20px;
+  z-index: 8;
+  pointer-events: none;
+  align-self: flex-start;
+}
+
+.carouselStickerWrapper .vibeStamp {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
 }
 
 .cPageDivider {
-  height: 1px;
-  background: rgba(242, 240, 235, 0.1);
-  margin: 12px 0 10px;
-  flex-shrink: 0;
+  display: none;
 }
 
 .cPageBody {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cPageStickerAnchor {
@@ -825,48 +960,56 @@
 
 .posterStatFooter {
   position: relative;
-  z-index: 2;
+  z-index: 4;
   flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: stretch;
   gap: 0;
-  margin-top: 18px;
-  padding-top: 14px;
-  border: 1px solid rgba(245, 239, 220, 0.09);
-  border-radius: 17px;
+  margin-top: 0;
+  padding-top: 12px;
+  border: 0;
+  border-top: 1px solid rgba(242, 240, 235, 0.06);
+  border-radius: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.018);
+  background: transparent;
 }
 
 .posterStatChip {
   flex: 1;
   min-width: 0;
-  min-height: 108px;
-  padding: 20px 8px 22px;
+  min-height: 80px;
+  padding: 12px 6px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   background: transparent;
   border: 0;
-  border-right: 1px solid rgba(245, 239, 220, 0.08);
   border-radius: 0;
   text-align: center;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025);
+  box-shadow: none;
+  position: relative;
 }
 
-.posterStatChip:last-child {
-  border-right: 0;
+.posterStatChip:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 24%;
+  width: 1px;
+  height: 52%;
+  background: rgba(242, 240, 235, 0.06);
 }
 
 .posterStatLabel {
   display: block;
-  color: rgba(242, 240, 235, 0.7);
+  color: rgba(242, 240, 235, 0.38);
+  font-family: var(--font-barlow);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.16em;
-  line-height: 1.1;
+  letter-spacing: 0.20em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
@@ -874,21 +1017,23 @@
   display: block;
   margin-top: 4px;
   color: var(--wodi-yellow);
-  font-size: 32px;
+  font-size: clamp(36px, 10vw, 48px);
   font-family: var(--font-display);
   font-weight: 900;
   line-height: 1;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .posterStatUnit {
   display: block;
-  margin-top: 3px;
-  color: rgba(242, 240, 235, 0.55);
+  margin-top: 4px;
+  color: rgba(242, 240, 235, 0.38);
+  font-family: var(--font-barlow);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.12em;
-  line-height: 1.1;
+  letter-spacing: 0.20em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
@@ -896,12 +1041,13 @@
   position: relative;
   z-index: 1;
   flex: 1 1 auto;
+  min-height: 0;
   margin-top: 0;
-  padding: 8px 2px 6px;
+  padding: 2px 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: clip;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -913,8 +1059,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 4px 0;
+  gap: 8px;
+  padding: 4px 0 8px;
   overflow: hidden;
 }
 
@@ -940,8 +1086,8 @@
 }
 
 .artifactEyebrow {
-  color: rgba(242, 240, 235, 0.55);
-  font-size: 10px;
+  color: rgba(242, 240, 235, 0.38);
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.20em;
   text-transform: uppercase;
@@ -950,20 +1096,23 @@
 
 .artifactBlueprint {
   margin: 0;
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: 22px;
+  color: rgba(242, 240, 235, 0.75);
+  font-family: var(--font-barlow);
+  font-size: clamp(13px, 3.5vw, 15px);
   font-weight: 800;
-  letter-spacing: normal;
-  line-height: 1.05;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
   text-transform: uppercase;
   overflow-wrap: anywhere;
+  max-width: 85%;
+  margin: 12px auto 0;
+  text-align: center;
 }
 
 .artifactRows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .artifactRow {
@@ -1026,10 +1175,10 @@
 
 .artifactPrimary {
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: clamp(25px, 7vw, 32px);
   font-weight: 900;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
@@ -1073,6 +1222,116 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
+
+/* ─── AMRAP Intervals — Compact 2-line strip cards ──────────────────────── */
+
+.amrapIntervalStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * Target: ~56–60px tall per card so three cards + two 8px gaps = ≤196px.
+ * Layout: yellow left spine · card body (flex-col) · no divider / no totals.
+ */
+.amrapPartCard {
+  background: #141618;
+  border: 1px solid rgba(242, 240, 235, 0.10);
+  border-left: 3px solid #f5c200;
+  border-radius: 10px;
+  padding: 10px 12px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 12px rgba(245, 194, 0, 0.05);
+}
+
+/*
+ * Line 1: eyebrow (left) + result (right) on a single row.
+ * No border-bottom — the prescription line below provides enough separation.
+ */
+.amrapPartHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Eyebrow group: "AMRAP 1" + "· 12 MIN" side by side */
+.amrapPartEyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* "AMRAP 1" — brighter dim so it reads as the section label */
+.amrapPartBadge {
+  color: rgba(242, 240, 235, 0.55);
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* "· 12 MIN" — softer, secondary within the eyebrow */
+.amrapPartDuration {
+  color: rgba(242, 240, 235, 0.32);
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/*
+ * Result — L1 for this card.
+ * Sits on the right of line 1 so label:value reads as a single unit.
+ * 22px keeps it dominant without competing with the hero block above.
+ */
+.amrapPartResult {
+  color: #f5c200;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/*
+ * Line 2: movement names joined by " · " — no reps, no weights.
+ * Single truncated line keeps the card height fixed.
+ */
+.amrapPartPrescription {
+  color: rgba(242, 240, 235, 0.38);
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Legacy detail-table classes — kept to avoid breaking any callers, but
+   the table is no longer rendered. Set display:none so stale JSX is harmless. */
+.amrapMovementRows  { display: none; }
+.amrapMovementRow   { display: none; }
+.amrapMovQty        { display: none; }
+.amrapMovName       { display: none; }
+.amrapMovWeight     { display: none; }
+.amrapMovWeightHeavy{ display: none; }
+.amrapPartTotals    { display: none; }
 
 /* ============================================
    Header — Condensed nav row
@@ -1146,26 +1405,25 @@
 }
 
 .rewardBackBtn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 50%;
-  color: rgba(255, 255, 255, 0.6);
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid rgba(242, 240, 235, 0.10);
+  border-radius: 999px;
+  color: rgba(242, 240, 235, 0.72);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
-  /* 44px touch target via padding */
-  padding: 2px;
 }
 
-.rewardBackBtn svg { width: 24px; height: 24px; }
-.rewardBackBtn:hover  { color: #fff; }
-.rewardBackBtn:active { transform: scale(0.92); }
+.rewardBackBtn svg { width: 18px; height: 18px; }
+.rewardBackBtn:hover  { background: rgba(242, 240, 235, 0.10); color: #f2f0eb; }
+.rewardBackBtn:active { transform: scale(0.93); }
 
 .rewardDate {
   flex: 1;
@@ -2210,47 +2468,36 @@
 .shareBarGhost:hover  { background: rgba(255, 255, 255, 0.08); transform: translateY(-1px); }
 .shareBarGhost:active { transform: scale(0.96); }
 
-/* Done button — primary CTA in reward mode (social-native: prominent) */
+/* Done button — primary CTA in reward mode. Yellow fill = earned exit. */
 .shareBarDone {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   height: 52px;
   padding: 0 24px;
-  background: rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  font-family: var(--font-family);
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
+  background: var(--wodi-yellow);
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-barlow);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #0c0d0f;
   cursor: pointer;
-  transition: all 0.2s var(--ease-out);
+  transition: background 0.15s var(--ease-out), transform 0.15s var(--ease-out);
   -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 20px rgba(245, 194, 0, 0.22);
   position: relative;
   overflow: hidden;
 }
 
-/* Specular edge */
-.shareBarDone::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    rgba(255,255,255,0)    10%,
-    rgba(255,255,255,0.12) 40%,
-    rgba(255,255,255,0.12) 60%,
-    rgba(255,255,255,0)   90%
-  );
-  pointer-events: none;
-}
+/* No specular on a filled button — the yellow surface is its own material. */
+.shareBarDone::before { display: none; }
 
-.shareBarDone:hover  { background: rgba(255, 255, 255, 0.14); }
-.shareBarDone:active { transform: scale(0.97); }
+.shareBarDone:hover  { background: #ffd200; }
+.shareBarDone:active { transform: scale(0.97); box-shadow: 0 1px 8px rgba(245, 194, 0, 0.18); }
 
 /* Reward mode secondary row: Share only (no Edit in feed mode) */
 .shareBarRewardSecondary {
@@ -3387,8 +3634,8 @@
 .chipperMetaRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
+  gap: 16px;
+  margin-bottom: 14px;
   position: relative;
   z-index: 3;
 }
@@ -3400,14 +3647,14 @@
   gap: 12px;
   position: relative;
   z-index: 3;
-  margin-bottom: 14px;
-  min-height: 128px;
+  margin-bottom: 0;
+  min-height: 0;
 }
 
 .chipperTitleBlock {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
 }
@@ -3425,25 +3672,62 @@
   margin: 0;
   color: var(--wodi-white);
   font-family: var(--font-display);
-  font-size: clamp(3rem, 14vw, 5.5rem);
-  line-height: 0.88;
+  font-size: clamp(40px, 12vw, 58px);
+  line-height: 0.94;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   text-transform: uppercase;
   word-break: break-word;
+  max-width: 70%;
 }
 
 .chipperStructure {
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: 22px;
+  color: rgba(242, 240, 235, 0.42);
+  font-family: var(--font-barlow);
+  font-size: clamp(11px, 3.3vw, 14px);
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.22em;
+  line-height: 1.4;
   text-transform: uppercase;
+  max-width: 70%;
+  margin: 0;
+  text-align: left;
 }
 
 .chipperStructureResult {
-  color: var(--wodi-yellow);
+  display: none;
+}
+
+.chipperHeroScore {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 4px 0 2px;
+}
+
+.chipperHeroScoreValue {
+  color: var(--wodi-white);
+  font-family: var(--font-display);
+  font-size: clamp(58px, 17vw, 82px);
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chipperHeroScoreLabel {
+  color: rgba(242, 240, 235, 0.75);
+  font-family: var(--font-barlow);
+  font-size: clamp(13px, 3.5vw, 15px);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
 .chipperScoreBlock {
@@ -3477,7 +3761,7 @@
 
 .chipperSchemeTrack {
   padding: 12px 20px 4px;
-  border-top: 1px solid var(--wodi-line2);
+  border-top: 0;
 }
 
 .chipperBody {
@@ -3486,32 +3770,33 @@
   min-height: 0;
   display: flex;
   flex-direction: row;
-  border-top: 1px solid var(--wodi-line2);
-  padding-top: 10px;
+  border-top: 0;
+  padding-top: 0;
   overflow: hidden;
 }
 
 .chipperMovList {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 8px;
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 
 .chipperMovList::-webkit-scrollbar { display: none; }
 
 .chipperMovListPadded {
-  padding-right: 100px;
+  padding-right: 0;
+  max-width: 72%;
 }
 
 .chipperMovRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(242, 240, 235, 0.06);
+  gap: 14px;
+  padding: 0;
+  border-bottom: 0;
   position: relative;
 }
 
@@ -3521,11 +3806,11 @@
 
 .chipperMovQty {
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: clamp(34px, 9vw, 46px);
   font-weight: 900;
   color: var(--wodi-white);
-  line-height: 1;
-  min-width: 32px;
+  line-height: 0.95;
+  min-width: 58px;
   text-align: right;
   flex-shrink: 0;
 }
@@ -3545,10 +3830,10 @@
 .chipperMovName {
   color: var(--wodi-white);
   font-family: var(--font-barlow);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: clamp(17px, 4.8vw, 22px);
+  font-weight: 900;
   letter-spacing: 0.01em;
-  line-height: 1.2;
+  line-height: 1.05;
 }
 
 .chipperMovNameWeighted {
@@ -3556,10 +3841,10 @@
 }
 
 .chipperMovSub {
-  color: rgba(242, 240, 235, 0.7);
+  color: rgba(242, 240, 235, 0.62);
   font-family: var(--font-barlow);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: clamp(12px, 3.3vw, 16px);
+  font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: none;
 }
@@ -3575,30 +3860,32 @@
 
 .chipperStickerStack {
   position: absolute;
+  top: 24%;
   right: 0;
-  top: 10px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  z-index: 4;
+  gap: 14px;
+  z-index: 10;
+  pointer-events: none;
+  transform: rotate(-6deg);
 }
 
 .chipperSticker {
   background: var(--wodi-yellow);
   color: #0c0d0f;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 0;
-  width: 90px;
+  width: 104px;
   text-align: center;
 }
 
 .chipperStickerLabel {
   font-family: var(--font-barlow);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   line-height: 1.2;
@@ -3606,7 +3893,7 @@
 
 .chipperStickerValue {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -3614,8 +3901,8 @@
 
 .chipperStickerNote {
   font-family: var(--font-barlow);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 900;
   letter-spacing: 0.10em;
   text-transform: uppercase;
   line-height: 1.2;

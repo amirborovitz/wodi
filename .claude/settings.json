@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"C:/Users/aboro/OneDrive/Documents/myapps/wodboard\" && output=$(npx tsc -b 2>&1 && npx vite build 2>&1 | tail -5); code=$?; if [ $code -ne 0 ]; then echo \"$output\"; exit 2; fi",
+            "shell": "bash",
+            "timeout": 120,
+            "asyncRewake": true,
+            "rewakeSummary": "Build error — tsc or vite failed"
+          }
+        ]
+      }
+    ]
+  }
+}

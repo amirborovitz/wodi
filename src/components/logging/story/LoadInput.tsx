@@ -76,7 +76,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   }, []);
 
   const handleProgressiveChange = useCallback((start: number | undefined, peak: number | undefined) => {
-    const clampedStart = start != null ? clampWeight(start, weightStep) : undefined;
+    const clampedStart = start != null ? Math.max(0, start) : undefined;
     const clampedPeak = peak != null ? clampWeight(peak, weightStep) : undefined;
     onChange({
       weight: clampedStart,

@@ -1,17 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet, IntensityRating } from '../../../types';
+import { AnimatePresence } from 'framer-motion';
+import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet } from '../../../types';
 import { initStoryResults } from './WodStoryScreen';
-import { EditExerciseSheet } from './EditExerciseSheet';
 import { InputRouter } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
-import { WrapFlash } from './WrapFlash';
 import type { StoryExerciseResult } from './types';
 import { getPrescribedSetCount } from './types';
 import { useAuth } from '../../../context/AuthContext';
-import { calculateWorkoutEP, DEFAULT_BW } from '../../../utils/xpCalculations';
-import styles from './WodStoryScreen.module.css';
 
 // ─── Public type for WizardOverview ─────────────────────────────
 
@@ -25,7 +21,7 @@ export interface WizardBlock {
 
 // ─── Bridge type ────────────────────────────────────────────────
 
-interface LegacyExerciseResult {
+export interface LegacyExerciseResult {
   exercise: import('../../../types').ParsedExercise;
   sets: ExerciseSet[];
   completionTime?: number;
@@ -51,16 +47,7 @@ interface LegacyExerciseResult {
   ladderStep?: number;
   ladderPartial?: number;
   metconName?: string;
-  intensity?: IntensityRating | null;
 }
-
-// ─── Intensity options ───────────────────────────────────────────
-
-const INTENSITY_OPTIONS: { id: IntensityRating; emoji: string; label: string }[] = [
-  { id: 'smoked', emoji: '💀', label: 'Smoked' },
-  { id: 'cooked', emoji: '🔥', label: 'Cooked' },
-  { id: 'locked_in', emoji: '💪', label: 'Locked in' },
-];
 
 // ─── Block computation ───────────────────────────────────────────
 
@@ -177,7 +164,7 @@ function computeWizardBlocks(
 
 // ─── Wizard phase ────────────────────────────────────────────────
 
-type WizardPhase = 'overview' | 'logging' | 'intensity' | 'wrap';
+type WizardPhase = 'overview' | 'logging';
 
 // ─── Props ──────────────────────────────────────────────────────
 
@@ -256,8 +243,8 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       sets.push({ id: 'set-0', setNumber: 1, actualReps: rpm * mc2, completed: true });
       return { exercise: r.exercise, sets, rounds: step, notes: r.notes, ladderStep: step, ...(partial > 0 && { ladderPartial: partial }), ...buildMaps() };
     }
-    sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
-    return { exercise: r.exercise, sets, rounds: rc, notes: r.notes, ...buildMaps(), ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}) };
+    sets.push({ id: 'set-0', setNumber: 1, completed: true });
+    return { exercise: r.exercise, sets, rounds: rc, notes: r.notes, ...buildMaps() };
   }
 
   if ((r.movementResults?.length ?? 0) > 1) {
@@ -306,8 +293,8 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
       return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined, notes: r.notes };
     case 'score_rounds':
-      sets.push({ id: 'set-0', setNumber: 1, actualReps: r.partialReps ?? 0, completed: true });
-      return { exercise: r.exercise, sets, rounds: r.rounds, notes: r.notes, ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}) };
+      sets.push({ id: 'set-0', setNumber: 1, completed: true });
+      return { exercise: r.exercise, sets, rounds: r.rounds, notes: r.notes };
     case 'intervals': {
       const eit = Math.max(r.intervalsTotal ?? 0, effectiveSetsTotal);
       const count = r.intervalsCompleted === r.intervalsTotal && eit > (r.intervalsTotal ?? 0) ? eit : (r.intervalsCompleted ?? eit);
@@ -346,7 +333,7 @@ export function StoryLogResults({
 
   // ── Wizard state ──
   const [wizardPhase, setWizardPhase] = useState<WizardPhase>(
-    wizardBlocks.length > 1 ? 'overview' : wizardBlocks.length === 1 ? 'logging' : 'wrap',
+    wizardBlocks.length > 1 ? 'overview' : 'logging',
   );
   const [blockOrder, setBlockOrder] = useState<number[]>(() => wizardBlocks.map((_, i) => i));
   const [currentStep, setCurrentStep] = useState(0);
@@ -355,7 +342,6 @@ export function StoryLogResults({
   const [isSubstitutionOpen, setIsSubstitutionOpen] = useState(false);
 
   const [hasSeededAmrapIntervals, setHasSeededAmrapIntervals] = useState(false);
-  const [showIntensityCloseConfirm, setShowIntensityCloseConfirm] = useState(false);
 
   // ── Derived ──
   const currentBlockIdx = blockOrder[currentStep] ?? 0;
@@ -375,29 +361,25 @@ export function StoryLogResults({
 
   // ── Save pipeline ──
   const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
-    onSave(source.map(r => ({ ...toLegacyResult(r), metconName: r.metconName, intensity: r.intensity ?? null })));
+    onSave(source.map(r => ({ ...toLegacyResult(r), metconName: r.metconName })));
   }, [onSave]);
 
   // ── Block advance ──
   const goToNextBlock = useCallback((latestResults: StoryExerciseResult[]) => {
-    void latestResults;
     if (isLastBlock) {
-      setWizardPhase('wrap');
+      saveLegacyResults(latestResults);
     } else {
+      void latestResults;
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       setBlockExerciseStep(0);
       setIsSubstitutionOpen(false);
       setWizardPhase('logging');
     }
-  }, [currentStep, isLastBlock]);
+  }, [currentStep, isLastBlock, saveLegacyResults]);
 
   const handleBlockAdvance = useCallback(() => {
     if (!currentBlock) { saveLegacyResults(results); return; }
-    if (currentBlock.isMetcon) {
-      const needsIntensity = currentBlock.exerciseIndices.some(i => results[i]?.intensity === undefined);
-      if (needsIntensity) { setWizardPhase('intensity'); return; }
-    }
     goToNextBlock(results);
   }, [currentBlock, goToNextBlock, results, saveLegacyResults]);
 
@@ -445,24 +427,6 @@ export function StoryLogResults({
     }
   }, [blockExerciseStep, currentStep, wizardBlocks, blockOrder, onBack]);
 
-  const handleIntensityBack = useCallback(() => {
-    if (!currentBlock) return;
-    setBlockExerciseStep(Math.max(0, currentBlock.exerciseIndices.length - 1));
-    setWizardPhase('logging');
-  }, [currentBlock]);
-
-  // Intensity
-  const completeIntensity = useCallback((value: IntensityRating | null) => {
-    if (!currentBlock) return;
-    const nextResults = results.map((r, i) =>
-      currentBlock.exerciseIndices.includes(i) ? { ...r, intensity: value } : r,
-    );
-    setResults(nextResults);
-    goToNextBlock(nextResults);
-  }, [currentBlock, results, goToNextBlock]);
-
-  const handleWrapDone = useCallback(() => saveLegacyResults(results), [results, saveLegacyResults]);
-
   // Overview
   const handleOverviewSelect = useCallback((selectedBlockIdx: number) => {
     const newOrder: number[] = [selectedBlockIdx];
@@ -478,43 +442,6 @@ export function StoryLogResults({
     saveLegacyResults(results);
   }, [results, saveLegacyResults]);
 
-  const wrapLabel = useMemo(
-    () => [...new Set(wizardBlocks.map(b => b.typeLabel))].join(' + '),
-    [wizardBlocks],
-  );
-
-  const wrapEp = useMemo(() => {
-    const legacyResults = results.map(toLegacyResult);
-    let totalVolume = 0;
-    let totalSeconds = 0;
-
-    for (const result of legacyResults) {
-      for (const set of result.sets) {
-        if ((set.weight ?? 0) > 0 && (set.actualReps ?? 0) > 0) {
-          totalVolume += (set.weight ?? 0) * (set.actualReps ?? 0);
-        }
-        if ((set.time ?? 0) > 0) totalSeconds += set.time ?? 0;
-      }
-      if ((result.completionTime ?? 0) > 0) totalSeconds += result.completionTime ?? 0;
-    }
-
-    const timeCapMinutes = parsedWorkout.timeCap && parsedWorkout.timeCap > 0
-      ? parsedWorkout.timeCap / 60
-      : totalSeconds > 0
-        ? totalSeconds / 60
-        : 0;
-    const actualTimeMinutes = totalSeconds > 0 ? totalSeconds / 60 : undefined;
-
-    return calculateWorkoutEP(
-      totalVolume,
-      timeCapMinutes,
-      user?.weight || DEFAULT_BW,
-      false,
-      undefined,
-      actualTimeMinutes,
-      parsedWorkout.difficultyLevel,
-    ).total;
-  }, [parsedWorkout.difficultyLevel, parsedWorkout.timeCap, results, user?.weight]);
 
   // ── Render ──────────────────────────────────────────────────────
 
@@ -558,99 +485,7 @@ export function StoryLogResults({
           </WizardExerciseScreen>
         )}
 
-        {wizardPhase === 'wrap' && (
-          <WrapFlash key="wrap" ep={wrapEp} workoutLabel={wrapLabel} onDone={handleWrapDone} />
-        )}
       </AnimatePresence>
-
-      {/* Intensity prompt */}
-      <AnimatePresence>
-        {wizardPhase === 'intensity' && currentBlock && (
-          <motion.div
-            key="intensity"
-            className={styles.intensityScreen}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
-            <div className={styles.intensityInner}>
-              <div className={styles.intensityTopBar}>
-                <button type="button" className={styles.intensityBackBtn} onClick={handleIntensityBack} aria-label="Back">
-                  {'<'}
-                </button>
-                <div className={styles.intensityDots}>
-                  {blockOrder.map((_, i) => (
-                    <span key={i} className={i < currentStep ? styles.dotDone : i === currentStep ? styles.dotActive : styles.dotEmpty} />
-                  ))}
-                </div>
-                <button type="button" className={styles.intensityCloseBtn} onClick={() => setShowIntensityCloseConfirm(true)} aria-label="Close">
-                  x
-                </button>
-              </div>
-              <p className={styles.intensityEyebrow}>{currentBlock.displayName}</p>
-              <h2 className={styles.intensityTitle}>How'd that feel?</h2>
-              <div className={styles.intensityOptions}>
-                {INTENSITY_OPTIONS.map(opt => (
-                  <button key={opt.id} type="button" className={styles.intensityCard} onClick={() => completeIntensity(opt.id)}>
-                    <span className={styles.intensityEmoji}>{opt.emoji}</span>
-                    <span className={styles.intensityLabel}>{opt.label}</span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className={styles.intensitySkip} onClick={() => completeIntensity(null)}>Skip</button>
-            </div>
-
-            <AnimatePresence>
-              {showIntensityCloseConfirm && (
-                <motion.div
-                  className={styles.popupBackdrop}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={() => setShowIntensityCloseConfirm(false)}
-                >
-                  <motion.div
-                    className={styles.popupCard}
-                    initial={{ opacity: 0, scale: 0.92, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.92, y: 20 }}
-                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <p className={styles.popupTitle}>Discard this workout?</p>
-                    <p className={styles.popupBody}>Your progress won't be saved.</p>
-                    <div className={styles.popupActions}>
-                      <button type="button" className={styles.popupBtnSecondary} onClick={() => setShowIntensityCloseConfirm(false)}>
-                        Keep going
-                      </button>
-                      <button type="button" className={styles.popupBtnPrimary} onClick={() => { setShowIntensityCloseConfirm(false); onBack(); }}>
-                        Discard
-                      </button>
-                    </div>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Legacy edit sheet — used only outside wizard (e.g. re-editing after logging) */}
-      {wizardPhase !== 'logging' && wizardPhase !== 'overview' && wizardPhase !== 'wrap' && (
-        <EditExerciseSheet
-          open={false}
-          result={null}
-          onClose={() => {}}
-          onDone={() => {}}
-          onSkip={() => {}}
-          exerciseIndex={undefined}
-          exerciseTotal={results.length}
-        >
-          {null}
-        </EditExerciseSheet>
-      )}
     </>
   );
 }

@@ -21,7 +21,7 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
 import {
   getAlternativeType,
@@ -31,6 +31,8 @@ import {
 import { StoryLogResults } from '../components/logging/story/StoryLogResults';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult } from '../components/logging/story/types';
+import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
+import { WrapFlash } from '../components/logging/story/WrapFlash';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
 
@@ -48,7 +50,7 @@ interface AddWorkoutScreenProps {
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
 }
 
-type Step = 'capture' | 'voice' | 'processing' | 'preview' | 'log-results' | 'saving' | 'reward';
+type Step = 'capture' | 'voice' | 'processing' | 'preview' | 'log-results' | 'saving' | 'wrap' | 'reward';
 
 interface ExerciseResult {
   exercise: ParsedExercise;
@@ -202,8 +204,7 @@ function getMovementEffectiveRounds(
       break;
   }
 
-  const isBuyInCashOut = movement.role === 'buy_in' || movement.role === 'cash_out' ||
-    /^(?:buy-in|cash-out):/i.test(movement.name) || movement.perRound === false;
+  const isBuyInCashOut = movement.role === 'buy_in' || movement.role === 'cash_out' || movement.perRound === false;
 
   return isBuyInCashOut
     ? 1
@@ -276,7 +277,7 @@ function buildWorkloadBreakdownFromResults(
       const movKeys = getMovementKeys(movements);
       movements.forEach((mov, movIdx) => {
         const mk = movKeys[movIdx];
-        const isBuyInOrCashOut = mov.role === 'buy_in' || mov.role === 'cash_out' || /^(?:buy-in|cash-out):/i.test(mov.name);
+        const isBuyInOrCashOut = mov.role === 'buy_in' || mov.role === 'cash_out' || mov.perRound === false;
         const isFixed = isBuyInOrCashOut || mov.perRound === false; // buy-in/cash-out or "after each round" movements
         // Buy-in/cash-out repeat per interval (suggestedSets), not per ladder rung (rounds).
         // Other fixed movements repeat every ladder rung (round).
@@ -288,7 +289,7 @@ function buildWorkloadBreakdownFromResults(
           : repsPerMovement;
 
         const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
-        const movementName = rawMovementName.replace(/^(?:Buy-In|Cash-Out):\s*/i, '');
+        const movementName = rawMovementName;
         const key = movementName.toLowerCase();
 
         const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
@@ -346,19 +347,24 @@ function buildWorkloadBreakdownFromResults(
       const hasSections = result.exercise.sections && result.exercise.sections.length > 0;
       let iterationMovements: ParsedMovement[];
       let perMovementRounds: number[];
+      let perMovementSectionTypes: Array<ParsedSection['sectionType'] | undefined>;
 
       if (hasSections) {
         // Flatten sections: each movement appears once per section, with that section's rounds
         iterationMovements = [];
         perMovementRounds = [];
+        perMovementSectionTypes = [];
         for (const sec of result.exercise.sections!) {
+          const sectionRounds = sec.sectionType === 'rounds' ? (sec.rounds ?? 1) : 1;
           for (const m of sec.movements) {
             iterationMovements.push(m);
-            perMovementRounds.push(sec.rounds ?? 1);
+            perMovementRounds.push(sectionRounds);
+            perMovementSectionTypes.push(sec.sectionType);
           }
         }
       } else {
         iterationMovements = movements;
+        perMovementSectionTypes = movements.map(() => undefined);
         const repsPerRound = movements.reduce((sum, mov) => {
           const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
           return sum + reps;
@@ -437,17 +443,19 @@ function buildWorkloadBreakdownFromResults(
         return;
       }
 
-      // Buy-in/cash-out detection: done once per interval, not per AMRAP round.
-      // Detect via: AI role field, name prefix, or perRound=false (most reliable — survives serialization).
+      // Buy-in/cash-out sections are done once, not per AMRAP/round block.
       const stationVisits = stationVisitCounts?.[movIdx];
-      const effectiveRounds = getMovementEffectiveRounds(
-        mov,
-        movementRounds,
-        stationVisits,
-        result.exercise,
-        result,
-        parsedWorkout
-      );
+      const sectionType = perMovementSectionTypes[movIdx];
+      const effectiveRounds = sectionType && sectionType !== 'rounds'
+        ? 1
+        : getMovementEffectiveRounds(
+          mov,
+          movementRounds,
+          stationVisits,
+          result.exercise,
+          result,
+          parsedWorkout
+        );
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round
       const isPartialMove = result.partialMovements?.includes(mov.name) ?? false;
@@ -478,8 +486,7 @@ function buildWorkloadBreakdownFromResults(
       const movementTime = Math.round(perRoundTime * totalEffectiveRounds * exerciseFactor);
 
       const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
-      // Strip "Buy-In: " / "Cash-Out: " prefixes so these merge with their core counterpart
-      const movementName = rawMovementName.replace(/^(?:Buy-In|Cash-Out):\s*/i, '');
+      const movementName = rawMovementName;
       const wasSubstituted = rawMovementName !== mov.name;
       const substitutionType = wasSubstituted ? (getAlternativeType(mov.name, rawMovementName) ?? undefined) : undefined;
       const originalMovement = wasSubstituted ? mov.name : undefined;
@@ -745,6 +752,7 @@ function buildWorkloadBreakdownFromResults(
     benchmarkName: parsedWorkout?.benchmarkName,
   };
 }
+
 
 interface SavedWorkout {
   id: string;
@@ -1575,6 +1583,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
 
   // Reward screen state
   const [rewardData, setRewardData] = useState<RewardData | null>(null);
+  const [wrapEP, setWrapEP] = useState(0);
+  const [wrapLabel, setWrapLabel] = useState('');
   const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>([]);
   const [savedWorkoutMeta, setSavedWorkoutMeta] = useState<{ id: string; totalVolume: number; date: Date } | null>(null);
   const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
@@ -1589,7 +1599,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   );
   const teamSize = parsedWorkout?.teamSize || (isPartnerWorkout ? 2 : 1);
   const partnerFactor = isPartnerWorkout ? 1 / teamSize : 1;
-
   useEffect(() => {
     setSavedWorkouts(readSavedWorkouts());
   }, []);
@@ -1614,6 +1623,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         const base64 = await fileToBase64(initialImage);
         const workout = await parseWorkoutImage(base64);
         const refined = await refineWorkoutIfNeeded(workout, user?.id);
+        console.log('[DEBUG parse] exercises:', JSON.stringify(refined.exercises, null, 2));
         setParsedWorkout(refined);
         addSavedWorkout(refined);
         setStep('preview');
@@ -3340,10 +3350,35 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         setIsEditingAfterSave(false);
       }
 
-      // Brief pause for saving animation, then go straight to reward recap
-      setTimeout(() => {
-        setStep('reward');
-      }, 600);
+      // Compute final EP using the same formula WorkoutScreen will use (PRs now known)
+      const finalHasPR = reward.achievements?.some(a => a.type === 'pr') || reward.heroAchievement?.type === 'pr';
+      const epTimeCapMinutes = durationMinutes;
+      const epDifficultyLevel = parsedWorkout.format === 'strength' ? undefined : parsedWorkout.difficultyLevel;
+      const finalEP = calculateWorkoutEP(
+        totalVolume,
+        epTimeCapMinutes,
+        user.weight || DEFAULT_BW,
+        finalHasPR || false,
+        breakdownFromResults.movements,
+        actualTimeMinutes,
+        epDifficultyLevel,
+      ).total;
+
+      // Compute wrap label (mirrors StoryLogResults typeLabel logic)
+      const wrapCtx = { format: parsedWorkout.format, scoreType: parsedWorkout.scoreType, exerciseCount: parsedWorkout.exercises.length };
+      const wrapLabels = new Set<string>();
+      for (const ex of parsedWorkout.exercises) {
+        const mode = ex.loggingMode || getExerciseLoggingMode(ex, wrapCtx);
+        if (ex.type === 'strength' || mode === 'strength' || mode === 'sets') wrapLabels.add('STRENGTH');
+        else if (mode === 'amrap' || mode === 'amrap_intervals') wrapLabels.add('AMRAP');
+        else if (mode === 'for_time') wrapLabels.add('FOR TIME');
+        else if (mode === 'emom') wrapLabels.add('EMOM');
+        else if (mode === 'intervals') wrapLabels.add('INTERVAL');
+        else wrapLabels.add('METCON');
+      }
+      setWrapEP(finalEP);
+      setWrapLabel([...wrapLabels].join(' + '));
+      setStep('wrap');
     } catch (err) {
       console.error('Error saving workout:', err);
       setError('Failed to save workout. Please try again.');
@@ -3353,8 +3388,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
 
   return (
     <div className={styles.container} ref={containerRef}>
-      {/* Header — hidden during full-screen steps (story, reward, saving) */}
-      {step !== 'log-results' && step !== 'reward' && step !== 'saving' && (
+      {/* Header — hidden during full-screen steps (story, reward, saving, wrap) */}
+      {step !== 'log-results' && step !== 'reward' && step !== 'saving' && step !== 'wrap' && (
         <header className={styles.header}>
           <Button
             variant="ghost"
@@ -3657,6 +3692,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
                   <span className={styles.previewExercisePrescription}>
                     {exercise.prescription}
                   </span>
+                  {exercise.movements?.filter(m => m.name.startsWith('Cash-Out:') || m.name.startsWith('Buy-In:')).map((m, mi) => (
+                    <span key={mi} className={styles.previewExerciseCashOut}>
+                      {m.name}{m.distance ? ` ${m.distance}${m.unit ?? 'm'}` : m.reps ? ` ${m.reps} reps` : ''}
+                    </span>
+                  ))}
                 </div>
               ))}
             </div>
@@ -3717,6 +3757,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             <h2 className={styles.processingTitle}>Saving workout...</h2>
           </div>
         </motion.div>
+      )}
+
+      {step === 'wrap' && (
+        <WrapFlash ep={wrapEP} workoutLabel={wrapLabel} onDone={() => setStep('reward')} />
       )}
 
       {step === 'reward' && rewardData && (

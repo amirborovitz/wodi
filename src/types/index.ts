@@ -72,7 +72,7 @@ export interface RxCalories {
 }
 
 /** How the athlete felt about the metcon portion of a workout. */
-export type IntensityRating = 'smoked' | 'cooked' | 'locked_in';
+export type IntensityRating = 'smoked' | 'locked_in';
 export type FeelRating = IntensityRating;
 
 export interface Workout {

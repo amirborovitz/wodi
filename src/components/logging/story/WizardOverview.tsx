@@ -9,6 +9,16 @@ interface WizardOverviewProps {
   onBack: () => void;
 }
 
+function typeLabelColor(typeLabel: string): string {
+  switch (typeLabel) {
+    case 'STRENGTH': return 'var(--color-volume)';
+    case 'EMOM':
+    case 'INTERVAL':
+    case 'INTERVALS': return 'var(--color-sessions)';
+    default:          return 'var(--color-metcon)';
+  }
+}
+
 export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOverviewProps) {
   return (
     <motion.div
@@ -32,22 +42,29 @@ export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOv
         <h1 className={styles.title}>Where do you want to start?</h1>
 
         <div className={styles.blockList}>
-          {blocks.map((block, idx) => (
-            <motion.button
-              key={idx}
-              type="button"
-              className={styles.blockCard}
-              onClick={() => onSelect(idx)}
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <div className={styles.blockLeft}>
+          {blocks.map((block, idx) => {
+            const color = typeLabelColor(block.typeLabel);
+            return (
+              <motion.button
+                key={idx}
+                type="button"
+                className={styles.blockCard}
+                style={{ '--card-color': color } as React.CSSProperties}
+                onClick={() => onSelect(idx)}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.26, delay: idx * 0.06, ease: [0.16, 1, 0.3, 1] }}
+                whileTap={{ scale: 0.975 }}
+              >
+                {/* Badge above; name+chevron on the same row → chevron aligns with name */}
                 <span className={styles.blockType}>{block.typeLabel}</span>
-                <span className={styles.blockName}>{block.displayName}</span>
-              </div>
-              <span className={styles.blockChevron}>{'>'}</span>
-            </motion.button>
-          ))}
+                <div className={styles.nameRow}>
+                  <span className={styles.blockName}>{block.displayName}</span>
+                  <span className={styles.blockChevron} aria-hidden>›</span>
+                </div>
+              </motion.button>
+            );
+          })}
         </div>
 
         <button
@@ -55,7 +72,7 @@ export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOv
           className={styles.skipAll}
           onClick={onSkipAll}
         >
-          Skip all -&gt; just mark complete
+          Skip all → just mark complete
         </button>
       </div>
     </motion.div>

@@ -312,29 +312,48 @@ export function calculateWorkloadBreakdown(
     const multiplier = getContainerMultiplier(workout, exercise);
     const stationVisitCounts = getStationVisitCountsForExercise(workout, exercise, exerciseIndex);
 
-    // If exercise has movements array, use those
-    if (exercise.movements && exercise.movements.length > 0) {
-      exercise.movements.forEach((movement, movementIndex) => {
+    // Prefer structured sections when present. They preserve semantic repeat
+    // scope from the single AI parse: buy-in/cash-out sections are once,
+    // rounds sections use their explicit section round count.
+    const movementEntries = exercise.sections && exercise.sections.length > 0
+      ? exercise.sections.flatMap((section) => {
+          const sectionMultiplier = section.sectionType === 'rounds' ? (section.rounds ?? 1) : 1;
+          return section.movements.map((movement) => ({
+            movement,
+            fallbackMultiplier: sectionMultiplier,
+            forceOnce: section.sectionType !== 'rounds',
+          }));
+        })
+      : (exercise.movements || []).map((movement) => ({
+          movement,
+          fallbackMultiplier: multiplier,
+          forceOnce: false,
+        }));
+
+    // If exercise has movement structure, use it
+    if (movementEntries.length > 0) {
+      movementEntries.forEach(({ movement, fallbackMultiplier, forceOnce }, movementIndex) => {
         const key = movement.name.toLowerCase();
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
         // perRound: false means "done once" ONLY for buy-in/cash-out sections.
         // In ladder AMRAPs, perRound: false means fixed reps every round (not on the ladder).
+        const movementForCounting = forceOnce && !movement.countingMode
+          ? { ...movement, countingMode: 'once' as const }
+          : movement;
         const movMultiplier = getMovementMultiplier(
-          movement,
+          movementForCounting,
           movementIndex,
           exercise,
           workout,
-          multiplier,
+          fallbackMultiplier,
           stationVisitCounts
         );
         const schemeReps = getVariableSchemeMovementReps(movement, exercise);
         const reps = schemeReps ?? ((movement.reps || 0) * movMultiplier);
         const distance = (movement.distance || 0) * movMultiplier;
         const calories = (movement.calories || 0) * movMultiplier;
-
-        console.log(`[Workload] "${movement.name}" perRound=${movement.perRound} multiplier=${multiplier} movMultiplier=${movMultiplier} reps=${reps} distance=${distance}`);
 
         // Get per-implement weight from movementWeights override or rxWeights
         const perImplementWeight = movementWeights?.[movement.name]

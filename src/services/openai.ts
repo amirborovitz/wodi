@@ -239,9 +239,11 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
 - "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
+- MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
 
 ## SKILL / PRACTICE BLOCKS
-"Practice", "build weight", "movement focus" → type: "skill", suggestedSets: 1, NO suggestedReps, NO movements from other blocks.
+"Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
+Example: "A. 3 sets, for quality: 10 ring rows, 15 prone T-raises" → exercise type: "skill", suggestedSets: 3.
 
 ## TIME CAP
 "T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.
@@ -567,6 +569,56 @@ Output:
   ]
 }
 
+## AMRAP INTERVALS — NUMBERED BLOCKS
+
+When an AMRAP intervals workout has numbered sections (1. / 2. / 3. or labeled A / B / C) with DIFFERENT movement blocks, each numbered section is a SEPARATE exercise with loggingMode: "amrap". Do NOT merge them into one exercise.
+
+CRITICAL — BUY-IN RULE: In AMRAP intervals, the first movement of a numbered block is NEVER automatically a buy-in. A buy-in is ONLY movements explicitly introduced by "buy-in", "into AMRAP", or "then AMRAP" phrasing. If the workout lists numbered movement blocks without any "into AMRAP" language, every movement in every block is a regular per-round AMRAP movement.
+
+### 14. Numbered sequential AMRAP intervals (different blocks)
+Input: "[12:00 min AMRAP / 01:00 min REST] x 3 :
+1. 8/10 calories bike, 10 DB's burpee to deadlift, 10 DB's push press
+2. 5 pull up, 10 push ups, 15 air squats
+3. 10 A.KB swings, 10 T.T.B, 10 box jumps"
+Output:
+{
+  "title": "Endurance", "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps",
+  "timeCap": 2340, "intervalTime": 720, "sets": 3,
+  "exercises": [
+    {
+      "name": "AMRAP 1 — 12 Min", "type": "wod", "loggingMode": "amrap",
+      "prescription": "8/10 cal Bike, 10 DB Burpee to Deadlift, 10 DB Push Press",
+      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
+      "movements": [
+        { "name": "Bike", "calories": 10, "rxCalories": { "male": 10, "female": 8 }, "inputType": "none" },
+        { "name": "Dumbbell Burpee to Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 },
+        { "name": "Dumbbell Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 }
+      ]
+    },
+    {
+      "name": "AMRAP 2 — 12 Min", "type": "wod", "loggingMode": "amrap",
+      "prescription": "5 Pull-ups, 10 Push-ups, 15 Air Squats",
+      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
+      "movements": [
+        { "name": "Pull-up", "reps": 5, "inputType": "none" },
+        { "name": "Push-up", "reps": 10, "inputType": "none" },
+        { "name": "Air Squat", "reps": 15, "inputType": "none" }
+      ]
+    },
+    {
+      "name": "AMRAP 3 — 12 Min", "type": "wod", "loggingMode": "amrap",
+      "prescription": "10 American KB Swings, 10 Toes to Bar, 10 Box Jumps",
+      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
+      "movements": [
+        { "name": "American Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" }, "implementCount": 1 },
+        { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
+        { "name": "Box Jump", "reps": 10, "inputType": "none" }
+      ]
+    }
+  ]
+}
+NOTE: "8/10 calories bike" → Bike, calories: 10, rxCalories: { male: 10, female: 8 }. The Bike is movement #1 in AMRAP 1 — it is NOT a buy-in. No buy-in is present in this workout. Each numbered section becomes its own exercise.
+
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
 /**
@@ -624,7 +676,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
           ]
         }
       ],
-      max_tokens: 1500,
+      max_tokens: 2500,
       temperature: 0.2 // Lower temperature for more consistent parsing
     });
 

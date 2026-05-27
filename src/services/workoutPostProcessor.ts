@@ -403,6 +403,16 @@ function annotateMovementSemantics(
   let currentStationIndex = -1;
 
   return movements.map((movement) => {
+    // Normalize movements where the AI used the name prefix convention instead of the
+    // structured role/perRound fields (e.g. "Cash-Out: Farmer Carry" without role set).
+    if (!movement.role && movement.perRound !== false) {
+      if (/^cash[-\s]?out\s*:/i.test(movement.name)) {
+        movement = { ...movement, role: 'cash_out' as const, perRound: false as const };
+      } else if (/^buy[-\s]?in\s*:/i.test(movement.name)) {
+        movement = { ...movement, role: 'buy_in' as const, perRound: false as const };
+      }
+    }
+
     const stationIndex = movement.stationIndex != null
       ? movement.stationIndex
       : (() => {
@@ -1285,7 +1295,7 @@ function postProcessMovements(
   console.log('[postProcessMovements] Pass 2 — nameCounts:', Object.fromEntries(nameCounts),
     'namesWithWeights:', [...namesWithWeights]);
 
-  return pass1.map((result, i) => {
+  const pass2 = pass1.map((result, i) => {
     if (result.rxWeights) {
       console.log(`[postProcessMovements] "${result.name}" already has weight from pass 1`);
       return result;
@@ -1332,6 +1342,20 @@ function postProcessMovements(
     }
 
     return result;
+  });
+
+  // Final pass: strip rxWeights where the AI confused the rep count for a weight.
+  // Signature: both male and female Rx values equal the movement's own reps field
+  // (e.g. "10 DB's burpee to deadlift" → reps:10, rxWeights:{male:10,female:10}).
+  // Real Rx weights are either sex-differentiated or come with a unit in the text.
+  return pass2.map(mov => {
+    if (!mov.rxWeights || mov.reps == null) return mov;
+    const { male, female } = mov.rxWeights;
+    if (male === mov.reps && (female == null || female === mov.reps)) {
+      const { rxWeights: _dropped, ...rest } = mov;
+      return rest;
+    }
+    return mov;
   });
 }
 

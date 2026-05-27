@@ -1,6 +1,6 @@
 import type { StoryExerciseResult, MovementResult } from './types';
 import { LoadInput } from './LoadInput';
-import { ScoreTimeInput } from './ScoreInputs';
+import { ScoreTimeInput, ScoreRoundsInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
 import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
@@ -27,8 +27,6 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
   const kind = result.kind;
   const movements = result.movementResults ?? [];
 
-  // Scored exercises: for_time keeps the time input; AMRAP drops the round counter —
-  // movement-level inputs (weight, cal, reps) are the actual logging story.
   if (kind === 'score_time' || kind === 'score_rounds') {
     const isLadder = !!(result.exercise.ladderReps && result.exercise.ladderReps.length > 0);
 
@@ -53,6 +51,9 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       <>
         {kind === 'score_time' && (
           <ScoreTimeInput result={result} onChange={onChange} />
+        )}
+        {kind === 'score_rounds' && !isAmrapIntervals && !isLadder && (
+          <ScoreRoundsInput result={result} onChange={onChange} />
         )}
         {isLadder && (
           <LadderInput result={result} onChange={onChange} />

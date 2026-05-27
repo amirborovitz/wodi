@@ -1,17 +1,19 @@
 /* ═══════════════════════════════════════════
    WizardOverview — block picker entry screen
+   Pure AMOLED black canvas, floating cards.
    ═══════════════════════════════════════════ */
 
 .container {
   position: fixed;
   inset: 0;
-  background: var(--wodi-bg);
+  background: #000;
   display: flex;
   flex-direction: column;
   z-index: 10;
 }
 
-/* Back button (top-left) */
+/* ── Back button (top-left) ── */
+
 .backBtn {
   position: absolute;
   top: calc(var(--safe-top) + 12px);
@@ -35,7 +37,8 @@
   background: rgba(242, 240, 235, 0.10);
 }
 
-/* Inner content — centered, max-width constrained */
+/* ── Inner content ── */
+
 .inner {
   flex: 1;
   display: flex;
@@ -46,30 +49,33 @@
   margin: 0 auto;
 }
 
-/* Eyebrow */
+/* ── Eyebrow ── */
+
 .eyebrow {
   font-family: var(--font-barlow);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.20em;
   text-transform: uppercase;
-  color: rgba(242, 240, 235, 0.7);
-  margin: 0 0 12px;
+  color: var(--wodi-dim);
+  margin: 0 0 10px;
 }
 
-/* Title */
+/* ── Main heading ── */
+
 .title {
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 800;
+  font-size: 36px;
+  font-weight: 900;
   color: var(--wodi-white);
-  line-height: 1.08;
-  letter-spacing: 0;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
   margin: 0 0 28px;
   text-transform: none;
 }
 
-/* Block list */
+/* ── Block list ── */
+
 .blockList {
   display: flex;
   flex-direction: column;
@@ -77,16 +83,18 @@
   flex: 1;
 }
 
-/* Individual block card */
+/* ── Individual card ── */
+
 .blockCard {
   width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 20px;
   background: var(--wodi-card);
   border: 1px solid var(--wodi-line2);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   text-align: left;
@@ -96,55 +104,63 @@
 
 .blockCard:active {
   background: var(--wodi-card2);
-  border-color: rgba(245, 194, 0, 0.3);
+  border-color: color-mix(in srgb, var(--card-color, var(--wodi-yellow)) 30%, transparent);
 }
 
-.blockLeft {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
+/* ── Type badge pill ── */
 
-/* Type chip: "STRENGTH", "AMRAP" etc */
 .blockType {
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(242, 240, 235, 0.08);
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--card-color, var(--color-metcon)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-color, var(--color-metcon)) 28%, transparent);
   font-family: var(--font-barlow);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(242, 240, 235, 0.85);
+  color: var(--card-color, var(--color-metcon));
+  line-height: 1;
 }
 
-/* Block display name */
+/* ── Name + chevron on the same row ── */
+/* This is the key layout: chevron sits beside the title, not centered on the full card. */
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
 .blockName {
   font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--wodi-white);
   line-height: 1.1;
   letter-spacing: -0.01em;
   text-transform: uppercase;
   overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
 }
 
-/* Chevron */
+/* Chevron is in nameRow → same baseline as blockName, not the card center */
 .blockChevron {
-  font-size: 24px;
-  color: var(--wodi-dim);
   flex-shrink: 0;
-  margin-left: 12px;
+  font-size: 24px;
+  color: var(--wodi-white);
+  opacity: 0.22;
   line-height: 1;
+  align-self: center;
 }
 
-/* Skip all link */
+/* ── Skip all link ── */
+
 .skipAll {
   margin-top: 28px;
   align-self: center;
@@ -152,15 +168,25 @@
   border: none;
   color: var(--wodi-dim);
   font-family: var(--font-barlow);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   padding: 10px 16px;
   -webkit-tap-highlight-color: transparent;
   text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--wodi-dim) 50%, transparent);
   text-underline-offset: 3px;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .skipAll:active {
   color: var(--wodi-white);
+}
+
+/* ── Reduced motion ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .blockCard {
+    transition: none;
+  }
 }
