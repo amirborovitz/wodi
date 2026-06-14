@@ -48,6 +48,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
 
   // Get user goals or defaults
   const goals: UserGoals = user?.goals || DEFAULT_USER_GOALS;
+  const weeklyRepsGoal = Math.min(5000, goals.volumeGoal || DEFAULT_USER_GOALS.volumeGoal);
   const bodyweight = user?.weight || DEFAULT_BW;
 
   // Calculate weekly stats
@@ -68,14 +69,15 @@ export function useWeeklyStats(): WeeklyStatsResult {
       };
     });
 
-    // Sum up weekly totals
-    const weeklyVolume = workoutsWithStats.reduce((acc, w) => acc + w.totalVolume, 0);
+    // Sum up weekly totals. The legacy weeklyVolume field now represents reps
+    // for UI compatibility with existing goal settings.
+    const weeklyVolume = workoutsWithStats.reduce((acc, w) => acc + (w.totalReps || 0), 0);
     const weeklyMetconMinutes = workoutsWithStats.reduce((acc, w) => acc + w.metconMinutes, 0);
     const weeklyFrequency = workoutsWithStats.length;
     const weeklyEP = workoutsWithStats.reduce((acc, w) => acc + w.ep.total, 0);
 
     // Calculate percentages
-    const volumePercent = Math.round((weeklyVolume / goals.volumeGoal) * 100);
+    const volumePercent = Math.round((weeklyVolume / weeklyRepsGoal) * 100);
     const metconPercent = Math.round((weeklyMetconMinutes / goals.metconGoal) * 100);
     const frequencyPercent = Math.round((weeklyFrequency / goals.streakGoal) * 100);
 
@@ -92,7 +94,7 @@ export function useWeeklyStats(): WeeklyStatsResult {
       frequencyOverload: frequencyPercent > 100,
       weeklyWorkouts: workoutsWithStats,
     };
-  }, [workouts, goals, bodyweight]);
+  }, [workouts, goals, bodyweight, weeklyRepsGoal]);
 
   return {
     ...weeklyData,

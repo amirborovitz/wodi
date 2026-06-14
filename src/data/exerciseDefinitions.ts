@@ -468,3 +468,96 @@ export function getMovementCategory(name: string): MovementCategory {
 
   return 'weightlifting';
 }
+
+// ============================================
+// CANONICAL LIFT NAMES (for PR screen)
+// Maps misspellings, abbreviations, and exercise-name suffixes
+// ("Deadlift Strength") to a single canonical lift name ("Deadlift")
+// ============================================
+
+interface CanonicalLift {
+  name: string;
+  aliases: string[];
+}
+
+// Order matters for fallback matching: more specific lifts (e.g. "power clean")
+// must be listed so they win over their generic root ("clean") — handled by
+// sorting all aliases by length before matching, longest first.
+const CANONICAL_LIFTS: CanonicalLift[] = [
+  { name: 'Clean and Jerk', aliases: ['clean and jerk', 'clean & jerk', 'c&j', 'c & j', 'cnj'] },
+  { name: 'Hang Power Clean', aliases: ['hang power clean', 'hpc'] },
+  { name: 'Hang Power Snatch', aliases: ['hang power snatch', 'hps'] },
+  { name: 'Hang Squat Clean', aliases: ['hang squat clean'] },
+  { name: 'Hang Squat Snatch', aliases: ['hang squat snatch'] },
+  { name: 'Hang Clean', aliases: ['hang clean'] },
+  { name: 'Hang Snatch', aliases: ['hang snatch'] },
+  { name: 'Squat Clean', aliases: ['squat clean'] },
+  { name: 'Squat Snatch', aliases: ['squat snatch'] },
+  { name: 'Power Clean', aliases: ['power clean', 'pc'] },
+  { name: 'Power Snatch', aliases: ['power snatch'] },
+  { name: 'Power Jerk', aliases: ['power jerk'] },
+  { name: 'Split Jerk', aliases: ['split jerk'] },
+  { name: 'Push Jerk', aliases: ['push jerk'] },
+  { name: 'Push Press', aliases: ['push press'] },
+  { name: 'Strict Press', aliases: ['strict press', 'shoulder press', 'military press', 'overhead press', 'ohp'] },
+  { name: 'Sumo Deadlift High Pull', aliases: ['sumo deadlift high pull', 'sdhp'] },
+  { name: 'Romanian Deadlift', aliases: ['romanian deadlift', 'rdl'] },
+  { name: 'Deficit Deadlift', aliases: ['deficit deadlift'] },
+  { name: 'Front Squat', aliases: ['front squat'] },
+  { name: 'Overhead Squat', aliases: ['overhead squat', 'ohs'] },
+  { name: 'Back Squat', aliases: ['back squat'] },
+  { name: 'Bench Press', aliases: ['bench press', 'bench'] },
+  { name: 'Deadlift', aliases: ['deadlift', 'dead lift', 'dl'] },
+  { name: 'Snatch', aliases: ['snatch'] },
+  { name: 'Clean', aliases: ['clean'] },
+  { name: 'Jerk', aliases: ['jerk'] },
+  { name: 'Thruster', aliases: ['thruster'] },
+  { name: 'Squat', aliases: ['squat'] },
+  { name: 'Press', aliases: ['press'] },
+];
+
+// Trailing words/phrases that describe how a lift is being trained, not which
+// lift it is. Stripped before matching so "Deadlift Strength" === "Deadlift".
+const LIFT_NAME_NOISE_SUFFIXES = [
+  'strength', 'work', 'wod', 'workout', 'session', 'practice', 'skill',
+  'technique', 'build', 'build up', 'build-up', 'ladder', 'complex',
+  'for time', 'emom', 'sets', 'set', 'warm up', 'warm-up', 'warmup',
+];
+
+const SORTED_LIFT_ALIASES = CANONICAL_LIFTS
+  .flatMap(lift => lift.aliases.map(alias => ({ alias, name: lift.name })))
+  .sort((a, b) => b.alias.length - a.alias.length);
+
+function toTitleCase(name: string): string {
+  return name.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/**
+ * Resolve a movement/exercise name to its canonical lift name, stripping
+ * training-context suffixes ("Deadlift Strength" → "Deadlift") and mapping
+ * known abbreviations/misspellings (e.g. "rdl" → "Romanian Deadlift").
+ * Falls back to a title-cased version of the cleaned input if no known lift matches.
+ */
+export function getCanonicalLiftName(name: string): string {
+  let normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
+
+  // Strip noise suffixes repeatedly (handles "Deadlift Strength Work")
+  let stripped = true;
+  while (stripped) {
+    stripped = false;
+    for (const suffix of LIFT_NAME_NOISE_SUFFIXES) {
+      const regex = new RegExp(`\\s+${escapeRegex(suffix)}$`, 'i');
+      if (regex.test(normalized)) {
+        normalized = normalized.replace(regex, '').trim();
+        stripped = true;
+      }
+    }
+  }
+
+  for (const { alias, name: canonical } of SORTED_LIFT_ALIASES) {
+    const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
+    if (regex.test(normalized)) return canonical;
+  }
+
+  return toTitleCase(normalized);
+}

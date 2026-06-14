@@ -23,6 +23,9 @@ interface ScoreMovementInputsProps {
    *  show a "{total} {unit} total ÷{teamSize}" annotation below the movement
    *  name so the athlete knows they are logging their personal share. */
   teamSize?: number;
+  /** True only in AMRAP/relay workouts where a prescribed distance movement represents
+   *  a relay trip count (how many times the athlete ran X meters), not a total distance. */
+  isRelayContext?: boolean;
 }
 
 // Classify a movement by equipment type for weight propagation grouping.
@@ -62,9 +65,9 @@ function getDefaultMetconWeight(mr: MovementResult): number | undefined {
   return roundToLegalWeight(rx * 0.8, mr);
 }
 
-function getFallbackWeight(type: 'barbell' | 'kb' | 'db'): number {
+function getFallbackWeight(type: 'barbell' | 'kb' | 'db'): number | undefined {
   if (type === 'kb') return 16;
-  if (type === 'db') return 10;
+  if (type === 'db') return undefined;
   return 40;
 }
 
@@ -103,6 +106,9 @@ function partnerAnnotation(mr: MovementResult, teamSize: number): string | null 
   if (mr.movement.together) {
     return 'together';
   }
+
+  // Runs are independent in IGYG — each partner runs the full distance, no split annotation
+  if (/\b(run|running|sprint)\b/i.test(mr.movement.name)) return null;
 
   const isCal =
     mr.movement.inputType === 'calories' ||
@@ -296,8 +302,8 @@ interface TileConfig {
   inputMode: 'decimal' | 'numeric';
 }
 
-const LOAD_TILE_COLOR = '#FFD700';
-const METRIC_TILE_COLOR = '#FF00FF';
+const LOAD_TILE_COLOR = '#f5c200';
+const METRIC_TILE_COLOR = '#f5c200';
 
 function getTileConfig(mr: MovementResult): TileConfig | null {
   const isMaxBodyweight =
@@ -417,6 +423,7 @@ export function ScoreMovementInputs({
   onBatch,
   onSubstitutionOpenChange,
   teamSize,
+  isRelayContext = false,
 }: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
@@ -438,12 +445,13 @@ export function ScoreMovementInputs({
     return [...groups.values()];
   }, [movements]);
 
+  // Only the first (focused) load group uses the hero shared-weight screen.
+  // Secondary groups (different equipment type) are rendered as individual tiles.
   const sharedWeightKeys = useMemo(() => {
     const keys = new Set<string>();
-    loadGroups.forEach((group) => {
-      if (separateWeightGroups.has(group.type)) return;
-      group.movements.forEach((mr) => keys.add(mr.movementKey));
-    });
+    const focusedGroup = loadGroups[0];
+    if (!focusedGroup || separateWeightGroups.has(focusedGroup.type)) return keys;
+    focusedGroup.movements.forEach((mr) => keys.add(mr.movementKey));
     return keys;
   }, [loadGroups, separateWeightGroups]);
 
@@ -524,6 +532,10 @@ export function ScoreMovementInputs({
     if (seededDefaultsRef.current) return;
     const next = movements.map((mr) => {
       if (mr.kind !== 'load' || mr.weight != null) return mr;
+      // Seed from Rx weight (80% of prescribed) when available, otherwise fall back to
+      // the equipment default (barbell=40, KB=16). This keeps the persisted value consistent
+      // with what the hero weight screen visually displays — without seeding, the screen
+      // shows a fallback weight that is lost if the user never taps +/-.
       const defaultWeight = getDefaultMetconWeight(mr) ?? getFallbackWeight(getEquipmentType(mr.movement.name));
       return defaultWeight != null ? { ...mr, weight: defaultWeight } : mr;
     });
@@ -860,10 +872,34 @@ export function ScoreMovementInputs({
             style={{ width: `${Math.min(progress, 100)}%` }}
           />
         </div>
+
+        {mr.kind === 'load' && (
+          <div className={styles.intervalWeightRow}>
+            <button
+              type="button"
+              className={styles.intervalWeightStep}
+              onClick={() => onChange(globalIndex, { weight: Math.max(0, roundToLegalWeight((mr.weight ?? 0) - getLegalWeightStep(mr), mr)) })}
+              aria-label={`Decrease ${label} weight`}
+            >
+              -
+            </button>
+            <span className={styles.intervalWeightValue}>{mr.weight ?? 0}</span>
+            <span className={styles.intervalWeightLabel}>KG</span>
+            <button
+              type="button"
+              className={styles.intervalWeightStep}
+              onClick={() => onChange(globalIndex, { weight: roundToLegalWeight((mr.weight ?? 0) + getLegalWeightStep(mr), mr) })}
+              aria-label={`Increase ${label} weight`}
+            >
+              +
+            </button>
+          </div>
+        )}
       </div>
     );
   };
 
+  console.log('[ScoreMovementInputs]', { variant, movements: movements.map(m => ({ name: m.movement.name, kind: m.kind, inputType: m.movement.inputType, isBodyweight: m.movement.isBodyweight })) });
   if (variant === 'amrap_intervals') {
     const roundLabel = roundsTotal && roundsTotal > 0
       ? `${roundsTotal} rounds - totals calculated from your per-round reps`
@@ -983,6 +1019,7 @@ export function ScoreMovementInputs({
               onChange={(patch) => onChange(globalIndex, patch)}
               onCenterPress={() => openTile(mr.movementKey)}
               active={activeTileId === mr.movementKey}
+              isRelayContext={isRelayContext}
             />
           )}
           {/* MAX bodyweight: no prescribed quantity → let user log their score */}
@@ -1007,7 +1044,7 @@ export function ScoreMovementInputs({
     const firstWithValue = focusedLoadGroup.movements.find(mr => mr.weight != null);
     const firstRx = focusedLoadGroup.movements.find(mr => getRxWeight(mr) != null);
     const base = firstWithValue ?? firstRx ?? focusedLoadGroup.movements[0];
-    const currentWeight = base?.weight ?? getDefaultMetconWeight(base) ?? getFallbackWeight(focusedLoadGroup.type);
+    const currentWeight = base?.weight ?? getDefaultMetconWeight(base) ?? getFallbackWeight(focusedLoadGroup.type) ?? 0;
     const rx = getRxWeight(base);
     const step = getLegalWeightStep(base);
     const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' · ');
@@ -1030,7 +1067,7 @@ export function ScoreMovementInputs({
           <div className={styles.separateWeightList}>
             {focusedLoadGroup.movements.map((mr) => {
               const globalIndex = movements.indexOf(mr);
-              const value = mr.weight ?? getDefaultMetconWeight(mr) ?? getFallbackWeight(focusedLoadGroup.type);
+              const value = mr.weight ?? getDefaultMetconWeight(mr) ?? getFallbackWeight(focusedLoadGroup.type) ?? 0;
               const movementStep = getLegalWeightStep(mr);
               return (
                 <div key={mr.movementKey} className={styles.separateWeightRow}>
@@ -1139,9 +1176,9 @@ export function ScoreMovementInputs({
           </button>
         )}
 
-        {alternateMovements.length > 0 && (
+        {alternateMovements.filter(mr => mr.kind === 'load').length > 0 && (
           <div className={styles.inlineAlternateList}>
-            {alternateMovements.map((mr) => {
+            {alternateMovements.filter(mr => mr.kind === 'load').map((mr) => {
               const sub = getSubState(mr);
               const isActive = sub.isSubstituted;
               return (
@@ -1174,12 +1211,28 @@ export function ScoreMovementInputs({
   // Only stop on movements where the athlete can actually change something.
   // Plain bodyweight movements with no alternate are omitted from this input step.
   const visibleMovements = movements.filter(mr => movementHasInput(mr) || movementHasAlternate(mr));
+  const prioritizeInputs = (items: MovementResult[]) => (
+    [...items].sort((a, b) => Number(movementHasInput(b)) - Number(movementHasInput(a)))
+  );
   const visibleSectionGroups = groupBySections(visibleMovements);
   const focusedLoadStep = renderFocusedLoadStep();
+  // Non-load movements (distance, reps) that need their own tile even when the hero weight
+  // picker is showing — e.g. "200m Run" in an IGYG AMRAP alongside Power Cleans.
+  // Secondary load groups (different equipment type from loadGroups[0]) also get tiles here,
+  // because the hero screen only handles the first group (e.g. KB swing gets the hero screen,
+  // but a weighted box step up with barbell equipment type needs its own tile).
+  const secondaryLoadMovements = loadGroups.slice(1).flatMap(g => g.movements);
+  const nonLoadVisibleMovements = prioritizeInputs([
+    ...secondaryLoadMovements,
+    ...visibleMovements.filter(mr => mr.kind !== 'load'),
+  ]);
 
-  return (
-    <>
-      {focusedLoadStep ?? (visibleSectionGroups ? (
+  const movementTileBlock = focusedLoadStep
+    ? nonLoadVisibleMovements.length > 0
+      ? <div className={styles.multiRow}>{nonLoadVisibleMovements.map(renderMovField)}</div>
+      : null
+    : visibleSectionGroups
+      ? (
         <div className={styles.multiRow}>
           {visibleSectionGroups.map((group) => (
             <div key={group.sectionIndex} className={styles.sectionGroup}>
@@ -1189,15 +1242,17 @@ export function ScoreMovementInputs({
                 </span>
                 <span className={styles.sectionLine} />
               </div>
-              {group.movements.map(renderMovField)}
+              {prioritizeInputs(group.movements).map(renderMovField)}
             </div>
           ))}
         </div>
-      ) : (
-        <div className={styles.multiRow}>
-          {visibleMovements.map(renderMovField)}
-        </div>
-      ))}
+      )
+      : <div className={styles.multiRow}>{prioritizeInputs(visibleMovements).map(renderMovField)}</div>;
+
+  return (
+    <>
+      {focusedLoadStep}
+      {movementTileBlock}
 
       {/* Substitution sheet — single instance, driven by swapOpenKey */}
       {swapMr && (
@@ -1268,22 +1323,57 @@ function DistanceField({
   onChange,
   onCenterPress,
   active,
+  isRelayContext = false,
 }: {
   mr: MovementResult;
   onChange: (p: Partial<MovementResult>) => void;
   onCenterPress: () => void;
   active: boolean;
+  isRelayContext?: boolean;
 }) {
-  // Cardio machines (bike, row, ski) measure in calories when AI didn't prescribe distance.
   const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
   const isCal = mr.movement.inputType === 'calories'
     || (mr.movement.calories != null && mr.movement.calories > 0)
     || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
+
+  // In an AMRAP relay, a prescribed distance means "how many trips" — show a count stepper.
+  // In a for-time workout, a prescribed distance is just the fixed target — show normal entry.
+  const perTripSubDist = !isCal && mr.substitution?.targetUnit === 'distance' && mr.substitution.adjustedValue != null
+    ? mr.substitution.adjustedValue
+    : null;
+  const prescribedDist = !isCal ? (perTripSubDist ?? mr.movement.distance ?? 0) : 0;
+  const isRelayCount = isRelayContext && prescribedDist > 0;
+
+  if (isRelayCount) {
+    const count = mr.distance != null && prescribedDist > 0
+      ? Math.round(mr.distance / prescribedDist)
+      : undefined;
+    const unit = `× ${prescribedDist}${mr.distanceUnit ?? mr.movement.unit ?? 'm'}`;
+    return (
+      <StepperInput
+        value={count}
+        onChange={(v) => {
+          const c = v != null ? Math.max(0, Math.round(v)) : undefined;
+          onChange({ distance: c != null ? c * prescribedDist : undefined });
+        }}
+        step={1}
+        min={0}
+        placeholder="0"
+        unit={unit}
+        color={METRIC_TILE_COLOR}
+        inputMode="numeric"
+        size="arcade"
+        onCenterPress={onCenterPress}
+        active={active}
+      />
+    );
+  }
+
   const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
   const value = isCal ? mr.calories : mr.distance;
   const placeholder = isCal
     ? (mr.movement.calories ? String(mr.movement.calories) : '0')
-    : (mr.movement.distance ? String(mr.movement.distance) : '0');
+    : '0';
   const step = isCal ? 1 : (unit === 'km' ? 0.5 : unit === 'mi' ? 0.1 : 50);
 
   return (

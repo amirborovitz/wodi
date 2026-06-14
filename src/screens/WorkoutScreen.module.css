@@ -47,12 +47,20 @@
 }
 
 .posterFrame {
+  --poster-serif: Georgia, "Times New Roman", Times, serif;
+  --poster-type: "Courier New", Courier, "DM Mono", monospace;
+  --poster-hand: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  --poster-ink: #11100d;
+  --poster-muted-ink: rgba(17, 16, 13, 0.58);
+  --poster-red: #c9362c;
+  --poster-blue: #6b6b6b;
   position: relative;
   z-index: 1;
-  width: 100%;
-  max-width: 430px;
-  height: 100vh;
-  height: 100dvh;
+  width: min(390px, calc(100vw - 32px));
+  max-width: 390px;
+  height: auto;
+  max-height: calc(100dvh - 64px);
+  aspect-ratio: 9 / 16;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -60,10 +68,22 @@
   overflow: hidden;
   border-radius: 0;
   box-sizing: border-box;
-  padding: 20px 20px 24px 20px;
-  background: #0c0d0f;
-  border: 0;
-  box-shadow: none;
+  padding: 20px 20px 0 20px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background-color: #f3ebd6;
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 27px,
+      rgba(0, 0, 0, 0.075) 28px,
+      transparent 29px
+    );
+  border: 2px solid #000;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  justify-content: flex-start;
 }
 
 .posterBodyLock {
@@ -72,9 +92,12 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 6px;
-  overflow: hidden;
+  gap: clamp(4px, 0.8dvh, 10px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+.posterBodyLock::-webkit-scrollbar { display: none; }
 
 /* Film-grain noise overlay — high-contrast chalky gym floor texture */
 .posterFrame::before {
@@ -97,49 +120,100 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(242, 240, 235, 0.06);
-  border: 1px solid rgba(242, 240, 235, 0.10);
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 999px;
-  color: rgba(242, 240, 235, 0.72);
+  color: #000;
   cursor: pointer;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .posterBackBtn svg { width: 18px; height: 18px; }
-.posterBackBtn:hover  { background: rgba(242, 240, 235, 0.10); color: #f2f0eb; }
+.posterBackBtn:hover  { background: rgba(0, 0, 0, 0.10); color: #000; }
 .posterBackBtn:active { transform: scale(0.93); }
 
 .posterShareBtn {
-  height: 34px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 14px 0 10px;
-  background: var(--wodi-yellow);
-  border: 0;
+  justify-content: center;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: 999px;
-  color: #0c0d0f;
-  font-family: var(--font-barlow);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  color: #000;
   cursor: pointer;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
-.posterShareBtn svg { width: 16px; height: 16px; stroke: #0c0d0f; }
-.posterShareBtn:active { transform: scale(0.95); opacity: 0.85; }
+.posterShareBtn svg { width: 18px; height: 18px; stroke: currentColor; }
+.posterShareBtn:hover { background: rgba(0, 0, 0, 0.10); color: #000; }
+.posterShareBtn:active { transform: scale(0.93); opacity: 0.85; }
+.posterShareBtn:disabled { cursor: default; opacity: 0.72; }
+
+.posterFloatingActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 max(env(safe-area-inset-bottom, 8px), 8px);
+}
+
+.posterShareSpinner {
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  border: 2px solid rgba(242, 240, 235, 0.22);
+  border-top-color: var(--wodi-white);
+  animation: posterShareSpin 0.75s linear infinite;
+}
+
+@keyframes posterShareSpin {
+  to { transform: rotate(360deg); }
+}
 
 .posterBrandMark {
   position: absolute;
   left: 50%;
+  bottom: 10px;
   transform: translateX(-50%);
-  color: rgba(245, 239, 220, 0.13);
-  font-size: 15px;
-  font-weight: 950;
-  letter-spacing: -0.04em;
+  z-index: 4;
+  padding-top: 0;
+  color: rgba(0, 0, 0, 0.35);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  pointer-events: none;
+}
+
+.posterBrandMark span {
+  color: #ff7a1a;
+}
+
+.posterShareToast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 72px);
+  z-index: 9;
+  width: min(340px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  padding: 11px 14px;
+  border-radius: 999px;
+  background: var(--wodi-card2);
+  border: 1px solid var(--wodi-line2);
+  color: var(--wodi-white);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
 }
 
 .posterWatermark {
@@ -189,7 +263,7 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 4px;
 }
 
 .posterMetaChips {
@@ -205,15 +279,15 @@
   min-height: auto;
   padding: 0;
   border: 0;
-  color: transparent;
-  font-family: var(--font-display);
-  font-size: clamp(36px, 10vw, 48px);
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(34px, 9vw, 46px);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   background: transparent;
-  -webkit-text-stroke: 1px var(--wodi-yellow);
+  -webkit-text-stroke: 0;
 }
 
 .posterIntensityChip {
@@ -375,9 +449,9 @@
 }
 
 .posterDate {
-  color: rgba(242, 240, 235, 0.55);
-  font-family: var(--font-barlow);
-  font-size: 10px;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -394,22 +468,34 @@
 }
 
 .posterVibeHero {
-  position: relative;
+  position: static;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 3px;
+  margin-top: 4px;
 }
 
 .posterVibeHeadline {
   display: block;
-  color: rgba(242, 240, 235, 0.38);
-  font-family: var(--font-barlow);
-  font-size: 11px;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 13px;
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: 0.20em;
+  text-transform: uppercase;
+  max-width: 90%;
+}
+
+.posterPartClassification {
+  display: block;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.20em;
+  line-height: 1.2;
   text-transform: uppercase;
   max-width: 90%;
 }
@@ -423,29 +509,31 @@
 }
 
 .posterProgressionHero {
-  color: var(--wodi-white, #f2f0eb);
-  font-family: var(--font-display);
-  font-size: clamp(48px, 12vw, 64px);
+  color: var(--poster-ink);
+  font-family: var(--poster-type);
+  font-size: clamp(32px, 9vw, 48px);
   font-weight: 900;
   line-height: 1.1;
   letter-spacing: 0;
-  text-shadow: none;
-  max-width: min(100%, 390px);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  text-align: center;
 }
 
 .posterProgressionNote {
-  color: rgba(242, 240, 235, 0.75);
-  font-family: var(--font-barlow);
+  color: rgba(0, 0, 0, 0.62);
+  font-family: var(--poster-hand);
   font-size: clamp(13px, 3.5vw, 15px);
   font-weight: 800;
   letter-spacing: 0.15em;
   line-height: 1.4;
   text-transform: uppercase;
   max-width: 85%;
-  margin: 12px auto 0;
+  margin: 2px auto 0;
   text-align: center;
 }
 
@@ -501,9 +589,9 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 10px 9px;
+  padding: 0;
   border-radius: 8px;
-  box-shadow: 0 5px 0 rgba(0,0,0,0.45);
+  box-shadow: none;
 }
 
 .highlightStampHero {
@@ -514,12 +602,15 @@
 /* Complex sticker: absolute anchor inside .posterHeroBlock, top-right */
 .complexStickerAnchor {
   position: absolute;
-  top: 62px;
-  right: 12px;
+  top: 12%;
+  right: 16px;
   z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  pointer-events: none;
+  transform: rotate(6deg);
+  transform-origin: top right;
 }
 
 .complexStickerAnchor .highlightStampHero {
@@ -533,21 +624,34 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 9px 9px;
+  padding: 0;
   border-radius: 8px;
-  box-shadow:
-    0 5px 0 rgba(0, 0, 0, 0.55),
-    0 10px 18px rgba(0, 0, 0, 0.48);
+  box-shadow: none;
   border: 0;
 }
 
 .posterStickerRow {
+  position: absolute;
+  top: 20px;
+  right: -10px;
+  z-index: 12;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  width: 100%;
+  gap: 8px;
+  width: 86px;
+  max-width: 86px;
   overflow: visible;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  pointer-events: none;
+  transform: rotate(6deg) scale(0.88);
+  transform-origin: top right;
+}
+
+.posterStickerRow .highlightStamp,
+.posterStickerRow .complexPRFanItem {
+  width: 86px;
+  max-width: 86px;
 }
 
 .posterStickerRowCompact {
@@ -569,14 +673,20 @@
 }
 
 /* Per design system: stickers ALWAYS yellow background */
-.highlightStampYellow  { background: var(--wodi-yellow); }
-.highlightStampMagenta { background: var(--wodi-yellow); }
+.highlightStampYellow,
+.highlightStampMagenta {
+  background: rgba(243, 235, 214, 0.94);
+  border: 2px solid #ff3b30;
+  border-radius: 7px;
+  padding: 6px 8px 7px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
+}
 
 .highlightStampTitle,
 .highlightStampValue,
 .highlightStampNote {
-  color: #0c0d0f;
-  font-family: var(--font-display);
+  color: #ff3b30;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
 }
 
 .highlightStampTitle {
@@ -607,25 +717,27 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 4px;
+  gap: 2px;
+  margin-top: 0;
+  padding-top: 0;
   border-top: 0;
+  width: 100%;
 }
 
 .posterResultHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .posterResultMovement {
   min-width: 0;
-  color: rgba(245, 239, 220, 0.7);
-  font-size: 13px;
+  color: rgba(0, 0, 0, 0.62);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.16em;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -645,12 +757,13 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
 }
 
 .posterProgressionCount {
-  color: rgba(245, 239, 220, 0.7);
+  color: rgba(0, 0, 0, 0.58);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: 22px;
   font-weight: 950;
   line-height: 1;
@@ -664,7 +777,7 @@
   display: flex;
   justify-content: center;
   gap: 6px;
-  padding: 4px 0 6px;
+  padding: 0 0 3px;
   position: relative;
   z-index: 3;
 }
@@ -715,7 +828,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 36px;
+  min-height: 24px;
 }
 
 .cPageName {
@@ -750,10 +863,10 @@
 /* Part name — small dim eyebrow above the hero score */
 .cPageHeadline {
   display: block;
-  font-family: var(--font-barlow);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: 12px;
   font-weight: 800;
-  color: rgba(242, 240, 235, 0.55);
+  color: rgba(0, 0, 0, 0.58);
   line-height: 1.2;
   letter-spacing: 0.20em;
   text-transform: uppercase;
@@ -765,16 +878,19 @@
 /* Hero score — the single dominant element */
 .cPageHeroScore {
   display: block;
-  font-family: var(--font-display);
-  font-size: clamp(48px, 12vw, 64px);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(20px, 5.5vw, 32px);
   font-weight: 900;
-  color: var(--wodi-white, #f2f0eb);
+  color: #000;
   line-height: 1.1;
   letter-spacing: 0;
   text-transform: uppercase;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
 }
 
 /* Metadata description — small dim prescription lines */
@@ -795,7 +911,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  gap: 12px;
+  gap: 6px;
   min-height: 0;
   position: relative;
   z-index: 3;
@@ -807,7 +923,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
 }
 
 /* Legacy combined result line — kept for any remaining references */
@@ -850,33 +966,46 @@
 }
 
 .cPageBody {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .cPageStickerAnchor {
   position: absolute;
-  right: 10px;
-  top: 44px;
+  right: -8px;
+  top: 8px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
-  z-index: 4;
+  gap: 6px;
+  z-index: 8;
   pointer-events: none;
+  transform: rotate(6deg) scale(0.88);
+  transform-origin: top right;
 }
 
 /* Keep all artifact content (blueprint + movement rows) clear of the sticker */
 .cPageBody .posterStructureLayer {
-  padding-right: 148px;
+  padding-right: 0;
+  padding-top: 4px;
 }
 
 /* Blueprint in carousel: constrain width so text stays clear of sticker */
 .cPageBody .artifactBlueprint {
-  max-width: 100%;
+  max-width: 88%;
+}
+
+.cPageBody .artifactBlueprintSub {
+  max-width: 88%;
+}
+
+.cPageStickerAnchor .highlightStamp,
+.cPageStickerAnchor .complexPRFanItem {
+  width: 112px;
+  max-width: 112px;
 }
 
 
@@ -959,27 +1088,29 @@
 /* ─────────────────────────────────────────────────────────────────────── */
 
 .posterStatFooter {
-  position: relative;
-  z-index: 4;
   flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: stretch;
   gap: 0;
-  margin-top: 0;
-  padding-top: 12px;
-  border: 0;
-  border-top: 1px solid rgba(242, 240, 235, 0.06);
-  border-radius: 0;
+  margin: 8px 0 0;
+  padding: 8px 72px 9px 10px;
+  border: 2px solid #000;
+  border-top: 2px solid #000;
+  border-bottom: 0;
+  border-left: 0;
+  border-right: 0;
   overflow: hidden;
-  background: transparent;
+  background: rgba(243, 235, 214, 0.72);
+  position: relative;
 }
 
 .posterStatChip {
-  flex: 1;
+  flex: 0 0 33.333%;
+  width: 33.333%;
   min-width: 0;
-  min-height: 80px;
-  padding: 12px 6px 4px;
+  min-height: 44px;
+  padding: 0 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -993,32 +1124,30 @@
 }
 
 .posterStatChip:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 24%;
-  width: 1px;
-  height: 52%;
-  background: rgba(242, 240, 235, 0.06);
+  display: none;
+}
+
+.posterStatChip:not(:last-child) {
+  border-right: 0;
 }
 
 .posterStatLabel {
   display: block;
-  color: rgba(242, 240, 235, 0.38);
-  font-family: var(--font-barlow);
-  font-size: 10px;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.20em;
+  letter-spacing: 0.10em;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: lowercase;
 }
 
 .posterStatValue {
   display: block;
-  margin-top: 4px;
-  color: var(--wodi-yellow);
-  font-size: clamp(36px, 10vw, 48px);
-  font-family: var(--font-display);
+  margin-top: 1px;
+  color: #000;
+  font-size: clamp(14px, 4vw, 19px);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -1027,10 +1156,10 @@
 
 .posterStatUnit {
   display: block;
-  margin-top: 4px;
-  color: rgba(242, 240, 235, 0.38);
-  font-family: var(--font-barlow);
-  font-size: 10px;
+  margin-top: 0;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.20em;
   line-height: 1;
@@ -1040,14 +1169,13 @@
 .posterStructureLayer {
   position: relative;
   z-index: 1;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   margin-top: 0;
-  padding: 2px 0;
+  padding: 0 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  overflow-y: hidden;
+  gap: clamp(8px, 2dvh, 24px);
+  overflow-y: visible;
   overflow-x: clip;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1055,12 +1183,13 @@
 
 .posterStructureLayer::-webkit-scrollbar { display: none; }
 
+/* blueprint-zone + damage-zone combined — gap scales with screen height */
 .artifactSection {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 8px;
+  gap: 16px;
+  padding: clamp(4px, 0.8dvh, 10px) 0;
   overflow: hidden;
 }
 
@@ -1083,43 +1212,107 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  color: #000;
 }
 
 .artifactEyebrow {
-  color: rgba(242, 240, 235, 0.38);
+  color: #000;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.20em;
   text-transform: uppercase;
-  font-family: var(--font-barlow);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
 }
 
+/* blueprint-zone: prescription header — scales with viewport height */
 .artifactBlueprint {
   margin: 0;
-  color: rgba(242, 240, 235, 0.75);
-  font-family: var(--font-barlow);
-  font-size: clamp(13px, 3.5vw, 15px);
+  color: rgba(0, 0, 0, 0.9);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(12px, 2.2dvh, 15px);
   font-weight: 800;
   letter-spacing: 0.15em;
   line-height: 1.4;
   text-transform: uppercase;
   overflow-wrap: anywhere;
   max-width: 85%;
-  margin: 12px auto 0;
+  margin: clamp(6px, 1.2dvh, 14px) auto 0;
   text-align: center;
 }
 
+/* blueprint-zone secondary line: interval profile below target */
+.artifactBlueprintSub {
+  margin: clamp(2px, 0.5dvh, 6px) auto 0;
+  color: rgba(0, 0, 0, 0.68);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(10px, 1.8dvh, 13px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* damage-zone: actual results — left-aligned data rows (number · name) */
 .artifactRows {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  align-items: stretch;
+  width: 100%;
 }
 
 .artifactRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.artifactRowMain {
   display: grid;
-  grid-template-columns: max-content 1fr;
+  grid-template-columns: 72px 1fr;
+  align-items: baseline;
+  gap: 0 12px;
+}
+
+/* ─── Progressive Round Row — 3-column grid ──────────────────── */
+.artifactRoundRow {
+  display: grid;
+  grid-template-columns: 80px 1fr max-content;
+  gap: 16px;
   align-items: start;
-  gap: 12px;
+  margin-bottom: 6px;
+}
+
+/* Column 1: phase label — yellow, right-aligned, flush to movement */
+.artifactRoundLabel {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 0.85em;
+  font-weight: 800;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--wodi-yellow);
+}
+
+/* Column 2: movement + reps — high-contrast white */
+.artifactRoundMovement {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  line-height: 1.2;
+}
+
+/* Column 3: weight — muted, right-aligned */
+.artifactRoundWeight {
+  font-family: var(--font-barlow), sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  color: rgba(242, 240, 235, 0.65);
 }
 
 /* ─── Station EMOM — Narrative Column Layout ─────────────────── */
@@ -1128,8 +1321,10 @@
 .artifactStationRow {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 2px;
   padding: 2px 0;
+  text-align: center;
 }
 
 /* L3: muted grey prescription label — "MIN 1 · POWER CLEAN" */
@@ -1138,13 +1333,13 @@
   font-weight: 700;
   letter-spacing: 0.10em;
   text-transform: uppercase;
-  color: rgba(242, 240, 235, 0.7);
+  color: rgba(0, 0, 0, 0.76);
   line-height: 1.2;
 }
 
 /* L2: neon result line — "8 → 32 REPS @ 45KG" in mono */
 .artifactStationResult {
-  font-family: var(--font-mono);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: 16px;
   font-weight: 900;
   letter-spacing: -0.02em;
@@ -1154,11 +1349,11 @@
 
 /* L3 sub: secondary total — "32 total" readable but clearly subordinate */
 .artifactStationTotal {
-  font-family: var(--font-barlow);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: rgba(242, 240, 235, 0.7);
+  color: rgba(17, 16, 13, 0.52);
   text-transform: none;
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
@@ -1173,18 +1368,21 @@
   pointer-events: none;
 }
 
+/* damage-zone primary metric: fixed-width right-aligned left column */
 .artifactPrimary {
-  font-family: var(--font-display);
-  font-size: clamp(25px, 7vw, 32px);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(16px, 4dvh, 26px);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
+  text-align: right;
+  min-width: 0;
 }
 
-.artifactPrimaryYellow { color: var(--wodi-yellow); }
-.artifactPrimaryMagenta { color: var(--wodi-yellow); }
-.artifactPrimaryCyan { color: var(--wodi-yellow); }
+.artifactPrimaryYellow { color: #c9362c; }
+.artifactPrimaryMagenta { color: #c9362c; }
+.artifactPrimaryCyan { color: #c9362c; }
 
 .artifactTextBlock {
   display: flex;
@@ -1194,29 +1392,36 @@
 }
 
 .artifactName {
-  color: var(--wodi-white);
-  font-family: var(--font-barlow);
-  font-size: 16px;
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(13px, 2.5dvh, 17px);
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.12;
   overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.artifactInlineLoad {
+  color: rgba(17, 16, 13, 0.60);
+  font-weight: 900;
 }
 
 .artifactSubNote {
-  color: rgba(242, 240, 235, 0.7);
-  font-family: var(--font-barlow);
+  color: rgba(17, 16, 13, 0.52);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: none;
+  padding-left: calc(72px + 12px);
 }
 
 .artifactContinuation {
   display: inline-flex;
   width: fit-content;
   margin-top: 2px;
-  color: rgba(242, 240, 235, 0.7);
+  color: #000;
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.16em;
@@ -1228,7 +1433,91 @@
 .amrapIntervalStack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 90%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.amrapBlueprintBlock,
+.amrapResultsBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.amrapBlueprintBlock {
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.posterIntensityStamp {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  padding: 2px 5px;
+  background: rgba(243, 235, 214, 0.92);
+  color: #ff3b30;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(13px, 3.8vw, 18px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+  text-shadow: 0 1px 0 rgba(255, 122, 26, 0.35);
+}
+
+.amrapBlueprintLead,
+.amrapResultsLead {
+  margin: 0 0 2px;
+  font: inherit;
+  color: inherit;
+}
+
+.amrapBlueprintLine {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+  opacity: 1;
+}
+
+.amrapResultsBlock {
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(10px, 2.8vw, 12px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.amrapResultsLead {
+  color: #000;
+  letter-spacing: 0.14em;
+  margin-bottom: 4px;
+}
+
+.amrapPartLine {
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  max-width: 100%;
+  text-transform: uppercase;
 }
 
 /*
@@ -1236,15 +1525,14 @@
  * Layout: yellow left spine · card body (flex-col) · no divider / no totals.
  */
 .amrapPartCard {
-  background: #141618;
-  border: 1px solid rgba(242, 240, 235, 0.10);
-  border-left: 3px solid #f5c200;
-  border-radius: 10px;
-  padding: 10px 12px 10px 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  box-shadow: 0 2px 12px rgba(245, 194, 0, 0.05);
+  gap: 0;
+  box-shadow: none;
 }
 
 /*
@@ -1268,21 +1556,25 @@
 
 /* "AMRAP 1" — brighter dim so it reads as the section label */
 .amrapPartBadge {
-  color: rgba(242, 240, 235, 0.55);
-  font-family: var(--font-barlow);
-  font-size: 10px;
+  color: #000;
+  font-family: inherit;
+  font-size: inherit;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: inherit;
   text-transform: uppercase;
-  line-height: 1;
+  line-height: inherit;
   white-space: nowrap;
+}
+
+.amrapPartBullet {
+  color: #000;
 }
 
 /* "· 12 MIN" — softer, secondary within the eyebrow */
 .amrapPartDuration {
-  color: rgba(242, 240, 235, 0.32);
+  color: rgba(242, 240, 235, 0.50);
   font-family: var(--font-barlow);
-  font-size: 10px;
+  font-size: inherit;
   font-weight: 700;
   letter-spacing: 0.10em;
   text-transform: uppercase;
@@ -1296,15 +1588,13 @@
  * 22px keeps it dominant without competing with the hero block above.
  */
 .amrapPartResult {
-  color: #f5c200;
-  font-family: var(--font-display);
-  font-size: 22px;
+  color: #ff3b30;
+  font-family: inherit;
+  font-size: inherit;
   font-weight: 900;
-  letter-spacing: -0.01em;
-  line-height: 1;
-  white-space: nowrap;
+  letter-spacing: inherit;
+  line-height: inherit;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
 }
 
 /*
@@ -1312,15 +1602,33 @@
  * Single truncated line keeps the card height fixed.
  */
 .amrapPartPrescription {
-  color: rgba(242, 240, 235, 0.38);
-  font-family: var(--font-barlow);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: rgba(242, 240, 235, 0.50);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: inherit;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.amrapPartSeparator {
+  color: rgba(242, 240, 235, 0.60);
+}
+
+.amrapPartContext {
+  color: #000;
+}
+
+.amrapPartLoad {
+  color: #0077b6;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 900;
+  letter-spacing: inherit;
+  line-height: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Legacy detail-table classes — kept to avoid breaking any callers, but
@@ -3635,7 +3943,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 14px;
+  margin-bottom: 4px;
   position: relative;
   z-index: 3;
 }
@@ -3654,7 +3962,7 @@
 .chipperTitleBlock {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
@@ -3670,26 +3978,26 @@
 
 .chipperTitle {
   margin: 0;
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: clamp(40px, 12vw, 58px);
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(38px, 10vw, 56px);
   line-height: 0.94;
   font-weight: 900;
   letter-spacing: 0;
   text-transform: uppercase;
   word-break: break-word;
-  max-width: 70%;
+  max-width: 100%;
 }
 
 .chipperStructure {
-  color: rgba(242, 240, 235, 0.42);
-  font-family: var(--font-barlow);
-  font-size: clamp(11px, 3.3vw, 14px);
+  color: rgba(0, 0, 0, 0.54);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(10px, 3vw, 13px);
   font-weight: 800;
   letter-spacing: 0.22em;
   line-height: 1.4;
   text-transform: uppercase;
-  max-width: 70%;
+  max-width: 100%;
   margin: 0;
   text-align: left;
 }
@@ -3704,14 +4012,14 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  margin: 4px 0 2px;
+  gap: 2px;
+  margin: 2px 0 0;
 }
 
 .chipperHeroScoreValue {
-  color: var(--wodi-white);
-  font-family: var(--font-display);
-  font-size: clamp(58px, 17vw, 82px);
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(46px, 14vw, 74px);
   font-weight: 900;
   line-height: 0.92;
   letter-spacing: 0;
@@ -3722,8 +4030,8 @@
 }
 
 .chipperHeroScoreLabel {
-  color: rgba(242, 240, 235, 0.75);
-  font-family: var(--font-barlow);
+  color: rgba(0, 0, 0, 0.62);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
   font-size: clamp(13px, 3.5vw, 15px);
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -3760,7 +4068,7 @@
 }
 
 .chipperSchemeTrack {
-  padding: 12px 20px 4px;
+  padding: 5px 20px 2px;
   border-top: 0;
 }
 
@@ -3778,7 +4086,7 @@
 .chipperMovList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   flex: 1;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -3805,10 +4113,10 @@
 }
 
 .chipperMovQty {
-  font-family: var(--font-display);
-  font-size: clamp(34px, 9vw, 46px);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(24px, 6.8vw, 36px);
   font-weight: 900;
-  color: var(--wodi-white);
+  color: #000;
   line-height: 0.95;
   min-width: 58px;
   text-align: right;
@@ -3816,7 +4124,7 @@
 }
 
 .chipperMovQtyWeighted {
-  color: var(--wodi-yellow);
+  color: #0077b6;
 }
 
 .chipperMovMeta {
@@ -3828,9 +4136,9 @@
 }
 
 .chipperMovName {
-  color: var(--wodi-white);
-  font-family: var(--font-barlow);
-  font-size: clamp(17px, 4.8vw, 22px);
+  color: #000;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(14px, 3.8vw, 19px);
   font-weight: 900;
   letter-spacing: 0.01em;
   line-height: 1.05;
@@ -3841,9 +4149,9 @@
 }
 
 .chipperMovSub {
-  color: rgba(242, 240, 235, 0.62);
-  font-family: var(--font-barlow);
-  font-size: clamp(12px, 3.3vw, 16px);
+  color: #0077b6;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: clamp(11px, 3vw, 15px);
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: none;
@@ -3860,21 +4168,23 @@
 
 .chipperStickerStack {
   position: absolute;
-  top: 24%;
-  right: 0;
+  top: 12%;
+  right: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   z-index: 10;
   pointer-events: none;
-  transform: rotate(-6deg);
+  transform: rotate(6deg);
+  transform-origin: top right;
 }
 
 .chipperSticker {
-  background: var(--wodi-yellow);
-  color: #0c0d0f;
+  background: rgba(243, 235, 214, 0.94);
+  color: #ff3b30;
+  border: 2px solid #ff3b30;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -3883,8 +4193,8 @@
 }
 
 .chipperStickerLabel {
-  font-family: var(--font-barlow);
-  font-size: 12px;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -3892,18 +4202,464 @@
 }
 
 .chipperStickerValue {
-  font-family: var(--font-display);
-  font-size: 34px;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 28px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: -0.02em;
 }
 
 .chipperStickerNote {
-  font-family: var(--font-barlow);
-  font-size: 10px;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 8px;
   font-weight: 900;
   letter-spacing: 0.10em;
   text-transform: uppercase;
   line-height: 1.2;
+}
+
+/* Team workout squad tag line — under the format label */
+.squadTagLine {
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  opacity: 0.72;
+  margin-top: 2px;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+/* Floating MVP sticker for standout individual in team workout */
+.teamMvpSticker {
+  position: absolute;
+  right: 14px;
+  top: 10%;
+  z-index: 10;
+  background: #ff3b30;
+  border-radius: 4px;
+  padding: 6px 10px 8px;
+  transform: rotate(5deg);
+  max-width: 110px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+}
+
+.teamMvpStickerText {
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-align: center;
+  display: block;
+}
+
+/* ============================================
+   Celebration Poster: Analog Logbook Direction
+   Cream paper + typewritten data + serif WOD identity + sticker collage.
+   This normalizes chipper, single-part, and carousel poster paths to one
+   visual language while the render refactor continues.
+   ============================================ */
+
+.posterFrame {
+  --poster-serif: Georgia, "Times New Roman", Times, serif;
+  --poster-type: "Courier New", Courier, "DM Mono", monospace;
+  --poster-hand: "Segoe Print", "Bradley Hand", "Comic Sans MS", "Marker Felt", cursive;
+  --poster-ink: #11100d;
+  --poster-muted-ink: rgba(17, 16, 13, 0.58);
+  --poster-red: #c9362c;
+  --poster-blue: #6b6b6b;
+  color: var(--poster-ink);
+  font-family: var(--poster-type);
+  width: min(390px, calc(100vw - 32px));
+  max-width: 390px;
+  height: auto;
+  max-height: calc(100dvh - 64px);
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
+}
+
+.posterVibeTag,
+.chipperTitle {
+  color: var(--poster-ink);
+  font-family: var(--poster-serif);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.posterVibeTag {
+  font-size: clamp(32px, 8vw, 44px);
+}
+
+.chipperTitle {
+  font-size: clamp(34px, 8.6vw, 48px);
+  max-width: 100%;
+}
+
+.posterProgressionHero,
+.cPageHeroScore,
+.chipperHeroScoreValue {
+  color: var(--poster-ink);
+  font-family: var(--poster-serif);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-shadow: none;
+}
+
+.posterProgressionHero,
+.cPageHeroScore {
+  font-size: clamp(20px, 5.5vw, 32px) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.chipperHeroScoreValue {
+  font-size: clamp(40px, 12vw, 62px);
+}
+
+.posterFinalScore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.posterFinalScoreLabel {
+  color: var(--poster-muted-ink);
+  font-family: var(--poster-type);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.posterFinalScoreValue {
+  color: var(--poster-ink);
+  font-family: var(--poster-type);
+  font-size: clamp(42px, 12vw, 58px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.posterDate,
+.posterVibeHeadline,
+.posterVibeHeadlineLadder,
+.posterPartClassification,
+.posterProgressionNote,
+.posterProgressionCount,
+.cPageHeadline,
+.chipperStructure,
+.chipperHeroScoreLabel,
+.artifactEyebrow,
+.artifactBlueprint,
+.artifactBlueprintSub,
+.artifactStationLabel,
+.artifactName,
+.artifactContinuation,
+.posterStatLabel,
+.posterStatValue,
+.posterStatUnit,
+.amrapBlueprintBlock,
+.amrapResultsBlock,
+.squadTagLine {
+  font-family: var(--poster-type);
+}
+
+.posterDate,
+.posterVibeHeadline,
+.posterVibeHeadlineLadder,
+.posterPartClassification,
+.posterProgressionNote,
+.cPageHeadline,
+.chipperStructure,
+.chipperHeroScoreLabel,
+.artifactBlueprintSub,
+.posterStatLabel,
+.posterStatUnit,
+.squadTagLine {
+  color: var(--poster-muted-ink);
+}
+
+.artifactBlueprint,
+.artifactStationLabel,
+.artifactName,
+.artifactContinuation,
+.amrapBlueprintBlock,
+.amrapResultsBlock {
+  color: var(--poster-ink);
+}
+
+.artifactPrimary,
+.artifactStationResult,
+.artifactStationTotal,
+.artifactSubNote,
+.artifactInlineLoad,
+.chipperMovQty,
+.chipperMovName,
+.chipperMovSub {
+  font-family: var(--poster-type);
+}
+
+.artifactPrimary,
+.artifactStationResult,
+.chipperMovQty {
+  font-weight: 900;
+}
+
+.artifactPrimaryYellow,
+.artifactPrimaryCyan,
+.artifactStationTotal,
+.artifactInlineLoad,
+.artifactSubNote,
+.chipperMovQtyWeighted,
+.chipperMovSub {
+  color: var(--poster-blue);
+}
+
+.artifactPrimaryMagenta {
+  color: var(--poster-red);
+}
+
+.chipperMovQty:not(.chipperMovQtyWeighted),
+.chipperMovName {
+  color: var(--poster-ink);
+}
+
+.posterStatValue {
+  color: var(--poster-ink);
+  font-weight: 900;
+}
+
+.posterIntensityStamp,
+.posterBrandMark,
+.teamMvpStickerText {
+  font-family: var(--poster-hand);
+}
+
+.posterIntensityStamp {
+  color: var(--poster-red);
+  text-shadow: none;
+}
+
+.posterBrandMark span {
+  color: var(--poster-red);
+}
+
+.highlightStampYellow,
+.highlightStampMagenta,
+.chipperSticker {
+  background: rgba(255, 248, 224, 0.96);
+  border: 2px solid var(--poster-red);
+  color: var(--poster-red);
+  box-shadow:
+    0 2px 0 rgba(17, 16, 13, 0.24),
+    0 8px 18px rgba(17, 16, 13, 0.16);
+}
+
+.highlightStampTitle,
+.highlightStampValue,
+.highlightStampNote,
+.chipperStickerLabel,
+.chipperStickerValue,
+.chipperStickerNote {
+  color: var(--poster-red);
+  font-family: var(--poster-type);
+}
+
+.highlightStampValue,
+.chipperStickerValue {
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+/* Performance card hierarchy fix: tight rhythm, intentional stickers, scannable rows. */
+.posterHeroBlock,
+.posterResultBlock,
+.posterStructureLayer,
+.cPageHeroRow,
+.cPageBody {
+  margin-top: 0;
+}
+
+.posterBodyLock {
+  gap: clamp(12px, 2dvh, 20px);
+}
+
+.posterResultBlock {
+  gap: 8px;
+}
+
+.posterStructureLayer {
+  gap: 16px;
+}
+
+.posterStructureLayer .artifactHeader {
+  display: none;
+}
+
+.cPageBody .posterStructureLayer {
+  padding-top: 4px;
+  padding-right: 0;
+}
+
+/* Sticker sits top-right of cPageBody; blueprint + rows must leave right column clear */
+.cPageBody .artifactBlueprint,
+.cPageBody .artifactBlueprintSub {
+  max-width: 68%;
+}
+
+.cPageBody .artifactRow {
+  max-width: 70%;
+}
+
+.artifactSection {
+  gap: 14px;
+}
+
+.artifactBlueprint {
+  margin: 0 auto;
+}
+
+.artifactBlueprintSub {
+  max-width: min(92%, 340px);
+  line-height: 1.65;
+}
+
+.artifactRows {
+  align-items: stretch;
+  gap: 9px;
+}
+
+.artifactRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.artifactRowMain {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 0 12px;
+  text-align: left;
+}
+
+.artifactPrimary {
+  display: block;
+  width: 100%;
+  text-align: right;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.artifactName {
+  display: block;
+  text-align: left;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifactSubNote {
+  display: block;
+  padding-left: calc(60px + 12px);
+  margin-left: 0;
+  text-align: left;
+  color: rgba(17, 16, 13, 0.56);
+}
+
+.artifactInlineLoad,
+.artifactStationTotal,
+.chipperMovSub {
+  color: rgba(17, 16, 13, 0.56);
+}
+
+.artifactPrimaryYellow,
+.artifactPrimaryCyan {
+  color: var(--poster-red);
+}
+
+.artifactStationRow {
+  align-items: stretch;
+  text-align: left;
+}
+
+.artifactStationResult {
+  color: var(--poster-red);
+}
+
+.posterStickerRow {
+  top: auto;
+  right: -12px;
+  bottom: 92px;
+  transform: rotate(5deg) scale(0.82);
+  transform-origin: bottom right;
+}
+
+.cPageStickerAnchor {
+  top: auto;
+  right: -10px;
+  bottom: 12px;
+  transform: rotate(5deg) scale(0.82);
+  transform-origin: bottom right;
+}
+
+.chipperStickerStack {
+  top: auto;
+  right: 8px;
+  bottom: 18px;
+  transform: rotate(5deg);
+}
+
+.chipperMovListPadded {
+  max-width: 100%;
+  padding-right: 122px;
+}
+
+.chipperMovRow {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 12px;
+}
+
+.chipperMovQty {
+  min-width: 0;
+  text-align: right;
+}
+
+.chipperMovMeta,
+.chipperMovName,
+.chipperMovSub {
+  text-align: left;
+}
+
+.chipperMovName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.posterStatFooter {
+  display: flex;
+  grid-template-columns: none;
+  padding-right: 94px;
+}
+
+.posterStatChip {
+  flex: 1 1 50%;
+  width: 50%;
+  min-height: 48px;
 }

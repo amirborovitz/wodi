@@ -1,4 +1,5 @@
 import type { Achievement, Exercise, PersonalRecord, Workout } from '../types';
+import { getCanonicalLiftName } from '../data/exerciseDefinitions';
 
 interface AchievementContext {
   workout: {
@@ -123,7 +124,7 @@ function isPREligible(movementName: string): boolean {
 }
 
 function normalizePRMovementName(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, ' ').trim();
+  return getCanonicalLiftName(name).toLowerCase();
 }
 
 /**
@@ -348,7 +349,7 @@ export function extractNewPRs(
       if (!existingPR || bestWeight > existingPR.weight) {
         newPRs.push({
           id: `${workout.id}-${movementName}`,
-          movement: movementName,
+          movement: getCanonicalLiftName(movementName),
           weight: bestWeight,
           date: workout.date,
           workoutId: workout.id,

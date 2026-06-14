@@ -21,7 +21,7 @@ export async function elementToCanvas(
     height: options?.height,
     useCORS: true,
     allowTaint: true,
-    backgroundColor: '#0b0b0b',
+    backgroundColor: '#0c0d0f',
     logging: false,
   });
 

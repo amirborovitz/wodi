@@ -635,44 +635,19 @@ function extractProgression(exercise: Exercise): number[] | null {
 // Detects when the last set has notably more reps at lower weight.
 // ============================================
 // Footer Stats Extraction (strength only)
-// Shows supporting info: Volume and Set count.
+// Shows supporting set count without total tonnage.
 // Peak weight is now the hero so we don't repeat it here.
 // ============================================
 
 function extractFooterStats(
   exercise: Exercise,
   displayType: string,
-  breakdownMovements?: MovementTotal[],
+  _breakdownMovements?: MovementTotal[],
 ): Array<{ value: string; label: string }> {
   const sets = getCompletedSets(exercise);
   const stats: Array<{ value: string; label: string }> = [];
 
   if (displayType === 'strength') {
-    // Per-set calculation is most accurate (handles progressive weights correctly)
-    let totalVol = 0;
-    const setsWithWeight = sets.filter(s => s.weight && s.weight > 0);
-    if (setsWithWeight.length > 0) {
-      totalVol = sets.reduce((sum, s) => sum + (s.weight || 0) * (s.actualReps || s.targetReps || 0), 0);
-    } else if (breakdownMovements && breakdownMovements.length > 0) {
-      // Fallback to breakdown when sets don't carry weight
-      totalVol = breakdownMovements.reduce((sum, m) => {
-        if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-          // Use average weight when progression exists
-          const avgWeight = m.weightProgression && m.weightProgression.length > 1
-            ? m.weightProgression.reduce((s, w) => s + w, 0) / m.weightProgression.length
-            : m.weight;
-          return sum + avgWeight * m.totalReps;
-        }
-        return sum;
-      }, 0);
-    }
-
-    if (totalVol > 0) {
-      stats.push({
-        value: totalVol >= 1000 ? `${(totalVol / 1000).toFixed(1)}t` : `${Math.round(totalVol)}kg`,
-        label: 'VOLUME',
-      });
-    }
     if (sets.length > 1) {
       stats.push({ value: `${sets.length}`, label: 'SETS' });
     }

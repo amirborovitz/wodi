@@ -7,7 +7,6 @@ import {
   buildShareSegments,
   buildMovementLine,
   formatTime,
-  formatVolume,
   isExcludedExercise,
   detectExerciseDisplayType,
 } from './shareCardUtils';
@@ -134,14 +133,12 @@ function buildWorkoutText(data: RewardData): string {
   const statParts: string[] = [];
   // Partner workouts: divide by teamSize for personal share
   const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
-  const totalVolume = Math.round((workloadBreakdown?.grandTotalVolume || workoutSummary.totalVolume || 0) / teamSize);
   const totalReps = Math.round((workloadBreakdown?.grandTotalReps || workoutSummary.totalReps || 0) / teamSize);
 
   if (workoutSummary.duration) {
     const totalSec = Math.round(workoutSummary.duration * 60);
     statParts.push(`Time: ${formatTime(totalSec)}`);
   }
-  if (totalVolume > 0) statParts.push(`Volume: ${formatVolume(totalVolume)}`);
   if (totalReps > 0) statParts.push(`${totalReps} reps`);
 
   if (statParts.length > 0) {

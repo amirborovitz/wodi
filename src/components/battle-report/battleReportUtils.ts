@@ -311,16 +311,6 @@ export function computeHeadline(
     }
   }
 
-  // Fallback: total volume or reps
-  if (workoutSummary.totalVolume > 0) {
-    const vol = workoutSummary.totalVolume;
-    return {
-      primary: vol >= 1000 ? `${(vol / 1000).toFixed(1)}t` : `${Math.round(vol)} kg`,
-      formatLabel,
-      accentColor,
-    };
-  }
-
   return {
     primary: `${workoutSummary.totalReps} reps`,
     formatLabel,
@@ -335,14 +325,13 @@ export function computeTeamImpact(
   if (!parsedWorkout.partnerWorkout || !parsedWorkout.teamSize) return null;
 
   const teamSize = parsedWorkout.teamSize;
-  const personalVolume = rewardData.workoutSummary.totalVolume;
   const personalReps = rewardData.workoutSummary.totalReps;
 
   return {
     teamSize,
     personalPercent: Math.round((1 / teamSize) * 100),
-    personalVolume,
-    teamTotal: Math.round(personalVolume * teamSize),
+    personalVolume: personalReps,
+    teamTotal: Math.round(personalReps * teamSize),
     personalReps,
     teamTotalReps: Math.round(personalReps * teamSize),
   };

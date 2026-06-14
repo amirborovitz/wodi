@@ -18,18 +18,18 @@ export interface UserStats {
   totalWorkouts: number;
   currentStreak: number;
   longestStreak: number;
-  totalVolume: number;  // kg lifted all-time
+  totalVolume: number;  // legacy field retained for stored workout compatibility
 }
 
 // User's weekly goals for Power Cell Dashboard
 export interface UserGoals {
-  volumeGoal: number;     // kg per week (default: 20000)
+  volumeGoal: number;     // legacy key, now weekly rep target
   metconGoal: number;     // minutes per week (default: 60)
   streakGoal: number;     // workouts per week (default: 4)
 }
 
 export const DEFAULT_USER_GOALS: UserGoals = {
-  volumeGoal: 20000,
+  volumeGoal: 500,
   metconGoal: 60,
   streakGoal: 4,
 };
@@ -54,7 +54,7 @@ export type ScoreType =
   | 'time'            // Total time (for_time workouts)
   | 'time_per_set'    // Split time each set (intervals)
   | 'rounds_reps'     // Rounds + extra reps (AMRAP)
-  | 'load'            // Weight lifted (strength)
+  | 'load'            // Load value (strength)
   | 'reps'            // Total reps (some EMOMs)
   | 'pass_fail';      // Completed or not
 
@@ -72,8 +72,43 @@ export interface RxCalories {
 }
 
 /** How the athlete felt about the metcon portion of a workout. */
-export type IntensityRating = 'smoked' | 'locked_in';
+export type IntensityRating =
+  | 'cooked'
+  | 'smoked'
+  | 'barely'
+  | 'sent_it'
+  | 'gassed'
+  | 'held_on'
+  | 'machine'
+  | 'dark_place'
+  | 'solid'
+  | 'easy_day'
+  | 'survived'
+  | 'dialed_in';
+
 export type FeelRating = IntensityRating;
+
+/** Poster skin choice on the celebration screen. Must match SKINS in HandwrittenFace/index.tsx */
+export type PosterSkinId = 'slab' | 'chalk' | 'flare' | 'stadium';
+
+/** Poster "FELT" vibe choice. Must match VIBE_KEYS in HandwrittenFace/brand.ts */
+export type PosterVibeKey = 'chill' | 'solid' | 'sweaty' | 'cooked' | 'smoked' | 'wrecked';
+
+/** Display label for each vibe on the celebration poster */
+export const INTENSITY_DISPLAY: Record<IntensityRating, string> = {
+  cooked:     'COOKED!',
+  smoked:     'SMOKED!',
+  barely:     'BARELY.',
+  sent_it:    'SENT IT',
+  gassed:     'GASSED',
+  held_on:    'HELD ON',
+  machine:    'MACHINE',
+  dark_place: 'DARK PLACE',
+  solid:      'SOLID',
+  easy_day:   'EASY DAY',
+  survived:   'SURVIVED',
+  dialed_in:  'DIALED IN',
+};
 
 export interface Workout {
   id: string;
@@ -86,6 +121,7 @@ export interface Workout {
   partnerWorkout?: boolean;
   partnerFactor?: number;
   teamSize?: number;
+  partnerNames?: string[];
   workloadBreakdown?: WorkloadBreakdown;
   status: WorkoutStatus;
   exercises: Exercise[];
@@ -97,6 +133,8 @@ export interface Workout {
   format?: WorkoutFormat;  // workout format for EP recalculation
   difficultyLevel?: number; // AI-assessed programmed difficulty 1–10
   feelRating?: FeelRating;  // user-entered metcon feel rating
+  posterSkin?: PosterSkinId;   // chosen celebration poster skin (Slab/Chalk/Flare/Stadium)
+  posterVibe?: PosterVibeKey;  // chosen "FELT" vibe on the celebration poster
   heroAchievement?: Achievement;
   achievements?: Achievement[];
   isPR?: boolean;
@@ -129,6 +167,7 @@ export interface Exercise {
   intensity?: IntensityRating | null; // user-entered metcon block intensity
   aiPartName?: string;     // Generated poster wordmark for this workout part
   partNameOverride?: string; // User-edited poster wordmark override
+  mvpNote?: string;         // Individual standout note for team workouts (e.g. "NIMROD CRUSHED IT!")
 }
 
 export interface ExerciseSet {
@@ -302,7 +341,8 @@ export type Screen =
   | 'workout-detail'
   | 'profile'
   | 'onboarding'
-  | 'pr';
+  | 'pr'
+  | 'records';
 
 // Common component props
 export interface BaseProps {
@@ -380,6 +420,7 @@ export interface RewardData {
   workoutContext?: string;
   workoutRawText?: string;
   teamSize?: number;                      // Partner workout team size (2 for pairs, N for teams)
+  partnerNames?: string[];                // Names of training partners for team workouts
   workoutId?: string;                     // Persisted workout id for poster edits
   difficultyLevel?: number;               // AI-assessed programmed difficulty 1–10
 }

@@ -1,0 +1,301 @@
+/*
+ * HandwrittenFace poster — keyframe animations and layout scaffolding.
+ *
+ * Skin components (SkinSlab / SkinChalk / SkinFlare) use inline styles.
+ * Only layout containers and animations live here.
+ */
+
+@keyframes flipIn {
+  from {
+    opacity: 0;
+    transform: perspective(1100px) rotateY(10deg) translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hintFade {
+  0%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #090b0d;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 6px;
+  flex-shrink: 0;
+}
+
+.navBack {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  color: rgba(243, 241, 234, 0.8);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: rgba(243, 241, 234, 0.6);
+  text-transform: uppercase;
+  text-align: center;
+  flex: 1;
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navSpacer {
+  width: 36px;
+}
+
+.cardArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 26px 0;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardWrapper {
+  width: 100%;
+  animation: flipIn 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
+  transform-origin: center top;
+}
+
+.tapHint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  animation: hintFade 4s ease forwards;
+  pointer-events: none;
+}
+
+/* ── Carousel (multi-part workouts) ───────────────────────────────────── */
+
+.carouselDots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0 2px;
+  flex-shrink: 0;
+}
+
+.carouselDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(243, 241, 234, 0.2);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.18s, transform 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.carouselDotActive {
+  background: #f5c200;
+  transform: scale(1.3);
+}
+
+.carouselViewport {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: visible;
+  position: relative;
+  padding: 24px 0 0;
+  touch-action: pan-y;
+}
+
+.carouselSlider {
+  display: flex;
+  height: 100%;
+  will-change: transform;
+}
+
+.carouselSlide {
+  min-width: 100%;
+  padding: 0 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bottomSheet {
+  padding: 14px 16px 18px;
+  background: linear-gradient(180deg, transparent, rgba(8, 10, 13, 0.9) 28%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  flex-shrink: 0;
+}
+
+.switcherRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.switcherLabel {
+  font-family: 'Barlow', sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.4);
+  width: 32px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.switcherTrack {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.switcherBtn {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  transition: background 0.18s, color 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.vibeTrack {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.vibeBtn {
+  flex: 1;
+  height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.005em;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.14s, color 0.14s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shareRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.shareBtn {
+  flex: 1;
+  height: 50px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  background: #f5c200;
+  color: #0b0c0e;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shareBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.shareSpinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-top-color: #0b0c0e;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.toast {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  background: rgba(10, 12, 15, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(243, 241, 234, 0.9);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}

@@ -88,7 +88,10 @@ export function WizardExerciseScreen({
         <div className={styles.header}>
           <div className={styles.blockIdentity}>
             <span className={styles.blockChip}>{blockType}</span>
-            <span className={styles.blockName}>{blockName}</span>
+            {blockName.toLowerCase().trim() !== result.exercise.name.toLowerCase().trim()
+              && blockName.toLowerCase().trim() !== blockType.toLowerCase().trim() && (
+              <span className={styles.blockName}>{blockName}</span>
+            )}
           </div>
           {exerciseTotal > 1 && (
             <p className={styles.exerciseCounter}>

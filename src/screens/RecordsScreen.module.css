@@ -1,0 +1,325 @@
+.screen {
+  min-height: 100dvh;
+  background: #0b0c0e;
+  overflow-y: auto;
+  padding-bottom: 40px;
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 20px;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: #16181c;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.backIconSvg {
+  width: 18px;
+  height: 18px;
+  color: #f3f1ea;
+}
+
+.pageTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  color: #f3f1ea;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+/* ── Content ──────────────────────────────────────────────────── */
+.content {
+  padding: 0 20px;
+}
+
+/* ── PR card grid ─────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.prCard {
+  background: #16181c;
+  border: 1px solid rgba(243, 241, 234, 0.1);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prCard:active {
+  transform: scale(0.97);
+  border-color: rgba(245, 194, 0, 0.3);
+}
+
+.prMovement {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+.prBest {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 34px;
+  font-weight: 900;
+  color: #f5c200;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  margin-top: 4px;
+}
+
+.prDate {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.38);
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+}
+
+/* ── Loading skeletons ────────────────────────────────────────── */
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.skeleton {
+  height: 110px;
+  background: #16181c;
+  border-radius: 14px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 0.25; }
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 32px;
+  gap: 16px;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 36px;
+  color: rgba(245, 194, 0, 0.3);
+}
+
+.emptyText {
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(243, 241, 234, 0.4);
+  line-height: 1.5;
+  max-width: 260px;
+}
+
+/* ── Detail sheet ─────────────────────────────────────────────── */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 200;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+
+.sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #16181c;
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid rgba(243, 241, 234, 0.12);
+  z-index: 201;
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  max-height: 80dvh;
+  overflow-y: auto;
+}
+
+.sheetHandle {
+  width: 36px;
+  height: 4px;
+  background: rgba(243, 241, 234, 0.2);
+  border-radius: 999px;
+  margin: 0 auto 20px;
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.sheetEyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.4);
+  letter-spacing: 0.15em;
+  margin-bottom: 4px;
+}
+
+.sheetTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  color: #f3f1ea;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  background: rgba(243, 241, 234, 0.08);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.closeBtn svg {
+  width: 16px;
+  height: 16px;
+  color: #f3f1ea;
+}
+
+/* Sheet best result */
+.sheetBest {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  background: rgba(245, 194, 0, 0.08);
+  border: 1px solid rgba(245, 194, 0, 0.2);
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.sheetBestLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.45);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.sheetBestValue {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 48px;
+  font-weight: 900;
+  color: #f5c200;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+}
+
+.sheetBestDate {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.45);
+}
+
+/* History */
+.sheetHistoryLabel {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.4);
+  letter-spacing: 0.15em;
+  margin-bottom: 10px;
+}
+
+.sheetHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(243, 241, 234, 0.06);
+}
+
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.historyWeight {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  color: #f3f1ea;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  min-width: 64px;
+}
+
+.historyDate {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.4);
+  flex: 1;
+}
+
+.historyBestChip {
+  background: #f5c200;
+  color: #0b0c0e;
+  font-family: 'Barlow', sans-serif;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  padding: 2px 6px;
+  line-height: 1.4;
+}

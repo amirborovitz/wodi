@@ -4,7 +4,7 @@ import { useWeeklyStats } from '../../hooks/useWeeklyStats';
 import styles from './PowerCellDashboard.module.css';
 
 // Icons
-const VolumeIcon = () => (
+const RepsIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M6.5 6.5h11M6.5 17.5h11M4 12h16" strokeLinecap="round" />
     <circle cx="5" cy="6.5" r="2" />
@@ -48,6 +48,8 @@ export function PowerCellDashboard() {
     );
   }
 
+  const weeklyRepsGoal = Math.min(5000, goals.volumeGoal || 500);
+
   return (
     <div className={styles.dashboard}>
       {/* Header */}
@@ -68,12 +70,12 @@ export function PowerCellDashboard() {
       {/* Power Cells Grid */}
       <div className={styles.cells}>
         <PowerCell
-          label="Lift"
+          label="Reps"
           value={weeklyVolume}
-          goal={goals.volumeGoal}
-          unit="kg"
+          goal={weeklyRepsGoal}
+          unit="reps"
           color="var(--neon-orange)"
-          icon={<VolumeIcon />}
+          icon={<RepsIcon />}
         />
         <PowerCell
           label="Move"
@@ -101,7 +103,7 @@ export function PowerCellDashboard() {
         transition={{ delay: 0.5 }}
       >
         <span className={styles.goalText}>
-          Goals: {(goals.volumeGoal / 1000).toFixed(0)}k kg | In Motion {goals.metconGoal} min | {goals.streakGoal} sessions
+          Goals: {weeklyRepsGoal.toLocaleString()} reps | In Motion {goals.metconGoal} min | {goals.streakGoal} sessions
         </span>
       </motion.div>
     </div>

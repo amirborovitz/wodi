@@ -326,8 +326,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
   const withBuyIns = detectMisplacedBuyIns(withStationRotation);
 
+  // Correct amrap_intervals → intervals when "AMRAP" doesn't appear in the text,
+  // and strip false "Buy-In:" labels the AI adds to interval movements.
+  const withCorrectedIntervals = correctFalseAmrapIntervals(withBuyIns);
+
   // Normalize explicit movement semantics so downstream math can trust structure
-  return backfillMovementSemantics(withBuyIns);
+  return backfillMovementSemantics(withCorrectedIntervals);
 }
 
 function inferScoreEntryMode(
@@ -541,6 +545,52 @@ function backfillEmomMinuteStations(workout: ParsedWorkout): ParsedWorkout {
 }
 
 /**
+ * Correct the AI's over-eager amrap_intervals classification.
+ * "Every X min x N: [fixed work]" is intervals (fixed amounts per round), not amrap_intervals.
+ * amrap_intervals requires the word "AMRAP" to appear in the exercise name or prescription.
+ * Also strips "Buy-In:" prefixes and perRound=false from movements in corrected exercises.
+ */
+function correctFalseAmrapIntervals(workout: ParsedWorkout): ParsedWorkout {
+  // Use the raw OCR'd text as ground truth — the AI-generated exercise names are unreliable
+  // (the AI hallucinates "AMRAP" and "Buy-In:" even when the whiteboard says neither).
+  const rawText = (workout.rawText ?? '').toLowerCase();
+  const rawHasAmrap = /\bamrap\b/.test(rawText);
+  // Buy-in requires explicit language in the source text — not just AI inference.
+  const rawHasBuyIn = /\bbuy[\s-]?in\b|\binto\s+amrap\b|\bthen\s+amrap\b/i.test(rawText);
+
+  let changed = false;
+  const exercises = workout.exercises.map(ex => {
+    const isAmrapIntervals = ex.loggingMode === 'amrap_intervals';
+    const shouldBeIntervals = isAmrapIntervals && !rawHasAmrap;
+    const hasFalseBuyIns = !rawHasBuyIn && (ex.movements ?? []).some(m => /^buy[-\s]?in\s*:/i.test(m.name));
+
+    if (!shouldBeIntervals && !hasFalseBuyIns) return ex;
+
+    changed = true;
+    const movements = (ex.movements ?? []).map(m => {
+      if (!/^buy[-\s]?in\s*:/i.test(m.name)) return m;
+      return {
+        ...m,
+        name: m.name.replace(/^buy[-\s]?in\s*:\s*/i, ''),
+        perRound: undefined,
+        role: undefined,
+      } as typeof m;
+    });
+
+    if (shouldBeIntervals) {
+      return { ...ex, loggingMode: 'intervals' as const, movements };
+    }
+    return { ...ex, movements };
+  });
+
+  const format = workout.format === 'amrap_intervals' && !rawHasAmrap
+    ? 'intervals' as const
+    : workout.format;
+
+  return changed ? { ...workout, format, exercises } : workout;
+}
+
+/**
  * Detect buy-in movements that the AI placed in movements[] instead of buyIn[].
  * For amrap_intervals workouts with prescriptions like "200m run Into AMRAP: ...",
  * the first movement (before "into AMRAP") is a buy-in done once per interval,
@@ -556,16 +606,12 @@ function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
     if (ex.movements.some(m => m.perRound === false || m.role === 'buy_in' || /^buy-in:/i.test(m.name))) return ex;
 
     const rx = ((ex.name || '') + ' ' + (ex.prescription || '')).toLowerCase();
-    // Pattern: "into AMRAP", "buy-in", or "then AMRAP" in prescription
+    // Only flag a buy-in when the prescription text explicitly says so.
+    // Structural heuristics ("first cardio + rest have reps") are too broad and incorrectly
+    // label movements like "100 cal Echo Bike + 20 DB Snatch" where both are done every round.
     const hasBuyInPattern = /\binto\s+amrap\b|\bbuy[\s-]?in\b|\bthen\s+amrap\b/i.test(rx);
 
-    // For amrap_intervals, also detect by structure: first movement is cardio (distance/calories, no reps)
-    // followed by rep-based AMRAP movements — this is the classic buy-in pattern.
-    const firstMov = ex.movements[0];
-    const firstIsCardio = firstMov && (firstMov.distance || firstMov.calories) && !firstMov.reps;
-    const restHaveReps = ex.movements.slice(1).some(m => m.reps && m.reps > 0);
-
-    if (!hasBuyInPattern && !(firstIsCardio && restHaveReps)) return ex;
+    if (!hasBuyInPattern) return ex;
 
     // Find the buy-in: first movement with distance/calories but no reps
     const buyInIdx = ex.movements.findIndex(m =>

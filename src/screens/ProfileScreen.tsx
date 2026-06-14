@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
-import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
+import { usePRCount } from '../hooks/usePRCount';
 import styles from './ProfileScreen.module.css';
 
 type TimePeriod = 'week' | 'month' | 'all';
@@ -17,6 +17,7 @@ const PERIOD_LABELS: Record<TimePeriod, string> = {
 
 interface ProfileScreenProps {
   onNavigateToPR?: () => void;
+  onNavigateToRecords?: () => void;
   onNavigateToSettings?: () => void;
 }
 
@@ -57,10 +58,11 @@ function useTickerNumber(target: number, duration = 420): number {
   return display;
 }
 
-export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts();
   const weeklyStats = useWeeklyStats();
+  const { prCount } = usePRCount();
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -86,12 +88,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
   }, [workouts, periodCutoff]);
 
   const stats = useMemo(() => {
-    const bodyweight = user?.weight || DEFAULT_BW;
-    const totalLiftedKg = filteredWorkouts.reduce((sum, w) => sum + (w.totalVolume || 0), 0);
-    const effortPoints = filteredWorkouts.reduce((sum, w) => {
-      const ep = calculateWorkoutEP(w.totalVolume || 0, getTimeCapMinutes(w), bodyweight, Boolean(w.isPR), w.workloadBreakdown?.movements);
-      return sum + ep.total;
-    }, 0);
     const moveMinutes = filteredWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0);
     const workoutsCount = filteredWorkouts.length;
     const distanceMeters = filteredWorkouts.reduce(
@@ -99,20 +95,16 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
       0
     );
     return {
-      totalLiftedKg,
-      effortPoints,
       moveMinutes,
       workoutsCount,
       distanceMeters,
     };
-  }, [filteredWorkouts, user?.weight]);
+  }, [filteredWorkouts]);
 
   const totalWorkouts = user?.stats.totalWorkouts || workouts.length;
   const totalEP = weeklyStats.weeklyEP + totalWorkouts * 10;
-  const level = Math.floor(totalEP / 500) + 1;
+  const handle = user?.email ? `@${user.email.split('@')[0]}` : '';
 
-  const displayLiftedKg = useTickerNumber(stats.totalLiftedKg);
-  const displayEffortPoints = useTickerNumber(stats.effortPoints);
   const displayMoveMinutes = useTickerNumber(stats.moveMinutes);
   const displayWorkouts = useTickerNumber(stats.workoutsCount);
   const displayDistanceMeters = useTickerNumber(stats.distanceMeters);
@@ -123,7 +115,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
     width: `calc(${100 / PERIODS.length}% - 6px)`,
   };
 
-  const lifted = formatLifted(displayLiftedKg);
   const moveParts = formatMoveParts(displayMoveMinutes, timePeriod === 'all');
   const distance = formatDistance(displayDistanceMeters);
 
@@ -189,39 +180,55 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
 
         <div className={styles.nameArea}>
           <h1 className={styles.name}>{user?.displayName}</h1>
-          <span className={styles.subtitle}>{getLevelTitle(level)}</span>
+          {handle && <span className={styles.handle}>{handle}</span>}
         </div>
-
-        <button className={styles.settingsButton} onClick={onNavigateToSettings} aria-label="Settings">
-          <SettingsIcon />
-        </button>
       </motion.div>
 
       {photoError && <span className={styles.photoError}>{photoError}</span>}
 
-      {/* Hero: Total Lifted + EP Score */}
+      {/* Lifetime stats strip */}
       <motion.div
-        className={styles.heroCard}
+        className={styles.lifetimeStrip}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.28 }}
       >
-        <span className={styles.heroLabel}>TOTAL LIFTED</span>
-        <div className={styles.heroMetric}>
-          <span className={styles.heroNumber}>{lifted.value}</span>
-          <span className={styles.heroUnit}>{lifted.unit}</span>
-        </div>
-        <div className={styles.epRow}>
-          <span className={styles.epPlus}>+</span>
-          <span className={styles.epNumber}>{Math.round(displayEffortPoints)}</span>
-          <span className={styles.epLabel}>EP</span>
-        </div>
+        {[
+          ['Workouts', totalWorkouts],
+          ['Posters', workouts.length],
+          ['PRs', prCount],
+          ['Total EP', totalEP],
+        ].map(([label, value]) => (
+          <div key={label} className={styles.lifetimeStat}>
+            <span className={styles.lifetimeValue}>{Math.round(Number(value)).toLocaleString()}</span>
+            <span className={styles.lifetimeLabel}>{label}</span>
+          </div>
+        ))}
       </motion.div>
 
-      {/* PR Navigation Link */}
-      <button className={styles.prLink} onClick={onNavigateToPR}>
-        Records &amp; PRs &rarr;
-      </button>
+      {/* Navigation rows */}
+      <div className={styles.navRows}>
+        <button
+          className={`${styles.navRow} ${styles.navRowAccent}`}
+          onClick={onNavigateToRecords ?? onNavigateToPR}
+          aria-label="View records and PRs"
+        >
+          <span className={`${styles.navRowIcon} ${styles.navRowIconAccent}`}>★</span>
+          <div className={styles.navRowText}>
+            <span className={styles.navRowLabel}>Records & PRs</span>
+            <span className={styles.navRowSub}>{prCount} personal records</span>
+          </div>
+          <span className={styles.navRowChevron}>›</span>
+        </button>
+
+        <button className={styles.navRow} onClick={onNavigateToSettings} aria-label="Settings">
+          <span className={styles.navRowIcon}><SettingsIcon /></span>
+          <div className={styles.navRowText}>
+            <span className={styles.navRowLabel}>Settings</span>
+          </div>
+          <span className={styles.navRowChevron}>›</span>
+        </button>
+      </div>
 
       {/* Period Toggle */}
       <div className={styles.periodToggle}>
@@ -271,11 +278,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToSettings }: ProfileS
   );
 }
 
-function formatLifted(kg: number): { value: string; unit: string } {
-  if (kg >= 1000) return { value: (kg / 1000).toFixed(1), unit: 'tons' };
-  return { value: Math.round(kg).toString(), unit: 'kg' };
-}
-
 type TextPart = { text: string; type: 'number' | 'unit' };
 
 function formatMoveParts(minutes: number, isAllTime: boolean): TextPart[] {
@@ -321,22 +323,12 @@ function formatDistance(meters: number): { value: string; unit: string } {
   return { value: Math.round(meters).toString(), unit: 'm' };
 }
 
-function getLevelTitle(level: number): string {
-  if (level >= 50) return 'Legend';
-  if (level >= 40) return 'Elite';
-  if (level >= 30) return 'Champion';
-  if (level >= 20) return 'Warrior';
-  if (level >= 15) return 'Veteran';
-  if (level >= 10) return 'Grinder';
-  if (level >= 5) return 'Athlete';
-  return 'Rookie';
-}
-
 function SettingsIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
+

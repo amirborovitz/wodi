@@ -11,6 +11,7 @@ import { AddWorkoutScreen } from './screens/AddWorkoutScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PRScreen } from './screens/PRScreen';
+import { RecordsScreen } from './screens/RecordsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen, GoalsSettingsScreen } from './components/settings';
 import { BottomNav } from './components/ui';
@@ -32,6 +33,7 @@ function AppContent() {
   const [editingWorkout, setEditingWorkout] = useState<WorkoutWithStats | null>(null);
   const [workoutList, setWorkoutList] = useState<WorkoutWithStats[]>([]);
   const [navDir, setNavDir] = useState<'up' | 'down' | null>(null);
+  const [workoutDetailOrigin, setWorkoutDetailOrigin] = useState<'home' | 'history'>('history');
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
     setShowRecentWorkoutsOnOpen(false);
@@ -116,7 +118,7 @@ function AppContent() {
             posterMode
             enterFrom={enterFrom}
             workout={selectedWorkout}
-            onBack={() => { setNavDir(null); setCurrentScreen('history'); }}
+            onBack={() => { setNavDir(null); setCurrentScreen(workoutDetailOrigin); }}
             onEditWorkout={() => handleEditWorkout(selectedWorkout)}
             onRenameWorkoutDetail={async (newTitle: string) => {
               if (!selectedWorkout?.id) return;
@@ -142,6 +144,7 @@ function AppContent() {
             onSelectWorkout={(workout, sortedList) => {
               setSelectedWorkout(workout);
               setWorkoutList(sortedList);
+              setWorkoutDetailOrigin('history');
               setCurrentScreen('workout-detail');
             }}
           />
@@ -154,6 +157,7 @@ function AppContent() {
               setNavDir(null);
               setSelectedWorkout(workout);
               setWorkoutList(sortedList);
+              setWorkoutDetailOrigin('history');
               setCurrentScreen('workout-detail');
             }}
           />
@@ -162,6 +166,7 @@ function AppContent() {
         return (
           <ProfileScreen
             onNavigateToPR={() => setCurrentScreen('pr')}
+            onNavigateToRecords={() => setCurrentScreen('records')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
           />
         );
@@ -197,9 +202,14 @@ function AppContent() {
             onBack={() => setCurrentScreen('profile')}
             onSelectWorkout={(workoutId) => {
               void workoutId;
-              // Navigate to workout detail - we'll need to fetch the workout
               setCurrentScreen('history');
             }}
+          />
+        );
+      case 'records':
+        return (
+          <RecordsScreen
+            onBack={() => setCurrentScreen('profile')}
           />
         );
       case 'home':
@@ -223,6 +233,7 @@ function AppContent() {
               setNavDir(null);
               setSelectedWorkout(workout);
               setWorkoutList(sortedList);
+              setWorkoutDetailOrigin('home');
               setCurrentScreen('workout-detail');
             }}
             ringsKey={homeRingsKey}

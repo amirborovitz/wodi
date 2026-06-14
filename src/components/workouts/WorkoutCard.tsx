@@ -64,12 +64,6 @@ function formatDuration(minutes: number): string {
   return mins > 0 ? `${hrs}h ${mins}min` : `${hrs}h`;
 }
 
-function formatVolume(kg: number): string {
-  if (kg === 0) return '';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-  return `${Math.round(kg).toLocaleString()} kg`;
-}
-
 export function WorkoutCard({ workout, index, onClick }: WorkoutCardProps) {
   const style = typeStyles[workout.type] || typeStyles.mixed;
   const duration = workout.duration || 0;
@@ -106,10 +100,10 @@ export function WorkoutCard({ workout, index, onClick }: WorkoutCardProps) {
           <span className={styles.statValue}>{exerciseCount}</span>
           <span className={styles.statLabel}>exercises</span>
         </div>
-        {workout.totalVolume > 0 && (
+        {workout.totalReps > 0 && (
           <div className={styles.stat}>
-            <span className={styles.statValue}>{formatVolume(workout.totalVolume)}</span>
-            <span className={styles.statLabel}>volume</span>
+            <span className={styles.statValue}>{workout.totalReps.toLocaleString()}</span>
+            <span className={styles.statLabel}>reps</span>
           </div>
         )}
       </div>

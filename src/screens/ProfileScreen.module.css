@@ -96,33 +96,13 @@
   text-overflow: ellipsis;
 }
 
-.subtitle {
+.handle {
   display: block;
-  color: rgba(255, 214, 0, 0.65);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+  color: rgba(242, 240, 235, 0.38);
+  font-size: 12px;
   letter-spacing: 0.02em;
-}
-
-/* ── Settings Button ───────────────────── */
-
-.settingsButton {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
-  color: rgba(255, 255, 255, 0.6);
-  transition: background var(--duration-fast) ease;
-}
-
-.settingsButton:active {
-  background: rgba(255, 255, 255, 0.1);
 }
 
 .photoError {
@@ -132,123 +112,124 @@
   font-size: var(--text-xs);
 }
 
-/* ── Hero Card ─────────────────────────── */
+/* ── Lifetime stats strip ──────────────── */
 
-.heroCard {
-  margin: var(--space-4) var(--space-4) 0;
-  padding: 24px 20px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(16px);
-  text-align: center;
+.lifetimeStrip {
+  display: flex;
+  margin: 20px 20px 0;
+  border-radius: 18px;
+  background: #141618;
+  border: 1px solid rgba(242, 240, 235, 0.12);
   overflow: hidden;
 }
 
-.heroLabel {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 10px;
-  font-weight: var(--font-semibold);
+.lifetimeStat {
+  flex: 1;
+  padding: 15px 6px;
+  text-align: center;
+}
+
+.lifetimeStat:not(:first-child) {
+  border-left: 1px solid rgba(242, 240, 235, 0.12);
+}
+
+.lifetimeValue {
+  display: block;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #f2f0eb;
+  line-height: 1;
+}
+
+.lifetimeLabel {
+  display: block;
+  margin-top: 4px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 9.5px;
+  font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.38);
 }
 
-.heroMetric {
+/* ── Navigation rows ────────────────────── */
+
+.navRows {
   display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 16px 0;
 }
 
-.heroNumber {
-  font-size: 3.5rem;
-  font-weight: var(--font-black);
-  line-height: 1;
-  background: linear-gradient(135deg, #FF8A00 0%, #FF1493 50%, #FF8A00 100%);
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: gradientShift 3s ease infinite;
-}
-
-.heroUnit {
-  font-size: 1.5rem;
-  font-weight: var(--font-bold);
-  line-height: 1;
-  background: linear-gradient(135deg, #FF8A00 0%, #FF1493 50%, #FF8A00 100%);
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: gradientShift 3s ease infinite;
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-/* ── EP Score Badge (Neon Yellow) ─────── */
-
-.epRow {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  margin-top: 12px;
-  padding: 6px 16px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 214, 0, 0.08);
-  border: 1px solid rgba(255, 214, 0, 0.18);
-}
-
-.epPlus {
-  color: var(--neon-yellow);
-  font-size: 1rem;
-  font-weight: var(--font-bold);
-  line-height: 1;
-  opacity: 0.75;
-}
-
-.epNumber {
-  color: var(--neon-yellow);
-  font-size: 1.25rem;
-  font-weight: var(--font-black);
-  line-height: 1;
-}
-
-.epLabel {
-  color: var(--neon-yellow);
-  font-size: 0.7rem;
-  font-weight: var(--font-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1;
-  opacity: 0.75;
-}
-
-/* ── PR Link ─────────────────────────── */
-
-.prLink {
-  display: block;
+.navRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   width: 100%;
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  text-align: center;
-  letter-spacing: 0.02em;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: #141618;
+  border: 1px solid rgba(242, 240, 235, 0.12);
   cursor: pointer;
-  transition: color var(--duration-fast) ease;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.prLink:active {
-  color: rgba(255, 255, 255, 0.7);
+.navRow:active {
+  background: #1a1c1f;
+}
+
+.navRowAccent {
+  border-color: rgba(245, 194, 0, 0.27);
+}
+
+.navRowIcon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f0eb;
+}
+
+.navRowIconAccent {
+  background: #f5c200;
+  color: #0c0d0f;
+  font-size: 16px;
+}
+
+.navRowText {
+  flex: 1;
+  min-width: 0;
+}
+
+.navRowLabel {
+  display: block;
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #f2f0eb;
+}
+
+.navRowSub {
+  display: block;
+  margin-top: 1px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: rgba(242, 240, 235, 0.38);
+}
+
+.navRowChevron {
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 400;
+  color: rgba(242, 240, 235, 0.35);
+  line-height: 1;
 }
 
 /* ── Period Toggle ──────────────────────── */

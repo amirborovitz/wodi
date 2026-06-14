@@ -65,7 +65,7 @@ export interface HeadlineData {
 export interface TeamImpactData {
   teamSize: number;
   personalPercent: number;    // 0-100
-  personalVolume: number;     // kg
+  personalVolume: number;     // legacy alias for personalReps
   teamTotal: number;          // estimated total
   personalReps: number;
   teamTotalReps: number;

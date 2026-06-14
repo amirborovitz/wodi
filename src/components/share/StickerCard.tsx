@@ -1,6 +1,6 @@
-import { forwardRef } from 'react';
+import { forwardRef, Fragment } from 'react';
 import styles from './StickerCard.module.css';
-import type { RewardData, Exercise, ExerciseSet, ParsedMovement } from '../../types';
+import type { RewardData, Exercise, ExerciseSet } from '../../types';
 import {
   TRINITY,
   TRINITY_GLOW,
@@ -8,7 +8,6 @@ import {
   type FunStat,
   detectExerciseDisplayType,
   formatTime,
-  formatVolume,
   getCompletedSets,
   buildFunStats,
 } from './shareCardUtils';
@@ -23,13 +22,6 @@ interface StickerCardProps {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function computeExerciseVolume(exercise: Exercise): number {
-  return (exercise.sets || []).reduce((acc, s) => {
-    if (s.weight && s.actualReps) return acc + s.weight * s.actualReps;
-    return acc;
-  }, 0);
-}
 
 function getPeakWeight(exercise: Exercise): number {
   const weights = (exercise.sets || [])
@@ -66,23 +58,6 @@ function formatStrengthCompact(sets: ExerciseSet[]): string[] {
   return lines;
 }
 
-function formatMovement(m: ParsedMovement): string {
-  const parts: string[] = [];
-  if (m.reps)     parts.push(`${m.reps}`);
-  if (m.distance) parts.push(m.distance >= 1000 ? `${m.distance / 1000}km` : `${m.distance}m`);
-  if (m.calories) parts.push(`${m.calories} cal`);
-  parts.push(m.name);
-  if (m.rxWeights) {
-    const w = m.rxWeights;
-    if (w.female && w.male && w.female !== w.male) {
-      parts.push(`@ ${w.female}/${w.male}${w.unit || 'kg'}`);
-    } else {
-      const wt = w.male || w.female;
-      if (wt) parts.push(`@ ${wt}${w.unit || 'kg'}`);
-    }
-  }
-  return parts.join(' ');
-}
 
 function sectionColorForType(type: ReturnType<typeof detectExerciseDisplayType>): keyof typeof TRINITY {
   if (type === 'strength') return 'yellow';
@@ -211,13 +186,11 @@ const StrengthCard = forwardRef<HTMLDivElement, CardInnerProps>(
     const glow  = TRINITY_GLOW.yellow;
 
     // Compute aggregate stats
-    const totalVol = exercises.reduce((acc, ex) => acc + computeExerciseVolume(ex), 0);
     const peakWeight = Math.max(...exercises.map(ex => getPeakWeight(ex)), 0);
     const totalSets = exercises.reduce((acc, ex) => acc + getCompletedSets(ex).length, 0);
 
     const stats: FunStat[] = [];
     if (peakWeight > 0) stats.push({ value: `${peakWeight}kg`, label: 'PEAK', color, glow });
-    if (totalVol > 0)   stats.push({ value: formatVolume(totalVol), label: 'VOL', color, glow });
     if (totalSets > 0)  stats.push({ value: `${totalSets}`, label: 'SETS', color, glow });
 
     return (
@@ -278,7 +251,7 @@ const StrengthCard = forwardRef<HTMLDivElement, CardInnerProps>(
 );
 
 // ---------------------------------------------------------------------------
-// METCON CARD — score as hero, movement list
+// METCON CARD — Instagram Story optimized: massive score hero + movement grid
 // ---------------------------------------------------------------------------
 
 const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
@@ -286,7 +259,6 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
     const color = TRINITY.magenta;
     const glow  = TRINITY_GLOW.magenta;
 
-    // Find the primary metcon exercise (first for_time or amrap)
     const primaryEx = exercises.find(ex => {
       const t = detectExerciseDisplayType(ex);
       return t === 'for_time' || t === 'amrap';
@@ -295,78 +267,71 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
     const exType = primaryEx ? detectExerciseDisplayType(primaryEx) : 'for_time';
     const sets = primaryEx ? getCompletedSets(primaryEx) : [];
 
-    // Score computation
-    let scoreText = '';
-    let scoreLabel = '';
+    // Detect interval splits
+    const splitTimes = sets.map(s => s.time).filter((t): t is number => t != null && t > 0);
+    const isInterval = splitTimes.length > 1;
+    const splitAvg  = isInterval ? Math.round(splitTimes.reduce((a, b) => a + b, 0) / splitTimes.length) : 0;
+    const splitBest = isInterval ? Math.min(...splitTimes) : 0;
 
-    if (exType === 'for_time') {
+    // Score hero
+    let scoreText  = '';
+    let scoreLabel = '';
+    if (isInterval) {
+      scoreText  = formatTime(splitAvg);
+      scoreLabel = `AVG SPLIT  ·  BEST ${formatTime(splitBest)}`;
+    } else if (exType === 'for_time') {
       const timeSet = sets.find(s => s.time != null && s.time > 0);
-      scoreText = timeSet ? formatTime(timeSet.time || 0) : '';
-      scoreLabel = 'COMPLETED';
+      scoreText  = timeSet ? formatTime(timeSet.time || 0) : '';
+      scoreLabel = 'FINAL TIME';
     } else if (exType === 'amrap') {
-      // Prefer exercise.rounds (set by story logging) over counting completed sets
       const rounds  = primaryEx?.rounds || sets.filter(s => s.completed).length;
       const lastSet = sets[sets.length - 1];
       const extra   = lastSet?.actualReps || 0;
-      scoreText = rounds > 0 ? `${rounds} rds${extra > 0 ? ` + ${extra}` : ''}` : '';
-      scoreLabel = 'SCORE';
+      scoreText  = rounds > 0 ? `${rounds}` : '';
+      scoreLabel = extra > 0 ? `ROUNDS + ${extra} REPS` : 'ROUNDS';
     } else if (exType === 'cardio') {
       const totalCal  = sets.reduce((acc, s) => acc + (s.calories || 0), 0);
       const totalDist = sets.reduce((acc, s) => acc + (s.distance || 0), 0);
       if (totalCal > 0) { scoreText = `${totalCal}`; scoreLabel = 'CAL'; }
       else if (totalDist > 0) {
-        scoreText = totalDist >= 1000 ? `${(totalDist / 1000).toFixed(1)}` : `${totalDist}`;
+        scoreText  = totalDist >= 1000 ? `${(totalDist / 1000).toFixed(1)}` : `${totalDist}`;
         scoreLabel = totalDist >= 1000 ? 'KM' : 'M';
       }
     }
 
-    // Detect interval splits
-    const splitTimes = sets.map(s => s.time).filter((t): t is number => t != null && t > 0);
-    const isInterval = splitTimes.length > 1;
-    const splitAvg = isInterval ? Math.round(splitTimes.reduce((a, b) => a + b, 0) / splitTimes.length) : 0;
-    const splitBest = isInterval ? Math.min(...splitTimes) : 0;
-
-    // Movements from primary exercise
+    const formatTag = isInterval ? 'INTERVAL' : exType === 'amrap' ? 'AMRAP' : exType === 'cardio' ? 'CARDIO' : 'FOR TIME';
     const movements = primaryEx?.movements || [];
-
-    // Rx tag
-    const rxWeights = primaryEx?.rxWeights;
-    const rxLabel = rxWeights
-      ? rxWeights.female && rxWeights.male && rxWeights.female !== rxWeights.male
-        ? `Rx ${rxWeights.female}/${rxWeights.male}kg`
-        : `Rx ${rxWeights.male || rxWeights.female}kg`
-      : null;
-
-    // Prescription fallback
-    const prescriptionLines = !movements.length && primaryEx?.prescription
-      ? primaryEx.prescription.split(/\n|(?:\s*;\s*)/).map(l => l.trim()).filter(Boolean)
-      : [];
-
-    // Metcon-specific stats
-    // Partner workouts: divide by teamSize for personal share
-    const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
-    const metconStats: FunStat[] = [];
-    const totalReps = Math.round(exercises.reduce((acc, ex) => {
-      return acc + (ex.sets || []).reduce((a, s) => a + (s.actualReps || 0), 0);
-    }, 0) / teamSize);
-    const totalDist = Math.round(exercises.reduce((acc, ex) => {
-      return acc + (ex.sets || []).reduce((a, s) => a + (s.distance || 0), 0);
-    }, 0) / teamSize);
-    const totalCals = Math.round(exercises.reduce((acc, ex) => {
-      return acc + (ex.sets || []).reduce((a, s) => a + (s.calories || 0), 0);
-    }, 0) / teamSize);
-
-    if (totalReps > 0) metconStats.push({ value: `${totalReps}`, label: 'REPS', color, glow });
-    if (totalDist > 0) {
-      metconStats.push({
-        value: totalDist >= 1000 ? `${(totalDist / 1000).toFixed(1)}km` : `${Math.round(totalDist)}m`,
-        label: 'DIST', color: TRINITY.cyan, glow: TRINITY_GLOW.cyan,
-      });
-    }
-    if (totalCals > 0) metconStats.push({ value: `${totalCals}`, label: 'CAL', color, glow });
-
-    // Card title: exercise name or primary exercise name
     const cardTitle = primaryEx?.name || 'Metcon';
+
+    // EP estimate: base + time bonus + PR bonus
+    const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
+    const epEstimate = Math.round(
+      10 +
+      (data.workoutSummary.duration || 0) * 3 +
+      (data.heroAchievement?.type === 'pr' ? 25 : 0)
+    );
+
+    // Output: distance → cals → reps
+    const totalDist = Math.round((data.workloadBreakdown?.grandTotalDistance || 0) / teamSize);
+    const totalCals = Math.round(exercises.reduce((acc, ex) =>
+      acc + (ex.sets || []).reduce((a, s) => a + (s.calories || 0), 0), 0) / teamSize);
+    const totalReps = Math.round(exercises.reduce((acc, ex) =>
+      acc + (ex.sets || []).reduce((a, s) => a + (s.actualReps || 0), 0), 0) / teamSize);
+
+    let outputText  = '';
+    let outputLabel = '';
+    if (totalDist > 0) {
+      outputText  = totalDist >= 1000 ? `${(totalDist / 1000).toFixed(1)} KM` : `${totalDist} M`;
+      outputLabel = 'DISTANCE';
+    } else if (totalCals > 0) {
+      outputText  = `${totalCals} CAL`;
+      outputLabel = 'OUTPUT';
+    } else if (totalReps > 0) {
+      outputText  = `${totalReps}`;
+      outputLabel = 'REPS';
+    }
+
+    const solidLabel = data.heroAchievement?.type === 'pr' ? 'NEW PR!' : 'SOLID!';
 
     return (
       <div ref={ref} className={styles.root}>
@@ -377,117 +342,77 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
             aria-hidden="true"
           />
           <div className={styles.glowBottom} aria-hidden="true" />
-
           <div
             className={styles.accentStripe}
             style={{ background: `linear-gradient(90deg, ${color} 0%, transparent 100%)` }}
             aria-hidden="true"
           />
 
+          {/* Header: eyebrow label + workout name */}
           <header className={styles.header}>
             <div className={styles.headerTop}>
-              <span
-                className={styles.exerciseTypeTag}
-                style={{ color, borderColor: `${color}44`, background: `${color}10` }}
-              >
-                {isInterval ? 'INTERVAL' : exType === 'amrap' ? 'AMRAP' : exType === 'cardio' ? 'CARDIO' : 'FOR TIME'}
-              </span>
-              <span className={styles.headerMeta}>
-                {userName ? `${userName}  ·  ` : ''}wodi
-              </span>
+              <span className={styles.typeEyebrow} style={{ color }}>{formatTag}</span>
+              <span className={styles.headerMeta}>{userName ? `${userName}  ·  ` : ''}wodi</span>
             </div>
-            <h2 className={styles.singleExerciseTitle}>{cardTitle}</h2>
+            <h2 className={styles.cardTitle}>{cardTitle}</h2>
           </header>
 
-          <div className={styles.detailBody}>
-            <div className={styles.metconDetail}>
-              {/* Interval splits or big score hero */}
-              {isInterval ? (
-                <div className={styles.intervalSplitBlock}>
-                  <div className={styles.intervalSplitGrid}>
-                    {splitTimes.map((t, i) => (
-                      <div key={i} className={styles.intervalSplitCell}>
-                        <span className={styles.intervalSplitNum}>S{i + 1}</span>
-                        <span className={styles.intervalSplitTime} style={{ color: t === splitBest ? TRINITY.cyan : undefined }}>
-                          {formatTime(t)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className={styles.intervalSplitStats}>
-                    <span>Avg {formatTime(splitAvg)}</span>
-                    <span style={{ color: TRINITY.cyan }}>Best {formatTime(splitBest)}</span>
-                  </div>
-                </div>
-              ) : scoreText ? (
-                <div className={styles.metconScoreBlock}>
-                  <span className={styles.metconScoreValue} style={{ color, textShadow: `0 0 20px ${color}66` }}>
-                    {scoreText}
-                  </span>
-                  <span className={styles.metconScoreLabel}>{scoreLabel}</span>
-                </div>
-              ) : null}
-
-              {/* Rx tag */}
-              {rxLabel && (
-                <span
-                  className={styles.rxTag}
-                  style={{ color, borderColor: `${color}44`, background: `${color}10` }}
-                >
-                  {rxLabel}
-                </span>
-              )}
-
-              {/* Movement list */}
-              {movements.length > 0 ? (
-                <div className={styles.movementList}>
-                  {primaryEx?.rounds && primaryEx.rounds > 1 && (
-                    <span className={styles.movementRoundsLine}>
-                      {primaryEx.rounds} rounds:
-                    </span>
-                  )}
-                  {movements.map((m, i) => (
-                    <div key={i} className={styles.movementLine}>
-                      <span className={styles.movementDot} style={{ color }}>·</span>
-                      <span className={styles.movementText}>{formatMovement(m)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : prescriptionLines.length > 0 ? (
-                <div className={styles.movementList}>
-                  {prescriptionLines.map((line, i) => (
-                    <span key={i} className={styles.movementText}>{line}</span>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* Additional exercises beyond primary */}
-              {exercises.length > 1 && (
-                <div className={styles.additionalExercises}>
-                  {exercises.filter(ex => ex !== primaryEx).map((ex, i) => {
-                    const t = detectExerciseDisplayType(ex);
-                    const c = TRINITY[sectionColorForType(t)];
-                    return (
-                      <div key={ex.id || i} className={styles.additionalExRow}>
-                        <span className={styles.additionalExName}>{ex.name}</span>
-                        <span className={styles.additionalExDetail} style={{ color: c }}>
-                          {getExerciseQuickSummary(ex, t)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {metconStats.length > 0 && (
-            <div className={styles.statsRow}>
-              {metconStats.map((stat, i) => (
-                <StatChip key={i} {...stat} />
-              ))}
+          {/* Score hero — massive focal point */}
+          {scoreText && (
+            <div className={styles.scoreBlock}>
+              <span
+                className={styles.scoreHero}
+                style={{ color, textShadow: `0 0 32px ${color}44` }}
+              >
+                {scoreText}
+              </span>
+              <span className={styles.scoreLabel}>{scoreLabel}</span>
             </div>
           )}
+
+          {/* Movement list — 2-column grid with format sticker */}
+          {movements.length > 0 && (
+            <div className={styles.movementBlock}>
+              <div className={styles.movementBlockHeader}>
+                <span className={styles.movementsEyebrow}>
+                  {primaryEx?.rounds && primaryEx.rounds > 1 ? `${primaryEx.rounds} rounds` : 'movements'}
+                </span>
+                <div className={styles.formatSticker} style={{ background: color }}>
+                  <span className={styles.formatStickerText}>{formatTag}</span>
+                </div>
+              </div>
+              <div className={styles.movementGrid}>
+                {movements.map((m, i) => {
+                  const qty =
+                    m.reps != null     ? `${m.reps}`
+                    : m.distance != null ? m.distance >= 1000 ? `${m.distance / 1000}k` : `${m.distance}m`
+                    : m.calories != null ? `${m.calories}`
+                    : '—';
+                  return (
+                    <Fragment key={i}>
+                      <span className={styles.movementQty} style={{ color }}>{qty}</span>
+                      <span className={styles.movementName}>{m.name}</span>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Data bar — EFFORT + OUTPUT + SOLID */}
+          <div className={styles.dataBar}>
+            <div className={styles.dataBarItem}>
+              <span className={styles.dataBarValue}>{epEstimate} pts</span>
+              <span className={styles.dataBarLabel}>EFFORT</span>
+            </div>
+            {outputText && (
+              <div className={styles.dataBarItem}>
+                <span className={styles.dataBarValue}>{outputText}</span>
+                <span className={styles.dataBarLabel}>{outputLabel}</span>
+              </div>
+            )}
+            <span className={styles.solidText}>{solidLabel}</span>
+          </div>
 
           <CardFooter />
         </div>
@@ -495,31 +420,6 @@ const MetconCard = forwardRef<HTMLDivElement, CardInnerProps>(
     );
   }
 );
-
-// ---------------------------------------------------------------------------
-// Quick one-line summary for additional exercises
-// ---------------------------------------------------------------------------
-
-function getExerciseQuickSummary(ex: Exercise, type: ReturnType<typeof detectExerciseDisplayType>): string {
-  const sets = getCompletedSets(ex);
-  if (type === 'for_time') {
-    const timeSet = sets.find(s => s.time != null && s.time > 0);
-    return timeSet ? formatTime(timeSet.time || 0) : ex.prescription || '';
-  }
-  if (type === 'amrap') {
-    const rounds = ex.rounds || sets.filter(s => s.completed).length;
-    const lastSet = sets[sets.length - 1];
-    const extra = lastSet?.actualReps || 0;
-    return rounds > 0 ? `${rounds} rds${extra > 0 ? ` + ${extra}` : ''}` : '';
-  }
-  if (type === 'cardio') {
-    const totalCal = sets.reduce((acc, s) => acc + (s.calories || 0), 0);
-    const totalDist = sets.reduce((acc, s) => acc + (s.distance || 0), 0);
-    return totalCal > 0 ? `${totalCal} cal` : totalDist > 0 ? `${totalDist}m` : '';
-  }
-  const totalReps = sets.reduce((acc, s) => acc + (s.actualReps || 0), 0);
-  return totalReps > 0 ? `${totalReps} reps` : '';
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components

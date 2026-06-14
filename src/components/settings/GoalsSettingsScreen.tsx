@@ -15,7 +15,7 @@ export function GoalsSettingsScreen({
   goals,
   onSave,
 }: GoalsSettingsScreenProps) {
-  const [volumeGoal, setVolumeGoal] = useState(goals.volumeGoal || DEFAULT_USER_GOALS.volumeGoal);
+  const [volumeGoal, setVolumeGoal] = useState(Math.min(5000, goals.volumeGoal || DEFAULT_USER_GOALS.volumeGoal));
   const [metconGoal, setMetconGoal] = useState(goals.metconGoal || DEFAULT_USER_GOALS.metconGoal);
   const [streakGoal, setStreakGoal] = useState(goals.streakGoal || DEFAULT_USER_GOALS.streakGoal);
   const [saving, setSaving] = useState(false);
@@ -35,7 +35,7 @@ export function GoalsSettingsScreen({
   };
 
   const handleVolumeChange = (delta: number) => {
-    const newValue = Math.max(1000, Math.min(100000, volumeGoal + delta));
+    const newValue = Math.max(50, Math.min(5000, volumeGoal + delta));
     setVolumeGoal(newValue);
     saveGoals({ volumeGoal: newValue, metconGoal, streakGoal }, 'volume');
   };
@@ -71,7 +71,7 @@ export function GoalsSettingsScreen({
       </header>
 
       <div className={styles.content}>
-        {/* Volume Goal */}
+        {/* Reps Goal */}
         <motion.div
           className={`${styles.goalCard} ${savedGoal === 'volume' ? styles.goalSaved : ''}`}
           initial={{ opacity: 0, y: 20 }}
@@ -81,32 +81,32 @@ export function GoalsSettingsScreen({
           <div className={styles.goalHeader}>
             <span className={styles.goalDot} style={{ background: 'var(--color-volume)' }} />
             <div className={styles.goalInfo}>
-              <span className={styles.goalLabel}>Lift</span>
-              <span className={styles.goalHint}>Weight moved this week</span>
+              <span className={styles.goalLabel}>Reps</span>
+              <span className={styles.goalHint}>Completed reps this week</span>
             </div>
           </div>
           <div className={styles.goalControl}>
             <button
               className={styles.stepButton}
-              onClick={() => handleVolumeChange(-1000)}
-              disabled={volumeGoal <= 1000}
+              onClick={() => handleVolumeChange(-50)}
+              disabled={volumeGoal <= 50}
             >
               <MinusIcon />
             </button>
             <div className={styles.goalValue}>
-              <span className={styles.valueNumber}>{(volumeGoal / 1000).toFixed(0)}k</span>
-              <span className={styles.valueUnit}>kg/week</span>
+              <span className={styles.valueNumber}>{volumeGoal.toLocaleString()}</span>
+              <span className={styles.valueUnit}>reps/week</span>
             </div>
             <button
               className={styles.stepButton}
-              onClick={() => handleVolumeChange(1000)}
-              disabled={volumeGoal >= 100000}
+              onClick={() => handleVolumeChange(50)}
+              disabled={volumeGoal >= 5000}
             >
               <PlusIcon />
             </button>
           </div>
           <div className={styles.presets}>
-            {[10000, 15000, 20000, 30000].map((preset) => (
+            {[250, 500, 750, 1000].map((preset) => (
               <button
                 key={preset}
                 className={`${styles.presetButton} ${volumeGoal === preset ? styles.presetActive : ''}`}
@@ -115,7 +115,7 @@ export function GoalsSettingsScreen({
                   saveGoals({ volumeGoal: preset, metconGoal, streakGoal }, 'volume');
                 }}
               >
-                {preset / 1000}k
+                {preset}
               </button>
             ))}
           </div>

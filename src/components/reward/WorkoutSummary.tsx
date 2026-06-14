@@ -7,7 +7,7 @@ interface WorkoutSummaryProps {
   type: WorkoutType;
   duration: number;
   exerciseCount: number;
-  totalVolume: number;
+  totalVolume?: number;
   totalReps?: number;
   delay?: number;
 }
@@ -26,7 +26,6 @@ export function WorkoutSummary({
   type,
   duration,
   exerciseCount,
-  totalVolume,
   totalReps,
   delay = 2.2,
 }: WorkoutSummaryProps) {
@@ -36,11 +35,6 @@ export function WorkoutSummary({
     const hours = Math.floor(mins / 60);
     const remainingMins = Math.round(mins % 60);
     return remainingMins > 0 ? `${hours}h ${remainingMins}min` : `${hours}h`;
-  };
-
-  const formatVolume = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-    return `${parseFloat(kg.toFixed(1))}kg`;
   };
 
   return (
@@ -70,15 +64,6 @@ export function WorkoutSummary({
             <div className={styles.stat}>
               <span className={styles.statValue}>{totalReps}</span>
               <span className={styles.statLabel}>Reps</span>
-            </div>
-          </>
-        )}
-        {totalVolume > 0 && (
-          <>
-            <div className={styles.divider} />
-            <div className={styles.stat}>
-              <span className={styles.statValue}>{formatVolume(totalVolume)}</span>
-              <span className={styles.statLabel}>Volume</span>
             </div>
           </>
         )}

@@ -76,25 +76,3 @@ export function useCountUp(
 
   return value;
 }
-
-/**
- * Hook for animating volume (kg) with formatted output
- * Returns the animated value in kg, caller handles formatting
- */
-export function useCountUpVolume(
-  targetKg: number,
-  options: Omit<UseCountUpOptions, 'decimals'> = {}
-): number {
-  return useCountUp(targetKg, { ...options, decimals: 0 });
-}
-
-/**
- * Format volume with count-up animation
- * Displays as tons if >= 1000kg
- */
-export function formatAnimatedVolume(kg: number): string {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(2)} tons`;
-  }
-  return `${Math.round(kg).toLocaleString()} kg`;
-}

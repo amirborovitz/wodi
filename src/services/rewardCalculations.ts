@@ -20,8 +20,8 @@ interface ConsistencyParams {
 
 const INTENSITY_COLOR = '#00BFFF';
 const INTENSITY_GLOW = 'rgba(0, 191, 255, 0.5)';
-const VOLUME_COLOR = '#00FF7F';
-const VOLUME_GLOW = 'rgba(0, 255, 127, 0.5)';
+const WORK_COLOR = '#00FF7F';
+const WORK_GLOW = 'rgba(0, 255, 127, 0.5)';
 const CONSISTENCY_COLOR = '#FF6B9D';
 const CONSISTENCY_GLOW = 'rgba(255, 107, 157, 0.5)';
 
@@ -69,50 +69,22 @@ export function calculateIntensityRing(params: IntensityParams): RingMetric {
 }
 
 /**
- * Calculate the Volume ring metric
- * Uses tonnage for strength, rep count for metcons
+ * Calculate the work ring metric.
  */
 export function calculateVolumeRing(params: VolumeParams): RingMetric {
-  const { totalVolume, totalReps, workoutType, userAverageVolume } = params;
+  const { totalReps } = params;
+  const TARGET_REPS = 200;
+  const percentage = Math.min(Math.round((totalReps / TARGET_REPS) * 100), 100);
 
-  // Determine whether to use tonnage or rep count
-  const isStrengthFocused = workoutType === 'strength' || totalVolume > 1000;
-
-  if (isStrengthFocused) {
-    // Strength: Use tonnage
-    const target = userAverageVolume ? userAverageVolume * 1.1 : 5000;
-    const percentage = Math.min(Math.round((totalVolume / target) * 100), 100);
-
-    // Format volume display
-    const displayValue = totalVolume >= 1000
-      ? `${(totalVolume / 1000).toFixed(2)}`
-      : totalVolume;
-    const unit = totalVolume >= 1000 ? 'tons' : 'kg';
-
-    return {
-      id: 'volume',
-      label: 'Lift',
-      value: Number(displayValue),
-      percentage,
-      unit,
-      color: VOLUME_COLOR,
-      glowColor: VOLUME_GLOW,
-    };
-  } else {
-    // Metcon: Use rep count
-    const TARGET_REPS = 200;
-    const percentage = Math.min(Math.round((totalReps / TARGET_REPS) * 100), 100);
-
-    return {
-      id: 'volume',
-      label: 'Lift',
-      value: totalReps,
-      percentage,
-      unit: 'reps',
-      color: VOLUME_COLOR,
-      glowColor: VOLUME_GLOW,
-    };
-  }
+  return {
+    id: 'volume',
+    label: 'Work',
+    value: totalReps,
+    percentage,
+    unit: 'reps',
+    color: WORK_COLOR,
+    glowColor: WORK_GLOW,
+  };
 }
 
 /**

@@ -5,7 +5,7 @@ import type { WorkoutType } from '../../types';
 
 interface WorkoutHeroProps {
   workoutType?: WorkoutType;
-  onTakePhoto: () => void;
+  onTakePhoto?: () => void;
   onUploadImage: () => void;
 }
 
@@ -44,7 +44,6 @@ const meshColorMap: Record<WorkoutType, { c1: string; c2: string; c3: string }> 
 
 export function WorkoutHero({
   workoutType = 'metcon',
-  onTakePhoto,
   onUploadImage,
 }: WorkoutHeroProps) {
   const colors = meshColorMap[workoutType] || meshColorMap.metcon;
@@ -123,11 +122,8 @@ export function WorkoutHero({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
         >
-          <Button variant="primary" size="lg" onClick={onTakePhoto}>
-            Take Photo
-          </Button>
-          <Button variant="secondary" size="lg" onClick={onUploadImage}>
-            Upload Image
+          <Button variant="primary" size="lg" onClick={onUploadImage}>
+            Add photo
           </Button>
         </motion.div>
       </div>

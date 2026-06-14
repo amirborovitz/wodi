@@ -11,7 +11,7 @@ interface RingData {
 interface ConcentricRingsProps {
   sessions: RingData;   // Cyan - inner ring
   metcon: RingData;     // Magenta - middle ring
-  volume: RingData;     // Yellow - outer ring
+  volume: RingData;     // Yellow - outer ring, presented as work/reps
   size?: number;        // Container size in px (default: 280)
 }
 
@@ -114,7 +114,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
   const center = size / 2;
 
   // Calculate radii (outer to inner)
-  const outerRadius = center - strokeWidth / 2 - 10;   // Volume (yellow)
+  const outerRadius = center - strokeWidth / 2 - 10;   // Work (yellow)
   const middleRadius = outerRadius - gap;              // Metcon (magenta)
   const innerRadius = middleRadius - gap;              // Sessions (cyan)
 
@@ -132,7 +132,7 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
           width={size}
           height={size}
         >
-        {/* Lift ring (outer - yellow) */}
+        {/* Work ring (outer - yellow) */}
         <Ring
           percentage={volumePercent}
           radius={outerRadius}
@@ -182,10 +182,10 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
         <div>
           <div className={styles.legendItem}>
             <span className={styles.legendDot} style={{ background: 'var(--color-volume)' }} />
-            <span className={styles.legendLabel}>Lift</span>
+            <span className={styles.legendLabel}>Work</span>
             <span className={styles.legendSep}>{'\u00b7'}</span>
             <span className={styles.legendValue}>
-              {formatNumber(volume.value, 'kg')} / {formatNumber(volume.goal, 'kg')} {volume.goal >= 1000 ? 'tons' : 'kg'}
+              {formatNumber(volume.value)} / {formatNumber(volume.goal)}
             </span>
           </div>
           <div className={styles.legendProgress}>
@@ -241,9 +241,6 @@ export function ConcentricRings({ sessions, metcon, volume, size = 280 }: Concen
   );
 }
 
-function formatNumber(value: number, unit: string): string {
-  if (unit === 'kg' && value >= 1000) {
-    return (value / 1000).toFixed(1);
-  }
+function formatNumber(value: number): string {
   return value.toLocaleString();
 }

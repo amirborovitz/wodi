@@ -26,6 +26,7 @@ interface InputRouterProps {
 export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
+  console.log('[InputRouter]', { kind, loggingMode: result.exercise.loggingMode, movementKinds: movements.map(m => ({ name: m.movement.name, kind: m.kind })) });
 
   if (kind === 'score_time' || kind === 'score_rounds') {
     const isLadder = !!(result.exercise.ladderReps && result.exercise.ladderReps.length > 0);
@@ -47,12 +48,44 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       && descRepsPerSet
       && descRepsPerSet.length >= 3;
 
+    // A relay-distance movement is a prescribed fixed distance (e.g. 200m run) that
+    // renders as a relay-count stepper. When one exists the ROUNDS counter is redundant —
+    // the relay stepper IS the score input. We hide ScoreRoundsInput and sync the relay
+    // count back into result.rounds so the celebration screen still gets the right number.
+    const relayMr = inputMovements.find(
+      mr => mr.kind === 'distance' &&
+        (mr.movement.distance ?? 0) > 0 &&
+        !(mr.movement.inputType === 'calories' || (mr.movement.calories ?? 0) > 0)
+    );
+    const hasRelay = !!relayMr;
+    // Pure relay: run IS the score (no other scored movements). In IGYG workouts the relay
+    // count and AMRAP rounds are separate — both inputs are shown independently.
+    const isPureRelay = hasRelay && inputMovements.filter(mr => mr !== relayMr).length === 0;
+    console.log('[InputRouter isPureRelay]', {
+      hasRelay, isPureRelay,
+      relayMr: relayMr?.movement.name,
+      inputMovements: inputMovements.map(m => ({ name: m.movement.name, kind: m.kind })),
+      visibleMovements: visibleMovements.map(m => ({ name: m.movement.name, kind: m.kind })),
+      allMovements: movements.map(m => ({ name: m.movement.name, kind: m.kind })),
+    });
+
+    const syncRelay = (next: MovementResult[]): Partial<StoryExerciseResult> => {
+      if (!isPureRelay) return {};
+      const updated = next.find(
+        m => m.kind === 'distance' &&
+          (m.movement.distance ?? 0) > 0 &&
+          !(m.movement.inputType === 'calories' || (m.movement.calories ?? 0) > 0)
+      );
+      if (!updated || updated.distance == null || !updated.movement.distance) return {};
+      return { rounds: Math.round(updated.distance / updated.movement.distance) };
+    };
+
     return (
       <>
         {kind === 'score_time' && (
           <ScoreTimeInput result={result} onChange={onChange} />
         )}
-        {kind === 'score_rounds' && !isAmrapIntervals && !isLadder && (
+        {kind === 'score_rounds' && !isAmrapIntervals && !isLadder && !isPureRelay && (
           <ScoreRoundsInput result={result} onChange={onChange} />
         )}
         {isLadder && (
@@ -71,6 +104,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
             inputMovements={inputMovements}
             variant={isAmrapIntervals ? 'amrap_intervals' : 'default'}
             roundsTotal={isAmrapIntervals ? (result.exercise.intervalCount ?? result.setsTotal) : undefined}
+            isRelayContext={hasRelay && kind === 'score_rounds'}
             teamSize={teamSize}
             onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {
@@ -79,16 +113,15 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
               const globalIdx = key ? next.findIndex(m => m.movementKey === key) : -1;
               const i = globalIdx >= 0 ? globalIdx : index;
               next[i] = { ...next[i], ...patch };
-              onChange({ movementResults: next });
+              onChange({ movementResults: next, ...syncRelay(next) });
             }}
             onBatch={(updated) => {
-              // Merge updated visible movements back into the full array
               const next = [...movements];
               updated.forEach(mr => {
                 const i = next.findIndex(m => m.movementKey === mr.movementKey);
                 if (i >= 0) next[i] = mr;
               });
-              onChange({ movementResults: next });
+              onChange({ movementResults: next, ...syncRelay(next) });
             }}
           />
         )}

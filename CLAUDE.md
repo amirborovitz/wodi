@@ -6,6 +6,89 @@ WodBoard (codename **Wodi**) is a premium CrossFit workout logging app.
 
 ---
 
+## Agent Operating Norms
+
+- **Read the design system PDF** (`wodi · Design System.pdf`, project root) before any visual, layout, or component-design decision — not just the markdown summary.
+- **The user builds, deploys, and tests on production themselves.** Do not run `npm run build`, `npm run dev`, `firebase deploy`, or start dev servers unless explicitly asked. Do not block completion on "verify in browser" — finish the code change and let the user test it live.
+
+---
+
+## Code Architecture — Non-Negotiable Rules for Every Agent
+
+These rules apply to **every file you touch**. No exceptions, no "I'll clean it up later."
+
+### 1 — Hooks own logic, components render
+
+All computation (data transformation, derived state, business logic) lives in hooks.  
+Components receive data and call handlers. They do not calculate, build data structures, or fetch.
+
+```
+✅ const data = useCelebrationData(workout, rewardData);
+✅ return <CelebrationPoster data={data} />;
+
+❌ const artifact = useMemo(() => buildRewardArtifactSections(...), [...]);  // inside component
+```
+
+### 2 — One path per concern
+
+Before adding a second code path, delete the first one or unify them.
+
+- One artifact builder, not two (`buildRewardArtifactSections` + `buildPageArtifactSection`)
+- One sticker system, not four (`posterStickerRow`, `complexStickerAnchor`, `cPageStickerAnchor`, `carouselStickerWrapper`)
+- One layout per workout format, not five (standard / ladder / complex / multi-part / chipper)
+
+If you feel the need to add a parallel path, stop and refactor the existing one instead.
+
+### 3 — No dead code
+
+When you replace a code path, **delete the old one**. Do not:
+- Leave fallback branches that are never reached
+- Keep commented-out alternatives
+- Add a cascade CSS override that fights an earlier rule — update the base rule
+
+Every function, hook, CSS class, and type must be actively used. If you cannot find a caller, delete it.
+
+### 4 — CSS: one rule wins, clearly
+
+Never write two rules for the same selector fighting each other via cascade order.  
+If you need to change a value, find the existing rule and change it there.  
+No `!important` — if you need it, the specificity structure is wrong; fix that instead.
+
+### 5 — Explicit TypeScript
+
+- No `any`. Use `unknown` + type guard if the shape is truly unknown.
+- Explicit return types on all hooks and non-trivial functions.
+- Colocate types with the code that uses them. `src/types/index.ts` is for shared domain types only.
+- Prefer `interface` for objects, `type` for unions and aliases.
+
+### 6 — Modern React patterns
+
+- `useMemo` / `useCallback` for expensive derived values and stable callbacks — not for every line.
+- Prefer extracting a custom hook over putting 10+ `useMemo` calls inside a component.
+- State colocation: keep state as close to where it's used as possible.
+- Avoid `useEffect` for derived state — compute it during render or in a memo.
+
+### Celebration Screen Architecture (the current refactor target)
+
+`WorkoutScreen.tsx` is being refactored from a ~5 000-line monolith into:
+
+```
+useCelebrationData(mode, rewardData?, workout?)
+  → CelebrationData { heroResult, artifactSections, stickers, carouselPages, footerStats }
+
+WorkoutScreen
+  ├── useCelebrationData()           ← all computation here
+  ├── <CelebrationPoster data={…} /> ← vintage paper view (Face A)
+  └── <CelebrationBreakdown data={…}/> ← dark glass view (Face B, upcoming)
+```
+
+The two views share one data source. The athlete taps the card to flip between them.  
+**Do not add new computation inside WorkoutScreen's render.** Put it in the hook.
+
+---
+
+---
+
 ## What the app does
 
 1. User photographs a gym whiteboard → AI parses it into a structured workout
@@ -245,7 +328,8 @@ EP = base(10) + time(3/min) + volume(0.5 per vol/bw) + distance(0.01/m) + PR bon
 
 ## Design System (Wodi v1.0) — April 2026
 
-**Full spec:** `memory/wodi-design-system.md` (authoritative). Summary below.
+**Full spec (PDF):** `wodi · Design System.pdf` (project root) — read this before making any visual or layout decisions.  
+**Markdown summary:** `memory/wodi-design-system.md`. Summary below.
 
 ### Colors
 

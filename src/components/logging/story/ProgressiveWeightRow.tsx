@@ -13,10 +13,10 @@ const STEP = 2.5;
 const DRAG_THRESHOLD = 6;   // px before drag mode activates
 const PX_PER_STEP = 16;     // px of drag per 2.5kg step
 
-/** Round up to nearest multiple of 5 */
+/** Round down to nearest multiple of 5 */
 function suggestPeak(start: number | undefined): number | undefined {
   if (!start || start <= 0) return undefined;
-  return Math.ceil(start * 1.3 / 5) * 5;
+  return Math.floor(start * 1.3 / 5) * 5;
 }
 
 // ─── Weight interpolation utilities ──────────────────────────────

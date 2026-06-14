@@ -26,9 +26,12 @@ Return ONLY valid JSON:
   "partnerWorkout": false,
   "teamSize": null,
   // difficultyLevel: 1–10 rating of programmed difficulty (not the athlete's fitness level).
-  // 1 = very easy recovery/active rest, 5 = moderate (benchmark), 8 = hard, 10 = brutal.
-  // Base this on load relative to body weight, volume, workout duration, and movement complexity.
-  "difficultyLevel": 5,
+  // DO NOT default to 5 — actively evaluate the workout.
+  // 1=active recovery, 2=easy, 3=light, 4=moderate-easy, 5=moderate benchmark pace,
+  // 6=moderate-hard, 7=hard, 8=very hard, 9=extremely hard, 10=brutal/competition.
+  // Factors: load vs bodyweight, total volume, time cap, movement complexity, intensity.
+  // Examples: 3x5 Back Squat@60%=4, Fran=7, Murph=8, 50-cal Echo Bike+50 Thrusters×3=8, active recovery row=2.
+  "difficultyLevel": "<evaluate: 1–10>",
   // "sets" is the TOTAL number of working rounds for the main WOD (not counting buy-in / cash-out one-off work).
   // For structures like "Into, 2 rounds: [block A] Into, 2 rounds: [block B]" the total sets is 4.
   "exercises": [
@@ -44,8 +47,10 @@ Return ONLY valid JSON:
       "suggestedRepsPerSet": [6, 5, 4, 3, 2],
       "ladderReps": [2, 4, 6, 8, 10],
       "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
-      // Buy-in work that happens ONCE before all rounds (e.g. big machine effort before the WOD) goes into "buyIn".
-      // This work is not repeated each round.
+      // Buy-in work that happens ONCE before all rounds goes into "buyIn" — only when explicitly labeled as buy-in
+      // or clearly separated from the repeated rounds (e.g. "600m run, then 8 RFT: ...").
+      // DO NOT use buyIn for the first movement in a fixed-rep interval (e.g. "every 11 min: 100 cal Echo Bike + 20 DB Snatch"
+      // — both movements are done every round, neither is a buy-in).
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
         // Each movement can have a "role": "buy_in" (done once before rounds), "cash_out" (done once after rounds), or omit for normal per-round work.
@@ -95,6 +100,18 @@ Return ONLY valid JSON:
   - "movements": the per-round block of movements for that section.
 - Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
   Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
+- CRITICAL — PROGRESSIVE / BUILDING ROUNDS RULE: When each round is structurally different
+  (a new movement is added or removed each round), DO NOT collapse into one "rounds: N" section.
+  Instead emit one sections entry per round, each with "rounds": 1, listing that round's exact movements.
+  This preserves the true volume and structure for logging.
+  Signal words: "Round 2 - Add", "Round 3 - Add", "each round adds", building/ascending rep ladders across rounds.
+  Example: "Round 1: 10 BOB + 10 Cal Row / Round 2 - Add 20 Thrusters / Round 3 - Add 30 PC" →
+    sections: [
+      { sectionType: "rounds", rounds: 1, movements: [BOB×10, Row×10] },
+      { sectionType: "rounds", rounds: 1, movements: [BOB×10, Thruster×20, Row×10] },
+      { sectionType: "rounds", rounds: 1, movements: [BOB×10, PC×30, Thruster×20, Row×10] }
+    ]
+  The top-level movements[] should still list the UNIQUE set of movements (deduplicated) for reference.
 - CRITICAL — CHIPPER RULE: In for_time workouts where the same movement appears on
   multiple separate lines WITHOUT an explicit "X rounds" or "X sets" wrapper, you MUST
   preserve EVERY line as its own movement entry, in order, even when the name and quantity
@@ -107,8 +124,8 @@ Return ONLY valid JSON:
 ## FORMAT DETECTION (pick exactly one)
 | Format | Trigger | scoreType |
 |--------|---------|-----------|
-| amrap_intervals | "2:30 AMRAP x 4", multiple AMRAPs with rest, "every X:XX → buy-in + AMRAP" | rounds_reps |
-| intervals | "5 sets for time", "every 3:00 x 5" (NO "AMRAP" or "into AMRAP" in text) | time_per_set |
+| amrap_intervals | "2:30 AMRAP x 4", multiple AMRAPs with rest, "every X:XX → buy-in + AMRAP for remaining time" — word "AMRAP" MUST appear | rounds_reps |
+| intervals | "5 sets for time", "every 3:00 x 5", "every 11 min x 3: [fixed work]" — fixed amounts per interval, NO "AMRAP" in text | time_per_set |
 | for_time | "for time", "RFT" (no "x sets") | time |
 | amrap | "AMRAP 12" (single) | rounds_reps |
 | emom | "EMOM", "every 1:00", "E2MOM" | reps |
@@ -175,7 +192,7 @@ Every exercise MUST include "loggingMode" — this determines which logging UI t
 - "strength": barbell/DB/KB lifts with sets×reps (5x5 Back Squat, 3x8 DB Press)
 - "for_time": complete work ASAP, log total time (RFT, chipper, partner IGUG, team workouts with total cal/rep targets)
 - "amrap": as many rounds as possible in time limit
-- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00) OR "every X:XX" with a buy-in then AMRAP for remaining time
+- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00) OR "every X:XX" with explicit "AMRAP" text — the word "AMRAP" MUST appear. "Every 11 min x 3: 100 cal Echo Bike + 20 DB Snatch" is NOT amrap_intervals — it is intervals (fixed amounts per round)
 - "intervals": repeated sets with individual times (5 sets for time, every 3:00 x 5) — NOT when "AMRAP" or "into AMRAP" appears in the text
 - "emom": every minute on the minute
 - "cardio": machine work scored by calories (single machine, no other movements)
@@ -214,6 +231,9 @@ CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walk
 2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
 3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
 4. ALWAYS include "difficultyLevel" (1–10) at the top level. Rate the programmed difficulty, not athlete fitness. Use the full range: 1=active recovery, 3=easy, 5=moderate benchmark pace, 7=hard, 8=very hard, 10=brutal. Consider load relative to body weight, total volume, time cap, and movement complexity. Example: "50 cal Echo Bike + 50 Thrusters @30kg × 3 rounds" = 8.
+5. Prescription fidelity: "prescription" MUST paraphrase the actual whiteboard text. NEVER invent descriptors like "build to heavy", "heavy singles", "for quality" unless those exact words appear in the source.
+6. RPE / RIR strength work: "@0-1 R.I.R" / "@2-3 R.I.R" / "@7 RPE" are intensity constraints, NOT rep counts. Set suggestedReps from the rep count in the prescription (e.g., "5 C2B @0-1 RIR" → suggestedReps: 5). NEVER sum multiple movement reps across a superset to produce suggestedReps. For a superset exercise with different rep counts per movement, omit suggestedReps entirely.
+7. Compound movement names: ALWAYS preserve the full name — "Burpee Step Up", "Burpee Box Jump Over", "Burpee Broad Jump" are distinct movements. Do NOT simplify to "Burpee".
 
 ## CONTAINER/BENCHMARK RECOGNITION
 - containerRounds: outer rounds wrapping a benchmark (7 in "7 rounds of Cindy")
@@ -240,6 +260,18 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
 - "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
+- ROTATING STATION HEADCOUNT: "5 groups starting at different stations (7 people max)" / "max 6 per station" are logistics notes, NOT team designations. Do NOT set partnerWorkout or teamSize from headcount-per-station language. Only set teamSize when athletes are explicitly working together as one unit (IGUG, In Pairs, Team of N completing a shared target).
+
+### IGYG AMRAP WITH SPLIT STATIONS (two independent streams)
+When an IGYG / partner AMRAP has P1 and P2 doing DIFFERENT activities simultaneously (e.g., "P1: 200m Run while P2: AMRAP of 4 Power Clean + 6 Push-up + 8 Sit-up"), you MUST split into TWO separate exercises:
+1. **Relay exercise** — the movement one partner does while the other AMRAPs. loggingMode: "amrap", movements: ONE entry describing the relay unit (e.g., { name: "Run", distance: 200, inputType: "distance" }). Rounds = how many relay trips the athlete completed. The UI shows a relay-count tile (tap + for each trip).
+2. **AMRAP exercise** — the block the other partner does during the relay. loggingMode: "amrap", full movements array.
+
+Both athletes do both exercises during the workout (they switch), so both exercises appear in the session. Each gets its own logging wizard screen and its own hero score on the recap.
+
+This is fundamentally different from IGUG for-time (same movements, alternating) — in split-station IGYG, P1 and P2 have INDEPENDENT, non-overlapping scores at all times. Do NOT merge them into one exercise.
+
+The relay unit can be ANY movement type: a run (200m), a bodyweight movement (10 box jumps), a machine (10 cal Echo Bike), or a distance carry. The split-station rule applies universally.
 
 ## SKILL / PRACTICE BLOCKS
 "Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
@@ -619,6 +651,78 @@ Output:
 }
 NOTE: "8/10 calories bike" → Bike, calories: 10, rxCalories: { male: 10, female: 8 }. The Bike is movement #1 in AMRAP 1 — it is NOT a buy-in. No buy-in is present in this workout. Each numbered section becomes its own exercise.
 
+### 15. IGYG AMRAP — split stations (P1 and P2 do different movements)
+Input: "15 min AMRAP with a partner (I go you go): P1: 200m Run. P2: AMRAP: 4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups."
+Output:
+{
+  "title": "Partner AMRAP",
+  "type": "amrap",
+  "format": "amrap",
+  "scoreType": "rounds_reps",
+  "partnerWorkout": true,
+  "teamSize": 2,
+  "timeCap": 900,
+  "exercises": [
+    {
+      "name": "200m Run — Relay",
+      "type": "wod",
+      "loggingMode": "amrap",
+      "prescription": "200m Run relay while partner AMRAPs. Each round = one 200m run.",
+      "suggestedSets": 1,
+      "workDuration": 900,
+      "movements": [
+        { "name": "Run", "distance": 200, "inputType": "distance" }
+      ]
+    },
+    {
+      "name": "Partner AMRAP 15 Min",
+      "type": "wod",
+      "loggingMode": "amrap",
+      "prescription": "4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups",
+      "suggestedSets": 1,
+      "workDuration": 900,
+      "movements": [
+        { "name": "Power Clean", "reps": 4, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
+        { "name": "Push-up", "reps": 6, "inputType": "none" },
+        { "name": "Sit-up", "reps": 8, "inputType": "none" }
+      ]
+    }
+  ]
+}
+NOTE: Same rule applies when the relay movement is bodyweight (e.g., "P1: 10 Box Jumps while P2 AMRAPs" → relay exercise name "10 Box Jumps — Relay", movements: [{ name: "Box Jump", reps: 10, inputType: "none" }]). The relay exercise always has exactly ONE movement describing the relay unit. The athlete logs relay trips via the relay tile (each tap = one trip). NEVER use movements: [] for relay exercises.
+
+### 16. Progressive / building chipper (each round adds a movement)
+Input: "For time (TC 41 min): Buy In: 100 DB Hip Thrusts (17.5/22.5 kg). Into: Round 1: 10 Burpees Over Bar, 10 Cal Row. Round 2 - Add 20 Thrusters (30/40 kg). Round 3 - Add 30 Power Cleans. Round 4 - Add 40 Back Squats. Round 5: 10 BOB, 20 Thrusters, 30 Power Cleans, 40 Back Squats, 50 Bent Over Rows, 10 Cal Row. Cash Out: 50 Deadlifts (70/90 kg)"
+Output:
+{
+  "title": "PREY", "type": "for_time", "format": "for_time", "scoreType": "time", "timeCap": 2460, "sets": 5,
+  "exercises": [{
+    "name": "PREY For Time", "type": "wod", "loggingMode": "for_time",
+    "prescription": "Buy-in: 100 DB Hip Thrusts, then 5 building rounds (each adds a movement), cash-out: 50 Deadlifts",
+    "suggestedSets": 5,
+    "buyIn": [{ "name": "Dumbbell Hip Thrust", "reps": 100, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 17.5, "unit": "kg" } }],
+    "movements": [
+      { "name": "Burpees Over Bar", "reps": 10, "inputType": "none" },
+      { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } },
+      { "name": "Power Clean", "reps": 30, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } },
+      { "name": "Back Squat", "reps": 40, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } },
+      { "name": "Bent Over Row", "reps": 50, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } },
+      { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }
+    ],
+    "cashOut": [{ "name": "Deadlift", "reps": 50, "inputType": "weight", "rxWeights": { "male": 90, "female": 70, "unit": "kg" } }],
+    "sections": [
+      { "sectionType": "buy_in", "rounds": 1, "movements": [{ "name": "Dumbbell Hip Thrust", "reps": 100, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 17.5, "unit": "kg" } }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Burpees Over Bar", "reps": 10, "inputType": "none" }, { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Burpees Over Bar", "reps": 10, "inputType": "none" }, { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Burpees Over Bar", "reps": 10, "inputType": "none" }, { "name": "Power Clean", "reps": 30, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Burpees Over Bar", "reps": 10, "inputType": "none" }, { "name": "Back Squat", "reps": 40, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Power Clean", "reps": 30, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Burpees Over Bar", "reps": 10, "inputType": "none" }, { "name": "Bent Over Row", "reps": 50, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Back Squat", "reps": 40, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Power Clean", "reps": 30, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Thruster", "reps": 20, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }, { "name": "Row", "calories": 10, "rxCalories": { "male": 10, "female": 10 }, "inputType": "none" }] },
+      { "sectionType": "cash_out", "rounds": 1, "movements": [{ "name": "Deadlift", "reps": 50, "inputType": "weight", "rxWeights": { "male": 90, "female": 70, "unit": "kg" } }] }
+    ]
+  }]
+}
+NOTE: Each round is a separate sections entry with rounds: 1. DO NOT collapse into one "rounds: 5" section when each round's movement list is different. The movements[] at the top lists unique movements for reference only.
+
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 
 /**
@@ -637,7 +741,7 @@ export async function parseWorkoutText(text: string): Promise<{ raw: string; par
         ],
       },
     ],
-    max_tokens: 2000,
+    max_tokens: 4000,
     temperature: 0.2,
   });
 
@@ -676,7 +780,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
           ]
         }
       ],
-      max_tokens: 2500,
+      max_tokens: 4000,
       temperature: 0.2 // Lower temperature for more consistent parsing
     });
 

@@ -9,7 +9,7 @@ interface TeamImpactBarProps {
 
 export function TeamImpactBar({ data }: TeamImpactBarProps) {
   const animatedPercent = useCountUp(data.personalPercent, { duration: 1000, delay: 600 });
-  const animatedTotal = useCountUp(data.teamTotal, { duration: 1200, delay: 400 });
+  const animatedTotal = useCountUp(data.teamTotalReps, { duration: 1200, delay: 400 });
 
   return (
     <motion.div
@@ -23,7 +23,7 @@ export function TeamImpactBar({ data }: TeamImpactBarProps) {
         <div className={styles.barHeader}>
           <span className={styles.barTitle}>TEAM TOTAL</span>
           <span className={styles.barValue}>
-            {Math.round(animatedTotal).toLocaleString()} kg
+            {Math.round(animatedTotal).toLocaleString()} reps
           </span>
         </div>
         <div className={styles.barTrack}>
@@ -41,7 +41,7 @@ export function TeamImpactBar({ data }: TeamImpactBarProps) {
         <span className={styles.impactPercent}>{Math.round(animatedPercent)}%</span>
         <span className={styles.impactLabel}>YOUR IMPACT</span>
         <span className={styles.impactDetail}>
-          +{data.personalVolume.toLocaleString()} kg
+          +{data.personalReps.toLocaleString()} reps
         </span>
       </div>
     </motion.div>

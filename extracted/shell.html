@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wodi · app</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("29c5341d-399b-473b-9811-7c28c832f354") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("f44a9be3-5c21-4886-86c3-cbc71b5b5c0b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("1d2b61c4-458e-4ec4-ad06-c60a18878e18") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("494c4ba7-beed-46c8-b26b-c7618081fd76") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("cbc40143-e9c1-4656-a869-dcc00c669e8a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("724b5887-8f36-4e07-8815-b73ac52fcd84") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("f8c48651-dc47-40c6-ba17-bd6e035f732f") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("0190714d-4209-44c1-a86a-bdf74eb4ffc1") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("3c5de575-34bd-4a53-94df-97d352cc0dad") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("98135609-bc38-49f0-b358-5b831065af3e") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("595d7d37-c9c2-4278-b81a-a95344fcedd7") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("9789d79e-0578-4c18-a24f-d0cef9539774") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("9197b014-8a23-4739-8d69-82ced9d100cb") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("67d312c7-be22-4454-b6fe-809dc309f8ae") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("e61937b0-197f-47fc-a3a9-63f7295ebdf5") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("eb46301c-5eec-4869-a229-e65685629bcd") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("0b8ee3e8-c09b-446a-bb71-5df0c6372673") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("a369d01d-058c-4cee-9c6b-acedbc883b1c") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("45b8c9dc-b3ac-4087-95bb-480a5230aae7") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("eb11a427-ece1-4e9c-becc-33970448b750") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("6ea8e371-d2bd-4fb1-bd12-29aa052365a4") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("7f574326-5dc4-4aee-8c53-cc19f041aba8") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("cf166acb-da95-4323-b28d-fb8a7aaa258b") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("18d04be8-1650-4ce5-9d29-ef1e272c9bfa") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("ed46dc1c-76c8-49cf-9b5d-2888c466fd0c") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("dfe54423-c033-47e4-a001-84c8364bcd75") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("3414ebed-05e4-4afc-8f4a-e0a818c3a02b") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("ac285777-4a66-4519-bfc6-18221ada1d54") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("f2be5601-6b7b-493d-a883-2dc91a191332") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("edda2f96-8e21-43a3-b4c0-749c4941575d") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("091c3f95-e0e1-4020-a3c2-281f45d7917f") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("28ac40a6-5908-4642-a487-d2f5850e3ba1") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("acf56304-362a-4564-b0ec-e529282ab8fd") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("80dbf49e-fdb7-43ed-ae52-b80a95db63ed") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("091c3f95-e0e1-4020-a3c2-281f45d7917f") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("28ac40a6-5908-4642-a487-d2f5850e3ba1") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("acf56304-362a-4564-b0ec-e529282ab8fd") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("80dbf49e-fdb7-43ed-ae52-b80a95db63ed") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("091c3f95-e0e1-4020-a3c2-281f45d7917f") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("28ac40a6-5908-4642-a487-d2f5850e3ba1") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("acf56304-362a-4564-b0ec-e529282ab8fd") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("80dbf49e-fdb7-43ed-ae52-b80a95db63ed") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("3e6e4287-6646-4edb-8117-3e56fc3c8aea") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("ff9d6da5-b2e6-49a0-ace5-518e4a8bdd5a") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("6cbfb737-904c-4095-bd34-847c7245061a") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'DM Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("5dcbfb40-91ee-4c56-8070-d4ad77b16e99") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; background:#08090b; font-family:'Barlow',sans-serif; overflow:hidden; }
+#root { height:100%; display:flex; align-items:center; justify-content:center; }
+button { font-family:inherit; -webkit-tap-highlight-color:transparent; }
+.hscroll::-webkit-scrollbar { height:0; }
+.vscroll::-webkit-scrollbar { width:0; }
+@keyframes scrIn { from { transform:translateY(8px); } to { transform:none; } }
+@keyframes celebIn { from { transform:perspective(1100px) rotateX(6deg) translateY(14px) scale(0.97); } to { transform:none; } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes toastIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="04accc08-815a-4e86-8cc6-f41439936cd1" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="aa7e061c-e6bb-48c6-a429-be64a06b9efc" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="ba3e516c-0801-495c-8483-5dcabccb471e" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="a9951460-d5b7-428d-a539-5ba061d03d87"></script>
+<script type="text/babel" src="14a7e748-fa99-45be-a320-c2f54023b654"></script>
+<script type="text/babel" src="78bc9416-5a3b-4fc6-8bf7-b10fc038fb20"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useLayoutEffect, useRef } = React;
+const INK = '#0a0c0f', YEL = '#f5c200';
+
+// status bar
+function StatusBar() {
+  return (
+    <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 26px 6px', fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+      <span>9:41</span>
+      <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="#fff"><rect x="0" y="6" width="3" height="5" rx="0.6"/><rect x="4" y="4" width="3" height="7" rx="0.6"/><rect x="8" y="2" width="3" height="9" rx="0.6"/><rect x="12" y="0" width="3" height="11" rx="0.6"/></svg>
+        <svg width="16" height="11" viewBox="0 0 24 17" fill="none" stroke="#fff" strokeWidth="2"><path d="M1 6C5 2 19 2 23 6"/><path d="M4 10c3-3 13-3 16 0"/><path d="M7.5 14c2-2 7-2 9 0"/><circle cx="12" cy="17" r="1.5" fill="#fff"/></svg>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 5px', border: '1.2px solid #fff', borderRadius: 4 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>72</span>
+          <span style={{ width: 8, height: 5, background: '#fff', borderRadius: 1 }}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// full celebration poster overlay
+function Celebration({ workout, onClose, onShareToStory, onSavePoster }) {
+  const Comp = SKINS[workout.skin] || SkinSlab;
+  const v = VIBE[workout.vibe];
+  const cardRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = cardRef.current; if (!el) return;
+    const avail = 560; const h = el.offsetHeight;
+    setScale(h > avail ? Math.max(0.6, avail / h) : 1);
+  }, [workout]);
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 30 }}>
+      {/* story backdrop */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(158deg, #1b2330 0%, #0e1318 46%, #15101a 100%)' }}/>
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.55, background: `radial-gradient(78% 48% at 22% 16%, rgba(120,150,190,0.26) 0%, transparent 60%), radial-gradient(72% 50% at 86% 90%, ${v.color}2a 0%, transparent 60%)` }}/>
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.4, mixBlendMode: 'overlay', backgroundImage: 'radial-gradient(rgba(255,255,255,0.85) 0.6px, transparent 0.6px)', backgroundSize: '4px 4px' }}/>
+      <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <StatusBar />
+        {/* top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 18px 0' }}>
+          <button onClick={onClose} style={glass(38)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          {workout.isPR ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 999, background: YEL, color: INK, fontFamily: "'Barlow', sans-serif", fontSize: 11, fontWeight: 900, letterSpacing: '0.12em' }}>★ NEW PR POSTER</span>
+          ) : workout.justLogged ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 999, background: YEL, color: INK, fontFamily: "'Barlow', sans-serif", fontSize: 11, fontWeight: 900, letterSpacing: '0.12em' }}>+{workout.ep} EP LOGGED</span>
+          ) : <span/>}
+          <div style={{ width: 38 }}/>
+        </div>
+        {/* poster */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 30px', minHeight: 0 }}>
+          <div style={{ width: '100%', animation: 'celebIn 0.5s cubic-bezier(.2,.7,.3,1)' }}>
+            <div ref={cardRef} style={{ width: '100%', position: 'relative', transform: `scale(${scale})`, transformOrigin: 'center center' }}>
+              <Comp wod={workout.wod} vibe={workout.vibe} />
+              {workout.isPR && <PRRibbon />}
+            </div>
+          </div>
+        </div>
+        {/* actions */}
+        <div style={{ padding: '8px 18px 26px', display: 'flex', gap: 10 }}>
+          <button onClick={onShareToStory} style={{ flex: 1, height: 52, borderRadius: 15, border: 'none', cursor: 'pointer', background: `linear-gradient(100deg, ${YEL}, #ffe14d 60%, ${YEL})`, color: INK, fontSize: 14, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: `0 8px 24px ${YEL}40` }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share to Story
+          </button>
+          <button onClick={onSavePoster} style={{ width: 52, height: 52, borderRadius: 15, cursor: 'pointer', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.16)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ msg }) {
+  return (
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 96, display: 'flex', justifyContent: 'center', zIndex: 40, pointerEvents: 'none', animation: 'toastIn 0.3s ease' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', borderRadius: 999, background: 'rgba(20,22,26,0.95)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+        <span style={{ color: YEL }}>✎</span> {msg}
+      </span>
+    </div>
+  );
+}
+
+console.log('[wodi] build check: log/settings flow v2 loaded');
+
+function App() {
+  const [screen, setScreen] = useState('today');
+  const [record, setRecord] = useState(null);
+  const [open, setOpen] = useState(null);   // workout for celebration
+  const [toast, setToast] = useState(null);
+  const [workouts, setWorkouts] = useState(WORKOUTS);
+  const [monthEp, setMonthEp] = useState(MONTH_EP);
+  const scrollRef = useRef(null);
+
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [screen]);
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(null), 2200); };
+
+  const nav = (id) => { setRecord(null); setScreen(id); };
+
+  const onShare = (w) => { setOpen(w); showToast('Ready to share to your story'); };
+  const onShareToStory = () => { showToast('Shared to your story'); setOpen(null); };
+  const onSavePoster = () => showToast('Poster saved to your camera roll');
+
+  // turn a quick-pick template into a freshly "logged" poster, drop it at the
+  // top of the collection, and open it in the celebration overlay.
+  const handleLogged = (template) => {
+    const skinIds = POSTER_SKINS.map(s => s.id);
+    const vibeIds = Object.keys(VIBE);
+    const skin = skinIds[Math.floor(Math.random() * skinIds.length)];
+    const vibe = vibeIds[Math.floor(Math.random() * vibeIds.length)];
+    const newWorkout = {
+      id: 'logged-' + Date.now(), skin, vibe, ep: template.ep, isPR: false, when: 'Just now', justLogged: true,
+      wod: {
+        type: template.type, title: template.name, date: 'TODAY', format: template.format, sub: template.sub,
+        blocks: template.blocks, result: template.result, totals: template.totals,
+      },
+    };
+    setWorkouts(ws => [newWorkout, ...ws]);
+    setMonthEp(e => e + template.ep);
+    setScreen('today');
+    setOpen(newWorkout);
+  };
+
+  let body;
+  if (screen === 'today') body = <TodayScreen workouts={workouts} monthEp={monthEp} onOpenPoster={setOpen} onLog={() => setScreen('log')} onShare={onShare} onSeeAll={() => setScreen('gallery')} />;
+  else if (screen === 'gallery') body = <GalleryScreen workouts={workouts} onOpenPoster={setOpen} onShare={onShare} />;
+  else if (screen === 'me') body = <MeScreen onOpenRecords={() => setScreen('records')} onNav={nav} onShareProfile={() => showToast('Profile link copied')} onOpenSettings={() => setScreen('settings')} />;
+  else if (screen === 'records') body = <RecordsScreen onBack={() => setScreen('me')} onOpenRecord={(r) => { setRecord(r); setScreen('detail'); }} />;
+  else if (screen === 'detail') body = <RecordDetailScreen record={record} onBack={() => setScreen('records')} />;
+  else if (screen === 'log') body = <LogScreen onBack={() => setScreen('today')} onLogged={handleLogged} />;
+  else if (screen === 'settings') body = <SettingsScreen onBack={() => setScreen('me')} />;
+
+  return (
+    <div style={{ width: 396, height: 812, position: 'relative', overflow: 'hidden', background: '#0a0c0f', borderRadius: 40, boxShadow: '0 30px 80px rgba(0,0,0,0.7), inset 0 0 0 8px #15171c, inset 0 0 0 9px rgba(255,255,255,0.05)' }}>
+      {/* ambient bg */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, #101319 0%, #0a0c0f 38%)' }}/>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 260, background: `radial-gradient(90% 60% at 50% -8%, ${YEL}18 0%, transparent 60%)` }}/>
+
+      <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <StatusBar />
+        <div ref={scrollRef} className="vscroll" key={screen} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 16, animation: 'scrIn 0.32s ease' }}>
+          {body}
+        </div>
+        <BottomNav active={screen} onNav={nav} />
+      </div>
+
+      {open && <Celebration workout={open} onClose={() => setOpen(null)} onShareToStory={onShareToStory} onSavePoster={onSavePoster} />}
+      {toast && <Toast msg={toast} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+
+</body></html>

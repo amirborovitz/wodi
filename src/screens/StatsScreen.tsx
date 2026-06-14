@@ -11,14 +11,9 @@ export function StatsScreen() {
   const { prCount, loading: prLoading } = usePRCount();
 
   const totalWorkouts = workouts.length;
-  const totalVolume = workouts.reduce((acc, w) => acc + w.totalVolume, 0);
+  const totalReps = workouts.reduce((acc, w) => acc + (w.totalReps || 0), 0);
   const currentStreak = user?.stats.currentStreak || 0;
   const longestStreak = user?.stats.longestStreak || 0;
-
-  const formatVolume = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(2)} tons`;
-    return `${kg}kg`;
-  };
 
   const isLoading = loading || prLoading;
 
@@ -75,8 +70,8 @@ export function StatsScreen() {
                 {/* Tonnage Card */}
                 <div className={styles.statCard}>
                   <span className={styles.statIcon}>⚖️</span>
-                  <span className={styles.statValue}>{formatVolume(totalVolume)}</span>
-                  <span className={styles.statLabel}>Total Lifted</span>
+                  <span className={styles.statValue}>{totalReps.toLocaleString()}</span>
+                  <span className={styles.statLabel}>Total Reps</span>
                 </div>
 
                 {/* Workouts Card */}

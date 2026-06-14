@@ -151,37 +151,13 @@ function buildStatSegments(movement: MovementTotal): StatSegment[] {
   const hasWeight = movement.weight && movement.weight > 0;
   const hasProgression = movement.weightProgression && movement.weightProgression.length > 1;
 
-  // For weighted movements: show volume (reps × weight) instead of raw reps
-  // For bodyweight/unweighted: show reps
   if (movement.totalReps && movement.totalReps > 0) {
-    if (hasWeight && !hasProgression) {
-      // Show volume = reps × weight
-      const volume = movement.totalReps * movement.weight!;
-      const unit = movement.unit === 'lb' ? 'lb' : 'kg';
-      if (volume >= 1000) {
-        segments.push({
-          parts: [
-            { type: 'number', value: `${(volume / 1000).toFixed(1)}` },
-            { type: 'text', value: `t ${unit === 'lb' ? 'lb' : ''}` },
-          ],
-        });
-      } else {
-        segments.push({
-          parts: [
-            { type: 'number', value: `${Math.round(volume)}` },
-            { type: 'text', value: ` ${unit}` },
-          ],
-        });
-      }
-    } else if (!hasWeight) {
-      // Bodyweight — just show reps
-      segments.push({
-        parts: [
-          { type: 'number', value: `${movement.totalReps}` },
-          { type: 'text', value: ' reps' },
-        ],
-      });
-    }
+    segments.push({
+      parts: [
+        { type: 'number', value: `${movement.totalReps}` },
+        { type: 'text', value: ' reps' },
+      ],
+    });
   }
 
   // Weight / progression — show per-set weights for varying loads
@@ -194,25 +170,6 @@ function buildStatSegments(movement: MovementTotal): StatSegment[] {
     weightParts.push({ type: 'text', value: ` ${unit}` });
     segments.push({ parts: weightParts });
 
-    // Also show total volume for progressions
-    if (movement.totalReps && movement.totalReps > 0 && hasWeight) {
-      const volume = movement.totalReps * movement.weight!;
-      if (volume >= 1000) {
-        segments.push({
-          parts: [
-            { type: 'number', value: `${(volume / 1000).toFixed(1)}` },
-            { type: 'text', value: 't' },
-          ],
-        });
-      } else {
-        segments.push({
-          parts: [
-            { type: 'number', value: `${Math.round(volume)}` },
-            { type: 'text', value: ` ${unit}` },
-          ],
-        });
-      }
-    }
   } else if (hasWeight) {
     // Show the per-unit weight as context
     const unit = movement.unit === 'lb' ? 'lb' : 'kg';
@@ -479,3 +436,4 @@ export function WorkloadBreakdown({
     </motion.div>
   );
 }
+

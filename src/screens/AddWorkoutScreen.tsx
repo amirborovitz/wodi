@@ -11,7 +11,7 @@ import {
   recordPatternUsage,
   getDefaultFields,
 } from '../services/loggingPatternLearning';
-import type { LoggingGuidanceResponse, ExerciseLoggingMode, IntensityRating } from '../types';
+import type { LoggingGuidanceResponse, ExerciseLoggingMode } from '../types';
 import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +60,7 @@ interface ExerciseResult {
   movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
   movementAlternatives?: Record<string, string>; // Selected alternatives for movements
   movementDistances?: Record<string, number>; // Per-movement distance overrides
+  movementDistancesPerRep?: Record<string, number>; // Per-movement per-trip distance (relay)
   movementReps?: Record<string, number>; // Per-movement rep overrides
   movementCalories?: Record<string, number>; // Per-movement calorie overrides
   rounds?: number; // Number of rounds completed (for multi-movement WODs)
@@ -80,7 +81,6 @@ interface ExerciseResult {
   ladderStep?: number;
   ladderPartial?: number;
   metconName?: string;
-  intensity?: IntensityRating | null;
 }
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
@@ -293,9 +293,7 @@ function buildWorkloadBreakdownFromResults(
         const key = movementName.toLowerCase();
 
         const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
-          ?? mov.rxWeights?.male
-          ?? mov.rxWeights?.female;
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
         const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
         const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
         const weight = explicitWeight;
@@ -417,6 +415,7 @@ function buildWorkloadBreakdownFromResults(
       const userReps = movementLookup(result.movementReps || {}, mk, mov.name);
       const userDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
       const userCalories = movementLookup(result.movementCalories || {}, mk, mov.name);
+      const userDistancePerRep = movementLookup(result.movementDistancesPerRep || {}, mk, mov.name);
 
       const perRoundReps = userReps ?? mov.reps ?? 0;
       const perRoundDistance = userDistance ?? mov.distance ?? 0;
@@ -473,13 +472,15 @@ function buildWorkloadBreakdownFromResults(
             ? perRoundReps
             : (perRoundReps * totalEffectiveRounds))
       ) * repsFactor);
+      // User-entered distance/calories are always totals (relay count × prescribed dist,
+      // or total cals/distance logged for the whole exercise) — never multiply by rounds.
       const movementDistance = Math.round((
-        userDistance !== undefined && useUserTotalsDirectly
+        userDistance !== undefined
           ? perRoundDistance
           : (perRoundDistance * totalEffectiveRounds)
       ) * distanceFactor);
       const movementCalories = Math.round((
-        userCalories !== undefined && useUserTotalsDirectly
+        userCalories !== undefined
           ? perRoundCalories
           : (perRoundCalories * totalEffectiveRounds)
       ) * caloriesFactor);
@@ -497,9 +498,7 @@ function buildWorkloadBreakdownFromResults(
       const rawWeight = (hasVaryingSetWeights && weightFromSets && isWeightedMovement(mov))
         ? weightFromSets
         : (movementLookup(result.movementWeights || {}, mk, mov.name)
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined)
-          ?? mov.rxWeights?.male
-          ?? mov.rxWeights?.female);
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined));
       console.log(`[BuildWorkload] "${mov.name}" weight: movWeights=${movementLookup(result.movementWeights || {}, mk, mov.name)} rxMale=${mov.rxWeights?.male} rxFemale=${mov.rxWeights?.female} → rawWeight=${rawWeight} | movCals=${movementCalories} | result.movementCalories=`, result.movementCalories);
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
@@ -560,7 +559,7 @@ function buildWorkloadBreakdownFromResults(
           originalMovement,
           substitutionType,
           implementCount: implementCount > 1 ? implementCount : undefined,
-          distancePerRep: perRoundDistance > 0 ? perRoundDistance : undefined,
+          distancePerRep: userDistancePerRep ?? (mov.distance && mov.distance > 0 ? mov.distance : undefined),
           together: isTogether || undefined,
         });
       }
@@ -819,11 +818,13 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
   // Calorie/distance inputs are never weighted (cardio machines like Echo Bike, Rower)
   if (movement.inputType === 'calories' || movement.inputType === 'distance') return false;
 
+  // Explicit load evidence overrides bodyweight/none flags from AI
+  if (/\bweighted\b/i.test(movement.name)) return true;
+  if (movement.rxWeights) return true;
+
   // Explicit bodyweight flag from AI — trust it
   if (movement.isBodyweight) return false;
   if (movement.inputType === 'none') return false;
-
-  if (movement.rxWeights) return true;
 
   const name = movement.name.toLowerCase();
 
@@ -1516,7 +1517,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   // Voice input state
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -1704,7 +1704,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
       // Start with blank to get correct kind, movements, setsTotal, etc.
       const blank = createBlankResult(parsedEx, i, mode, user?.sex);
       const result: StoryExerciseResult = { ...blank };
-      result.intensity = savedEx.intensity ?? undefined;
 
       // Overlay saved values based on kind
       switch (result.kind) {
@@ -3082,7 +3081,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
           ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
           ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
           ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
-          ...(result.exercise.type !== 'strength' && result.intensity ? { intensity: result.intensity } : {}),
           // User-entered WOD name during logging takes priority; AI-generated name is fallback
           ...((result.metconName || result.exercise.aiPartName) && {
             aiPartName: result.metconName || result.exercise.aiPartName,
@@ -3164,7 +3162,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         ? perExerciseDuration
         : Math.max(timeCapSeconds, emomSeconds);
       const effectiveDuration = Math.max(totalDuration, programmedDuration);
-      const durationMinutes = effectiveDuration > 0 ? effectiveDuration / 60 : 0;
+      const durationMinutes = effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : 0;
 
       // DEBUG: Log duration calculation
       console.warn('⏱️ DURATION CALC', {
@@ -3412,19 +3410,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Hidden file inputs */}
+          {/* Hidden file input */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            onChange={handleFileSelect}
-            className={styles.hiddenInput}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
             onChange={handleFileSelect}
             className={styles.hiddenInput}
           />
@@ -3437,40 +3427,25 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
                 <circle cx="12" cy="13" r="4" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
-            <h2 className={styles.captureTitle}>Capture your WOD</h2>
+            <h2 className={styles.captureTitle}>Add your WOD photo</h2>
             <p className={styles.captureText}>
-              Take a photo or upload an image of your workout
+              Add an image of your workout
             </p>
 
             <div className={styles.captureButtons}>
               <Button
                 variant="primary"
-                onClick={() => cameraInputRef.current?.click()}
-                size="lg"
-                fullWidth
-                className={styles.capturePrimaryButton}
-                icon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="12" cy="13" r="4" />
-                  </svg>
-                }
-              >
-                Take Photo
-              </Button>
-              <Button
-                variant="secondary"
                 onClick={() => fileInputRef.current?.click()}
                 size="lg"
                 fullWidth
-                className={styles.captureSecondaryButton}
+                className={styles.capturePrimaryButton}
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 }
               >
-                Upload Image
+                Add photo
               </Button>
               <Button
                 variant="secondary"

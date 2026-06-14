@@ -17,7 +17,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     id: 'home',
-    label: 'Wall',
+    label: 'Today',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" strokeLinecap="round" strokeLinejoin="round" />
@@ -27,10 +27,13 @@ const navItems: NavItem[] = [
   },
   {
     id: 'history',
-    label: 'History',
+    label: 'Gallery',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 6h16M4 12h16M4 18h10" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="3" y="3" width="8" height="8" rx="1.5" />
+        <rect x="13" y="3" width="8" height="8" rx="1.5" />
+        <rect x="3" y="13" width="8" height="8" rx="1.5" />
+        <rect x="13" y="13" width="8" height="8" rx="1.5" />
       </svg>
     ),
   },

@@ -29,6 +29,7 @@ export interface LegacyExerciseResult {
   movementWeights?: Record<string, number>;
   movementAlternatives?: Record<string, string>;
   movementDistances?: Record<string, number>;
+  movementDistancesPerRep?: Record<string, number>;
   movementReps?: Record<string, number>;
   movementCalories?: Record<string, number>;
   rounds?: number;
@@ -198,7 +199,8 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   function buildMaps() {
     const mw: Record<string, number> = {}, md: Record<string, number> = {},
           mr: Record<string, number> = {}, mc: Record<string, number> = {},
-          ic: Record<string, number> = {}, ma: Record<string, string> = {};
+          ic: Record<string, number> = {}, ma: Record<string, string> = {},
+          mdpr: Record<string, number> = {};
     for (const m of r.movementResults ?? []) {
       const n = m.movement.name;
       if (m.kind === 'load' && m.weight != null && m.weight > 0) mw[n] = m.weight;
@@ -211,10 +213,19 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         if (!(m.distance != null && m.distance > 0)) md[n] = 0;
         if (!(m.calories != null && m.calories > 0)) mc[n] = 0;
       }
+      // For relay distance movements, store the per-trip distance so the workload builder
+      // can set distancePerRep correctly (critical when substituted, e.g. 200m run → 700m Echo Bike).
+      if (m.kind === 'distance' && (m.movement.distance ?? 0) > 0) {
+        const perTrip = m.substitution?.targetUnit === 'distance' && m.substitution.adjustedValue != null
+          ? m.substitution.adjustedValue
+          : m.movement.distance!;
+        mdpr[n] = perTrip;
+      }
     }
     return {
       ...(Object.keys(mw).length > 0 ? { movementWeights: mw } : {}),
       ...(Object.keys(md).length > 0 ? { movementDistances: md } : {}),
+      ...(Object.keys(mdpr).length > 0 ? { movementDistancesPerRep: mdpr } : {}),
       ...(Object.keys(mr).length > 0 ? { movementReps: mr } : {}),
       ...(Object.keys(mc).length > 0 ? { movementCalories: mc } : {}),
       ...(Object.keys(ic).length > 0 ? { implementCounts: ic } : {}),

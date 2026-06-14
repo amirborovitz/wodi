@@ -184,7 +184,6 @@ export function buildFunStats(data: RewardData): FunStat[] {
   // Divide by teamSize so share chips show the athlete's personal share.
   const teamSize = data.teamSize && data.teamSize > 1 ? data.teamSize : 1;
 
-  const totalVolume = Math.round((workloadBreakdown?.grandTotalVolume || workoutSummary.totalVolume || 0) / teamSize);
   const durationSec = Math.round((workoutSummary.duration || 0) * 60);
   const totalReps   = Math.round((workloadBreakdown?.grandTotalReps || workoutSummary.totalReps || 0) / teamSize);
   const totalDist   = Math.round((workloadBreakdown?.grandTotalDistance || 0) / teamSize);
@@ -192,16 +191,7 @@ export function buildFunStats(data: RewardData): FunStat[] {
   const totalCals   = Math.round((workloadBreakdown?.grandTotalCalories || 0) / teamSize);
   const hasPR       = heroAchievement?.type === 'pr';
 
-  // Priority order: VOL, TIME, PR, REPS, CARRY, DIST, CAL
-  if (totalVolume > 0) {
-    stats.push({
-      value: formatVolume(totalVolume),
-      label: 'VOL',
-      color: TRINITY.yellow,
-      glow: TRINITY_GLOW.yellow,
-    });
-  }
-
+  // Priority order: TIME, PR, REPS, CARRY, DIST, CAL
   if (durationSec > 0) {
     stats.push({
       value: formatTime(durationSec),
@@ -278,11 +268,6 @@ export function formatTime(totalSeconds: number): string {
     return `${hrs}:${rm.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-export function formatVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${parseFloat(kg.toFixed(1)).toLocaleString()}kg`;
 }
 
 export function getCompletedSets(exercise: Exercise) {

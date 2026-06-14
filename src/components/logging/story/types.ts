@@ -2,7 +2,6 @@ import type {
   ExerciseLoggingMode,
   ExerciseSet,
   Exercise,
-  IntensityRating,
   ParsedExercise,
   ParsedMovement,
   ParsedSectionType,
@@ -92,9 +91,6 @@ export interface StoryExerciseResult {
 
   // User-entered name for this metcon/WOD block (stored as aiPartName on the Exercise)
   metconName?: string;
-
-  // User-entered one-tap vibe check for metcon/WOD blocks only
-  intensity?: IntensityRating | null;
 }
 
 // Per-movement result within a superset or complex exercise
@@ -172,6 +168,9 @@ function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_m
   // Implement prefix (dumbbell/db/kettlebell/kb) means always weighted — even if the movement
   // name also contains a bodyweight word (e.g., "Dumbbell Burpee to Deadlift").
   if (/\b(dumbbell|dumbell|db|kettlebell|kb)\s+\w/i.test(n)) return 'weight';
+  // Explicit "weighted" modifier means load even if the base movement is normally bodyweight
+  // (e.g., "weighted box step up", "weighted pull-up", "weighted vest lunges").
+  if (/\bweighted\b/i.test(n)) return 'weight';
   // Check bodyweight BEFORE weighted (e.g., "chest to bar" shouldn't match "bar")
   if (BODYWEIGHT_NAME_PATTERNS.some(p => n.includes(p))) return 'bodyweight';
   if (/\bbanded?\b|band\b|rotation|hold\b/i.test(n)) return 'bodyweight';
@@ -182,6 +181,14 @@ function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_m
 
 export function movementToKind(mov: ParsedMovement): ExerciseKind {
   const nameClass = classifyMovementName(mov.name);
+  console.log('[movementToKind]', mov.name, { nameClass, inputType: mov.inputType, isBodyweight: mov.isBodyweight, reps: mov.reps, rxWeights: mov.rxWeights });
+
+  // Hard override: "weighted" in the name always means load — the athlete explicitly
+  // chose to add weight. This beats isBodyweight=true and inputType='none' from the AI,
+  // which often marks "box step up" as bodyweight even when "weighted" is prefixed.
+  if (/\bweighted\b/i.test(mov.name) && mov.inputType !== 'distance' && mov.inputType !== 'calories') {
+    return 'load';
+  }
 
   // Hard override: cardio machines → calories (distance-like)
   // Exception 1: AI explicitly says it's weighted.
@@ -198,17 +205,20 @@ export function movementToKind(mov: ParsedMovement): ExerciseKind {
   if (mov.inputType === 'calories') return 'distance';
   if (mov.inputType === 'distance') return 'distance';
 
-  // Rescue: AI says 'none' but name is clearly weighted → load
+  // Rescue: AI says 'none' or 'bodyweight' but has load evidence → load
   if (mov.inputType === 'none' || mov.isBodyweight) {
+    // rxWeights is explicit load evidence from the AI — trust it even if isBodyweight was set
+    if (mov.rxWeights) return 'load';
     if (nameClass === 'weight' && !mov.isBodyweight) return 'load';
     if (mov.time && mov.time > 0) return 'duration';
+    if (nameClass === 'distance_cardio') return 'distance';
     return 'reps';
   }
 
   // No inputType from AI — full fallback heuristics
   if (nameClass === 'weight' && !mov.isBodyweight) return 'load';
   if (nameClass === 'distance_cardio') {
-    return mov.distance ? 'reps' : 'distance';
+    return 'distance'; // DistanceField handles relay-count UI when prescribedDist > 0
   }
   if (mov.distance && mov.distance > 0) return 'distance';
   if (mov.time && mov.time > 0) return 'duration';
@@ -739,7 +749,14 @@ export function createBlankResult(
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
   teamSize?: number,
 ): StoryExerciseResult {
-  const kind = getDurationOverrideKind(exercise) ?? loggingModeToKind(loggingMode);
+  const baseKind = getDurationOverrideKind(exercise) ?? loggingModeToKind(loggingMode);
+  // "weighted" in exercise name contradicts a 'reps' classification — override to load.
+  // Guard against distance/calorie movements (e.g. "Weighted Vest Run").
+  const kind = (
+    baseKind === 'reps'
+    && /\bweighted\b/i.test(exercise.name)
+    && !exercise.movements?.some(m => m.inputType === 'distance' || m.inputType === 'calories')
+  ) ? 'load' : baseKind;
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
