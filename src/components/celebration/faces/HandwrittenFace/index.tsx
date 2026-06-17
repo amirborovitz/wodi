@@ -17,6 +17,8 @@ import { SkinSlab } from './SkinSlab';
 import { SkinChalk } from './SkinChalk';
 import { SkinFlare } from './SkinFlare';
 import { SkinStadium } from './SkinStadium';
+import { SkinBlueprint } from './SkinBlueprint';
+import { SkinPress } from './SkinPress';
 import styles from './index.module.css';
 
 // ─── Skin registry ─────────────────────────────────────────────────────────
@@ -26,6 +28,8 @@ const SKINS = [
   { id: 'chalk',   name: 'Chalk',   Comp: SkinChalk   },
   { id: 'flare',   name: 'Flare',   Comp: SkinFlare   },
   { id: 'stadium', name: 'Stadium', Comp: SkinStadium },
+  { id: 'blueprint', name: 'Blueprint', Comp: SkinBlueprint },
+  { id: 'press', name: 'Press', Comp: SkinPress },
 ] as const;
 
 type SkinId = typeof SKINS[number]['id'];
@@ -97,14 +101,20 @@ export function HandwrittenFace({
 
   // ── Skin controls ──────────────────────────────────────────────────────
 
-  const flipSkin = (): void => {
+  const stepSkin = (direction: 1 | -1): void => {
     setSkinIdx((i) => {
-      const next = (i + 1) % SKINS.length;
+      const next = (i + direction + SKINS.length) % SKINS.length;
       onPosterCustomizationChange?.({ posterSkin: SKINS[next].id });
       return next;
     });
     setPulse((p) => p + 1);
     setShowHint(false);
+  };
+
+  const stepSkinFromTap = (clientX: number, target: HTMLElement | null): void => {
+    const rect = target?.getBoundingClientRect();
+    const midpoint = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    stepSkin(clientX < midpoint ? -1 : 1);
   };
 
   const pickSkin = (i: number): void => {
@@ -143,8 +153,11 @@ export function HandwrittenFace({
     const vel = (dx / dt) * 1000;
     dragRef.current = null;
 
-    // Small movement = tap → flip skin
-    if (Math.abs(dx) < 8) { flipSkin(); return; }
+    // Small movement = tap: left half previous style, right half next style.
+    if (Math.abs(dx) < 8) {
+      stepSkinFromTap(e.changedTouches[0].clientX, carouselViewportRef.current);
+      return;
+    }
 
     const n = data.carouselPageData!.length;
     if ((dx < -40 || vel < -300) && carouselPage < n - 1) snapToPage(carouselPage + 1);
@@ -304,13 +317,19 @@ export function HandwrittenFace({
         <div className={styles.navSpacer} />
       </div>
 
-      <div ref={cardAreaRef} className={styles.cardArea} onClick={flipSkin} role="button" aria-label="Tap to change poster style">
+      <div
+        ref={cardAreaRef}
+        className={styles.cardArea}
+        onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
+        role="button"
+        aria-label="Tap left for previous style, right for next style"
+      >
         <div key={pulse} ref={cardContentRef} className={styles.cardWrapper} style={{ transform: `scale(${cardScale})` }}>
           <div ref={posterFrameRef}>
             <Skin wod={singleWod} vibe={vibe} />
           </div>
         </div>
-        {showHint && <div className={styles.tapHint}>Tap card to flip the style</div>}
+        {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
       </div>
 
       {bottomSheet}

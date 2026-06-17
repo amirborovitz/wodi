@@ -89,7 +89,7 @@ export type IntensityRating =
 export type FeelRating = IntensityRating;
 
 /** Poster skin choice on the celebration screen. Must match SKINS in HandwrittenFace/index.tsx */
-export type PosterSkinId = 'slab' | 'chalk' | 'flare' | 'stadium';
+export type PosterSkinId = 'slab' | 'chalk' | 'flare' | 'stadium' | 'blueprint' | 'press';
 
 /** Poster "FELT" vibe choice. Must match VIBE_KEYS in HandwrittenFace/brand.ts */
 export type PosterVibeKey = 'chill' | 'solid' | 'sweaty' | 'cooked' | 'smoked' | 'wrecked';

@@ -194,16 +194,16 @@
 
 .switcherTrack {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
+  border-radius: 18px;
   padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .switcherBtn {
-  flex: 1;
   padding: 9px 4px;
   border-radius: 999px;
   border: none;
