@@ -82,7 +82,16 @@ export function SkinSlab({ wod, vibe }: SkinSlabProps): React.JSX.Element {
               const parts = getMovementValueParts(wod, r);
               return (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '3px 0' }}>
-                  <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                  {parts.roundLabel ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '2px 6px', fontFamily: fD, fontSize: 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        {parts.roundLabel}
+                      </span>
+                      <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                    </div>
+                  ) : (
+                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                  )}
                   {parts.isStrength ? (
                     parts.strengthValue ? (
                       <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: BRAND.yellow, whiteSpace: 'nowrap', textAlign: 'right' }}>

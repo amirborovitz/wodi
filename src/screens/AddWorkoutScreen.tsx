@@ -1516,7 +1516,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const libraryInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   // Voice input state
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -1994,10 +1996,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      setShowPhotoMenu(false);
+      return;
+    }
 
     // Reset input value so selecting the same file again triggers onChange
     event.target.value = '';
+    setShowPhotoMenu(false);
 
     // Create preview URL
     const url = URL.createObjectURL(file);
@@ -3412,9 +3418,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         >
           {/* Hidden file input */}
           <input
-            ref={fileInputRef}
+            ref={libraryInputRef}
             type="file"
             accept="image/*"
+            onChange={handleFileSelect}
+            className={styles.hiddenInput}
+          />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
             onChange={handleFileSelect}
             className={styles.hiddenInput}
           />
@@ -3435,7 +3449,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             <div className={styles.captureButtons}>
               <Button
                 variant="primary"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setShowPhotoMenu(true)}
                 size="lg"
                 fullWidth
                 className={styles.capturePrimaryButton}
@@ -3447,6 +3461,45 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
               >
                 Add photo
               </Button>
+              {showPhotoMenu && (
+                <div className={styles.photoMenuOverlay} onClick={() => setShowPhotoMenu(false)}>
+                  <motion.div
+                    className={styles.photoMenu}
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.18 }}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={styles.photoMenuOption}
+                      onClick={() => {
+                        setShowPhotoMenu(false);
+                        libraryInputRef.current?.click();
+                      }}
+                    >
+                      <span className={styles.photoMenuTitle}>Choose from library</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.photoMenuOption}
+                      onClick={() => {
+                        setShowPhotoMenu(false);
+                        cameraInputRef.current?.click();
+                      }}
+                    >
+                      <span className={styles.photoMenuTitle}>Take photo</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.photoMenuCancel}
+                      onClick={() => setShowPhotoMenu(false)}
+                    >
+                      Cancel
+                    </button>
+                  </motion.div>
+                </div>
+              )}
               <Button
                 variant="secondary"
                 onClick={() => { setVoiceTranscript(''); setStep('voice'); }}

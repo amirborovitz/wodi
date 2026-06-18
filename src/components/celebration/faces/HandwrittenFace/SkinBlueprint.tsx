@@ -123,9 +123,15 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
                   padding: '5px 0',
                   borderBottom: `1px solid rgba(140,180,255,0.13)`,
                 }}>
-                  <span style={{ fontFamily: fM, fontSize: 9, color: GRID_DIM, minWidth: 16, letterSpacing: '0.02em' }}>
-                    {String(num + 1).padStart(2, '0')}
-                  </span>
+                  {parts.roundLabel ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '1px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                      {parts.roundLabel}
+                    </span>
+                  ) : (
+                    <span style={{ fontFamily: fM, fontSize: 9, color: GRID_DIM, minWidth: 16, letterSpacing: '0.02em' }}>
+                      {String(num + 1).padStart(2, '0')}
+                    </span>
+                  )}
                   <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 800, lineHeight: 1.25 }}>{parts.movName}</span>
                   {parts.isStrength ? (
                     parts.strengthValue ? (

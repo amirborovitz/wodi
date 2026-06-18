@@ -47,6 +47,7 @@ export interface PosterLine {
   load: string; // "60/40kg" (prescribed)
   mine: string; // "60kg" (what user did)
   team: string; // "50" — per-partner share of the prescribed total (partner workouts only)
+  roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
 }
 
 export type PosterRow = PosterBlock | PosterLine;
@@ -388,7 +389,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
       rxLabel = row.name; // fallback: just "Run"
     }
   } else if (row.roundLabel != null) {
-    rxLabel = `${row.roundLabel}  ${row.primary}`.trim();
+    rxLabel = row.primary ?? '';
   } else {
     rxLabel = row.primary ? `${row.primary} ${row.name}` : row.name;
   }
@@ -406,7 +407,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     }
   }
 
-  return { kind: 'line', rx: rxLabel.trim(), load, mine, team };
+  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, roundLabel: row.roundLabel };
 }
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────

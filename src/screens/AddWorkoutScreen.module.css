@@ -97,6 +97,56 @@
   gap: var(--space-3);
 }
 
+.photoMenuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-4) + var(--safe-bottom));
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.photoMenu {
+  width: min(100%, 400px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.photoMenuOption,
+.photoMenuCancel {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+}
+
+.photoMenuOption:first-child {
+  color: #0c0d0f;
+  background: #f5c200;
+  border-color: #f5c200;
+}
+
+.photoMenuTitle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photoMenuCancel {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-2);
+}
+
 .error {
   width: 100%;
   max-width: 400px;

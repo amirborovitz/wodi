@@ -84,7 +84,16 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
               const parts = getMovementValueParts(wod, r);
               return (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '1.5px 0' }}>
-                  <span style={{ fontFamily: fH, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{parts.movName}</span>
+                  {parts.roundLabel ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: '2px 6px', fontFamily: fD, fontSize: 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                        {parts.roundLabel}
+                      </span>
+                      <span style={{ fontFamily: fH, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{parts.movName}</span>
+                    </div>
+                  ) : (
+                    <span style={{ fontFamily: fH, fontSize: 23, fontWeight: 500, lineHeight: 1.1 }}>{parts.movName}</span>
+                  )}
                   {parts.isStrength ? (
                     parts.strengthValue ? (
                       <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap', textAlign: 'right' }}>{parts.strengthValue}</span>

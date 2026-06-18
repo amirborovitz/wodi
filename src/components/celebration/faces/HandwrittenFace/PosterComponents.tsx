@@ -30,6 +30,8 @@ export interface MovementValueParts {
   me: string | null;
   /** Solo workouts: the single "what I did" value, e.g. "60kg". */
   single: string | null;
+  /** Round label chip text — "R1", "R2", "BUY-IN" for pyramid/chipper rows. */
+  roundLabel?: string;
 }
 
 export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementValueParts {
@@ -37,12 +39,14 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   const isStrength = wod.type === 'STRENGTH';
 
   if (isStrength) {
-    return { movName, isStrength: true, strengthValue: embeddedLoad || r.load || null, team: null, me: null, single: null };
+    return { movName, isStrength: true, strengthValue: embeddedLoad || r.load || null, team: null, me: null, single: null, roundLabel: r.roundLabel };
   }
   if (r.team) {
-    return { movName, isStrength: false, strengthValue: null, team: r.team, me: r.mine || null, single: null };
+    return { movName, isStrength: false, strengthValue: null, team: r.team, me: r.mine || null, single: null, roundLabel: r.roundLabel };
   }
-  return { movName, isStrength: false, strengthValue: null, team: null, me: null, single: r.mine || null };
+  // Prefer logged weight (mine); fall back to prescribed load (r.load) so pyramid rows
+  // show their weight even when mine-map lookup fails (round-label rows have no movement name).
+  return { movName, isStrength: false, strengthValue: null, team: null, me: null, single: r.mine || r.load || null, roundLabel: r.roundLabel };
 }
 
 // ─── Wordmark ─────────────────────────────────────────────────────────────

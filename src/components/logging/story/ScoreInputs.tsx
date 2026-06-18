@@ -42,19 +42,22 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
     setSecondText(totalSeconds > 0 ? String(seconds).padStart(2, '0') : '');
   }, [totalSeconds, minutes, seconds]);
 
-  const normalizeTimeFields = useCallback(() => {
-    const parsedMinutes = parseInt(minuteText.replace(/\D/g, '') || '0', 10) || 0;
-    const parsedSeconds = Math.min(59, parseInt(secondText.replace(/\D/g, '') || '0', 10) || 0);
+  const normalizeTimeFields = useCallback((currentMins: string, currentSecs: string) => {
+    const parsedMinutes = parseInt(currentMins.replace(/\D/g, '') || '0', 10) || 0;
+    const parsedSeconds = Math.min(59, parseInt(currentSecs.replace(/\D/g, '') || '0', 10) || 0);
     const hasAnyTime = parsedMinutes > 0 || parsedSeconds > 0;
     setMinuteText(hasAnyTime ? String(parsedMinutes).padStart(2, '0') : '');
     setSecondText(hasAnyTime ? String(parsedSeconds).padStart(2, '0') : '');
-  }, [minuteText, secondText]);
+  }, []);
 
   const handleMinutesChange = useCallback((value: string) => {
     const digits = value.replace(/\D/g, '');
     const nextMinuteText = digits.slice(0, 2);
     setMinuteText(nextMinuteText);
     setTime(parseInt(nextMinuteText || '0', 10) || 0, parseInt(secondText.replace(/\D/g, '') || '0', 10) || 0);
+    if (nextMinuteText.length === 2) {
+      secRef.current?.focus();
+    }
   }, [secondText, setTime]);
 
   const handleSecondsChange = useCallback((value: string) => {
@@ -86,13 +89,13 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
             onPointerUp={(e) => selectAllInput(e.currentTarget)}
             onChange={(e) => handleMinutesChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || (e.key >= '0' && e.key <= '9' && (e.currentTarget.value.length >= 2))) {
+              if (e.key === 'Enter') {
                 secRef.current?.focus();
               }
             }}
-            onBlur={() => {
+            onBlur={(e) => {
               activeFieldRef.current = null;
-              normalizeTimeFields();
+              normalizeTimeFields(e.currentTarget.value, secondText);
             }}
           />
           <span className={styles.timeDrumLabel}>min</span>
@@ -115,9 +118,9 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
             }}
             onPointerUp={(e) => selectAllInput(e.currentTarget)}
             onChange={(e) => handleSecondsChange(e.target.value)}
-            onBlur={() => {
+            onBlur={(e) => {
               activeFieldRef.current = null;
-              normalizeTimeFields();
+              normalizeTimeFields(minuteText, e.currentTarget.value);
             }}
           />
           <span className={styles.timeDrumLabel}>sec</span>

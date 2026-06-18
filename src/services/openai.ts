@@ -112,6 +112,21 @@ Return ONLY valid JSON:
       { sectionType: "rounds", rounds: 1, movements: [BOB×10, PC×30, Thruster×20, Row×10] }
     ]
   The top-level movements[] should still list the UNIQUE set of movements (deduplicated) for reference.
+- CRITICAL — PYRAMID / PALINDROME CHIPPER RULE: When a for-time workout has multiple distinct sections
+  where the SAME movement names appear but with DIFFERENT reps, distances, or calories per section
+  (e.g., descending/ascending patterns like "600m / 400m / 200m / 400m / 600m", pyramid structures),
+  DO NOT collapse into a flat movement list. Emit one sections entry per section with "rounds": 1,
+  listing that section's EXACT movements with its specific reps/distances.
+  Signal patterns: mirrored/alternating distances or reps, pyramid (down then up or up then down),
+  sections separated by "/" or listed as "Round 1:", "Round 2:", etc. with identical movement names but different quantities.
+  Example: "600m Run, 60 KB SDHP, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 200m Run, 20 C2B, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 600m Run, 60 KB SDHP, 10 Burpee" →
+    sections: [
+      { sectionType: "rounds", rounds: 1, movements: [Run×600m, KB SDHP×60, Burpee×10] },
+      { sectionType: "rounds", rounds: 1, movements: [Run×400m, KB Swing×40, Burpee×10] },
+      { sectionType: "rounds", rounds: 1, movements: [Run×200m, C2B Pull-up×20, Burpee×10] },
+      { sectionType: "rounds", rounds: 1, movements: [Run×400m, KB Swing×40, Burpee×10] },
+      { sectionType: "rounds", rounds: 1, movements: [Run×600m, KB SDHP×60, Burpee×10] }
+    ]
 - CRITICAL — CHIPPER RULE: In for_time workouts where the same movement appears on
   multiple separate lines WITHOUT an explicit "X rounds" or "X sets" wrapper, you MUST
   preserve EVERY line as its own movement entry, in order, even when the name and quantity
@@ -722,6 +737,32 @@ Output:
   }]
 }
 NOTE: Each round is a separate sections entry with rounds: 1. DO NOT collapse into one "rounds: 5" section when each round's movement list is different. The movements[] at the top lists unique movements for reference only.
+
+### 17. Pyramid / palindrome chipper (same movement count per section, different reps/distances)
+Input: "For time: 600m Run, 60 KB SDHP, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 200m Run, 20 Chest-to-Bar Pull-up, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 600m Run, 60 KB SDHP, 10 Burpee (30 min TC)"
+Output:
+{
+  "title": "5-Round Pyramid For Time", "type": "for_time", "format": "for_time", "scoreType": "time", "timeCap": 1800,
+  "exercises": [{
+    "name": "5-Round Pyramid For Time", "type": "wod", "loggingMode": "for_time",
+    "prescription": "5-section pyramid for time · 30 min cap",
+    "movements": [
+      { "name": "Run", "distance": 600, "inputType": "none" },
+      { "name": "KB Sumo Deadlift High Pull", "reps": 60, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+      { "name": "Burpee", "reps": 10, "inputType": "none" },
+      { "name": "American Kettlebell Swing", "reps": 40, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+      { "name": "Chest-to-Bar Pull-up", "reps": 20, "inputType": "none" }
+    ],
+    "sections": [
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Run", "distance": 600, "inputType": "none" }, { "name": "KB Sumo Deadlift High Pull", "reps": 60, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Burpee", "reps": 10, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Run", "distance": 400, "inputType": "none" }, { "name": "American Kettlebell Swing", "reps": 40, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Burpee", "reps": 10, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Run", "distance": 200, "inputType": "none" }, { "name": "Chest-to-Bar Pull-up", "reps": 20, "inputType": "none" }, { "name": "Burpee", "reps": 10, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Run", "distance": 400, "inputType": "none" }, { "name": "American Kettlebell Swing", "reps": 40, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Burpee", "reps": 10, "inputType": "none" }] },
+      { "sectionType": "rounds", "rounds": 1, "movements": [{ "name": "Run", "distance": 600, "inputType": "none" }, { "name": "KB Sumo Deadlift High Pull", "reps": 60, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Burpee", "reps": 10, "inputType": "none" }] }
+    ]
+  }]
+}
+NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The movements[] at top lists unique movements (deduplicated) for reference. DO NOT flatten all sections into one movement list — the pyramid structure must be preserved.
 
 If image is not a workout, return: {"error": "Could not parse workout from image"}`;
 

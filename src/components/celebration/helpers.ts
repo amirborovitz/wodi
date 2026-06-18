@@ -219,6 +219,16 @@ export function getSectionedForTimeLabel(exercise?: Exercise | null): string | u
     && roundSections.some((s, i) => i > 0 && (s.movements ?? []).length !== (roundSections[i - 1].movements ?? []).length);
   if (isProgressive) return `progressive ${roundSections.length}-round chipper`;
 
+  const movCounts = roundSections.map((s) => (s.movements ?? []).length);
+  const isPyramid = roundSections.every((s) => (s.rounds ?? 1) === 1)
+    && movCounts[0] > 0
+    && movCounts.every((c) => c === movCounts[0])
+    && roundSections.some((s, i) => i > 0 && (s.movements ?? []).some((mov, j) => {
+      const prevMov = (roundSections[i - 1].movements ?? [])[j];
+      return !!prevMov && (mov.reps !== prevMov.reps || mov.distance !== prevMov.distance || mov.calories !== prevMov.calories);
+    }));
+  if (isPyramid) return `${roundSections.length}-round pyramid for time`;
+
   const roundCounts = roundSections
     .map((section) => section.rounds)
     .filter((rounds): rounds is number => typeof rounds === 'number' && rounds > 0);
@@ -921,6 +931,23 @@ function isProgressiveChipper(exercise: Exercise | null | undefined): boolean {
   return counts.some((c, i) => i > 0 && c !== counts[i - 1]);
 }
 
+function isPyramidChipper(exercise: Exercise | null | undefined): boolean {
+  if (!exercise?.sections?.length) return false;
+  const roundSections = exercise.sections.filter((s) => s.sectionType === 'rounds');
+  if (roundSections.length < 2) return false;
+  if (!roundSections.every((s) => (s.rounds ?? 1) === 1)) return false;
+  const counts = roundSections.map((s) => (s.movements ?? []).length);
+  if (counts[0] === 0 || counts.some((c) => c !== counts[0])) return false;
+  return roundSections.some((s, i) => {
+    if (i === 0) return false;
+    const prev = roundSections[i - 1];
+    return (s.movements ?? []).some((mov, j) => {
+      const prevMov = (prev.movements ?? [])[j];
+      return !!prevMov && (mov.reps !== prevMov.reps || mov.distance !== prevMov.distance || mov.calories !== prevMov.calories);
+    });
+  });
+}
+
 function abbreviateMovementForPoster(name: string): string {
   return name
     .replace(/\bDumbbell\b/gi, 'DB')
@@ -954,7 +981,7 @@ function formatProgressiveMovementData(
   return { movement: (plusPrefix ? '+ ' : '') + parts.join(' · '), weight };
 }
 
-function buildProgressiveChipperRows(sections: ParsedSection[]): ArtifactRow[] {
+function buildProgressiveChipperRows(sections: ParsedSection[], showAllMovements = false): ArtifactRow[] {
   const rows: ArtifactRow[] = [];
   let roundIndex = 1;
   let prevMovNames: Set<string> = new Set();
@@ -971,8 +998,9 @@ function buildProgressiveChipperRows(sections: ParsedSection[]): ArtifactRow[] {
     } else {
       const isFirst = roundIndex === 1;
       const isLast = roundIndex === totalRounds;
-      // R1: full · R2…R(n-1): diff with + prefix · Rn: full cumulative
-      const diffOnly = !isFirst && !isLast;
+      // Building chipper: R1 full, R2…R(n-1) diff with + prefix, Rn full cumulative
+      // Pyramid chipper (showAllMovements): always show full movements per section
+      const diffOnly = !showAllMovements && !isFirst && !isLast;
       const { movement, weight } = formatProgressiveMovementData(movements, prevMovNames, diffOnly, diffOnly);
       rows.push({ roundLabel: `R${roundIndex}`, name: `round-${roundIndex}`, primary: movement, subNote: weight, accent: 'magenta' });
       prevMovNames = new Set(movements.map((m) => m.name.toLowerCase()));
@@ -1062,6 +1090,21 @@ export function buildRewardArtifactSections(
       title: 'Blueprint',
       blueprint: blueprint ?? undefined,
       rows: buildProgressiveChipperRows(mainExercise!.sections!),
+    }];
+  }
+
+  // Pyramid/palindrome chipper: same movement count per section, different reps/distances
+  if (isPyramidChipper(mainExercise)) {
+    const pyramidSections = mainExercise!.sections!.filter((s) => s.sectionType === 'rounds');
+    const pyramidBlueprint = normalizeBlueprint([
+      `${pyramidSections.length}-round pyramid for time`,
+      timeCapLabel ? `· ${timeCapLabel}` : null,
+    ].filter(Boolean).join(' '));
+    return [{
+      eyebrow: 'FOR TIME',
+      title: 'Blueprint',
+      blueprint: pyramidBlueprint,
+      rows: buildProgressiveChipperRows(mainExercise!.sections!, true),
     }];
   }
 
