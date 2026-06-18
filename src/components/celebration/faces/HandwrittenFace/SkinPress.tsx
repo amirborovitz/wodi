@@ -11,7 +11,7 @@ import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterC
 
 interface SkinPressProps {
   wod: PosterWod;
-  vibe: VibeKey;
+  vibe: VibeKey | null;
 }
 
 export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
@@ -136,7 +136,7 @@ export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
               )}
             </div>
           </div>
-          <VibeStamp vibe={vibe} scale={0.78} color={BRAND.paperInk} />
+          {vibe && <VibeStamp vibe={vibe} scale={0.78} color={BRAND.paperInk} />}
         </div>
       </div>
 

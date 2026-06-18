@@ -1,7 +1,5 @@
 /**
- * PosterComponents.tsx — Shared brand-lock components used by all three skins.
- *
- * Wordmark, FormatTag, VibeStamp — inline styles only, matching the design source exactly.
+ * Shared poster components used by all handwritten skins.
  */
 
 import React from 'react';
@@ -9,28 +7,19 @@ import { BRAND, VIBE, fD, fB } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod, PosterLine } from './posterData';
 
-// Splits "50->65KG Push Press" → { name: "Push Press", load: "50->65KG" }.
-// Returns { name: rx, load: '' } when no embedded load prefix is found.
 export function parseRxLoad(rx: string): { name: string; load: string } {
   const match = rx.match(/^(\d+(?:\.\d+)?(?:\s*->\s*\d+(?:\.\d+)?)?\s*(?:kg|lb))\s+(.+)$/i);
   if (!match) return { name: rx, load: '' };
   return { name: match[2], load: match[1] };
 }
 
-// ─── Movement row right-side value(s) ─────────────────────────────────────
-
 export interface MovementValueParts {
   movName: string;
   isStrength: boolean;
-  /** STRENGTH rows: prescribed/embedded load string, e.g. "60/40KG". */
   strengthValue: string | null;
-  /** Partner workouts: per-partner share of the prescribed total, e.g. "50". */
   team: string | null;
-  /** Partner workouts: the athlete's own personal value (weight only), e.g. "40kg". */
   me: string | null;
-  /** Solo workouts: the single "what I did" value, e.g. "60kg". */
   single: string | null;
-  /** Round label chip text — "R1", "R2", "BUY-IN" for pyramid/chipper rows. */
   roundLabel?: string;
 }
 
@@ -39,17 +28,38 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   const isStrength = wod.type === 'STRENGTH';
 
   if (isStrength) {
-    return { movName, isStrength: true, strengthValue: embeddedLoad || r.load || null, team: null, me: null, single: null, roundLabel: r.roundLabel };
+    return {
+      movName,
+      isStrength: true,
+      strengthValue: embeddedLoad || r.load || null,
+      team: null,
+      me: null,
+      single: null,
+      roundLabel: r.roundLabel,
+    };
   }
   if (r.team) {
-    return { movName, isStrength: false, strengthValue: null, team: r.team, me: r.mine || null, single: null, roundLabel: r.roundLabel };
+    return {
+      movName,
+      isStrength: false,
+      strengthValue: null,
+      team: r.team,
+      me: r.mine || null,
+      single: null,
+      roundLabel: r.roundLabel,
+    };
   }
-  // Prefer logged weight (mine); fall back to prescribed load (r.load) so pyramid rows
-  // show their weight even when mine-map lookup fails (round-label rows have no movement name).
-  return { movName, isStrength: false, strengthValue: null, team: null, me: null, single: r.mine || r.load || null, roundLabel: r.roundLabel };
-}
 
-// ─── Wordmark ─────────────────────────────────────────────────────────────
+  return {
+    movName,
+    isStrength: false,
+    strengthValue: null,
+    team: null,
+    me: null,
+    single: r.mine || r.load || null,
+    roundLabel: r.roundLabel,
+  };
+}
 
 interface WordmarkProps {
   color: string;
@@ -73,8 +83,6 @@ export function Wordmark({ color, dot = BRAND.yellow, size = 15 }: WordmarkProps
     </span>
   );
 }
-
-// ─── FormatTag ────────────────────────────────────────────────────────────
 
 interface FormatTagProps {
   label: string;
@@ -106,8 +114,6 @@ export function FormatTag({ label, color, fill = 'transparent' }: FormatTagProps
   );
 }
 
-// ─── VibeStamp ────────────────────────────────────────────────────────────
-
 interface VibeStampProps {
   vibe: VibeKey;
   scale?: number;
@@ -117,21 +123,27 @@ interface VibeStampProps {
 export function VibeStamp({ vibe, scale = 1, color }: VibeStampProps): React.JSX.Element {
   const v = VIBE[vibe];
   const c = color ?? v.color;
+
   return (
     <div
       style={{
-        transform: `rotate(-7deg) scale(${scale})`,
+        minWidth: 112,
+        height: 52,
+        transform: `rotate(-5deg) scale(${scale})`,
         transformOrigin: 'center',
         display: 'inline-flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1,
+        flexShrink: 0,
         padding: '5px 13px 4px',
-        border: `2.5px solid ${c}`,
-        borderRadius: 4,
+        border: `3px solid ${c}`,
+        borderRadius: 5,
         color: c,
+        background: 'rgba(11,12,14,0.08)',
+        boxShadow: '0 8px 18px rgba(0,0,0,0.28)',
         lineHeight: 1,
-        backgroundImage:
-          'repeating-linear-gradient(108deg, transparent 0 3px, rgba(0,0,0,0.05) 3px 5px)',
       }}
     >
       <span
@@ -140,6 +152,9 @@ export function VibeStamp({ vibe, scale = 1, color }: VibeStampProps): React.JSX
           fontSize: 6.5,
           fontWeight: 900,
           letterSpacing: '0.32em',
+          textTransform: 'uppercase',
+          color: c,
+          whiteSpace: 'nowrap',
         }}
       >
         · FELT ·
@@ -147,10 +162,12 @@ export function VibeStamp({ vibe, scale = 1, color }: VibeStampProps): React.JSX
       <span
         style={{
           fontFamily: fD,
-          fontSize: 21,
+          fontSize: 24,
           fontWeight: 900,
           letterSpacing: '0.03em',
-          marginTop: 1,
+          color: c,
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
         }}
       >
         {v.label}

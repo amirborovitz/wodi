@@ -34,12 +34,12 @@ export interface VibeConfig {
 }
 
 export const VIBE: Record<VibeKey, VibeConfig> = {
-  chill: { label: 'CHILL', color: BRAND.yellow },
+  chill: { label: 'CHILL', color: '#37D29B' },
   solid: { label: 'SOLID', color: BRAND.yellow },
-  sweaty: { label: 'SWEATY', color: BRAND.yellow },
-  cooked: { label: 'COOKED', color: BRAND.yellow },
-  smoked: { label: 'SMOKED', color: BRAND.yellow },
-  wrecked: { label: 'WRECKED', color: BRAND.yellow },
+  sweaty: { label: 'SWEATY', color: '#FB923C' },
+  cooked: { label: 'COOKED', color: '#FF4444' },
+  smoked: { label: 'SMOKED', color: '#C566FF' },
+  wrecked: { label: 'WRECKED', color: '#8590A8' },
 };
 
 export const VIBE_KEYS: VibeKey[] = ['chill', 'solid', 'sweaty', 'cooked', 'smoked', 'wrecked'];

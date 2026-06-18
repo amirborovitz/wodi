@@ -13,7 +13,7 @@ import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterC
 
 interface SkinFlareProps {
   wod: PosterWod;
-  vibe: VibeKey;
+  vibe: VibeKey | null;
 }
 
 export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
@@ -122,7 +122,7 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
               )}
             </div>
           </div>
-          <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />
+          {vibe && <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />}
         </div>
       </div>
 

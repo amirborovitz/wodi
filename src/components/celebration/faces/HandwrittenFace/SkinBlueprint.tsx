@@ -11,7 +11,7 @@ import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterC
 
 interface SkinBlueprintProps {
   wod: PosterWod;
-  vibe: VibeKey;
+  vibe: VibeKey | null;
 }
 
 const NAVY = '#192640';
@@ -180,7 +180,7 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
               )}
             </div>
           </div>
-          <VibeStamp vibe={vibe} scale={0.78} color={BRAND.yellow} />
+          {vibe && <VibeStamp vibe={vibe} scale={0.78} color={BRAND.yellow} />}
         </div>
       </div>
 

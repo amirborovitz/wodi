@@ -23,7 +23,11 @@
 /* Reward mode: fixed viewport height, scrolls internally */
 .containerReward {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   align-items: center;
   justify-content: center;

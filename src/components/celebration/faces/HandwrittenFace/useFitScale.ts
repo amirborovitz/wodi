@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Scales content down (never up) so it fits entirely within its container's
@@ -12,7 +12,7 @@ export function useFitScale<C extends HTMLElement, T extends HTMLElement>(
   const contentRef = useRef<T | null>(null);
   const [scale, setScale] = useState(1);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     const content = contentRef.current;
     if (!container || !content) return;
@@ -21,9 +21,9 @@ export function useFitScale<C extends HTMLElement, T extends HTMLElement>(
       const containerHeight = container.clientHeight;
       const contentHeight = content.scrollHeight;
       if (containerHeight > 0 && contentHeight > 0) {
-        // Never shrink below 88% — past that, body text drops under the
-        // design system's 11px minimum and becomes hard to read.
-        setScale(Math.min(1, Math.max(0.88, containerHeight / contentHeight)));
+        // Long pyramid/chipper posters need a little give, but staying near
+        // full size is more important than forcing every tall skin to fit.
+        setScale(Math.min(1, Math.max(0.84, containerHeight / contentHeight)));
       }
     };
 

@@ -6,8 +6,8 @@
  *                   tap to cycle skins. Page dots show position.
  */
 
-import React, { useState, useRef, useMemo } from 'react';
-import { motion, useMotionValue, animate as fmAnimate } from 'framer-motion';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'framer-motion';
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
@@ -19,20 +19,20 @@ import { SkinFlare } from './SkinFlare';
 import { SkinStadium } from './SkinStadium';
 import { SkinBlueprint } from './SkinBlueprint';
 import { SkinPress } from './SkinPress';
+import { SkinHazard } from './SkinHazard';
 import styles from './index.module.css';
 
 // ─── Skin registry ─────────────────────────────────────────────────────────
 
 const SKINS = [
-  { id: 'slab',    name: 'Slab',    Comp: SkinSlab    },
-  { id: 'chalk',   name: 'Chalk',   Comp: SkinChalk   },
-  { id: 'flare',   name: 'Flare',   Comp: SkinFlare   },
-  { id: 'stadium', name: 'Stadium', Comp: SkinStadium },
+  { id: 'slab',      name: 'Slab',      Comp: SkinSlab      },
+  { id: 'chalk',     name: 'Chalk',     Comp: SkinChalk     },
+  { id: 'flare',     name: 'Flare',     Comp: SkinFlare     },
+  { id: 'stadium',   name: 'Stadium',   Comp: SkinStadium   },
+  { id: 'press',     name: 'Press',     Comp: SkinPress     },
   { id: 'blueprint', name: 'Blueprint', Comp: SkinBlueprint },
-  { id: 'press', name: 'Press', Comp: SkinPress },
+  { id: 'hazard',    name: 'Hazard',    Comp: SkinHazard    },
 ] as const;
-
-type SkinId = typeof SKINS[number]['id'];
 
 // ─── Vibe derivation ───────────────────────────────────────────────────────
 
@@ -42,14 +42,47 @@ const INTENSITY_VIBE_MAP: Record<string, VibeKey> = {
   solid: 'solid', easy_day: 'chill', survived: 'wrecked', dialed_in: 'solid',
 };
 
-function deriveVibe(data: CelebrationFaceProps['data']): VibeKey {
+/** Real signal only — legacy per-exercise intensity logged before "Felt" moved to the poster. */
+function getLoggedVibe(data: CelebrationFaceProps['data']): VibeKey | null {
   const userVibe = data.exercises?.find((ex) => ex.intensity)?.intensity;
-  if (userVibe && INTENSITY_VIBE_MAP[userVibe]) return INTENSITY_VIBE_MAP[userVibe];
+  return (userVibe && INTENSITY_VIBE_MAP[userVibe]) || null;
+}
+
+/** Pure guess (EP-based) — only used to pre-seed the Felt picker, never shown unconfirmed. */
+function guessVibe(data: CelebrationFaceProps['data']): VibeKey {
   const ep = data.totalEP ?? 0;
   if (ep >= 250) return 'cooked';
   if (ep >= 160) return 'smoked';
   if (ep >= 80)  return 'sweaty';
   return 'solid';
+}
+
+// ─── Bottom bar icons ───────────────────────────────────────────────────────
+
+function StyleIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FeltIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 2.5s6 6.7 6 11a6 6 0 1 1-12 0c0-4.3 6-11 6-11Z" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ShareIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 15.5V4" strokeLinecap="round" />
+      <path d="M7.5 8.5 12 4l4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 14v4.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -61,15 +94,19 @@ export function HandwrittenFace({
     const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
     return saved >= 0 ? saved : 0;
   });
-  const [vibe, setVibe]               = useState<VibeKey>(() => data.posterVibe ?? deriveVibe(data));
+  const [vibe, setVibe]               = useState<VibeKey>(() => data.posterVibe ?? getLoggedVibe(data) ?? guessVibe(data));
+  const [vibeConfirmed, setVibeConfirmed] = useState<boolean>(() => (data.posterVibe ?? getLoggedVibe(data)) != null);
   const [pulse, setPulse]             = useState<number>(0);
   const [showHint, setShowHint]       = useState<boolean>(true);
   const [isPosterSharing, setSharing] = useState<boolean>(false);
   const [shareToast, setShareToast]   = useState<string | null>(null);
   const [carouselPage, setCarouselPage] = useState<number>(0);
+  const [activePanel, setActivePanel] = useState<'style' | 'felt' | null>(null);
+  const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
 
   const posterFrameRef    = useRef<HTMLDivElement>(null);
   const carouselViewportRef = useRef<HTMLDivElement>(null);
+  const skinChipRowRef    = useRef<HTMLDivElement>(null);
   const carouselX         = useMotionValue(0);
   const dragRef           = useRef<{ x: number; t: number } | null>(null);
 
@@ -123,6 +160,25 @@ export function HandwrittenFace({
     setShowHint(false);
     onPosterCustomizationChange?.({ posterSkin: SKINS[i].id });
   };
+
+  // ── Bottom bar panel ───────────────────────────────────────────────────
+
+  const measureSkinScroll = (): void => {
+    const el = skinChipRowRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    const thumbPct = Math.min(100, (clientWidth / scrollWidth) * 100);
+    const maxScroll = scrollWidth - clientWidth;
+    const offsetPct = maxScroll > 0 ? (scrollLeft / maxScroll) * (100 - thumbPct) : 0;
+    setSkinScroll({ thumbPct, offsetPct });
+  };
+
+  useEffect(() => {
+    if (activePanel === 'style') measureSkinScroll();
+  }, [activePanel]);
+
+  const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
+  const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
 
   // ── Carousel swipe ─────────────────────────────────────────────────────
 
@@ -206,37 +262,65 @@ export function HandwrittenFace({
     } finally { setSharing(false); }
   };
 
-  // ─── Shared bottom sheet ──────────────────────────────────────────────
+  // ─── Shared bottom bar ────────────────────────────────────────────────
 
-  const bottomSheet = (
-    <div className={styles.bottomSheet}>
-      <div className={styles.switcherRow}>
-        <span className={styles.switcherLabel}>STYLE</span>
-        <div className={styles.switcherTrack}>
-          {SKINS.map((s, i) => (
-            <button key={s.id as SkinId} className={styles.switcherBtn}
-              style={{ background: i === skinIdx ? '#f5c200' : 'transparent', color: i === skinIdx ? '#0b0c0e' : 'rgba(255,255,255,0.7)' }}
-              onClick={(e) => { e.stopPropagation(); pickSkin(i); }}>
-              {s.name}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={styles.switcherRow}>
-        <span className={styles.switcherLabel}>FELT</span>
-        <div className={styles.vibeTrack}>
-          {VIBE_KEYS.map((k) => (
-            <button key={k} className={styles.vibeBtn}
-              style={{ background: k === vibe ? VIBE[k].color : 'rgba(255,255,255,0.06)', border: k === vibe ? 'none' : '1px solid rgba(255,255,255,0.1)', color: k === vibe ? '#0a0c0f' : 'rgba(255,255,255,0.6)' }}
-              onClick={(e) => { e.stopPropagation(); setVibe(k); onPosterCustomizationChange?.({ posterVibe: k }); }}>
-              {VIBE[k].label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={styles.shareRow}>
+  const bottomBar = (
+    <div className={styles.bottomBar}>
+      <AnimatePresence initial={false}>
+        {activePanel === 'style' && (
+          <motion.div key="style-panel" className={styles.panel}
+            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
+            <div ref={skinChipRowRef} className={styles.skinChipRow} onScroll={measureSkinScroll}>
+              {SKINS.map((s, i) => (
+                <button key={s.id} className={`${styles.skinChip} ${i === skinIdx ? styles.skinChipActive : ''}`}
+                  onClick={(e) => { e.stopPropagation(); pickSkin(i); }}>
+                  {s.name}
+                </button>
+              ))}
+            </div>
+            {skinScroll.thumbPct < 100 && (
+              <div className={styles.scrollTrack}>
+                <div className={styles.scrollThumb} style={{ width: `${skinScroll.thumbPct}%`, transform: `translateX(${skinScroll.offsetPct}%)` }} />
+              </div>
+            )}
+          </motion.div>
+        )}
+        {activePanel === 'felt' && (
+          <motion.div key="felt-panel" className={styles.panel}
+            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
+            <div className={styles.feltChipRow}>
+              {VIBE_KEYS.map((k) => (
+                <button key={k} className={`${styles.feltChip} ${vibeConfirmed && k === vibe ? styles.feltChipActive : ''}`}
+                  style={vibeConfirmed && k === vibe ? { background: VIBE[k].color } : undefined}
+                  onClick={(e) => { e.stopPropagation(); setVibe(k); setVibeConfirmed(true); onPosterCustomizationChange?.({ posterVibe: k }); }}>
+                  {VIBE[k].label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className={styles.tabRow}>
+        <button className={`${styles.tabBtn} ${activePanel === 'style' ? styles.tabBtnActive : ''}`}
+          onClick={toggleStylePanel} aria-pressed={activePanel === 'style'} aria-label="Change poster style">
+          <span className={styles.tabIcon}><StyleIcon /></span>
+          <span className={styles.tabLabel}>Style</span>
+        </button>
+        <button className={`${styles.tabBtn} ${activePanel === 'felt' ? styles.tabBtnActive : ''}`}
+          onClick={toggleFeltPanel} aria-pressed={activePanel === 'felt'} aria-label="Change how it felt">
+          <span className={styles.tabIcon}><FeltIcon /></span>
+          <span className={styles.tabLabel}>Felt</span>
+        </button>
         <button className={styles.shareBtn} onClick={handleShare} disabled={isPosterSharing} aria-label="Share to Story">
-          {isPosterSharing ? <span className={styles.shareSpinner} /> : 'Share to Story'}
+          {isPosterSharing ? <span className={styles.shareSpinner} /> : (
+            <>
+              <span className={styles.shareIcon}><ShareIcon /></span>
+              <span>Share</span>
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -272,14 +356,14 @@ export function HandwrittenFace({
         {/* Swipeable card deck */}
         <div
           ref={(el) => { carouselViewportRef.current = el; carouselAreaRef.current = el; }}
-          className={styles.carouselViewport}
+          className={`${styles.carouselViewport} ${activePanel ? styles.carouselViewportPanelOpen : ''}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
           <motion.div className={styles.carouselSlider} style={{ x: carouselX }}>
             {pageWods.map((pageWod, i) => (
-              <div key={i} className={styles.carouselSlide}>
+              <div key={i} className={`${styles.carouselSlide} ${activePanel ? styles.carouselSlidePanelOpen : ''}`}>
                 <div
                   key={`${pulse}-${i}`}
                   ref={i === carouselPage ? carouselContentRef : undefined}
@@ -291,7 +375,7 @@ export function HandwrittenFace({
                   }}
                 >
                   <div ref={i === carouselPage ? posterFrameRef : undefined}>
-                    <Skin wod={pageWod} vibe={vibe} />
+                    <Skin wod={pageWod} vibe={vibeConfirmed ? vibe : null} />
                   </div>
                 </div>
               </div>
@@ -299,7 +383,7 @@ export function HandwrittenFace({
           </motion.div>
         </div>
 
-        {bottomSheet}
+        {bottomBar}
         {shareToast && <div className={styles.toast} role="status">{shareToast}</div>}
       </div>
     );
@@ -319,20 +403,20 @@ export function HandwrittenFace({
 
       <div
         ref={cardAreaRef}
-        className={styles.cardArea}
+        className={`${styles.cardArea} ${activePanel ? styles.cardAreaPanelOpen : ''}`}
         onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
         role="button"
         aria-label="Tap left for previous style, right for next style"
       >
         <div key={pulse} ref={cardContentRef} className={styles.cardWrapper} style={{ transform: `scale(${cardScale})` }}>
           <div ref={posterFrameRef}>
-            <Skin wod={singleWod} vibe={vibe} />
+            <Skin wod={singleWod} vibe={vibeConfirmed ? vibe : null} />
           </div>
         </div>
         {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
       </div>
 
-      {bottomSheet}
+      {bottomBar}
       {shareToast && <div className={styles.toast} role="status">{shareToast}</div>}
     </div>
   );

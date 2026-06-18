@@ -12,7 +12,7 @@ import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterC
 
 interface SkinStadiumProps {
   wod: PosterWod;
-  vibe: VibeKey;
+  vibe: VibeKey | null;
 }
 
 const GLOW_SOFT = `0 0 8px ${BRAND.yellow}40`;
@@ -221,9 +221,11 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
             )}
           </div>
           {/* Stamp overlaps the digit area — does not compress digit width */}
-          <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 1 }}>
-            <VibeStamp vibe={vibe} scale={0.78} />
-          </div>
+          {vibe && (
+            <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 1 }}>
+              <VibeStamp vibe={vibe} scale={0.78} />
+            </div>
+          )}
         </div>
       </div>
 

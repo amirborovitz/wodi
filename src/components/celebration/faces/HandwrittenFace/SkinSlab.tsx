@@ -15,7 +15,7 @@ import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterC
 
 interface SkinSlabProps {
   wod: PosterWod;
-  vibe: VibeKey;
+  vibe: VibeKey | null;
 }
 
 export function SkinSlab({ wod, vibe }: SkinSlabProps): React.JSX.Element {
@@ -137,7 +137,7 @@ export function SkinSlab({ wod, vibe }: SkinSlabProps): React.JSX.Element {
               )}
             </div>
           </div>
-          <VibeStamp vibe={vibe} scale={0.78} />
+          {vibe && <VibeStamp vibe={vibe} scale={0.78} />}
         </div>
       </div>
 
