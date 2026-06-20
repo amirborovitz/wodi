@@ -1,28 +1,43 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { FirebaseError } from 'firebase/app';
 import { useAuth } from '../context/AuthContext';
 import styles from './LoginScreen.module.css';
 
+function describeSignInError(err: unknown): string {
+  const code = err instanceof FirebaseError ? err.code : undefined;
+  return code ? `Failed to sign in. (${code})` : 'Failed to sign in. Please try again.';
+}
+
 export function LoginScreen() {
-  const { signInWithGoogle } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const { signInWithGoogle, signInWithApple } = useAuth();
+  const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
-    setLoading(true);
+    setLoading('google');
     setError(null);
     try {
       await signInWithGoogle();
     } catch (err) {
-      setError('Failed to sign in. Please try again.');
+      setError(describeSignInError(err));
       console.error(err);
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
-  const handleAppleSignIn = () => {
-    setError('Apple sign-in is not available yet.');
+  const handleAppleSignIn = async () => {
+    setLoading('apple');
+    setError(null);
+    try {
+      await signInWithApple();
+    } catch (err) {
+      setError(describeSignInError(err));
+      console.error(err);
+    } finally {
+      setLoading(null);
+    }
   };
 
   const handleEmailSignIn = () => {
@@ -62,6 +77,7 @@ export function LoginScreen() {
             type="button"
             className={styles.appleButton}
             onClick={handleAppleSignIn}
+            disabled={loading !== null}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
@@ -69,14 +85,14 @@ export function LoginScreen() {
                 d="M16.37 1.43c0 1.14-.41 2.2-1.12 3.02-.86.96-2.26 1.7-3.56 1.6a4.3 4.3 0 0 1-.03-.5c0-1.1.48-2.28 1.17-3.05.76-.86 2.08-1.5 3.54-1.57v.5Zm4.3 16.16c-.35.82-.76 1.58-1.24 2.28-.66.98-1.2 1.66-1.62 2.05-.64.64-1.33.97-2.09 1-.55 0-1.2-.16-1.96-.47-.77-.31-1.48-.47-2.13-.47-.67 0-1.39.16-2.17.47-.78.31-1.41.48-1.9.5-.73.03-1.44-.31-2.11-1.03-.43-.4-.99-1.1-1.67-2.1-.73-1.05-1.33-2.26-1.8-3.63-.5-1.47-.75-2.9-.75-4.28 0-1.58.34-2.94 1.02-4.08.53-.92 1.25-1.65 2.15-2.18a5.81 5.81 0 0 1 2.9-.83c.57 0 1.32.18 2.24.53.92.36 1.52.54 1.78.54.2 0 .86-.2 1.98-.61 1.05-.38 1.93-.54 2.65-.49 1.95.16 3.42.93 4.4 2.3-1.74 1.05-2.6 2.52-2.58 4.4.01 1.46.54 2.67 1.57 3.63.47.45 1 .8 1.58 1.04-.13.39-.28.78-.44 1.16Z"
               />
             </svg>
-            Continue with Apple
+            {loading === 'apple' ? 'Connecting...' : 'Continue with Apple'}
           </button>
 
           <button
             type="button"
             className={styles.googleButton}
             onClick={handleGoogleSignIn}
-            disabled={loading}
+            disabled={loading !== null}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path
@@ -96,7 +112,7 @@ export function LoginScreen() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            {loading ? 'Connecting...' : 'Continue with Google'}
+            {loading === 'google' ? 'Connecting...' : 'Continue with Google'}
           </button>
 
           <button

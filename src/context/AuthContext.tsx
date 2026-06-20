@@ -14,7 +14,8 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, googleProvider, db, storage } from '../services/firebase';
+import { auth, googleProvider, appleProvider, db, storage } from '../services/firebase';
+import { removeUndefined } from '../utils/firestoreUtils';
 import type { User, UserStats, UserGoals } from '../types';
 
 interface UserProfileUpdate {
@@ -30,6 +31,7 @@ interface AuthContextValue {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   updateUserGoals: (goals: UserGoals) => Promise<void>;
   updateUserPhoto: (file: File) => Promise<string>;
@@ -48,6 +50,34 @@ const DEFAULT_STATS: UserStats = {
 };
 
 const USER_CACHE_KEY = 'wodboard_user_cache';
+
+function buildNewUserFromFirebase(fbUser: FirebaseUser): Omit<User, 'id'> {
+  return {
+    email: fbUser.email || '',
+    displayName: fbUser.displayName || 'Athlete',
+    photoUrl: fbUser.photoURL || undefined,
+    photoUpdatedAt: undefined,
+    createdAt: new Date(),
+    stats: DEFAULT_STATS,
+  };
+}
+
+// Retries transient Firestore failures (e.g. a freshly-issued auth token not yet
+// propagated for the very first request right after sign-in).
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, delayMs = 600): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
 
 function getCachedUser(): User | null {
   try {
@@ -112,53 +142,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Single source of truth for turning a Firestore user doc (or its absence) into a `User`.
+  // Used by both the cold-start fetch and the background cache refresh so the two paths
+  // can't drift apart again — a doc missing entirely or missing individual fields (e.g.
+  // a partial doc created by a stats-increment write before account creation ever landed)
+  // is backfilled the same way regardless of which caller hit it.
+  const loadOrCreateUserDoc = async (fbUser: FirebaseUser): Promise<User> => {
+    const userRef = doc(db, 'users', fbUser.uid);
+    const userSnap = await withRetry(() => getDoc(userRef));
+
+    if (!userSnap.exists()) {
+      const newUser = buildNewUserFromFirebase(fbUser);
+      await withRetry(() => setDoc(userRef, removeUndefined({ ...newUser, createdAt: serverTimestamp() })));
+      return { id: fbUser.uid, ...newUser };
+    }
+
+    const data = userSnap.data();
+    const cached = getCachedUser();
+    const cachedPhotoNewer = cached?.photoUpdatedAt && (!data.photoUpdatedAt || cached.photoUpdatedAt > data.photoUpdatedAt);
+
+    // TEMP MIGRATION (2026-06-19): heals users/{uid} docs left partial by the
+    // now-fixed `photoUpdatedAt: undefined` setDoc bug (see firestoreUtils.ts).
+    // That bug is fixed, so no new doc should ever need this. Safe to delete this
+    // block once the one known affected user reopens the app and their doc shows
+    // email/displayName/createdAt in the Firebase Console.
+    const backfill: Record<string, unknown> = {};
+    if (!data.email && fbUser.email) backfill.email = fbUser.email;
+    if (!data.displayName && fbUser.displayName) backfill.displayName = fbUser.displayName;
+    if (!data.createdAt) backfill.createdAt = serverTimestamp();
+    if (Object.keys(backfill).length > 0) {
+      setDoc(userRef, backfill, { merge: true }).catch(() => {});
+    }
+
+    return {
+      id: fbUser.uid,
+      email: data.email || fbUser.email || '',
+      displayName: data.displayName || fbUser.displayName || 'Athlete',
+      photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
+      photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
+      createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
+      stats: { ...DEFAULT_STATS, ...data.stats },
+      goals: data.goals,
+      birthYear: data.birthYear ?? data.age,
+      weight: data.weight,
+      sex: data.sex,
+      onboardingComplete: data.onboardingComplete,
+    };
+  };
+
   const fetchAndSetUser = async (fbUser: FirebaseUser) => {
     try {
-      const userRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userRef);
-
-      let userData: User;
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        const cached = getCachedUser();
-        const cachedPhotoNewer = cached?.photoUpdatedAt && (!data.photoUpdatedAt || cached.photoUpdatedAt > data.photoUpdatedAt);
-        userData = {
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          displayName: data.displayName || fbUser.displayName || 'Athlete',
-          photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
-          photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
-          createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
-          stats: data.stats || DEFAULT_STATS,
-          goals: data.goals,
-          birthYear: data.birthYear ?? data.age,
-          weight: data.weight,
-          sex: data.sex,
-          onboardingComplete: data.onboardingComplete,
-        };
-      } else {
-        // Create new user document
-        const newUser: Omit<User, 'id'> = {
-          email: fbUser.email || '',
-          displayName: fbUser.displayName || 'Athlete',
-          photoUrl: fbUser.photoURL || undefined,
-          photoUpdatedAt: undefined,
-          createdAt: new Date(),
-          stats: DEFAULT_STATS,
-        };
-
-        await setDoc(userRef, {
-          ...newUser,
-          createdAt: serverTimestamp(),
-        });
-
-        userData = { id: fbUser.uid, ...newUser };
-      }
-
+      const userData = await loadOrCreateUserDoc(fbUser);
       setUser(userData);
       setCachedUser(userData);
 
       // Stamp last-active (fire-and-forget)
+      const userRef = doc(db, 'users', fbUser.uid);
       setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -179,33 +218,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUserData = async (fbUser: FirebaseUser) => {
     try {
+      const userData = await loadOrCreateUserDoc(fbUser);
+      setUser(userData);
+      setCachedUser(userData);
+
+      // Stamp last-active (fire-and-forget)
       const userRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        const cached = getCachedUser();
-        const cachedPhotoNewer = cached?.photoUpdatedAt && (!data.photoUpdatedAt || cached.photoUpdatedAt > data.photoUpdatedAt);
-        const userData: User = {
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          displayName: data.displayName || fbUser.displayName || 'Athlete',
-          photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
-          photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
-          createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
-          stats: data.stats || DEFAULT_STATS,
-          goals: data.goals,
-          birthYear: data.birthYear ?? data.age,
-          weight: data.weight,
-          sex: data.sex,
-          onboardingComplete: data.onboardingComplete,
-        };
-        setUser(userData);
-        setCachedUser(userData);
-
-        // Stamp last-active (fire-and-forget)
-        setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
-      }
+      setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error refreshing user data:', error);
     }
@@ -268,7 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const userRef = doc(db, 'users', firebaseUser.uid);
-      await setDoc(userRef, profile, { merge: true });
+      await setDoc(userRef, removeUndefined(profile), { merge: true });
 
       const updatedUser = { ...user, ...profile };
       setUser(updatedUser);
@@ -298,6 +317,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithApple = async () => {
+    try {
+      await signInWithPopup(auth, appleProvider);
+    } catch (error) {
+      console.error('Error signing in with Apple:', error);
+      throw error;
+    }
+  };
+
   const signOut = async () => {
     try {
       setCachedUser(null);
@@ -314,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       firebaseUser,
       loading,
       signInWithGoogle,
+      signInWithApple,
       signOut,
       updateUserGoals,
       updateUserPhoto,

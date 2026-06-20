@@ -20,12 +20,24 @@ export interface MovementValueParts {
   team: string | null;
   me: string | null;
   single: string | null;
+  total: string | null;
   roundLabel?: string;
+}
+
+function formatTotalNote(note: string | undefined): string | null {
+  if (!note) return null;
+  return note
+    .replace(/\btotal\b/i, 'TOTAL')
+    .replace(/\bkm\b/i, 'KM')
+    .replace(/\bm\b/i, 'M')
+    .replace(/\bcal\b/i, 'CAL')
+    .replace(/\breps\b/i, 'REPS');
 }
 
 export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementValueParts {
   const { name: movName, load: embeddedLoad } = parseRxLoad(r.rx);
   const isStrength = wod.type === 'STRENGTH';
+  const total = formatTotalNote(r.total);
 
   if (isStrength) {
     return {
@@ -35,6 +47,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       team: null,
       me: null,
       single: null,
+      total,
       roundLabel: r.roundLabel,
     };
   }
@@ -46,6 +59,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       team: r.team,
       me: r.mine || null,
       single: null,
+      total,
       roundLabel: r.roundLabel,
     };
   }
@@ -56,7 +70,8 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     strengthValue: null,
     team: null,
     me: null,
-    single: r.mine || r.load || null,
+    single: r.mine || r.load || total,
+    total,
     roundLabel: r.roundLabel,
   };
 }

@@ -32,6 +32,7 @@ import { StoryLogResults } from '../components/logging/story/StoryLogResults';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
+import { removeUndefined } from '../utils/firestoreUtils';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
@@ -84,6 +85,7 @@ interface ExerciseResult {
 }
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
+const SAVED_WORKOUTS_EMAIL = 'aborovitz@gmail.com';
 
 const CINDY_MOVEMENTS = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat'];
 const DT_MOVEMENTS = ['deadlift', 'hang clean', 'hang power clean', 'shoulder to overhead', 'push jerk'];
@@ -764,29 +766,6 @@ interface SavedWorkout {
 
 const SAVED_WORKOUTS_KEY = 'wodboard.savedWorkouts';
 const SAVED_WORKOUTS_LIMIT = 12;
-
-// Helper to remove undefined values from objects (Firestore doesn't accept undefined)
-function removeUndefined<T>(obj: T): T {
-  if (Array.isArray(obj)) {
-    return obj.map(removeUndefined) as T;
-  }
-  if (obj !== null && typeof obj === 'object') {
-    // Preserve special Firebase FieldValue objects (serverTimestamp, increment, etc.)
-    // and Date objects
-    const proto = Object.getPrototypeOf(obj);
-    if (proto !== Object.prototype && proto !== null) {
-      return obj; // Return special objects unchanged
-    }
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        cleaned[key] = removeUndefined(value);
-      }
-    }
-    return cleaned as T;
-  }
-  return obj;
-}
 
 function readSavedWorkouts(): SavedWorkout[] {
   if (typeof window === 'undefined') return [];
@@ -1509,6 +1488,7 @@ async function refineWorkoutIfNeeded(
 export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showRecentOnOpen, editWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = user?.email === ADMIN_EMAIL;
+  const canUseSavedWorkouts = user?.email?.toLowerCase() === SAVED_WORKOUTS_EMAIL;
   const { calculateRewardData } = useRewardData();
   const { workouts: recentWorkouts } = useWorkouts(10);
   const [step, setStep] = useState<Step>('capture');
@@ -1517,8 +1497,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   // Voice input state
   const [voiceTranscript, setVoiceTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -1602,8 +1580,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   const teamSize = parsedWorkout?.teamSize || (isPartnerWorkout ? 2 : 1);
   const partnerFactor = isPartnerWorkout ? 1 / teamSize : 1;
   useEffect(() => {
-    setSavedWorkouts(readSavedWorkouts());
-  }, []);
+    setSavedWorkouts(canUseSavedWorkouts ? readSavedWorkouts() : []);
+  }, [canUseSavedWorkouts]);
 
   useEffect(() => {
     if (showRecentOnOpen && isAdmin) {
@@ -1897,6 +1875,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   }, [step, currentExerciseIndex, parsedWorkout, loggingGuidance]);
 
   const persistSavedWorkouts = (next: SavedWorkout[]) => {
+    if (!canUseSavedWorkouts) return;
     setSavedWorkouts(next);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(SAVED_WORKOUTS_KEY, JSON.stringify(next));
@@ -1904,6 +1883,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   };
 
   const addSavedWorkout = (workout: ParsedWorkout) => {
+    if (!canUseSavedWorkouts) return;
     const newEntry: SavedWorkout = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
@@ -1934,6 +1914,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   };
 
   const handleSelectSavedWorkout = (saved: SavedWorkout) => {
+    if (!canUseSavedWorkouts) return;
     setParsedWorkout(normalizeParsedWorkout(saved.workout));
     setImageUrl(null);
     setError(null);
@@ -1941,11 +1922,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   };
 
   const handleRemoveSavedWorkout = (id: string) => {
+    if (!canUseSavedWorkouts) return;
     const next = savedWorkouts.filter((entry) => entry.id !== id);
     persistSavedWorkouts(next);
   };
 
   const handleClearSavedWorkouts = () => {
+    if (!canUseSavedWorkouts) return;
     persistSavedWorkouts([]);
   };
 
@@ -1997,13 +1980,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      setShowPhotoMenu(false);
       return;
     }
 
     // Reset input value so selecting the same file again triggers onChange
     event.target.value = '';
-    setShowPhotoMenu(false);
 
     // Create preview URL
     const url = URL.createObjectURL(file);
@@ -3424,15 +3405,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             onChange={handleFileSelect}
             className={styles.hiddenInput}
           />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileSelect}
-            className={styles.hiddenInput}
-          />
-
           {/* Main capture area */}
           <Card variant="outlined" padding="lg" className={styles.captureCard}>
             <div className={styles.captureIcon}>
@@ -3449,7 +3421,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             <div className={styles.captureButtons}>
               <Button
                 variant="primary"
-                onClick={() => setShowPhotoMenu(true)}
+                onClick={() => libraryInputRef.current?.click()}
                 size="lg"
                 fullWidth
                 className={styles.capturePrimaryButton}
@@ -3461,45 +3433,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
               >
                 Add photo
               </Button>
-              {showPhotoMenu && (
-                <div className={styles.photoMenuOverlay} onClick={() => setShowPhotoMenu(false)}>
-                  <motion.div
-                    className={styles.photoMenu}
-                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.18 }}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      className={styles.photoMenuOption}
-                      onClick={() => {
-                        setShowPhotoMenu(false);
-                        libraryInputRef.current?.click();
-                      }}
-                    >
-                      <span className={styles.photoMenuTitle}>Choose from library</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.photoMenuOption}
-                      onClick={() => {
-                        setShowPhotoMenu(false);
-                        cameraInputRef.current?.click();
-                      }}
-                    >
-                      <span className={styles.photoMenuTitle}>Take photo</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.photoMenuCancel}
-                      onClick={() => setShowPhotoMenu(false)}
-                    >
-                      Cancel
-                    </button>
-                  </motion.div>
-                </div>
-              )}
               <Button
                 variant="secondary"
                 onClick={() => { setVoiceTranscript(''); setStep('voice'); }}
@@ -3527,7 +3460,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             </motion.div>
           )}
 
-          {savedWorkouts.length > 0 && (
+          {canUseSavedWorkouts && savedWorkouts.length > 0 && (
             <div className={styles.savedSection}>
               <div className={styles.savedHeader}>
                 <h3 className={styles.savedTitle}>Saved WODs</h3>

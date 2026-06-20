@@ -780,6 +780,26 @@ function getMovementDisplayNameFromContext(
     return nameWords.every((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`).test(lower));
   });
   if (!matchingClause) return name;
+  const escapedName = nameWords
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  const compoundMatch = matchingClause.match(new RegExp(`\\b(${escapedName})(\\s*(?:&|\\+|and|to)\\s+[a-z][a-z\\s-]*)`, 'i'));
+  if (compoundMatch) {
+    const suffix = compoundMatch[2]
+      .replace(/\s+(?:@|\d+(?:\.\d+)?\s*(?:kg|lb|lbs)?|rx|tc|cap).*$/i, '')
+      .trim();
+    if (suffix) {
+      const displaySuffix = suffix
+        .toLowerCase()
+        .replace(/\b[a-z]/g, (char) => char.toUpperCase())
+        .replace(/\bAnd\b/g, 'and')
+        .replace(/\bTo\b/g, 'to');
+      return `${name}${suffix}`
+        .replace(suffix, displaySuffix)
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
   const source = matchingClause.toLowerCase();
   const hasDb = /\b(?:db'?s?|dumbbells?)\b/i.test(source);
   const hasKb = /\b(?:kb'?s?|kettlebells?)\b/i.test(source);
@@ -857,7 +877,7 @@ function buildCelebrationMovementRow(params: {
     const relayCount = hasPrescribedDist && totalDistance && totalDistance > perRoundDistance
       ? Math.round(totalDistance / perRoundDistance)
       : 0;
-    const isCleanRelay = relayCount >= 2
+    const isCleanRelay = actual?.wasSubstituted && relayCount >= 2
       && Math.abs(relayCount * perRoundDistance - (totalDistance ?? 0)) < 1;
     primary = isCleanRelay ? `${relayCount}×` : `${perRoundDistance}m`;
     if (!suppressDistanceTotal && totalDistance && totalDistance !== perRoundDistance) {
@@ -899,7 +919,7 @@ function buildCelebrationMovementRow(params: {
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
     ? Math.round(totalDistance / perRoundDistance)
     : 0;
-  const isRelayRow = relayCountForName >= 2
+  const isRelayRow = actual?.wasSubstituted && relayCountForName >= 2
     && perRoundDistance != null
     && Math.abs(relayCountForName * perRoundDistance - (totalDistance ?? 0)) < 1;
   const relayDistLabel = isRelayRow && perRoundDistance != null
@@ -911,13 +931,31 @@ function buildCelebrationMovementRow(params: {
       ? `${displayName} @ ${weight}${unit}${weightEachSuffix}`
       : undefined;
 
-  return {
+  const result = {
     primary,
     name: displayName,
     nameWithLoad,
+    loadNote: hasWeight ? `${weight}${unit}${weightEachSuffix}` : undefined,
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
+    totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
     accent,
   };
+
+  {
+    console.log('[CelebrationDebug:buildCelebrationMovementRow]', {
+      movementName,
+      weight,
+      hasWeight,
+      actualWeight: actual?.weight,
+      prescribedWeight: prescribed?.weight,
+      isStrength,
+      perRoundReps,
+      totalReps,
+      result,
+    });
+  }
+
+  return result;
 }
 
 // ─── Progressive chipper helpers ─────────────────────────────────────────────
@@ -1173,7 +1211,7 @@ export function buildRewardArtifactSections(
     });
   });
 
-  if (shouldLogCelebrationDebug()) {
+  {
     console.warn('[CelebrationDebug:v20260503-single-artifact]', {
       path: 'buildRewardArtifactSections',
       rawText,
@@ -1755,7 +1793,7 @@ function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined
   return globalLabels[globalFormat || ''] || 'WOD';
 }
 
-function buildFormatLine(format: string | undefined, exercises: Exercise[], durationMinutes: number, timeCap?: number, teamSize?: number): string | undefined {
+function buildFormatLine(format: string | undefined, exercises: Exercise[], _durationMinutes: number, timeCap?: number, teamSize?: number): string | undefined {
   const formatLabels: Record<string, string> = { for_time: 'For Time', amrap: 'AMRAP', amrap_intervals: 'AMRAP', emom: 'EMOM', intervals: 'Intervals', strength: 'Strength', tabata: 'Tabata' };
   if (!format) return undefined;
   const partnerSuffix = teamSize && teamSize > 1 ? (teamSize === 2 ? ' · In Pairs' : ` · Team of ${teamSize}`) : '';
@@ -1775,7 +1813,7 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], dura
     else if (count > 0) base = count + ' × AMRAP';
     else base = 'AMRAP Intervals';
   } else if (format === 'amrap') {
-    const cap = timeCap ? Math.round(timeCap / 60) : durationMinutes;
+    const cap = timeCap ? Math.round(timeCap / 60) : 0;
     base = cap > 0 ? `${cap} min ${label}` : label;
   } else if (format === 'emom') {
     const ex = exercises[0];
@@ -1783,7 +1821,7 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], dura
     const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
     const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
-    else { const cap = timeCap ? Math.round(timeCap / 60) : durationMinutes; base = cap > 0 ? `${cap} min ${label}` : label; }
+    else { const cap = timeCap ? Math.round(timeCap / 60) : 0; base = cap > 0 ? `${cap} min ${label}` : label; }
   } else if (format === 'intervals') {
     const ex = exercises[0];
     const intervalSets = ex?.sets?.length || ex?.rounds || 0;

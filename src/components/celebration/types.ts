@@ -40,7 +40,9 @@ export interface ArtifactRow {
   primary: string;
   name: string;
   nameWithLoad?: string;
+  loadNote?: string;
   subNote?: string;
+  totalNote?: string;
   accent: 'yellow' | 'magenta' | 'cyan';
   missing?: boolean;
   stationRow?: boolean;

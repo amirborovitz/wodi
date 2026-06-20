@@ -499,6 +499,26 @@ function getMovementDisplayNameFromContext(
     return nameWords.every((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`).test(lower));
   });
   if (!matchingClause) return name;
+  const escapedName = nameWords
+    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+');
+  const compoundMatch = matchingClause.match(new RegExp(`\\b(${escapedName})(\\s*(?:&|\\+|and|to)\\s+[a-z][a-z\\s-]*)`, 'i'));
+  if (compoundMatch) {
+    const suffix = compoundMatch[2]
+      .replace(/\s+(?:@|\d+(?:\.\d+)?\s*(?:kg|lb|lbs)?|rx|tc|cap).*$/i, '')
+      .trim();
+    if (suffix) {
+      const displaySuffix = suffix
+        .toLowerCase()
+        .replace(/\b[a-z]/g, (char) => char.toUpperCase())
+        .replace(/\bAnd\b/g, 'and')
+        .replace(/\bTo\b/g, 'to');
+      return `${name}${suffix}`
+        .replace(suffix, displaySuffix)
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
   const source = matchingClause.toLowerCase();
   const hasDb = /\b(?:db'?s?|dumbbells?)\b/i.test(source);
   const hasKb = /\b(?:kb'?s?|kettlebells?)\b/i.test(source);
@@ -585,13 +605,14 @@ function buildCelebrationMovementRow(params: {
 
   let primary = '-';
   if (perRoundDistance && perRoundDistance > 0) {
-    // When a fixed distance is prescribed and the total is a clean multiple, show relay
-    // count ("5 × 200M") so it reads as "how many times I ran" rather than a distance blob.
+    // Substitution relay rows use a compact trip count. Normal repeated-distance
+    // rows keep the per-set prescription visible and put the accumulated distance
+    // in the total note.
     const hasPrescribedDist = (prescribed?.distance ?? 0) > 0;
     const relayCount = hasPrescribedDist && totalDistance && totalDistance > perRoundDistance
       ? Math.round(totalDistance / perRoundDistance)
       : 0;
-    const isCleanRelay = relayCount >= 2
+    const isCleanRelay = actual?.wasSubstituted && relayCount >= 2
       && Math.abs(relayCount * perRoundDistance - (totalDistance ?? 0)) < 1;
     primary = isCleanRelay ? `${relayCount}×` : `${perRoundDistance}m`;
     if (!suppressDistanceTotal && totalDistance && totalDistance !== perRoundDistance) {
@@ -637,7 +658,7 @@ function buildCelebrationMovementRow(params: {
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
     ? Math.round(totalDistance / perRoundDistance)
     : 0;
-  const isRelayRow = relayCountForName >= 2
+  const isRelayRow = actual?.wasSubstituted && relayCountForName >= 2
     && perRoundDistance != null
     && Math.abs(relayCountForName * perRoundDistance - (totalDistance ?? 0)) < 1;
   const relayDistLabel = isRelayRow && perRoundDistance != null
@@ -653,7 +674,9 @@ function buildCelebrationMovementRow(params: {
     primary,
     name: displayName,
     nameWithLoad,
+    loadNote: hasWeight ? `${weight}${unit}${weightEachSuffix}` : undefined,
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
+    totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
     accent,
   };
 }
@@ -1736,7 +1759,7 @@ export function inferTeamSizeFromText(text?: string): number | undefined {
 function buildFormatLine(
   format: string | undefined,
   exercises: Exercise[],
-  durationMinutes: number,
+  _durationMinutes: number,
   timeCap?: number,
   teamSize?: number,
 ): string | undefined {
@@ -1783,7 +1806,7 @@ function buildFormatLine(
       base = 'AMRAP Intervals';
     }
   } else if (format === 'amrap') {
-    const cap = timeCap ? Math.round(timeCap / 60) : durationMinutes;
+    const cap = timeCap ? Math.round(timeCap / 60) : 0;
     base = cap > 0 ? `${cap} min ${label}` : label;
   } else if (format === 'emom') {
     // Use the single exercise (there is only one at this point)
@@ -1795,7 +1818,7 @@ function buildFormatLine(
     if (intervalSets > 0 && intervalTime) {
       base = `${intervalSets} \u00d7 every ${intervalTime}`;
     } else {
-      const cap = timeCap ? Math.round(timeCap / 60) : durationMinutes;
+      const cap = timeCap ? Math.round(timeCap / 60) : 0;
       base = cap > 0 ? `${cap} min ${label}` : label;
     }
   } else if (format === 'intervals') {
@@ -2627,7 +2650,6 @@ export function buildRewardArtifactSections(
       prescribed,
       actual: movement,
       repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? repeatCount,
-      suppressDistanceTotal: true,
     });
   });
 

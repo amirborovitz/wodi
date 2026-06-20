@@ -130,9 +130,10 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
   }
 
   // Superset: multiple movements → dedicated per-movement input.
-  // Exception: EMOM/intervals with mixed bodyweight/cardio movements (e.g. Cindy)
+  // Exception: EMOM with mixed bodyweight/cardio movements (e.g. Cindy)
   // still go to ScoreMovementInputs. But an all-weighted complex (e.g. Power Clean +
   // Squat Clean + Push Jerk EMOM) gets SupersetInput for shared barbell weight.
+  // (kind 'intervals' is EMOM-only now — "X sets for time" maps to 'score_time' above.)
   const isWeightedComplex = kind === 'intervals' && movements.every(mr => mr.kind === 'load');
   if (movements.length > 1 && (kind !== 'intervals' || isWeightedComplex)) {
     return <SupersetInput result={result} onChange={onChange} />;
@@ -153,7 +154,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     case 'distance':
       return <DistanceInput result={result} onChange={onChange} />;
     case 'intervals': {
-      // Just show per-movement inputs — the interval count is fixed and redundant.
+      // EMOM: no time/score input — just confirm per-movement weight/distance.
       return (
         <ScoreMovementInputs
           movements={movements}

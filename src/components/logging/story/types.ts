@@ -243,7 +243,9 @@ const LOGGING_MODE_TO_KIND: Record<ExerciseLoggingMode, ExerciseKind> = {
   for_time:         'score_time',
   amrap:            'score_rounds',
   amrap_intervals:  'score_rounds',
-  intervals:        'intervals',
+  // "X sets for time" (scoreType time_per_set) is scored by completion time,
+  // same as for_time — only EMOM has no time score (fixed cadence, reps-based).
+  intervals:        'score_time',
   emom:             'intervals',
 };
 

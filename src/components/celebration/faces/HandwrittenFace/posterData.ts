@@ -46,6 +46,7 @@ export interface PosterLine {
   rx: string;   // "10 Deadlift"
   load: string; // "60/40kg" (prescribed)
   mine: string; // "60kg" (what user did)
+  total?: string;
   team: string; // "50" — per-partner share of the prescribed total (partner workouts only)
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
 }
@@ -166,23 +167,22 @@ function buildFormatLine(data: CelebrationData): string {
 
 function buildSubLine(data: CelebrationData): string {
   const fmt = data.workoutFormat;
-  if (fmt === 'for_time' && data.durationMinutes > 0) {
-    return `${Math.round(data.durationMinutes)} MIN CAP`;
-  }
+  const ex0 = data.exercises[0];
   if (fmt === 'strength') {
     return 'build to heavy';
   }
   if (fmt === 'amrap' && data.durationMinutes > 0) {
     return `${Math.round(data.durationMinutes)} min`;
   }
-  const timeCap = data.exercises[0] && 'timeCap' in data.exercises[0]
-    ? (data.exercises[0] as unknown as { timeCap?: number }).timeCap
-    : undefined;
-  if (timeCap && timeCap > 0) {
-    const mins = Math.round(timeCap / 60);
-    return `${mins} MIN CAP`;
-  }
+  const cap = explicitTimeCapSub(ex0, data.rawText);
+  if (cap) return cap;
   return '';
+}
+
+function explicitTimeCapSub(exercise: CelebrationData['exercises'][number] | undefined, rawText?: string): string {
+  const source = `${exercise?.name ?? ''} ${exercise?.prescription ?? ''} ${rawText ?? ''}`;
+  const match = source.match(/\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i);
+  return match ? `${parseInt(match[1], 10)} MIN CAP` : '';
 }
 
 // Totals shown in the brand strip: REPS · EFFORT · KM/CAL
@@ -352,10 +352,45 @@ function computeTeamShare(primary: string, teamSize: number): string {
 // distance/rep/calorie "mine" values come from the same prescribed total as
 // the TEAM share and would just duplicate it.
 function isWeightValue(value: string): boolean {
-  return /\b(kg|lb)\b/i.test(value);
+  return /(kg|lb)\b/i.test(value);
 }
 
 // Pulls the logged weight out of `nameWithLoad` ("Hang Power Clean @ 40kg" → "40kg").
+function normalizeMovementKey(value: string): string[] {
+  const stop = new Set(['and', 'the', 'with', 'for', 'time', 'rounds', 'round']);
+  return value
+    .toLowerCase()
+    .replace(/&|\+/g, ' ')
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/[\s-]+/)
+    .filter((word) => word.length > 1 && !stop.has(word));
+}
+
+function lookupMineValue(mineMap: Map<string, string> | undefined, rowName: string, rxLabel: string): string {
+  if (!mineMap) return '';
+
+  const exact = mineMap.get(rowName.toLowerCase().trim());
+  if (exact) return exact;
+
+  const rowWords = normalizeMovementKey(`${rowName} ${rxLabel}`);
+  if (rowWords.length === 0) return '';
+
+  for (const [key, value] of mineMap.entries()) {
+    if (!isWeightValue(value)) continue;
+    const keyWords = normalizeMovementKey(key);
+    if (keyWords.length === 0) continue;
+
+    const shared = keyWords.filter((word) => rowWords.includes(word)).length;
+    const keyInsideRow = keyWords.every((word) => rowWords.includes(word));
+    const rowInsideKey = rowWords.length <= keyWords.length && rowWords.every((word) => keyWords.includes(word));
+    if (keyInsideRow || rowInsideKey || shared >= Math.min(2, keyWords.length)) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
 function extractLoadSuffix(nameWithLoad: string | undefined): string {
   if (!nameWithLoad) return '';
   const match = nameWithLoad.match(/@\s*(.+)$/);
@@ -395,19 +430,39 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   }
 
   const load = row.subNote && isRxLoad(row.subNote) ? row.subNote : '';
-  const mineRaw = mineMap?.get(row.name.toLowerCase().trim()) ?? '';
+  const mineRaw = lookupMineValue(mineMap, row.name, rxLabel);
+  const total = row.totalNote || (row.subNote && /\btotal\b/i.test(row.subNote) ? row.subNote : undefined);
+  const loadSuffix = row.loadNote || extractLoadSuffix(row.nameWithLoad);
 
   let team = '';
-  let mine = mineRaw;
+  let mine = loadSuffix || mineRaw;
+  const mineBeforeWipe = mine;
   if (teamSize && teamSize > 1) {
     team = computeTeamShare(row.primary ?? '', teamSize);
     if (team) {
-      const loadSuffix = extractLoadSuffix(row.nameWithLoad);
       mine = loadSuffix || (isWeightValue(mineRaw) ? mineRaw : '');
     }
+  } else if (total && !isWeightValue(mine)) {
+    mine = '';
   }
 
-  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, roundLabel: row.roundLabel };
+  {
+    console.log('[CelebrationDebug:artifactRowToPosterLine]', {
+      rowName: row.name,
+      rowLoadNote: row.loadNote,
+      rowNameWithLoad: row.nameWithLoad,
+      rowTotalNote: row.totalNote,
+      rowSubNote: row.subNote,
+      loadSuffix,
+      mineRaw,
+      total,
+      mineBeforeWipe,
+      mineAfterWipe: mine,
+      isWeightValueResult: isWeightValue(mineBeforeWipe),
+    });
+  }
+
+  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, total, roundLabel: row.roundLabel };
 }
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────
@@ -457,7 +512,7 @@ export function buildPosterWodFromPage(
   const sub = (() => {
     if (exFmt === 'strength') return 'build to heavy';
     if (exFmt === 'amrap' && data.durationMinutes > 0) return `${Math.round(data.durationMinutes)} min`;
-    if (exFmt === 'for_time' && data.durationMinutes > 0) return `${Math.round(data.durationMinutes)} MIN CAP`;
+    if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
     return '';
   })();
 

@@ -268,40 +268,42 @@
   background: #f5c200;
 }
 
-/* ── Persistent tab row (Style / Felt / Share) ──────────────────────────── */
+/* ── Persistent tab row (Style / Felt) ──────────────────────────────────── */
 
 .tabRow {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .tabBtn {
-  flex: 0 0 64px;
+  min-width: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 50px;
+  justify-content: flex-start;
+  gap: 10px;
+  height: 56px;
+  padding: 0 15px;
   border-radius: 14px;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(243, 241, 234, 0.55);
-  transition: background 0.18s, color 0.18s;
+  color: rgba(243, 241, 234, 0.62);
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
   -webkit-tap-highlight-color: transparent;
 }
 
 .tabBtnActive {
-  background: rgba(245, 194, 0, 0.16);
-  color: #f5c200;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--felt-color, #f5c200);
+  color: var(--felt-color, #f5c200);
 }
 
 .tabIcon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
 }
 
 .tabIcon svg {
@@ -309,81 +311,34 @@
   height: 100%;
 }
 
+.tabCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  line-height: 1;
+}
+
 .tabLabel {
   font-family: 'Barlow', sans-serif;
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.shareBtn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 50px;
-  border-radius: 14px;
-  border: none;
-  cursor: pointer;
-  background: #f5c200;
-  color: #0b0c0e;
-  font-family: 'Barlow', sans-serif;
-  font-size: 14px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
-  transition: opacity 0.15s;
-  -webkit-tap-highlight-color: transparent;
+  color: currentColor;
+  opacity: 0.72;
 }
 
-.shareIcon {
-  width: 16px;
-  height: 16px;
-}
-
-.shareIcon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.shareBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.shareSpinner {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(0, 0, 0, 0.25);
-  border-top-color: #0b0c0e;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.toast {
-  position: absolute;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 9px 18px;
-  background: rgba(10, 12, 15, 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: rgba(243, 241, 234, 0.9);
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
+.tabValue {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  pointer-events: none;
-  z-index: 50;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 234, 0.92);
 }

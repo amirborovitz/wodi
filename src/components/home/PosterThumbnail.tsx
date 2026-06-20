@@ -1,5 +1,5 @@
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
-import type { FeelRating, WorkoutFormat } from '../../types';
+import type { FeelRating, PosterSkinId, WorkoutFormat } from '../../types';
 import { INTENSITY_DISPLAY } from '../../types';
 import { VIBE } from '../celebration/faces/HandwrittenFace/brand';
 import styles from './PosterThumbnail.module.css';
@@ -142,6 +142,21 @@ function getRelativeLabel(date: Date): string {
   return formatPosterDate(date);
 }
 
+function getSkinClass(skin: PosterSkinId | undefined): string {
+  switch (skin) {
+    case 'chalk': return styles.skinChalk;
+    case 'flare': return styles.skinFlare;
+    case 'stadium': return styles.skinStadium;
+    case 'press': return styles.skinPress;
+    case 'blueprint': return styles.skinBlueprint;
+    case 'hazard': return styles.skinHazard;
+    case 'ink': return styles.skinInk;
+    case 'bout': return styles.skinBout;
+    case 'slab':
+    default: return styles.skinSlab;
+  }
+}
+
 export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnailProps): React.ReactElement {
   const hero = getThumbnailHero(workout);
   const formatTag = getFormatTag(workout);
@@ -153,12 +168,13 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
   const feelVibe = workout.feelRating as FeelRating | undefined;
   const vibeLabel = posterVibe ? VIBE[posterVibe].label : (feelVibe ? INTENSITY_DISPLAY[feelVibe] : null);
   const vibeColor = posterVibe ? VIBE[posterVibe].color : (feelVibe ? (VIBE_COLORS[feelVibe] ?? '#f5c200') : '#f5c200');
+  const skinClass = getSkinClass(workout.posterSkin);
 
   return (
     <div className={`${styles.wrapper} ${fullWidth ? styles.wrapperFull : ''}`}>
       <button
         type="button"
-        className={`${styles.frame} ${fullWidth ? styles.frameFull : ''}`}
+        className={`${styles.frame} ${skinClass} ${fullWidth ? styles.frameFull : ''}`}
         onClick={onClick}
         aria-label={`Open ${workout.title} workout`}
       >

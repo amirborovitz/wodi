@@ -10,7 +10,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import type { Achievement, Workout, WorkoutType } from '../types';
+import {
+  POSTER_CUSTOMIZATION_EVENT,
+  type PosterCustomizationEventDetail,
+} from './usePosterCustomization';
+import type { Achievement, PosterSkinId, PosterVibeKey, Workout, WorkoutType } from '../types';
 
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
@@ -164,6 +168,8 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             timeCap: data.timeCap,
             format: data.format,
             difficultyLevel: typeof data.difficultyLevel === 'number' ? data.difficultyLevel : undefined,
+            posterSkin: data.posterSkin as PosterSkinId | undefined,
+            posterVibe: data.posterVibe as PosterVibeKey | undefined,
             heroAchievement,
             achievements,
             isPR,
@@ -192,6 +198,27 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
   useEffect(() => {
     fetchWorkouts();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePosterCustomization = (event: Event): void => {
+      const customEvent = event as CustomEvent<PosterCustomizationEventDetail>;
+      const { workoutId, update } = customEvent.detail;
+
+      setWorkouts((prev) => prev.map((workout) => {
+        if (workout.id !== workoutId) return workout;
+        return {
+          ...workout,
+          ...(update.posterSkin !== undefined ? { posterSkin: update.posterSkin } : {}),
+          ...(update.posterVibe !== undefined ? { posterVibe: update.posterVibe ?? undefined } : {}),
+        };
+      }));
+    };
+
+    window.addEventListener(POSTER_CUSTOMIZATION_EVENT, handlePosterCustomization);
+    return () => window.removeEventListener(POSTER_CUSTOMIZATION_EVENT, handlePosterCustomization);
+  }, []);
 
   const deleteWorkout = async (workoutId: string): Promise<boolean> => {
     if (!user) return false;

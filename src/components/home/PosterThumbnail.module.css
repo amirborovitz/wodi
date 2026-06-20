@@ -53,6 +53,210 @@
   aspect-ratio: 150 / 210;
 }
 
+.skinSlab {
+  background: #0b0c0e;
+  border-color: rgba(243, 241, 234, 0.1);
+}
+
+.skinChalk {
+  background: #f1e7cf;
+  border-color: rgba(33, 29, 21, 0.2);
+}
+
+.skinChalk .formatTag {
+  color: #211d15;
+  border-color: rgba(33, 29, 21, 0.55);
+}
+
+.skinChalk .dateStr,
+.skinChalk .heroLabel,
+.skinChalk .vibeFelt {
+  color: rgba(33, 29, 21, 0.55);
+}
+
+.skinChalk .wodName,
+.skinChalk .movementName,
+.skinChalk .wordmark,
+.skinChalk .vibeWord {
+  color: #211d15;
+}
+
+.skinChalk .prescription,
+.skinChalk .movementWeight,
+.skinChalk .heroValue,
+.skinChalk .wordmarkDot {
+  color: #f5c200;
+}
+
+.skinChalk .divider,
+.skinChalk .heroSection,
+.skinChalk .posterFooter {
+  border-color: rgba(33, 29, 21, 0.12);
+}
+
+.skinFlare {
+  background: #f5c200;
+  border-color: rgba(245, 194, 0, 0.42);
+}
+
+.skinFlare .formatTag {
+  color: #0b0c0e;
+  border-color: rgba(11, 12, 14, 0.4);
+}
+
+.skinFlare .dateStr,
+.skinFlare .heroLabel,
+.skinFlare .vibeFelt {
+  color: rgba(11, 12, 14, 0.55);
+}
+
+.skinFlare .wodName,
+.skinFlare .movementName,
+.skinFlare .movementWeight,
+.skinFlare .heroValue,
+.skinFlare .wordmark,
+.skinFlare .wordmarkDot {
+  color: #0b0c0e;
+}
+
+.skinFlare .prescription {
+  color: rgba(11, 12, 14, 0.72);
+}
+
+.skinFlare .divider,
+.skinFlare .heroSection,
+.skinFlare .posterFooter {
+  border-color: rgba(11, 12, 14, 0.16);
+}
+
+.skinFlare .vibeStamp {
+  background: rgba(11, 12, 14, 0.08);
+}
+
+.skinStadium {
+  background:
+    radial-gradient(circle at 4px 4px, rgba(245, 194, 0, 0.18) 1px, transparent 1.8px),
+    #0b0c0e;
+  background-size: 8px 8px;
+  border-color: rgba(245, 194, 0, 0.24);
+}
+
+.skinStadium .heroSection {
+  margin: auto -2px 0;
+  padding: 7px 6px 6px;
+  border: 1px solid rgba(245, 194, 0, 0.12);
+  border-radius: 8px;
+  background: rgba(245, 194, 0, 0.08);
+}
+
+.skinPress {
+  background: #171411;
+  border-color: rgba(245, 194, 0, 0.24);
+  box-shadow: inset 0 0 0 4px rgba(245, 194, 0, 0.08);
+}
+
+.skinBlueprint {
+  background:
+    linear-gradient(rgba(245, 194, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(245, 194, 0, 0.06) 1px, transparent 1px),
+    #07121d;
+  background-size: 16px 16px;
+  border-color: rgba(245, 194, 0, 0.24);
+}
+
+.skinHazard {
+  background:
+    repeating-linear-gradient(-45deg, rgba(245, 194, 0, 0.12) 0 6px, transparent 6px 13px),
+    #090b0d;
+  border-color: rgba(245, 194, 0, 0.35);
+}
+
+.skinInk {
+  background:
+    radial-gradient(circle at 18% 68%, rgba(245, 194, 0, 0.95) 0 27px, transparent 28px),
+    repeating-linear-gradient(0deg, rgba(23, 24, 20, 0.035) 0 1px, transparent 1px 6px),
+    #eee7d5;
+  border-color: rgba(23, 24, 20, 0.2);
+}
+
+.skinInk .formatTag {
+  color: #171814;
+  border-color: rgba(23, 24, 20, 0.55);
+}
+
+.skinInk .dateStr,
+.skinInk .heroLabel,
+.skinInk .vibeFelt {
+  color: rgba(23, 24, 20, 0.5);
+}
+
+.skinInk .wodName,
+.skinInk .movementName,
+.skinInk .wordmark,
+.skinInk .wordmarkDot {
+  color: #171814;
+}
+
+.skinInk .prescription,
+.skinInk .movementWeight {
+  color: rgba(23, 24, 20, 0.7);
+}
+
+.skinInk .heroValue {
+  color: #050504;
+}
+
+.skinInk .divider,
+.skinInk .heroSection,
+.skinInk .posterFooter {
+  border-color: rgba(23, 24, 20, 0.13);
+}
+
+.skinBout {
+  background:
+    linear-gradient(rgba(245, 194, 0, 0.11), rgba(245, 194, 0, 0.05)) padding-box,
+    #4d0713;
+  border-color: rgba(245, 194, 0, 0.38);
+  box-shadow: inset 0 0 0 4px rgba(245, 194, 0, 0.08);
+}
+
+.skinBout .formatTag {
+  color: #f5c200;
+  border-color: rgba(245, 194, 0, 0.8);
+}
+
+.skinBout .dateStr,
+.skinBout .heroLabel,
+.skinBout .vibeFelt {
+  color: rgba(255, 241, 187, 0.52);
+}
+
+.skinBout .wodName,
+.skinBout .movementName,
+.skinBout .wordmark {
+  color: #fff1bb;
+}
+
+.skinBout .prescription,
+.skinBout .movementWeight,
+.skinBout .heroValue,
+.skinBout .wordmarkDot {
+  color: #f5c200;
+}
+
+.skinBout .heroSection {
+  margin: auto -2px 0;
+  padding: 7px 6px 6px;
+  border: 1px solid rgba(245, 194, 0, 0.18);
+  border-radius: 6px;
+  background: rgba(59, 6, 16, 0.72);
+}
+
+.skinBout .divider,
+.skinBout .posterFooter {
+  border-color: rgba(255, 241, 187, 0.12);
+}
+
 /* ── Header row ───────────────────────────────────────────────── */
 .posterHeader {
   display: flex;

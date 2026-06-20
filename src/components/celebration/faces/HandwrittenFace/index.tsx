@@ -20,6 +20,8 @@ import { SkinStadium } from './SkinStadium';
 import { SkinBlueprint } from './SkinBlueprint';
 import { SkinPress } from './SkinPress';
 import { SkinHazard } from './SkinHazard';
+import { SkinInk } from './SkinInk';
+import { SkinBout } from './SkinBout';
 import styles from './index.module.css';
 
 // ─── Skin registry ─────────────────────────────────────────────────────────
@@ -32,6 +34,8 @@ const SKINS = [
   { id: 'press',     name: 'Press',     Comp: SkinPress     },
   { id: 'blueprint', name: 'Blueprint', Comp: SkinBlueprint },
   { id: 'hazard',    name: 'Hazard',    Comp: SkinHazard    },
+  { id: 'ink',       name: 'Ink',       Comp: SkinInk       },
+  { id: 'bout',      name: 'Bout',      Comp: SkinBout      },
 ] as const;
 
 // ─── Vibe derivation ───────────────────────────────────────────────────────
@@ -75,16 +79,6 @@ function FeltIcon(): React.JSX.Element {
   );
 }
 
-function ShareIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 15.5V4" strokeLinecap="round" />
-      <path d="M7.5 8.5 12 4l4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 14v4.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5V14" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
@@ -98,13 +92,10 @@ export function HandwrittenFace({
   const [vibeConfirmed, setVibeConfirmed] = useState<boolean>(() => (data.posterVibe ?? getLoggedVibe(data)) != null);
   const [pulse, setPulse]             = useState<number>(0);
   const [showHint, setShowHint]       = useState<boolean>(true);
-  const [isPosterSharing, setSharing] = useState<boolean>(false);
-  const [shareToast, setShareToast]   = useState<string | null>(null);
   const [carouselPage, setCarouselPage] = useState<number>(0);
   const [activePanel, setActivePanel] = useState<'style' | 'felt' | null>(null);
   const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
 
-  const posterFrameRef    = useRef<HTMLDivElement>(null);
   const carouselViewportRef = useRef<HTMLDivElement>(null);
   const skinChipRowRef    = useRef<HTMLDivElement>(null);
   const carouselX         = useMotionValue(0);
@@ -130,6 +121,9 @@ export function HandwrittenFace({
   );
 
   const Skin = SKINS[skinIdx].Comp;
+  const currentSkin = SKINS[skinIdx];
+  const currentFelt = VIBE[vibe];
+  const bottomBarStyle = { '--felt-color': currentFelt.color } as React.CSSProperties;
 
   const { containerRef: cardAreaRef, contentRef: cardContentRef, scale: cardScale } =
     useFitScale<HTMLDivElement, HTMLDivElement>([singleWod, skinIdx]);
@@ -179,6 +173,17 @@ export function HandwrittenFace({
 
   const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
+  const toggleVibe = (nextVibe: VibeKey): void => {
+    if (vibeConfirmed && nextVibe === vibe) {
+      setVibeConfirmed(false);
+      onPosterCustomizationChange?.({ posterVibe: null });
+      return;
+    }
+
+    setVibe(nextVibe);
+    setVibeConfirmed(true);
+    onPosterCustomizationChange?.({ posterVibe: nextVibe });
+  };
 
   // ── Carousel swipe ─────────────────────────────────────────────────────
 
@@ -221,51 +226,10 @@ export function HandwrittenFace({
     else snapToPage(carouselPage);
   };
 
-  // ── Share handler ─────────────────────────────────────────────────────
-
-  const showToast = (msg: string): void => {
-    setShareToast(msg);
-    window.setTimeout(() => setShareToast(null), 2600);
-  };
-
-  const handleShare = async (): Promise<void> => {
-    if (isPosterSharing) return;
-    setSharing(true);
-    navigator.vibrate?.(8);
-    try {
-      const { elementToCanvas, canvasToBlob, isNativeShareSupported, downloadBlob } =
-        await import('../../../../utils/shareUtils');
-      const source = posterFrameRef.current;
-      if (!source) throw new Error('Poster not ready');
-      await document.fonts?.ready;
-      const clone = source.cloneNode(true) as HTMLElement;
-      clone.style.cssText = 'width:1080px;height:auto;max-width:none;position:relative;transform:none;box-sizing:border-box;';
-      const host = document.createElement('div');
-      host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1080px;overflow:hidden;';
-      host.appendChild(clone);
-      document.body.appendChild(host);
-      try {
-        const canvas = await elementToCanvas(clone, { scale: 2 });
-        const blob   = await canvasToBlob(canvas, 'png');
-        const safe   = (data.rewardDisplayTitle || 'wodi').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48) || 'wodi';
-        const file   = new File([blob], `${safe}-${Date.now()}.png`, { type: 'image/png' });
-        if (isNativeShareSupported()) {
-          try { await navigator.share({ title: data.rewardDisplayTitle || 'Wodi', text: 'wodi.', files: [file] }); return; }
-          catch (e) { if ((e as Error).name === 'AbortError') return; }
-        }
-        downloadBlob(blob, file.name);
-        showToast('Image saved — open Instagram to share.');
-      } finally { document.body.removeChild(host); }
-    } catch (e) {
-      console.error('Failed to export poster:', e);
-      showToast('Could not create image. Screenshot still works.');
-    } finally { setSharing(false); }
-  };
-
   // ─── Shared bottom bar ────────────────────────────────────────────────
 
   const bottomBar = (
-    <div className={styles.bottomBar}>
+    <div className={styles.bottomBar} style={bottomBarStyle}>
       <AnimatePresence initial={false}>
         {activePanel === 'style' && (
           <motion.div key="style-panel" className={styles.panel}
@@ -294,7 +258,7 @@ export function HandwrittenFace({
               {VIBE_KEYS.map((k) => (
                 <button key={k} className={`${styles.feltChip} ${vibeConfirmed && k === vibe ? styles.feltChipActive : ''}`}
                   style={vibeConfirmed && k === vibe ? { background: VIBE[k].color } : undefined}
-                  onClick={(e) => { e.stopPropagation(); setVibe(k); setVibeConfirmed(true); onPosterCustomizationChange?.({ posterVibe: k }); }}>
+                  onClick={(e) => { e.stopPropagation(); toggleVibe(k); }}>
                   {VIBE[k].label}
                 </button>
               ))}
@@ -307,20 +271,18 @@ export function HandwrittenFace({
         <button className={`${styles.tabBtn} ${activePanel === 'style' ? styles.tabBtnActive : ''}`}
           onClick={toggleStylePanel} aria-pressed={activePanel === 'style'} aria-label="Change poster style">
           <span className={styles.tabIcon}><StyleIcon /></span>
-          <span className={styles.tabLabel}>Style</span>
+          <span className={styles.tabCopy}>
+            <span className={styles.tabLabel}>Style</span>
+            <span className={styles.tabValue}>{currentSkin.name}</span>
+          </span>
         </button>
         <button className={`${styles.tabBtn} ${activePanel === 'felt' ? styles.tabBtnActive : ''}`}
           onClick={toggleFeltPanel} aria-pressed={activePanel === 'felt'} aria-label="Change how it felt">
           <span className={styles.tabIcon}><FeltIcon /></span>
-          <span className={styles.tabLabel}>Felt</span>
-        </button>
-        <button className={styles.shareBtn} onClick={handleShare} disabled={isPosterSharing} aria-label="Share to Story">
-          {isPosterSharing ? <span className={styles.shareSpinner} /> : (
-            <>
-              <span className={styles.shareIcon}><ShareIcon /></span>
-              <span>Share</span>
-            </>
-          )}
+          <span className={styles.tabCopy}>
+            <span className={styles.tabLabel}>Felt</span>
+            <span className={styles.tabValue}>{vibeConfirmed ? currentFelt.label : 'Pick one'}</span>
+          </span>
         </button>
       </div>
     </div>
@@ -374,9 +336,7 @@ export function HandwrittenFace({
                     animation: i === carouselPage ? 'flipIn 0.4s cubic-bezier(0.2,0.7,0.3,1)' : undefined,
                   }}
                 >
-                  <div ref={i === carouselPage ? posterFrameRef : undefined}>
-                    <Skin wod={pageWod} vibe={vibeConfirmed ? vibe : null} />
-                  </div>
+                  <Skin wod={pageWod} vibe={vibeConfirmed ? vibe : null} />
                 </div>
               </div>
             ))}
@@ -384,7 +344,6 @@ export function HandwrittenFace({
         </div>
 
         {bottomBar}
-        {shareToast && <div className={styles.toast} role="status">{shareToast}</div>}
       </div>
     );
   }
@@ -409,15 +368,12 @@ export function HandwrittenFace({
         aria-label="Tap left for previous style, right for next style"
       >
         <div key={pulse} ref={cardContentRef} className={styles.cardWrapper} style={{ transform: `scale(${cardScale})` }}>
-          <div ref={posterFrameRef}>
-            <Skin wod={singleWod} vibe={vibeConfirmed ? vibe : null} />
-          </div>
+          <Skin wod={singleWod} vibe={vibeConfirmed ? vibe : null} />
         </div>
         {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
       </div>
 
       {bottomBar}
-      {shareToast && <div className={styles.toast} role="status">{shareToast}</div>}
     </div>
   );
 }
