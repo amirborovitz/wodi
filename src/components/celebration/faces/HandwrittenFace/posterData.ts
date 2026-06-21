@@ -11,6 +11,7 @@
 import type { CelebrationData } from '../../../../hooks/useCelebrationData';
 import type { ArtifactSection, ArtifactRow, StoryMovementLine } from '../../types';
 import type { MovementTotal } from '../../../../types';
+import { shouldLogCelebrationDebug } from '../../../../hooks/useCelebrationData';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -446,7 +447,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     mine = '';
   }
 
-  {
+  if (shouldLogCelebrationDebug()) {
     console.log('[CelebrationDebug:artifactRowToPosterLine]', {
       rowName: row.name,
       rowLoadNote: row.loadNote,

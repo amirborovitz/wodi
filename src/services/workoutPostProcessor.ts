@@ -290,7 +290,7 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     type: correctedType,
     format: correctedFormat,
     timeCap,
-    partnerWorkout: workout.partnerWorkout || partnerResult.partnerWorkout || undefined,
+    partnerWorkout: workout.partnerWorkout ?? partnerResult.partnerWorkout ?? undefined,
     teamSize: workout.teamSize || partnerResult.teamSize || undefined,
     sets: partnerResult.adjustedSets ?? workout.sets,
     exercises: processedExercises.map(ex => ({
@@ -1747,7 +1747,9 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
     /\bin\s+a\s+team\s+of\s+\d+\b/i,
   ];
 
-  const isPartner = workout.partnerWorkout || partnerPatterns.some(p => p.test(lower));
+  // Trust an explicit AI `false` — only fall back to regex when the AI left the field unset.
+  const isPartner = workout.partnerWorkout === true
+    || (workout.partnerWorkout !== false && partnerPatterns.some(p => p.test(lower)));
 
   if (!isPartner) {
     return { partnerWorkout: false };
