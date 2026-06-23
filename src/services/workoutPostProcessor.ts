@@ -20,6 +20,16 @@ const TIME_MIN_PATTERN = /(\d+)\s*(?:min(?:utes?)?|m\b)/i;
 const TIME_MMSS_PATTERN = /(\d+):(\d{2})/;
 
 /**
+ * Generic/equipment words excluded when matching a movement name against an
+ * "after each round/set" clause in detectLadderReps — keeps the match anchored
+ * to the movement's distinctive words instead of shared prepositions/equipment terms.
+ */
+const FIXED_MOVEMENT_STOPWORDS = new Set([
+  'the', 'a', 'of', 'and', 'with', 'over', 'to', 'in', 'on', 'each', 'single',
+  'db', 'dbs', 'kb', 'kbs', 'twin', 'double', 'dumbbell', 'dumbbells', 'kettlebell', 'kettlebells',
+]);
+
+/**
  * Cardio machine names that should have time/distance/calories
  */
 const CARDIO_MACHINES = [
@@ -326,9 +336,21 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
   const withBuyIns = detectMisplacedBuyIns(withStationRotation);
 
-  // Correct amrap_intervals → intervals when "AMRAP" doesn't appear in the text,
-  // and strip false "Buy-In:" labels the AI adds to interval movements.
-  const withCorrectedIntervals = correctFalseAmrapIntervals(withBuyIns);
+  // Diagnostic only — warns if the AI's amrap_intervals/Buy-In classification looks inconsistent
+  // with its own text, but does NOT override loggingMode/role/perRound. See function doc.
+  checkAmrapIntervalsAndBuyInConsistency(withBuyIns);
+  const withCorrectedIntervals = withBuyIns;
+
+  // A session should have at most 2 non-secondary (main) parts — surface it if the AI didn't
+  // follow that rule, rather than silently guessing which exercise to demote. Picking the wrong
+  // one would be its own bug; this is visibility for debugging, not auto-correction.
+  const mainPartCount = withCorrectedIntervals.exercises.filter((ex) => ex.isSecondary !== true).length;
+  if (mainPartCount > 2) {
+    console.warn(
+      `[PostProcessor] ${mainPartCount} exercises marked isSecondary:false (expected at most 2):`,
+      withCorrectedIntervals.exercises.map((ex) => ({ name: ex.name, isSecondary: ex.isSecondary })),
+    );
+  }
 
   // Normalize explicit movement semantics so downstream math can trust structure
   return backfillMovementSemantics(withCorrectedIntervals);
@@ -526,7 +548,10 @@ function backfillEmomMinuteStations(workout: ParsedWorkout): ParsedWorkout {
       if (!movements || movements.length <= 1) return exercise;
       if (movements.some((movement) => movement.stationLabel?.trim())) return exercise;
 
-      const exerciseText = `${exercise.name} ${exercise.prescription} ${workoutText}`;
+      // Use this exercise's own scoped text, not the shared workoutText — a sibling EMOM
+      // block's "Min 1: / Min 2:" cues must never make an unrelated block look like a
+      // rotating-station EMOM too.
+      const exerciseText = `${exercise.name} ${exercise.prescription} ${getExerciseScopedText(workout, exercise)}`;
       if (!hasEmomMinuteStationCue(exerciseText)) return exercise;
 
       return {
@@ -545,49 +570,33 @@ function backfillEmomMinuteStations(workout: ParsedWorkout): ParsedWorkout {
 }
 
 /**
- * Correct the AI's over-eager amrap_intervals classification.
- * "Every X min x N: [fixed work]" is intervals (fixed amounts per round), not amrap_intervals.
- * amrap_intervals requires the word "AMRAP" to appear in the exercise name or prescription.
- * Also strips "Buy-In:" prefixes and perRound=false from movements in corrected exercises.
+ * Diagnostic-only check on the AI's amrap_intervals classification and Buy-In labeling.
+ *
+ * This used to silently OVERRIDE loggingMode (amrap_intervals → intervals) and strip "Buy-In:"
+ * labels/role/perRound whenever this exercise's own text didn't literally contain "AMRAP" or
+ * buy-in language. That second-guessed a field the AI explicitly set, which is the same class
+ * of problem as trusting workout-level text over per-exercise data — just inverted: instead of
+ * a sibling block's text leaking in, a rigid regex was overruling the AI's own classification
+ * for THIS exercise. Per the "trust the AI" principle (the post-processor backfills missing
+ * fields, never overrides ones the AI already set), this now only logs a warning when the
+ * heuristic disagrees, so a real misclassification pattern is visible for prompt-tuning instead
+ * of being silently auto-corrected.
  */
-function correctFalseAmrapIntervals(workout: ParsedWorkout): ParsedWorkout {
-  // Use the raw OCR'd text as ground truth — the AI-generated exercise names are unreliable
-  // (the AI hallucinates "AMRAP" and "Buy-In:" even when the whiteboard says neither).
-  const rawText = (workout.rawText ?? '').toLowerCase();
-  const rawHasAmrap = /\bamrap\b/.test(rawText);
-  // Buy-in requires explicit language in the source text — not just AI inference.
-  const rawHasBuyIn = /\bbuy[\s-]?in\b|\binto\s+amrap\b|\bthen\s+amrap\b/i.test(rawText);
+function checkAmrapIntervalsAndBuyInConsistency(workout: ParsedWorkout): void {
+  for (const ex of workout.exercises) {
+    const exText = `${getExerciseScopedText(workout, ex)} ${ex.prescription || ''}`.toLowerCase();
+    const exHasAmrap = /\bamrap\b/.test(exText);
+    const exHasBuyInLanguage = /\bbuy[\s-]?in\b|\binto\s+amrap\b|\bthen\s+amrap\b/i.test(exText);
 
-  let changed = false;
-  const exercises = workout.exercises.map(ex => {
-    const isAmrapIntervals = ex.loggingMode === 'amrap_intervals';
-    const shouldBeIntervals = isAmrapIntervals && !rawHasAmrap;
-    const hasFalseBuyIns = !rawHasBuyIn && (ex.movements ?? []).some(m => /^buy[-\s]?in\s*:/i.test(m.name));
-
-    if (!shouldBeIntervals && !hasFalseBuyIns) return ex;
-
-    changed = true;
-    const movements = (ex.movements ?? []).map(m => {
-      if (!/^buy[-\s]?in\s*:/i.test(m.name)) return m;
-      return {
-        ...m,
-        name: m.name.replace(/^buy[-\s]?in\s*:\s*/i, ''),
-        perRound: undefined,
-        role: undefined,
-      } as typeof m;
-    });
-
-    if (shouldBeIntervals) {
-      return { ...ex, loggingMode: 'intervals' as const, movements };
+    if (ex.loggingMode === 'amrap_intervals' && !exHasAmrap) {
+      console.warn(`[PostProcessor] "${ex.name}" is loggingMode=amrap_intervals but its own scoped text has no "AMRAP" — trusting the AI's classification, not auto-correcting.`);
     }
-    return { ...ex, movements };
-  });
 
-  const format = workout.format === 'amrap_intervals' && !rawHasAmrap
-    ? 'intervals' as const
-    : workout.format;
-
-  return changed ? { ...workout, format, exercises } : workout;
+    const hasBuyInLabel = (ex.movements ?? []).some(m => /^buy[-\s]?in\s*:/i.test(m.name) || m.role === 'buy_in');
+    if (hasBuyInLabel && !exHasBuyInLanguage) {
+      console.warn(`[PostProcessor] "${ex.name}" has a Buy-In movement but its own scoped text has no "buy-in"/"into AMRAP"/"then AMRAP" — trusting the AI's classification, not auto-correcting.`);
+    }
+  }
 }
 
 /**
@@ -637,6 +646,18 @@ function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
 }
 
 /**
+ * The text an exercise actually owns: prefer the AI's per-exercise rawText (scoped to just this
+ * block). The shared workout.rawText describes the WHOLE photo/workout, so for a multi-exercise
+ * workout (e.g. skill + strength + metcon) it is NOT a safe per-exercise signal — using it can
+ * leak one sibling block's wording/numbers into another block's detection. It's only safe to
+ * fall back to when this exercise IS the whole workout.
+ */
+function getExerciseScopedText(workout: ParsedWorkout, ex: ParsedExercise): string {
+  if (ex.rawText && ex.rawText.trim()) return ex.rawText;
+  return workout.exercises.length === 1 ? (workout.rawText || '') : '';
+}
+
+/**
  * Detect ladder rep patterns on AMRAP exercises.
  * A ladder is a strictly ascending rep sequence (e.g., [4, 6, 8, 10, 12]).
  * Sources: suggestedRepsPerSet, or an ascending number pattern in the prescription text.
@@ -654,11 +675,27 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
   // "after each round" pattern — marks a movement as fixed (not part of the ladder)
   const AFTER_EACH_PATTERN = /after\s+(?:each|every)\s+(?:round|interval|set)/i;
 
+  // workout.format describes the WHOLE workout, not any one block. For a multi-exercise workout
+  // it's not a safe signal for an individual exercise — "format=amrap" can be true purely
+  // because a SIBLING block is the AMRAP, not this one.
+  const isSingleExerciseWorkout = workout.exercises.length === 1;
+
   const exercises = workout.exercises.map(ex => {
+    // A strength or skill block can never be an ascending-ladder AMRAP. Strip ladderReps
+    // unconditionally here — BEFORE the "already has ladder data" check below — because this
+    // can be data the AI hallucinated directly (e.g. during the refine pass, which isn't
+    // whitelisted the way the initial parse is), not just something our own heuristics would
+    // have assigned. An AI-provided value is not automatically trustworthy when it's
+    // structurally impossible for this exercise type.
+    if (ex.type === 'strength' || ex.type === 'skill') {
+      return ex.ladderReps ? { ...ex, ladderReps: undefined } : ex;
+    }
+
     // Already has ladder data
     if (ex.ladderReps && ex.ladderReps.length > 0) return ex;
 
-    const isAmrapExercise = ex.loggingMode === 'amrap' || ex.loggingMode === 'amrap_intervals' || isAmrapFormat;
+    const isAmrapExercise = ex.loggingMode === 'amrap' || ex.loggingMode === 'amrap_intervals'
+      || (isSingleExerciseWorkout && isAmrapFormat);
     if (!isAmrapExercise) return ex;
 
     let ladderReps: number[] | undefined;
@@ -676,9 +713,12 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
       }
     }
 
-    // Source 2: ascending number pattern in prescription text or rawText
+    // Source 2: ascending number pattern in prescription text, or in this exercise's own scoped
+    // rawText (never the shared workout.rawText for a multi-exercise workout — that can pick up
+    // a sibling block's numbers, e.g. a ladder AMRAP's rep scheme bleeding onto an unrelated
+    // strength block).
     if (!ladderReps) {
-      const searchTexts = [ex.prescription || '', workout.rawText || ''];
+      const searchTexts = [ex.prescription || '', getExerciseScopedText(workout, ex)];
       for (const text of searchTexts) {
         const match = text.match(LADDER_PATTERN);
         if (match) {
@@ -704,16 +744,40 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
 
     // Mark "after each round" movements as perRound: false
     // These are fixed per interval, not part of the ladder.
-    // Detection: "after each round" in rawText/prescription near the movement name,
-    // OR the movement's reps don't match the first ladder value.
-    const rawText = (workout.rawText || '') + ' ' + (ex.prescription || '');
-    const hasAfterEach = AFTER_EACH_PATTERN.test(rawText);
+    // Primary detection: the movement's name appears in the same clause as "after each round/set".
+    // Fallback: the movement's reps don't match any ladder value — weaker, because it fails when
+    // the fixed movement's reps coincidentally equal one of the ladder rungs (e.g. a fixed "6 burpees"
+    // alongside a ladder that happens to pass through 6 reps on some round).
+    const fullText = getExerciseScopedText(workout, ex) + ' ' + (ex.prescription || '');
+    const hasAfterEach = AFTER_EACH_PATTERN.test(fullText);
+    const rawClauses = `${getExerciseScopedText(workout, ex)}\n${ex.prescription || ''}`
+      .split(/[\n.;*•]+/)
+      .map(clause => clause.trim())
+      .filter(Boolean);
+    // Only trust clause-anchored matching when the text actually has line/sentence structure —
+    // a single unstructured blob would make every movement "match" the one clause containing
+    // "after each", including the ladder movements themselves.
+    const afterEachClauses = rawClauses.length > 1
+      ? rawClauses.filter(clause => AFTER_EACH_PATTERN.test(clause))
+      : [];
     const movements = ex.movements?.map(mov => {
       if (mov.perRound === false) return mov; // already marked
+      if (!hasAfterEach) return mov;
 
-      // If rawText has "after each round" and this movement's reps differ from ladder values,
-      // it's likely the fixed movement (e.g., "30 DU after each round").
-      if (hasAfterEach && mov.reps && !ladderReps!.includes(mov.reps)) {
+      const movWords = mov.name
+        .toLowerCase()
+        .replace(/'/g, '')
+        .split(/\s+/)
+        .filter(word => word && !FIXED_MOVEMENT_STOPWORDS.has(word));
+      const matchesAfterEachClause = movWords.length > 0
+        && afterEachClauses.some(clause => movWords.some(word => clause.toLowerCase().includes(word)));
+      if (matchesAfterEachClause) {
+        console.log(`[PostProcessor] Marking "${mov.name}" as perRound=false (matched "after each" clause)`);
+        return { ...mov, perRound: false as const };
+      }
+
+      // Fallback: reps don't match any ladder value.
+      if (mov.reps && !ladderReps!.includes(mov.reps)) {
         console.log(`[PostProcessor] Marking "${mov.name}" as perRound=false (${mov.reps} reps, not in ladder [${ladderReps}])`);
         return { ...mov, perRound: false as const };
       }
@@ -737,13 +801,19 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
  * like "300m run (together)" and sets together=true on matching movements.
  */
 function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
-  const rawText = (workout.rawText || '').toLowerCase();
-  if (!rawText.includes('together')) return workout;
+  const anyTogether = (workout.rawText || '').toLowerCase().includes('together')
+    || workout.exercises.some(ex => (ex.prescription || '').toLowerCase().includes('together'));
+  if (!anyTogether) return workout;
 
-  // Build a set of movement names that appear with "(together)" in the raw text
-  // Pattern: "300m run (together)", "run together", "run (together)"
-  const togetherNames = new Set<string>();
-  for (const ex of workout.exercises) {
+  let changed = false;
+  const exercises = workout.exercises.map(ex => {
+    // Scoped to THIS exercise only — a "(together)" mention in a sibling block must never
+    // flag a same-named movement in an unrelated block.
+    const exerciseText = `${getExerciseScopedText(workout, ex)} ${ex.prescription || ''}`.toLowerCase();
+    if (!exerciseText.includes('together')) return ex;
+
+    // Pattern: "300m run (together)", "run together", "run (together)"
+    const togetherNames = new Set<string>();
     const allMovements = [
       ...(ex.movements || []),
       ...(ex.sections?.flatMap(s => s.movements) || []),
@@ -754,30 +824,29 @@ function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
         mov.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\(?together\\)?',
         'i'
       );
-      if (pattern.test(rawText) || pattern.test(ex.prescription || '')) {
+      if (pattern.test(exerciseText)) {
         togetherNames.add(mov.name.toLowerCase());
       }
     }
-  }
+    if (togetherNames.size === 0) return ex;
 
-  if (togetherNames.size === 0) return workout;
+    changed = true;
+    const setFlag = (mov: ParsedMovement): ParsedMovement =>
+      !mov.together && togetherNames.has(mov.name.toLowerCase())
+        ? { ...mov, together: true }
+        : mov;
 
-  const setFlag = (mov: ParsedMovement): ParsedMovement =>
-    !mov.together && togetherNames.has(mov.name.toLowerCase())
-      ? { ...mov, together: true }
-      : mov;
-
-  return {
-    ...workout,
-    exercises: workout.exercises.map(ex => ({
+    return {
       ...ex,
       movements: ex.movements?.map(setFlag),
       sections: ex.sections?.map(s => ({
         ...s,
         movements: s.movements.map(setFlag),
       })),
-    })),
-  };
+    };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
 }
 
 

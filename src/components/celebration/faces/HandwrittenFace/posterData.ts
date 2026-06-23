@@ -9,7 +9,7 @@
  */
 
 import type { CelebrationData } from '../../../../hooks/useCelebrationData';
-import type { ArtifactSection, ArtifactRow, StoryMovementLine } from '../../types';
+import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult } from '../../types';
 import type { MovementTotal } from '../../../../types';
 import { shouldLogCelebrationDebug } from '../../../../hooks/useCelebrationData';
 
@@ -27,7 +27,10 @@ export interface PosterWod {
   format: string;       // '12 ROUNDS', '5 × 5', '12-MIN AMRAP'
   sub: string;          // '30 MIN CAP', 'build to heavy', …
   blocks: PosterBlock[];
-  result: { label: string; value: string };
+  // meta: quiet context beside the hero score — "12:00 CAP" for a plain AMRAP, or "into round 7"
+  // for a ladder AMRAP's partial reps. No rep-total field by design — the poster never carries a
+  // checkable reps total for a ladder score; see buildAmrapResultMeta.
+  result: { label: string; value: string; meta?: string };
   rx: string | null;    // "RX'D" | "PR" | null
   totals: PosterTotal[]; // Supporting stats for the brand strip
   ep: number;            // Effort Points — shown in brand strip
@@ -50,6 +53,9 @@ export interface PosterLine {
   total?: string;
   team: string; // "50" — per-partner share of the prescribed total (partner workouts only)
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
+  // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
+  // render the normal rx/load/mine row AND additionally render this chart right below it.
+  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string };
 }
 
 export type PosterRow = PosterBlock | PosterLine;
@@ -138,7 +144,7 @@ function buildFormatLine(data: CelebrationData): string {
   const exercises = data.exercises;
   const ex0 = exercises[0];
 
-  if (fmt === 'amrap' && data.durationMinutes > 0) {
+  if ((fmt === 'amrap' || fmt === 'amrap_intervals') && data.durationMinutes > 0) {
     return `${data.durationMinutes}-MIN AMRAP`;
   }
   if (fmt === 'emom' && ex0) {
@@ -172,12 +178,25 @@ function buildSubLine(data: CelebrationData): string {
   if (fmt === 'strength') {
     return 'build to heavy';
   }
-  if (fmt === 'amrap' && data.durationMinutes > 0) {
+  if ((fmt === 'amrap' || fmt === 'amrap_intervals') && data.durationMinutes > 0) {
     return `${Math.round(data.durationMinutes)} min`;
   }
   const cap = explicitTimeCapSub(ex0, data.rawText);
   if (cap) return cap;
   return '';
+}
+
+/**
+ * This exercise's own prescribed AMRAP duration, in minutes — extracted ONLY from its own
+ * rawText/prescription/name (never the shared workout-level rawText), so in a multi-part
+ * workout a sibling block's duration can never bleed onto this one's poster page. Mirrors
+ * extractTimeCap's AMRAP pattern in workoutPostProcessor.ts, scoped per-exercise.
+ */
+function extractAmrapMinutes(exercise: CelebrationData['exercises'][number] | undefined): number | undefined {
+  if (!exercise) return undefined;
+  const source = `${exercise.rawText ?? ''} ${exercise.prescription ?? ''} ${exercise.name ?? ''}`;
+  const match = source.match(/(\d+)\s*min(?:ute)?s?\s*amrap/i) ?? source.match(/amrap\s*(\d+)\s*min/i);
+  return match ? parseInt(match[1], 10) : undefined;
 }
 
 function explicitTimeCapSub(exercise: CelebrationData['exercises'][number] | undefined, rawText?: string): string {
@@ -219,9 +238,30 @@ function buildResultLabel(format: string | undefined): string {
 function buildResultValue(data: CelebrationData): string {
   const hero = data.heroResult;
   if (!hero) return '--';
-  // Don't append unit — the result label ("MY TIME", "TOP SET") provides context.
-  // Keeping the value clean prevents multi-line wrapping at large font sizes.
+  // A ladder AMRAP's unit IS part of the score ("6" + "+10" = rounds + partial reps), not a
+  // redundant label restating the unit ("ROUNDS") the result label already states — so it must
+  // always render. For every other format, skip it: the result label provides that context, and
+  // appending it again risks multi-line wrapping at the hero's large font size.
+  if (hero.ladderIntoRound != null && hero.unit) return `${hero.value} ${hero.unit}`;
   return hero.value ?? '--';
+}
+
+/**
+ * Quiet context beside an AMRAP hero score. A ladder AMRAP's rounds+partial score ("6 +10")
+ * gets "into round 7" — which round the partial is logged into — never a rep total (a round is
+ * often several movements, so a total can't be verified at a glance; that reconciliation belongs
+ * in the log/edit view, not the shared poster). Every other AMRAP falls back to the cap alone.
+ */
+function buildAmrapResultMeta(
+  isAmrap: boolean,
+  amrapMinutes: number | undefined,
+  heroResult: HeroResult | null | undefined,
+): { meta?: string } {
+  if (!isAmrap) return {};
+  if (heroResult?.ladderIntoRound != null) {
+    return { meta: `into round ${heroResult.ladderIntoRound}` };
+  }
+  return { meta: amrapMinutes ? `${amrapMinutes}:00 CAP` : undefined };
 }
 
 /**
@@ -463,7 +503,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     });
   }
 
-  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, total, roundLabel: row.roundLabel };
+  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, total, roundLabel: row.roundLabel, ladderTrack: row.ladderTrack };
 }
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────
@@ -471,17 +511,13 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
 export function buildPosterWodFromPage(
   data: CelebrationData,
   pageIndex: number,
-  workoutDate?: Date,
 ): PosterWod {
   const pages = data.carouselPageData!;
   const page = pages[pageIndex];
   const section = data.perPageSections?.[pageIndex] ?? null;
   const heroResult = data.perPageHeroResults?.[pageIndex] ?? null;
 
-  const date = workoutDate ?? new Date();
-
-  const exName = page.exercise.name?.trim().toUpperCase() ?? null;
-  const title = exName && !isGenericTitle(exName) ? exName : null;
+  const date = data.workoutDate;
 
   // Prefer the exercise's own loggingMode/type over the whole workout's format.
   // This prevents Part A's "emom" format from stamping Part B's METCON card.
@@ -502,17 +538,41 @@ export function buildPosterWodFromPage(
     : exFmt === 'emom' ? 'METCON'
     : mapFormatToType(exFmt as Parameters<typeof mapFormatToType>[0]);
 
+  // 'amrap' and 'amrap_intervals' are both displayed as "AMRAP" everywhere else in this function
+  // (the type tag above, mapFormatToType, resultLabel below) — duration extraction must treat
+  // them the same way, or a single-AMRAP-block exercise classified as amrap_intervals silently
+  // skips the duration entirely while the tag still reads "AMRAP".
+  const isAmrap = exFmt === 'amrap' || exFmt === 'amrap_intervals';
+
+  // This exercise's OWN prescribed AMRAP duration (never the workout-wide duration, which mixes
+  // in the other parts of a multi-block session) — used for both the title and the format line
+  // so the card states the duration instead of bare "AMRAP" duplicating the type tag.
+  const amrapMinutes = isAmrap ? extractAmrapMinutes(page.exercise) : undefined;
+
+  const exName = page.exercise.name?.trim().toUpperCase() ?? null;
+  let title = exName && !isGenericTitle(exName) ? exName : null;
+  if (!title && isAmrap && amrapMinutes) {
+    title = `${amrapMinutes} MIN`;
+  }
+
   const format = (() => {
     if (heroResult?.formatLine) {
       const fl = heroResult.formatLine.toUpperCase();
       if (fl && fl !== 'WORKOUT') return fl;
     }
+    if (isAmrap && amrapMinutes) return `${amrapMinutes}-MIN AMRAP`;
     return mapFormatToType(exFmt);
   })();
 
+  // Never let the title repeat the format/type string verbatim (e.g. a title that resolved to
+  // bare "AMRAP") — matches the de-dup rule already enforced in buildPosterWod.
+  if (title && (title.toUpperCase() === format.toUpperCase() || title.toUpperCase() === type.toUpperCase())) {
+    title = null;
+  }
+
   const sub = (() => {
     if (exFmt === 'strength') return 'build to heavy';
-    if (exFmt === 'amrap' && data.durationMinutes > 0) return `${Math.round(data.durationMinutes)} min`;
+    if (isAmrap && amrapMinutes) return `${amrapMinutes} min`;
     if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
     return '';
   })();
@@ -532,6 +592,7 @@ export function buildPosterWodFromPage(
   const resultValue = heroResult
     ? `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
     : '--';
+  const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, heroResult);
 
   const rx: string | null = data.isPR ? 'PR' : null;
   const totals = buildTotals(data, resultValue);
@@ -539,7 +600,7 @@ export function buildPosterWodFromPage(
   return {
     type, title, date: formatWorkoutDate(date), format, sub,
     blocks: [],
-    result: { label: resultLabel, value: resultValue },
+    result: { label: resultLabel, value: resultValue, meta: resultMeta },
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),
@@ -552,9 +613,8 @@ export function buildPosterWodFromPage(
 
 export function buildPosterWod(
   data: CelebrationData,
-  workoutDate?: Date,
 ): PosterWod {
-  const date = workoutDate ?? new Date();
+  const date = data.workoutDate;
 
   // Title — null when generic or when it would duplicate the format string
   const rawTitle = data.rewardDisplayTitle ?? '';
@@ -578,6 +638,9 @@ export function buildPosterWod(
   // Result
   const resultLabel = buildResultLabel(data.workoutFormat);
   const resultValue = buildResultValue(data);
+  const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
+  const amrapMinutes = data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined;
+  const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, data.heroResult);
 
   // RX badge
   const rx: string | null = data.isPR ? 'PR' : null;
@@ -599,7 +662,7 @@ export function buildPosterWod(
     format,
     sub,
     blocks: [],
-    result: { label: resultLabel, value: resultValue },
+    result: { label: resultLabel, value: resultValue, meta: resultMeta },
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),

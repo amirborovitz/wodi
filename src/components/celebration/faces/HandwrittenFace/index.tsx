@@ -37,7 +37,7 @@ function FeltIcon(): React.JSX.Element {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, mode, onBack, onDone, onPosterCustomizationChange,
+  data, onBack, onDone, onPosterCustomizationChange,
 }: CelebrationFaceProps): React.JSX.Element {
   const [skinIdx, setSkinIdx]         = useState<number>(() => {
     const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
@@ -56,22 +56,19 @@ export function HandwrittenFace({
   const carouselX         = useMotionValue(0);
   const dragRef           = useRef<{ x: number; t: number } | null>(null);
 
-  const workoutDate = mode === 'reward' ? new Date() : undefined;
   const isCarousel  = data.isCarousel && (data.carouselPageData?.length ?? 0) > 1;
 
   // Single-page wod (used when not a carousel, or as a fallback title)
   const singleWod = useMemo(
-    () => buildPosterWod(data, workoutDate),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => buildPosterWod(data),
     [data],
   );
 
   // Per-page wods (carousel path)
   const pageWods = useMemo(
     () => isCarousel
-      ? data.carouselPageData!.map((_, i) => buildPosterWodFromPage(data, i, workoutDate))
+      ? data.carouselPageData!.map((_, i) => buildPosterWodFromPage(data, i))
       : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [data, isCarousel],
   );
 

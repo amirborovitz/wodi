@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
 
 interface SkinFlareProps {
   wod: PosterWod;
@@ -75,31 +75,46 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
             ) : (() => {
               const parts = getMovementValueParts(wod, r);
               return (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '3px 0', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                  <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
-                  {parts.isStrength ? (
-                    parts.strengthValue ? (
-                      <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.7)', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                        {parts.strengthValue}
-                      </span>
-                    ) : <span />
-                  ) : parts.team ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                        {parts.team}
-                      </span>
-                      {parts.me && (
-                        <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
-                          {parts.me}
+                <React.Fragment key={i}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '3px 0', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                    {parts.isStrength ? (
+                      parts.strengthValue ? (
+                        <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.7)', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          {parts.strengthValue}
                         </span>
-                      )}
-                    </div>
-                  ) : parts.single ? (
-                    <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      {parts.single}
-                    </span>
-                  ) : <span />}
-                </div>
+                      ) : <span />
+                    ) : parts.team ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
+                        <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                          {parts.team}
+                        </span>
+                        {parts.me && (
+                          <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
+                            {parts.me}
+                          </span>
+                        )}
+                      </div>
+                    ) : parts.single ? (
+                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {parts.single}
+                      </span>
+                    ) : <span />}
+                  </div>
+                  {r.ladderTrack && (
+                    <LadderTrackChart
+                      track={r.ladderTrack}
+                      barColor={BRAND.ink}
+                      peakColor={BRAND.ink}
+                      emptyColor="rgba(0,0,0,0.25)"
+                      mutedFill="rgba(0,0,0,0.16)"
+                      mutedAccent="rgba(0,0,0,0.55)"
+                      textColor={BRAND.ink}
+                      dimColor="rgba(0,0,0,0.5)"
+                      glow={false}
+                    />
+                  )}
+                </React.Fragment>
               );
             })()
           )}
@@ -121,6 +136,11 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
                 </span>
               )}
             </div>
+            {wod.result.meta && (
+              <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, color: 'rgba(0,0,0,0.55)', marginTop: 2, letterSpacing: '0.04em' }}>
+                {wod.result.meta}
+              </div>
+            )}
           </div>
           {vibe && <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />}
         </div>

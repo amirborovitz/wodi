@@ -88,22 +88,6 @@ function isPrimaryExercise(
   );
 }
 
-function getExerciseBlockKey(
-  workout: ParsedWorkout,
-  loggingModes: ExerciseLoggingMode[],
-  index: number,
-): string {
-  const ex = workout.exercises[index];
-  const mode = getModeForExercise(workout, loggingModes, index);
-  if (ex?.type === 'strength' || mode === 'strength' || mode === 'sets') return 'strength';
-  if (mode === 'for_time') return 'for_time';
-  if (mode === 'amrap' || mode === 'amrap_intervals') return 'amrap';
-  if (mode === 'emom') return 'emom';
-  if (mode === 'intervals') return 'interval';
-  if (ex?.type === 'wod') return `metcon-${index}`;
-  return `primary-${index}`;
-}
-
 function computeWizardBlocks(
   workout: ParsedWorkout,
   loggingModes: ExerciseLoggingMode[],
@@ -119,7 +103,12 @@ function computeWizardBlocks(
 
     const match = ex.name.match(PART_PATTERN);
     const label = match ? match[1].toUpperCase() : null;
-    const key = label ? `part-${label}` : getExerciseBlockKey(workout, loggingModes, i);
+    // Only merge consecutive exercises into one wizard block when they share an EXPLICIT part
+    // label (e.g. "A.1"/"A.2" — the same WOD split across entries for interval scoring).
+    // Without a label, every exercise gets its own block — two unrelated exercises (e.g. a
+    // warm-up "strength" piece and the actual lifting "strength" piece) must never be merged
+    // just because they land in the same coarse type/loggingMode bucket.
+    const key = label ? `part-${label}` : `solo-${i}`;
     if (currentIndices.length > 0 && (key !== currentKey || (label != null && label !== currentLabel))) {
       if (currentIndices.length > 0) rawGroups.push({ label: currentLabel, indices: currentIndices });
       currentLabel = label;

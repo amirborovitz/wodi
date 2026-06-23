@@ -76,6 +76,139 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   };
 }
 
+// ─── Ladder track ───────────────────────────────────────────────────────────
+
+/** Mirrors getLadderRungValue in celebration/helpers.ts — extrapolates beyond the prescribed array. */
+function ladderRungValue(reps: number[], idx: number): number {
+  if (idx < reps.length) return reps[idx];
+  const step = reps.length >= 2 ? reps[reps.length - 1] - reps[reps.length - 2] : 2;
+  return reps[reps.length - 1] + step * (idx - reps.length + 1);
+}
+
+export interface LadderTrackChartProps {
+  track: { reps: number[]; step: number; partial?: number; cadence?: string };
+  /** Filled bar / lit rung color (the skin's accent — yellow on dark skins, ink on the
+   * all-yellow Flare skin, gold on Bout, etc). Used ONLY for completed rounds. */
+  barColor?: string;
+  /** Peak (current completed) bar color — usually a brighter/emphasized version of barColor. */
+  peakColor?: string;
+  /** Outline color for not-yet-reached (empty) bars. */
+  emptyColor?: string;
+  /**
+   * Muted-ink fill for the in-progress (partial) bar — must derive from the skin's OWN ink, not
+   * a dimmed accent colour, or it reads as mud on a light/colored surface (e.g. dim yellow on
+   * Flare's yellow field, or on Chalk/Press paper, looks olive). Dark skins default to a dimmed
+   * barColor (their ink IS the accent); light skins MUST pass a black/charcoal-based override.
+   */
+  mutedFill?: string;
+  /** Muted-ink accent for the partial bar's cap line / outline / "+N" label — same rule as
+   * mutedFill, just more opaque/solid. Defaults to peakColor (dark-skin behavior). */
+  mutedAccent?: string;
+  /** Value-label text color (rung numbers under each bar). */
+  textColor?: string;
+  /** Cadence caption color. */
+  dimColor?: string;
+  /** Whether the peak bar gets a glow box-shadow (skip on light/paper skins). */
+  glow?: boolean;
+}
+
+/**
+ * Ascending-ladder AMRAP climb, shown as ONE bar-chart strip — pure visual, no movement
+ * name/weight text. The caller renders the movement name/weight line through its OWN normal
+ * row markup (so it inherits that skin's exact font/size/highlight treatment) and places this
+ * chart right below it. Completed rounds are solid bars; the in-progress round is a DASHED-
+ * OUTLINE ghost rung with a FIXED half-fill — a convention meaning "started, didn't finish,"
+ * never a fill measured to reps_done/round_target (a round is often several movements, so
+ * reps-into-round don't map to a knowable height). The +N sits inside the half-fill; the
+ * dashed top signals the rung continues past the drawn height. That fill/outline/label use
+ * mutedFill/mutedAccent, NEVER the completed-round barColor, so light-surface skins don't
+ * render a muddy dimmed-yellow tone. Adapted from LadderStaircase (WorkoutScreen.tsx,
+ * detail-mode only); colors are passed per-skin so every skin stays in its own palette.
+ */
+export function LadderTrackChart({
+  track,
+  barColor = BRAND.yellow,
+  peakColor = BRAND.yellowHi,
+  emptyColor = BRAND.faint,
+  mutedFill,
+  mutedAccent,
+  textColor = BRAND.white,
+  dimColor = BRAND.dim,
+  glow = true,
+}: LadderTrackChartProps): React.JSX.Element {
+  const resolvedMutedAccent = mutedAccent ?? peakColor;
+  // Dark skins (no explicit mutedFill override) get the spec's "fixed yellow half-fill" — solid
+  // barColor, not a washed-out tint. Light-surface skins keep their own ink-based override (an
+  // opaque yellow patch there would be the exact "yellow as fill on a light surface" the muted-
+  // ink system exists to avoid) — so the +N label only switches to dark ink in the default case,
+  // where it's sitting on a solid yellow fill instead of each skin's own translucent ink tint.
+  const usingDefaultFill = mutedFill === undefined;
+  const resolvedMutedFill = mutedFill ?? barColor;
+  const ghostLabelColor = usingDefaultFill ? BRAND.ink : resolvedMutedAccent;
+  const { reps, step, partial = 0, cadence } = track;
+  const MAX_BARS = 7;
+  const totalNeeded = step + 1; // completed rungs + one in-progress (ghost) rung
+  const startIdx = Math.max(0, totalNeeded - MAX_BARS);
+  const endIdx = Math.max(startIdx, totalNeeded - 1);
+  const bars = Array.from({ length: endIdx - startIdx + 1 }, (_, i) => {
+    const idx = startIdx + i;
+    return { idx, value: ladderRungValue(reps, idx), completed: idx < step, isNext: idx === step };
+  });
+  const maxVal = Math.max(...bars.map((b) => b.value), 1);
+  const MAX_H = 32;
+  const GHOST_FILL_RATIO = 0.5; // fixed symbol, not a measured reps_done/round_target level
+
+  return (
+    <div style={{ padding: '4px 0 6px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5 }}>
+        {startIdx > 0 && <span style={{ fontFamily: fB, fontSize: 11, color: emptyColor, alignSelf: 'center' }}>···</span>}
+        {bars.map(({ idx, value, completed, isNext }) => {
+          const barH = Math.max(6, Math.round((value / maxVal) * MAX_H));
+          const fillH = isNext && partial > 0 ? Math.round(barH * GHOST_FILL_RATIO) : 0;
+          return (
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+              <div style={{
+                position: 'relative',
+                width: isNext ? 22 : 18,
+                height: barH,
+                borderRadius: '3px 3px 1px 1px',
+                background: completed ? barColor : 'transparent',
+                border: completed ? 'none' : `1.5px ${isNext ? 'dashed' : 'solid'} ${isNext ? resolvedMutedAccent : emptyColor}`,
+                boxShadow: glow && completed && idx === step - 1 ? `0 0 10px ${barColor}80` : 'none',
+                overflow: 'hidden',
+              }}>
+                {isNext && fillH > 0 && (
+                  <>
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: fillH, background: resolvedMutedFill }} />
+                    <div style={{ position: 'absolute', left: 0, right: 0, bottom: fillH, height: 2, background: resolvedMutedAccent }} />
+                    <span style={{
+                      position: 'absolute', left: 0, right: 0, bottom: Math.max(0, fillH - 13),
+                      textAlign: 'center', fontFamily: fD, fontSize: 8.5, fontWeight: 900, color: ghostLabelColor,
+                    }}>
+                      +{partial}
+                    </span>
+                  </>
+                )}
+              </div>
+              <span style={{
+                fontFamily: fD, fontSize: 9, fontWeight: 900,
+                color: isNext ? resolvedMutedAccent : completed ? textColor : emptyColor,
+              }}>
+                {isNext ? `R${idx + 1}` : value}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {cadence && (
+        <div style={{ marginTop: 5, fontFamily: fB, fontSize: 9.5, fontWeight: 800, color: dimColor, letterSpacing: '0.04em' }}>
+          {cadence}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface WordmarkProps {
   color: string;
   dot?: string;

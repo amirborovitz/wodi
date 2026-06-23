@@ -9,7 +9,7 @@ import { BRAND, fD, fH, fB, fBL } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
 
 interface SkinChalkProps {
   wod: PosterWod;
@@ -89,38 +89,53 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
             ) : (() => {
               const parts = getMovementValueParts(wod, r);
               return (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: compact ? 10 : 16, padding: compact ? '0.5px 0' : '1.5px 0' }}>
-                  {parts.roundLabel ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: compact ? '1px 5px' : '2px 6px', fontFamily: fD, fontSize: compact ? 9 : 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                        {parts.roundLabel}
-                      </span>
-                      <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
-                    </div>
-                  ) : (
-                    <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
-                  )}
-                  {parts.isStrength ? (
-                    parts.strengthValue ? (
-                      <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap', textAlign: 'right' }}>{parts.strengthValue}</span>
-                    ) : <span />
-                  ) : parts.team ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
-                      <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                        <span style={hl()}>{parts.team}</span>
-                      </span>
-                      {parts.me && (
-                        <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap' }}>
-                          {parts.me}
+                <React.Fragment key={i}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: compact ? 10 : 16, padding: compact ? '0.5px 0' : '1.5px 0' }}>
+                    {parts.roundLabel ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: compact ? '1px 5px' : '2px 6px', fontFamily: fD, fontSize: compact ? 9 : 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {parts.roundLabel}
                         </span>
-                      )}
-                    </div>
-                  ) : parts.single ? (
-                    <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                      <span style={hl()}>{parts.single}</span>
-                    </span>
-                  ) : <span />}
-                </div>
+                        <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                    )}
+                    {parts.isStrength ? (
+                      parts.strengthValue ? (
+                        <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap', textAlign: 'right' }}>{parts.strengthValue}</span>
+                      ) : <span />
+                    ) : parts.team ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
+                        <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                          <span style={hl()}>{parts.team}</span>
+                        </span>
+                        {parts.me && (
+                          <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap' }}>
+                            {parts.me}
+                          </span>
+                        )}
+                      </div>
+                    ) : parts.single ? (
+                      <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={hl()}>{parts.single}</span>
+                      </span>
+                    ) : <span />}
+                  </div>
+                  {r.ladderTrack && (
+                    <LadderTrackChart
+                      track={r.ladderTrack}
+                      barColor={BRAND.yellow}
+                      peakColor={BRAND.yellow}
+                      emptyColor="rgba(33,29,21,0.25)"
+                      mutedFill="rgba(33,29,21,0.16)"
+                      mutedAccent="rgba(33,29,21,0.55)"
+                      textColor={BRAND.paperInk}
+                      dimColor="#7a6038"
+                      glow={false}
+                    />
+                  )}
+                </React.Fragment>
               );
             })()
           )}
@@ -143,6 +158,11 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                 </span>
               )}
             </div>
+            {wod.result.meta && (
+              <div style={{ fontFamily: fD, fontSize: 13, color: '#7a6038', marginTop: 1 }}>
+                {wod.result.meta.toLowerCase()}
+              </div>
+            )}
           </div>
           {vibe && <VibeStamp vibe={vibe} color={BRAND.paperInk} scale={compact ? 0.58 : 0.68} />}
         </div>

@@ -7,7 +7,7 @@ import { fD, fB, fM } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
 
 interface SkinBoutProps {
   wod: PosterWod;
@@ -97,17 +97,29 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
             ) : (() => {
               const parts = getMovementValueParts(wod, r);
               return (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr max-content', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${BOUT_BONE}12` }}>
-                  <span style={{ color: BOUT_GOLD, fontSize: 9 }}>✦</span>
-                  <span style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 900, color: BOUT_BONE, lineHeight: 1.22 }}>{parts.movName}</span>
-                  {parts.isStrength && parts.strengthValue ? (
-                    <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 900, color: BOUT_GOLD }}>{parts.strengthValue}</span>
-                  ) : parts.team ? (
-                    <span style={{ fontFamily: fD, fontSize: 18, fontWeight: 900, color: BOUT_GOLD, whiteSpace: 'nowrap' }}>{parts.team}</span>
-                  ) : parts.single ? (
-                    <span style={{ fontFamily: fD, fontSize: 18, fontWeight: 900, color: BOUT_GOLD, whiteSpace: 'nowrap' }}>{parts.single}</span>
-                  ) : <span />}
-                </div>
+                <React.Fragment key={i}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr max-content', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${BOUT_BONE}12` }}>
+                    <span style={{ color: BOUT_GOLD, fontSize: 9 }}>✦</span>
+                    <span style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 900, color: BOUT_BONE, lineHeight: 1.22 }}>{parts.movName}</span>
+                    {parts.isStrength && parts.strengthValue ? (
+                      <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 900, color: BOUT_GOLD }}>{parts.strengthValue}</span>
+                    ) : parts.team ? (
+                      <span style={{ fontFamily: fD, fontSize: 18, fontWeight: 900, color: BOUT_GOLD, whiteSpace: 'nowrap' }}>{parts.team}</span>
+                    ) : parts.single ? (
+                      <span style={{ fontFamily: fD, fontSize: 18, fontWeight: 900, color: BOUT_GOLD, whiteSpace: 'nowrap' }}>{parts.single}</span>
+                    ) : <span />}
+                  </div>
+                  {r.ladderTrack && (
+                    <LadderTrackChart
+                      track={r.ladderTrack}
+                      barColor={BOUT_GOLD}
+                      peakColor={BOUT_GOLD}
+                      emptyColor={`${BOUT_GOLD}40`}
+                      textColor={BOUT_BONE}
+                      dimColor={`${BOUT_BONE}66`}
+                    />
+                  )}
+                </React.Fragment>
               );
             })()
           )}
@@ -120,6 +132,11 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
           <div style={{ fontFamily: fD, fontSize: 66, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.035em' }}>
             {wod.result.value}
           </div>
+          {wod.result.meta && (
+            <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', color: `${BOUT_BG}99` }}>
+              {wod.result.meta}
+            </div>
+          )}
           <span style={{ position: 'absolute', left: 18, bottom: -8, width: 0, height: 0, borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderTop: `9px solid ${BOUT_GOLD}` }} />
           <span style={{ position: 'absolute', right: 18, bottom: -8, width: 0, height: 0, borderLeft: '9px solid transparent', borderRight: '9px solid transparent', borderTop: `9px solid ${BOUT_GOLD}` }} />
         </div>

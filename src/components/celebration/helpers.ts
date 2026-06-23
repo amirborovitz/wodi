@@ -246,14 +246,101 @@ export function getLadderRungValue(reps: number[], idx: number): number {
   return reps[reps.length - 1] + step * (idx - reps.length + 1);
 }
 
+/**
+ * Per-implement weight to display for a ladder movement — prefers what was actually logged
+ * over the prescribed Rx, since this is the "what I did" layer. MovementTotal.weight for a
+ * twin-implement movement is the EFFECTIVE weight used for volume math (per-implement × 2), so
+ * it's divided back down to the per-dumbbell/kettlebell value that was actually entered.
+ */
+function deriveDisplayWeight(
+  prescribed: { weight?: number; implementCount?: 1 | 2 } | undefined,
+  actual: MovementTotal | undefined,
+): number | undefined {
+  if (actual?.weight && actual.weight > 0) {
+    return prescribed?.implementCount === 2 ? actual.weight / 2 : actual.weight;
+  }
+  return prescribed?.weight && prescribed.weight > 0 ? prescribed.weight : undefined;
+}
+
+/**
+ * Ascending-ladder AMRAP section: ONE bar-chart track (rendered by the poster skin — see
+ * ArtifactRow.ladderTrack) showing the climb, with the scaling movement names + weight listed
+ * once beside it — never the movement names repeated once per round, and never a flat "2→12"
+ * range that hides the per-round climb. The fixed per-round add-on (e.g. burpees) gets its own
+ * normal row via buildCelebrationMovementRow, exactly like any other movement on the poster.
+ */
+function splitLadderMovements(exercise: Exercise): { scaling: ParsedMovement[]; fixed: ParsedMovement[] } {
+  return {
+    scaling: (exercise.movements ?? []).filter((m) => m.perRound !== false),
+    fixed: (exercise.movements ?? []).filter((m) => m.perRound === false),
+  };
+}
+
+function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): ArtifactRow[] | undefined {
+  const ladderReps = exercise.ladderReps;
+  if (!ladderReps || ladderReps.length === 0) return undefined;
+
+  const { scaling: scalingMovements, fixed: fixedMovements } = splitLadderMovements(exercise);
+  if (scalingMovements.length === 0) return undefined;
+
+  let weight: number | undefined;
+  let unit = 'kg';
+  let weightSuffix = '';
+  for (const mov of scalingMovements) {
+    const actual = findBreakdownForParsedMovement(mov, movements);
+    const prescribedWeight = mov.rxWeights?.male || mov.rxWeights?.female;
+    const w = deriveDisplayWeight({ weight: prescribedWeight, implementCount: mov.implementCount }, actual);
+    if (w != null) {
+      weight = w;
+      unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit ?? 'kg');
+      weightSuffix = mov.implementCount === 2 ? ' each' : '';
+      break;
+    }
+  }
+
+  const step = exercise.ladderStep ?? 0;
+  const partial = exercise.ladderPartial ?? 0;
+
+  // Per-round increment — stated explicitly so the climb rule is read, not guessed.
+  const cadence = ladderReps.length >= 2 ? ladderReps[1] - ladderReps[0] : undefined;
+  const cadenceLabel = cadence != null ? `+${cadence} REPS EVERY ROUND` : undefined;
+
+  const fixedRows: ArtifactRow[] = fixedMovements.map((mov) => {
+    const actual = findBreakdownForParsedMovement(mov, movements);
+    const perRound = mov.reps ?? mov.calories ?? mov.distance ?? undefined;
+    const unitLabel = mov.reps != null ? '' : mov.calories != null ? ' CAL' : mov.distance != null ? 'M' : '';
+    return {
+      primary: '',
+      name: abbreviateMovementForPoster(mov.name),
+      loadNote: perRound != null ? `${perRound}${unitLabel} EVERY ROUND` : undefined,
+      accent: (actual?.color ?? 'magenta') as ArtifactRow['accent'],
+    };
+  });
+
+  const trackRow: ArtifactRow = {
+    primary: '',
+    name: scalingMovements.map((m) => abbreviateMovementForPoster(m.name)).join(' + '),
+    loadNote: weight != null ? `${weight}${unit}${weightSuffix}` : undefined,
+    accent: 'yellow',
+    ladderTrack: { reps: ladderReps, step, partial: partial > 0 ? partial : undefined, cadence: cadenceLabel },
+  };
+
+  return [trackRow, ...fixedRows];
+}
+
 export function parseDescLadderScheme(
   exercise: Exercise,
+  /** Shared workout-level rawText — only safe when the caller knows this exercise IS the whole
+   * workout. Prefer exercise.rawText (this block's own scoped slice) whenever it's present;
+   * for a multi-exercise workout, callers should pass undefined here rather than the shared
+   * blob, so one part's bracket notation can never match against a sibling part. */
   rawText?: string,
 ): number[] | undefined {
   if (exercise.suggestedRepsPerSet && exercise.suggestedRepsPerSet.length >= 3) {
     return exercise.suggestedRepsPerSet;
   }
-  const searchText = [rawText, exercise.prescription, exercise.name].filter(Boolean).join(' ');
+  const scopedRawText = exercise.rawText || rawText;
+  const searchText = [scopedRawText, exercise.prescription, exercise.name].filter(Boolean).join(' ');
   const match = searchText.match(/\[(\d+(?:\s*[-–]\s*\d+){2,})\]/);
   if (!match) return undefined;
   const nums = match[1].split(/\s*[-–]\s*/).map(Number).filter((n) => n > 0);
@@ -1059,15 +1146,19 @@ export function buildRewardArtifactSections(
   if (!movements || movements.length === 0) return [];
 
   const mainExercise = exercises[0];
-  const capText = `${mainExercise?.name || ''} ${mainExercise?.prescription || ''} ${rawText || ''}`;
+  // rawText is shared across ALL exercises in the workout — only safe to use as a text-matching
+  // fallback when mainExercise IS the whole workout. Otherwise prefer mainExercise.rawText
+  // (handled inside parseDescLadderScheme) and don't let a sibling block's text leak in here.
+  const scopedRawText = exercises.length === 1 ? rawText : mainExercise?.rawText;
+  const capText = `${mainExercise?.name || ''} ${mainExercise?.prescription || ''} ${scopedRawText || ''}`;
   const capMatch = capText.match(/\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i);
   const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
   const isForTime = /for\s*time|\brft\b/i.test(capText);
-  const repeatCount = getPrescribedRoundCount(exercises, rawText)
+  const repeatCount = getPrescribedRoundCount(exercises, scopedRawText)
     || (mainExercise ? getPrescriptionRepeatCount(mainExercise) : undefined)
     || (isForTime && mainExercise ? inferRoundCountFromMovements(mainExercise, movements) : undefined);
   const everyCadence = !isForTime ? extractEveryXCadence(capText) : undefined;
-  const descLadderScheme = isForTime && mainExercise ? parseDescLadderScheme(mainExercise, rawText) : undefined;
+  const descLadderScheme = isForTime && mainExercise ? parseDescLadderScheme(mainExercise, scopedRawText) : undefined;
   const blueprintRaw = repeatCount && repeatCount > 1
     ? [
         isForTime
@@ -1144,6 +1235,20 @@ export function buildRewardArtifactSections(
       blueprint: pyramidBlueprint,
       rows: buildProgressiveChipperRows(mainExercise!.sections!, true),
     }];
+  }
+
+  // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
+  // range or movement names repeated once per round
+  if (mainExercise?.ladderReps && mainExercise.ladderReps.length > 0) {
+    const ladderRows = buildLadderRows(mainExercise, movements);
+    if (ladderRows) {
+      return [{
+        eyebrow: 'AMRAP',
+        title: 'Blueprint',
+        blueprint: blueprint ?? undefined,
+        rows: ladderRows,
+      }];
+    }
   }
 
   const prescribedOrder = prescribedMovements.map((m) => normalizeStampMovementName(m.name));
@@ -1240,6 +1345,20 @@ export function buildPageArtifactSection(
   teamSize?: number,
 ): ArtifactSection | null {
   if (!movements || movements.length === 0) return null;
+
+  // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
+  // range or movement names repeated once per round
+  if (exercise.ladderReps && exercise.ladderReps.length > 0) {
+    const ladderRows = buildLadderRows(exercise, movements);
+    if (ladderRows) {
+      return {
+        eyebrow: 'WOD',
+        title: exercise.name,
+        rows: ladderRows,
+        hiddenCount: 0,
+      };
+    }
+  }
 
   const stationLabelMap: Record<string, string> = {};
   const prescribedRepsMap: Record<string, number> = {};
@@ -2038,8 +2157,24 @@ export function computeHeroResult(
   if (amrapExercise) {
     const isLadder = amrapExercise.ladderReps && amrapExercise.ladderReps.length > 0 && amrapExercise.ladderStep != null;
     if (isLadder) {
-      const totalReps = amrapExercise.sets.reduce((sum, s) => sum + (s.actualReps || 0), 0);
-      if (totalReps > 0) return { value: `${totalReps}`, unit: 'REPS', formatLine, storyLine, storyMovements: buildStory(amrapExercise.ladderStep || 1), accentClass: 'accentMagenta' };
+      // An AMRAP ladder score IS rounds + partial reps — lead with that ("6 +10"), not a raw
+      // rep count nobody watching can verify. amrapExercise.sets[0].actualReps is the scaling
+      // movements' combined total (per-movement reps × movement count, used for the workload
+      // breakdown) — it is NOT "total reps for the workout" and must never be shown as the hero.
+      const step = amrapExercise.ladderStep || 0;
+      if (step > 0) {
+        const partial = amrapExercise.ladderPartial || 0;
+        return {
+          value: `${step}`,
+          unit: partial > 0 ? `+${partial}` : undefined,
+          formatLine, storyLine,
+          storyMovements: buildStory(step),
+          accentClass: 'accentMagenta',
+          // The poster never carries a rep total for a ladder score (no way to verify it at a
+          // glance) — just which round the partial is logged into, beside the rounds+partial hero.
+          ladderIntoRound: partial > 0 ? step + 1 : undefined,
+        };
+      }
     }
     const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
       ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)

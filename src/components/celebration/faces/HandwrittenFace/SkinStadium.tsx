@@ -8,7 +8,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
 
 interface SkinStadiumProps {
   wod: PosterWod;
@@ -160,35 +160,46 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
             ) : (() => {
               const parts = getMovementValueParts(wod, r);
               return (
-                <div key={i} style={{
-                  display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center',
-                  gap: 16, padding: '5px 0',
-                  borderBottom: '1px solid rgba(242,240,235,0.10)',
-                }}>
-                  <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
-                  {parts.isStrength ? (
-                    parts.strengthValue ? (
-                      <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, whiteSpace: 'nowrap', textAlign: 'right' }}>
-                        {parts.strengthValue}
-                      </span>
-                    ) : <span />
-                  ) : parts.team ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                        {parts.team}
-                      </span>
-                      {parts.me && (
-                        <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
-                          {parts.me}
+                <React.Fragment key={i}>
+                  <div style={{
+                    display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center',
+                    gap: 16, padding: '5px 0',
+                    borderBottom: '1px solid rgba(242,240,235,0.10)',
+                  }}>
+                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                    {parts.isStrength ? (
+                      parts.strengthValue ? (
+                        <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          {parts.strengthValue}
                         </span>
-                      )}
-                    </div>
-                  ) : parts.single ? (
-                    <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      {parts.single}
-                    </span>
-                  ) : <span />}
-                </div>
+                      ) : <span />
+                    ) : parts.team ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
+                        <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                          {parts.team}
+                        </span>
+                        {parts.me && (
+                          <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+                            {parts.me}
+                          </span>
+                        )}
+                      </div>
+                    ) : parts.single ? (
+                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {parts.single}
+                      </span>
+                    ) : <span />}
+                  </div>
+                  {r.ladderTrack && (
+                    <LadderTrackChart
+                      track={r.ladderTrack}
+                      barColor={BRAND.yellow}
+                      peakColor={BRAND.yellowHi}
+                      textColor={BRAND.white}
+                      dimColor={BRAND.dim}
+                    />
+                  )}
+                </React.Fragment>
               );
             })()
           )}
@@ -217,6 +228,11 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
             {scoreUnit && (
               <div style={{ fontFamily: fD, fontSize: 22, fontWeight: 700, color: `${BRAND.yellow}a8`, marginTop: 4 }}>
                 {scoreUnit}
+              </div>
+            )}
+            {wod.result.meta && (
+              <div style={{ fontFamily: fM, fontSize: 9, fontWeight: 700, color: `${BRAND.yellow}55`, marginTop: 4, letterSpacing: '0.04em' }}>
+                {wod.result.meta}
               </div>
             )}
           </div>

@@ -168,6 +168,13 @@ export interface Exercise {
   aiPartName?: string;     // Generated poster wordmark for this workout part
   partNameOverride?: string; // User-edited poster wordmark override
   mvpNote?: string;         // Individual standout note for team workouts (e.g. "NIMROD CRUSHED IT!")
+  // This exercise's OWN slice of the whiteboard/source text — scoped to just this block, not
+  // the whole photo. Carried through from ParsedExercise.rawText so poster-time text matching
+  // (e.g. parseDescLadderScheme) stays scoped per part in multi-exercise workouts.
+  rawText?: string;
+  // True if this is an auxiliary/accessory block (warm-up, body armor, mobility, skill practice)
+  // rather than one of the session's main parts (typically a strength piece and a metcon/WOD).
+  isSecondary?: boolean;
 }
 
 export interface ExerciseSet {
@@ -314,6 +321,15 @@ export interface ParsedExercise {
   workDuration?: number;              // programmed work time in seconds (e.g. 180 for a 3-min AMRAP)
   restDuration?: number;              // programmed rest time in seconds between rounds/intervals
   aiPartName?: string;                // Generated poster wordmark for this workout part
+  // This exercise's OWN slice of the whiteboard/source text — scoped to just this block,
+  // not the whole photo. Use this (not the workout-level rawText) for any per-exercise text
+  // matching (ladder detection, "after each round" phrasing, etc.) in a multi-exercise workout,
+  // so one block's wording can never leak into a sibling block's detection.
+  rawText?: string;
+  // True if this is an auxiliary/accessory block (warm-up, body armor, mobility, skill practice)
+  // rather than one of the session's main parts. A session has AT MOST 2 main parts — typically
+  // a strength piece and a metcon/WOD — every other exercise must be isSecondary: true.
+  isSecondary?: boolean;
 }
 
 // Movement substitution tracking during logging
@@ -423,6 +439,7 @@ export interface RewardData {
   partnerNames?: string[];                // Names of training partners for team workouts
   workoutId?: string;                     // Persisted workout id for poster edits
   difficultyLevel?: number;               // AI-assessed programmed difficulty 1–10
+  date?: Date;                            // The workout's actual date (Firestore `date` field)
 }
 
 // Weekly stats for consistency ring

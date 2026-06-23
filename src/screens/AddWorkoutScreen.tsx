@@ -3067,6 +3067,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
           ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),
           ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
           ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
+          ...(result.exercise.rawText && { rawText: result.exercise.rawText }),
+          ...(typeof result.exercise.isSecondary === 'boolean' && { isSecondary: result.exercise.isSecondary }),
           ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
           // User-entered WOD name during logging takes priority; AI-generated name is fallback
           ...((result.metconName || result.exercise.aiPartName) && {
@@ -3330,6 +3332,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         ...(teamSize > 1 && { teamSize }),
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         ...(persistedWorkoutId && { workoutId: persistedWorkoutId }),
+        date: workoutDate,
       });
       if (skipPersistence) {
         setIsEditingAfterSave(false);

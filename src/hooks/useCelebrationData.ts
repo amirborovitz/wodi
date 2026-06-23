@@ -127,6 +127,7 @@ export interface CelebrationData {
   rawText: string | undefined;
   durationMinutes: number;
   displayMinutes: number;
+  workoutDate: Date;
 
   // Persisted poster customization (Firestore-backed)
   workoutId: string | undefined;
@@ -237,6 +238,16 @@ function achievementMatchesMovementList(
   });
 }
 
+/**
+ * Is this exercise one of the session's main parts (vs. a secondary/auxiliary block like a
+ * warm-up or body-armor circuit)? Trusts the AI's explicit `isSecondary` when present; for
+ * older data that predates the field, falls back to the `type !== 'skill'` proxy.
+ */
+function isMainPart(ex: Exercise): boolean {
+  if (typeof ex.isSecondary === 'boolean') return !ex.isSecondary;
+  return ex.type !== 'skill';
+}
+
 // ─── The hook ─────────────────────────────────────────────────────────────────
 
 export function useCelebrationData(
@@ -268,6 +279,10 @@ export function useCelebrationData(
   const isPR: boolean | undefined = isReward
     ? rewardData?.heroAchievement?.type === 'pr'
     : workout?.isPR;
+
+  // The workout's actual date — never "now at render time". Reward mode carries it on
+  // rewardData (set at save time); detail mode reads the persisted Firestore field.
+  const workoutDate: Date = (isReward ? rewardData?.date : workout?.date) ?? new Date();
 
   // ── Poster customization (persisted to Firestore) ──────────────────────────
 
@@ -662,11 +677,15 @@ export function useCelebrationData(
 
   // ── Poster layout ─────────────────────────────────────────────────────────
 
+  // Multi-part wins over the single-exercise special layouts (chipper/complex/ladder) — those
+  // are shaping concerns for ONE exercise's own page, not a reason to collapse a session with
+  // multiple main parts (e.g. strength + metcon) into one combined poster. The carousel's
+  // per-page builders already handle ladder/chipper/complex shaping for whichever page needs it.
   const posterLayout: PosterLayout = (() => {
+    if (exercises.filter(isMainPart).length > 1) return 'multi-part';
     if (isChipper) return 'chipper';
     if (barbellComplex) return 'complex';
     if (ladderData) return 'ladder';
-    if (exercises.filter((ex) => ex.type !== 'skill').length > 1) return 'multi-part';
     return 'standard';
   })();
 
@@ -678,7 +697,7 @@ export function useCelebrationData(
     if (posterLayout !== 'multi-part') return null;
     const allMovements = activeBreakdown?.movements ?? [];
 
-    return exercises.filter((ex) => ex.type !== 'skill').map((ex): CarouselPage => {
+    return exercises.filter(isMainPart).map((ex): CarouselPage => {
       const isStrength = ex.type === 'strength' || ex.type === 'skill';
       const exNameLower = ex.name.toLowerCase();
       const subNames = new Set((ex.movements ?? []).map((m) => m.name.toLowerCase()));
@@ -732,9 +751,13 @@ export function useCelebrationData(
       : workout?.teamSize;
     const movements = activeBreakdown?.movements ?? [];
     const heroRawText = isReward ? rewardData?.workoutRawText : workout?.rawText;
+    // Only reached when there's at most 1 main part — exclude any secondary exercise (e.g. a
+    // warm-up) so it can never be mistaken for "the metcon" just because it comes first and
+    // isn't type:'strength'.
+    const mainExercises = exercises.filter(isMainPart);
 
     return computeHeroResult(
-      exercises,
+      mainExercises.length > 0 ? mainExercises : exercises,
       workoutFormat,
       totalVolume,
       totalEP,
@@ -903,13 +926,19 @@ export function useCelebrationData(
   // ── Artifact sections ─────────────────────────────────────────────────────
 
   const artifactSections = useMemo(
-    () =>
-      buildRewardArtifactSections(
-        exercises,
+    () => {
+      // Only reached when there's at most 1 main part — but a secondary exercise (e.g. a
+      // warm-up) could still be exercises[0] if it comes first in the array. Exclude it so
+      // buildRewardArtifactSections' mainExercise is always the actual main part, not whichever
+      // exercise happens to be listed first.
+      const mainExercises = exercises.filter(isMainPart);
+      return buildRewardArtifactSections(
+        mainExercises.length > 0 ? mainExercises : exercises,
         activeBreakdown?.movements ?? [],
         rawText,
         workoutFormat,
-      ),
+      );
+    },
     [exercises, activeBreakdown?.movements, rawText, workoutFormat],
   );
 
@@ -984,12 +1013,16 @@ export function useCelebrationData(
     if (!carouselPageData) return null;
     const teamSize =
       rewardData?.teamSize ?? workout?.teamSize ?? inferTeamSizeFromText(rawText);
+    // rawText is shared across every page/part of the workout — only safe to pass through when
+    // there's exactly one page. Otherwise each page must rely on its own exercise.rawText
+    // (handled inside parseDescLadderScheme), so one part's text never matches a sibling part's.
+    const scopedRawText = carouselPageData.length === 1 ? rawText : undefined;
     return carouselPageData.map((page) =>
       buildPageArtifactSection(
         page.exercise,
         page.movements,
         page.isStrength,
-        rawText,
+        scopedRawText,
         teamSize,
       ),
     );
@@ -1048,6 +1081,7 @@ export function useCelebrationData(
     rawText,
     durationMinutes,
     displayMinutes,
+    workoutDate,
     workoutId,
     posterSkin,
     posterVibe,

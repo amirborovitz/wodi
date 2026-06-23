@@ -13,7 +13,7 @@ const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit coach and workout parse
 Return ONLY valid JSON:
 {
   "title": "workout name — see TITLE RULES below",
-  "rawText": "full workout text from the image (OCR-style, line breaks ok)",
+  "rawText": "full workout text from the image (OCR-style, line breaks ok) — the WHOLE image, every block",
   "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
   "format": "for_time" | "intervals" | "amrap" | "amrap_intervals" | "emom" | "strength" | "tabata",
   "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
@@ -40,6 +40,16 @@ Return ONLY valid JSON:
       "type": "strength" | "cardio" | "skill" | "wod",
       "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets",
       "prescription": "human-readable prescription",
+      // isSecondary: see HIGH-LEVEL PARTS section below. false for the session's main part(s)
+      // (the strength piece and/or the metcon), true for everything else (warm-up, body armor,
+      // mobility, accessory/prehab, skill practice unrelated to the main lifts).
+      "isSecondary": false,
+      // rawText: ONLY the lines from the whiteboard that belong to THIS block (e.g. just the
+      // "B. STRENGTH..." section, not "A." or "C."). When the workout has multiple exercises,
+      // each one's rawText must be its own non-overlapping slice — never paste the whole
+      // workout's text into every exercise. For a single-exercise workout this can equal the
+      // top-level rawText.
+      "rawText": "this block's own lines from the whiteboard",
       // suggestedSets is the number of working rounds for this exercise (for a for_time WOD this usually matches "sets").
       // When the workout text says "Into, 2 rounds: [block]" you must set suggestedSets to 2 for that working block.
       "suggestedSets": 5,
@@ -85,6 +95,23 @@ Return ONLY valid JSON:
     }
   ]
 }
+
+## HIGH-LEVEL PARTS — isSecondary
+
+A CrossFit session has AT MOST 2 main parts: a strength/skill piece and a metcon/WOD (the
+conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's "isSecondary":
+- false — for the strength piece (e.g. "Bench Press 5x5 @70-85%") and the metcon/WOD. These are
+  the parts the athlete trains for and the recap should foreground.
+- true — for everything else: warm-ups, "body armor", mobility/prehab circuits, activation work,
+  skill practice unrelated to the main lifts. These exist to support the main parts, not stand
+  alongside them.
+- A session NEVER has more than 2 exercises with "isSecondary": false. If your parse has 3+
+  non-secondary exercises, reconsider — at least one of them is accessory/secondary work, even
+  if it's still substantial (e.g. a 2-set shoulder activation circuit before the real lifting).
+- A session can have ZERO secondary parts (a clean strength + metcon day) or just one main part
+  (metcon-only, or strength-only) — don't force a 3-part structure that isn't there.
+- This is purely about session structure, not about how each part is logged or scored — it has
+  no effect on "type"/"loggingMode"/"format", which are decided independently per their own rules.
 
 ## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x [BLOCK] -> CASH-OUT)
 
@@ -267,6 +294,7 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - "1-2-3-4-5 each" → ladderReps: [1, 2, 3, 4, 5], loggingMode: "amrap"
 - "21-15-9" is NOT a ladder (descending) → suggestedRepsPerSet: [21, 15, 9], NO ladderReps
 - ladderReps applies ONLY to ascending sequences in AMRAP workouts. Do not set it for strength or for_time.
+- FIXED ADD-ON MOVEMENTS: if a movement is done every round at a CONSTANT rep count alongside the ladder (e.g. "2-4-6-8-10-12 KB lunges + push press, 6 burpees after each set"), set "perRound": false on that movement and keep its real fixed reps value. Decide this from the "after each round/set" language, NOT from whether its rep count happens to match one of the ladder rungs — a fixed "6 burpees" stays fixed even if the ladder also passes through 6.
 
 ## PARTNER / TEAM WORKOUTS
 - "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
@@ -878,6 +906,7 @@ Rules:
 - Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
 - Preserve "loggingHints" (including sharedWeightMovements) from the original parsed data.
 - Preserve "workDuration" and "restDuration" from the original parsed data.
+- Preserve each exercise's "rawText" (its own scoped slice of the whiteboard) from the original parsed data unchanged — never copy one exercise's rawText onto another.
 - Preserve original structure when unsure — only correct obvious errors.`;
 
 export async function refineParsedWorkout(
@@ -913,7 +942,11 @@ export async function refineParsedWorkout(
     jsonStr = jsonMatch[1];
   }
 
-  const refined = JSON.parse(jsonStr.trim()) as ParsedWorkout;
+  // Validate/whitelist exactly like the initial parse — the refine step is a second AI call
+  // and is just as capable of hallucinating fields (e.g. an invented "isSecondary" flag, or
+  // ladderReps copied onto the wrong exercise) as the first one. A raw `as ParsedWorkout` cast
+  // would let any such hallucination survive untouched into the saved workout.
+  const refined = validateParsedWorkout(JSON.parse(jsonStr.trim()));
 
   // Post-process the refined workout
   return postProcessParsedWorkout(refined);
@@ -1220,6 +1253,8 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         workDuration: typeof exercise.workDuration === 'number' && exercise.workDuration > 0 ? exercise.workDuration : undefined,
         restDuration: typeof exercise.restDuration === 'number' && exercise.restDuration > 0 ? exercise.restDuration : undefined,
         ...(ladderReps && { ladderReps }),
+        ...(typeof exercise.rawText === 'string' && exercise.rawText.trim() && { rawText: exercise.rawText }),
+        ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),
       });
     }
   }
