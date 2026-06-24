@@ -22,6 +22,13 @@ export interface MovementValueParts {
   single: string | null;
   total: string | null;
   roundLabel?: string;
+  // True for a split:'rounds' partner row — skins must render this row at FULL WIDTH (no value
+  // column at all), not merely with an empty value. Distinct from team===null && single===null
+  // on a normal row (which can legitimately happen for a missing "—" row).
+  isRoundsSplit?: boolean;
+  // The inline "@ 45kg" weight tag for a split:'rounds' row, split out of movName so skins can
+  // render it as a quiet/dim suffix instead of full-weight movement-name text.
+  loadTag?: string | null;
 }
 
 function formatTotalNote(note: string | undefined): string | null {
@@ -51,6 +58,22 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       roundLabel: r.roundLabel,
     };
   }
+  if (wod.split === 'rounds') {
+    const loadMatch = movName.match(/^(.*?)\s*(@\s*.+)$/);
+    return {
+      movName: loadMatch ? loadMatch[1] : movName,
+      isStrength: false,
+      strengthValue: null,
+      team: null,
+      me: null,
+      single: null,
+      total: null,
+      roundLabel: r.roundLabel,
+      isRoundsSplit: true,
+      loadTag: loadMatch ? loadMatch[2] : null,
+    };
+  }
+
   if (r.team) {
     return {
       movName,
@@ -320,6 +343,37 @@ export function VibeStamp({ vibe, scale = 1, color }: VibeStampProps): React.JSX
       >
         {v.label}
       </span>
+    </div>
+  );
+}
+
+interface PairsLegendProps {
+  /** Left label ("Team") color — the section's dim/quiet token. */
+  teamColor: string;
+  /** Right label ("Me") color — matches whatever color each skin already used for its old bare
+   * "Me" label, so this is a drop-in replacement, not a restyle. */
+  meColor: string;
+}
+
+/**
+ * split:'reps' partner header — names both scopes (TEAM = the shared prescription on the left,
+ * ME = personal share on the right) so the left column doesn't read as unlabeled. Replaces each
+ * skin's old bare "Me" span when wod.split === 'reps'. Both labels share the same quiet weight;
+ * the personal number's prominence comes from the value below, not the label itself.
+ */
+export function PairsLegend({ teamColor, meColor }: PairsLegendProps): React.JSX.Element {
+  const labelStyle = (color: string): React.CSSProperties => ({
+    fontFamily: fB,
+    fontSize: 9,
+    fontWeight: 800,
+    letterSpacing: '0.14em',
+    color,
+    textTransform: 'uppercase',
+  });
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+      <span style={labelStyle(teamColor)}>Team</span>
+      <span style={labelStyle(meColor)}>Me</span>
     </div>
   );
 }

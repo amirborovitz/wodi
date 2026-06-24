@@ -175,6 +175,20 @@ export interface Exercise {
   // True if this is an auxiliary/accessory block (warm-up, body armor, mobility, skill practice)
   // rather than one of the session's main parts (typically a strength piece and a metcon/WOD).
   isSecondary?: boolean;
+  // Per-exercise partner classification — independent of the workout-level partnerWorkout/
+  // teamSize (which apply once to the whole session, for EP/volume math). THIS exercise's own
+  // value answers "is THIS specific block the partnered one" — e.g. false for a solo strength
+  // piece in a session whose metcon part is partnered. AI-set at parse time, backfilled by
+  // workoutPostProcessor.ts when missing; the celebration poster's detectPartnerSplit() falls
+  // back to its own text-regex detection only when both are absent (pre-existing saved data).
+  partnerWorkout?: boolean;
+  // 'rounds' — partners trade whole rounds (IGUG); 'reps' — partners share one flat/continuous
+  // total with no round structure. Meaningless unless partnerWorkout is true.
+  partnerSplit?: 'reps' | 'rounds';
+  // This athlete's personal round count when partnerSplit === 'rounds' (e.g. 6 of "12 RFT, 6
+  // each"). Distinct from the pre-save-only ParsedExercise.suggestedSets, which never survives
+  // into the saved Exercise — this is the value the poster's round ledger actually reads.
+  personalRounds?: number;
 }
 
 export interface ExerciseSet {
@@ -330,6 +344,15 @@ export interface ParsedExercise {
   // rather than one of the session's main parts. A session has AT MOST 2 main parts — typically
   // a strength piece and a metcon/WOD — every other exercise must be isSecondary: true.
   isSecondary?: boolean;
+  // Per-exercise partner classification — independent of the workout-level partnerWorkout/
+  // teamSize (those apply once to the whole session, for EP/volume math; see PARTNER / TEAM
+  // WORKOUTS rules). THIS field answers "is THIS specific block the partnered one" — set false
+  // (not omitted) on a solo strength/skill block even when the session overall is partnered.
+  // 'rounds' = partners trade whole rounds (IGUG); 'reps' = partners share one flat/continuous
+  // total, no round structure. The per-person round count for 'rounds' continues to be
+  // suggestedSets (existing "(N each)" convention) — no separate field needed pre-save.
+  partnerWorkout?: boolean;
+  partnerSplit?: 'reps' | 'rounds';
 }
 
 // Movement substitution tracking during logging

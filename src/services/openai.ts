@@ -91,7 +91,16 @@ Return ONLY valid JSON:
       // restDuration: programmed rest time for THIS EXERCISE in SECONDS.
       // Examples: "AMRAP 3:00 x 4" with 1:00 rest (single exercise) → 240 (60*4),
       //   "A.1 AMRAP 6:00 (Round 1)" with 2:00 rest (one of 4 split) → 120. Omit when no prescribed rest.
-      "restDuration": 240
+      "restDuration": 240,
+      // partnerWorkout / partnerSplit: is THIS SPECIFIC block the partnered one, and how do
+      // partners split it? Independent of the top-level partnerWorkout/teamSize (those apply to
+      // the whole session for EP/volume math) — see PARTNER / TEAM WORKOUTS below. Set
+      // partnerWorkout: false (not omitted) on a solo strength/skill block even when the session
+      // overall is partnered.
+      "partnerWorkout": true,
+      // "rounds" = partners trade whole rounds (IGUG/"I go you go"/"(N each)"); "reps" = partners
+      // share one flat/continuous total, no round structure (e.g. "100 wall balls between you").
+      "partnerSplit": "rounds"
     }
   ]
 }
@@ -303,6 +312,7 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
 - "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
+- PER-EXERCISE partnerWorkout/partnerSplit (on EACH exercise object, separate from and in addition to the top-level fields above): the top-level fields describe the whole SESSION (for EP/volume math); they do NOT mean every exercise is partnered. On EACH exercise, set its OWN partnerWorkout/partnerSplit: a strength or skill block is partnerWorkout: false even when a sibling metcon block in the same session is partnered — set this explicitly, don't omit it. For the exercise that IS partnered: partnerSplit: "rounds" when partners trade whole rounds (IGUG/"I go you go"/"(N each)"), or partnerSplit: "reps" when partners share one flat/continuous total with no round structure (e.g. "100 wall balls between you, split however"). The per-person round count for "rounds" continues to be suggestedSets, per the "(N each)" rule above — do not add a separate count field.
 - ROTATING STATION HEADCOUNT: "5 groups starting at different stations (7 people max)" / "max 6 per station" are logistics notes, NOT team designations. Do NOT set partnerWorkout or teamSize from headcount-per-station language. Only set teamSize when athletes are explicitly working together as one unit (IGUG, In Pairs, Team of N completing a shared target).
 
 ### IGYG AMRAP WITH SPLIT STATIONS (two independent streams)
@@ -424,6 +434,7 @@ Output:
 {
   "type": "for_time", "format": "for_time", "scoreType": "time", "partnerWorkout": true, "teamSize": 2, "sets": 6, "timeCap": 960,
   "exercises": [{ "name": "Partner RFT (6 each)", "type": "wod", "loggingMode": "for_time", "prescription": "6 rounds each: 10 DL 60/40kg, 40 DU/60 SU, 15 Box Jumps", "suggestedSets": 6,
+    "partnerWorkout": true, "partnerSplit": "rounds",
     "movements": [
       { "name": "Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
       { "name": "Single Under", "reps": 60, "inputType": "none", "alternative": { "name": "Double Under", "reps": 40 } },
@@ -1255,6 +1266,8 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         ...(ladderReps && { ladderReps }),
         ...(typeof exercise.rawText === 'string' && exercise.rawText.trim() && { rawText: exercise.rawText }),
         ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),
+        ...(typeof exercise.partnerWorkout === 'boolean' && { partnerWorkout: exercise.partnerWorkout }),
+        ...((exercise.partnerSplit === 'reps' || exercise.partnerSplit === 'rounds') && { partnerSplit: exercise.partnerSplit }),
       });
     }
   }

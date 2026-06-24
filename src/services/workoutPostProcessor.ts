@@ -317,8 +317,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill "together" flag from rawText when AI missed it
   const withTogether = backfillTogetherFlag(withLadder);
 
+  // Backfill per-exercise partnerWorkout/partnerSplit when the AI missed them
+  const withPartnerSplit = backfillPartnerSplit(withTogether);
+
   // Backfill loggingMode on exercises that the AI missed
-  const withLoggingModes = backfillLoggingModes(withTogether);
+  const withLoggingModes = backfillLoggingModes(withPartnerSplit);
 
   // Backfill inputType on any movements that the AI missed
   const withInputTypes = backfillInputTypes(withLoggingModes);
@@ -849,6 +852,41 @@ function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
   return changed ? { ...workout, exercises } : workout;
 }
 
+/**
+ * Backfill per-exercise partnerWorkout/partnerSplit when the AI didn't set them. Scoped to THIS
+ * exercise's own text via getExerciseScopedText (never the shared workout-level rawText for a
+ * multi-exercise workout) — a sibling block being partnered must never flag an unrelated block
+ * (e.g. a solo strength piece sharing a session with a partnered metcon must backfill to
+ * partnerWorkout: false, not inherit the session's partner status). Round structure comes from
+ * data already on the exercise (suggestedSets, sections[].rounds) rather than a new text-based
+ * round-count regex — that data is more reliable than re-deriving it from the whiteboard text.
+ */
+function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
+  if (!workout.partnerWorkout) return workout; // session isn't partnered at all — nothing to do
+
+  let changed = false;
+  const exercises = workout.exercises.map(ex => {
+    if (ex.partnerWorkout != null) return ex; // AI already classified this exercise — trust it, including an explicit false
+
+    changed = true;
+    const exerciseText = `${getExerciseScopedText(workout, ex)} ${ex.prescription || ''}`.toLowerCase();
+    const isPartner = PARTNER_PATTERNS.some(p => p.test(exerciseText)) || /\bpartner\b/i.test(exerciseText);
+    if (!isPartner) {
+      return { ...ex, partnerWorkout: false };
+    }
+
+    const hasRoundStructure = (ex.suggestedSets ?? 1) > 1
+      || (ex.sections?.some(s => (s.rounds ?? 1) > 1) ?? false);
+
+    return {
+      ...ex,
+      partnerWorkout: true,
+      partnerSplit: ex.partnerSplit ?? (hasRoundStructure ? 'rounds' : 'reps'),
+    };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
+}
 
 /**
  * Correct workout type to match the corrected format
@@ -1786,6 +1824,23 @@ const KNOWN_ALTERNATIVE_PAIRS: Array<{ primary: string; alternatives: string[]; 
   { primary: 'Knees to Elbow', alternatives: ['Toes to Bar'] },
 ];
 
+// Partner/team detection patterns — shared by detectAndAdjustPartnerWorkout (workout-level) and
+// backfillPartnerSplit (per-exercise) so the two never drift into disagreeing definitions of
+// "partner language." Kept identical to the existing workout-level list (unchanged behavior);
+// backfillPartnerSplit ORs in one extra bare-"partner" check of its own (see below) rather than
+// broadening this shared list, so detectAndAdjustPartnerWorkout's existing matching is untouched.
+const PARTNER_PATTERNS = [
+  /\bi\s*go\s*you\s*go\b/i,
+  /\bigug\b/i,
+  /\bin\s+pairs?\b/i,
+  /\bwith\s+a\s+partner\b/i,
+  /\bpartner\s+wod\b/i,
+  /\bteams?\s+of\s+\d+\b/i,
+  /\bpartner\s+rft\b/i,
+  /\bgroups?\s+of\s+\d+\b/i,
+  /\bin\s+a\s+team\s+of\s+\d+\b/i,
+];
+
 /**
  * Detect partner workout patterns in raw text and adjust rounds
  */
@@ -1803,22 +1858,9 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
 
   const lower = text.toLowerCase();
 
-  // Partner/team detection patterns
-  const partnerPatterns = [
-    /\bi\s*go\s*you\s*go\b/i,
-    /\bigug\b/i,
-    /\bin\s+pairs?\b/i,
-    /\bwith\s+a\s+partner\b/i,
-    /\bpartner\s+wod\b/i,
-    /\bteams?\s+of\s+\d+\b/i,
-    /\bpartner\s+rft\b/i,
-    /\bgroups?\s+of\s+\d+\b/i,
-    /\bin\s+a\s+team\s+of\s+\d+\b/i,
-  ];
-
   // Trust an explicit AI `false` — only fall back to regex when the AI left the field unset.
   const isPartner = workout.partnerWorkout === true
-    || (workout.partnerWorkout !== false && partnerPatterns.some(p => p.test(lower)));
+    || (workout.partnerWorkout !== false && PARTNER_PATTERNS.some(p => p.test(lower)));
 
   if (!isPartner) {
     return { partnerWorkout: false };

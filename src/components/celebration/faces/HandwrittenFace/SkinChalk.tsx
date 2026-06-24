@@ -5,11 +5,12 @@
  */
 
 import React from 'react';
-import { BRAND, fD, fH, fB, fBL } from './brand';
+import { BRAND, fD, fH, fBL } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { RoundLedger } from './RoundLedger';
 
 interface SkinChalkProps {
   wod: PosterWod;
@@ -69,10 +70,19 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
 
         {/* Movement rows — handwritten */}
         <div>
-          {wod.teamSize > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
-              <span style={{ fontFamily: fB, fontSize: 9, fontWeight: 800, letterSpacing: '0.14em', color: 'rgba(33,29,21,0.4)', textTransform: 'uppercase' }}>Me</span>
-            </div>
+          {wod.isPartnerConfirmed && (
+            wod.split === 'rounds' && wod.rounds ? (
+              <RoundLedger
+                rounds={wod.rounds}
+                meColor={BRAND.yellow}
+                partnerColor="rgba(33,29,21,0.35)"
+                pendingColor="rgba(33,29,21,0.18)"
+                dimColor="#5a4628"
+                glow={false}
+              />
+            ) : (
+              <PairsLegend teamColor="rgba(33,29,21,0.4)" meColor="rgba(33,29,21,0.4)" />
+            )
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -99,7 +109,12 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                         <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
                       </div>
                     ) : (
-                      <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                      <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: '#7a6038', marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
                     )}
                     {parts.isStrength ? (
                       parts.strengthValue ? (
