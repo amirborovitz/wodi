@@ -34,6 +34,9 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
   const movementFont = compact ? 19.5 : 23;
   const movementLineHeight = compact ? 1.02 : 1.1;
   const valueFont = compact ? 20 : 23;
+  const resultParts = wod.result.value.split(' ');
+  const resultPrimary = resultParts[0] ?? wod.result.value;
+  const resultUnit = resultParts.slice(1).join(' ');
 
   return (
     <div style={{ width: '100%', position: 'relative', transform: 'rotate(-1.3deg)' }}>
@@ -160,16 +163,16 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
         <div style={{ height: 2, background: 'repeating-linear-gradient(90deg, #211d15 0 6px, transparent 6px 10px)', opacity: 0.35, margin: compact ? '7px 0 5px' : '10px 0 8px' }} />
 
         {/* Result — hero number, flanked by the vibe stamp */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: compact ? 6 : 10, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0, flex: '1 1 0' }}>
             <div style={{ fontFamily: fH, fontSize: compact ? 16 : 18, color: '#5a4628', lineHeight: 1 }}>{wod.result.label.toLowerCase()}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, flexWrap: 'nowrap', marginTop: compact ? 0 : 2 }}>
-              <span style={{ fontFamily: fD, fontSize: compact ? 64 : 80, fontWeight: 900, lineHeight: 0.88, color: BRAND.paperInk, whiteSpace: 'nowrap' }}>
-                <span style={hl()}>{wod.result.value.split(' ')[0]}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: compact ? 4 : 6, flexWrap: 'wrap', marginTop: compact ? 0 : 2, maxWidth: '100%' }}>
+              <span style={{ fontFamily: fD, fontSize: compact ? 60 : 74, fontWeight: 900, lineHeight: 0.88, color: BRAND.paperInk, whiteSpace: 'nowrap' }}>
+                <span style={hl()}>{resultPrimary}</span>
               </span>
-              {wod.result.value.includes(' ') && (
-                <span style={{ fontFamily: fD, fontSize: compact ? 23 : 28, fontWeight: 700, color: '#7a6038', whiteSpace: 'nowrap', paddingBottom: compact ? 4 : 6 }}>
-                  {wod.result.value.split(' ').slice(1).join(' ')}
+              {resultUnit && (
+                <span style={{ fontFamily: fD, fontSize: compact ? 20 : 24, fontWeight: 700, color: '#7a6038', whiteSpace: 'nowrap', paddingBottom: compact ? 4 : 6 }}>
+                  {resultUnit}
                 </span>
               )}
             </div>
@@ -179,7 +182,11 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
               </div>
             )}
           </div>
-          {vibe && <VibeStamp vibe={vibe} color={BRAND.paperInk} scale={compact ? 0.58 : 0.68} />}
+          {vibe && (
+            <div style={{ flex: '0 0 auto', marginLeft: 'auto', paddingBottom: compact ? 1 : 3 }}>
+              <VibeStamp vibe={vibe} color={BRAND.paperInk} scale={compact ? 0.56 : 0.62} />
+            </div>
+          )}
         </div>
 
         {/* Footer: RX/PR stamp + wordmark */}
