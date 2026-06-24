@@ -7,7 +7,8 @@ import { fD, fB, fM } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { RoundLedger } from './RoundLedger';
 
 interface SkinBoutProps {
   wod: PosterWod;
@@ -88,6 +89,20 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
         <BoutRule label="Tale of the tape" />
 
         <div style={{ background: BOUT_PANEL, border: `1px solid ${BOUT_GOLD}1c`, borderRadius: 5, padding: '9px 12px' }}>
+          {wod.isPartnerConfirmed && (
+            wod.split === 'rounds' && wod.rounds ? (
+              <RoundLedger
+                rounds={wod.rounds}
+                meColor={BOUT_GOLD}
+                partnerColor={`${BOUT_BONE}40`}
+                pendingColor={`${BOUT_BONE}20`}
+                dimColor={`${BOUT_BONE}66`}
+                glow={false}
+              />
+            ) : (
+              <PairsLegend teamColor={`${BOUT_BONE}55`} meColor={`${BOUT_BONE}55`} />
+            )
+          )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
               <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: i ? 10 : 0, marginBottom: 2 }}>
@@ -100,7 +115,12 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
                 <React.Fragment key={i}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr max-content', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${BOUT_BONE}12` }}>
                     <span style={{ color: BOUT_GOLD, fontSize: 9 }}>✦</span>
-                    <span style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 900, color: BOUT_BONE, lineHeight: 1.22 }}>{parts.movName}</span>
+                    <span style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 900, color: BOUT_BONE, lineHeight: 1.22 }}>
+                      {parts.movName}
+                      {parts.loadTag && (
+                        <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: `${BOUT_BONE}66`, marginLeft: 6 }}>{parts.loadTag}</span>
+                      )}
+                    </span>
                     {parts.isStrength && parts.strengthValue ? (
                       <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 900, color: BOUT_GOLD }}>{parts.strengthValue}</span>
                     ) : parts.team ? (

@@ -7,7 +7,8 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { RoundLedger } from './RoundLedger';
 
 interface SkinHazardProps {
   wod: PosterWod;
@@ -111,10 +112,18 @@ export function SkinHazard({ wod, vibe }: SkinHazardProps): React.JSX.Element {
           borderBottom: '1px solid rgba(245,194,0,0.34)',
           padding: '5px 0',
         }}>
-          {wod.teamSize > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-              <span style={{ fontFamily: fB, fontSize: 9, fontWeight: 900, letterSpacing: '0.14em', color: BRAND.dim, textTransform: 'uppercase' }}>Me</span>
-            </div>
+          {wod.isPartnerConfirmed && (
+            wod.split === 'rounds' && wod.rounds ? (
+              <RoundLedger
+                rounds={wod.rounds}
+                meColor={BRAND.yellow}
+                partnerColor="rgba(243,241,234,0.3)"
+                pendingColor="rgba(243,241,234,0.16)"
+                dimColor={BRAND.dim}
+              />
+            ) : (
+              <PairsLegend teamColor={BRAND.dim} meColor={BRAND.dim} />
+            )
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -164,6 +173,9 @@ export function SkinHazard({ wod, vibe }: SkinHazardProps): React.JSX.Element {
                       )}
                       <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 800, lineHeight: 1.22, minWidth: 0 }}>
                         {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: BRAND.dim, marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
                       </span>
                     </div>
                     {parts.isStrength ? (

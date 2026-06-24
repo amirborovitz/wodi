@@ -3069,6 +3069,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
           ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
           ...(result.exercise.rawText && { rawText: result.exercise.rawText }),
           ...(typeof result.exercise.isSecondary === 'boolean' && { isSecondary: result.exercise.isSecondary }),
+          ...(typeof result.exercise.partnerWorkout === 'boolean' && { partnerWorkout: result.exercise.partnerWorkout }),
+          ...(result.exercise.partnerSplit && { partnerSplit: result.exercise.partnerSplit }),
+          ...(result.exercise.partnerSplit === 'rounds' && result.exercise.suggestedSets && {
+            personalRounds: result.exercise.suggestedSets,
+          }),
           ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
           // User-entered WOD name during logging takes priority; AI-generated name is fallback
           ...((result.metconName || result.exercise.aiPartName) && {

@@ -34,7 +34,25 @@ export interface PosterWod {
   rx: string | null;    // "RX'D" | "PR" | null
   totals: PosterTotal[]; // Supporting stats for the brand strip
   ep: number;            // Effort Points — shown in brand strip
-  teamSize: number;      // Partner workout team size (1 = solo)
+  teamSize: number;      // Partner workout team size (1 = solo) — SESSION-level, set once by the
+                         // AI for the whole multi-part workout. Never use this alone to decide
+                         // whether THIS page/card shows partner UI — a sibling part being
+                         // partnered does not make this one partnered. Use isPartnerConfirmed.
+  // True only when this specific card/page's own content confirmed partner/round-trade language
+  // (derived from ArtifactSection.isPartnerConfirmed). Gates ALL partner-specific poster UI —
+  // round ledger, TEAM|ME header, "OUR ___" hero label, format-line override. False for an
+  // unconfirmed part even when teamSize > 1 at the session level (e.g. a solo strength block
+  // sharing a session with a partnered metcon).
+  isPartnerConfirmed: boolean;
+  // Partner-workout display mode. 'rounds' (partners trade whole rounds, IGUG) means skins must
+  // render the round ledger (`rounds` below) instead of a per-movement personal number. 'reps'
+  // (flat shared total, no round structure) keeps the existing per-movement TEAM|ME number.
+  // Meaningless unless isPartnerConfirmed is true.
+  split: 'reps' | 'rounds';
+  // Round-ledger chips — only present when split === 'rounds'. 'me'/'partner' = whose round;
+  // 'pending' = not yet reached (time-capped/partial finish), a flat symbolic state never a
+  // computed partial.
+  rounds?: ('me' | 'partner' | 'pending')[];
 }
 
 export interface PosterBlock {
@@ -134,6 +152,17 @@ function formatWorkoutDate(date: Date): string {
 }
 
 function buildFormatLine(data: CelebrationData): string {
+  // Confirmed-partner workouts: trust the artifact blueprint — it's already split-aware (computed
+  // from the same repeatCount/teamSize data as the round ledger below it) — over
+  // heroResult.formatLine or the independent regex fallback chain further down, which run their
+  // own separate "for time vs intervals" detection and can disagree (e.g. "12 INTERVALS" header
+  // above a "12 ROUNDS FOR TIME" blueprint for the exact same WOD). Gated on isPartnerConfirmed,
+  // not raw teamSize — a session-level teamSize doesn't mean THIS card's own block is partnered.
+  if (data.artifactSections[0]?.isPartnerConfirmed) {
+    const sectionBlueprint = data.artifactSections[0]?.blueprint;
+    if (sectionBlueprint) return sectionBlueprint.toUpperCase();
+  }
+
   // Prefer heroResult.formatLine if it looks meaningful
   if (data.heroResult?.formatLine) {
     const fl = data.heroResult.formatLine.toUpperCase();
@@ -225,13 +254,18 @@ function buildTotals(data: CelebrationData, heroValue: string): PosterTotal[] {
   return items.filter((t) => t.value !== heroValue).slice(0, 2);
 }
 
-function buildResultLabel(format: string | undefined): string {
+// A partner score is the team's, never personal — "OUR ___" for any CONFIRMED-partner card,
+// regardless of split type (the shared hero never changes between split types; only the
+// per-movement readout above it does). Strength stays individual even in a team session.
+// isPartner must come from isPartnerConfirmed (this card's own content), never raw teamSize —
+// a session-level teamSize doesn't mean this specific card's block is the partnered one.
+function buildResultLabel(format: string | undefined, isPartner: boolean): string {
   switch (format) {
-    case 'for_time':        return 'MY TIME';
+    case 'for_time':        return isPartner ? 'OUR TIME' : 'MY TIME';
     case 'amrap':
-    case 'amrap_intervals': return 'TOTAL ROUNDS';
+    case 'amrap_intervals': return isPartner ? 'OUR ROUNDS' : 'TOTAL ROUNDS';
     case 'strength':        return 'TOP SET';
-    default:                return 'MY RESULT';
+    default:                return isPartner ? 'OUR RESULT' : 'MY RESULT';
   }
 }
 
@@ -363,8 +397,12 @@ function isRxLoad(subNote: string): boolean {
   return !/\btotal\b/i.test(subNote);
 }
 
-// Splits the AI-prescribed total in `primary` into a per-partner share —
-// e.g. "100" → "50", "1800m" → "900m", "80 CAL" → "40 cal" (teamSize=2).
+// Splits an AI-prescribed ONE-SHOT team total in `primary` into a per-partner share —
+// e.g. "100" → "50", "1800m" → "900m", "80 CAL" → "40 cal" (teamSize=2). Only valid for a
+// single shared target (e.g. "100 wall balls, split however"). Never call this for a
+// per-round/per-turn value (row.repeatCount > 1) — IGUG-style partner rounds alternate whole
+// rounds between partners, so the reps/distance/calories *within* one round are never split
+// further; dividing them again double-discounts the work.
 // Returns '' for shapes that aren't a shareable team total (weights, relay legs "5×").
 function computeTeamShare(primary: string, teamSize: number): string {
   const p = primary.trim();
@@ -439,6 +477,27 @@ function extractLoadSuffix(nameWithLoad: string | undefined): string {
 }
 
 function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>, teamSize?: number): PosterLine {
+  // Round-trade partner row (IGUG): whoever's up does the WHOLE round, so there's no personal
+  // "share" of this movement to compute — primary/relay/team-share logic below doesn't apply.
+  // Full prescription, full-width, weight inline via nameWithLoad (e.g. "Clean & Jerk @ 45kg").
+  // The round ledger (rendered separately from PosterWod.rounds) carries the personal stat here.
+  if (row.partnerSplit === 'rounds') {
+    // Full per-round prescription in one string — "5 Clean & Jerk @ 45kg" — since there's no
+    // separate value column for these rows to carry the reps/weight instead.
+    const loadSuffix = row.loadNote ? ` @ ${row.loadNote}` : '';
+    const rxLabel = row.primary ? `${row.primary} ${row.name}${loadSuffix}` : `${row.name}${loadSuffix}`;
+    return {
+      kind: 'line',
+      rx: rxLabel.trim(),
+      load: '',
+      mine: '',
+      team: '',
+      total: undefined,
+      roundLabel: row.roundLabel,
+      ladderTrack: row.ladderTrack,
+    };
+  }
+
   const primaryTrimmed = (row.primary ?? '').trim();
   const relayMatch = primaryTrimmed.match(/^(\d+)×$/);
 
@@ -475,10 +534,18 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   const total = row.totalNote || (row.subNote && /\btotal\b/i.test(row.subNote) ? row.subNote : undefined);
   const loadSuffix = row.loadNote || extractLoadSuffix(row.nameWithLoad);
 
+  const isPerRoundValue = !!(row.repeatCount && row.repeatCount > 1);
+
   let team = '';
   let mine = loadSuffix || mineRaw;
   const mineBeforeWipe = mine;
-  if (teamSize && teamSize > 1) {
+  // Gate on this ROW's own confirmed split (set only when this block's own text confirmed
+  // partner language — see partnerSplit.ts), never on the raw teamSize alone. teamSize is a
+  // session-level field the AI stamps once for the whole multi-part workout (so EP/volume math
+  // scales correctly everywhere) — it does not mean every block in the session is partnered.
+  // Using it unguarded here would divide an unconfirmed solo block's values by teamSize purely
+  // because a SIBLING block in the same session happens to be partnered.
+  if (row.partnerSplit === 'reps' && teamSize && teamSize > 1 && !isPerRoundValue) {
     team = computeTeamShare(row.primary ?? '', teamSize);
     if (team) {
       mine = loadSuffix || (isWeightValue(mineRaw) ? mineRaw : '');
@@ -555,7 +622,15 @@ export function buildPosterWodFromPage(
     title = `${amrapMinutes} MIN`;
   }
 
+  // This page's OWN confirmed status, never the session-level teamSize — a sibling page being
+  // partnered doesn't make this page partnered (e.g. a solo strength page sharing a session with
+  // a partnered metcon page).
+  const isPartnerPage = !!section?.isPartnerConfirmed;
+
   const format = (() => {
+    // Partner pages: trust the artifact blueprint (already split-aware) over an independent
+    // format guess, for the same reason buildPosterWod does — see that function's comment.
+    if (isPartnerPage && section?.blueprint) return section.blueprint.toUpperCase();
     if (heroResult?.formatLine) {
       const fl = heroResult.formatLine.toUpperCase();
       if (fl && fl !== 'WORKOUT') return fl;
@@ -583,10 +658,10 @@ export function buildPosterWodFromPage(
 
   const resultLabel = (() => {
     switch (exFmt) {
-      case 'for_time': return 'MY TIME';
-      case 'amrap': case 'amrap_intervals': return 'ROUNDS';
+      case 'for_time': return isPartnerPage ? 'OUR TIME' : 'MY TIME';
+      case 'amrap': case 'amrap_intervals': return isPartnerPage ? 'OUR ROUNDS' : 'ROUNDS';
       case 'strength': return 'TOP SET';
-      default: return 'RESULT';
+      default: return isPartnerPage ? 'OUR RESULT' : 'RESULT';
     }
   })();
   const resultValue = heroResult
@@ -597,6 +672,10 @@ export function buildPosterWodFromPage(
   const rx: string | null = data.isPR ? 'PR' : null;
   const totals = buildTotals(data, resultValue);
 
+  const sectionLedger = section?.roundLedger;
+  const split: 'reps' | 'rounds' = sectionLedger ? 'rounds' : 'reps';
+  const rounds = sectionLedger?.rounds;
+
   return {
     type, title, date: formatWorkoutDate(date), format, sub,
     blocks: [],
@@ -605,6 +684,9 @@ export function buildPosterWodFromPage(
     totals,
     ep: Math.round(data.totalEP ?? 0),
     teamSize,
+    isPartnerConfirmed: isPartnerPage,
+    split,
+    rounds,
     _rows: rows,
   } as PosterWodInternal;
 }
@@ -635,8 +717,13 @@ export function buildPosterWod(
   }
   const dateStr = formatWorkoutDate(date);
 
+  const isPartnerConfirmed = !!data.artifactSections[0]?.isPartnerConfirmed;
+  const sectionLedger = data.artifactSections[0]?.roundLedger;
+  const split: 'reps' | 'rounds' = sectionLedger ? 'rounds' : 'reps';
+  const rounds = sectionLedger?.rounds;
+
   // Result
-  const resultLabel = buildResultLabel(data.workoutFormat);
+  const resultLabel = buildResultLabel(data.workoutFormat, isPartnerConfirmed);
   const resultValue = buildResultValue(data);
   const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
   const amrapMinutes = data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined;
@@ -667,6 +754,9 @@ export function buildPosterWod(
     totals,
     ep: Math.round(data.totalEP ?? 0),
     teamSize,
+    isPartnerConfirmed,
+    split,
+    rounds,
     _rows: rows,
   };
 

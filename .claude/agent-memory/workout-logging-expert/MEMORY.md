@@ -1,1 +1,2 @@
 - [repairUndercountedBreakdown must skip buy-in/cash-out](repair_undercounted_buy_in_cash_out.md) — when an exercise has no sections[] but its movements[] contains a cash-out (perRound:false), the repair function multiplies its totals by round count; check role/perRound/countingMode before multiplying.
+- [computeTeamShare divides per-round reps](computeteamshare_divides_per_round_reps.md) — partner RFT poster rows show per-round reps halved (5→3) because artifactRowToPosterLine treats row.primary as a team total and divides by teamSize.

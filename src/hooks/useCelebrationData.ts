@@ -932,14 +932,21 @@ export function useCelebrationData(
       // buildRewardArtifactSections' mainExercise is always the actual main part, not whichever
       // exercise happens to be listed first.
       const mainExercises = exercises.filter(isMainPart);
+      // Explicit AI-set field only — matches posterTeamSize below (the value that actually
+      // drives the poster's visible partner gate). No text-inference fallback here: this feeds
+      // partner-split DISPLAY decisions, and an inferred teamSize disagreeing with the value the
+      // rest of the poster trusts is exactly how a solo-looking poster could get partner-shaped
+      // row math from a stray "partner" mention elsewhere in rawText.
+      const teamSize = rewardData?.teamSize ?? workout?.teamSize;
       return buildRewardArtifactSections(
         mainExercises.length > 0 ? mainExercises : exercises,
         activeBreakdown?.movements ?? [],
         rawText,
         workoutFormat,
+        teamSize,
       );
     },
-    [exercises, activeBreakdown?.movements, rawText, workoutFormat],
+    [exercises, activeBreakdown?.movements, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize],
   );
 
   // ── Per-page carousel data ────────────────────────────────────────────────

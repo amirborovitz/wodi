@@ -29,6 +29,7 @@ import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
 } from '../../services/celebrationStickerConfig';
+import { detectPartnerSplit, buildRoundLedger } from './partnerSplit';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -196,6 +197,27 @@ export function inferRoundCountFromMovements(
     }
   }
   return undefined;
+}
+
+// How many rounds of a teamSize>1 round-trade WOD were actually completed — for the round
+// ledger's filled-vs-pending split. Unlike inferRoundCountFromMovements (which requires a clean
+// 2-50 integer ratio, since it's backfilling a missing round count), this floors and clamps, so
+// a time-capped WOD that stopped mid-round never reads as having completed its final round.
+// actual.totalReps already reflects only what was actually logged, never a full-prescription
+// assumption, so this generalizes to any capped/partial finish, not just a complete one.
+export function inferCompletedRounds(
+  totalRounds: number,
+  exercise: Exercise,
+  movements: MovementTotal[],
+): number {
+  let best = 0;
+  for (const pMov of exercise.movements || []) {
+    const actual = movements.find((m) => m.name.toLowerCase() === pMov.name.toLowerCase());
+    if (pMov.reps && pMov.reps > 0 && actual?.totalReps) {
+      best = Math.max(best, Math.floor(actual.totalReps / pMov.reps));
+    }
+  }
+  return best > 0 ? Math.min(totalRounds, best) : totalRounds;
 }
 
 export function getSectionedMovementRepeatCounts(exercise?: Exercise | null): Map<string, number> | undefined {
@@ -906,8 +928,9 @@ function buildCelebrationMovementRow(params: {
   isStrength?: boolean;
   suppressCalorieTotal?: boolean;
   suppressDistanceTotal?: boolean;
+  partnerSplit?: 'reps' | 'rounds';
 }): ArtifactRow {
-  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder } = params;
+  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit } = params;
   const weight = prescribed?.implementCount === 2 && prescribed.weight
     ? prescribed.weight
     : actual?.weight ?? prescribed?.weight;
@@ -1026,6 +1049,8 @@ function buildCelebrationMovementRow(params: {
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
     totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
     accent,
+    repeatCount,
+    partnerSplit,
   };
 
   {
@@ -1142,6 +1167,7 @@ export function buildRewardArtifactSections(
   movements: MovementTotal[],
   rawText?: string,
   format?: WorkoutFormat,
+  teamSize?: number,
 ): ArtifactSection[] {
   if (!movements || movements.length === 0) return [];
 
@@ -1278,6 +1304,27 @@ export function buildRewardArtifactSections(
     ? movements.find((m) => (m.distancePerRep ?? 0) > 0 && (m.totalDistance ?? 0) > 0)
     : undefined;
 
+  // Strength is individual even in a team session — a "6 sets" rep scheme is not a round-trade
+  // structure, and each partner lifts their own top set. Never run partner-split detection on it.
+  const isStrengthSection = mainExercise?.type === 'strength';
+  const splitInfo = teamSize && teamSize > 1 && !isStrengthSection
+    ? detectPartnerSplit({
+        teamSize,
+        scopedText: capText,
+        prescribedRoundCount: repeatCount,
+        aiPartnerWorkout: mainExercise?.partnerWorkout,
+        aiPartnerSplit: mainExercise?.partnerSplit,
+        aiPersonalRounds: mainExercise?.personalRounds,
+      })
+    : undefined;
+  const roundLedger = splitInfo?.split === 'rounds' && mainExercise
+    ? {
+        totalRounds: splitInfo.totalRounds!,
+        personalRounds: splitInfo.personalRounds!,
+        rounds: buildRoundLedger(splitInfo.totalRounds!, inferCompletedRounds(splitInfo.totalRounds!, mainExercise, movements)),
+      }
+    : undefined;
+
   let blueprintSub: string | undefined;
   if (relayMovement) {
     const perTrip = relayMovement.distancePerRep!;
@@ -1313,6 +1360,7 @@ export function buildRewardArtifactSections(
       repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? repeatCount,
       suppressDistanceTotal: true,
       isLadder: !!descLadderScheme,
+      partnerSplit: splitInfo?.split,
     });
   });
 
@@ -1334,6 +1382,8 @@ export function buildRewardArtifactSections(
     blueprintSub,
     rows,
     hiddenCount: Math.max(0, movements.length - rows.length),
+    roundLedger,
+    isPartnerConfirmed: !!splitInfo,
   }];
 }
 
@@ -1394,16 +1444,35 @@ export function buildPageArtifactSection(
   const repeatCount = getPrescribedRoundCount([exercise], scopedExerciseText)
     || getPrescriptionRepeatCount(exercise)
     || inferRoundCountFromMovements(exercise, movements);
-  const isTeamIGUG = !!teamSize && teamSize > 1
-    && /\b(?:teams?\s+of|i\s*go\s*y(?:ou|o?u?)\s*go|igug|partner|in\s+pairs?)\b/i.test(exerciseOnlyText);
-  const eachRoundsMatch = exerciseOnlyText.match(/\((\d+)\s*each\)/i);
-  const personalRepeatCount = isTeamIGUG
-    ? eachRoundsMatch
-      ? parseInt(eachRoundsMatch[1], 10)
-      : repeatCount && repeatCount > 1
-        ? Math.max(1, Math.round(repeatCount / teamSize))
-        : repeatCount
-    : repeatCount;
+  // Strength is individual even in a team session — a "6 sets" rep scheme is not a round-trade
+  // structure, and each partner lifts their own top set. Never run partner-split detection on it.
+  // Scoped text for the partner-language gate specifically: prefer this exercise's OWN rawText
+  // (the AI's per-block slice, e.g. "In pairs, I go you go") over exerciseOnlyText alone — the
+  // partner phrasing often lives only in the original wording, not in the normalized
+  // name/prescription fields. Mirrors the exercise.rawText-first convention parseDescLadderScheme
+  // already uses; kept separate from exerciseOnlyText itself since that's relied on by several
+  // unrelated pre-existing regex checks below (for_time/relay/AMRAP-minute detection) that this
+  // fix shouldn't touch.
+  const exercisePartnerScopedText = `${exercise.rawText || ''} ${exerciseOnlyText}`;
+  const splitInfo = teamSize && teamSize > 1 && !isStrength
+    ? detectPartnerSplit({
+        teamSize,
+        scopedText: exercisePartnerScopedText,
+        prescribedRoundCount: repeatCount,
+        aiPartnerWorkout: exercise.partnerWorkout,
+        aiPartnerSplit: exercise.partnerSplit,
+        aiPersonalRounds: exercise.personalRounds,
+      })
+    : undefined;
+  const isTeamIGUG = splitInfo?.split === 'rounds';
+  const personalRepeatCount = isTeamIGUG ? splitInfo!.personalRounds : repeatCount;
+  const roundLedger = isTeamIGUG
+    ? {
+        totalRounds: splitInfo!.totalRounds!,
+        personalRounds: splitInfo!.personalRounds!,
+        rounds: buildRoundLedger(splitInfo!.totalRounds!, inferCompletedRounds(splitInfo!.totalRounds!, exercise, movements)),
+      }
+    : undefined;
   const capMatch = exerciseOnlyText.match(
     /\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i,
   );
@@ -1538,6 +1607,7 @@ export function buildPageArtifactSection(
       actual: movement,
       repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? personalRepeatCount,
       isStrength,
+      partnerSplit: splitInfo?.split,
     });
 
     if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {
@@ -1584,6 +1654,8 @@ export function buildPageArtifactSection(
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
       descLadderCompleted: descSchemeCompleted ?? strengthBubbleScheme?.length,
     }),
+    roundLedger,
+    isPartnerConfirmed: !!splitInfo,
   };
 }
 

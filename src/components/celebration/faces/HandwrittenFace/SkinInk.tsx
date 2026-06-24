@@ -7,7 +7,8 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart } from './PosterComponents';
+import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { RoundLedger } from './RoundLedger';
 
 interface SkinInkProps {
   wod: PosterWod;
@@ -99,6 +100,20 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
         <InkRule heavy />
 
         <div>
+          {wod.isPartnerConfirmed && (
+            wod.split === 'rounds' && wod.rounds ? (
+              <RoundLedger
+                rounds={wod.rounds}
+                meColor={BRAND.yellow}
+                partnerColor="rgba(23,24,20,0.32)"
+                pendingColor="rgba(23,24,20,0.16)"
+                dimColor="rgba(23,24,20,0.45)"
+                glow={false}
+              />
+            ) : (
+              <PairsLegend teamColor="rgba(23,24,20,0.42)" meColor="rgba(23,24,20,0.42)" />
+            )
+          )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
               <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: i ? 12 : 0, marginBottom: 3 }}>
@@ -126,7 +141,12 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
                     }}
                   >
                     <span style={{ fontSize: 16, lineHeight: 1 }}>•</span>
-                    <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>{parts.movName}</span>
+                    <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>
+                      {parts.movName}
+                      {parts.loadTag && (
+                        <span style={{ fontFamily: fD, fontSize: 12.5, fontWeight: 700, color: 'rgba(23,24,20,0.45)', marginLeft: 6 }}>{parts.loadTag}</span>
+                      )}
+                    </span>
                     {parts.isStrength && parts.strengthValue ? (
                       <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 800, color: 'rgba(23,24,20,0.34)' }}>{parts.strengthValue}</span>
                     ) : parts.team ? (

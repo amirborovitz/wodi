@@ -52,6 +52,15 @@ export interface ArtifactRow {
   missing?: boolean;
   stationRow?: boolean;
   roundLabel?: string; // left-aligned label for progressive round rows (R1, R2, BUY-IN, etc.)
+  // Rounds this row's `primary` repeats over (e.g. 12 for "12 RFT"). When set and >1, `primary`
+  // is a per-round/per-turn value (e.g. "5 reps every round"), never a one-shot team total — the
+  // poster layer must not run it through partner team-share math a second time.
+  repeatCount?: number;
+  // Set when this row belongs to a teamSize>1 workout. 'rounds' means partners trade whole
+  // rounds (IGUG) — the poster must show no per-row personal number at all (see
+  // ArtifactSection.roundLedger instead). 'reps' means a flat shared total, where a per-row
+  // personal share number is still meaningful.
+  partnerSplit?: 'reps' | 'rounds';
   // Ascending-ladder AMRAP bar-chart track, rendered as a SEPARATE visual element right below
   // this row (the row itself renders normally through the skin's own markup, so the movement
   // name/weight inherit that skin's exact font/size treatment — the chart never duplicates
@@ -72,6 +81,21 @@ export interface ArtifactSection {
   rxStamp?: boolean;
   descLadderScheme?: number[];
   descLadderCompleted?: number;
+  // True only when THIS section's own text confirmed partner/round-trade language (see
+  // partnerSplit.ts) — never derived from the workout-level teamSize alone. A multi-part
+  // workout's teamSize is stamped once for the whole session (so EP/volume math scales
+  // correctly everywhere); it does not mean every part is the partnered one. Poster-level
+  // partner UI (round ledger, TEAM|ME header, "OUR ___" hero label) must gate on this, not on
+  // raw teamSize, or an unconfirmed solo part inherits partner treatment from a sibling part.
+  isPartnerConfirmed?: boolean;
+  // Set only for a teamSize>1 section whose rows are partnerSplit==='rounds' — the round-trade
+  // ledger data ("who took which round"), one per section since every row in an IGUG round
+  // shares the same round structure.
+  roundLedger?: {
+    totalRounds: number;
+    personalRounds: number;
+    rounds: ('me' | 'partner' | 'pending')[];
+  };
 }
 
 export type PosterLayout = 'chipper' | 'complex' | 'ladder' | 'multi-part' | 'standard';
