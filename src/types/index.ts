@@ -114,6 +114,7 @@ export interface Workout {
   id: string;
   userId: string;
   date: Date;
+  sourceDate?: string;      // Calendar date printed on the original WOD/whiteboard
   title: string;
   type: WorkoutType;
   stationRotation?: boolean;   // Rotating interval/station workout (A/B/C/D repeating)
@@ -228,6 +229,7 @@ export interface ParsedWorkout {
   intervalTime?: number;        // Interval duration in seconds (for EMOM/intervals)
   restTime?: number;            // Rest duration in seconds (for interval workouts)
   rawText?: string;
+  sourceDate?: string;          // Calendar date visible in the original WOD text/image
   containerRounds?: number;     // Outer rounds (e.g., 7 in "7 rounds of Cindy")
   benchmarkName?: string;       // Named benchmark if recognized (e.g., "Cindy", "Fran")
   benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
@@ -463,6 +465,7 @@ export interface RewardData {
   workoutId?: string;                     // Persisted workout id for poster edits
   difficultyLevel?: number;               // AI-assessed programmed difficulty 1–10
   date?: Date;                            // The workout's actual date (Firestore `date` field)
+  sourceDate?: string;                    // Date printed on the original WOD
 }
 
 // Weekly stats for consistency ring
@@ -580,4 +583,12 @@ export interface ClassificationLogEntry {
   // Meta
   timestamp: Date;
   userId?: string;
+}
+
+export interface PlannedWorkout {
+  id: string;
+  userId: string;
+  parsedWorkout: ParsedWorkout;
+  plannedDate: Date;
+  createdAt: Date;
 }

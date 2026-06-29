@@ -14,7 +14,12 @@ Return ONLY valid JSON:
 {
   "title": "workout name — see TITLE RULES below",
   "rawText": "full workout text from the image (OCR-style, line breaks ok) — the WHOLE image, every block",
+  // sourceDate: date printed on the original WOD/whiteboard, not the date the user logs it.
+  // If a full date is visible, return ISO "YYYY-MM-DD". If only day/month is visible, infer the
+  // current year. If no original WOD date is visible, return null.
+  "sourceDate": "2026-06-26",
   "type": "strength" | "metcon" | "emom" | "amrap" | "for_time" | "mixed",
+  // format: describes the PRIMARY exercise's structure. For mixed sessions (strength + metcon), use the metcon's format. Each exercise's loggingMode is authoritative — format is only used for top-level metadata.
   "format": "for_time" | "intervals" | "amrap" | "amrap_intervals" | "emom" | "strength" | "tabata",
   "scoreType": "time" | "time_per_set" | "rounds_reps" | "load" | "reps",
   "sets": 5,
@@ -50,7 +55,9 @@ Return ONLY valid JSON:
       // workout's text into every exercise. For a single-exercise workout this can equal the
       // top-level rawText.
       "rawText": "this block's own lines from the whiteboard",
-      // suggestedSets is the number of working rounds for this exercise (for a for_time WOD this usually matches "sets").
+      // suggestedSets is the TOTAL number of working rounds for this exercise.
+      // For for_time WODs this usually matches "sets". For EMOM with nested inner rounds
+      // ("Every 4 min × 4: 2 rounds of: [movements]"), set suggestedSets = intervals × inner rounds (4 × 2 = 8).
       // When the workout text says "Into, 2 rounds: [block]" you must set suggestedSets to 2 for that working block.
       "suggestedSets": 5,
       "suggestedReps": 10,
@@ -239,17 +246,21 @@ Every DB or KB movement MUST include "implementCount": 1 or 2.
 - When ambiguous, default to 1
 
 ## LOGGING MODE (per exercise)
-Every exercise MUST include "loggingMode" — this determines which logging UI the user sees:
+Every exercise MUST include "loggingMode" — this is the MOST IMPORTANT field per exercise and determines which logging UI the user sees. Set it independently for each exercise regardless of the workout's overall format.
 - "strength": barbell/DB/KB lifts with sets×reps (5x5 Back Squat, 3x8 DB Press)
 - "for_time": complete work ASAP, log total time (RFT, chipper, partner IGUG, team workouts with total cal/rep targets)
 - "amrap": as many rounds as possible in time limit
-- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00) OR "every X:XX" with explicit "AMRAP" text — the word "AMRAP" MUST appear. "Every 11 min x 3: 100 cal Echo Bike + 20 DB Snatch" is NOT amrap_intervals — it is intervals (fixed amounts per round)
-- "intervals": repeated sets with individual times (5 sets for time, every 3:00 x 5) — NOT when "AMRAP" or "into AMRAP" appears in the text
-- "emom": every minute on the minute
+- "amrap_intervals": multiple AMRAP blocks with rest (3x AMRAP 3:00, rest 1:00) OR "every X:XX" with explicit "AMRAP" text — the word "AMRAP" MUST appear. "Every 11 min x 3: 100 cal Echo Bike + 20 DB Snatch" is NOT amrap_intervals — it is emom (fixed amounts per round)
+- "emom": ANY fixed time-window structure where the athlete logs weight/reps — NOT their time. Includes strict EMOM (every 1 min), E2MOM, E3MOM, "every 4:00 min", "every 5 min", "every X:XX × N rounds" with fixed movements. The interval duration is PRESCRIBED; the athlete logs WHAT they did, never how long it took. Examples: "EMOM 10: 3 Squat Cleans", "Every 4:00 min x 4 rounds: 8 Thrusters + 8 T2B + 8 Box Jumps", "E3MOM x 5: 5 Deadlifts @80%"
+- "intervals": sets where the athlete's TIME PER SET is the score — they are racing the clock. Use ONLY when athletes are expected to log a split time per set. Examples: "5×400m for time, 2 min rest", "4 sets for time: 10 DL + 10 Box Jumps, rest = work time". NOT for "every X min" structures where a time window is prescribed.
 - "cardio": machine work scored by calories (single machine, no other movements)
 - "cardio_distance": cardio scored by distance (single machine, no other movements)
 - "bodyweight": reps-only bodyweight work (no weight needed)
 - "sets": generic fallback
+
+CRITICAL emom vs intervals: "Every 4:00 min x 4 rounds: 8 Thrusters + 8 TTB + 8 Box Jumps" → "emom" (prescribed window, log weight). "5 sets for time, 2 min rest" → "intervals" (race the clock, log split times). When in doubt: if the time is the window you work WITHIN, it's "emom". If the time is WHAT YOU'RE MEASURING, it's "intervals".
+
+CRITICAL nested EMOM rounds: When an EMOM has inner rounds ("Every X min × N: M rounds of: [movements]"), set suggestedSets = N × M (total effective rounds). Example: "Every 4 min × 4 rounds: 2 rounds of: 8 Thrusters, 8 T2B, 8 Box Jumps" → suggestedSets: 8 (4 × 2). The movements keep reps as the per-round value (reps: 8). This ensures totalReps = suggestedSets × reps = 8 × 8 = 64.
 
 CRITICAL: Partner/IGUG/team workouts where teams complete a target (e.g., "300 cal echo bike" or "100 rounds") are ALWAYS "for_time" — even if the word "interval" appears in the text. "intervals" mode means individually-timed sets with rest, NOT partner rotation.
 
@@ -312,6 +323,7 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
 - "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
+- CRITICAL PARTNER SPLIT DISTINCTION: There are two partner workout shapes. Use partnerSplit: "rounds" only when partners explicitly trade/own complete rounds, e.g. "6 rounds (3 each)", "alternate full rounds", or a single total round target completed round-by-round. For sectioned for-time partner workouts ("In pairs: 3 rounds ... then 3 rounds ... then buy-out/cash-out"), use partnerSplit: "reps" even if the instructions say "I go you go" or "split however"; each exercise inside the section is shared/split unless that movement is marked together. Keep section.rounds as the prescribed section repeat count.
 - PER-EXERCISE partnerWorkout/partnerSplit (on EACH exercise object, separate from and in addition to the top-level fields above): the top-level fields describe the whole SESSION (for EP/volume math); they do NOT mean every exercise is partnered. On EACH exercise, set its OWN partnerWorkout/partnerSplit: a strength or skill block is partnerWorkout: false even when a sibling metcon block in the same session is partnered — set this explicitly, don't omit it. For the exercise that IS partnered: partnerSplit: "rounds" when partners trade whole rounds (IGUG/"I go you go"/"(N each)"), or partnerSplit: "reps" when partners share one flat/continuous total with no round structure (e.g. "100 wall balls between you, split however"). The per-person round count for "rounds" continues to be suggestedSets, per the "(N each)" rule above — do not add a separate count field.
 - ROTATING STATION HEADCOUNT: "5 groups starting at different stations (7 people max)" / "max 6 per station" are logistics notes, NOT team designations. Do NOT set partnerWorkout or teamSize from headcount-per-station language. Only set teamSize when athletes are explicitly working together as one unit (IGUG, In Pairs, Team of N completing a shared target).
 
@@ -415,7 +427,36 @@ Output:
 }
 NOTE: stationLabel goes on the first movement of each station only. "Renegade Row" is a weighted movement (inputType: "weight"), not a cardio machine.
 
-### 6. Mixed session (Strength + Superset + Metcon)
+### 6. Mixed session (Strength + EMOM + Cool Down)
+Input: "A. STRENGTH (squat)\nBack Squat\n5 sets x 5 reps @80-85%\n\nB. METCON (Intervals)\nEvery 04:00 min x 4 rounds:\n2 rounds of:\n8 Thrusters @30/40kg\n8 T.T.B\n8 box jumps\n\nC. Cool down\n~01:30 min/side box Pigeon stretch\n~01:30 min/side banded lat stretch (elbow)"
+Output:
+{
+  "title": "IRON SURGE", "type": "mixed", "format": "emom", "scoreType": "load",
+  "exercises": [
+    {
+      "name": "Back Squat", "type": "strength", "loggingMode": "strength", "isSecondary": false,
+      "prescription": "5x5 @80-85%", "suggestedSets": 5, "suggestedReps": 5,
+      "movements": []
+    },
+    {
+      "name": "Every 4:00 min x 4 rounds", "type": "wod", "loggingMode": "emom", "isSecondary": false,
+      "prescription": "2 rounds of: 8 Thrusters @30/40kg, 8 T.T.B, 8 Box Jumps", "suggestedSets": 8,
+      "movements": [
+        { "name": "Thruster", "reps": 8, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } },
+        { "name": "Toes to Bar", "reps": 8, "inputType": "none" },
+        { "name": "Box Jump", "reps": 8, "inputType": "none" }
+      ]
+    },
+    {
+      "name": "Cool Down", "type": "skill", "loggingMode": "sets", "isSecondary": true,
+      "prescription": "~1:30 min/side box Pigeon stretch, ~1:30 min/side banded lat stretch", "suggestedSets": 1,
+      "movements": []
+    }
+  ]
+}
+NOTE: Each exercise has its own loggingMode set independently. "Every 4:00 min x 4 rounds" → "emom" (prescribed time window, log weight). suggestedSets = 8 = 4 intervals × 2 inner rounds — always multiply through so totalReps is correct. Cool Down → isSecondary: true (not a primary scored part). The workout-level format reflects the metcon's format.
+
+### 6b. Mixed session (Strength + Superset + Metcon)
 Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
 Output:
 {
@@ -1063,6 +1104,9 @@ function validateMovement(data: unknown): ParsedMovement | null {
 
 function validateParsedWorkout(data: unknown): ParsedWorkout {
   const raw = data as Record<string, unknown>;
+  const sourceDate = typeof raw.sourceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.sourceDate)
+    ? raw.sourceDate
+    : undefined;
 
   // Validate workout type
   const validTypes: WorkoutType[] = ['strength', 'metcon', 'emom', 'amrap', 'for_time', 'mixed'];
@@ -1304,6 +1348,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
     partnerWorkout: typeof raw.partnerWorkout === 'boolean' ? raw.partnerWorkout : undefined,
     teamSize: typeof raw.teamSize === 'number' && raw.teamSize >= 2 ? raw.teamSize : undefined,
     rawText,
+    sourceDate,
     difficultyLevel: typeof raw.difficultyLevel === 'number' && raw.difficultyLevel >= 1 && raw.difficultyLevel <= 10
       ? Math.round(raw.difficultyLevel)
       : undefined,

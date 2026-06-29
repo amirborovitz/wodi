@@ -41,7 +41,7 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
 
         {/* Identity */}
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontFamily: fD, fontSize: named ? 26 : 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontFamily: fD, fontSize: named ? 26 : 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'normal' }}>
             {named ? wod.title : wod.format}
           </div>
           <div style={{ fontFamily: fD, fontSize: 17, fontWeight: 800, letterSpacing: '0.04em', color: 'rgba(0,0,0,0.62)', marginTop: 3 }}>
@@ -66,9 +66,9 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
                 dimColor="rgba(0,0,0,0.5)"
                 glow={false}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(0,0,0,0.35)" meColor="rgba(0,0,0,0.35)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -87,12 +87,21 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
               return (
                 <React.Fragment key={i}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '3px 0', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
-                      {parts.movName}
-                      {parts.loadTag && (
-                        <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: 'rgba(0,0,0,0.5)', marginLeft: 6 }}>{parts.loadTag}</span>
-                      )}
-                    </span>
+                    {parts.roundLabel ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.ink, color: BRAND.yellow, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {parts.roundLabel}
+                        </span>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: 'rgba(0,0,0,0.5)', marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
+                    )}
                     {parts.isStrength ? (
                       parts.strengthValue ? (
                         <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: 'rgba(0,0,0,0.7)', whiteSpace: 'nowrap', textAlign: 'right' }}>

@@ -205,11 +205,10 @@ export function movementToKind(mov: ParsedMovement): ExerciseKind {
   if (mov.inputType === 'calories') return 'distance';
   if (mov.inputType === 'distance') return 'distance';
 
-  // Rescue: AI says 'none' or 'bodyweight' but has load evidence → load
+  // AI said 'none' or isBodyweight — trust it. Only rxWeights (also AI data) can
+  // rescue to 'load'; name patterns must not override an explicit AI classification.
   if (mov.inputType === 'none' || mov.isBodyweight) {
-    // rxWeights is explicit load evidence from the AI — trust it even if isBodyweight was set
     if (mov.rxWeights) return 'load';
-    if (nameClass === 'weight' && !mov.isBodyweight) return 'load';
     if (mov.time && mov.time > 0) return 'duration';
     if (nameClass === 'distance_cardio') return 'distance';
     return 'reps';

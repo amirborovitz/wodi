@@ -125,7 +125,7 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
           <div style={{
             fontFamily: fD, fontSize: named ? 26 : 34, fontWeight: 900,
             lineHeight: 1, letterSpacing: '-0.01em',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
           }}>
             {named ? wod.title : wod.format}
           </div>
@@ -151,9 +151,9 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
                 dimColor={BRAND.dim}
                 glow
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(255,255,255,0.35)" meColor="rgba(255,255,255,0.35)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -176,12 +176,21 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
                     gap: 16, padding: '5px 0',
                     borderBottom: '1px solid rgba(242,240,235,0.10)',
                   }}>
-                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
-                      {parts.movName}
-                      {parts.loadTag && (
-                        <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: BRAND.dim, marginLeft: 6 }}>{parts.loadTag}</span>
-                      )}
-                    </span>
+                    {parts.roundLabel ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {parts.roundLabel}
+                        </span>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: BRAND.dim, marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
+                    )}
                     {parts.isStrength ? (
                       parts.strengthValue ? (
                         <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, whiteSpace: 'nowrap', textAlign: 'right' }}>

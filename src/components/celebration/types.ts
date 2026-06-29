@@ -61,6 +61,12 @@ export interface ArtifactRow {
   // ArtifactSection.roundLedger instead). 'reps' means a flat shared total, where a per-row
   // personal share number is still meaningful.
   partnerSplit?: 'reps' | 'rounds';
+  // TEAM/ME contract for split-round partner posters: when present, this is the athlete's
+  // accumulated personal work for the row. The round ledger is context, not the only ME stat.
+  partnerMine?: string;
+  // Poster rows that already carry their load inline (e.g. sectioned partner prescriptions)
+  // should not render a second handwritten/logged load value on the right.
+  suppressMine?: boolean;
   // Ascending-ladder AMRAP bar-chart track, rendered as a SEPARATE visual element right below
   // this row (the row itself renders normally through the skin's own markup, so the movement
   // name/weight inherit that skin's exact font/size treatment — the chart never duplicates
@@ -88,6 +94,10 @@ export interface ArtifactSection {
   // partner UI (round ledger, TEAM|ME header, "OUR ___" hero label) must gate on this, not on
   // raw teamSize, or an unconfirmed solo part inherits partner treatment from a sibling part.
   isPartnerConfirmed?: boolean;
+  // Partner poster display mode. 'shares' is the flat TEAM/ME share layout for one-shot shared
+  // totals. 'sections' is for sectioned for-time partner WODs where each section stays readable
+  // as a full prescription row, with no round ledger or TEAM/ME split.
+  partnerDisplayMode?: 'shares' | 'sections';
   // Set only for a teamSize>1 section whose rows are partnerSplit==='rounds' — the round-trade
   // ledger data ("who took which round"), one per section since every row in an IGUG round
   // shares the same round structure.

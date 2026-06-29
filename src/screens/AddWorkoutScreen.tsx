@@ -49,6 +49,7 @@ interface AddWorkoutScreenProps {
   initialImage?: File | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
+  plannedWorkout?: import('../types').PlannedWorkout | null; // Pre-parsed workout — jump straight to log-results
 }
 
 type Step = 'capture' | 'voice' | 'processing' | 'preview' | 'log-results' | 'saving' | 'wrap' | 'reward';
@@ -1461,6 +1462,9 @@ async function refineWorkoutIfNeeded(
     if (!refined.rawText && parsed.rawText) {
       refined.rawText = parsed.rawText;
     }
+    if (!refined.sourceDate && parsed.sourceDate) {
+      refined.sourceDate = parsed.sourceDate;
+    }
     console.log('[Refine] Refined result:', {
       exerciseCount: refined.exercises.length,
       exercises: refined.exercises.map(e => ({ name: e.name, type: e.type })),
@@ -1485,7 +1489,7 @@ async function refineWorkoutIfNeeded(
   }
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showRecentOnOpen, editWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = user?.email === ADMIN_EMAIL;
   const canUseSavedWorkouts = user?.email?.toLowerCase() === SAVED_WORKOUTS_EMAIL;
@@ -1643,6 +1647,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
       type: editWorkout.type,
       format,
       scoreType: editWorkout.type === 'strength' ? 'load' : 'time',
+      sourceDate: editWorkout.sourceDate,
       timeCap: editWorkout.duration ? editWorkout.duration * 60 : undefined,
       exercises: editWorkout.exercises.map(ex => {
         // Reconstruct movements from workloadBreakdown for multi-movement exercises
@@ -1767,6 +1772,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
     setStep('log-results');
     console.log('[EditWorkout] Pre-filled story results:', storyResults);
   }, [editWorkout]);
+
+  // Handle planned workout — already AI-parsed, jump straight to logging
+  useEffect(() => {
+    if (!plannedWorkout) return;
+    setParsedWorkout(plannedWorkout.parsedWorkout);
+    setImageUrl(null);
+    setError(null);
+    setStep('log-results');
+  }, [plannedWorkout]);
 
   // Run smart classification for exercises with low confidence when entering log-results
   useEffect(() => {
@@ -1962,6 +1976,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
       type: workout.type,
       format: workout.type === 'strength' ? 'strength' : 'for_time',
       scoreType: workout.type === 'strength' ? 'load' : 'time',
+      sourceDate: workout.sourceDate,
       exercises: workout.exercises.map(ex => ({
         name: ex.name,
         type: ex.type,
@@ -3182,6 +3197,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
       const workoutBase = {
         userId: user.id,
         date: workoutDate,
+        sourceDate: parsedWorkout.sourceDate,
         title: workoutTitle,
         type: parsedWorkout.type,
         ...(parsedWorkout.stationRotation && { stationRotation: true }),
@@ -3334,6 +3350,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
         workloadBreakdown,
         workoutContext: workoutContextLine || undefined,
         workoutRawText: parsedWorkout.rawText?.trim() || undefined,
+        sourceDate: parsedWorkout.sourceDate,
         ...(teamSize > 1 && { teamSize }),
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         ...(persistedWorkoutId && { workoutId: persistedWorkoutId }),

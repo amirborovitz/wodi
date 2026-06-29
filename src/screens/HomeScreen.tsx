@@ -3,9 +3,12 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
+import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
+import { OnDeckCard } from '../components/home/OnDeckCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
+import type { PlannedWorkout } from '../types';
 import styles from './HomeScreen.module.css';
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
@@ -18,6 +21,7 @@ interface HomeScreenProps {
   onUsePastWorkout?: () => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
+  onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   ringsKey?: number; // kept for API compatibility — unused
 }
 
@@ -46,10 +50,12 @@ export function HomeScreen({
   onUsePastWorkout,
   onOpenProfile,
   onSelectWorkout,
+  onLogPlannedWorkout,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
   const isAdmin = user?.email === ADMIN_EMAIL;
   const { workouts, loading, refresh, deleteWorkout } = useWorkouts(100);
+  const { planned } = usePlannedWorkouts();
   const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -247,6 +253,30 @@ export function HomeScreen({
           <button type="button" className={styles.adminBtn} onClick={onUsePastWorkout}>
             Load from Recent
           </button>
+        )}
+
+        {/* ── ON DECK ── */}
+        {planned.length > 0 && (
+          <motion.section
+            className={styles.onDeck}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.08, duration: 0.28 }}
+          >
+            <div className={styles.onDeckHeader}>
+              <span className={styles.onDeckTitle}>On deck</span>
+              <span className={styles.onDeckCount}>{planned.length}</span>
+            </div>
+            <div className={styles.onDeckScroll}>
+              {planned.map((p) => (
+                <OnDeckCard
+                  key={p.id}
+                  planned={p}
+                  onLog={onLogPlannedWorkout ?? (() => {})}
+                />
+              ))}
+            </div>
+          </motion.section>
         )}
 
         {/* ── Poster gallery ── */}

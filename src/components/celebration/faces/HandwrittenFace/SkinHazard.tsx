@@ -82,9 +82,7 @@ export function SkinHazard({ wod, vibe }: SkinHazardProps): React.JSX.Element {
             lineHeight: 0.92,
             letterSpacing: '-0.01em',
             textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
           }}>
             {named ? wod.title : wod.format}
           </div>
@@ -121,9 +119,9 @@ export function SkinHazard({ wod, vibe }: SkinHazardProps): React.JSX.Element {
                 pendingColor="rgba(243,241,234,0.16)"
                 dimColor={BRAND.dim}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor={BRAND.dim} meColor={BRAND.dim} />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (

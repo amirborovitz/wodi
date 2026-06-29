@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
@@ -16,7 +16,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen, GoalsSettingsScreen } from './components/settings';
 import { BottomNav } from './components/ui';
 import { DEFAULT_USER_GOALS } from './types';
-import type { Screen } from './types';
+import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
 import './styles/variables.css';
 
@@ -28,6 +28,7 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutWithStats | null>(null);
   const [editingWorkout, setEditingWorkout] = useState<WorkoutWithStats | null>(null);
@@ -43,8 +44,16 @@ function AppContent() {
 
   const handleEditWorkout = (workout: WorkoutWithStats) => {
     setEditingWorkout(workout);
-    setPendingImage(null); // Clear any pending image
+    setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
+    setCurrentScreen('add-workout');
+  };
+
+  const handleLogPlannedWorkout = (planned: PlannedWorkout) => {
+    setPendingPlannedWorkout(planned);
+    setPendingImage(null);
+    setShowRecentWorkoutsOnOpen(false);
+    setEditingWorkout(null);
     setCurrentScreen('add-workout');
   };
 
@@ -94,18 +103,24 @@ function AppContent() {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
+              setPendingPlannedWorkout(null);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
             onWorkoutCreated={() => {
+              if (pendingPlannedWorkout?.id) {
+                deleteDoc(doc(db, 'plannedWorkouts', pendingPlannedWorkout.id));
+              }
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
+              setPendingPlannedWorkout(null);
               setHomeRingsKey((prev) => prev + 1);
               setCurrentScreen('home');
             }}
             initialImage={pendingImage}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
+            plannedWorkout={pendingPlannedWorkout}
           />
         );
       case 'workout-detail': {
@@ -236,6 +251,7 @@ function AppContent() {
               setWorkoutDetailOrigin('home');
               setCurrentScreen('workout-detail');
             }}
+            onLogPlannedWorkout={handleLogPlannedWorkout}
             ringsKey={homeRingsKey}
           />
         );

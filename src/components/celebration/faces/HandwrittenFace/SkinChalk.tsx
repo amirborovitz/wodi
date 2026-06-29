@@ -61,7 +61,7 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
         </div>
 
         {/* Title — yellow highlighter swipe if named */}
-        <div style={{ fontFamily: fD, fontSize: named ? (compact ? 25 : 28) : (compact ? 29 : 32), fontWeight: 900, lineHeight: 1, marginTop: compact ? 6 : 8, color: BRAND.paperInk, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontFamily: fD, fontSize: named ? (compact ? 25 : 28) : (compact ? 29 : 32), fontWeight: 900, lineHeight: 1, marginTop: compact ? 6 : 8, color: BRAND.paperInk, whiteSpace: 'normal' }}>
           <span style={named ? hl() : undefined}>{named ? wod.title : wod.format}</span>
         </div>
         <div style={{ fontFamily: fH, fontSize: compact ? 19 : 22, color: '#5a4628', marginTop: compact ? 1 : 3 }}>
@@ -83,9 +83,9 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                 dimColor="#5a4628"
                 glow={false}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(33,29,21,0.4)" meColor="rgba(33,29,21,0.4)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (

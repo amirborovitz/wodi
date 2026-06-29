@@ -33,6 +33,15 @@ function InkRule({ heavy = false }: { heavy?: boolean }): React.JSX.Element {
 export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = Boolean(wod.title);
+  const loggedLoad = rows.reduce<string | undefined>((found, row) => {
+    if (found || row.kind !== 'line') return found;
+    const parts = getMovementValueParts(wod, row);
+    const candidate = parts.single ?? parts.strengthValue ?? parts.me ?? '';
+    return /\b(?:kg|lb)\b/i.test(candidate) ? candidate : found;
+  }, undefined);
+  const resultNote = wod.result.label.toUpperCase() === 'ROUNDS HELD'
+    ? `all rounds held${loggedLoad ? ` · @ ${loggedLoad}` : ''}`
+    : `${wod.result.label.toLowerCase()}${wod.result.meta ? ` · ${wod.result.meta}` : ''}`;
 
   return (
     <div
@@ -77,9 +86,7 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
               lineHeight: 0.95,
               letterSpacing: '-0.01em',
               textTransform: 'uppercase',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              whiteSpace: 'normal',
               textShadow: '1px 0 0 #171814',
             }}
           >
@@ -110,9 +117,9 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
                 dimColor="rgba(23,24,20,0.45)"
                 glow={false}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(23,24,20,0.42)" meColor="rgba(23,24,20,0.42)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -140,7 +147,13 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
                       borderBottom: '1px solid rgba(23,24,20,0.1)',
                     }}
                   >
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>•</span>
+                    {parts.roundLabel ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: 'rgba(23,24,20,1)', borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                        {parts.roundLabel}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 16, lineHeight: 1 }}>•</span>
+                    )}
                     <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>
                       {parts.movName}
                       {parts.loadTag && (
@@ -174,22 +187,34 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
           )}
         </div>
 
-        <div style={{ marginTop: 14, position: 'relative', minHeight: 96, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
-          <div style={{ position: 'relative', minWidth: 0, paddingLeft: 4 }}>
-            <div style={{ position: 'absolute', width: 118, height: 118, left: -7, bottom: -22, borderRadius: '50%', background: BRAND.yellow, zIndex: 0 }} />
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ fontFamily: fB, fontSize: 8.5, fontWeight: 900, letterSpacing: '0.18em', textTransform: 'uppercase' }}>{wod.result.label}</div>
-              <span style={{ fontFamily: fD, fontSize: 78, fontWeight: 900, lineHeight: 0.82, letterSpacing: '-0.04em', color: '#050504', whiteSpace: 'nowrap' }}>
-                {wod.result.value}
-              </span>
-              {wod.result.meta && (
-                <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, color: 'rgba(23,24,20,0.45)', marginTop: 2, letterSpacing: '0.04em' }}>
-                  {wod.result.meta}
-                </div>
-              )}
+        <div style={{ marginTop: 18, position: 'relative', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+          <div style={{ position: 'relative', minWidth: 0, paddingLeft: 6 }}>
+            <div style={{ fontFamily: fH, fontSize: 16, fontWeight: 700, color: 'rgba(23,24,20,0.72)', transform: 'rotate(-2deg)', marginBottom: 4 }}>
+              {resultNote}
             </div>
+            <span
+              style={{
+                display: 'inline-block',
+                background: BRAND.yellow,
+                color: '#050504',
+                fontFamily: fD,
+                fontSize: 66,
+                fontWeight: 900,
+                lineHeight: 0.82,
+                letterSpacing: '-0.04em',
+                padding: '3px 12px 8px',
+                transform: 'rotate(-1.5deg)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {wod.result.value}
+            </span>
           </div>
-          {vibe && <VibeStamp vibe={vibe} scale={0.72} />}
+          {vibe && (
+            <div style={{ transform: 'rotate(-7deg)', marginRight: 2, marginTop: -4 }}>
+              <VibeStamp vibe={vibe} scale={0.64} />
+            </div>
+          )}
         </div>
       </div>
 

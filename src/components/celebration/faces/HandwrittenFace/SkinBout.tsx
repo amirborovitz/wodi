@@ -77,7 +77,7 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
           <div style={{ fontFamily: fB, fontSize: 8.5, fontWeight: 900, letterSpacing: '0.24em', color: `${BOUT_BONE}66`, textTransform: 'uppercase' }}>
             Presenting
           </div>
-          <div style={{ fontFamily: fD, fontSize: named ? 36 : 45, fontWeight: 900, lineHeight: 0.92, letterSpacing: '-0.01em', color: BOUT_BONE, textTransform: 'uppercase', textShadow: `0 0 18px ${BOUT_GOLD}26`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontFamily: fD, fontSize: named ? 36 : 45, fontWeight: 900, lineHeight: 0.92, letterSpacing: '-0.01em', color: BOUT_BONE, textTransform: 'uppercase', textShadow: `0 0 18px ${BOUT_GOLD}26`, whiteSpace: 'normal' }}>
             {named ? wod.title : wod.format}
           </div>
           <div style={{ marginTop: 7, display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 8 }}>
@@ -99,9 +99,9 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
                 dimColor={`${BOUT_BONE}66`}
                 glow={false}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor={`${BOUT_BONE}55`} meColor={`${BOUT_BONE}55`} />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -114,7 +114,13 @@ export function SkinBout({ wod, vibe }: SkinBoutProps): React.JSX.Element {
               return (
                 <React.Fragment key={i}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr max-content', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i === rows.length - 1 ? 'none' : `1px solid ${BOUT_BONE}12` }}>
-                    <span style={{ color: BOUT_GOLD, fontSize: 9 }}>✦</span>
+                    {parts.roundLabel ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', background: BOUT_GOLD, color: BOUT_BG, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+                        {parts.roundLabel}
+                      </span>
+                    ) : (
+                      <span style={{ color: BOUT_GOLD, fontSize: 9 }}>✦</span>
+                    )}
                     <span style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 900, color: BOUT_BONE, lineHeight: 1.22 }}>
                       {parts.movName}
                       {parts.loadTag && (

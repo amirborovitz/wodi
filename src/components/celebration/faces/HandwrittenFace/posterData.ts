@@ -47,8 +47,10 @@ export interface PosterWod {
   // Partner-workout display mode. 'rounds' (partners trade whole rounds, IGUG) means skins must
   // render the round ledger (`rounds` below) instead of a per-movement personal number. 'reps'
   // (flat shared total, no round structure) keeps the existing per-movement TEAM|ME number.
+  // 'sections' keeps partner hero/title treatment but renders section prescription rows without
+  // a ledger or TEAM/ME header.
   // Meaningless unless isPartnerConfirmed is true.
-  split: 'reps' | 'rounds';
+  split: 'reps' | 'rounds' | 'sections';
   // Round-ledger chips — only present when split === 'rounds'. 'me'/'partner' = whose round;
   // 'pending' = not yet reached (time-capped/partial finish), a flat symbolic state never a
   // computed partial.
@@ -111,17 +113,28 @@ const GENERIC_TITLE_PATTERNS = [
   /^intervals?$/i,
   /^\d+\s*rounds?\s+for\s+time$/i,   // "5 Rounds For Time"
   /^\d+\s*rounds?$/i,                 // "5 Rounds"
+  /^\d+\s*sections?\s+for\s+time(?:\s*[•·-]\s*.*)?$/i,
   /^\d+[-\s]min\s+amrap$/i,           // "12-Min AMRAP"
   /^\d+[-\s]min\s+emom$/i,
+  /^\d+\s*min\s+cap$/i,
+];
+
+// EMOM cadence strings (e.g. "EVERY 4:00 MIN X 4 ROUNDS") — not a WOD name, so suppress
+// as the poster title, but keep for block-section blueprint rendering (structural context).
+const CADENCE_TITLE_PATTERNS = [
+  /^every\s+[\d:]+\s*min(?:ute)?s?\s*(?:x|×)\s*\d+/i,
 ];
 
 function isGenericTitle(title: string): boolean {
-  return GENERIC_TITLE_PATTERNS.some((p) => p.test(title.trim()));
+  const t = title.trim();
+  return GENERIC_TITLE_PATTERNS.some((p) => p.test(t))
+    || CADENCE_TITLE_PATTERNS.some((p) => p.test(t));
 }
 
 // Suppress section headers that are just describing the workout format
 const FORMAT_HEADER_PATTERNS = [
   ...GENERIC_TITLE_PATTERNS,
+  ...CADENCE_TITLE_PATTERNS,
   /^the\s+wod$/i,
   /^the\s+workout$/i,
 ];
@@ -151,7 +164,28 @@ function formatWorkoutDate(date: Date): string {
     .replace(',', '');
 }
 
+function formatSourceDate(sourceDate: string | undefined, fallbackDate: Date): string {
+  if (!sourceDate) return formatWorkoutDate(fallbackDate);
+  const match = sourceDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return formatWorkoutDate(fallbackDate);
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const monthLabel = monthNames[month - 1];
+  if (!monthLabel || day < 1 || day > 31) return formatWorkoutDate(fallbackDate);
+  return `${day} ${monthLabel} ${String(year).slice(-2)}`;
+}
+
 function buildFormatLine(data: CelebrationData): string {
+  if (data.artifactSections[0]?.partnerDisplayMode === 'sections') {
+    const cap = explicitTimeCapSub(data.exercises[0], data.rawText);
+    return [
+      `${data.artifactSections.length} SECTIONS FOR TIME`,
+      cap || null,
+    ].filter(Boolean).join(' · ');
+  }
+
   // Confirmed-partner workouts: trust the artifact blueprint — it's already split-aware (computed
   // from the same repeatCount/teamSize data as the round ledger below it) — over
   // heroResult.formatLine or the independent regex fallback chain further down, which run their
@@ -202,6 +236,9 @@ function buildFormatLine(data: CelebrationData): string {
 }
 
 function buildSubLine(data: CelebrationData): string {
+  if (data.artifactSections[0]?.isPartnerConfirmed) {
+    return '';
+  }
   const fmt = data.workoutFormat;
   const ex0 = data.exercises[0];
   if (fmt === 'strength') {
@@ -265,6 +302,8 @@ function buildResultLabel(format: string | undefined, isPartner: boolean): strin
     case 'amrap':
     case 'amrap_intervals': return isPartner ? 'OUR ROUNDS' : 'TOTAL ROUNDS';
     case 'strength':        return 'TOP SET';
+    case 'emom':
+    case 'intervals':       return 'ROUNDS HELD';
     default:                return isPartner ? 'OUR RESULT' : 'MY RESULT';
   }
 }
@@ -315,6 +354,8 @@ function sectionsToRows(sections: ArtifactSection[], mineMap?: Map<string, strin
       !isFormatHeader(section.title);
     const cap = section.blueprint ?? section.eyebrow ?? '';
 
+    const isCadenceTitle = CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
+
     if (hasHeader) {
       rows.push({
         kind: 'block',
@@ -323,8 +364,9 @@ function sectionsToRows(sections: ArtifactSection[], mineMap?: Map<string, strin
         label: isDuplicateTitle ? '' : section.title.toUpperCase(),
         cap,
       } satisfies PosterBlock);
-    } else if (isDuplicateTitle && cap) {
-      // Section title was a format header but there's still a cap worth showing.
+    } else if ((isDuplicateTitle || isCadenceTitle) && cap) {
+      // Section title was a format/cadence header (suppressed as label) but the
+      // blueprint cap carries structural context worth showing (e.g. "EVERY 4 MIN · 4 ROUNDS").
       rows.push({ kind: 'block', label: '', cap } satisfies PosterBlock);
     }
 
@@ -490,7 +532,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
       kind: 'line',
       rx: rxLabel.trim(),
       load: '',
-      mine: '',
+      mine: row.partnerMine ?? '',
       team: '',
       total: undefined,
       roundLabel: row.roundLabel,
@@ -521,7 +563,10 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
       const perCal = Math.round(parseInt(calMatch[1], 10) / relayCount);
       rxLabel = `${perCal}cal ${row.name}`.trim(); // "19cal Echo Bike"
     } else {
-      rxLabel = row.name; // fallback: just "Run"
+      // nameWithLoad is pre-computed as "${perRoundDist} ${name}" for relay rows (e.g. "1.3km Echo
+      // Bike") — use it instead of bare name when suppressDistanceTotal prevented subNote from
+      // carrying the total.
+      rxLabel = row.nameWithLoad?.trim() || row.name;
     }
   } else if (row.roundLabel != null) {
     rxLabel = row.primary ?? '';
@@ -530,14 +575,14 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   }
 
   const load = row.subNote && isRxLoad(row.subNote) ? row.subNote : '';
-  const mineRaw = lookupMineValue(mineMap, row.name, rxLabel);
+  const mineRaw = row.suppressMine ? '' : lookupMineValue(mineMap, row.name || rxLabel, rxLabel);
   const total = row.totalNote || (row.subNote && /\btotal\b/i.test(row.subNote) ? row.subNote : undefined);
   const loadSuffix = row.loadNote || extractLoadSuffix(row.nameWithLoad);
 
   const isPerRoundValue = !!(row.repeatCount && row.repeatCount > 1);
 
   let team = '';
-  let mine = loadSuffix || mineRaw;
+  let mine = row.suppressMine ? '' : loadSuffix || mineRaw;
   const mineBeforeWipe = mine;
   // Gate on this ROW's own confirmed split (set only when this block's own text confirmed
   // partner language — see partnerSplit.ts), never on the raw teamSize alone. teamSize is a
@@ -644,8 +689,12 @@ export function buildPosterWodFromPage(
   if (title && (title.toUpperCase() === format.toUpperCase() || title.toUpperCase() === type.toUpperCase())) {
     title = null;
   }
+  if (!title && isPartnerPage) {
+    title = 'PARTNER METCON';
+  }
 
   const sub = (() => {
+    if (isPartnerPage) return '';
     if (exFmt === 'strength') return 'build to heavy';
     if (isAmrap && amrapMinutes) return `${amrapMinutes} min`;
     if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
@@ -661,11 +710,14 @@ export function buildPosterWodFromPage(
       case 'for_time': return isPartnerPage ? 'OUR TIME' : 'MY TIME';
       case 'amrap': case 'amrap_intervals': return isPartnerPage ? 'OUR ROUNDS' : 'ROUNDS';
       case 'strength': return 'TOP SET';
+      case 'emom': case 'intervals': return 'ROUNDS HELD';
       default: return isPartnerPage ? 'OUR RESULT' : 'RESULT';
     }
   })();
   const resultValue = heroResult
-    ? `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
+    ? resultLabel === 'ROUNDS HELD'
+      ? heroResult.value
+      : `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
     : '--';
   const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, heroResult);
 
@@ -673,11 +725,11 @@ export function buildPosterWodFromPage(
   const totals = buildTotals(data, resultValue);
 
   const sectionLedger = section?.roundLedger;
-  const split: 'reps' | 'rounds' = sectionLedger ? 'rounds' : 'reps';
+  const split: PosterWod['split'] = sectionLedger ? 'rounds' : section?.partnerDisplayMode === 'sections' ? 'sections' : 'reps';
   const rounds = sectionLedger?.rounds;
 
   return {
-    type, title, date: formatWorkoutDate(date), format, sub,
+    type, title, date: formatSourceDate(data.sourceDate, date), format, sub,
     blocks: [],
     result: { label: resultLabel, value: resultValue, meta: resultMeta },
     rx,
@@ -715,12 +767,15 @@ export function buildPosterWod(
   )) {
     title = null;
   }
-  const dateStr = formatWorkoutDate(date);
+  const dateStr = formatSourceDate(data.sourceDate, date);
 
   const isPartnerConfirmed = !!data.artifactSections[0]?.isPartnerConfirmed;
   const sectionLedger = data.artifactSections[0]?.roundLedger;
-  const split: 'reps' | 'rounds' = sectionLedger ? 'rounds' : 'reps';
+  const split: PosterWod['split'] = sectionLedger ? 'rounds' : data.artifactSections[0]?.partnerDisplayMode === 'sections' ? 'sections' : 'reps';
   const rounds = sectionLedger?.rounds;
+  if (!title && isPartnerConfirmed) {
+    title = 'PARTNER METCON';
+  }
 
   // Result
   const resultLabel = buildResultLabel(data.workoutFormat, isPartnerConfirmed);

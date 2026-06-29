@@ -2076,20 +2076,37 @@ function backfillLoggingModes(workout: ParsedWorkout): ParsedWorkout {
 
       let inferred: ExerciseLoggingMode | undefined;
 
-      // Infer from exercise type first
-      if (ex.type === 'strength') {
-        inferred = 'strength';
-      } else if (ex.type === 'cardio') {
-        inferred = 'cardio';
+      // Check exercise name/prescription for EMOM "every X min" pattern first.
+      // Handles mixed workouts where one exercise is named "Every 4:00 min x 4 rounds"
+      // regardless of the overall workout format field.
+      const exerciseText = `${ex.name || ''} ${ex.prescription || ''}`;
+      if (/every\s+\d+(?::\d{2})?\s*(?:min|:)/i.test(exerciseText)) {
+        inferred = 'emom';
       }
 
-      // If not inferred from type, use workout-level format
+      // Infer from exercise type
+      if (!inferred) {
+        if (ex.type === 'strength') {
+          inferred = 'strength';
+        } else if (ex.type === 'cardio') {
+          inferred = 'cardio';
+        }
+      }
+
+      // If not inferred from name/type, use workout-level format
       if (!inferred) {
         switch (workout.format) {
           case 'for_time': inferred = 'for_time'; break;
           case 'amrap': inferred = 'amrap'; break;
           case 'amrap_intervals': inferred = 'amrap_intervals'; break;
-          case 'intervals': inferred = 'intervals'; break;
+          case 'intervals': {
+            // "EVERY X:XX MIN" is a fixed-cadence EMOM-style interval — exercises are
+            // weight/reps scored, not time scored. True intervals ("4x400m for time") have
+            // no "every" timing notation.
+            const workoutText = workout.rawText || workout.title || '';
+            inferred = /every\s+\d+(?::\d{2})?\s*(?:min|:)/i.test(workoutText) ? 'emom' : 'intervals';
+            break;
+          }
           case 'emom': inferred = 'emom'; break;
           case 'strength': inferred = 'strength'; break;
           case 'tabata': inferred = 'intervals'; break;

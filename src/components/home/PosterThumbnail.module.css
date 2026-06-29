@@ -19,16 +19,12 @@
   -webkit-touch-callout: none;
 }
 
-/* ── Poster card frame — crops/centers the real, scaled-down skin ───────── */
+/* ── Poster card frame — scales the real poster without cropping ───────── */
 .frame {
   width: 150px;
-  height: 210px;
   border-radius: 10px;
   overflow: hidden;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
   transition: transform 0.12s ease;
@@ -46,13 +42,14 @@
 
 .frameFull {
   width: 100%;
-  height: auto;
-  aspect-ratio: 150 / 210;
 }
 
 .card {
+  position: absolute;
+  top: 0;
+  left: 50%;
   flex-shrink: 0;
-  transform-origin: center center;
+  transform-origin: center top;
 }
 
 /* ── Label below the card ─────────────────────────────────────── */

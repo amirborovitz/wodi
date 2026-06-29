@@ -77,9 +77,7 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
             fontWeight: 900,
             lineHeight: 1,
             letterSpacing: '-0.01em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
           }}>
             {named ? wod.title : wod.format}
           </div>
@@ -104,9 +102,9 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
                 pendingColor="rgba(140,180,255,0.18)"
                 dimColor={GRID_DIM}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(255,255,255,0.42)" meColor="rgba(255,255,255,0.42)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (

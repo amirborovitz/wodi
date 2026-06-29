@@ -152,6 +152,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             id: doc.id,
             userId: data.userId,
             date: data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date),
+            sourceDate: typeof data.sourceDate === 'string' ? data.sourceDate : undefined,
             title: data.title,
             type: data.type as WorkoutType,
             imageUrl: data.imageUrl,

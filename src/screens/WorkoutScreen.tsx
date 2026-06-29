@@ -3902,6 +3902,7 @@ export function WorkoutScreen({
           exercises: hydratedExercises,
           workloadBreakdown: workloadBreakdown || undefined,
           workoutRawText: workout.rawText,
+          sourceDate: workout.sourceDate,
           ...(workout.teamSize && workout.teamSize > 1 && { teamSize: workout.teamSize }),
         }
       : undefined;

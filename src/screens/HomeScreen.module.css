@@ -199,6 +199,53 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── ON DECK ──────────────────────────────────────────────────── */
+.onDeck {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.onDeckHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.onDeckTitle {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.4);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.onDeckCount {
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.4);
+}
+
+.onDeckScroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 4px;
+}
+
+.onDeckScroll::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Gallery ──────────────────────────────────────────────────── */
 .gallery {
   display: flex;

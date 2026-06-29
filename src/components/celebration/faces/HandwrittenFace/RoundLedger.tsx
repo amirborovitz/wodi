@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { BRAND, fB } from './brand';
+import { BRAND, fB, fD } from './brand';
 import type { RoundLedgerEntry } from '../../partnerSplit';
 
 export interface RoundLedgerProps {
@@ -36,26 +36,36 @@ export function RoundLedger({
   const partnerRounds = rounds.filter((r) => r === 'partner').length;
 
   return (
-    <div style={{ marginBottom: 4 }}>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 5 }}>
         {rounds.map((state, i) => (
           <div
             key={i}
             style={{
-              width: 15,
-              height: 15,
+              width: 17,
+              height: 17,
               flexShrink: 0,
-              borderRadius: 3,
+              borderRadius: 4,
               background: state === 'me' ? meColor : 'transparent',
               border: state === 'me'
                 ? 'none'
                 : `1.5px ${state === 'pending' ? 'dashed' : 'solid'} ${state === 'pending' ? pendingColor : partnerColor}`,
               boxShadow: glow && state === 'me' ? `0 0 6px ${meColor}80` : 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontFamily: fD,
+              fontSize: 9,
+              fontWeight: 900,
+              lineHeight: 1,
+              color: state === 'me' ? BRAND.ink : dimColor,
             }}
-          />
+          >
+            {i + 1}
+          </div>
         ))}
       </div>
-      <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, color: dimColor, letterSpacing: '0.02em' }}>
+      <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 800, color: dimColor, letterSpacing: '0.04em' }}>
         me {personalRounds} · partner {partnerRounds}
       </div>
     </div>

@@ -11,8 +11,8 @@ interface PosterThumbnailProps {
   fullWidth?: boolean;
 }
 
-// Width the real skin components are designed at — the thumbnail renders them
-// at this size, then scales the whole card down to fit the frame.
+// Width the real skin components are designed at. The thumbnail renders that
+// same poster and scales it down without cropping.
 const POSTER_REFERENCE_WIDTH = 360;
 
 function formatPosterDate(date: Date): string {
@@ -44,6 +44,7 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
   const frameRef = useRef<HTMLButtonElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
+  const [frameHeight, setFrameHeight] = useState(210);
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
@@ -53,7 +54,9 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
     const measure = (): void => {
       const cardHeight = card.scrollHeight;
       if (frame.clientWidth > 0 && cardHeight > 0) {
-        setScale(Math.min(frame.clientWidth / POSTER_REFERENCE_WIDTH, frame.clientHeight / cardHeight));
+        const nextScale = frame.clientWidth / POSTER_REFERENCE_WIDTH;
+        setScale(nextScale);
+        setFrameHeight(cardHeight * nextScale);
       }
     };
 
@@ -70,13 +73,14 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
         ref={frameRef}
         type="button"
         className={`${styles.frame} ${fullWidth ? styles.frameFull : ''}`}
+        style={{ height: frameHeight }}
         onClick={onClick}
         aria-label={`Open ${workout.title} workout`}
       >
         <div
           ref={cardRef}
           className={styles.card}
-          style={{ width: POSTER_REFERENCE_WIDTH, transform: `scale(${scale})` }}
+          style={{ width: POSTER_REFERENCE_WIDTH, transform: `translateX(-50%) scale(${scale})` }}
         >
           <Skin wod={wod} vibe={vibe} />
         </div>

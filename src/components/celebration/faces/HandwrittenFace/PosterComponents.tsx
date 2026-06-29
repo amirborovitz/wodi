@@ -66,7 +66,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       strengthValue: null,
       team: null,
       me: null,
-      single: null,
+      single: r.mine || null,
       total: null,
       roundLabel: r.roundLabel,
       isRoundsSplit: true,

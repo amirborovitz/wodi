@@ -18,6 +18,7 @@ interface SkinPressProps {
 export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = !!wod.title;
+  const isPartnerPoster = wod.isPartnerConfirmed;
 
   return (
     <div style={{
@@ -47,15 +48,16 @@ export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
 
         <div style={{ marginTop: 12 }}>
           <div style={{
+            display: 'inline',
+            background: isPartnerPoster ? BRAND.yellow : 'transparent',
+            padding: isPartnerPoster ? '0 5px 1px' : 0,
             fontFamily: fD,
             fontSize: named ? 26 : 34,
             fontWeight: 900,
             lineHeight: 0.98,
             letterSpacing: '-0.01em',
             textTransform: 'uppercase',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
           }}>
             {named ? wod.title : wod.format}
           </div>
@@ -82,9 +84,9 @@ export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
                 dimColor="rgba(33,29,21,0.54)"
                 glow={false}
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(33,29,21,0.42)" meColor="rgba(33,29,21,0.42)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
@@ -100,6 +102,52 @@ export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
               </div>
             ) : (() => {
               const parts = getMovementValueParts(wod, r);
+              if (parts.isRoundsSplit) {
+                return (
+                  <React.Fragment key={i}>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: parts.single ? '1fr max-content' : '1fr',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '6px 0',
+                      borderBottom: '1px solid rgba(33,29,21,0.16)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        {parts.roundLabel && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 4, padding: '3px 6px 2px', fontFamily: fD, fontSize: 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                            {parts.roundLabel}
+                          </span>
+                        )}
+                        <span style={{ minWidth: 0, fontFamily: fB, fontSize: 15, fontWeight: 900, lineHeight: 1.25 }}>
+                          {parts.movName}
+                          {parts.loadTag && (
+                            <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 800, color: 'rgba(33,29,21,0.58)', marginLeft: 6 }}>{parts.loadTag}</span>
+                          )}
+                        </span>
+                      </div>
+                      {parts.single && (
+                        <span style={{ fontFamily: fH, fontSize: 18, fontWeight: 700, color: BRAND.paperInk, background: BRAND.yellow, padding: '0 4px', transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                          {parts.single}
+                        </span>
+                      )}
+                    </div>
+                    {r.ladderTrack && (
+                      <LadderTrackChart
+                        track={r.ladderTrack}
+                        barColor={BRAND.yellow}
+                        peakColor={BRAND.yellow}
+                        emptyColor="rgba(33,29,21,0.25)"
+                        mutedFill="rgba(33,29,21,0.16)"
+                        mutedAccent="rgba(33,29,21,0.55)"
+                        textColor={BRAND.paperInk}
+                        dimColor="rgba(33,29,21,0.54)"
+                        glow={false}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              }
               return (
                 <React.Fragment key={i}>
                   <div style={{
@@ -110,12 +158,21 @@ export function SkinPress({ wod, vibe }: SkinPressProps): React.JSX.Element {
                     padding: '5px 0',
                     borderBottom: '1px solid rgba(33,29,21,0.16)',
                   }}>
-                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 900, lineHeight: 1.25 }}>
-                      {parts.movName}
-                      {parts.loadTag && (
-                        <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 800, color: 'rgba(33,29,21,0.58)', marginLeft: 6 }}>{parts.loadTag}</span>
-                      )}
-                    </span>
+                    {parts.roundLabel ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                          {parts.roundLabel}
+                        </span>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 900, lineHeight: 1.25 }}>{parts.movName}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 900, lineHeight: 1.25 }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 800, color: 'rgba(33,29,21,0.58)', marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
+                    )}
                     {parts.isStrength ? (
                       parts.strengthValue ? (
                         <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 900, color: BRAND.paperInk, whiteSpace: 'nowrap', textAlign: 'right' }}>

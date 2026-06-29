@@ -46,7 +46,7 @@ export function SkinSlab({ wod, vibe }: SkinSlabProps): React.JSX.Element {
           <div style={{
             fontFamily: fD, fontSize: named ? 26 : 34, fontWeight: 900,
             lineHeight: 1, letterSpacing: '-0.01em',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
           }}>
             {named ? wod.title : wod.format}
           </div>
@@ -72,9 +72,9 @@ export function SkinSlab({ wod, vibe }: SkinSlabProps): React.JSX.Element {
                 dimColor={BRAND.dim}
                 glow
               />
-            ) : (
+            ) : wod.split === 'reps' ? (
               <PairsLegend teamColor="rgba(255,255,255,0.35)" meColor="rgba(255,255,255,0.35)" />
-            )
+            ) : null
           )}
           {rows.map((r, i) =>
             r.kind === 'block' ? (
