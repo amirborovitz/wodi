@@ -109,7 +109,7 @@ function ladderRungValue(reps: number[], idx: number): number {
 }
 
 export interface LadderTrackChartProps {
-  track: { reps: number[]; step: number; partial?: number; cadence?: string };
+  track: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
   /** Filled bar / lit rung color (the skin's accent — yellow on dark skins, ink on the
    * all-yellow Flare skin, gold on Bout, etc). Used ONLY for completed rounds. */
   barColor?: string;
@@ -168,9 +168,9 @@ export function LadderTrackChart({
   const usingDefaultFill = mutedFill === undefined;
   const resolvedMutedFill = mutedFill ?? barColor;
   const ghostLabelColor = usingDefaultFill ? BRAND.ink : resolvedMutedAccent;
-  const { reps, step, partial = 0, cadence } = track;
-  const MAX_BARS = 7;
-  const totalNeeded = step + 1; // completed rungs + one in-progress (ghost) rung
+  const { reps, step, partial = 0, cadence, complete = false } = track;
+  const MAX_BARS = complete ? Math.max(7, Math.min(10, reps.length)) : 7;
+  const totalNeeded = complete ? step : step + 1; // completed rungs + optional in-progress ghost rung
   const startIdx = Math.max(0, totalNeeded - MAX_BARS);
   const endIdx = Math.max(startIdx, totalNeeded - 1);
   const bars = Array.from({ length: endIdx - startIdx + 1 }, (_, i) => {

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
@@ -8,11 +9,12 @@ import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCa
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
+import { db } from '../services/firebase';
 import type { PlannedWorkout } from '../types';
 import styles from './HomeScreen.module.css';
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
-const GALLERY_MAX = 10;
+const GALLERY_MAX = 7;
 const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
@@ -44,6 +46,12 @@ function getStartOfMonth(): Date {
   return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
 }
 
+function getSavedTitle(saved: PlannedWorkout): string {
+  return saved.parsedWorkout?.title?.trim()
+    || saved.parsedWorkout?.exercises?.find((exercise) => exercise.name?.trim())?.name
+    || 'Saved WOD';
+}
+
 export function HomeScreen({
   onAddWorkout,
   onImageSelected,
@@ -56,6 +64,7 @@ export function HomeScreen({
   const isAdmin = user?.email === ADMIN_EMAIL;
   const { workouts, loading, refresh, deleteWorkout } = useWorkouts(100);
   const { planned } = usePlannedWorkouts();
+  const [savedSheetOpen, setSavedSheetOpen] = useState(false);
   const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +103,10 @@ export function HomeScreen({
   }, [workouts, monthStart, user?.weight]);
 
   const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
+  const savedSummary = useMemo(() => {
+    if (planned.length === 0) return '';
+    return planned.slice(0, 3).map(getSavedTitle).join(', ');
+  }, [planned]);
 
   const actionSheetWorkout = actionSheetWorkoutId
     ? workouts.find((w) => w.id === actionSheetWorkoutId) ?? null
@@ -109,6 +122,20 @@ export function HomeScreen({
       await deleteWorkout(actionSheetWorkoutId);
       setActionSheetWorkoutId(null);
     }
+  };
+
+  const handleDeleteSavedWod = async (saved: PlannedWorkout) => {
+    await deleteDoc(doc(db, 'savedWods', saved.id));
+    if (planned.length <= 1) setSavedSheetOpen(false);
+  };
+
+  const handleLogSavedWod = (saved: PlannedWorkout) => {
+    setSavedSheetOpen(false);
+    onLogPlannedWorkout?.(saved);
+  };
+
+  const handleOpenSavedSheet = () => {
+    setSavedSheetOpen(true);
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,11 +254,12 @@ export function HomeScreen({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.04, duration: 0.28 }}
-          aria-label="Log a workout"
+          aria-label="Add a workout"
         >
           <span className={styles.logIcon} aria-hidden="true">+</span>
           <div className={styles.logTextBlock}>
-            <span className={styles.logTitle}>Log a workout</span>
+            <span className={styles.logTitle}>Add a workout</span>
+            <span className={styles.logSubtitleClean}>Make its poster &mdash; or save for later &rarr;</span>
             <span className={styles.logSubtitle}>Make today's poster →</span>
           </div>
         </motion.button>
@@ -255,27 +283,33 @@ export function HomeScreen({
           </button>
         )}
 
-        {/* ── ON DECK ── */}
+        {/* ── For Later ── */}
         {planned.length > 0 && (
           <motion.section
-            className={styles.onDeck}
+            className={styles.savedShelf}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.08, duration: 0.28 }}
           >
-            <div className={styles.onDeckHeader}>
-              <span className={styles.onDeckTitle}>On deck</span>
-              <span className={styles.onDeckCount}>{planned.length}</span>
-            </div>
-            <div className={styles.onDeckScroll}>
-              {planned.map((p) => (
-                <OnDeckCard
-                  key={p.id}
-                  planned={p}
-                  onLog={onLogPlannedWorkout ?? (() => {})}
-                />
-              ))}
-            </div>
+            <button
+              type="button"
+              className={styles.savedSummaryLine}
+              onClick={handleOpenSavedSheet}
+              onPointerUp={handleOpenSavedSheet}
+              aria-label={`Open ${planned.length} saved WODs`}
+            >
+              <span className={styles.savedSummaryIcon} aria-hidden="true">
+                <span className={styles.savedSummaryBookmark} />
+              </span>
+              <span className={styles.savedSummaryCopy}>
+                <strong>{planned.length} saved for later</strong>
+                <span>{'·'}</span>
+                <span className={styles.savedSummaryText}>{savedSummary}</span>
+              </span>
+              <span className={styles.savedSummaryView} aria-hidden="true">
+                VIEW <span>{'>'}</span>
+              </span>
+            </button>
           </motion.section>
         )}
 
@@ -287,10 +321,7 @@ export function HomeScreen({
           transition={{ delay: 0.12, duration: 0.3 }}
         >
           <div className={styles.galleryHeader}>
-            <span className={styles.galleryTitle}>YOUR POSTERS</span>
-            {!loading && workouts.length > 0 && (
-              <span className={styles.galleryCount}>{workouts.length}</span>
-            )}
+            <span className={styles.galleryTitle}>LAST WORKOUTS</span>
           </div>
 
           {loading ? (
@@ -315,15 +346,6 @@ export function HomeScreen({
                   />
                 </div>
               ))}
-              <button
-                type="button"
-                className={styles.addCard}
-                onClick={onAddWorkout}
-                aria-label="Log a new workout"
-              >
-                <span className={styles.addCardIcon}>+</span>
-                <span className={styles.addCardLabel}>New</span>
-              </button>
             </div>
           )}
         </motion.section>
@@ -334,6 +356,68 @@ export function HomeScreen({
         onDelete={handleDeleteWorkout}
         onCancel={() => setActionSheetWorkoutId(null)}
       />
+
+      <AnimatePresence>
+        {savedSheetOpen && (
+          <>
+            <motion.button
+              type="button"
+              className={styles.savedSheetBackdrop}
+              aria-label="Close For Later"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.16 }}
+              onClick={() => setSavedSheetOpen(false)}
+            />
+            <motion.section
+              className={styles.savedSheet}
+              role="dialog"
+              aria-modal="true"
+              aria-label="For Later"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+            >
+              <div className={styles.savedSheetHandle} aria-hidden="true" />
+              <div className={styles.savedSheetHeader}>
+                <span className={styles.onDeckTitleWrap}>
+                  <span className={styles.onDeckTick} aria-hidden="true" />
+                  <span className={styles.onDeckTitle}>For Later</span>
+                  <span className={styles.savedSheetCount}>{planned.length}</span>
+                </span>
+                <button
+                  type="button"
+                  className={styles.savedSheetClose}
+                  aria-label="Close For Later"
+                  onClick={() => setSavedSheetOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className={styles.savedSheetList}>
+                {planned.length === 0 ? (
+                  <div className={styles.savedSheetEmpty}>
+                    No saved WODs yet.
+                  </div>
+                ) : (
+                  planned.map((p) => (
+                    <OnDeckCard
+                      key={p.id}
+                      planned={p}
+                      onLog={handleLogSavedWod}
+                      onOpen={handleLogSavedWod}
+                      onDelete={handleDeleteSavedWod}
+                    />
+                  ))
+                )}
+              </div>
+            </motion.section>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

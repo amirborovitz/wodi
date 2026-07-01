@@ -3,7 +3,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore';
@@ -29,29 +28,36 @@ export function usePlannedWorkouts(): UsePlannedWorkoutsResult {
     }
 
     const q = query(
-      collection(db, 'plannedWorkouts'),
+      collection(db, 'savedWods'),
       where('userId', '==', user.id),
-      orderBy('plannedDate', 'asc'),
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      const items: PlannedWorkout[] = snap.docs.map((d) => {
-        const data = d.data();
-        return {
-          id: d.id,
-          userId: data.userId,
-          parsedWorkout: data.parsedWorkout,
-          plannedDate: data.plannedDate instanceof Timestamp
-            ? data.plannedDate.toDate()
-            : new Date(data.plannedDate),
-          createdAt: data.createdAt instanceof Timestamp
+      const items: PlannedWorkout[] = snap.docs
+        .map((d) => {
+          const data = d.data();
+          const createdAt = data.createdAt instanceof Timestamp
             ? data.createdAt.toDate()
-            : new Date(data.createdAt),
-        };
-      });
+            : data.createdAt
+              ? new Date(data.createdAt)
+              : new Date();
+
+          const status: PlannedWorkout['status'] = data.status === 'scanning' ? 'scanning' : 'parsed';
+
+          return {
+            id: d.id,
+            userId: data.userId,
+            status,
+            raw: data.raw ?? data.parsedWorkout?.rawText ?? '',
+            parsedWorkout: data.parsedWorkout,
+            createdAt,
+          };
+        })
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       setPlanned(items);
       setLoading(false);
-    }, () => {
+    }, (err) => {
+      console.error('[usePlannedWorkouts] Firestore error:', err);
       setLoading(false);
     });
 

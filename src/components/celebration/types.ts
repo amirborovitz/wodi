@@ -73,7 +73,7 @@ export interface ArtifactRow {
   // them). `reps` is the prescribed rung sequence, `step` is rungs completed, `partial` is reps
   // into the next rung, `cadence` states the per-round increment explicitly ("+2 REPS EVERY
   // ROUND") so the climb rule is read, not guessed.
-  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string };
+  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
 }
 
 export interface ArtifactSection {

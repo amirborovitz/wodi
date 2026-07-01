@@ -252,6 +252,11 @@ export function loggingModeToKind(mode: ExerciseLoggingMode): ExerciseKind {
   return LOGGING_MODE_TO_KIND[mode] ?? 'note';
 }
 
+function isFixedCadenceInterval(exercise: ParsedExercise): boolean {
+  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/\s+/g, ' ');
+  return /\b(?:emom|e\d+mom|every\s+\d+(?::\d{2})?\s*(?:min(?:ute)?s?)?)\b/i.test(text);
+}
+
 const DURATION_HOLD_PATTERNS = [
   'wall sit',
   'wall hold',
@@ -751,13 +756,16 @@ export function createBlankResult(
   teamSize?: number,
 ): StoryExerciseResult {
   const baseKind = getDurationOverrideKind(exercise) ?? loggingModeToKind(loggingMode);
+  const cadenceKind = loggingMode === 'intervals' && baseKind === 'score_time' && isFixedCadenceInterval(exercise)
+    ? 'intervals'
+    : baseKind;
   // "weighted" in exercise name contradicts a 'reps' classification — override to load.
   // Guard against distance/calorie movements (e.g. "Weighted Vest Run").
   const kind = (
-    baseKind === 'reps'
+    cadenceKind === 'reps'
     && /\bweighted\b/i.test(exercise.name)
     && !exercise.movements?.some(m => m.inputType === 'distance' || m.inputType === 'calories')
-  ) ? 'load' : baseKind;
+  ) ? 'load' : cadenceKind;
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;

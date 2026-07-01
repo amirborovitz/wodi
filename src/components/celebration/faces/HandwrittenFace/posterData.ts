@@ -75,7 +75,7 @@ export interface PosterLine {
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
   // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
   // render the normal rx/load/mine row AND additionally render this chart right below it.
-  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string };
+  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
 }
 
 export type PosterRow = PosterBlock | PosterLine;
@@ -154,6 +154,18 @@ function mapFormatToType(format: string | undefined): string {
     case 'tabata':          return 'TABATA';
     default:                return 'METCON';
   }
+}
+
+export function getPrimaryCarouselPageIndex(data: CelebrationData): number {
+  const pages = data.carouselPageData;
+  if (!pages || pages.length === 0) return 0;
+  const forTimeIndex = pages.findIndex((page) => {
+    const ex = page.exercise as unknown as Record<string, unknown>;
+    return !page.isStrength && ex['loggingMode'] === 'for_time';
+  });
+  if (forTimeIndex >= 0) return forTimeIndex;
+  const metconIndex = pages.findIndex((page) => !page.isStrength);
+  return metconIndex >= 0 ? metconIndex : 0;
 }
 
 function formatWorkoutDate(date: Date): string {
@@ -303,7 +315,7 @@ function buildResultLabel(format: string | undefined, isPartner: boolean): strin
     case 'amrap_intervals': return isPartner ? 'OUR ROUNDS' : 'TOTAL ROUNDS';
     case 'strength':        return 'TOP SET';
     case 'emom':
-    case 'intervals':       return 'ROUNDS HELD';
+    case 'intervals':       return 'ROUNDS';
     default:                return isPartner ? 'OUR RESULT' : 'MY RESULT';
   }
 }
@@ -710,14 +722,12 @@ export function buildPosterWodFromPage(
       case 'for_time': return isPartnerPage ? 'OUR TIME' : 'MY TIME';
       case 'amrap': case 'amrap_intervals': return isPartnerPage ? 'OUR ROUNDS' : 'ROUNDS';
       case 'strength': return 'TOP SET';
-      case 'emom': case 'intervals': return 'ROUNDS HELD';
+      case 'emom': case 'intervals': return 'ROUNDS';
       default: return isPartnerPage ? 'OUR RESULT' : 'RESULT';
     }
   })();
   const resultValue = heroResult
-    ? resultLabel === 'ROUNDS HELD'
-      ? heroResult.value
-      : `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
+    ? `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
     : '--';
   const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, heroResult);
 
@@ -748,6 +758,10 @@ export function buildPosterWodFromPage(
 export function buildPosterWod(
   data: CelebrationData,
 ): PosterWod {
+  if (data.isCarousel && data.carouselPageData?.length) {
+    return buildPosterWodFromPage(data, getPrimaryCarouselPageIndex(data));
+  }
+
   const date = data.workoutDate;
 
   // Title — null when generic or when it would duplicate the format string

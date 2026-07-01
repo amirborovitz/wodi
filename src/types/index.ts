@@ -588,7 +588,8 @@ export interface ClassificationLogEntry {
 export interface PlannedWorkout {
   id: string;
   userId: string;
-  parsedWorkout: ParsedWorkout;
-  plannedDate: Date;
+  status: 'scanning' | 'parsed';
+  raw: string;
+  parsedWorkout?: ParsedWorkout;
   createdAt: Date;
 }

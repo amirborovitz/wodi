@@ -27,6 +27,7 @@ function AppContent() {
   const { user, loading, refreshUser, updateUserProfile, updateUserGoals, signOut } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
+  const [saveForLaterMode, setSaveForLaterMode] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
@@ -38,6 +39,7 @@ function AppContent() {
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
     setShowRecentWorkoutsOnOpen(false);
+    setSaveForLaterMode(false);
     setEditingWorkout(null); // Clear any editing state
     setCurrentScreen('add-workout');
   };
@@ -46,6 +48,7 @@ function AppContent() {
     setEditingWorkout(workout);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
+    setSaveForLaterMode(false);
     setCurrentScreen('add-workout');
   };
 
@@ -53,6 +56,7 @@ function AppContent() {
     setPendingPlannedWorkout(planned);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
+    setSaveForLaterMode(false);
     setEditingWorkout(null);
     setCurrentScreen('add-workout');
   };
@@ -104,23 +108,38 @@ function AppContent() {
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
+              setSaveForLaterMode(false);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
-            onWorkoutCreated={() => {
+            onWorkoutCreated={async () => {
               if (pendingPlannedWorkout?.id) {
-                deleteDoc(doc(db, 'plannedWorkouts', pendingPlannedWorkout.id));
+                try {
+                  await deleteDoc(doc(db, 'savedWods', pendingPlannedWorkout.id));
+                } catch (err) {
+                  console.error('[SavedWod] Failed to remove logged saved WOD:', err);
+                }
               }
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
+              setSaveForLaterMode(false);
               setHomeRingsKey((prev) => prev + 1);
+              setCurrentScreen('home');
+            }}
+            onSavedForLater={() => {
+              setPendingImage(null);
+              setShowRecentWorkoutsOnOpen(false);
+              setEditingWorkout(null);
+              setPendingPlannedWorkout(null);
+              setSaveForLaterMode(false);
               setCurrentScreen('home');
             }}
             initialImage={pendingImage}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
             plannedWorkout={pendingPlannedWorkout}
+            saveForLaterMode={saveForLaterMode}
           />
         );
       case 'workout-detail': {
@@ -233,7 +252,10 @@ function AppContent() {
           <HomeScreen
             onAddWorkout={() => {
               setEditingWorkout(null);
+              setPendingImage(null);
+              setPendingPlannedWorkout(null);
               setShowRecentWorkoutsOnOpen(false);
+              setSaveForLaterMode(false);
               setCurrentScreen('add-workout');
             }}
             onImageSelected={handleImageSelected}
@@ -241,6 +263,7 @@ function AppContent() {
               setEditingWorkout(null);
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(true);
+              setSaveForLaterMode(false);
               setCurrentScreen('add-workout');
             }}
             onOpenProfile={() => setCurrentScreen('profile')}

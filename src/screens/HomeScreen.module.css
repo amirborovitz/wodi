@@ -163,6 +163,10 @@
 }
 
 .logSubtitle {
+  display: none;
+}
+
+.logSubtitleClean {
   font-family: 'Barlow', sans-serif;
   font-size: 12px;
   font-weight: 600;
@@ -203,47 +207,125 @@
 .onDeck {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 24px;
 }
 
 .onDeckHeader {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
 }
 
+.onDeckTitleWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.onDeckTick {
+  width: 4px;
+  height: 14px;
+  background: #f5c200;
+  border-radius: 999px;
+}
+
 .onDeckTitle {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  color: rgba(243, 241, 234, 0.4);
-  letter-spacing: 0.18em;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: #f2f0eb;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
-.onDeckCount {
+.saveWodLink {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: #f5c200;
   font-family: 'Barlow', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(243, 241, 234, 0.4);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.onDeckScroll {
+.onDeckList {
   display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  margin: 0 -20px;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 4px;
+  flex-direction: column;
+  gap: 9px;
 }
 
-.onDeckScroll::-webkit-scrollbar {
-  display: none;
+.emptySavedRow {
+  width: 100%;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(22, 24, 28, 0.56);
+  border: 1px dashed rgba(243, 241, 234, 0.15);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emptySavedPlus {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 194, 0, 0.16);
+  border-radius: 9px;
+  color: #f5c200;
+  font-family: 'Barlow', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.emptySavedCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emptySavedTitle {
+  color: #f3f1ea;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.emptySavedMeta {
+  color: rgba(243, 241, 234, 0.46);
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.moreSavedBtn {
+  align-self: center;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(245, 194, 0, 0.9);
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Gallery ──────────────────────────────────────────────────── */
@@ -266,13 +348,6 @@
   color: rgba(243, 241, 234, 0.4);
   letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.galleryCount {
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(243, 241, 234, 0.4);
 }
 
 .galleryScroll {
@@ -342,39 +417,247 @@
   line-height: 1.4;
 }
 
-/* ── Add another card ─────────────────────────────────────────── */
-.addCard {
-  width: 64px;
-  height: 210px;
-  background: #16181c;
-  border: 1px dashed rgba(243, 241, 234, 0.13);
-  border-radius: 10px;
-  flex-shrink: 0;
+.savedShelf {
+  margin-bottom: 24px;
+}
+
+.savedSummaryLine,
+.savedEmptyLine {
+  width: 100%;
+  min-height: 58px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 10px;
+  background: #16181c;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  border-radius: 12px;
+  color: #f3f1ea;
   cursor: pointer;
-  transition: border-color 0.12s ease;
+  padding: 9px 12px;
+  text-align: left;
   -webkit-tap-highlight-color: transparent;
 }
 
-.addCard:active {
-  border-color: rgba(245, 194, 0, 0.35);
+.savedSummaryLine:active,
+.savedEmptyLine:active {
+  border-color: rgba(245, 194, 0, 0.32);
+  background: #1a1c20;
 }
 
-.addCardIcon {
-  font-size: 20px;
-  color: rgba(243, 241, 234, 0.3);
-  font-weight: 300;
+.savedSummaryIcon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 194, 0, 0.18);
+  border-radius: 8px;
+}
+
+.savedSummaryBookmark {
+  position: relative;
+  width: 10px;
+  height: 15px;
+  background: #f5c200;
+  border-radius: 1px 1px 0 0;
+}
+
+.savedSummaryBookmark::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  bottom: -3px;
+  width: 8px;
+  height: 8px;
+  background: #16181c;
+  transform: rotate(45deg);
+}
+
+.savedSummaryCopy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(243, 241, 234, 0.42);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.savedSummaryCopy strong {
+  flex: 0 0 auto;
+  color: #f3f1ea;
+  font-weight: 900;
+}
+
+.savedSummaryText {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(243, 241, 234, 0.42);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedSummaryView {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: #f5c200;
+  color: #08090b;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
   line-height: 1;
 }
 
-.addCardLabel {
-  font-family: 'DM Mono', monospace;
-  font-size: 8px;
-  color: rgba(243, 241, 234, 0.28);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+.savedSummaryView span {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.savedEmptyLine {
+  min-height: 50px;
+  background: transparent;
+  color: rgba(243, 241, 234, 0.56);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.savedLinePlus {
+  color: #f5c200;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.savedSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.58);
+  border: 0;
+  padding: 0;
+}
+
+.savedSheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(74dvh, 620px);
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  background: #111318;
+  border: 1px solid rgba(243, 241, 234, 0.1);
+  border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -18px 46px rgba(0, 0, 0, 0.48);
+}
+
+.savedSheetHandle {
+  align-self: center;
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(243, 241, 234, 0.22);
+  margin-bottom: 2px;
+}
+
+.savedSheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.savedSheetCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background: rgba(243, 241, 234, 0.12);
+  border-radius: 999px;
+  color: rgba(243, 241, 234, 0.55);
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.savedSheetClose {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(243, 241, 234, 0.08);
+  border: 0;
+  border-radius: 50%;
+  color: rgba(243, 241, 234, 0.65);
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.savedSheetList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 1px;
+}
+
+.savedSheetEmpty {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(243, 241, 234, 0.38);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.savedSheetAdd {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  background: transparent;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  border-radius: 12px;
+  color: #f3f1ea;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.savedSheetAdd span {
+  color: #f5c200;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
 }

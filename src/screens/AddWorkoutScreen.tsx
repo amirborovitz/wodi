@@ -46,6 +46,8 @@ const BackIcon = () => (
 interface AddWorkoutScreenProps {
   onBack: () => void;
   onWorkoutCreated: () => void;
+  onSavedForLater?: () => void;
+  saveForLaterMode?: boolean;
   initialImage?: File | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
@@ -1489,7 +1491,7 @@ async function refineWorkoutIfNeeded(
   }
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, saveForLaterMode = false, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = user?.email === ADMIN_EMAIL;
   const canUseSavedWorkouts = user?.email?.toLowerCase() === SAVED_WORKOUTS_EMAIL;
@@ -1776,10 +1778,41 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
   // Handle planned workout — already AI-parsed, jump straight to logging
   useEffect(() => {
     if (!plannedWorkout) return;
-    setParsedWorkout(plannedWorkout.parsedWorkout);
-    setImageUrl(null);
-    setError(null);
-    setStep('log-results');
+
+    let cancelled = false;
+    const loadSavedWorkout = async () => {
+      setImageUrl(null);
+      setError(null);
+
+      if (plannedWorkout.parsedWorkout) {
+        setParsedWorkout(plannedWorkout.parsedWorkout);
+        setStep('log-results');
+        return;
+      }
+
+      const raw = plannedWorkout.raw.trim();
+      if (!raw) {
+        setError('Saved WOD is missing its original text.');
+        setStep('capture');
+        return;
+      }
+
+      setStep('processing');
+      try {
+        const { parsed } = await parseWorkoutText(raw);
+        if (cancelled) return;
+        setParsedWorkout(parsed);
+        setStep('log-results');
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[SavedWod] Failed to parse raw saved WOD:', err);
+        setError('Could not parse this saved WOD. Try adding it again.');
+        setStep('capture');
+      }
+    };
+
+    void loadSavedWorkout();
+    return () => { cancelled = true; };
   }, [plannedWorkout]);
 
   // Run smart classification for exercises with low confidence when entering log-results
@@ -2086,6 +2119,41 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleSaveForLater = async () => {
+    if (!parsedWorkout || !user?.id) return;
+    const raw = parsedWorkout.rawText?.trim()
+      || parsedWorkout.exercises
+        .map((exercise) => exercise.rawText?.trim() || exercise.prescription?.trim() || exercise.name?.trim())
+        .filter(Boolean)
+        .join('\n')
+      || parsedWorkout.title?.trim()
+      || 'Saved workout';
+    // Navigate immediately — don't block on the Firestore write
+    // JSON round-trip strips undefined values that Firestore rejects
+    const cleanParsed = JSON.parse(JSON.stringify(parsedWorkout)) as typeof parsedWorkout;
+    const payload = {
+      userId: user.id,
+      status: 'parsed',
+      raw,
+      parsedWorkout: cleanParsed,
+      createdAt: new Date(),
+    };
+
+    try {
+      if (plannedWorkout?.id) {
+        await setDoc(doc(db, 'savedWods', plannedWorkout.id), payload, { merge: true });
+        onBack();
+        return;
+      }
+
+      await addDoc(collection(db, 'savedWods'), payload);
+      (onSavedForLater ?? onWorkoutCreated)();
+    } catch (err) {
+      console.error('[SaveForLater] Failed to save WOD:', err);
+      setError('Could not save this WOD for later. Please try again.');
+    }
   };
 
   const handleConfirmWorkout = () => {
@@ -3689,6 +3757,27 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
           </Card>
 
           <div className={styles.previewActions}>
+            {saveForLaterMode ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={onBack}
+                  size="lg"
+                  className={styles.secondaryCta}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveForLater}
+                  size="lg"
+                  variant="primary"
+                  className={styles.primaryCta}
+                >
+                  Save for later
+                </Button>
+              </>
+            ) : (
+              <>
             <Button
               variant="secondary"
               onClick={onBack}
@@ -3705,7 +3794,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, initialImage, showR
             >
               Looks Good
             </Button>
+              </>
+            )}
           </div>
+
+          {!saveForLaterMode && (
+          <button
+            type="button"
+            className={styles.saveLaterLink}
+            onClick={handleSaveForLater}
+          >
+            Save for later <span aria-hidden="true">-&gt;</span>
+          </button>
+          )}
         </motion.div>
       )}
 

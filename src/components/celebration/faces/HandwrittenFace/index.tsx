@@ -11,7 +11,7 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'f
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
-import { buildPosterWod, buildPosterWodFromPage } from './posterData';
+import { buildPosterWod, buildPosterWodFromPage, getPrimaryCarouselPageIndex } from './posterData';
 import { useFitScale } from './useFitScale';
 import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import styles from './index.module.css';
@@ -63,13 +63,24 @@ export function HandwrittenFace({
     () => buildPosterWod(data),
     [data],
   );
+  const primaryCarouselPage = useMemo(
+    () => isCarousel ? getPrimaryCarouselPageIndex(data) : 0,
+    [data, isCarousel],
+  );
 
-  // Per-page wods (carousel path)
+  // Per-page wods (carousel path). The first slide matches the summary poster
+  // shown in home/history thumbnails, followed by the individual workout parts.
   const pageWods = useMemo(
     () => isCarousel
-      ? data.carouselPageData!.map((_, i) => buildPosterWodFromPage(data, i))
+      ? [
+          singleWod,
+          ...data.carouselPageData!
+            .map((_, i) => ({ i, wod: buildPosterWodFromPage(data, i) }))
+            .filter((page) => page.i !== primaryCarouselPage)
+            .map((page) => page.wod),
+        ]
       : null,
-    [data, isCarousel],
+    [data, isCarousel, primaryCarouselPage, singleWod],
   );
 
   const Skin = SKINS[skinIdx].Comp;
@@ -151,7 +162,7 @@ export function HandwrittenFace({
 
   const handleTouchMove = (e: React.TouchEvent): void => {
     if (!dragRef.current) return;
-    const n   = data.carouselPageData!.length;
+    const n   = pageWods?.length ?? 1;
     const w   = carouselViewportRef.current?.offsetWidth ?? 390;
     const dx  = e.touches[0].clientX - dragRef.current.x;
     const raw = -carouselPage * w + dx;
@@ -172,7 +183,7 @@ export function HandwrittenFace({
       return;
     }
 
-    const n = data.carouselPageData!.length;
+    const n = pageWods?.length ?? 1;
     if ((dx < -40 || vel < -300) && carouselPage < n - 1) snapToPage(carouselPage + 1);
     else if ((dx > 40 || vel > 300) && carouselPage > 0)  snapToPage(carouselPage - 1);
     else snapToPage(carouselPage);
@@ -245,8 +256,7 @@ export function HandwrittenFace({
   // ─────────────────────────────────────────────────────────────────────
 
   if (isCarousel && pageWods) {
-    const pages = data.carouselPageData!;
-    const navTitle = pages[carouselPage]?.exercise.name?.toUpperCase() ?? singleWod.type;
+    const navTitle = pageWods[carouselPage]?.title ?? pageWods[carouselPage]?.type ?? singleWod.type;
 
     return (
       <div className={styles.root}>
@@ -258,11 +268,11 @@ export function HandwrittenFace({
 
         {/* Page dots */}
         <div className={styles.carouselDots}>
-          {pages.map((_, i) => (
+          {pageWods.map((_, i) => (
             <button key={i}
               className={`${styles.carouselDot} ${i === carouselPage ? styles.carouselDotActive : ''}`}
               onClick={() => snapToPage(i)}
-              aria-label={`Part ${i + 1}`}
+              aria-label={i === 0 ? 'Summary' : `Part ${i}`}
             />
           ))}
         </div>

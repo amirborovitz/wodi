@@ -383,7 +383,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
     const unitLabel = mov.reps != null ? '' : mov.calories != null ? ' CAL' : mov.distance != null ? 'M' : '';
     return {
       primary: '',
-      name: abbreviateMovementForPoster(mov.name),
+      name: formatRepMovementNameForPoster(mov.name, mov.reps),
       loadNote: perRound != null ? `${perRound}${unitLabel} EVERY ROUND` : undefined,
       accent: (actual?.color ?? 'magenta') as ArtifactRow['accent'],
     };
@@ -391,13 +391,51 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
 
   const trackRow: ArtifactRow = {
     primary: '',
-    name: scalingMovements.map((m) => abbreviateMovementForPoster(m.name)).join(' + '),
+    name: scalingMovements.map((m) => formatRepMovementNameForPoster(m.name, m.reps ?? ladderReps[0])).join(' + '),
     loadNote: weight != null ? `${weight}${unit}${weightSuffix}` : undefined,
     accent: 'yellow',
     ladderTrack: { reps: ladderReps, step, partial: partial > 0 ? partial : undefined, cadence: cadenceLabel },
   };
 
   return [trackRow, ...fixedRows];
+}
+
+function buildDescendingLadderRows(
+  exercise: Exercise,
+  movements: MovementTotal[],
+  reps: number[],
+  completed: number,
+): ArtifactRow[] {
+  const prescribedMovements = exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements || [])
+    : (exercise.movements || []);
+  const ladderMovements = prescribedMovements.filter((movement) =>
+    movement.reps != null && movement.distance == null && movement.calories == null,
+  );
+  const rowMovements = ladderMovements.length > 0 ? ladderMovements : prescribedMovements;
+  const names = rowMovements
+    .map((movement) => formatRepMovementNameForPoster(movement.name, reps[0] ?? movement.reps))
+    .filter(Boolean);
+
+  const weightedMovement = rowMovements.find((movement) => movement.inputType === 'weight' || movement.rxWeights);
+  const weightedTotal = weightedMovement
+    ? movements.find((movement) =>
+        normalizeStampMovementName(movement.name) === normalizeStampMovementName(weightedMovement.name)
+        || normalizeStampMovementName(movement.originalMovement ?? '') === normalizeStampMovementName(weightedMovement.name),
+      )
+    : undefined;
+  const loggedWeight = weightedTotal?.weight;
+  const rxWeight = weightedMovement?.rxWeights?.male ?? weightedMovement?.rxWeights?.female;
+  const weight = loggedWeight ?? rxWeight;
+  const unit = weightedTotal?.unit === 'lb' ? 'lb' : (weightedMovement?.rxWeights?.unit ?? 'kg');
+
+  return [{
+    primary: reps.join('-'),
+    name: names.join(' + ') || exercise.name,
+    loadNote: weight && weight > 0 ? `${weight}${unit}` : undefined,
+    accent: weight && weight > 0 ? 'yellow' : 'magenta',
+    ladderTrack: { reps, step: completed, complete: true },
+  }];
 }
 
 export function parseDescLadderScheme(
@@ -420,6 +458,25 @@ export function parseDescLadderScheme(
 }
 
 // ─── Barbell complex detection ────────────────────────────────────────────────
+
+function parseForTimeRepScheme(
+  exercise: Exercise,
+  rawText?: string,
+): number[] | undefined {
+  const parsed = parseDescLadderScheme(exercise, rawText);
+  if (parsed) return parsed;
+
+  const scopedRawText = exercise.rawText || rawText;
+  const searchText = [scopedRawText, exercise.prescription, exercise.name].filter(Boolean).join(' ');
+  const matches = Array.from(searchText.matchAll(/\b(\d+(?:\s*[-\u2013]\s*\d+){2,})\b/g));
+  for (const match of matches) {
+    const nums = match[1].split(/\s*[-\u2013]\s*/).map(Number).filter((n) => n > 0);
+    const isMonotonic = nums.every((n, i) => i === 0 || n < nums[i - 1])
+      || nums.every((n, i) => i === 0 || n > nums[i - 1]);
+    if (nums.length >= 3 && isMonotonic) return nums;
+  }
+  return undefined;
+}
 
 export const BARBELL_PATTERNS = ['clean', 'jerk', 'snatch', 'press', 'deadlift', 'squat', 'thruster', 'pull'];
 
@@ -915,7 +972,10 @@ function formatPrescriptionMovementLine(movements: NonNullable<Exercise['movemen
           : movement.distance != null
             ? (movement.distance >= 1000 ? `${(movement.distance / 1000).toFixed(1)}KM` : `${movement.distance}M`)
             : '';
-      const name = formatStickerMovementName(movement.name);
+      const displayName = movement.reps != null && movement.reps !== 1
+        ? pluralizeMovementLabel(movement.name)
+        : movement.name;
+      const name = formatStickerMovementName(displayName);
       return [qty, name].filter(Boolean).join(' ');
     })
     .filter(Boolean);
@@ -1073,7 +1133,10 @@ function buildCelebrationMovementRow(params: {
     accent = 'yellow';
   }
 
-  const displayName = actual?.wasSubstituted && actual.name ? actual.name : movementName;
+  const baseDisplayName = actual?.wasSubstituted && actual.name ? actual.name : movementName;
+  const displayName = perRoundReps && perRoundReps !== 1 && !isStrength
+    ? pluralizeMovementLabel(baseDisplayName)
+    : baseDisplayName;
   const hasLoggedWeight = (actual?.weight || 0) > 0;
   const hasPrescribedDistForRelay = (prescribed?.distance ?? 0) > 0 && (perRoundDistance ?? 0) > 0;
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
@@ -1160,6 +1223,27 @@ function abbreviateMovementForPoster(name: string): string {
     .replace(/\bAmerican Kettlebell Swing\b/gi, 'AKS');
 }
 
+function pluralizeMovementLabel(name: string): string {
+  const cleaned = name.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return cleaned;
+  if (/^(?:HSPU|T2B|TTB|C2B|DU|BOB|BOR|AKS)$/i.test(cleaned)) return cleaned;
+
+  const lastWordMatch = cleaned.match(/([A-Za-z][A-Za-z-]*)$/);
+  if (!lastWordMatch) return cleaned;
+
+  const lastWord = lastWordMatch[1];
+  if (/ups$/i.test(lastWord)) return cleaned;
+  if (/press$/i.test(lastWord)) return cleaned.replace(/press$/i, (match) => `${match}es`);
+  if (/[^aeiou]y$/i.test(lastWord)) return cleaned.replace(/y$/i, (match) => (match === 'Y' ? 'IES' : 'ies'));
+  if (/(?:s|x|z|ch|sh)$/i.test(lastWord)) return cleaned.replace(new RegExp(`${lastWord}$`), `${lastWord}es`);
+  return `${cleaned}s`;
+}
+
+function formatRepMovementNameForPoster(name: string, reps?: number): string {
+  const abbreviated = abbreviateMovementForPoster(name);
+  return reps != null && reps !== 1 ? pluralizeMovementLabel(abbreviated) : abbreviated;
+}
+
 function formatProgressiveMovementData(
   movements: ParsedMovement[],
   prevNames: Set<string>,
@@ -1171,7 +1255,7 @@ function formatProgressiveMovementData(
 
   const parts = toShow.map((m) => {
     const qty = m.reps != null ? `${m.reps}` : m.calories != null ? `${m.calories}cal` : m.distance != null ? `${m.distance}m` : '';
-    const name = abbreviateMovementForPoster(m.name);
+    const name = formatRepMovementNameForPoster(m.name, m.reps);
     return qty ? `${qty} ${name}` : name;
   });
 
@@ -1267,7 +1351,7 @@ function buildMultiSectionForTimeSections(
     const load = formatSectionRxLoad(movement);
     const together = movement.together ? ' (together)' : '';
     return {
-      text: [qty, `${abbreviateMovementForPoster(movement.name)}${together}${load}`].filter(Boolean).join(' '),
+      text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${load}`].filter(Boolean).join(' '),
       hasWeight: load !== '',
     };
   }
@@ -1347,7 +1431,7 @@ export function buildRewardArtifactSections(
     || (mainExercise ? getPrescriptionRepeatCount(mainExercise) : undefined)
     || (isForTime && mainExercise ? inferRoundCountFromMovements(mainExercise, movements) : undefined);
   const everyCadence = !isForTime ? extractEveryXCadence(capText) : undefined;
-  const descLadderScheme = isForTime && mainExercise ? parseDescLadderScheme(mainExercise, scopedRawText) : undefined;
+  const descLadderScheme = isForTime && mainExercise ? parseForTimeRepScheme(mainExercise, scopedRawText) : undefined;
   const blueprintRaw = repeatCount && repeatCount > 1
     ? [
         isForTime
@@ -1668,6 +1752,15 @@ export function buildPageArtifactSection(
     /\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i,
   );
   const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
+  const isExerciseForTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
+  const descSchemeGlobal = !isStrength && isExerciseForTime
+    ? parseForTimeRepScheme(exercise, rawText)
+    : undefined;
+  const descSchemeCompleted = descSchemeGlobal
+    ? (exercise.rounds != null && exercise.rounds < descSchemeGlobal.length
+        ? exercise.rounds
+        : descSchemeGlobal.length)
+    : undefined;
 
   let blueprint: string | undefined;
   if (hasStations) {
@@ -1677,7 +1770,7 @@ export function buildPageArtifactSection(
     blueprint = [rounds ? `${rounds} rounds` : null, `${stationCount} stations`, '1 min each'].filter(Boolean).join(' · ');
   } else if (!isStrength && repeatCount && repeatCount > 1) {
     const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
-    const descScheme = forTime ? parseDescLadderScheme(exercise, rawText) : undefined;
+    const descScheme = forTime ? parseForTimeRepScheme(exercise, rawText) : undefined;
     const pageCadence = !forTime ? extractEveryXCadence(exerciseOnlyText) : undefined;
     const amrapMinMatch = !forTime && !pageCadence
       ? exerciseOnlyText.match(/\b(\d+)\s*(?:min(?:ute)?s?)\s*amrap\b/i)
@@ -1733,18 +1826,24 @@ export function buildPageArtifactSection(
     ? formatPrescriptionMovementLine(prescribedMovements)
     : undefined;
 
-  const isExerciseForTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
-  const descSchemeGlobal = !isStrength && isExerciseForTime
-    ? parseDescLadderScheme(exercise, rawText)
-    : undefined;
-  const descSchemeCompleted = descSchemeGlobal
-    ? (exercise.rounds != null && exercise.rounds < descSchemeGlobal.length
-        ? exercise.rounds
-        : descSchemeGlobal.length)
-    : undefined;
   const strengthBubbleScheme = isStrength && (exercise.suggestedRepsPerSet?.length ?? 0) >= 3
     ? exercise.suggestedRepsPerSet
     : undefined;
+
+  if (descSchemeGlobal && descSchemeCompleted) {
+    const rows = buildDescendingLadderRows(exercise, movements, descSchemeGlobal, descSchemeCompleted);
+    return {
+      eyebrow: 'WOD',
+      title: exercise.name,
+      blueprint,
+      blueprintSub,
+      rows,
+      hiddenCount: 0,
+      descLadderScheme: descSchemeGlobal,
+      descLadderCompleted: descSchemeCompleted,
+      isPartnerConfirmed: !!splitInfo,
+    };
+  }
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(exercise);
   const rowRepeatCount = getEffectiveMovementRepeatCount(exercise, personalRepeatCount);
@@ -2467,7 +2566,10 @@ export function computeHeroResult(
   const metconEx = findMetconExercise(exercises);
   const metconTime = metconEx.sets.find((s) => s.completed && s.time && s.time > 0)?.time;
   const anyTime = exercises.flatMap((ex) => ex.sets).find((s) => s.completed && s.time && s.time > 0)?.time;
-  const isForTimeFormat = format === 'for_time' || format === 'intervals';
+  const cadenceText = [rawText, ...exercises.flatMap((ex) => [ex.name, ex.prescription])].filter(Boolean).join(' ');
+  const isFixedCadence = /\b(?:emom|e\d+mom|every\s+\d+(?::\d{2})?\s*(?:min(?:ute)?s?)?)\b/i.test(cadenceText);
+  const prescribedCadenceRounds = isFixedCadence ? getPrescribedRoundCount(exercises, rawText) : undefined;
+  const isForTimeFormat = format === 'for_time' || (format === 'intervals' && !prescribedCadenceRounds);
   const metconIsForTime = isMixed && /for\s*time|rft|\d+\s*rounds?\s*for/i.test((metconEx.name + ' ' + metconEx.prescription).toLowerCase());
 
   if (isForTimeFormat || metconIsForTime) {
@@ -2482,22 +2584,21 @@ export function computeHeroResult(
 
   const emomHasCardio = format === 'emom' && movements.some((m) => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
 
-  // EMOM (non-cardio): score by rounds held. Load is context, not the result.
-  if (format === 'emom' && !emomHasCardio) {
+  // Fixed-cadence EMOM/intervals: the score is the prescribed structure, not a finish time.
+  if ((format === 'emom' || (format === 'intervals' && prescribedCadenceRounds)) && !emomHasCardio) {
     const ex0 = exercises[0];
-    const completedRounds = ex0?.sets?.filter((s) => s.completed).length ?? 0;
     const prescribedRounds =
+      prescribedCadenceRounds ??
       getPrescribedRoundCount(exercises, rawText) ??
       ex0?.intervalCount ??
       ex0?.sets?.length ??
       0;
-    if (completedRounds > 0 && prescribedRounds > 0) {
-      const roundsHeld = Math.min(completedRounds, prescribedRounds);
+    if (prescribedRounds > 0) {
       return {
-        value: `${roundsHeld}/${prescribedRounds}`,
+        value: `${prescribedRounds}`,
         unit: 'ROUNDS',
         formatLine, storyLine,
-        storyMovements: buildStory(roundsHeld),
+        storyMovements: buildStory(prescribedRounds),
         accentClass: 'accentMagenta',
       };
     }

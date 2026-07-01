@@ -4,6 +4,8 @@ import styles from './OnDeckCard.module.css';
 interface OnDeckCardProps {
   planned: PlannedWorkout;
   onLog: (planned: PlannedWorkout) => void;
+  onOpen?: (planned: PlannedWorkout) => void;
+  onDelete?: (planned: PlannedWorkout) => void;
 }
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -16,132 +18,82 @@ const FORMAT_LABELS: Record<string, string> = {
   tabata: 'TABATA',
 };
 
-const DAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-function getDayChip(date: Date): string {
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-  const dateStr = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}-${tomorrow.getMonth()}-${tomorrow.getDate()}`;
-
-  if (dateStr === todayStr) return 'TODAY';
-  if (dateStr === tomorrowStr) return 'TOMORROW';
-  return DAY_NAMES[date.getDay()];
-}
-
-function formatPlanDate(date: Date): string {
-  return `${DAY_SHORT[date.getDay()]} · ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`;
-}
-
 function buildSubtitle(wod: ParsedWorkout): string {
   const parts: string[] = [];
-
-  if (wod.timeCap && wod.timeCap > 0) {
-    parts.push(`${Math.round(wod.timeCap / 60)}-MIN`);
-  }
-
-  const formatLabel = FORMAT_LABELS[wod.format ?? ''] ?? wod.format ?? '';
-  if (formatLabel) parts.push(formatLabel);
-
-  const ex0 = wod.exercises?.[0];
-  if (ex0?.prescription && ex0.prescription.length < 40) {
-    return ex0.prescription;
-  }
-
+  if (wod.timeCap && wod.timeCap > 0) parts.push(`${Math.round(wod.timeCap / 60)}-MIN`);
+  const fmt = FORMAT_LABELS[wod.format ?? ''] ?? (wod.format ?? '').toUpperCase();
+  if (fmt) parts.push(fmt);
   if (wod.benchmarkName) parts.push('· benchmark');
-
+  else if (wod.partnerWorkout || wod.teamSize && wod.teamSize > 1) parts.push('· partner');
   return parts.join(' ');
 }
 
-interface MovementRow {
-  label: string;
-  isRx: boolean;
+function getTitle(planned: PlannedWorkout): string {
+  const wod = planned.parsedWorkout;
+  return wod?.title?.trim()
+    || wod?.exercises?.find(e => e.name?.trim())?.name?.trim()
+    || 'Workout';
 }
 
-const MAX_MOVEMENTS = 4;
-
-function getMovementRows(wod: ParsedWorkout): MovementRow[] {
-  const ex0 = wod.exercises?.[0];
-  if (!ex0) return [];
-
-  if (ex0.movements && ex0.movements.length > 0) {
-    return ex0.movements.map((m) => {
-      const repPrefix = m.reps ? `${m.reps} ` : m.distance ? `${m.distance}m ` : m.calories ? `${m.calories}cal ` : '';
-      const isRx = !!(m.rxWeights?.male || m.rxWeights?.female || m.rxCalories?.male);
-      return { label: `${repPrefix}${m.name}`, isRx };
-    });
-  }
-
-  // Strength: show sets from prescription or suggestedSets
-  if (wod.format === 'strength' || ex0.type === 'strength') {
-    const sets = ex0.suggestedSets ?? 3;
-    const reps = ex0.suggestedReps ?? 5;
-    return Array.from({ length: Math.min(sets, MAX_MOVEMENTS) }, (_, i) => ({
-      label: i === sets - 1 && sets > 1
-        ? `Top set · ${reps}`
-        : `Set ${i + 1} · ${reps}`,
-      isRx: false,
-    }));
-  }
-
-  return [];
+function TrashIcon(): React.JSX.Element {
+  return (
+    <svg width="15" height="16" viewBox="0 0 15 16" fill="none" aria-hidden="true">
+      <path d="M1.5 4h12M5.5 4V2.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1V4m2 0v9a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V4h10Z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
-export function OnDeckCard({ planned, onLog }: OnDeckCardProps): React.JSX.Element {
-  const { parsedWorkout, plannedDate } = planned;
-  const dayChip = getDayChip(plannedDate);
-  const formatLabel = FORMAT_LABELS[parsedWorkout.format ?? ''] ?? (parsedWorkout.format ?? '').toUpperCase();
-  const subtitle = buildSubtitle(parsedWorkout);
-  const allRows = getMovementRows(parsedWorkout);
-  const visibleRows = allRows.slice(0, MAX_MOVEMENTS);
-  const hiddenCount = allRows.length - visibleRows.length;
+function BookmarkIcon(): React.JSX.Element {
+  return (
+    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" aria-hidden="true">
+      <path d="M2 2.5A1.5 1.5 0 0 1 3.5 1h9A1.5 1.5 0 0 1 14 2.5v15.25L8 14.5l-6 3.25V2.5Z"
+        fill="#f5c200" />
+    </svg>
+  );
+}
+
+export function OnDeckCard({ planned, onLog, onDelete }: OnDeckCardProps): React.JSX.Element {
+  const title = getTitle(planned);
+  const subtitle = planned.parsedWorkout ? buildSubtitle(planned.parsedWorkout) : '';
 
   return (
-    <div className={styles.card}>
-      <div className={styles.topBar}>
-        <span className={styles.dayChip}>{dayChip}</span>
-        {formatLabel && <span className={styles.formatTag}>{formatLabel}</span>}
+    <div className={styles.row}>
+      {/* Bookmark icon */}
+      <div className={styles.bookmarkWrap} aria-hidden="true">
+        <BookmarkIcon />
       </div>
 
-      <div className={styles.body}>
-        <div className={styles.title}>{parsedWorkout.title ?? parsedWorkout.exercises?.[0]?.name ?? 'Workout'}</div>
-        {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
-
-        {visibleRows.length > 0 && (
-          <div className={styles.movements}>
-            {visibleRows.map((row, i) => (
-              <div key={i} className={styles.movRow}>
-                <span className={styles.movName}>{row.label}</span>
-                {row.isRx && <span className={styles.rxChip}>RX</span>}
-              </div>
-            ))}
-            {hiddenCount > 0 && (
-              <div className={styles.moreMovements}>+{hiddenCount} more</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <hr className={styles.divider} />
-
-      <div className={styles.footer}>
-        <div className={styles.pendingRow}>
-          <span className={styles.pendingLabel}>Result pending</span>
-          <span className={styles.pendingDate}>{formatPlanDate(plannedDate)}</span>
+      {/* Text */}
+      <div className={styles.copy}>
+        <div className={styles.titleLine}>
+          <span className={styles.savedChip}>SAVED</span>
+          <span className={styles.title}>{title}</span>
         </div>
+        {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
       </div>
 
-      <button
-        type="button"
-        className={styles.ctaBtn}
-        onClick={() => onLog(planned)}
-      >
-        Log result →
-      </button>
+      {/* Actions */}
+      <div className={styles.actions}>
+        {onDelete && (
+          <button
+            type="button"
+            className={styles.deleteBtn}
+            onClick={() => onDelete(planned)}
+            aria-label={`Delete ${title}`}
+          >
+            <TrashIcon />
+          </button>
+        )}
+        <button
+          type="button"
+          className={styles.logBtn}
+          onClick={() => onLog(planned)}
+          aria-label={`Log ${title}`}
+        >
+          LOG →
+        </button>
+      </div>
     </div>
   );
 }

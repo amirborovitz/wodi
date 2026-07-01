@@ -2038,7 +2038,10 @@ export function computeHeroResult(
     .flatMap(ex => ex.sets)
     .find(s => s.completed && s.time && s.time > 0)?.time;
 
-  const isForTimeFormat = format === 'for_time' || format === 'intervals';
+  const cadenceText = [rawText, ...exercises.flatMap((ex) => [ex.name, ex.prescription])].filter(Boolean).join(' ');
+  const isFixedCadence = /\b(?:emom|e\d+mom|every\s+\d+(?::\d{2})?\s*(?:min(?:ute)?s?)?)\b/i.test(cadenceText);
+  const prescribedCadenceRounds = isFixedCadence ? getPrescribedRoundCount(exercises, rawText) : undefined;
+  const isForTimeFormat = format === 'for_time' || (format === 'intervals' && !prescribedCadenceRounds);
   // Also detect for_time on mixed workouts by looking at the metcon exercise prescription
   const metconIsForTime = isMixed
     && /for\s*time|rft|\d+\s*rounds?\s*for/i.test(
@@ -2067,11 +2070,32 @@ export function computeHeroResult(
     }
   }
 
+  // Fixed-cadence EMOM/intervals: show the prescribed structure, not a finish-time score.
+  const emomHasCardio = format === 'emom'
+    && movements.some(m => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
+  if ((format === 'emom' || (format === 'intervals' && prescribedCadenceRounds)) && !emomHasCardio) {
+    const ex0 = exercises[0];
+    const prescribedRounds =
+      prescribedCadenceRounds ??
+      getPrescribedRoundCount(exercises, rawText) ??
+      ex0?.intervalCount ??
+      ex0?.sets?.length ??
+      0;
+    if (prescribedRounds > 0) {
+      return {
+        value: `${prescribedRounds}`,
+        unit: 'ROUNDS',
+        formatLine,
+        storyLine,
+        storyMovements: buildStory(prescribedRounds),
+        accentClass: 'accentMagenta',
+      };
+    }
+  }
+
   // 4. Strength / EMOM weighted complex (or mixed with strength): show peak weight.
   // amrap_intervals is excluded — its "mixed" structure is still a metcon, not strength.
   // Conditioning EMOMs (echo bike, row, etc.) skip this — calories are the story, not the DB weight.
-  const emomHasCardio = format === 'emom'
-    && movements.some(m => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
   if ((format === 'strength' || (format === 'emom' && !emomHasCardio) || isMixed) && format !== 'amrap_intervals') {
     const allWeights = exercises.flatMap(ex =>
       ex.sets.filter(s => s.completed).map(s => s.weight ?? 0)

@@ -508,6 +508,30 @@
   border-color: var(--glass-border-light);
 }
 
+/* ── Save for later button ── */
+.saveLaterLink {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(245, 194, 0, 0.42);
+  border-radius: var(--radius-lg, 14px);
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  color: #f2f0eb;
+  text-align: center;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  padding: 16px;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+
+.saveLaterLink:active {
+  background: rgba(245, 194, 0, 0.08);
+}
+
 /* Capture-step CTAs */
 .capturePrimaryButton {
   background: #f5c200 !important;

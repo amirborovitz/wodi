@@ -39,7 +39,8 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
     const candidate = parts.single ?? parts.strengthValue ?? parts.me ?? '';
     return /\b(?:kg|lb)\b/i.test(candidate) ? candidate : found;
   }, undefined);
-  const resultNote = wod.result.label.toUpperCase() === 'ROUNDS HELD'
+  const isFixedCadence = /\b(?:EMOM|E\d+MOM|EVERY)\b/i.test(`${wod.type} ${wod.format}`);
+  const resultNote = isFixedCadence && wod.result.label.toUpperCase() === 'ROUNDS'
     ? `all rounds held${loggedLoad ? ` · @ ${loggedLoad}` : ''}`
     : `${wod.result.label.toLowerCase()}${wod.result.meta ? ` · ${wod.result.meta}` : ''}`;
 
