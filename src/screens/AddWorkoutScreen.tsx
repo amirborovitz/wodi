@@ -244,32 +244,18 @@ function buildWorkloadBreakdownFromResults(
     );
     const exerciseFactor = isTeamExercise ? partnerFactor : 1;
     const movements = result.exercise.movements;
-    const setWeights = result.sets
-      .map(set => set.weight)
-      .filter((weight): weight is number => typeof weight === 'number' && weight > 0);
-    // Build weight progression if weights vary across sets
-    const hasVaryingSetWeights = setWeights.length > 1 && !setWeights.every(w => w === setWeights[0]);
-    const setWeightProgression = hasVaryingSetWeights ? setWeights : undefined;
-    // Compute weighted average (weight × reps per set) when progression exists
-    let weightFromSets: number | undefined;
-    if (hasVaryingSetWeights) {
-      let totalVol = 0;
-      let totalReps = 0;
-      for (const set of result.sets) {
-        if (set.weight && set.weight > 0) {
-          const reps = set.actualReps || result.exercise.suggestedReps || 1;
-          totalVol += set.weight * reps;
-          totalReps += reps;
-        }
-      }
-      weightFromSets = totalReps > 0
-        ? parseFloat((totalVol / totalReps).toFixed(2))
-        : undefined;
-    } else {
-      weightFromSets = setWeights.length > 0
-        ? parseFloat((setWeights.reduce((sum, weight) => sum + weight, 0) / setWeights.length).toFixed(2))
-        : undefined;
-    }
+    // Only the real (first/last set) weights are ever stored for a ranged load, so the
+    // distinct values are the true endpoints — no per-set fabrication to detect or undo.
+    const distinctSetWeights = [...new Set(
+      result.sets
+        .map(set => set.weight)
+        .filter((weight): weight is number => typeof weight === 'number' && weight > 0)
+    )];
+    const hasVaryingSetWeights = distinctSetWeights.length > 1;
+    const setWeightProgression = hasVaryingSetWeights ? distinctSetWeights : undefined;
+    const weightFromSets = distinctSetWeights.length > 0
+      ? parseFloat((distinctSetWeights.reduce((sum, weight) => sum + weight, 0) / distinctSetWeights.length).toFixed(2))
+      : undefined;
     // ── Ladder AMRAP: compute reps from sets (each set = one interval's total) ──
     const isLadderAmrap = result.exercise.ladderReps && result.exercise.ladderReps.length > 0;
     if (isLadderAmrap && movements && movements.length > 0) {
@@ -466,7 +452,6 @@ function buildWorkloadBreakdownFromResults(
       const partialExtra = (isPartialMove && mov.countingMode !== 'once' && mov.countingMode !== 'per_interval' && stationVisits == null) ? 1 : 0;
       const totalEffectiveRounds = effectiveRounds + partialExtra;
 
-      console.log(`[BuildWorkload] "${mov.name}" perRound=${mov.perRound} rounds=${movementRounds} effective=${effectiveRounds} partial=${partialExtra} reps=${perRoundReps} distance=${perRoundDistance} calories=${perRoundCalories} userEntered=[reps:${userReps !== undefined} dist:${userDistance !== undefined} cal:${userCalories !== undefined}]`);
       // Use cycle tracker total if available (variable rep scheme workouts)
       // Apply per-exercise partner factor only to AI-prescribed values
       const useUserTotalsDirectly = mov.scoreEntryMode === 'total';
@@ -477,15 +462,17 @@ function buildWorkloadBreakdownFromResults(
             ? perRoundReps
             : (perRoundReps * totalEffectiveRounds))
       ) * repsFactor);
-      // User-entered distance/calories are always totals (relay count × prescribed dist,
-      // or total cals/distance logged for the whole exercise) — never multiply by rounds.
+      // Story logging can prefill distance/calories from the prescription. Those values
+      // still repeat by rounds; only true total-entry fields should bypass round math.
+      const useDistanceAsTotal = userDistance !== undefined && ((mov.distance ?? 0) <= 0 || mov.scoreEntryMode === 'total');
+      const useCaloriesAsTotal = userCalories !== undefined && ((mov.calories ?? 0) <= 0 || mov.scoreEntryMode === 'total');
       const movementDistance = Math.round((
-        userDistance !== undefined
+        useDistanceAsTotal
           ? perRoundDistance
           : (perRoundDistance * totalEffectiveRounds)
       ) * distanceFactor);
       const movementCalories = Math.round((
-        userCalories !== undefined
+        useCaloriesAsTotal
           ? perRoundCalories
           : (perRoundCalories * totalEffectiveRounds)
       ) * caloriesFactor);
@@ -504,7 +491,6 @@ function buildWorkloadBreakdownFromResults(
         ? weightFromSets
         : (movementLookup(result.movementWeights || {}, mk, mov.name)
           ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined));
-      console.log(`[BuildWorkload] "${mov.name}" weight: movWeights=${movementLookup(result.movementWeights || {}, mk, mov.name)} rxMale=${mov.rxWeights?.male} rxFemale=${mov.rxWeights?.female} → rawWeight=${rawWeight} | movCals=${movementCalories} | result.movementCalories=`, result.movementCalories);
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
       const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
@@ -520,19 +506,6 @@ function buildWorkloadBreakdownFromResults(
 
       // Only attach weight progression to weighted movements
       const movWeightProgression = weight && setWeightProgression ? setWeightProgression : undefined;
-      if (mov.name.toLowerCase().includes('lunge')) {
-        console.warn('🔍 [BREAKDOWN-LUNGE]', {
-          movName: mov.name,
-          weight,
-          rawWeight,
-          weightFromSets,
-          hasVaryingSetWeights,
-          setWeightProgression,
-          movWeightProgression,
-          movementWeightsLookup: movementLookup(result.movementWeights || {}, mk, mov.name),
-          exerciseName: result.exercise.name,
-        });
-      }
 
       if (existing) {
         movementMap.set(key, {
@@ -592,8 +565,6 @@ function buildWorkloadBreakdownFromResults(
     }
 
     let exerciseReps = 0;
-    let exerciseVolume = 0;
-    let exerciseWeight: number | undefined;
     if (result.totalDistance && result.totalDistance > 0) {
       const key = result.exercise.name.toLowerCase();
       const existing = movementMap.get(key);
@@ -638,24 +609,22 @@ function buildWorkloadBreakdownFromResults(
       grandTotalCalories += totalCalories;
     }
 
-    const perSetWeights: number[] = [];
+    // Only the real (first/last set) weights are ever stored for a ranged load, so the
+    // distinct values are the true endpoints — no per-set fabrication to detect or undo.
+    const distinctWeights: number[] = [];
     result.sets.forEach((set) => {
       if (set.actualReps && set.actualReps > 0) {
         exerciseReps += set.actualReps;
-        if (set.weight) {
-          exerciseVolume += set.weight * set.actualReps;
-          perSetWeights.push(set.weight);
-          if (!exerciseWeight) {
-            exerciseWeight = set.weight;
-          }
+        if (set.weight && !distinctWeights.includes(set.weight)) {
+          distinctWeights.push(set.weight);
         }
       }
     });
 
-    // Build weight progression — only if weights vary across sets
-    const hasVaryingWeights = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
-    const weightProgression = hasVaryingWeights ? perSetWeights : undefined;
-
+    const exerciseWeight = distinctWeights.length > 0
+      ? distinctWeights.reduce((sum, w) => sum + w, 0) / distinctWeights.length
+      : undefined;
+    const weightProgression = distinctWeights.length > 1 ? distinctWeights : undefined;
 
     if (exerciseReps > 0) {
       const key = result.exercise.name.toLowerCase();
@@ -678,35 +647,28 @@ function buildWorkloadBreakdownFromResults(
       }
 
       grandTotalReps += exerciseReps;
-      grandTotalVolume += exerciseVolume;
+      if (exerciseWeight) {
+        grandTotalVolume += exerciseWeight * exerciseReps;
+      }
     }
   });
 
   // ── Post-process: patch weight progression for superset exercises ──
-  // When a superset exercise has interpolated weights across sets (e.g., 35→45kg),
-  // the per-movement loop may not correctly assign weightProgression because the
-  // Lunge movement might be added by a different exercise or code path.
-  // Fix: iterate results, find exercises with varying set weights, and patch
-  // the corresponding movement entry in the map.
+  // A ranged superset exercise (e.g. 35→45kg) may not get weightProgression assigned in the
+  // per-movement loop above because the movement might be added by a different exercise/code
+  // path. Fix: iterate results, find exercises with distinct (real, first/last-set) weights,
+  // and patch the corresponding movement entry in the map.
   results.forEach((result) => {
     const movements = result.exercise.movements;
     if (!movements || movements.length === 0) return;
-    const setWeights = result.sets
-      .map(s => s.weight)
-      .filter((w): w is number => typeof w === 'number' && w > 0);
-    if (setWeights.length <= 1 || setWeights.every(w => w === setWeights[0])) return;
+    const distinctWeights = [...new Set(
+      result.sets
+        .map(s => s.weight)
+        .filter((w): w is number => typeof w === 'number' && w > 0)
+    )];
+    if (distinctWeights.length <= 1) return;
 
-    // This exercise has varying set weights — find weighted movements and patch
-    let totalVol = 0;
-    let totalR = 0;
-    for (const s of result.sets) {
-      if (s.weight && s.weight > 0) {
-        const reps = s.actualReps || result.exercise.suggestedReps || 1;
-        totalVol += s.weight * reps;
-        totalR += reps;
-      }
-    }
-    const weightedAvg = totalR > 0 ? parseFloat((totalVol / totalR).toFixed(2)) : undefined;
+    const weightedAvg = distinctWeights.reduce((sum, w) => sum + w, 0) / distinctWeights.length;
 
     for (const mov of movements) {
       if (!isWeightedMovement(mov)) continue;
@@ -717,7 +679,7 @@ function buildWorkloadBreakdownFromResults(
       // Patch: set progression and correct weight to weighted average
       movementMap.set(key, {
         ...entry,
-        weightProgression: setWeights,
+        weightProgression: distinctWeights,
         weight: weightedAvg ?? entry.weight,
       });
     }
@@ -1083,11 +1045,6 @@ function classifyExercise(exercise: ParsedExercise): ExerciseInputType {
   return analyzeExerciseMetric(exercise).inputType;
 }
 
-// Determine if exercise needs weight input
-function exerciseNeedsWeight(exercise: ParsedExercise): boolean {
-  return classifyExercise(exercise) === 'weighted';
-}
-
 // Determine the logging mode for each exercise
 // ExerciseLoggingMode is now imported from '../types'
 
@@ -1149,31 +1106,20 @@ function getExerciseLoggingMode(
   const classification = classifyExercise(exercise);
   const movements = exercise.movements || [];
 
-  console.log('[getExerciseLoggingMode] Input:', {
-    exerciseName: name,
-    prescription,
-    classification,
-    movementsCount: movements.length,
-    movements: movements.map(m => m.name),
-  });
-
   // 1. AMRAP — exercise explicitly mentions AMRAP
   const isAmrapPattern =
     name.includes('amrap') ||
     prescription.includes('amrap');
 
   if (isAmrapPattern && (name.includes('x') || name.includes('rest'))) {
-    console.log('[getExerciseLoggingMode] -> amrap_intervals');
     return 'amrap_intervals';
   }
   if (isAmrapPattern) {
-    console.log('[getExerciseLoggingMode] -> amrap');
     return 'amrap';
   }
 
   // 2. For-time — exercise explicitly mentions "for time" / RFT
   if (shouldForceForTimeMode(exercise)) {
-    console.log('[getExerciseLoggingMode] -> for_time (forced)');
     return 'for_time';
   }
 
@@ -1187,17 +1133,14 @@ function getExerciseLoggingMode(
     prescription.includes('sets for time');
 
   if (isForTimePattern) {
-    console.log('[getExerciseLoggingMode] -> for_time');
     return 'for_time';
   }
 
   // 3. Cardio — single-movement cardio exercises
   if (classification === 'cardio_calories' && movements.length <= 1) {
-    console.log('[getExerciseLoggingMode] -> cardio');
     return 'cardio';
   }
   if (classification === 'cardio_distance' && movements.length <= 1) {
-    console.log('[getExerciseLoggingMode] -> cardio_distance');
     return 'cardio_distance';
   }
 
@@ -1209,7 +1152,6 @@ function getExerciseLoggingMode(
     /\bminute\b/i.test(name);
 
   if (isEmomPattern) {
-    console.log('[getExerciseLoggingMode] -> emom');
     return 'emom';
   }
 
@@ -1222,27 +1164,22 @@ function getExerciseLoggingMode(
     const hasForTime = /for\s+time/i.test(name) || /for\s+time/i.test(prescription);
     const hasTimeCap = /\d+\s*min\s*t\.?c|time\s*cap/i.test(prescription);
     if (isTeamIGUG || hasForTime || hasTimeCap) {
-      console.log('[getExerciseLoggingMode] -> for_time (interval + team/forTime/timeCap)');
       return 'for_time';
     }
-    console.log('[getExerciseLoggingMode] -> intervals');
     return 'intervals';
   }
 
   // 6. Bodyweight
   if (classification === 'bodyweight') {
-    console.log('[getExerciseLoggingMode] -> bodyweight');
     return 'bodyweight';
   }
 
   // 7. Strength
   if (exercise.type === 'strength') {
-    console.log('[getExerciseLoggingMode] -> strength');
     return 'strength';
   }
 
   // 8. Default — weight/reps per set
-  console.log('[getExerciseLoggingMode] -> sets (default)');
   return 'sets';
 }
 
@@ -1400,8 +1337,128 @@ function analyzeRefineNeed(parsed: ParsedWorkout): { shouldRefine: boolean; reas
   if (duplicateExercises) reasons.push('duplicate_exercises');
   if (hasMultipleBlocks && hasMixedTypes) reasons.push('mixed_exercise_types');
   if (rawTextHasMoreBlocks) reasons.push('potentially_missing_blocks');
+  if (hasRepeatedMovementFidelityRisk(parsed)) reasons.push('movement_occurrence_mismatch');
 
   return { shouldRefine: reasons.length > 0, reasons, rawText };
+}
+
+function hasRepeatedMovementFidelityRisk(parsed: ParsedWorkout): boolean {
+  return parsed.exercises.some((exercise) => {
+    const sourceText = getExerciseFidelityText(parsed, exercise);
+    if (!sourceText || !/\b(?:rft|rounds?\s+for\s+time|for\s+time)\b/i.test(sourceText)) {
+      return false;
+    }
+
+    const movements = getExerciseMovementSequence(exercise);
+    if (movements.length < 2) return false;
+
+    const structuredCounts = new Map<string, number>();
+    for (const movement of movements) {
+      const key = movementFidelityKey(movement.name);
+      if (!key) continue;
+      structuredCounts.set(key, (structuredCounts.get(key) ?? 0) + 1);
+    }
+
+    for (const [key, structuredCount] of structuredCounts) {
+      const rawCount = countMovementMentions(sourceText, key);
+      if (rawCount >= 2 && rawCount > structuredCount) {
+        console.warn('[Refine] Movement occurrence mismatch:', {
+          exercise: exercise.name,
+          movement: key,
+          rawCount,
+          structuredCount,
+        });
+        return true;
+      }
+    }
+
+    for (const movement of movements) {
+      const key = movementFidelityKey(movement.name);
+      if (!key || !movement.distance || movement.distance <= 0) continue;
+      const rawDistances = extractMovementDistances(sourceText, key);
+      if (rawDistances.length > 0 && !rawDistances.includes(movement.distance)) {
+        console.warn('[Refine] Movement distance mismatch:', {
+          exercise: exercise.name,
+          movement: key,
+          rawDistances,
+          structuredDistance: movement.distance,
+        });
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
+function getExerciseFidelityText(parsed: ParsedWorkout, exercise: ParsedExercise): string {
+  if (parsed.exercises.length === 1 && parsed.rawText?.trim()) return parsed.rawText;
+  if (exercise.rawText?.trim()) return exercise.rawText;
+  return `${exercise.name ?? ''} ${exercise.prescription ?? ''}`;
+}
+
+function getExerciseMovementSequence(exercise: ParsedExercise): ParsedMovement[] {
+  if (exercise.sections?.length) {
+    return exercise.sections.flatMap((section) => section.movements ?? []);
+  }
+  return exercise.movements ?? [];
+}
+
+function movementFidelityKey(name: string): string | null {
+  const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!normalized) return null;
+
+  if (/\brun(?:ning)?\b/.test(normalized)) return 'run';
+  if (/\bdeadlifts?\b/.test(normalized)) return 'deadlift';
+  if (/\bpower\s+cleans?\b/.test(normalized)) return 'power clean';
+  if (/\bfront\s+squats?\b/.test(normalized)) return 'front squat';
+  if (/\bshoulder\s+to\s+overheads?\b|\bstoh\b|\bs\s*t\s*o\s*h\b/.test(normalized)) return 'shoulder to overhead';
+  if (/\bpull\s*ups?\b|\bpullups?\b/.test(normalized)) return 'pull-up';
+  if (/\b(?:echo\s+)?bikes?\b/.test(normalized)) return 'bike';
+  if (/\brows?\b/.test(normalized)) return 'row';
+  if (/\bski(?:\s+erg)?\b/.test(normalized)) return 'ski';
+
+  return normalized;
+}
+
+function countMovementMentions(text: string, key: string): number {
+  const normalizedText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const patterns: Record<string, RegExp> = {
+    run: /\bruns?\b|\brunning\b/g,
+    deadlift: /\bdeadlifts?\b|\bdl\b/g,
+    'power clean': /\bpower\s+cleans?\b|\bpc\b/g,
+    'front squat': /\bfront\s+squats?\b|\bfs\b/g,
+    'shoulder to overhead': /\bshoulder\s+to\s+overheads?\b|\bstoh\b|\bs\s*t\s*o\s*h\b/g,
+    'pull-up': /\bpull\s*ups?\b|\bpullups?\b/g,
+    bike: /\b(?:echo\s+|assault\s+|air\s+)?bikes?\b/g,
+    row: /\brows?\b|\browing\b/g,
+    ski: /\bski(?:\s+erg)?\b/g,
+  };
+
+  const pattern = patterns[key] ?? new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`, 'g');
+  return [...normalizedText.matchAll(pattern)].length;
+}
+
+function extractMovementDistances(text: string, key: string): number[] {
+  const normalizedText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const names: Record<string, string> = {
+    run: 'run(?:s|ning)?',
+    row: 'row(?:s|ing)?',
+    bike: '(?:echo |assault |air )?bike',
+    ski: 'ski(?: erg)?',
+  };
+  const namePattern = names[key] ?? key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  const distancePattern = new RegExp(`\\b(\\d+)\\s*(m|km|mi)\\s+${namePattern}\\b`, 'g');
+  const distances: number[] = [];
+
+  for (const match of normalizedText.matchAll(distancePattern)) {
+    const value = parseInt(match[1], 10);
+    if (Number.isNaN(value)) continue;
+    const unit = match[2];
+    distances.push(unit === 'km' ? value * 1000 : value);
+  }
+
+  return distances;
 }
 
 function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
@@ -1449,12 +1506,10 @@ async function refineWorkoutIfNeeded(
 ): Promise<ParsedWorkout> {
   const analysis = analyzeRefineNeed(parsed);
 
-  console.log('[Refine] Initial parse:', {
-    exerciseCount: parsed.exercises.length,
-    exercises: parsed.exercises.map(e => ({ name: e.name, type: e.type })),
-    rawText: parsed.rawText?.substring(0, 200),
+  console.info('[REFINE CHECK]', {
+    shouldRefine: analysis.shouldRefine,
+    reasons: analysis.reasons,
   });
-  console.log('[Refine] Analysis:', analysis.reasons, 'shouldRefine:', analysis.shouldRefine);
 
   if (!analysis.shouldRefine) return parsed;
 
@@ -1467,22 +1522,22 @@ async function refineWorkoutIfNeeded(
     if (!refined.sourceDate && parsed.sourceDate) {
       refined.sourceDate = parsed.sourceDate;
     }
-    console.log('[Refine] Refined result:', {
-      exerciseCount: refined.exercises.length,
-      exercises: refined.exercises.map(e => ({ name: e.name, type: e.type })),
-    });
     if (userId) {
-      await addDoc(
-        collection(db, 'workoutParseRefinements'),
-        removeUndefined({
-          userId,
-          createdAt: serverTimestamp(),
-          reasons: analysis.reasons,
-          rawText: analysis.rawText,
-          parsed,
-          refined,
-        })
-      );
+      try {
+        await addDoc(
+          collection(db, 'workoutParseRefinements'),
+          removeUndefined({
+            userId,
+            createdAt: serverTimestamp(),
+            reasons: analysis.reasons,
+            rawText: analysis.rawText,
+            parsed,
+            refined,
+          })
+        );
+      } catch {
+        // Refinement is user-facing; audit logging is best-effort.
+      }
     }
     return refined;
   } catch (error) {
@@ -1609,7 +1664,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
         const base64 = await fileToBase64(initialImage);
         const workout = await parseWorkoutImage(base64);
         const refined = await refineWorkoutIfNeeded(workout, user?.id);
-        console.log('[DEBUG parse] exercises:', JSON.stringify(refined.exercises, null, 2));
         setParsedWorkout(refined);
         addSavedWorkout(refined);
         setStep('preview');
@@ -1627,8 +1681,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
   // Handle edit workout - skip directly to log-results with pre-filled data
   useEffect(() => {
     if (!editWorkout) return;
-
-    console.log('[EditWorkout] Starting edit for workout:', editWorkout.id, editWorkout.title);
 
     // Store workout ID for updating instead of creating new
     setSavedWorkoutMeta({
@@ -1772,7 +1824,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
     setEditInitialResults(storyResults);
     setStep('log-results');
-    console.log('[EditWorkout] Pre-filled story results:', storyResults);
   }, [editWorkout]);
 
   // Handle planned workout — already AI-parsed, jump straight to logging
@@ -1825,7 +1876,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
       // Check if we already have a smart classification for this exercise
       if (smartClassifications[currentExerciseIndex]) {
-        console.log('[SmartClassification] Using cached result for exercise', currentExerciseIndex);
         return;
       }
 
@@ -1834,7 +1884,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
       // If local analysis has low confidence, use AI
       if (localAnalysis.confidence === 'low' || localAnalysis.confidence === 'medium') {
-        console.log('[SmartClassification] Low confidence, calling AI for:', exercise.name);
         try {
           const result = await smartClassifyExercise(
             exercise.name,
@@ -1853,7 +1902,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
             },
           }));
 
-          console.log('[SmartClassification] AI result:', result);
         } catch (error) {
           console.warn('[SmartClassification] AI failed, using local analysis:', error);
         }
@@ -1887,7 +1935,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
     // Check if we already have guidance for this exercise
     if (loggingGuidance[currentExerciseIndex]) {
-      console.log('[LoggingGuidance] Using cached result for exercise', currentExerciseIndex);
       return;
     }
 
@@ -1905,12 +1952,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
           [currentExerciseIndex]: guidance,
         }));
 
-        console.log('[LoggingGuidance] Got guidance:', {
-          exercise: exercise.name,
-          mode: guidance.loggingMode,
-          confidence: guidance.confidence,
-          source: guidance.source,
-        });
       } catch (error) {
         console.warn('[LoggingGuidance] Failed to get guidance:', error);
       } finally {
@@ -2159,19 +2200,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
   const handleConfirmWorkout = () => {
     if (!parsedWorkout) return;
 
-    // Debug: log the parsed workout to understand what format was detected
-    console.log('Parsed workout:', {
-      type: parsedWorkout.type,
-      format: parsedWorkout.format,
-      scoreType: parsedWorkout.scoreType,
-      exercises: parsedWorkout.exercises.map(e => ({
-        name: e.name,
-        type: e.type,
-        mode: getExerciseLoggingMode(e),
-        rxWeights: e.rxWeights
-      }))
-    });
-
     // Initialize wizard - start with first exercise
     setCurrentExerciseIndex(0);
     setExerciseResults([]);
@@ -2247,87 +2275,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
   // Get the current exercise and its logging mode
   const currentExercise = parsedWorkout?.exercises[currentExerciseIndex];
-
-  // Determine exercise logging mode
-  // Priority: 1. User override, 2. Logging guidance, 3. Local rules, 4. Smart classification
-  const smartClassification = smartClassifications[currentExerciseIndex];
   const workoutContext = parsedWorkout ? {
     format: parsedWorkout.format,
     scoreType: parsedWorkout.scoreType,
     exerciseCount: parsedWorkout.exercises.length,
   } : undefined;
-  const localMode = currentExercise ? getExerciseLoggingMode(currentExercise, workoutContext) : 'sets';
-  const guidance = loggingGuidance[currentExerciseIndex];
-  const userOverride = modeOverrides[currentExerciseIndex];
-
-  // Priority:
-  // 1. User override (always wins)
-  // 2. Our rules (getExerciseLoggingMode) — if they return a specific mode, trust it
-  // 3. AI guidance — ONLY consulted when our rules returned the generic 'sets' default
-  //    AND the exercise is a single movement (ambiguous case where AI can help
-  //    determine if it's cardio/bodyweight/etc). Multi-movement exercises (supersets)
-  //    are never overridden.
-  const isMultiMovement = (currentExercise?.movements || []).length > 1;
-  const currentExerciseMode: ExerciseLoggingMode = currentExercise
-    ? (userOverride
-      ? userOverride
-      // Our rules returned a specific mode — trust it
-      : localMode !== 'sets' ? localMode
-      // localMode is 'sets' (generic default). For multi-movement exercises
-      // (supersets), 'sets' is correct — don't let AI override.
-      : isMultiMovement ? 'sets'
-      // Single-movement 'sets' default — AI can help disambiguate
-      : guidance && guidance.confidence >= 0.7
-        ? guidance.loggingMode
-      : smartClassification?.inputType === 'cardio_calories' ? 'cardio'
-      : smartClassification?.inputType === 'cardio_distance' ? 'cardio_distance'
-      : smartClassification?.inputType === 'bodyweight' ? 'bodyweight'
-      : 'sets')
-    : 'sets';
-
-  // Per-exercise checks based on logging mode
-  const isCurrentExerciseAmrapInterval = currentExerciseMode === 'amrap_intervals';
-  const isCurrentExerciseAmrap = currentExerciseMode === 'amrap';
-  const isCurrentExerciseForTime = currentExerciseMode === 'for_time';
-  const isCurrentExerciseCardio = currentExerciseMode === 'cardio';
-  const isCurrentExerciseCardioDistance = currentExerciseMode === 'cardio_distance';
-
-  // DEBUG: Log UI flags
-  console.log('[UI Flags]', {
-    step,
-    currentExerciseMode,
-    isCurrentExerciseAmrap,
-    isCurrentExerciseAmrapInterval,
-    isCurrentExerciseForTime,
-    isCurrentExerciseCardio,
-    isCurrentExerciseCardioDistance,
-    parsedWorkoutFormat: parsedWorkout?.format,
-    parsedWorkoutType: parsedWorkout?.type,
-  });
-
-  // Check if current exercise needs weight input (used for strength exercises)
-  const currentExerciseNeedsWeight = currentExercise
-    ? (smartClassification?.inputType === 'weighted' || (!smartClassification && exerciseNeedsWeight(currentExercise)))
-    : true;
-
-  // Debug: log exercise classification when in log-results step
-  if (currentExercise && step === 'log-results') {
-    const localAnalysis = analyzeExerciseMetric(currentExercise);
-    console.log('[Exercise Classification]', {
-      name: currentExercise.name,
-      prescription: currentExercise.prescription,
-      type: currentExercise.type,
-      localAnalysis: {
-        inputType: localAnalysis.inputType,
-        metric: localAnalysis.metric,
-        confidence: localAnalysis.confidence,
-        reason: localAnalysis.reason,
-      },
-      smartClassification: smartClassification || 'not yet loaded',
-      finalLoggingMode: currentExerciseMode,
-      needsWeight: currentExerciseNeedsWeight,
-    });
-  }
 
   // Track which interval sets have been manually edited
   const [, setManuallyEditedIntervalSets] = useState<Set<number>>(new Set());
@@ -2893,7 +2845,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
   const handleDeleteMovement = (name: string) => {
     if (!rewardData?.workloadBreakdown) return;
 
-    const deletedMovement = rewardData.workloadBreakdown.movements.find(m => m.name === name);
     const updatedMovements = rewardData.workloadBreakdown.movements.filter(m => m.name !== name);
 
     // Recalculate totals
@@ -2926,32 +2877,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       },
     });
 
-    console.log('[RewardScreen] Deleted movement:', name, deletedMovement);
   };
 
   const saveWorkout = async (results: ExerciseResult[]) => {
     if (!user || !parsedWorkout) return;
-
-    // Validation: Check for missing rounds/time in AMRAP/for_time workouts
-    const isRoundsBasedWorkout = parsedWorkout.format === 'amrap' ||
-      parsedWorkout.format === 'amrap_intervals' ||
-      parsedWorkout.type === 'amrap';
-
-    const isForTimeWorkout = parsedWorkout.format === 'for_time' ||
-      parsedWorkout.type === 'for_time';
-
-    // Debug log with explicit values
-    console.warn('🔍 [saveWorkout Validation]',
-      'format:', parsedWorkout.format,
-      'type:', parsedWorkout.type,
-      'isRoundsBasedWorkout:', isRoundsBasedWorkout,
-      'isForTimeWorkout:', isForTimeWorkout,
-      'results:', results.map(r => ({
-        name: r.exercise.name,
-        rounds: r.rounds,
-        completionTime: r.completionTime,
-      }))
-    );
 
     // Validation moved to EditExerciseSheet (skip/edit prompt on close).
     // By the time we reach here, user has already made their choices.
@@ -3158,6 +3087,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
             personalRounds: result.exercise.suggestedSets,
           }),
           ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
+          ...(result.exercise.workDuration != null && { workDuration: result.exercise.workDuration }),
+          ...(result.exercise.restDuration != null && { restDuration: result.exercise.restDuration }),
           // User-entered WOD name during logging takes priority; AI-generated name is fallback
           ...((result.metconName || result.exercise.aiPartName) && {
             aiPartName: result.metconName || result.exercise.aiPartName,
@@ -3240,24 +3171,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
         : Math.max(timeCapSeconds, emomSeconds);
       const effectiveDuration = Math.max(totalDuration, programmedDuration);
       const durationMinutes = effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : 0;
-
-      // DEBUG: Log duration calculation
-      console.warn('⏱️ DURATION CALC', {
-        type: parsedWorkout.type,
-        format: parsedWorkout.format,
-        timeCap: parsedWorkout.timeCap,
-        timeCapSeconds,
-        emomSeconds,
-        perExerciseDuration,
-        totalDuration,
-        effectiveDuration,
-        durationMinutes,
-        breakdownMovements: breakdownFromResults.movements?.map(m => ({
-          name: m.name,
-          distance: m.totalDistance,
-          reps: m.totalReps,
-        })),
-      });
 
       const workoutDate = savedWorkoutMeta?.date || new Date();
 

@@ -2,8 +2,10 @@ import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType } from '../types';
 import { postProcessParsedWorkout } from './workoutPostProcessor';
 
+const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+
 const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  apiKey: env?.VITE_OPENAI_API_KEY ?? process.env.VITE_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: true // Required for client-side usage
 });
 
@@ -14,6 +16,13 @@ Return ONLY valid JSON:
 {
   "title": "workout name — see TITLE RULES below",
   "rawText": "full workout text from the image (OCR-style, line breaks ok) — the WHOLE image, every block",
+  // TRANSCRIPTION FIDELITY: transcribe every visible line, including a short line that repeats
+  // a phrase you already transcribed (e.g. "200m run" appearing 5 times in one round, once
+  // before each movement). A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S.,
+  // A.M.R.A.P.) is NOT a line or sentence terminator — do not let it cause you to skip or merge
+  // the line that follows it. Before finalizing rawText, recount the visible lines in the image;
+  // a short repeating connector line positioned immediately before the LAST movement in a round
+  // is the single most commonly dropped line during transcription — verify that exact position.
   // sourceDate: date printed on the original WOD/whiteboard, not the date the user logs it.
   // If a full date is visible, return ISO "YYYY-MM-DD". If only day/month is visible, infer the
   // current year. If no original WOD date is visible, return null.
@@ -128,6 +137,13 @@ conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's 
   (metcon-only, or strength-only) — don't force a 3-part structure that isn't there.
 - This is purely about session structure, not about how each part is logged or scored — it has
   no effect on "type"/"loggingMode"/"format", which are decided independently per their own rules.
+- CRITICAL — EVERY PART IS A STANDALONE PRACTICE. All structure fields ("loggingMode",
+  "stationRotation", "intervalCount", "workDuration", "restDuration", and movement-level
+  "stationLabel"/"stationIndex"/"countingMode") describe ONE exercise only — set them on the
+  exercise they belong to and nowhere else. NEVER copy a flag from one part onto its siblings:
+  an interval-shaped part A does not make part B's plain AMRAP "stationRotation": true, and a
+  cool-down never carries the metcon's flags. Top-level "format"/"scoreType" describe the main
+  metcon/WOD part, not a blend of all parts.
 
 ## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x [BLOCK] -> CASH-OUT)
 
@@ -143,6 +159,12 @@ conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's 
   - "movements": the per-round block of movements for that section.
 - Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
   Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
+- CRITICAL DISTINCTION: The previous rule only means "do not copy the whole round block N
+  times." It does NOT mean dedupe repeated movements that appear multiple times inside the
+  round block itself. If the per-round prescription says "200m run, 10 deadlift, 200m run,
+  10 power clean", the movements[] array MUST contain Run, Deadlift, Run, Power Clean in
+  that order. Those repeated Run entries are real work inside each round, not simulated
+  rounds.
 - CRITICAL — PROGRESSIVE / BUILDING ROUNDS RULE: When each round is structurally different
   (a new movement is added or removed each round), DO NOT collapse into one "rounds: N" section.
   Instead emit one sections entry per round, each with "rounds": 1, listing that round's exact movements.
@@ -178,6 +200,18 @@ conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's 
   50 cal Echo Bike" → 5 separate movement entries in movements[], NOT 2.
   The absence of "X rounds" / "X sets" language IS the signal that each line is distinct
   work and must be logged separately. DO NOT collapse repeated movements into one entry.
+- CRITICAL — RFT INTRA-ROUND REPEATS: In RFT / rounds-for-time workouts, preserve the
+  exact movement sequence inside ONE round, counting every printed occurrence literally —
+  including a repeat that appears immediately before the FINAL movement in the round. The
+  last movement is not exempt just because it ends the round. If a movement appears
+  multiple times inside that per-round sequence, include it multiple times in movements[].
+  Example:
+  "4 RFT: 200m Run, 10 Deadlift, 200m Run, 10 Power Clean, 200m Run, 10 Front Squat,
+  200m Run, 10 Shoulder to Overhead, 200m Run, 10 Pull-up" ->
+  movements: [Run 200m, Deadlift 10, Run 200m, Power Clean 10, Run 200m,
+  Front Squat 10, Run 200m, Shoulder to Overhead 10, Run 200m, Pull-up 10],
+  suggestedSets: 4. Do NOT collapse those five Run entries into one, and do not drop the
+  one immediately before the last movement.
 
 ## FORMAT DETECTION (pick exactly one)
 | Format | Trigger | scoreType |
@@ -702,6 +736,8 @@ When an AMRAP intervals workout has numbered sections (1. / 2. / 3. or labeled A
 
 CRITICAL — BUY-IN RULE: In AMRAP intervals, the first movement of a numbered block is NEVER automatically a buy-in. A buy-in is ONLY movements explicitly introduced by "buy-in", "into AMRAP", or "then AMRAP" phrasing. If the workout lists numbered movement blocks without any "into AMRAP" language, every movement in every block is a regular per-round AMRAP movement.
 
+Exception for alternating stations: when the text says "(alt)", "alternate", "alternating stations", or "two groups starting at different stations" and labels blocks like B.1 / B.2 under one repeated interval clock, keep ONE metcon exercise with stationRotation: true, loggingMode: "amrap_intervals", intervalCount set to the total interval count, and stationLabel/stationIndex/countingMode: "per_station_visit" on the first movement of each station. The total interval count is distributed across stations. Example: "[02:00 AMRAP / 01:00 REST] x 6 (alt): B.1 200m Run + Max DB Devil Press, B.2 50 DU + Max Sit-ups" means 6 total intervals, 2 stations, 3 visits per station.
+
 ### 14. Numbered sequential AMRAP intervals (different blocks)
 Input: "[12:00 min AMRAP / 01:00 min REST] x 3 :
 1. 8/10 calories bike, 10 DB's burpee to deadlift, 10 DB's push press
@@ -850,7 +886,7 @@ If image is not a workout, return: {"error": "Could not parse workout from image
  * Parse a workout from plain text (no image).
  * Returns the raw AI JSON string for debugging, plus the parsed result.
  */
-export async function parseWorkoutText(text: string): Promise<{ raw: string; parsed: ParsedWorkout }> {
+export async function parseWorkoutText(text: string, sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT'): Promise<{ raw: string; parsed: ParsedWorkout }> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
@@ -876,72 +912,112 @@ export async function parseWorkoutText(text: string): Promise<{ raw: string; par
   const validated = validateParsedWorkout(data);
   const postProcessed = postProcessParsedWorkout(validated);
 
+  logAiWorkoutSummary(`${sourceLabel} PARSE AI`, data);
+  logAiWorkoutSummary(`${sourceLabel} PARSE POST`, postProcessed);
+
   return { raw: rawJson, parsed: postProcessed };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+// One console.table row per movement, in literal array order — makes a missing/duplicated
+// occurrence (e.g. a dropped interleaved "Run") visually obvious at a glance instead of
+// requiring the reader to expand a collapsed array in devtools.
+function movementDebugRow(value: unknown, index: number): Record<string, unknown> {
+  const movement = asRecord(value);
+  if (!movement) return { '#': index };
+  const rxWeights = asRecord(movement.rxWeights);
+  return {
+    '#': index,
+    name: typeof movement.name === 'string' ? movement.name : '?',
+    reps: typeof movement.reps === 'number' ? movement.reps : '',
+    distance: typeof movement.distance === 'number'
+      ? `${movement.distance}${typeof movement.unit === 'string' ? movement.unit : 'm'}`
+      : '',
+    calories: typeof movement.calories === 'number' ? movement.calories : '',
+    weight: rxWeights?.male ?? rxWeights?.female ?? '',
+  };
+}
+
+function logAiWorkoutSummary(label: string, workout: unknown): void {
+  const root = asRecord(workout);
+  const exercises = Array.isArray(root?.exercises) ? root.exercises : [];
+  console.info(`[${label}]`, {
+    title: typeof root?.title === 'string' ? root.title : undefined,
+    format: typeof root?.format === 'string' ? root.format : undefined,
+    exerciseCount: exercises.length,
+  });
+  exercises.forEach((entry, index) => {
+    const exercise = asRecord(entry);
+    const movements = Array.isArray(exercise?.movements) ? exercise.movements : [];
+    const sections = Array.isArray(exercise?.sections) ? exercise.sections : [];
+    const sectionMovements = sections.flatMap((section) => {
+      const sectionRecord = asRecord(section);
+      return Array.isArray(sectionRecord?.movements) ? sectionRecord.movements : [];
+    });
+    const source = sectionMovements.length > 0 ? sectionMovements : movements;
+    console.info(
+      `[${label}] exercise ${index + 1}: ${typeof exercise?.name === 'string' ? exercise.name : '?'} `
+      + `· loggingMode=${typeof exercise?.loggingMode === 'string' ? exercise.loggingMode : '?'} `
+      + `· suggestedSets=${typeof exercise?.suggestedSets === 'number' ? exercise.suggestedSets : '?'} `
+      + `· ${source.length} movement${source.length === 1 ? '' : 's'} per round`,
+    );
+    console.table(source.map(movementDebugRow));
+  });
+}
+
+// Deliberately tiny — this call's only job is faithful transcription. Keeping the 863-line
+// WORKOUT_PARSE_PROMPT out of it means the model isn't simultaneously reading pixels and
+// tracking structuring rules, which is what was causing it to silently drop repeated short
+// lines (e.g. a "200m run" connector) that a plain "what does this say" read gets right every
+// time. Structuring still happens afterward via parseWorkoutText, against this clean text.
+const IMAGE_TRANSCRIBE_PROMPT = `Transcribe every piece of text visible in this workout whiteboard/image exactly as written — title, date, section labels, all movements, reps, weights, and numbers — preserving line breaks and order.
+
+This is a literal transcription task only. Do not interpret, restructure, summarize, correct, or omit anything:
+- Include every line, even a short line that repeats one you already transcribed (e.g. a connector like "200m run" appearing multiple times, once before each of several movements).
+- A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S., A.M.R.A.P.) is not a line or sentence terminator — do not let it cause you to skip or merge the next line.
+- Before answering, recount the visible lines in the image and verify your transcription has that many lines.
+
+Return ONLY the transcribed text. No JSON, no markdown formatting, no commentary.`;
+
+async function transcribeWorkoutImage(base64Image: string): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: IMAGE_TRANSCRIBE_PROMPT },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`,
+              detail: 'high',
+            },
+          },
+        ],
+      },
+    ],
+    max_tokens: 600,
+    temperature: 0,
+  });
+
+  const content = response.choices[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error('No response from OpenAI (image transcription)');
+  }
+  return content;
 }
 
 export async function parseWorkoutImage(base64Image: string): Promise<ParsedWorkout> {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: WORKOUT_PARSE_PROMPT
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`,
-                detail: 'high'
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 4000,
-      temperature: 0.2 // Lower temperature for more consistent parsing
-    });
+    const transcribedText = await transcribeWorkoutImage(base64Image);
+    console.info('[IMAGE TRANSCRIBE]', transcribedText);
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response from OpenAI');
-    }
-
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = content;
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
-    const parsed = JSON.parse(jsonStr.trim());
-
-    console.warn('🔍 [AI PARSE] Full response:', JSON.stringify(parsed, null, 2));
-
-    if (parsed.error) {
-      throw new Error(parsed.error);
-    }
-
-    // Validate and transform the response
-    const validated = validateParsedWorkout(parsed);
-
-    // Post-process to fix common AI parsing issues
-    const postProcessed = postProcessParsedWorkout(validated);
-
-    console.log('[OpenAI Parse] Post-processed:', JSON.stringify({
-      exercises: postProcessed.exercises?.map(e => ({
-        name: e.name,
-        suggestedSets: e.suggestedSets,
-        movements: e.movements?.map(m => ({
-          name: m.name, reps: m.reps, distance: m.distance, calories: m.calories, perRound: m.perRound,
-        })),
-      })),
-    }, null, 2));
-
-    return postProcessed;
+    const { parsed } = await parseWorkoutText(transcribedText, 'IMAGE');
+    return parsed;
   } catch (error) {
     console.error('Error parsing workout image:', error);
     throw error;
@@ -956,6 +1032,13 @@ Rules:
 - Only split into multiple exercises for truly separate blocks (Strength + Metcon, Skill + WOD).
 - "5x3" = suggestedSets: 5, suggestedReps: 3.
 - Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
+- Preserve repeated movement occurrences that appear inside a single round or chipper sequence.
+  Do not dedupe repeated movements inside the movement list. Example: "4 RFT: 200m Run,
+  10 Deadlift, 200m Run, 10 Power Clean" must keep Run twice in movements[].
+- Do not duplicate the entire round block to simulate rounds. Keep one per-round sequence and
+  set suggestedSets/rounds for the round count.
+- If rawText says a movement quantity (for example 200m Run), the matching structured movement
+  must use that same quantity unless the raw text explicitly gives a different value.
 - Preserve "loggingHints" (including sharedWeightMovements) from the original parsed data.
 - Preserve "workDuration" and "restDuration" from the original parsed data.
 - Preserve each exercise's "rawText" (its own scoped slice of the whiteboard) from the original parsed data unchanged — never copy one exercise's rawText onto another.
@@ -998,10 +1081,14 @@ export async function refineParsedWorkout(
   // and is just as capable of hallucinating fields (e.g. an invented "isSecondary" flag, or
   // ladderReps copied onto the wrong exercise) as the first one. A raw `as ParsedWorkout` cast
   // would let any such hallucination survive untouched into the saved workout.
-  const refined = validateParsedWorkout(JSON.parse(jsonStr.trim()));
+  const parsedRefined = JSON.parse(jsonStr.trim());
+  const refined = validateParsedWorkout(parsedRefined);
 
   // Post-process the refined workout
-  return postProcessParsedWorkout(refined);
+  const postProcessed = postProcessParsedWorkout(refined);
+  logAiWorkoutSummary('REFINE AI', parsedRefined);
+  logAiWorkoutSummary('REFINE POST', postProcessed);
+  return postProcessed;
 }
 
 function validateRxWeights(data: unknown): RxWeights | undefined {
@@ -1305,6 +1392,8 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
         sections,
         loggingMode,
         loggingHints,
+        stationRotation: exercise.stationRotation === true ? true : undefined,
+        intervalCount: typeof exercise.intervalCount === 'number' && exercise.intervalCount > 0 ? exercise.intervalCount : undefined,
         workDuration: typeof exercise.workDuration === 'number' && exercise.workDuration > 0 ? exercise.workDuration : undefined,
         restDuration: typeof exercise.restDuration === 'number' && exercise.restDuration > 0 ? exercise.restDuration : undefined,
         ...(ladderReps && { ladderReps }),

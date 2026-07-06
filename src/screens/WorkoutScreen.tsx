@@ -204,7 +204,7 @@ function computeCardioStat(
     CARRY: (acc.CARRY.dist / 100) * 1,
   };
 
-  // Carry-only with short distance → fall back to reps
+  // Carry-only with short distance ? fall back to reps
   const hasNonCarry = effort.RUN > 0 || effort.ROW > 0 || effort.SKI > 0 || effort.BIKE > 0;
   const carryTooShort = !hasNonCarry && acc.CARRY.dist > 0 && acc.CARRY.dist < 200;
 
@@ -419,7 +419,7 @@ export function getLadderRungValue(reps: number[], idx: number): number {
   return reps[reps.length - 1] + step * (idx - reps.length + 1);
 }
 
-// ── Barbell Complex Detection ──────────────────────────────────────────
+// -- Barbell Complex Detection ------------------------------------------
 
 export function shouldLogCelebrationDebug(): boolean {
   return typeof window !== 'undefined'
@@ -716,6 +716,15 @@ export function repairUndercountedBreakdown(
         || /^(cash[-\s]?out|buy[-\s]?in)\s*:/i.test(movement.name);
       if (isBuyInCashOut) continue;
 
+      // Station-rotation movements run on only a subset of the intervals (3 of 6 in an
+      // alternating two-station AMRAP), so reps × prescription-round-count over-counts them —
+      // their breakdown totals already carry the correct per-visit multiplier from save time.
+      // Gate on STRUCTURAL markers only, never countingMode: a post-processor bug (fixed
+      // 2026-07-06) stamped per_station_visit onto plain-AMRAP movements in multi-part
+      // sessions, collapsing their save-time totals to one round — exactly the undercount
+      // this repair exists to heal.
+      if (movement.stationLabel != null || movement.stationIndex != null) continue;
+
       const isVariableSchemeMovement = !!(
         repScheme
         && movement.reps
@@ -822,7 +831,7 @@ interface BarbellComplex {
   totalRounds: number;
 }
 
-/** Detects 2+ weighted barbell movements done as a complex (same weight, ≥1 rep/round). */
+/** Detects 2+ weighted barbell movements done as a complex (same weight, =1 rep/round). */
 export function detectBarbellComplex(movements: MovementTotal[], rounds: number): BarbellComplex | null {
   if (movements.length < 2) return null;
   if (!movements.every(m =>
@@ -875,7 +884,7 @@ function formatRepScheme(repsPerSet?: number[]): string | undefined {
   return repsPerSet && repsPerSet.length > 1 ? repsPerSet.join('-') : undefined;
 }
 
-// Parse "[20-16-12-8-4]" bracket notation from text → [20,16,12,8,4], or undefined.
+// Parse "[20-16-12-8-4]" bracket notation from text ? [20,16,12,8,4], or undefined.
 export function parseDescLadderScheme(
   exercise: Exercise,
   rawText?: string,
@@ -1076,9 +1085,9 @@ function buildSectionedStoryMovements(
 
       // Partner workouts: show the TOTAL prescription as the main value.
       // IGUG (rounds > 1): split is at round level — each partner does full reps per round.
-      //   → no per-movement "your part" note; section header already shows "(N each)".
+      //   ? no per-movement "your part" note; section header already shows "(N each)".
       // Non-IGUG partner sections (buy-in, cash-out, single-round): split is per-rep.
-      //   → show per-movement "your part X" annotation.
+      //   ? show per-movement "your part X" annotation.
       // "Together" movements: everyone does the full amount — show "together" instead of splitting.
       // Check both the parsed movement's together flag AND the breakdown's together flag.
       const isPartner = teamSize && teamSize > 1;
@@ -1092,7 +1101,7 @@ function buildSectionedStoryMovements(
       const substitutionType = actual?.substitutionType;
 
       // For substituted movements, compute the per-section substituted value for the sub-label
-      // e.g., "300m Run → 1000m Echo Bike"
+      // e.g., "300m Run ? 1000m Echo Bike"
       let substitutedPerRound: string | undefined;
       if (wasSubstituted && actual) {
         const subDist = actual.distancePerRep ?? (actual.totalDistance ? Math.round(actual.totalDistance / sections.length) : 0);
@@ -1192,176 +1201,6 @@ export function findMovementTotal(
   );
 }
 
-function deriveStationRotationMeta(
-  exercises: Exercise[],
-  rawText?: string,
-): { intervalLabel?: string; totalRounds?: number; stationLoops?: number } {
-  const text = rawText || `${exercises.map(ex => `${ex.name} ${ex.prescription}`).join(' ')}`;
-  const normalized = normalizeIntervalNotation(text).replace(/(\d+)\.(\d{2})/g, '$1:$2');
-
-  const intervalMatch = normalized.match(/(?:every\s+)?(\d+:\d{2})\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)\s*rounds?/i);
-  if (intervalMatch) {
-    const totalRounds = parseInt(intervalMatch[2], 10);
-    const stationCount = exercises.length || 1;
-    return {
-      intervalLabel: intervalMatch[1],
-      totalRounds,
-      stationLoops: totalRounds > 0 ? Math.max(1, Math.round(totalRounds / stationCount)) : undefined,
-    };
-  }
-
-  const sharedRounds = exercises
-    .map(ex => ex.rounds)
-    .filter((rounds): rounds is number => typeof rounds === 'number' && rounds > 0);
-  if (sharedRounds.length === exercises.length && new Set(sharedRounds).size === 1) {
-    const stationLoops = sharedRounds[0];
-    return {
-      totalRounds: stationLoops * exercises.length,
-      stationLoops,
-    };
-  }
-
-  return {};
-}
-
-function isStationRotationWorkout(exercises: Exercise[], rawText?: string): boolean {
-  if (exercises.some(ex => ex.stationRotation)) return true;
-  if (exercises.length < 2) return false;
-
-  const namesAreLettered = exercises.every(ex => /^[A-H][).:\s-]+/i.test(ex.name.trim()));
-  if (!namesAreLettered && !(rawText && /(?:^|\n)\s*[A-H][).:]\s+/m.test(rawText))) {
-    return false;
-  }
-
-  const meta = deriveStationRotationMeta(exercises, rawText);
-  return Boolean(meta.totalRounds || meta.intervalLabel);
-}
-
-function formatMovementStoryTotal(movement?: MovementTotal): string {
-  if (!movement) return '';
-  if (movement.totalCalories && movement.totalCalories > 0) {
-    return `${movement.totalCalories} cal total`;
-  }
-  if (movement.totalDistance && movement.totalDistance > 0) {
-    return movement.totalDistance >= 1000
-      ? `${(movement.totalDistance / 1000).toFixed(1)}km total`
-      : `${movement.totalDistance}m total`;
-  }
-  if (movement.totalReps && movement.totalReps > 0) {
-    return `${movement.totalReps} total`;
-  }
-  return '';
-}
-
-function cleanStationLabel(name: string, index: number): string {
-  const letterMatch = name.trim().match(/^([A-H])[).:\s-]+/i);
-  const letter = letterMatch?.[1]?.toUpperCase() ?? String.fromCharCode(65 + index);
-  return `STATION ${letter}`;
-}
-
-function stripStationPrefix(name: string): string {
-  return name.replace(/^[A-H][).:\s-]+/i, '').trim();
-}
-
-function buildStationRotationStoryMovements(
-  exercises: Exercise[],
-  movements: MovementTotal[],
-  rawText?: string,
-): StoryMovementLine[] | undefined {
-  const lines: StoryMovementLine[] = [];
-  const meta = deriveStationRotationMeta(exercises, rawText);
-
-  if (meta.totalRounds || meta.intervalLabel) {
-    const headerBits = [
-      meta.totalRounds ? `${meta.totalRounds} ROUNDS` : undefined,
-      meta.intervalLabel ? `${meta.intervalLabel} STATIONS` : 'ROTATING STATIONS',
-    ].filter(Boolean);
-    lines.push({
-      perRound: '',
-      name: '',
-      total: '',
-      sectionHeader: headerBits.join(' · '),
-      sectionColor: 'cyan',
-    });
-  }
-
-  for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
-    const ex = exercises[exIdx];
-    const stationLoops = ex.rounds || meta.stationLoops;
-    const stationHeader = stationLoops && stationLoops > 1
-      ? `${cleanStationLabel(ex.name, exIdx)} · ×${stationLoops}`
-      : cleanStationLabel(ex.name, exIdx);
-
-    lines.push({
-      perRound: '',
-      name: '',
-      total: '',
-      sectionHeader: stationHeader,
-      sectionColor: 'magenta',
-    });
-
-    for (const mov of ex.movements || []) {
-      const actual = findMovementTotal(movements, mov.name, exIdx);
-      const displayName = actual?.wasSubstituted ? actual.name : mov.name;
-      const cleanName = stripStationPrefix(displayName).replace(/\bmax\s+/i, '').trim();
-      const isBodyweight = isBwVolumeMovement(displayName);
-      const weight = actual?.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female);
-      const unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit || 'kg');
-      const total = formatMovementStoryTotal(actual);
-      const color = actual?.color ?? 'magenta';
-
-      const isMaxMovement = Boolean(mov.isMaxReps) || /\bmax\b/i.test(mov.name);
-      if (isMaxMovement) {
-        lines.push({
-          perRound: 'MAX',
-          name: cleanName,
-          total,
-          color,
-          weight: !isBodyweight ? weight : undefined,
-          unit: !isBodyweight ? unit : undefined,
-        });
-        continue;
-      }
-
-      if ((mov.calories || 0) > 0 || (actual?.totalCalories || 0) > 0) {
-        const perVal = mov.calories || ((actual?.totalCalories && stationLoops) ? Math.round(actual.totalCalories / stationLoops) : 0);
-        lines.push({
-          perRound: `${perVal} cal`,
-          name: cleanName,
-          total,
-          color,
-        });
-        continue;
-      }
-
-      if ((mov.distance || 0) > 0 || (actual?.totalDistance || 0) > 0) {
-        const perVal = mov.distance || ((actual?.totalDistance && stationLoops) ? Math.round(actual.totalDistance / stationLoops) : 0);
-        const distanceLabel = perVal >= 1000 ? `${(perVal / 1000).toFixed(1)}km` : `${perVal}m`;
-        lines.push({
-          perRound: distanceLabel,
-          name: cleanName,
-          total,
-          color,
-        });
-        continue;
-      }
-
-      if ((mov.reps || 0) > 0 || (actual?.totalReps || 0) > 0) {
-        const perVal = mov.reps || ((actual?.totalReps && stationLoops) ? Math.round(actual.totalReps / stationLoops) : 0);
-        lines.push({
-          perRound: `${perVal}`,
-          name: cleanName,
-          total,
-          color,
-          weight: !isBodyweight ? weight : undefined,
-          unit: !isBodyweight ? unit : undefined,
-        });
-      }
-    }
-  }
-
-  return lines.length > 0 ? lines : undefined;
-}
 
 /**
  * Build story movements for mixed workouts (Strength + Metcon).
@@ -1370,12 +1209,8 @@ function buildStationRotationStoryMovements(
 function buildMixedStoryMovements(
   exercises: Exercise[],
   movements: MovementTotal[],
-  rawText?: string,
+  _rawText?: string,
 ): StoryMovementLine[] | undefined {
-  if (isStationRotationWorkout(exercises, rawText)) {
-    return buildStationRotationStoryMovements(exercises, movements, rawText);
-  }
-
   const lines: StoryMovementLine[] = [];
 
   for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
@@ -1409,7 +1244,7 @@ function buildMixedStoryMovements(
       }
       headerColor = 'magenta';
     } else if (isEmom) {
-      // Extract interval: "Every 3:00 x 5" → "E3MOM × 5"
+      // Extract interval: "Every 3:00 x 5" ? "E3MOM × 5"
       const intervalMatch = rx.match(/every\s+(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)/i);
       if (intervalMatch) {
         const mins = parseInt(intervalMatch[1], 10);
@@ -2051,14 +1886,14 @@ export function computeHeroResult(
   if (isForTimeFormat || metconIsForTime) {
     // Prefer the metcon exercise's time; fall back to any exercise time
     const heroTime = metconTime ?? anyTime;
-    if (heroTime) {
+    const fallbackDurationSeconds = durationMinutes > 0 ? Math.round(durationMinutes * 60) : 0;
+    if (heroTime || fallbackDurationSeconds > 0) {
       const rounds = metconEx.rounds || (!isMixed ? singleExerciseRounds : 1);
       // For mixed workouts, show the full session duration (strength + metcon),
       // not just the metcon split. durationMinutes has the total.
-      const totalSessionSeconds = durationMinutes > 0 ? Math.round(durationMinutes * 60) : 0;
-      const displayTime = isMixed && totalSessionSeconds > heroTime
-        ? totalSessionSeconds
-        : heroTime;
+      const displayTime = heroTime
+        ? (isMixed && fallbackDurationSeconds > heroTime ? fallbackDurationSeconds : heroTime)
+        : fallbackDurationSeconds;
       return {
         value: fmtTimeSocial(displayTime),
         unit: 'MIN',
@@ -2344,7 +2179,7 @@ export function getFlexHighlightStamp(
   );
   if (prAchievement?.movement && prAchievement.value) {
     return {
-      title: '★ NEW PR ★',
+      title: '? NEW PR ?',
       value: formatStampLoad(prAchievement?.value),
       note: prAchievement.movement.toUpperCase(),
       color: 'yellow',
@@ -2397,7 +2232,7 @@ export function getFlexHighlightStamp(
       const peakLabel = formatStampLoad(peakW, complex.unit);
       if (complexPR) {
         return {
-          title: '★ NEW PR ★',
+          title: '? NEW PR ?',
           value: `${peakLabel} COMPLEX`,
           note: complex.abbreviatedName,
           color: 'magenta',
@@ -2406,7 +2241,7 @@ export function getFlexHighlightStamp(
         };
       }
       const weightLabel = complex.weightEnd
-        ? `${formatStampLoad(complex.weight, complex.unit)}→${peakLabel}`
+        ? `${formatStampLoad(complex.weight, complex.unit)}?${peakLabel}`
         : peakLabel;
       return {
         title: 'HEAVIEST HIT',
@@ -2494,7 +2329,7 @@ export function getFlexHighlightStamp(
 
 /**
  * Clean up abbreviation dots in prescription text for display.
- * R.P.E → RPE, R.I.R → RIR. Preserves the AI's original casing.
+ * R.P.E ? RPE, R.I.R ? RIR. Preserves the AI's original casing.
  */
 export function normalizeBlueprint(text: string): string {
   return text
@@ -2578,8 +2413,8 @@ export function buildRewardArtifactSections(
     const unit = complex.unit;
     const startLabel = `${complex.weight}${unit.toUpperCase()}`;
     const peakLabel = complex.weightEnd ? `${complex.weightEnd}${unit.toUpperCase()}` : startLabel;
-    const weightDisplay = complex.weightEnd ? `${startLabel} → ${peakLabel}` : startLabel;
-    const primaryDisplay = complex.weightEnd ? `${startLabel}→${peakLabel}` : startLabel;
+    const weightDisplay = complex.weightEnd ? `${startLabel} ? ${peakLabel}` : startLabel;
+    const primaryDisplay = complex.weightEnd ? `${startLabel}?${peakLabel}` : startLabel;
     return [{
       eyebrow: complex.complexName.toUpperCase(),
       title: 'Complex',
@@ -2595,7 +2430,7 @@ export function buildRewardArtifactSections(
   }
 
   // Re-sort movements by prescribed order (workload breakdown sorts by Trinity color, not position).
-  // Use fuzzy matching: exact → contains → word-overlap, to handle name variations between
+  // Use fuzzy matching: exact ? contains ? word-overlap, to handle name variations between
   // AI-parsed movement names and workload-computed names (e.g. "Russian Kettlebell Swing" vs
   // "Russian KB Swing", "400m Run" vs "Run").
   const prescribedOrder = prescribedMovements.map(m => m.name.toLowerCase());
@@ -2607,7 +2442,7 @@ export function buildRewardArtifactSections(
     // 2. One contains the other
     idx = prescribedOrder.findIndex(p => p.includes(n) || n.includes(p));
     if (idx !== -1) return idx;
-    // 3. Significant word overlap (≥2 non-trivial words match)
+    // 3. Significant word overlap (=2 non-trivial words match)
     const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for']);
     const words = (s: string) => s.split(/[\s\-/]+/).filter(w => w.length > 2 && !stopWords.has(w));
     const nWords = new Set(words(n));
@@ -2643,7 +2478,7 @@ export function buildRewardArtifactSections(
       m.name.toLowerCase() !== relayOriginalName
     );
     const amrapLine = formatPrescriptionMovementLine(amrapPrescribed);
-    blueprintSub = amrapLine ? `P1: ${relayLabel} ↔ P2: ${amrapLine}` : `RELAY: ${relayLabel}`;
+    blueprintSub = amrapLine ? `P1: ${relayLabel} ? P2: ${amrapLine}` : `RELAY: ${relayLabel}`;
   } else {
     blueprintSub = prescribedMovements.length > 0
       ? formatPrescriptionMovementLine(prescribedMovements)
@@ -2651,7 +2486,7 @@ export function buildRewardArtifactSections(
   }
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(mainExercise);
-  const rows = orderedForRows.slice(0, 5).map((movement): ArtifactRow => {
+  const rows = orderedForRows.map((movement): ArtifactRow => {
     const prescribed = prescribedByName.get(movement.name.toLowerCase())
       ?? (movement.originalMovement ? prescribedByName.get(movement.originalMovement.toLowerCase()) : undefined);
     const parsedMovement = mainExercise?.movements?.find((candidate) => {
@@ -2710,7 +2545,7 @@ export function buildRewardArtifactSections(
     blueprint: displayBlueprint ?? undefined,
     blueprintSub,
     rows,
-    hiddenCount: Math.max(0, movements.length - rows.length),
+    hiddenCount: 0,
   }];
 }
 
@@ -2853,7 +2688,7 @@ export function buildPageArtifactSection(
     : undefined;
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(exercise);
-  const rows = orderedMovements.slice(0, 5).map((movement): ArtifactRow => {
+  const rows = orderedMovements.map((movement): ArtifactRow => {
     let primary = '—';
     let accent: ArtifactRow['accent'] = movement.color || 'magenta';
 
@@ -2999,7 +2834,7 @@ export function buildPageArtifactSection(
     blueprint,
     blueprintSub,
     rows,
-    hiddenCount: Math.max(0, movements.length - rows.length),
+    hiddenCount: 0,
     ...((descSchemeGlobal || strengthBubbleScheme) && {
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
       descLadderCompleted: descSchemeCompleted ?? strengthBubbleScheme?.length,
@@ -3424,7 +3259,7 @@ export function WorkoutScreen({
     };
   }, []);
 
-  // -- Face registry ─────────────────────────────────────────────────
+  // -- Face registry -------------------------------------------------
   // No flip UI yet — users always get the default handwritten face.
   // Adding a new face: create src/components/celebration/faces/YourFace/
   // and add it to the registry. faceId state here will drive switching.
@@ -3433,7 +3268,7 @@ export function WorkoutScreen({
   const [faceId] = useState(DEFAULT_FACE_ID);
   const { savePosterCustomization } = usePosterCustomization(celebrationData.workoutId);
 
-  // -- Normalize data from both modes ────────────────────────────────
+  // -- Normalize data from both modes --------------------------------
 
   const [renamedTitle, setRenamedTitle] = useState<string | null>(null);
   const baseTitle = isReward
@@ -3609,7 +3444,7 @@ export function WorkoutScreen({
 
   const totalEP = isReward ? (rewardEP?.total || 0) : (detailEP?.total || 0);
 
-  // -- Exercises for story cards (moved up — needed by heroResult) ────
+  // -- Exercises for story cards (moved up — needed by heroResult) ----
 
   const exercises = isReward
     ? (rewardData?.exercises || [])
@@ -3655,7 +3490,7 @@ export function WorkoutScreen({
 
   // Final totalVolume: complex tonnage takes priority over base calculation
   const totalVolume = complexTonnage ?? baseVolume;
-  // -- Ladder data — extracted from the primary AMRAP exercise ──────
+  // -- Ladder data — extracted from the primary AMRAP exercise ------
   // For fresh workouts: uses ladderStep saved during logging via LadderInput.
   // For historical workouts (ladderStep missing): infers step from stored totalReps
   // only when totalReps exactly sums to a complete rung boundary (unambiguous).
@@ -3672,7 +3507,7 @@ export function WorkoutScreen({
 
     const amrapEx = exercises.find(ex => ex.ladderReps && ex.ladderReps.length > 0);
     if (!amrapEx) {
-      console.log('[ladderData] no exercise with ladderReps → null');
+      console.log('[ladderData] no exercise with ladderReps ? null');
       return null;
     }
     const reps = amrapEx.ladderReps!;
@@ -3702,9 +3537,9 @@ export function WorkoutScreen({
 
 
 
-  // -- Hero Result — via useCelebrationData ────────────────────────
-  // Priority order (first match wins): chipper → complex → ladder → multi-part → standard
-  // -- Hero Result — pick the single best show-off number (both reward + detail) ──
+  // -- Hero Result — via useCelebrationData ------------------------
+  // Priority order (first match wins): chipper ? complex ? ladder ? multi-part ? standard
+  // -- Hero Result — pick the single best show-off number (both reward + detail) --
 
   const heroResult = useMemo((): HeroResult | null => {
     let format: WorkoutFormat | undefined;
@@ -3746,7 +3581,7 @@ export function WorkoutScreen({
     );
   }, [isReward, rewardData, workout, exercises, totalVolume, totalEP, durationMinutes, isPR, workloadBreakdown, activeAchievements]);
 
-  // -- Animated counters (reward mode) ───────────────────────────────
+  // -- Animated counters (reward mode) -------------------------------
 
   const animatedReps = useCountUp(isReward ? totalReps : 0, { delay: 250, duration: 1000 });
   const animatedSeconds = useCountUp(isReward ? totalSeconds : 0, { delay: 300, duration: 1000 });
@@ -3754,7 +3589,7 @@ export function WorkoutScreen({
   const animatedWeightedDistance = useCountUp(isReward ? totalWeightedDistance : 0, { delay: 250, duration: 1000, decimals: 0 });
   const animatedEP = useCountUp(isReward ? totalEP : 0, { delay: 350, duration: 1000 });
 
-  // -- Cardio/intensity stat for poster footer and detail chips ───
+  // -- Cardio/intensity stat for poster footer and detail chips ---
 
   const cardioStat = useMemo(
     () => computeCardioStat(activeBreakdown?.movements ?? [], totalReps, durationMinutes),
@@ -3767,7 +3602,7 @@ export function WorkoutScreen({
     ? (cardioStat.isKm ? (animatedCardioValue / 1000).toFixed(1) : Math.round(animatedCardioValue).toLocaleString())
     : (cardioStat.isKm ? (cardioStat.rawValue / 1000).toFixed(1) : Math.round(cardioStat.rawValue).toLocaleString());
 
-  // -- Receipt card: split number and unit ──────────────────────────
+  // -- Receipt card: split number and unit --------------------------
 
   // Right stat: EP
   const rightStat = {
@@ -3810,7 +3645,7 @@ export function WorkoutScreen({
   // hasEnginePills no longer needed (receipt card removed)
 
 
-  // -- Achievement pills (reward mode) — max 2, cool language ────────
+  // -- Achievement pills (reward mode) — max 2, cool language --------
 
   const achievementPills: { label: string }[] = [];
   if (isReward) {
@@ -3853,7 +3688,7 @@ export function WorkoutScreen({
   // Cap at 2 max
   const displayPills = achievementPills.slice(0, 2);
 
-  // -- Share adapter for detail mode ─────────────────────────────────
+  // -- Share adapter for detail mode ---------------------------------
 
   const hydratedExercises = useMemo(() => {
     if (!workout?.exercises) return [];
@@ -3877,7 +3712,7 @@ export function WorkoutScreen({
       if (ex.movements && ex.movements.length > 0) return ex;
       if (ex.type !== 'wod') return ex;
 
-      // Multiple wod exercises without movements → can't reliably assign, skip
+      // Multiple wod exercises without movements ? can't reliably assign, skip
       if (wodsNeedingMovements.length > 1) return ex;
 
       const roundsMatch = ex.prescription?.match(/(\d+)\s*(?:rounds?|rft)/i);
@@ -3931,7 +3766,7 @@ export function WorkoutScreen({
         }
       : undefined;
 
-  // -- User info (needed for share) ────────────────────────────────
+  // -- User info (needed for share) --------------------------------
 
   const userName = user?.displayName?.split(' ')[0]?.toUpperCase();
 
@@ -3941,7 +3776,7 @@ export function WorkoutScreen({
 
   if (!isReward && !workout) return null;
 
-  // -- Team poster metadata ────────────────────────────────────────
+  // -- Team poster metadata ----------------------------------------
 
   const handleEditClick = isReward ? onEdit : onEditWorkout;
   const d = isReward ? 0.15 : 0.1;
@@ -3982,7 +3817,7 @@ export function WorkoutScreen({
 
   const sharedBody = (
     <>
-      {/* -- Header row: Back · date · View Original (both modes) ── */}
+      {/* -- Header row: Back · date · View Original (both modes) -- */}
       <motion.div
         className={styles.rewardHeaderRow}
         initial={isReward ? { opacity: 0 } : false}
@@ -4011,7 +3846,7 @@ export function WorkoutScreen({
         )}
       </motion.div>
 
-      {/* -- Hero: Title (+ "Workout Complete" subtitle for reward) ── */}
+      {/* -- Hero: Title (+ "Workout Complete" subtitle for reward) -- */}
       <motion.div
         className={styles.heroHeader}
         initial={isReward ? { opacity: 0, y: -12 } : false}
@@ -4065,7 +3900,7 @@ export function WorkoutScreen({
         {isReward && <span className={styles.heroSubtitle}>Workout Complete</span>}
       </motion.div>
 
-      {/* -- Stat Chips Row ─────────────────────────────────────────── */}
+      {/* -- Stat Chips Row ------------------------------------------- */}
       {<motion.div
         className={styles.statChipsRow}
         initial={isReward ? { opacity: 0, y: 10 } : false}
@@ -4178,7 +4013,7 @@ export function WorkoutScreen({
 
       </motion.div>}
 
-      {/* -- Achievement Layer (reward only) — anchored to accomplishment zone ─ */}
+      {/* -- Achievement Layer (reward only) — anchored to accomplishment zone - */}
       {isReward && displayPills.length > 0 && !isComplex && (
         <motion.div
           className={styles.achievementLayer}
@@ -4194,7 +4029,7 @@ export function WorkoutScreen({
         </motion.div>
       )}
 
-      {/* -- Ladder Progress Track (detail mode only — reward uses posterFrame) ─ */}
+      {/* -- Ladder Progress Track (detail mode only — reward uses posterFrame) - */}
       {ladderData && ladderData.ladderStep > 0 && (
         <motion.div
           initial={isReward ? { opacity: 0, y: 6 } : false}
@@ -4209,7 +4044,7 @@ export function WorkoutScreen({
         </motion.div>
       )}
 
-      {/* -- Hero Result — the dominant show-off number (both modes) ─ */}
+      {/* -- Hero Result — the dominant show-off number (both modes) - */}
       {heroResult && (
         <motion.div
           className={styles.heroResultBlock}
@@ -4252,7 +4087,7 @@ export function WorkoutScreen({
                   );
                 }
 
-                // Strength progression row: ladder → peak, burnout row, total reps
+                // Strength progression row: ladder ? peak, burnout row, total reps
                 if (line.weightProgression && line.weightProgression.length > 0) {
                   const prog = line.weightProgression;
                   const peak = Math.max(...prog);
@@ -4273,7 +4108,7 @@ export function WorkoutScreen({
 
                   return (
                     <div key={i} className={styles.heroStoryProgressionBlock}>
-                      {/* Weight ladder: 70 → 100 kg */}
+                      {/* Weight ladder: 70 ? 100 kg */}
                       <div className={styles.heroStoryProgressionChain}>
                         {displayProgression.map((w, wi) => {
                           const isPeakWeight = w === peak && wi > 0;
@@ -4292,10 +4127,10 @@ export function WorkoutScreen({
                         <span className={styles.heroStoryProgressionUnit}>{line.unit ?? 'kg'}</span>
                       </div>
 
-                      {/* Burnout row: 🔥 12 Back Squat @50kg */}
+                      {/* Burnout row: ?? 12 Back Squat @50kg */}
                       {line.burnout && (
                         <div className={styles.heroBurnoutRow}>
-                          <span className={styles.heroBurnoutIcon}>🔥</span>
+                          <span className={styles.heroBurnoutIcon}>??</span>
                           <span className={styles.heroBurnoutReps}>{line.burnout.reps}</span>
                           <span className={styles.heroBurnoutName}>{line.name} @{line.burnout.weight}{line.unit ?? 'kg'}</span>
                         </div>
@@ -4323,7 +4158,7 @@ export function WorkoutScreen({
                     </span>
                     <span className={styles.heroStoryMovementSep} aria-hidden="true" />
                     <span className={styles.heroStoryMovementName}>
-                      {line.wasSubstituted && <span className={styles.heroSubIcon} aria-label="Substituted">⇄</span>}
+                      {line.wasSubstituted && <span className={styles.heroSubIcon} aria-label="Substituted">?</span>}
                       {line.name}
                       {line.weight && line.weight > 0 && (
                         <span className={styles.heroStoryMovementWeight}>@{line.weight}{line.unit ?? 'kg'}</span>
@@ -4355,7 +4190,7 @@ export function WorkoutScreen({
         </motion.div>
       )}
 
-      {/* -- Action Bar ─────────────────────────────────────────── */}
+      {/* -- Action Bar ------------------------------------------- */}
       <motion.div
         className={`${styles.shareBar} ${isReward ? styles.shareBarCompact : ''}`}
         initial={isReward ? { opacity: 0, y: 18 } : false}
@@ -4401,7 +4236,7 @@ export function WorkoutScreen({
     </>
   );
 
-  // -- Bottom sheets ──────────────────────────────────────────
+  // -- Bottom sheets ------------------------------------------
 
   const bottomSheets = (
     <>
@@ -4434,7 +4269,7 @@ export function WorkoutScreen({
     </>
   );
 
-  // -- Single wrapper ──────────────────────────────────────────
+  // -- Single wrapper ------------------------------------------
 
   const handleNavTouchStart = (e: React.TouchEvent) => {
     if (!posterMode || navExiting.current) return;
@@ -4513,3 +4348,4 @@ export function WorkoutScreen({
     </div>
   );
 }
+

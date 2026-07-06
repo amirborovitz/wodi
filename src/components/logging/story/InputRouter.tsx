@@ -26,8 +26,6 @@ interface InputRouterProps {
 export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
-  console.log('[InputRouter]', { kind, loggingMode: result.exercise.loggingMode, movementKinds: movements.map(m => ({ name: m.movement.name, kind: m.kind })) });
-
   if (kind === 'score_time' || kind === 'score_rounds') {
     const isLadder = !!(result.exercise.ladderReps && result.exercise.ladderReps.length > 0);
 
@@ -61,14 +59,6 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     // Pure relay: run IS the score (no other scored movements). In IGYG workouts the relay
     // count and AMRAP rounds are separate — both inputs are shown independently.
     const isPureRelay = hasRelay && inputMovements.filter(mr => mr !== relayMr).length === 0;
-    console.log('[InputRouter isPureRelay]', {
-      hasRelay, isPureRelay,
-      relayMr: relayMr?.movement.name,
-      inputMovements: inputMovements.map(m => ({ name: m.movement.name, kind: m.kind })),
-      visibleMovements: visibleMovements.map(m => ({ name: m.movement.name, kind: m.kind })),
-      allMovements: movements.map(m => ({ name: m.movement.name, kind: m.kind })),
-    });
-
     const syncRelay = (next: MovementResult[]): Partial<StoryExerciseResult> => {
       if (!isPureRelay) return {};
       const updated = next.find(

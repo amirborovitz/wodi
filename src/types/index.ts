@@ -163,6 +163,8 @@ export interface Exercise {
   suggestedRepsPerSet?: number[]; // Variable rep scheme (e.g., [40, 30, 20, 10])
   ladderReps?: number[];   // Ladder AMRAP rep scheme [4, 6, 8, 10, 12]
   intervalCount?: number;  // Number of AMRAP intervals
+  workDuration?: number;   // AI-parsed programmed work time in seconds (e.g. 120 for "2:00 AMRAP")
+  restDuration?: number;   // AI-parsed programmed rest time in seconds between rounds/intervals
   ladderStep?: number;     // How many rungs completed (continuous across intervals)
   ladderPartial?: number;  // Partial reps into next incomplete rung
   intensity?: IntensityRating | null; // user-entered metcon block intensity
@@ -383,7 +385,8 @@ export type Screen =
   | 'profile'
   | 'onboarding'
   | 'pr'
-  | 'records';
+  | 'records'
+  | 'recap';
 
 // Common component props
 export interface BaseProps {

@@ -15,9 +15,11 @@ import { RecordsScreen } from './screens/RecordsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen, GoalsSettingsScreen } from './components/settings';
 import { BottomNav } from './components/ui';
+import { WrappedStoryScreen } from './components/recap/WrappedStoryScreen';
 import { DEFAULT_USER_GOALS } from './types';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
+import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
@@ -36,6 +38,12 @@ function AppContent() {
   const [workoutList, setWorkoutList] = useState<WorkoutWithStats[]>([]);
   const [navDir, setNavDir] = useState<'up' | 'down' | null>(null);
   const [workoutDetailOrigin, setWorkoutDetailOrigin] = useState<'home' | 'history'>('history');
+  const [pendingRecapData, setPendingRecapData] = useState<RecapData | null>(null);
+
+  const handleOpenRecap = (recapData: RecapData) => {
+    setPendingRecapData(recapData);
+    setCurrentScreen('recap');
+  };
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
     setShowRecentWorkoutsOnOpen(false);
@@ -202,6 +210,7 @@ function AppContent() {
             onNavigateToPR={() => setCurrentScreen('pr')}
             onNavigateToRecords={() => setCurrentScreen('records')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
+            onOpenRecap={handleOpenRecap}
           />
         );
       case 'settings':
@@ -246,6 +255,13 @@ function AppContent() {
             onBack={() => setCurrentScreen('profile')}
           />
         );
+      case 'recap':
+        return pendingRecapData ? (
+          <WrappedStoryScreen
+            data={pendingRecapData}
+            onClose={() => { setPendingRecapData(null); setCurrentScreen('home'); }}
+          />
+        ) : null;
       case 'home':
       default:
         return (
@@ -259,13 +275,6 @@ function AppContent() {
               setCurrentScreen('add-workout');
             }}
             onImageSelected={handleImageSelected}
-            onUsePastWorkout={() => {
-              setEditingWorkout(null);
-              setPendingImage(null);
-              setShowRecentWorkoutsOnOpen(true);
-              setSaveForLaterMode(false);
-              setCurrentScreen('add-workout');
-            }}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {
               setNavDir(null);
@@ -275,6 +284,7 @@ function AppContent() {
               setCurrentScreen('workout-detail');
             }}
             onLogPlannedWorkout={handleLogPlannedWorkout}
+            onOpenRecap={handleOpenRecap}
             ringsKey={homeRingsKey}
           />
         );

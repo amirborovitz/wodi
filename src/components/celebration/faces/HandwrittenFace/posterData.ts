@@ -10,7 +10,7 @@
 
 import type { CelebrationData } from '../../../../hooks/useCelebrationData';
 import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult } from '../../types';
-import type { MovementTotal } from '../../../../types';
+import type { Exercise, MovementTotal } from '../../../../types';
 import { shouldLogCelebrationDebug } from '../../../../hooks/useCelebrationData';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -191,19 +191,9 @@ function formatSourceDate(sourceDate: string | undefined, fallbackDate: Date): s
 
 function buildFormatLine(data: CelebrationData): string {
   if (data.artifactSections[0]?.partnerDisplayMode === 'sections') {
-    const cap = explicitTimeCapSub(data.exercises[0], data.rawText);
-    return [
-      `${data.artifactSections.length} SECTIONS FOR TIME`,
-      cap || null,
-    ].filter(Boolean).join(' · ');
+    return 'FOR TIME';
   }
-
-  // Confirmed-partner workouts: trust the artifact blueprint — it's already split-aware (computed
-  // from the same repeatCount/teamSize data as the round ledger below it) — over
-  // heroResult.formatLine or the independent regex fallback chain further down, which run their
-  // own separate "for time vs intervals" detection and can disagree (e.g. "12 INTERVALS" header
-  // above a "12 ROUNDS FOR TIME" blueprint for the exact same WOD). Gated on isPartnerConfirmed,
-  // not raw teamSize — a session-level teamSize doesn't mean THIS card's own block is partnered.
+  // Confirmed-partner workouts: trust the artifact blueprint over independent format guesses.
   if (data.artifactSections[0]?.isPartnerConfirmed) {
     const sectionBlueprint = data.artifactSections[0]?.blueprint;
     if (sectionBlueprint) return sectionBlueprint.toUpperCase();
@@ -248,6 +238,11 @@ function buildFormatLine(data: CelebrationData): string {
 }
 
 function buildSubLine(data: CelebrationData): string {
+  if (data.artifactSections[0]?.partnerDisplayMode === 'sections') {
+    const labels: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
+    const count = labels[data.artifactSections.length] ?? `${data.artifactSections.length}`;
+    return `you & your partner - ${count} blocks`;
+  }
   if (data.artifactSections[0]?.isPartnerConfirmed) {
     return '';
   }
@@ -308,7 +303,10 @@ function buildTotals(data: CelebrationData, heroValue: string): PosterTotal[] {
 // per-movement readout above it does). Strength stays individual even in a team session.
 // isPartner must come from isPartnerConfirmed (this card's own content), never raw teamSize —
 // a session-level teamSize doesn't mean this specific card's block is the partnered one.
-function buildResultLabel(format: string | undefined, isPartner: boolean): string {
+function buildResultLabel(format: string | undefined, isPartner: boolean, heroUnit?: string): string {
+  // A reps hero (station AMRAP: accumulated max-effort reps) is not a rounds score — the
+  // label follows the hero's unit before falling back to the format.
+  if (heroUnit === 'REPS') return isPartner ? 'OUR REPS' : 'TOTAL REPS';
   switch (format) {
     case 'for_time':        return isPartner ? 'OUR TIME' : 'MY TIME';
     case 'amrap':
@@ -320,8 +318,7 @@ function buildResultLabel(format: string | undefined, isPartner: boolean): strin
   }
 }
 
-function buildResultValue(data: CelebrationData): string {
-  const hero = data.heroResult;
+function buildResultValue(hero: HeroResult | null | undefined): string {
   if (!hero) return '--';
   // A ladder AMRAP's unit IS part of the score ("6" + "+10" = rounds + partial reps), not a
   // redundant label restating the unit ("ROUNDS") the result label already states — so it must
@@ -360,13 +357,18 @@ function sectionsToRows(sections: ArtifactSection[], mineMap?: Map<string, strin
     const isDuplicateTitle =
       !!wodTitle &&
       section.title?.toUpperCase() === wodTitle.toUpperCase();
+    // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and the
+    // per-station ST. header blocks — a section-level block on top would restate both.
+    const hasStationHeaderRows = section.rows.some((row) => row.stationRow && row.roundLabel);
     const hasHeader =
+      !hasStationHeaderRows &&
       section.title &&
       section.title !== '' &&
       !isFormatHeader(section.title);
     const cap = section.blueprint ?? section.eyebrow ?? '';
 
-    const isCadenceTitle = CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
+    const isCadenceTitle = !hasStationHeaderRows
+      && CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
 
     if (hasHeader) {
       rows.push({
@@ -376,18 +378,40 @@ function sectionsToRows(sections: ArtifactSection[], mineMap?: Map<string, strin
         label: isDuplicateTitle ? '' : section.title.toUpperCase(),
         cap,
       } satisfies PosterBlock);
-    } else if ((isDuplicateTitle || isCadenceTitle) && cap) {
+    } else if (!hasStationHeaderRows && (isDuplicateTitle || isCadenceTitle) && cap) {
       // Section title was a format/cadence header (suppressed as label) but the
       // blueprint cap carries structural context worth showing (e.g. "EVERY 4 MIN · 4 ROUNDS").
       rows.push({ kind: 'block', label: '', cap } satisfies PosterBlock);
     }
 
+    let lastStationLabel: string | undefined;
     for (const row of section.rows) {
-      rows.push(artifactRowToPosterLine(row, mineMap, teamSize));
+      if (row.stationRow && row.roundLabel && row.roundLabel !== lastStationLabel) {
+        rows.push({
+          kind: 'block',
+          label: formatStationBlockLabel(row.roundLabel),
+          cap: row.stationHeaderCap,
+        } satisfies PosterBlock);
+        lastStationLabel = row.roundLabel;
+      }
+      // Convert with roundLabel intact — artifactRowToPosterLine relies on it to know a
+      // station row's primary already embeds the movement name ("200M RUN") and must not
+      // append the name again ("200M RUN RUN"). The chip itself is still suppressed on the
+      // emitted line: the ST. header block above already carries the station label.
+      const line = artifactRowToPosterLine(row, mineMap, teamSize);
+      rows.push(row.stationRow ? { ...line, roundLabel: undefined } : line);
     }
   }
 
   return rows;
+}
+
+function formatStationBlockLabel(label: string): string {
+  const numeric = label.match(/\b[A-Z]\.(\d+)\b/i);
+  if (numeric) return `ST. ${numeric[1]}`;
+  const station = label.match(/\b(?:station|st)\.?\s*(\d+|[A-Z])\b/i);
+  if (station) return `ST. ${station[1].toUpperCase()}`;
+  return label.toUpperCase();
 }
 
 // Build a name→weight map from storyMovements (includes progression strings).
@@ -580,7 +604,8 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
       // carrying the total.
       rxLabel = row.nameWithLoad?.trim() || row.name;
     }
-  } else if (row.roundLabel != null) {
+  } else if (row.stationRow || row.roundLabel != null) {
+    // Station rows carry their complete display line in primary — never re-append the name.
     rxLabel = row.primary ?? '';
   } else {
     rxLabel = row.primary ? `${row.primary} ${row.name}` : row.name;
@@ -632,6 +657,27 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────
 
+function formatClockSeconds(seconds: number): string {
+  const rounded = Math.round(seconds);
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatAlternatingStationClock(exercise: Exercise): { title: string } | undefined {
+  // "02:00" → "2:00" — the clock reads cleaner without the whiteboard's leading zero.
+  const stripLeadingZero = (clock: string): string => clock.replace(/^0(?=\d:)/, '');
+  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+  const match = text.match(/(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*amrap\s*\/\s*(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*rest.*?(?:[xX*×]\s*)(\d+)/i);
+  if (match) return { title: `[${stripLeadingZero(match[1])}/${stripLeadingZero(match[2])}] × ${match[3]}` };
+
+  const count = exercise.intervalCount || exercise.rounds || exercise.sets?.length;
+  if (!count || !exercise.workDuration) return undefined;
+  const work = formatClockSeconds(exercise.workDuration / count);
+  const rest = exercise.restDuration ? formatClockSeconds(exercise.restDuration / count) : undefined;
+  return { title: rest ? `[${work}/${rest}] × ${count}` : `[${work}] × ${count}` };
+}
+
 export function buildPosterWodFromPage(
   data: CelebrationData,
   pageIndex: number,
@@ -650,7 +696,7 @@ export function buildPosterWodFromPage(
   const exType = ex['type'] as string | undefined;
   const exFmt: string = page.isStrength
     ? 'strength'
-    : exLoggingMode === 'for_time' || exLoggingMode === 'amrap' || exLoggingMode === 'strength'
+    : exLoggingMode === 'for_time' || exLoggingMode === 'amrap' || exLoggingMode === 'amrap_intervals' || exLoggingMode === 'strength'
       ? exLoggingMode
       : exType === 'strength' ? 'strength'
       : data.workoutFormat ?? 'for_time';
@@ -667,6 +713,8 @@ export function buildPosterWodFromPage(
   // them the same way, or a single-AMRAP-block exercise classified as amrap_intervals silently
   // skips the duration entirely while the tag still reads "AMRAP".
   const isAmrap = exFmt === 'amrap' || exFmt === 'amrap_intervals';
+  const hasStationBlocks = !!section?.rows.some((row) => row.stationRow && row.roundLabel && row.stationHeaderCap);
+  const stationClock = hasStationBlocks ? formatAlternatingStationClock(page.exercise) : undefined;
 
   // This exercise's OWN prescribed AMRAP duration (never the workout-wide duration, which mixes
   // in the other parts of a multi-block session) — used for both the title and the format line
@@ -674,7 +722,7 @@ export function buildPosterWodFromPage(
   const amrapMinutes = isAmrap ? extractAmrapMinutes(page.exercise) : undefined;
 
   const exName = page.exercise.name?.trim().toUpperCase() ?? null;
-  let title = exName && !isGenericTitle(exName) ? exName : null;
+  let title = stationClock?.title ?? (exName && !isGenericTitle(exName) ? exName : null);
   if (!title && isAmrap && amrapMinutes) {
     title = `${amrapMinutes} MIN`;
   }
@@ -688,9 +736,14 @@ export function buildPosterWodFromPage(
     // Partner pages: trust the artifact blueprint (already split-aware) over an independent
     // format guess, for the same reason buildPosterWod does — see that function's comment.
     if (isPartnerPage && section?.blueprint) return section.blueprint.toUpperCase();
+    // Station pages: the title already carries the interval clock ("[2:00/1:00] × 6") — pair
+    // it with the station descriptor instead of a formatLine restating AMRAP.
+    if (stationClock) return 'alt. stations';
+    // A format line that just repeats the type tag ("AMRAP" under an AMRAP chip) adds
+    // nothing — fall through to the more specific duration variants.
     if (heroResult?.formatLine) {
       const fl = heroResult.formatLine.toUpperCase();
-      if (fl && fl !== 'WORKOUT') return fl;
+      if (fl && fl !== 'WORKOUT' && fl !== type) return fl;
     }
     if (isAmrap && amrapMinutes) return `${amrapMinutes}-MIN AMRAP`;
     return mapFormatToType(exFmt);
@@ -702,11 +755,15 @@ export function buildPosterWodFromPage(
     title = null;
   }
   if (!title && isPartnerPage) {
-    title = 'PARTNER METCON';
+    title = section?.partnerDisplayMode === 'sections' ? 'PARTNER WOD' : 'PARTNER METCON';
   }
 
   const sub = (() => {
+    if (section?.partnerDisplayMode === 'sections') return 'you & your partner - three blocks';
     if (isPartnerPage) return '';
+    // Station pages: the "alt. stations" format line stands alone (the clock title already
+    // carries the durations).
+    if (stationClock) return '';
     if (exFmt === 'strength') return 'build to heavy';
     if (isAmrap && amrapMinutes) return `${amrapMinutes} min`;
     if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
@@ -718,6 +775,9 @@ export function buildPosterWodFromPage(
   const rows: PosterRow[] = section ? sectionsToRows([section], mineMap, title, teamSize) : [];
 
   const resultLabel = (() => {
+    // A reps hero (station AMRAP: accumulated max-effort reps) must not sit under a "ROUNDS"
+    // label — the label follows the hero's unit, same rule as buildResultLabel.
+    if (heroResult?.unit === 'REPS') return isPartnerPage ? 'OUR REPS' : 'TOTAL REPS';
     switch (exFmt) {
       case 'for_time': return isPartnerPage ? 'OUR TIME' : 'MY TIME';
       case 'amrap': case 'amrap_intervals': return isPartnerPage ? 'OUR ROUNDS' : 'ROUNDS';
@@ -726,10 +786,13 @@ export function buildPosterWodFromPage(
       default: return isPartnerPage ? 'OUR RESULT' : 'RESULT';
     }
   })();
-  const resultValue = heroResult
-    ? `${heroResult.value}${heroResult.unit ? ` ${heroResult.unit}` : ''}`
-    : '--';
-  const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, heroResult);
+  // Same unit-suppression rule as the main poster (see buildResultValue): the result label
+  // already says "ROUNDS"/"MY TIME", so appending the unit again reads "ROUNDS · 6 ROUNDS".
+  const resultValue = buildResultValue(heroResult);
+  // Station pages: the interval clock in the title already states the cap — no meta line.
+  const { meta: resultMeta } = stationClock
+    ? { meta: undefined }
+    : buildAmrapResultMeta(isAmrap, amrapMinutes, heroResult);
 
   const rx: string | null = data.isPR ? 'PR' : null;
   const totals = buildTotals(data, resultValue);
@@ -788,12 +851,12 @@ export function buildPosterWod(
   const split: PosterWod['split'] = sectionLedger ? 'rounds' : data.artifactSections[0]?.partnerDisplayMode === 'sections' ? 'sections' : 'reps';
   const rounds = sectionLedger?.rounds;
   if (!title && isPartnerConfirmed) {
-    title = 'PARTNER METCON';
+    title = split === 'sections' ? 'PARTNER WOD' : 'PARTNER METCON';
   }
 
   // Result
-  const resultLabel = buildResultLabel(data.workoutFormat, isPartnerConfirmed);
-  const resultValue = buildResultValue(data);
+  const resultLabel = buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit);
+  const resultValue = buildResultValue(data.heroResult);
   const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
   const amrapMinutes = data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined;
   const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, amrapMinutes, data.heroResult);

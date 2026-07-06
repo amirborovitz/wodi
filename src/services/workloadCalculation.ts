@@ -140,15 +140,54 @@ function getStationVisitCount(totalIntervals: number, stationCount: number, stat
   return baseVisits + (stationIndex < remainder ? 1 : 0);
 }
 
+function getRoundSectionCount(exercise: ParsedExercise): number {
+  return exercise.sections?.filter((section) => section.sectionType === 'rounds').length ?? 0;
+}
+
+function hasAlternatingStationText(workout: ParsedWorkout, exercise: ParsedExercise): boolean {
+  const text = [
+    workout.rawText,
+    exercise.rawText,
+    exercise.name,
+    exercise.prescription,
+  ].filter(Boolean).join('\n');
+  return /\b(?:alt|alternat(?:e|ing)|stations?)\b/i.test(text)
+    || /\b[A-Z]\.\d+\b/.test(text);
+}
+
+function getStationTotalIntervals(
+  workout: ParsedWorkout,
+  exercise: ParsedExercise,
+  stationCount: number,
+): number {
+  const cycles = getContainerMultiplier(workout, exercise);
+  const suggestedSets = exercise.suggestedSets || 0;
+  const workoutSets = workout.sets || 0;
+
+  if (exercise.intervalCount && exercise.intervalCount > 0) return exercise.intervalCount;
+  if (suggestedSets > stationCount && suggestedSets % stationCount === 0) return suggestedSets;
+  if (workoutSets > stationCount && workoutSets % stationCount === 0) return workoutSets;
+  if (hasAlternatingStationText(workout, exercise) && workoutSets > 1) return workoutSets;
+
+  return cycles * stationCount;
+}
+
 export function getStationVisitCountsForExercise(
   workout: ParsedWorkout,
   exercise: ParsedExercise,
-  exerciseIndex: number
+  _exerciseIndex: number
 ): number[] | null {
   // Allow exercises with stationLabel on movements to bypass the stationRotation flag —
   // EMOM minute-station workouts use stationLabel without setting stationRotation.
   const hasMovementStationLabels = exercise.movements?.some(m => m.stationLabel);
-  if (!(workout.stationRotation || exercise.stationRotation || hasMovementStationLabels)) return null;
+  const hasSectionStationStructure = getRoundSectionCount(exercise) > 1 && (
+    workout.stationRotation
+    || exercise.stationRotation
+    || hasAlternatingStationText(workout, exercise)
+    || workout.format === 'amrap_intervals'
+    || exercise.loggingMode === 'amrap_intervals'
+  );
+  if (!(workout.stationRotation || exercise.stationRotation || hasMovementStationLabels || hasSectionStationStructure)) return null;
 
   // For exercises with movement-level station labels (EMOM stations):
   // Compute totalIntervals = cycles × stationCount so each station gets (cycles) visits.
@@ -161,21 +200,26 @@ export function getStationVisitCountsForExercise(
       (exercise.movements || []).map(m => m.stationLabel?.trim()).filter(Boolean)
     );
     const stationCount = stationLabelsInExercise.size || 1;
-    const cycles = getContainerMultiplier(workout, exercise);
-    const suggestedSets = exercise.suggestedSets || 0;
     // Heuristic: if suggestedSets is clearly the total-interval count (> stationCount, divisible),
     // use it directly (e.g. suggestedSets=16 for a 16-min EMOM with 4 stations → 4 visits).
+    // Same check against the session-level workout.sets: for alternating-station AMRAPs (e.g.
+    // "[2:00 AMRAP / 1:00 REST] x 6, alternating between 2 stations"), the AI merges both
+    // stations into one exercise with suggestedSets left at 1 (or unset) and puts the true total
+    // interval count (6) on workout.sets instead — multiplying that by stationCount again (as the
+    // cycles fallback below does) would double it (12 instead of 6), giving every station 6
+    // visits instead of 3.
     // Otherwise treat cycles as complete-cycle count and multiply: 4 cycles × 4 stations = 16.
-    totalIntervals = (suggestedSets > stationCount && suggestedSets % stationCount === 0)
-      ? suggestedSets
-      : cycles * stationCount;
+    totalIntervals = getStationTotalIntervals(workout, exercise, stationCount);
   } else {
-    totalIntervals = getContainerMultiplier(workout, exercise);
+    const stationCount = hasSectionStationStructure ? getRoundSectionCount(exercise) : 1;
+    totalIntervals = stationCount > 1
+      ? getStationTotalIntervals(workout, exercise, stationCount)
+      : getContainerMultiplier(workout, exercise);
   }
   if (totalIntervals <= 0) return null;
 
   // Section-based station rotation (only when stationRotation is explicitly set)
-  if ((workout.stationRotation || exercise.stationRotation) && exercise.sections && exercise.sections.length > 1) {
+  if ((workout.stationRotation || exercise.stationRotation || hasSectionStationStructure) && exercise.sections && exercise.sections.length > 1) {
     const roundSections = exercise.sections
       .map((section, sectionIndex) => ({ section, sectionIndex }))
       .filter(({ section }) => section.sectionType === 'rounds');
@@ -231,13 +275,6 @@ export function getStationVisitCountsForExercise(
         getStationVisitCount(totalIntervals, stationCount, stationIndex)
       );
     }
-  }
-
-  // Exercise-level station rotation: each exercise is one station (only for stationRotation workouts)
-  if ((workout.stationRotation || exercise.stationRotation) && workout.exercises.length > 1) {
-    const stationCount = workout.exercises.length;
-    const visits = getStationVisitCount(totalIntervals, stationCount, exerciseIndex);
-    return movements && movements.length > 0 ? movements.map(() => visits) : [visits];
   }
 
   return null;
@@ -518,21 +555,16 @@ export function calculateWorkloadFromExercises(
   for (const exercise of exercises) {
     const key = exercise.name.toLowerCase();
     let exerciseReps = 0;
-    let exerciseWeight: number | undefined;
     let exerciseDistance = 0;
     let exerciseCalories = 0;
-    let exerciseVolume = 0;
-    const perSetWeights: number[] = [];
+    const distinctWeights: number[] = [];
 
     for (const set of exercise.sets) {
       if (set.actualReps) {
         exerciseReps += set.actualReps;
       }
-      if (set.weight) {
-        if (!exerciseWeight) exerciseWeight = set.weight;
-        perSetWeights.push(set.weight);
-        // Accumulate per-set volume for accurate progressive weight totals
-        exerciseVolume += set.weight * (set.actualReps || 0);
+      if (set.weight && !distinctWeights.includes(set.weight)) {
+        distinctWeights.push(set.weight);
       }
       if (set.distance) {
         exerciseDistance += set.distance;
@@ -542,15 +574,12 @@ export function calculateWorkloadFromExercises(
       }
     }
 
-    // Build weight progression if weights vary across sets
-    const hasVaryingWeights = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
-    const weightProgression = hasVaryingWeights ? perSetWeights : undefined;
-
-    // Use weighted average weight when progression exists, so volume = avgWeight × totalReps
-    if (hasVaryingWeights && exerciseReps > 0 && exerciseVolume > 0) {
-      exerciseWeight = exerciseVolume / exerciseReps;
-    }
-
+    // Only the real (first/last set) weights are ever stored, so the average of the
+    // distinct values × total reps gives the true volume — no per-set fabrication needed.
+    const exerciseWeight = distinctWeights.length > 0
+      ? distinctWeights.reduce((sum, w) => sum + w, 0) / distinctWeights.length
+      : undefined;
+    const weightProgression = distinctWeights.length > 1 ? distinctWeights : undefined;
 
     const existing = movementMap.get(key);
     const color = inferColorFromName(exercise.name, exerciseWeight);

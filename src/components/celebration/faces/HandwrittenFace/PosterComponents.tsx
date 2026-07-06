@@ -87,15 +87,20 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     };
   }
 
+  // An Rx load alongside a logged total is context, not the row's value — render it as the
+  // quiet inline tag ("Max DB Devil Press 22.5/15kg — 18 reps") and let the total own the
+  // value column.
+  const inlineLoad = !!(r.load && total && !r.mine);
   return {
     movName,
     isStrength: false,
     strengthValue: null,
     team: null,
     me: null,
-    single: r.mine || r.load || total,
+    single: r.mine || (inlineLoad ? total : r.load || total),
     total,
     roundLabel: r.roundLabel,
+    loadTag: inlineLoad ? r.load : null,
   };
 }
 

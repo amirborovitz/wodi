@@ -191,14 +191,14 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
           ic: Record<string, number> = {}, ma: Record<string, string> = {},
           mdpr: Record<string, number> = {};
     for (const m of r.movementResults ?? []) {
-      const n = m.movement.name;
+      const n = m.movementKey || m.movement.name;
       if (m.kind === 'load' && m.weight != null && m.weight > 0) mw[n] = m.weight;
       if (m.distance != null && m.distance > 0) md[n] = m.distance;
       if (m.reps != null && m.reps > 0) mr[n] = m.reps;
       if (m.calories != null && m.calories > 0) mc[n] = m.calories;
       if (m.implementCount && m.implementCount > 1) ic[n] = m.implementCount;
       if (m.substitution) {
-        ma[m.substitution.originalName] = m.substitution.selectedName;
+        ma[n] = m.substitution.selectedName;
         if (!(m.distance != null && m.distance > 0)) md[n] = 0;
         if (!(m.calories != null && m.calories > 0)) mc[n] = 0;
       }
@@ -254,8 +254,12 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     const rps = r.exercise.suggestedRepsPerSet;
     for (let i = 0; i < setsCount; i++) {
       let weight: number | undefined;
-      if (isRange && sw != null && ew != null) { const f = setsCount > 1 ? i / (setsCount - 1) : 0; weight = Math.round((sw + f * (ew - sw)) * 2) / 2; }
-      else weight = sw;
+      if (isRange && sw != null && ew != null) {
+        // Only the first/last set carry a real (user-entered) weight — never invent middle sets
+        if (i === 0) weight = sw;
+        else if (i === setsCount - 1) weight = ew;
+        else weight = undefined;
+      } else weight = sw;
       const sr = rps?.[i] ?? r.exercise.suggestedReps;
       sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: sr, actualReps: sr, weight, completed: true });
     }
@@ -271,8 +275,10 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         let weight: number | undefined;
         if (r.loadMode === 'bodyweight') weight = undefined;
         else if (r.loadMode === 'range' && r.weight != null && r.weightEnd != null) {
-          const it = hasMax ? pc : setsCount;
-          weight = Math.round((r.weight + (it > 1 ? i / (it - 1) : 0) * (r.weightEnd - r.weight)) * 2) / 2;
+          // Only the first/last set carry a real (user-entered) weight — never invent middle sets
+          if (i === 0) weight = r.weight;
+          else if (i === pc - 1) weight = r.weightEnd;
+          else weight = undefined;
         } else weight = r.weight;
         const sr = rps?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
         sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: rps?.[i] ?? r.exercise.suggestedReps, actualReps: sr, weight, completed: true });

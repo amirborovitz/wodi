@@ -258,13 +258,6 @@ const MOVEMENT_ALIASES: Record<string, string> = {
  * Main post-processor function
  */
 export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout {
-  console.warn('🔧 [PostProcessor] CALLED with:', {
-    title: workout.title,
-    type: workout.type,
-    format: workout.format,
-    timeCap: workout.timeCap,
-  });
-
   // Detect partner workout if AI missed it
   const partnerResult = detectAndAdjustPartnerWorkout(workout);
 
@@ -284,16 +277,6 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     movements: ex.movements ? mergeAlternativeMovements(ex.movements) : undefined,
   }));
 
-
-  console.warn('🔧 [PostProcessor] RESULT:', {
-    originalFormat: workout.format,
-    correctedFormat,
-    originalType: workout.type,
-    correctedType,
-    timeCap,
-    partnerWorkout: partnerResult.partnerWorkout,
-    title: workout.title,
-  });
 
   const result = {
     ...workout,
@@ -359,13 +342,8 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   return backfillMovementSemantics(withCorrectedIntervals);
 }
 
-function inferScoreEntryMode(
-  movement: ParsedMovement,
-  loggingMode?: ExerciseLoggingMode
-): ParsedMovement['scoreEntryMode'] {
-  if (movement.scoreEntryMode) return movement.scoreEntryMode;
-
-  const isScoredMode = loggingMode === 'for_time'
+function isScoredLoggingMode(loggingMode?: ExerciseLoggingMode): boolean {
+  return loggingMode === 'for_time'
     || loggingMode === 'intervals'
     || loggingMode === 'amrap'
     || loggingMode === 'amrap_intervals'
@@ -373,8 +351,30 @@ function inferScoreEntryMode(
     || loggingMode === 'cardio'
     || loggingMode === 'cardio_distance'
     || loggingMode === 'bodyweight';
+}
 
-  if (!isScoredMode) return undefined;
+// A scored-mode movement with no prescribed quantity is a max-effort movement ("Max sit ups").
+// The AI rarely sets isMaxReps itself, and logging later writes the athlete's per-round reps
+// into movement.reps — destroying the "no prescribed value" signal — so stamp it before save
+// or the poster can no longer tell prescription from logged score.
+function inferIsMaxReps(
+  movement: ParsedMovement,
+  loggingMode?: ExerciseLoggingMode
+): boolean | undefined {
+  if (movement.isMaxReps != null) return movement.isMaxReps;
+  if (!isScoredLoggingMode(loggingMode)) return undefined;
+  return !movement.reps && !movement.distance && !movement.calories && !movement.time
+    ? true
+    : undefined;
+}
+
+function inferScoreEntryMode(
+  movement: ParsedMovement,
+  loggingMode?: ExerciseLoggingMode
+): ParsedMovement['scoreEntryMode'] {
+  if (movement.scoreEntryMode) return movement.scoreEntryMode;
+
+  if (!isScoredLoggingMode(loggingMode)) return undefined;
 
   if (movement.countingMode === 'per_station_visit' || movement.stationIndex != null || movement.stationLabel) {
     return 'per_round';
@@ -397,25 +397,34 @@ function inferCountingMode(
   if (movement.countingMode) return movement.countingMode;
   if (movement.stationIndex != null) return 'per_station_visit';
   if (movement.stationLabel) return 'per_station_visit';
-  const hasExplicitStationStructure = workout.exercises.length > 1
+  // Station counting must come from THIS exercise's own structure: station-labeled movements
+  // or multiple rounds-sections. A session-level workout.stationRotation must never leak into
+  // a sibling block — "exercises.length > 1" treated every multi-part session as station
+  // structure and stamped per_station_visit onto plain-AMRAP movements, silently collapsing
+  // their round multiplier to 1 (same scoping principle as per-exercise rawText).
+  const exerciseStationStructure = (exercise.movements?.some(
+    (candidate) => candidate.stationLabel || candidate.stationIndex != null,
+  ) ?? false)
     || (exercise.sections?.filter(section => section.sectionType === 'rounds').length ?? 0) > 1;
-  if ((exercise.stationRotation || workout.stationRotation) && hasExplicitStationStructure) {
+  if ((exercise.stationRotation || workout.stationRotation) && exerciseStationStructure) {
     return 'per_station_visit';
   }
 
   const buyOrCash = movement.role === 'buy_in' || movement.role === 'cash_out'
     || sectionType === 'buy_in' || sectionType === 'cash_out';
 
+  // Per-part scoping: this exercise's own loggingMode decides how its buy-in/cash-out counts.
+  // The session-level workout.format is a fallback for when the AI omitted loggingMode — it
+  // must never override a sibling part's own mode (part A being amrap_intervals doesn't make
+  // part B's for_time buy-in repeat per interval).
+  const isIntervalAmrapPart = (exercise.loggingMode ?? workout.format) === 'amrap_intervals';
+
   if (buyOrCash) {
-    return workout.format === 'amrap_intervals' || exercise.loggingMode === 'amrap_intervals'
-      ? 'per_interval'
-      : 'once';
+    return isIntervalAmrapPart ? 'per_interval' : 'once';
   }
 
   if (movement.perRound === false) {
-    return workout.format === 'amrap_intervals' || exercise.loggingMode === 'amrap_intervals'
-      ? 'per_interval'
-      : 'once';
+    return isIntervalAmrapPart ? 'per_interval' : 'once';
   }
 
   return 'per_round';
@@ -456,11 +465,13 @@ function annotateMovementSemantics(
 
     const countingMode = inferCountingMode(next, exercise, workout, sectionType);
     const scoreEntryMode = inferScoreEntryMode(next, exercise.loggingMode);
+    const isMaxReps = inferIsMaxReps(next, exercise.loggingMode);
 
     return {
       ...next,
       ...(countingMode ? { countingMode } : {}),
       ...(scoreEntryMode ? { scoreEntryMode } : {}),
+      ...(isMaxReps != null ? { isMaxReps } : {}),
     };
   });
 }
@@ -607,6 +618,16 @@ function checkAmrapIntervalsAndBuyInConsistency(workout: ParsedWorkout): void {
  * For amrap_intervals workouts with prescriptions like "200m run Into AMRAP: ...",
  * the first movement (before "into AMRAP") is a buy-in done once per interval,
  * not every AMRAP round. Flag it with perRound=false and "Buy-In: " prefix.
+ *
+ * Also handles the "fixed movement once, then Max effort for whatever time is left" phrasing
+ * (e.g. "200m run / Max single DB Devil press") — no "into AMRAP"/"buy-in" keywords appear, so
+ * the AI leaves loggingMode as plain "amrap" (repeatable couplet), which routes logging to the
+ * generic ROUNDS stepper. That's wrong here: there is no round to repeat, just one fixed
+ * movement done once plus a max-effort movement for the remainder. Detected by: exactly one
+ * movement with a prescribed quantity (reps/distance/calories) and exactly one with none at all
+ * (the max-effort one), alongside the word "max" in the text. Upgrades loggingMode to
+ * "amrap_intervals" so it reuses the existing amrap_intervals input path (which already hides
+ * the rounds stepper — see InputRouter's `!isAmrapIntervals` gate on ScoreRoundsInput).
  */
 function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
   if (workout.format !== 'amrap_intervals') return workout;
@@ -621,28 +642,42 @@ function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
     // Only flag a buy-in when the prescription text explicitly says so.
     // Structural heuristics ("first cardio + rest have reps") are too broad and incorrectly
     // label movements like "100 cal Echo Bike + 20 DB Snatch" where both are done every round.
-    const hasBuyInPattern = /\binto\s+amrap\b|\bbuy[\s-]?in\b|\bthen\s+amrap\b/i.test(rx);
+    const hasExplicitBuyInPattern = /\binto\s+amrap\b|\bbuy[\s-]?in\b|\bthen\s+amrap\b/i.test(rx);
 
-    if (!hasBuyInPattern) return ex;
+    if (hasExplicitBuyInPattern) {
+      // Find the buy-in: first movement with distance/calories but no reps
+      const buyInIdx = ex.movements.findIndex(m => (m.distance || m.calories) && !m.reps);
+      const targetIdx = buyInIdx >= 0 ? buyInIdx : 0;
+      changed = true;
+      return {
+        ...ex,
+        movements: ex.movements.map((m, i) => i !== targetIdx ? m : {
+          ...m,
+          perRound: false as const,
+          name: m.name.startsWith('Buy-In:') ? m.name : `Buy-In: ${m.name}`,
+        }),
+      };
+    }
 
-    // Find the buy-in: first movement with distance/calories but no reps
-    const buyInIdx = ex.movements.findIndex(m =>
-      (m.distance || m.calories) && !m.reps
-    );
-    // Fallback: if prescription mentions "into AMRAP", the first movement is the buy-in
-    const targetIdx = buyInIdx >= 0 ? buyInIdx : (hasBuyInPattern ? 0 : -1);
-    if (targetIdx < 0) return ex;
+    // Fixed-once + max-effort pattern: require exactly one movement with a prescribed
+    // quantity and exactly one with none at all, so we never misfire on a normal AMRAP
+    // couplet where every movement legitimately repeats each round.
+    if (!/\bmax\b/i.test(rx)) return ex;
+    const hasFixedQty = (m: ParsedMovement) => Boolean(m.reps || m.distance || m.calories);
+    const fixedMovements = ex.movements.filter(hasFixedQty);
+    const maxMovements = ex.movements.filter(m => !hasFixedQty(m));
+    if (fixedMovements.length === 0 || maxMovements.length !== 1) return ex;
 
     changed = true;
-    const newMovements = ex.movements.map((m, i) => {
-      if (i !== targetIdx) return m;
-      return {
+    return {
+      ...ex,
+      loggingMode: 'amrap_intervals' as ExerciseLoggingMode,
+      movements: ex.movements.map((m) => hasFixedQty(m) ? {
         ...m,
         perRound: false as const,
         name: m.name.startsWith('Buy-In:') ? m.name : `Buy-In: ${m.name}`,
-      };
-    });
-    return { ...ex, movements: newMovements };
+      } : m),
+    };
   });
 
   return changed ? { ...workout, exercises } : workout;
@@ -712,7 +747,6 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
         ladderReps = rps;
         const ic = workout.sets || ex.suggestedSets || 1;
         intervalCount = ic > 1 ? ic : undefined;
-        console.log(`[PostProcessor] Detected ladder from suggestedRepsPerSet: [${rps}], intervals: ${ic}`);
       }
     }
 
@@ -735,7 +769,6 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
                 : (workout.sets || ex.suggestedSets || 1);
               ladderReps = nums;
               intervalCount = ic > 1 ? ic : undefined;
-              console.log(`[PostProcessor] Detected ladder from text: [${nums}], intervals: ${ic}`);
               break;
             }
           }
@@ -775,13 +808,11 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
       const matchesAfterEachClause = movWords.length > 0
         && afterEachClauses.some(clause => movWords.some(word => clause.toLowerCase().includes(word)));
       if (matchesAfterEachClause) {
-        console.log(`[PostProcessor] Marking "${mov.name}" as perRound=false (matched "after each" clause)`);
         return { ...mov, perRound: false as const };
       }
 
       // Fallback: reps don't match any ladder value.
       if (mov.reps && !ladderReps!.includes(mov.reps)) {
-        console.log(`[PostProcessor] Marking "${mov.name}" as perRound=false (${mov.reps} reps, not in ladder [${ladderReps}])`);
         return { ...mov, perRound: false as const };
       }
       return mov;
@@ -926,12 +957,8 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
     ...workout.exercises.map(e => e.prescription),
   ].filter(Boolean).join(' ').toLowerCase();
 
-  console.warn('🔧 [correctWorkoutFormat] Checking text:', fullText.slice(0, 200));
-  console.warn('🔧 [correctWorkoutFormat] Prominent text contains AMRAP?', prominentText.includes('amrap'));
-
   // If AI already classified as strength and no AMRAP anywhere, keep it
   if (workout.format === 'strength' && !prominentText.includes('amrap') && !fullText.includes('amrap')) {
-    console.warn('🔧 [correctWorkoutFormat] -> Keeping strength format (no AMRAP in title/names)');
     return 'strength';
   }
 
@@ -941,10 +968,8 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
     if (/amrap.*x\s*\d/i.test(fullText) || /\d+\s*x\s*amrap/i.test(fullText) ||
         (fullText.includes('amrap') && fullText.includes('rest')) ||
         (fullText.includes('amrap') && /every\s+\d+/i.test(fullText))) {
-      console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap_intervals');
       return 'amrap_intervals';
     }
-    console.warn('🔧 [correctWorkoutFormat] -> Returning: amrap');
     return 'amrap';
   }
 
@@ -997,12 +1022,10 @@ function extractTimeCap(workout: ParsedWorkout): number | undefined {
     const match = text.match(pattern);
     if (match) {
       const minutes = parseInt(match[1]);
-      console.log('[extractTimeCap] Found time cap:', minutes, 'minutes from pattern:', pattern);
       return minutes * 60; // Convert to seconds
     }
   }
 
-  console.log('[extractTimeCap] No time cap found in:', text.slice(0, 100));
   return undefined;
 }
 
@@ -1350,8 +1373,11 @@ function enrichMovementFromPrescription(normalizedName: string, fullText: string
 
   for (const rule of modifierRules) {
     if (!rule.appliesTo(lower)) continue;
-    // Check if the prefix is already in the name
-    if (lower.startsWith(rule.prefix.toLowerCase())) continue;
+    // Skip if the prefix already appears anywhere in the name, not just at the very start —
+    // the AI sometimes already embeds it mid-name (e.g. "Single DB Alt Devil Press"), and a
+    // startsWith-only check let this rule prepend a second one: "Alt Single DB Alt Devil Press".
+    const prefixPattern = new RegExp(`\\b${rule.prefix.split(/\s+/).map(escapeRegex).join('\\s+')}\\b`, 'i');
+    if (prefixPattern.test(normalizedName)) continue;
     if (textMentionsMovement(rule.patterns)) {
       return `${rule.prefix} ${normalizedName}`;
     }
@@ -1445,12 +1471,8 @@ function postProcessMovements(
   // Track which occurrence index we're at for each normalized name
   const nameSeenCount = new Map<string, number>();
 
-  console.log('[postProcessMovements] Pass 2 — nameCounts:', Object.fromEntries(nameCounts),
-    'namesWithWeights:', [...namesWithWeights]);
-
   const pass2 = pass1.map((result, i) => {
     if (result.rxWeights) {
-      console.log(`[postProcessMovements] "${result.name}" already has weight from pass 1`);
       return result;
     }
 
@@ -1461,9 +1483,6 @@ function postProcessMovements(
     // If a sibling with the same normalized name already has weights,
     // skip the full-text search — the weight belongs to that sibling.
     if (isDuplicate && namesWithWeights.has(normalizedLower)) {
-      console.log(
-        `[postProcessMovements] Skipping weight search for "${result.name}" — sibling already has weight`
-      );
       return result;
     }
 
@@ -1490,7 +1509,6 @@ function postProcessMovements(
       findWeightForMovement(normalizedLower, fullText) ??
       findWeightForMovement(originalLower, fullText);
     if (movWeights) {
-      console.log(`[postProcessMovements] Found weight for unique "${result.name}" via full-text search`);
       return { ...result, rxWeights: movWeights };
     }
 
@@ -1572,11 +1590,9 @@ function normalizeSingleMovementName(name: string): string {
 
 function normalizeMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
-  console.log('[normalizeMovementName] input:', name, '→ lower:', lower);
 
   // 1. Check for exact match first (highest priority)
   if (MOVEMENT_ALIASES[lower]) {
-    console.log('[normalizeMovementName] exact match:', MOVEMENT_ALIASES[lower]);
     return MOVEMENT_ALIASES[lower];
   }
 
@@ -1720,11 +1736,6 @@ function findWeightForNthOccurrence(
   // Find all clauses mentioning this movement
   const nameRegex = new RegExp(`\\b${escapeRegex(movementName)}\\b`, 'i');
   const matchingClauses = clauses.filter(c => nameRegex.test(c));
-
-  console.log(
-    `[findWeightForNthOccurrence] "${movementName}" occurrence #${occurrenceIndex}`,
-    `clauses:`, matchingClauses
-  );
 
   // Get the clause for this specific occurrence
   const clause = matchingClauses[occurrenceIndex];
@@ -2185,7 +2196,6 @@ function backfillSharedWeightHints(workout: ParsedWorkout): ParsedWorkout {
       );
       if (!allSame) return ex;
 
-      console.warn('🔧 [PostProcessor] Backfilling sharedWeightMovements:', weighted.map(m => m.name));
       return {
         ...ex,
         loggingHints: {

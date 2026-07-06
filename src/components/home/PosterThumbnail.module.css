@@ -20,8 +20,9 @@
 }
 
 /* ── Poster card frame — scales the real poster without cropping ───────── */
+/* fix #2: smaller glanceable thumbnail so the shelf doesn't dominate the fold */
 .frame {
-  width: 150px;
+  width: 120px;
   border-radius: 10px;
   overflow: hidden;
   position: relative;

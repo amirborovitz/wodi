@@ -263,6 +263,20 @@ export function getSectionedMovementRepeatCounts(exercise?: Exercise | null): Ma
   return repeatCounts.size > 0 ? repeatCounts : undefined;
 }
 
+// True when a movement name appears more than once in a flat (non-sectioned) per-round
+// movement list — e.g. a run interleaved between every other movement, or a chipper's
+// repeated lines. That repetition is real structure the AI preserved on purpose and must
+// not be collapsed into a single aggregated row.
+function hasIntraRoundRepeat(movements: ParsedMovement[]): boolean {
+  const seen = new Set<string>();
+  for (const movement of movements) {
+    const key = movement.name.toLowerCase();
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
 function getSectionedRoundTradeCount(exercise?: Exercise | null): number | undefined {
   if (!exercise?.sections?.length) return undefined;
   const repeatedRoundTotal = exercise.sections.reduce((sum, section) => {
@@ -610,6 +624,15 @@ export function repairUndercountedBreakdown(
         || movement.countingMode === 'once'
         || /^(cash[-\s]?out|buy[-\s]?in)\s*:/i.test(movement.name);
       if (isBuyInCashOut) continue;
+
+      // Station-rotation movements run on only a subset of the intervals (3 of 6 in an
+      // alternating two-station AMRAP), so reps × prescription-round-count over-counts them —
+      // their breakdown totals already carry the correct per-visit multiplier from save time.
+      // Gate on STRUCTURAL markers only, never countingMode: a post-processor bug (fixed
+      // 2026-07-06) stamped per_station_visit onto plain-AMRAP movements in multi-part
+      // sessions, collapsing their save-time totals to one round — exactly the undercount
+      // this repair exists to heal.
+      if (movement.stationLabel != null || movement.stationIndex != null) continue;
 
       const isVariableSchemeMovement = !!(
         repScheme
@@ -1296,6 +1319,92 @@ function buildProgressiveChipperRows(sections: ParsedSection[], showAllMovements
 
 // ─── Multi-section For Time renderer ─────────────────────────────────────────
 
+function hasBodyweightPrescription(exercise: Exercise, movement: ParsedMovement): boolean {
+  if (movement.isBodyweight) return true;
+  const targetWords = normalizeStampMovementName(movement.name).split(/\s+/).filter(Boolean);
+  if (targetWords.length === 0) return false;
+  const source = `${exercise.rawText || ''}\n${exercise.prescription || ''}`;
+  const clauses = source.split(/[\n,;]+/).map((line) => line.trim()).filter(Boolean);
+  return clauses.some((clause) => {
+    const normalizedClause = normalizeStampMovementName(clause);
+    const mentionsMovement = targetWords.every((word) => normalizedClause.includes(word));
+    return mentionsMovement && /\b(?:b\s*w|bw|body\s*weight|bodyweight)\b/i.test(clause.replace(/\./g, ''));
+  });
+}
+
+function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): string {
+  if (hasBodyweightPrescription(exercise, movement)) return '';
+  if (movement.inputType !== 'weight') return '';
+  const male = movement.rxWeights?.male;
+  const female = movement.rxWeights?.female;
+  if (!male && !female) return '';
+  const unit = movement.rxWeights?.unit ?? 'kg';
+  const implementPrefix = movement.implementCount && movement.implementCount > 1
+    ? `${movement.implementCount}x`
+    : '';
+  if (male && female && male !== female) return ` @ ${implementPrefix}${male}/${female}${unit}`;
+  return ` @ ${implementPrefix}${male ?? female}${unit}`;
+}
+
+function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement, multiplier = 1): { text: string; hasWeight: boolean } {
+  const qty = movement.reps != null
+    ? `${movement.reps * multiplier}`
+    : movement.calories != null
+      ? /\bcal(?:orie|ories)?\b/i.test(movement.name)
+        ? `${movement.calories * multiplier}`
+        : `${movement.calories * multiplier} CAL`
+      : movement.distance != null
+        ? formatDistanceValue(movement.distance * multiplier).toUpperCase()
+        : '';
+  const load = formatSectionRxLoad(exercise, movement);
+  const together = movement.together ? ' (together)' : '';
+  return {
+    text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${load}`].filter(Boolean).join(' '),
+    hasWeight: load !== '',
+  };
+}
+
+// One poster row per literal movement occurrence, in the exact order the AI parsed them —
+// used when a flat (non-sectioned) per-round movement list has a repeated name (e.g. a run
+// interleaved between every other movement). Reuses buildCelebrationMovementRow so a repeated
+// movement renders with the exact same two-column (name + weight/total) styling as every other
+// row on the poster — just called once per literal occurrence instead of once per unique name.
+function buildSequentialMovementRows(
+  prescribedMovements: ParsedMovement[],
+  actualMovements: MovementTotal[],
+  options: {
+    repeatCount?: number;
+    movementRepeatCounts?: Map<string, number>;
+    isStrength?: boolean;
+    descLadderScheme?: number[];
+    partnerSplit?: 'reps' | 'rounds';
+  } = {},
+): ArtifactRow[] {
+  return prescribedMovements.map((movement): ArtifactRow => {
+    const key = movement.name.toLowerCase();
+    const actual = actualMovements.find((m) =>
+      m.name.toLowerCase() === key || m.originalMovement?.toLowerCase() === key,
+    );
+    return buildCelebrationMovementRow({
+      movementName: movement.name,
+      prescribed: {
+        reps: movement.reps,
+        distance: movement.distance,
+        calories: movement.calories,
+        weight: movement.rxWeights?.male || movement.rxWeights?.female,
+        implementCount: movement.implementCount,
+      },
+      actual,
+      repeatCount: options.movementRepeatCounts?.get(key) ?? options.repeatCount,
+      suppressDistanceTotal: true,
+      suppressCalorieTotal: true,
+      isStrength: options.isStrength,
+      isLadder: !!options.descLadderScheme,
+      partnerSplit: options.partnerSplit,
+    });
+  });
+}
+
 /**
  * One poster row per section — each section gets a [N×] chip on its first
  * movement so the reader can see "3× pull-up · push-up · lunge, then 3× run ·
@@ -1316,46 +1425,6 @@ function buildMultiSectionForTimeSections(
   let tradedRoundOffset = 0;
   let sectionIndex = 0;
 
-  function hasBodyweightPrescription(movement: ParsedMovement): boolean {
-    if (movement.isBodyweight) return true;
-    const targetWords = normalizeStampMovementName(movement.name).split(/\s+/).filter(Boolean);
-    if (targetWords.length === 0) return false;
-    const source = `${exercise.rawText || ''}\n${exercise.prescription || ''}`;
-    const clauses = source.split(/[\n,;]+/).map((line) => line.trim()).filter(Boolean);
-    return clauses.some((clause) => {
-      const normalizedClause = normalizeStampMovementName(clause);
-      const mentionsMovement = targetWords.every((word) => normalizedClause.includes(word));
-      return mentionsMovement && /\b(?:b\s*w|bw|body\s*weight|bodyweight)\b/i.test(clause.replace(/\./g, ''));
-    });
-  }
-
-  function formatSectionRxLoad(movement: ParsedMovement): string {
-    if (hasBodyweightPrescription(movement)) return '';
-    if (movement.inputType !== 'weight') return '';
-    const male = movement.rxWeights?.male;
-    const female = movement.rxWeights?.female;
-    if (!male && !female) return '';
-    const unit = movement.rxWeights?.unit ?? 'kg';
-    if (male && female && male !== female) return ` @ ${female}/${male}${unit}`;
-    return ` @ ${male ?? female}${unit}`;
-  }
-
-  function formatSectionMovementPart(movement: ParsedMovement, multiplier = 1): { text: string; hasWeight: boolean } {
-    const qty = movement.reps != null
-      ? `${movement.reps * multiplier}`
-      : movement.calories != null
-        ? `${movement.calories * multiplier} CAL`
-        : movement.distance != null
-          ? formatDistanceValue(movement.distance * multiplier).toUpperCase()
-          : '';
-    const load = formatSectionRxLoad(movement);
-    const together = movement.together ? ' (together)' : '';
-    return {
-      text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${load}`].filter(Boolean).join(' '),
-      hasWeight: load !== '',
-    };
-  }
-
   for (const section of exercise.sections) {
     const sectionMovements = section.movements ?? [];
     if (sectionMovements.length === 0) continue;
@@ -1364,7 +1433,7 @@ function buildMultiSectionForTimeSections(
     const sectionLetter = String.fromCharCode(65 + sectionIndex);
     sectionIndex += 1;
 
-    const moveParts = sectionMovements.map((m) => formatSectionMovementPart(m)).filter((part) => part.text);
+    const moveParts = sectionMovements.map((m) => formatSectionMovementPart(exercise, m)).filter((part) => part.text);
     if (moveParts.length === 0) continue;
 
     let personalRoundsForSection = 0;
@@ -1384,7 +1453,7 @@ function buildMultiSectionForTimeSections(
           : sectionLetter;
     const rows = moveParts.map((part, index): ArtifactRow => {
       const rowPartnerMine = personalRoundsForSection > 0
-        ? formatSectionMovementPart(sectionMovements[index], personalRoundsForSection).text
+        ? formatSectionMovementPart(exercise, sectionMovements[index], personalRoundsForSection).text
         : undefined;
       return {
         primary: part.text,
@@ -1395,9 +1464,9 @@ function buildMultiSectionForTimeSections(
       };
     });
     sections.push({
-      eyebrow: 'I GO YOU GO',
+      eyebrow: undefined,
       title: sectionTitle,
-      blueprint: 'you go, i go',
+      blueprint: undefined,
       rows,
       isPartnerConfirmed,
       partnerDisplayMode: isPartnerConfirmed ? 'sections' : undefined,
@@ -1614,26 +1683,33 @@ export function buildRewardArtifactSections(
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(mainExercise);
   const rowRepeatCount = getEffectiveMovementRepeatCount(mainExercise, repeatCount);
-  const rows = orderedForRows.slice(0, 5).map((movement): ArtifactRow => {
-    const prescribed = prescribedByName.get(movement.name.toLowerCase())
-      ?? (movement.originalMovement ? prescribedByName.get(movement.originalMovement.toLowerCase()) : undefined);
-    const parsedMovement = mainExercise?.movements?.find((candidate) => {
-      const name = candidate.name.toLowerCase();
-      return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
-    });
+  const rows = (!mainExercise?.sections?.length && hasIntraRoundRepeat(prescribedMovements))
+    ? buildSequentialMovementRows(prescribedMovements, movements, {
+        repeatCount: rowRepeatCount,
+        movementRepeatCounts,
+        descLadderScheme,
+        partnerSplit: splitInfo?.split,
+      })
+    : orderedForRows.map((movement): ArtifactRow => {
+        const prescribed = prescribedByName.get(movement.name.toLowerCase())
+          ?? (movement.originalMovement ? prescribedByName.get(movement.originalMovement.toLowerCase()) : undefined);
+        const parsedMovement = mainExercise?.movements?.find((candidate) => {
+          const name = candidate.name.toLowerCase();
+          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
+        });
 
-    return buildCelebrationMovementRow({
-      movementName: parsedMovement
-        ? getMovementDisplayNameFromContext(parsedMovement, capText)
-        : movement.name,
-      prescribed,
-      actual: movement,
-      repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
-      suppressDistanceTotal: true,
-      isLadder: !!descLadderScheme,
-      partnerSplit: splitInfo?.split,
-    });
-  });
+        return buildCelebrationMovementRow({
+          movementName: parsedMovement
+            ? getMovementDisplayNameFromContext(parsedMovement, capText)
+            : movement.name,
+          prescribed,
+          actual: movement,
+          repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
+          suppressDistanceTotal: true,
+          isLadder: !!descLadderScheme,
+          partnerSplit: splitInfo?.split,
+        });
+      });
 
   if (shouldLogCelebrationDebug()) {
     console.warn('[CelebrationDebug:v20260503-single-artifact]', {
@@ -1652,10 +1728,36 @@ export function buildRewardArtifactSections(
     blueprint: blueprint ?? undefined,
     blueprintSub,
     rows,
-    hiddenCount: Math.max(0, movements.length - rows.length),
+    hiddenCount: 0,
     roundLedger,
     isPartnerConfirmed: !!splitInfo,
   }];
+}
+
+// ─── Explicit work/rest durations from prescription text ─────────────────────
+// Used only to disambiguate the AI's workDuration/restDuration semantics (cumulative vs
+// per-interval) in the station blueprint — never to override an unambiguous AI value.
+
+function clockTokenToSeconds(token: string): number | undefined {
+  const clock = token.match(/^(\d{1,2}):(\d{2})$/);
+  if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
+  const unit = token.match(/^(\d+(?:\.\d+)?)\s*(min(?:ute)?s?|sec(?:ond)?s?)$/i);
+  if (unit) return /^s/i.test(unit[2]) ? Math.round(parseFloat(unit[1])) : Math.round(parseFloat(unit[1]) * 60);
+  return undefined;
+}
+
+const TIME_TOKEN_PATTERN = String.raw`(\d{1,2}:\d{2}|\d+(?:\.\d+)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?))`;
+
+function parseExplicitRestSeconds(text: string): number | undefined {
+  const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?rest`, 'i'))
+    ?? text.match(new RegExp(`rest\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
+  return match ? clockTokenToSeconds(match[1].trim()) : undefined;
+}
+
+function parseExplicitWorkSeconds(text: string): number | undefined {
+  const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?(?:amrap|work)`, 'i'))
+    ?? text.match(new RegExp(`(?:amrap|work)\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
+  return match ? clockTokenToSeconds(match[1].trim()) : undefined;
 }
 
 export function buildPageArtifactSection(
@@ -1687,19 +1789,46 @@ export function buildPageArtifactSection(
   const prescribedDistMap: Record<string, number> = {};
   const prescribedWeightMap: Record<string, number> = {};
   const prescribedImplementMap: Record<string, 1 | 2> = {};
+  const prescribedMaxMap: Record<string, boolean> = {};
+  const prescribedRxLabelMap: Record<string, string> = {};
+  const prescribedAltMap: Record<string, string> = {};
   const stationOrderMap: Record<string, number> = {};
+  const stationLabelsInOrder: string[] = [];
   let stationIdx = 0;
+  const formatStationDistance = (meters: number): string => (
+    meters >= 1000
+      ? `${meters % 1000 === 0 ? meters / 1000 : (meters / 1000).toFixed(1)}km`
+      : `${meters}m`
+  );
   const prescribedMovements = exercise.sections?.length
     ? exercise.sections.flatMap((section) => section.movements || [])
     : (exercise.movements || []);
   for (const m of prescribedMovements) {
     const key = m.name.toLowerCase();
-    if (m.stationLabel) stationLabelMap[key] = m.stationLabel;
+    if (m.stationLabel) {
+      stationLabelMap[key] = m.stationLabel;
+      if (!stationLabelsInOrder.includes(m.stationLabel)) stationLabelsInOrder.push(m.stationLabel);
+    }
     if (m.reps) prescribedRepsMap[key] = m.reps;
     if (m.calories) prescribedCalsMap[key] = m.calories;
     if (m.distance) prescribedDistMap[key] = m.distance;
-    if (m.rxWeights?.male || m.rxWeights?.female) prescribedWeightMap[key] = m.rxWeights.male || m.rxWeights.female || 0;
+    if (m.rxWeights?.male || m.rxWeights?.female) {
+      prescribedWeightMap[key] = m.rxWeights.male || m.rxWeights.female || 0;
+      const rxUnit = m.rxWeights.unit === 'lb' ? 'lb' : 'kg';
+      const { male, female } = m.rxWeights;
+      prescribedRxLabelMap[key] = male && female && male !== female
+        ? `${male}/${female}${rxUnit}`
+        : `${male || female}${rxUnit}`;
+    }
+    if (m.alternative?.name) {
+      const altQty = m.alternative.reps ? `${m.alternative.reps}`
+        : m.alternative.distance ? formatStationDistance(m.alternative.distance)
+        : m.alternative.calories ? `${m.alternative.calories} cal`
+        : '';
+      prescribedAltMap[key] = [altQty, m.alternative.name].filter(Boolean).join(' ');
+    }
     if (m.implementCount) prescribedImplementMap[key] = m.implementCount;
+    if (m.isMaxReps || /\bmax\b/i.test(m.name)) prescribedMaxMap[key] = true;
     if (!(key in stationOrderMap)) stationOrderMap[key] = stationIdx++;
   }
   const hasStations = Object.keys(stationLabelMap).length > 0;
@@ -1715,6 +1844,27 @@ export function buildPageArtifactSection(
   const repeatCount = getPrescribedRoundCount([exercise], scopedExerciseText)
     || getPrescriptionRepeatCount(exercise)
     || inferRoundCountFromMovements(exercise, movements);
+  const getStationVisitCount = (totalIntervals: number, stationCount: number, stationIndex: number): number => {
+    if (totalIntervals <= 0 || stationCount <= 0) return 1;
+    const baseVisits = Math.floor(totalIntervals / stationCount);
+    const remainder = totalIntervals % stationCount;
+    return baseVisits + (stationIndex < remainder ? 1 : 0);
+  };
+  const formatStationHeaderDuration = (seconds: number): string => {
+    const rounded = Math.round(seconds);
+    const mins = Math.floor(rounded / 60);
+    const secs = rounded % 60;
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+  const getStationHeaderCap = (stationLabel?: string): string | undefined => {
+    if (!stationLabel || !repeatCount || stationLabelsInOrder.length <= 1) return undefined;
+    const stationIndex = Math.max(0, stationLabelsInOrder.indexOf(stationLabel));
+    const visits = getStationVisitCount(repeatCount, stationLabelsInOrder.length, stationIndex);
+    const workPerVisit = exercise.workDuration && repeatCount > 0
+      ? formatStationHeaderDuration(exercise.workDuration / repeatCount)
+      : undefined;
+    return [`${visits} rds`, workPerVisit].filter(Boolean).join(' · ');
+  };
   // Strength is individual even in a team session — a "6 sets" rep scheme is not a round-trade
   // structure, and each partner lifts their own top set. Never run partner-split detection on it.
   // Scoped text for the partner-language gate specifically: prefer this exercise's OWN rawText
@@ -1766,8 +1916,34 @@ export function buildPageArtifactSection(
   if (hasStations) {
     const stationCount = Object.keys(stationLabelMap).length;
     const roundsMatch = (exercise.prescription || '').match(/(\d+)\s*rounds?/i);
-    const rounds = roundsMatch ? parseInt(roundsMatch[1]) : null;
-    blueprint = [rounds ? `${rounds} rounds` : null, `${stationCount} stations`, '1 min each'].filter(Boolean).join(' · ');
+    const rounds = exercise.rounds || (roundsMatch ? parseInt(roundsMatch[1]) : null);
+    // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
+    // hardcoded "1 min each" here would silently lie about the actual work/rest split.
+    const formatStationDuration = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
+    };
+    // workDuration/restDuration are CUMULATIVE across all rounds (per the AI's own contract —
+    // e.g. "2:00 AMRAP x 6" -> workDuration: 720), not per-round — divide back down to get the
+    // single work/rest interval to display. The AI sometimes violates the contract and returns
+    // the PER-INTERVAL value instead: when the exercise's own text prescribes exactly that
+    // duration (e.g. "[02:00 AMRAP / 01:00 REST] x 6" saved with restDuration: 60), dividing
+    // would invent a fictional split ("0:10 rest") — so a value matching the text's explicit
+    // work/rest is shown as-is.
+    const timingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+    const perIntervalSeconds = (cumulative: number | undefined, explicit: number | undefined): number | undefined => {
+      if (!cumulative || !rounds) return undefined;
+      return cumulative === explicit ? explicit : cumulative / rounds;
+    };
+    const workSeconds = perIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText));
+    const restSeconds = perIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText));
+    const workLabel = workSeconds ? formatStationDuration(workSeconds) : undefined;
+    const restLabel = restSeconds ? formatStationDuration(restSeconds) : undefined;
+    const timingLabel = workLabel
+      ? (restLabel ? `${workLabel} work / ${restLabel} rest` : `${workLabel} each`)
+      : `${stationCount} stations`;
+    blueprint = [rounds ? `${rounds} rounds` : null, timingLabel].filter(Boolean).join(' · ');
   } else if (!isStrength && repeatCount && repeatCount > 1) {
     const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
     const descScheme = forTime ? parseForTimeRepScheme(exercise, rawText) : undefined;
@@ -1847,96 +2023,124 @@ export function buildPageArtifactSection(
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(exercise);
   const rowRepeatCount = getEffectiveMovementRepeatCount(exercise, personalRepeatCount);
-  const rows = orderedMovements.slice(0, 5).map((movement): ArtifactRow => {
-    let primary = '—';
-    let accent: ArtifactRow['accent'] = movement.color || 'magenta';
+  const rows = (!hasStations && !exercise.sections?.length && hasIntraRoundRepeat(prescribedMovements))
+    ? buildSequentialMovementRows(prescribedMovements, movements, {
+        repeatCount: rowRepeatCount,
+        movementRepeatCounts,
+        isStrength,
+        descLadderScheme: descSchemeGlobal,
+        partnerSplit: splitInfo?.split,
+      })
+    : orderedMovements.map((movement): ArtifactRow => {
+        const key = movement.name.toLowerCase();
+        const stationLabel = stationLabelMap[key];
 
-    const key = movement.name.toLowerCase();
-    const stationLabel = stationLabelMap[key];
+        if (hasStations) {
+          const prescReps = prescribedRepsMap[key];
+          const prescCals = prescribedCalsMap[key];
+          const prescDist = prescribedDistMap[key];
+          // isMaxReps is stamped by the post-processor on save (logging writes the athlete's
+          // per-round reps into movement.reps, so "no prescribed value" alone stops being a
+          // reliable signal after save). The absence check remains for docs saved before the
+          // stamp existed.
+          const isMaxMovement = Boolean(prescribedMaxMap[key])
+            || (!(prescDist && prescDist > 0) && !(prescCals && prescCals > 0) && !(prescReps && prescReps > 0));
+          const wUnit = movement.unit === 'lb' ? 'lb' : 'kg';
+          const displayName = movement.name.replace(/\bDbs?\b/g, (token) => token.toUpperCase());
+          const totalR = movement.totalReps || 0;
+          const totalC = movement.totalCalories || 0;
+          const totalD = movement.totalDistance || 0;
 
-    if (hasStations) {
-      const prescReps = prescribedRepsMap[key];
-      const prescCals = prescribedCalsMap[key];
-      const prescDist = prescribedDistMap[key];
-      const wUnit = movement.unit === 'lb' ? 'LB' : 'KG';
-      const totalR = movement.totalReps || 0;
-      const totalC = movement.totalCalories || 0;
-      const totalD = movement.totalDistance || 0;
-      let totalNote: string | undefined;
+          let fullLine: string;
+          let rxLoadTag: string | undefined;
+          let totalNote: string | undefined;
 
-      if (prescDist && prescDist > 0) {
-        primary = prescDist >= 1000 ? `${(prescDist / 1000).toFixed(1)}KM` : `${prescDist}M`;
-        accent = 'magenta';
-        const displayTotalD = isTeamIGUG && personalRepeatCount ? prescDist * personalRepeatCount : totalD;
-        if (displayTotalD > 0 && displayTotalD !== prescDist) {
-          totalNote = displayTotalD >= 1000 ? `${(displayTotalD / 1000).toFixed(1)} km total` : `${displayTotalD}m total`;
+          if (isMaxMovement) {
+            // Max-effort movement: the prescription is just "Max <movement>"; the Rx load rides
+            // along as a quiet tag and the logged aggregate is the row's value ("24 reps").
+            fullLine = `Max ${displayName}`;
+            rxLoadTag = prescribedRxLabelMap[key]
+              || ((movement.weight || 0) > 0 ? `${movement.weight}${wUnit}` : undefined);
+            totalNote = totalD > 0 ? (totalD >= 1000 ? `${(totalD / 1000).toFixed(1)} km` : `${totalD}m`)
+              : totalC > 0 ? `${totalC} cal`
+              : totalR > 0 ? `${totalR} reps`
+              : undefined;
+          } else {
+            // Fixed prescription: one line as the athlete would read it off the whiteboard
+            // ("200m Run", "50 Double Under / 80 Singles"). The per-station round count in the
+            // ST. header already says how many times it ran — no derived totals.
+            const qty = prescDist && prescDist > 0 ? formatStationDistance(prescDist)
+              : prescCals && prescCals > 0 ? `${prescCals} cal`
+              : `${prescReps}`;
+            const altSuffix = prescribedAltMap[key] ? ` / ${prescribedAltMap[key]}` : '';
+            const loadSuffix = (movement.weight || 0) > 0 ? ` @ ${movement.weight}${wUnit}`
+              : prescribedRxLabelMap[key] ? ` @ ${prescribedRxLabelMap[key]}` : '';
+            fullLine = `${qty} ${displayName}${altSuffix}${loadSuffix}`;
+          }
+
+          // Station rows always carry the COMPLETE display line in primary (the poster line
+          // converter renders it verbatim and never re-appends the name). The station letter
+          // renders as the ST. header block above, via roundLabel on the station's first row.
+          const base: ArtifactRow = {
+            primary: fullLine,
+            name: displayName,
+            subNote: rxLoadTag,
+            totalNote,
+            accent: isMaxMovement ? 'yellow' : (movement.color || 'magenta'),
+            stationRow: true,
+            suppressMine: true,
+          };
+          if (stationLabel) {
+            return {
+              ...base,
+              roundLabel: stationLabel.toUpperCase(),
+              stationHeaderCap: getStationHeaderCap(stationLabel),
+            };
+          }
+          return base;
         }
-      } else if (prescCals && prescCals > 0) {
-        primary = `${prescCals} CAL`;
-        accent = 'magenta';
-        const displayTotalC = isTeamIGUG && personalRepeatCount ? prescCals * personalRepeatCount : totalC;
-        if (displayTotalC > 0 && displayTotalC !== prescCals) totalNote = `${displayTotalC} cal total`;
-      } else if (prescReps && prescReps > 0) {
-        if ((movement.weight || 0) > 0) {
-          primary = `${prescReps} @ ${movement.weight}${wUnit}`;
-          accent = 'yellow';
-        } else {
-          primary = `${prescReps} REPS`;
+
+        const prescribed = {
+          reps: prescribedRepsMap[key],
+          distance: prescribedDistMap[key],
+          calories: prescribedCalsMap[key],
+          weight: prescribedWeightMap[key],
+          implementCount: prescribedImplementMap[key],
+        };
+        const parsedMovement = exercise.movements?.find((candidate) => {
+          const name = candidate.name.toLowerCase();
+          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
+        });
+
+        const row = buildCelebrationMovementRow({
+          movementName: parsedMovement
+            ? getMovementDisplayNameFromContext(parsedMovement, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`)
+            : movement.name,
+          prescribed,
+          actual: movement,
+          repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
+          isStrength,
+          partnerSplit: splitInfo?.split,
+        });
+
+        if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {
+          const isLadderMov = prescribed.reps != null && descSchemeGlobal.includes(prescribed.reps);
+          const movWeight = movement.weight ?? prescribed.weight;
+          const wUnit = movement.unit === 'lb' ? 'LB' : 'KG';
+          const isWeighted = (movWeight ?? 0) > 0;
+          if (isWeighted) {
+            row.primary = `@${movWeight}${wUnit}`;
+          } else if (movement.totalReps) {
+            row.primary = `${movement.totalReps}`;
+          }
+          if (isLadderMov) {
+            const schemeTotal = descSchemeGlobal.slice(0, descSchemeCompleted).reduce((s, n) => s + n, 0);
+            row.subNote = `${schemeTotal} total`;
+          }
         }
-        const displayTotalR = isTeamIGUG && personalRepeatCount ? prescReps * personalRepeatCount : totalR;
-        if (displayTotalR > 0 && displayTotalR !== prescReps) totalNote = `${displayTotalR} total`;
-      } else if ((movement.weight || 0) > 0) {
-        primary = `${movement.weight} ${wUnit}`;
-        accent = 'yellow';
-      }
 
-      const prescLabel = stationLabel
-        ? `${stationLabel.toUpperCase()} · ${movement.name.toUpperCase()}`
-        : movement.name.toUpperCase();
-      return { primary, name: prescLabel, subNote: totalNote, accent, stationRow: true };
-    }
-
-    const prescribed = {
-      reps: prescribedRepsMap[key],
-      distance: prescribedDistMap[key],
-      calories: prescribedCalsMap[key],
-      weight: prescribedWeightMap[key],
-      implementCount: prescribedImplementMap[key],
-    };
-    const parsedMovement = exercise.movements?.find((candidate) => {
-      const name = candidate.name.toLowerCase();
-      return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
-    });
-
-    const row = buildCelebrationMovementRow({
-      movementName: parsedMovement
-        ? getMovementDisplayNameFromContext(parsedMovement, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`)
-        : movement.name,
-      prescribed,
-      actual: movement,
-      repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
-      isStrength,
-      partnerSplit: splitInfo?.split,
-    });
-
-    if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {
-      const isLadderMov = prescribed.reps != null && descSchemeGlobal.includes(prescribed.reps);
-      const movWeight = movement.weight ?? prescribed.weight;
-      const wUnit = movement.unit === 'lb' ? 'LB' : 'KG';
-      const isWeighted = (movWeight ?? 0) > 0;
-      if (isWeighted) {
-        row.primary = `@${movWeight}${wUnit}`;
-      } else if (movement.totalReps) {
-        row.primary = `${movement.totalReps}`;
-      }
-      if (isLadderMov) {
-        const schemeTotal = descSchemeGlobal.slice(0, descSchemeCompleted).reduce((s, n) => s + n, 0);
-        row.subNote = `${schemeTotal} total`;
-      }
-    }
-
-    return row;
-  });
+        return row;
+      });
 
   if (shouldLogCelebrationDebug()) {
     console.warn('[CelebrationDebug:v20260503-page-artifact]', {
@@ -1958,7 +2162,7 @@ export function buildPageArtifactSection(
     blueprint,
     blueprintSub,
     rows,
-    hiddenCount: Math.max(0, movements.length - rows.length),
+    hiddenCount: 0,
     ...((descSchemeGlobal || strengthBubbleScheme) && {
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
       descLadderCompleted: descSchemeCompleted ?? strengthBubbleScheme?.length,
@@ -2171,93 +2375,6 @@ function buildSectionedStoryMovements(
   return lines.length > 0 ? lines : undefined;
 }
 
-function deriveStationRotationMeta(exercises: Exercise[], rawText?: string): { intervalLabel?: string; totalRounds?: number; stationLoops?: number } {
-  const text = rawText || `${exercises.map((ex) => `${ex.name} ${ex.prescription}`).join(' ')}`;
-  const normalized = normalizeIntervalNotation(text).replace(/(\d+)\.(\d{2})/g, '$1:$2');
-  const intervalMatch = normalized.match(/(?:every\s+)?(\d+:\d{2})\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)\s*rounds?/i);
-  if (intervalMatch) {
-    const totalRounds = parseInt(intervalMatch[2], 10);
-    const stationCount = exercises.length || 1;
-    return { intervalLabel: intervalMatch[1], totalRounds, stationLoops: totalRounds > 0 ? Math.max(1, Math.round(totalRounds / stationCount)) : undefined };
-  }
-  const sharedRounds = exercises.map((ex) => ex.rounds).filter((r): r is number => typeof r === 'number' && r > 0);
-  if (sharedRounds.length === exercises.length && new Set(sharedRounds).size === 1) {
-    return { totalRounds: sharedRounds[0] * exercises.length, stationLoops: sharedRounds[0] };
-  }
-  return {};
-}
-
-function isStationRotationWorkout(exercises: Exercise[], rawText?: string): boolean {
-  if (exercises.some((ex) => ex.stationRotation)) return true;
-  if (exercises.length < 2) return false;
-  const namesAreLettered = exercises.every((ex) => /^[A-H][).:\s-]+/i.test(ex.name.trim()));
-  if (!namesAreLettered && !(rawText && /(?:^|\n)\s*[A-H][).:]\s+/m.test(rawText))) return false;
-  const meta = deriveStationRotationMeta(exercises, rawText);
-  return Boolean(meta.totalRounds || meta.intervalLabel);
-}
-
-function formatMovementStoryTotal(movement?: MovementTotal): string {
-  if (!movement) return '';
-  if (movement.totalCalories && movement.totalCalories > 0) return `${movement.totalCalories} cal total`;
-  if (movement.totalDistance && movement.totalDistance > 0) {
-    return movement.totalDistance >= 1000 ? `${(movement.totalDistance / 1000).toFixed(1)}km total` : `${movement.totalDistance}m total`;
-  }
-  if (movement.totalReps && movement.totalReps > 0) return `${movement.totalReps} total`;
-  return '';
-}
-
-function cleanStationLabel(name: string, index: number): string {
-  const letterMatch = name.trim().match(/^([A-H])[).:\s-]+/i);
-  const letter = letterMatch?.[1]?.toUpperCase() ?? String.fromCharCode(65 + index);
-  return `STATION ${letter}`;
-}
-
-function stripStationPrefix(name: string): string {
-  return name.replace(/^[A-H][).:\s-]+/i, '').trim();
-}
-
-function buildStationRotationStoryMovements(exercises: Exercise[], movements: MovementTotal[], rawText?: string): StoryMovementLine[] | undefined {
-  const lines: StoryMovementLine[] = [];
-  const meta = deriveStationRotationMeta(exercises, rawText);
-  if (meta.totalRounds || meta.intervalLabel) {
-    const headerBits = [meta.totalRounds ? `${meta.totalRounds} ROUNDS` : undefined, meta.intervalLabel ? `${meta.intervalLabel} STATIONS` : 'ROTATING STATIONS'].filter(Boolean);
-    lines.push({ perRound: '', name: '', total: '', sectionHeader: headerBits.join(' · '), sectionColor: 'cyan' });
-  }
-  for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
-    const ex = exercises[exIdx];
-    const stationLoops = ex.rounds || meta.stationLoops;
-    const stationHeader = stationLoops && stationLoops > 1 ? `${cleanStationLabel(ex.name, exIdx)} · ×${stationLoops}` : cleanStationLabel(ex.name, exIdx);
-    lines.push({ perRound: '', name: '', total: '', sectionHeader: stationHeader, sectionColor: 'magenta' });
-    for (const mov of ex.movements || []) {
-      const actual = findMovementTotal(movements, mov.name, exIdx);
-      const displayName = actual?.wasSubstituted ? actual.name : mov.name;
-      const cleanName = stripStationPrefix(displayName).replace(/\bmax\s+/i, '').trim();
-      const isBodyweight = isBwVolumeMovement(displayName);
-      const weight = actual?.weight ?? (mov.rxWeights?.male || mov.rxWeights?.female);
-      const unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit || 'kg');
-      const total = formatMovementStoryTotal(actual);
-      const color = actual?.color ?? 'magenta';
-      const isMaxMovement = Boolean(mov.isMaxReps) || /\bmax\b/i.test(mov.name);
-      if (isMaxMovement) { lines.push({ perRound: 'MAX', name: cleanName, total, color, weight: !isBodyweight ? weight : undefined, unit: !isBodyweight ? unit : undefined }); continue; }
-      if ((mov.calories || 0) > 0 || (actual?.totalCalories || 0) > 0) {
-        const perVal = mov.calories || ((actual?.totalCalories && stationLoops) ? Math.round(actual.totalCalories / stationLoops) : 0);
-        lines.push({ perRound: `${perVal} cal`, name: cleanName, total, color });
-        continue;
-      }
-      if ((mov.distance || 0) > 0 || (actual?.totalDistance || 0) > 0) {
-        const perVal = mov.distance || ((actual?.totalDistance && stationLoops) ? Math.round(actual.totalDistance / stationLoops) : 0);
-        const distanceLabel = perVal >= 1000 ? `${(perVal / 1000).toFixed(1)}km` : `${perVal}m`;
-        lines.push({ perRound: distanceLabel, name: cleanName, total, color });
-        continue;
-      }
-      if ((mov.reps || 0) > 0 || (actual?.totalReps || 0) > 0) {
-        const perVal = mov.reps || ((actual?.totalReps && stationLoops) ? Math.round(actual.totalReps / stationLoops) : 0);
-        lines.push({ perRound: `${perVal}`, name: cleanName, total, color, weight: !isBodyweight ? weight : undefined, unit: !isBodyweight ? unit : undefined });
-      }
-    }
-  }
-  return lines.length > 0 ? lines : undefined;
-}
 
 function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined): string {
   const rx = normalizeIntervalNotation((ex.name || '') + ' ' + (ex.prescription || '')).toLowerCase();
@@ -2381,8 +2498,7 @@ function buildLadderStoryMovements(exercise: Exercise, movements: MovementTotal[
   return lines.length > 0 ? lines : undefined;
 }
 
-function buildMixedStoryMovements(exercises: Exercise[], movements: MovementTotal[], rawText?: string): StoryMovementLine[] | undefined {
-  if (isStationRotationWorkout(exercises, rawText)) return buildStationRotationStoryMovements(exercises, movements, rawText);
+function buildMixedStoryMovements(exercises: Exercise[], movements: MovementTotal[], _rawText?: string): StoryMovementLine[] | undefined {
   const lines: StoryMovementLine[] = [];
   for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
     const ex = exercises[exIdx];
@@ -2557,10 +2673,36 @@ export function computeHeroResult(
         };
       }
     }
-    const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
-      ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)
-      : (amrapExercise.rounds || 0);
-    if (totalRounds > 0) return { value: formatAmrapRounds(totalRounds), unit: 'ROUNDS', formatLine, storyLine, storyMovements: buildStory(Math.floor(totalRounds)), accentClass: 'accentMagenta' };
+    // Alternating-station interval AMRAP: exercise.rounds is the prescribed interval count
+    // (the "× 6" on the clock), never a logged score — the real score is the reps accumulated
+    // on the max-effort movements ("Max Devil Press" + "Max Sit-up" → 39 reps). Prescribed
+    // structure must never become the hero.
+    // Gate on STRUCTURAL markers only, never countingMode — a post-processor bug (fixed
+    // 2026-07-06) stamped per_station_visit onto plain-AMRAP movements in multi-part sessions,
+    // and those exercises DO have a real logged rounds score that must stay the hero.
+    const stationMovements = amrapExercise.movements ?? [];
+    const isStationRotation = stationMovements.some((m) =>
+      m.stationLabel != null || m.stationIndex != null);
+    if (isStationRotation) {
+      const maxTotalReps = stationMovements
+        .filter((m) => m.isMaxReps || /\bmax\b/i.test(m.name))
+        .reduce((sum, m) => sum + (findBreakdownForParsedMovement(m, movements)?.totalReps || 0), 0);
+      if (maxTotalReps > 0) {
+        return {
+          value: `${maxTotalReps}`,
+          unit: 'REPS',
+          formatLine, storyLine,
+          storyMovements: buildStory(amrapExercise.rounds || 1),
+          accentClass: 'accentMagenta',
+        };
+      }
+      // No max-effort reps logged — fall through to calories/EP/duration, never the structure.
+    } else {
+      const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
+        ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)
+        : (amrapExercise.rounds || 0);
+      if (totalRounds > 0) return { value: formatAmrapRounds(totalRounds), unit: 'ROUNDS', formatLine, storyLine, storyMovements: buildStory(Math.floor(totalRounds)), accentClass: 'accentMagenta' };
+    }
   }
 
   const metconEx = findMetconExercise(exercises);
@@ -2574,10 +2716,12 @@ export function computeHeroResult(
 
   if (isForTimeFormat || metconIsForTime) {
     const heroTime = metconTime ?? anyTime;
-    if (heroTime) {
+    const fallbackDurationSeconds = durationMinutes > 0 ? Math.round(durationMinutes * 60) : 0;
+    if (heroTime || fallbackDurationSeconds > 0) {
       const rounds = metconEx.rounds || (!isMixed ? singleExerciseRounds : 1);
-      const totalSessionSeconds = durationMinutes > 0 ? Math.round(durationMinutes * 60) : 0;
-      const displayTime = isMixed && totalSessionSeconds > heroTime ? totalSessionSeconds : heroTime;
+      const displayTime = heroTime
+        ? (isMixed && fallbackDurationSeconds > heroTime ? fallbackDurationSeconds : heroTime)
+        : fallbackDurationSeconds;
       return { value: fmtTimeSocial(displayTime), unit: 'MIN', formatLine, storyLine, storyMovements: buildStory(rounds), accentClass: 'accentMagenta' };
     }
   }

@@ -5,25 +5,27 @@ import { useAuth } from '../context/AuthContext';
 import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
+import { useRecapData } from '../hooks/useRecapData';
 import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
+import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import { db } from '../services/firebase';
 import type { PlannedWorkout } from '../types';
+import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
 
-const ADMIN_EMAIL = 'aborovitz@gmail.com';
 const GALLERY_MAX = 7;
 const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
   onAddWorkout: () => void;
   onImageSelected?: (file: File) => void;
-  onUsePastWorkout?: () => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
+  onOpenRecap?: (data: RecapData) => void;
   ringsKey?: number; // kept for API compatibility — unused
 }
 
@@ -55,16 +57,44 @@ function getSavedTitle(saved: PlannedWorkout): string {
 export function HomeScreen({
   onAddWorkout,
   onImageSelected,
-  onUsePastWorkout,
   onOpenProfile,
   onSelectWorkout,
   onLogPlannedWorkout,
+  onOpenRecap,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
-  const isAdmin = user?.email === ADMIN_EMAIL;
   const { workouts, loading, refresh, deleteWorkout } = useWorkouts(100);
   const { planned } = usePlannedWorkouts();
+  const { monthRecap, seasonRecap } = useRecapData(workouts);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
+
+  // Show season recap if this is a quarter-start month (Jan/Apr/Jul/Oct) + day ≤ 7; else month recap.
+  // Both windows: day 1–7 of the new period.
+  const recapForToday = useMemo(() => {
+    const now = new Date();
+    if (now.getDate() > 7) return null;
+    if (now.getMonth() % 3 === 0 && seasonRecap) return seasonRecap;
+    return monthRecap;
+  }, [monthRecap, seasonRecap]);
+
+  const recapHandledKey = recapForToday
+    ? `wodi_recap_handled_${recapForToday.period}_${recapForToday.periodSub}`
+    : null;
+  const [recapHandled, setRecapHandled] = useState(() => {
+    if (!recapHandledKey) return false;
+    return localStorage.getItem(recapHandledKey) === '1';
+  });
+  const showRecapCard = Boolean(recapForToday) && !recapHandled;
+
+  const handleDismissRecap = () => {
+    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
+    setRecapHandled(true);
+  };
+  const handleOpenRecap = () => {
+    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
+    setRecapHandled(true);
+    if (recapForToday) onOpenRecap?.(recapForToday);
+  };
   const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -246,6 +276,21 @@ export function HomeScreen({
           </div>
         </motion.header>
 
+        {/* ── Recap ready card (first 7 days of a new period) ── */}
+        {showRecapCard && recapForToday && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.03, duration: 0.28 }}
+          >
+            <RecapReadyCard
+              data={recapForToday}
+              onOpen={handleOpenRecap}
+              onDismiss={handleDismissRecap}
+            />
+          </motion.div>
+        )}
+
         {/* ── Log CTA ── */}
         <motion.button
           type="button"
@@ -274,13 +319,6 @@ export function HomeScreen({
           >
             +{Math.round(monthlyEP).toLocaleString()} <span className={styles.epUnit}>EP this month</span>
           </motion.p>
-        )}
-
-        {/* ── Admin: load recent ── */}
-        {isAdmin && onUsePastWorkout && (
-          <button type="button" className={styles.adminBtn} onClick={onUsePastWorkout}>
-            Load from Recent
-          </button>
         )}
 
         {/* ── For Later ── */}

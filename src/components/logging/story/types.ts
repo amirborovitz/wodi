@@ -181,8 +181,6 @@ function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_m
 
 export function movementToKind(mov: ParsedMovement): ExerciseKind {
   const nameClass = classifyMovementName(mov.name);
-  console.log('[movementToKind]', mov.name, { nameClass, inputType: mov.inputType, isBodyweight: mov.isBodyweight, reps: mov.reps, rxWeights: mov.rxWeights });
-
   // Hard override: "weighted" in the name always means load — the athlete explicitly
   // chose to add weight. This beats isBodyweight=true and inputType='none' from the AI,
   // which often marks "box step up" as bodyweight even when "weighted" is prefixed.
@@ -539,17 +537,17 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
       const hasMaxSet = /\bmax\b/i.test(prescriptionText) || !!(repsPerSet && result.setsTotal > repsPerSet.length);
       // Prescribed sets (excluding max set if present)
       const prescribedCount = hasMaxSet ? (repsPerSet?.length ?? result.setsTotal) : (result.setsCompleted ?? result.setsTotal);
-      const total = result.setsCompleted ?? result.setsTotal;
 
       for (let i = 0; i < prescribedCount; i++) {
         let weight: number | undefined;
         if (result.loadMode === 'bodyweight') {
           weight = undefined;
         } else if (result.loadMode === 'range' && result.weight != null && result.weightEnd != null) {
-          // Interpolate weight across prescribed sets
-          const interpTotal = hasMaxSet ? prescribedCount : total;
-          const fraction = interpTotal > 1 ? i / (interpTotal - 1) : 0;
-          weight = Math.round((result.weight + fraction * (result.weightEnd - result.weight)) * 2) / 2;
+          // Only the first and last set carry a real (user-entered) weight — the athlete
+          // never told us what they lifted on any set in between, so we don't invent one.
+          if (i === 0) weight = result.weight;
+          else if (i === prescribedCount - 1) weight = result.weightEnd;
+          else weight = undefined;
         } else {
           weight = result.weight;
         }

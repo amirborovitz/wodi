@@ -291,6 +291,75 @@ function isMainPart(ex: Exercise): boolean {
   return ex.type !== 'skill';
 }
 
+function hasPartnerLanguage(text: string): boolean {
+  return /\bpartner\b|\bin pairs\b|\bpairs\b|\bteams?\s+of\s+\d+\b|\b\d+[- ]person\b|\bigug\b|\bigyg\b|\bi\s*go\s*you\s*go\b|\bgroups?\s+of\s+\d+\b/i.test(text);
+}
+
+function hasForTimeLanguage(text: string, workoutFormat?: WorkoutFormat): boolean {
+  return workoutFormat === 'for_time' || /for\s*time|\brft\b|\b\d+\s*rounds?\s+for\s+time\b/i.test(text);
+}
+
+function getSectionRoundCount(exercise: Exercise): number | undefined {
+  return getPrescribedRoundCount([exercise], `${exercise.rawText ?? ''} ${exercise.name} ${exercise.prescription}`)
+    ?? getPrescriptionRepeatCount(exercise)
+    ?? exercise.rounds
+    ?? exercise.sets?.filter((set) => set.completed).length
+    ?? exercise.sets?.length;
+}
+
+function buildPosterOnlySectionedPartnerExercise(
+  mainExercises: Exercise[],
+  rawText: string | undefined,
+  workoutFormat: WorkoutFormat | undefined,
+  teamSize: number | undefined,
+  displayMinutes: number,
+): Exercise | null {
+  if (mainExercises.length <= 1) return null;
+  if (!teamSize || teamSize <= 1) return null;
+  if (mainExercises.some((exercise) => exercise.type === 'strength' || exercise.type === 'skill')) return null;
+
+  const combinedText = [
+    rawText ?? '',
+    ...mainExercises.map((exercise) => `${exercise.rawText ?? ''} ${exercise.name} ${exercise.prescription}`),
+  ].join('\n');
+  if (!hasPartnerLanguage(combinedText) || !hasForTimeLanguage(combinedText, workoutFormat)) return null;
+
+  const sections = mainExercises.map((exercise) => {
+    const sectionMovements = exercise.sections?.length
+      ? exercise.sections.flatMap((section) => section.movements ?? [])
+      : (exercise.movements ?? []);
+    const rounds = getSectionRoundCount(exercise);
+    return sectionMovements.length > 0 && rounds && rounds > 0
+      ? { sectionType: 'rounds' as const, rounds, movements: sectionMovements }
+      : null;
+  });
+
+  if (sections.some((section) => section === null)) return null;
+
+  return {
+    ...mainExercises[0],
+    id: `${mainExercises[0].id}-sectioned-partner-poster`,
+    name: 'Partner WOD',
+    prescription: `${sections.length} sections for time`,
+    movements: sections.flatMap((section) => section!.movements),
+    sections: sections.map((section) => section!),
+    rounds: undefined,
+    sets: displayMinutes > 0
+      ? [{
+          id: 'set-0',
+          setNumber: 1,
+          time: Math.round(displayMinutes * 60),
+          completed: true,
+        }]
+      : mainExercises.flatMap((exercise) => exercise.sets ?? []),
+    partnerWorkout: true,
+    partnerSplit: 'reps',
+    rawText: combinedText,
+    aiPartName: undefined,
+    partNameOverride: undefined,
+  };
+}
+
 // ─── The hook ─────────────────────────────────────────────────────────────────
 
 export function useCelebrationData(
@@ -728,8 +797,28 @@ export function useCelebrationData(
   // are shaping concerns for ONE exercise's own page, not a reason to collapse a session with
   // multiple main parts (e.g. strength + metcon) into one combined poster. The carousel's
   // per-page builders already handle ladder/chipper/complex shaping for whichever page needs it.
+  const baseMainExercises = useMemo((): Exercise[] => exercises.filter(isMainPart), [exercises]);
+
+  const sectionedPartnerPosterExercise = useMemo(
+    () => buildPosterOnlySectionedPartnerExercise(
+      baseMainExercises,
+      rawText,
+      workoutFormat,
+      rewardData?.teamSize ?? workout?.teamSize ?? inferTeamSizeFromText(rawText),
+      displayMinutes,
+    ),
+    [baseMainExercises, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize, displayMinutes],
+  );
+
+  const posterMainExercises = useMemo(
+    (): Exercise[] => sectionedPartnerPosterExercise
+      ? [sectionedPartnerPosterExercise]
+      : baseMainExercises,
+    [sectionedPartnerPosterExercise, baseMainExercises],
+  );
+
   const posterLayout: PosterLayout = (() => {
-    if (exercises.filter(isMainPart).length > 1) return 'multi-part';
+    if (posterMainExercises.length > 1) return 'multi-part';
     if (isChipper) return 'chipper';
     if (barbellComplex) return 'complex';
     if (ladderData) return 'ladder';
@@ -744,7 +833,7 @@ export function useCelebrationData(
     if (posterLayout !== 'multi-part') return null;
     const allMovements = activeBreakdown?.movements ?? [];
 
-    return exercises.filter(isMainPart).map((ex): CarouselPage => {
+    return posterMainExercises.map((ex): CarouselPage => {
       const isStrength = ex.type === 'strength' || ex.type === 'skill';
       const exNameLower = ex.name.toLowerCase();
       const subNames = new Set((ex.movements ?? []).map((m) => m.name.toLowerCase()));
@@ -785,7 +874,7 @@ export function useCelebrationData(
       const metconMovements = allMovements.filter((m) => subNames.has(m.name.toLowerCase()));
       return { exercise: ex, movements: metconMovements, isStrength };
     });
-  }, [posterLayout, exercises, activeBreakdown?.movements]);
+  }, [posterLayout, posterMainExercises, activeBreakdown?.movements]);
 
   // ── Hero result ───────────────────────────────────────────────────────────
 
@@ -801,7 +890,7 @@ export function useCelebrationData(
     // Only reached when there's at most 1 main part — exclude any secondary exercise (e.g. a
     // warm-up) so it can never be mistaken for "the metcon" just because it comes first and
     // isn't type:'strength'.
-    const mainExercises = exercises.filter(isMainPart);
+    const mainExercises = posterMainExercises;
 
     return computeHeroResult(
       mainExercises.length > 0 ? mainExercises : exercises,
@@ -822,6 +911,7 @@ export function useCelebrationData(
     rewardData,
     workout,
     exercises,
+    posterMainExercises,
     totalVolume,
     totalEP,
     durationMinutes,
@@ -978,7 +1068,7 @@ export function useCelebrationData(
       // warm-up) could still be exercises[0] if it comes first in the array. Exclude it so
       // buildRewardArtifactSections' mainExercise is always the actual main part, not whichever
       // exercise happens to be listed first.
-      const mainExercises = exercises.filter(isMainPart);
+      const mainExercises = posterMainExercises;
       // Explicit AI-set field only — matches posterTeamSize below (the value that actually
       // drives the poster's visible partner gate). No text-inference fallback here: this feeds
       // partner-split DISPLAY decisions, and an inferred teamSize disagreeing with the value the
@@ -993,7 +1083,7 @@ export function useCelebrationData(
         teamSize,
       );
     },
-    [exercises, activeBreakdown?.movements, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize],
+    [exercises, posterMainExercises, activeBreakdown?.movements, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize],
   );
 
   // ── Per-page carousel data ────────────────────────────────────────────────

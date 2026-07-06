@@ -3,7 +3,8 @@
   background: #0b0c0e;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* fix #3: enough clearance for the floating tab bar */
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 .layout {
@@ -37,7 +38,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 16px 0 20px;
+  /* fix #4: tighten header bottom gap */
+  padding: 14px 0 14px;
 }
 
 .greetingBlock {
@@ -112,17 +114,18 @@
 }
 
 /* ── Log CTA ──────────────────────────────────────────────────── */
+/* fix #1: tighter vertical padding so it doesn't dominate the fold */
 .logCTA {
   width: 100%;
   background: #f5c200;
   border: none;
   border-radius: 16px;
-  padding: 16px 20px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   cursor: pointer;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   transition: transform 0.1s ease, filter 0.1s ease;
   -webkit-tap-highlight-color: transparent;
 }
@@ -133,12 +136,12 @@
 }
 
 .logIcon {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 300;
   color: #0b0c0e;
   line-height: 1;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   background: rgba(0, 0, 0, 0.14);
   border-radius: 50%;
   display: flex;
@@ -180,7 +183,8 @@
   font-size: 14px;
   font-weight: 700;
   color: #f5c200;
-  margin-bottom: 22px;
+  /* fix #4: tighter gap before the "For Later" shelf */
+  margin-bottom: 14px;
 }
 
 .epUnit {
@@ -379,8 +383,8 @@
 }
 
 .skeleton {
-  width: 150px;
-  height: 210px;
+  width: 120px;
+  height: 168px;
   background: #16181c;
   border-radius: 10px;
   flex-shrink: 0;
@@ -418,7 +422,8 @@
 }
 
 .savedShelf {
-  margin-bottom: 24px;
+  /* fix #4: tighter gap before the gallery */
+  margin-bottom: 16px;
 }
 
 .savedSummaryLine,

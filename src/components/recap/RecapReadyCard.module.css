@@ -1,0 +1,139 @@
+.card {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #17181d, #101216);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(245, 194, 0, 0.05);
+}
+
+.ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  display: flex;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* whole body is the tap target */
+.body {
+  position: relative;
+  padding: 13px 14px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.body:active {
+  opacity: 0.88;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f5c200;
+  color: #0b0c0e;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #0b0c0e;
+  flex-shrink: 0;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.dismissBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(243, 241, 234, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dismissBtn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mainRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.peek {
+  flex-shrink: 0;
+  width: 54px;
+  height: 84px;
+  border-radius: 7px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transform: rotate(-2deg);
+}
+
+.copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.headline {
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 0.95;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.5);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inlineCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

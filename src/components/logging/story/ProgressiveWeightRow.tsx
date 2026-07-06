@@ -19,24 +19,6 @@ function suggestPeak(start: number | undefined): number | undefined {
   return Math.floor(start * 1.3 / 5) * 5;
 }
 
-// ─── Weight interpolation utilities ──────────────────────────────
-
-export function interpolateWeights(start: number, peak: number, sets: number): number[] {
-  if (sets <= 1) return [start];
-  return Array.from({ length: sets }, (_, i) => {
-    const fraction = i / (sets - 1);
-    const raw = start + fraction * (peak - start);
-    return Math.round(raw / 2.5) * 2.5;
-  });
-}
-
-export function getWeightForSet(start: number, peak: number, sets: number, setIndex: number): number {
-  if (sets <= 1) return start;
-  const fraction = setIndex / (sets - 1);
-  const raw = start + fraction * (peak - start);
-  return Math.round(raw / 2.5) * 2.5;
-}
-
 // ─── Icons ───────────────────────────────────────────────────────
 
 function ChevronUp() {

@@ -899,7 +899,6 @@ export function ScoreMovementInputs({
     );
   };
 
-  console.log('[ScoreMovementInputs]', { variant, movements: movements.map(m => ({ name: m.movement.name, kind: m.kind, inputType: m.movement.inputType, isBodyweight: m.movement.isBodyweight })) });
   if (variant === 'amrap_intervals') {
     const roundLabel = roundsTotal && roundsTotal > 0
       ? `${roundsTotal} rounds - totals calculated from your per-round reps`

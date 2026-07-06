@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { usePRCount } from '../hooks/usePRCount';
+import { useRecapData } from '../hooks/useRecapData';
+import { MeWrappedHub } from '../components/recap/MeWrappedHub';
+import type { RecapData } from '../hooks/useRecapData';
 import styles from './ProfileScreen.module.css';
 
 type TimePeriod = 'week' | 'month' | 'all';
@@ -19,6 +22,7 @@ interface ProfileScreenProps {
   onNavigateToPR?: () => void;
   onNavigateToRecords?: () => void;
   onNavigateToSettings?: () => void;
+  onOpenRecap?: (data: RecapData) => void;
 }
 
 function easeInOutCubic(t: number): number {
@@ -58,11 +62,12 @@ function useTickerNumber(target: number, duration = 420): number {
   return display;
 }
 
-export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onOpenRecap }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts();
   const weeklyStats = useWeeklyStats();
   const { prCount } = usePRCount();
+  const { monthRecap, seasonRecap } = useRecapData(workouts);
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -274,6 +279,12 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
           )}
         </motion.div>
       </div>
+
+      {/* Your Wrapped \u2014 permanent home, independent of the period toggle */}
+      <MeWrappedHub
+        items={[monthRecap, seasonRecap].filter((d): d is RecapData => d !== null)}
+        onOpen={(data) => onOpenRecap?.(data)}
+      />
     </div>
   );
 }

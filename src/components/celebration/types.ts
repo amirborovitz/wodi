@@ -51,6 +51,7 @@ export interface ArtifactRow {
   accent: 'yellow' | 'magenta' | 'cyan';
   missing?: boolean;
   stationRow?: boolean;
+  stationHeaderCap?: string;
   roundLabel?: string; // left-aligned label for progressive round rows (R1, R2, BUY-IN, etc.)
   // Rounds this row's `primary` repeats over (e.g. 12 for "12 RFT"). When set and >1, `primary`
   // is a per-round/per-turn value (e.g. "5 reps every round"), never a one-shot team total — the
