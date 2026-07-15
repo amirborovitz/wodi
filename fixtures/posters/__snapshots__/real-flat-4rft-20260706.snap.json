@@ -1,0 +1,440 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "4 Rounds For Time",
+      "blueprint": "4 rounds for time",
+      "blueprintSub": "600M ECHO BIKE • 10 DEADLIFTS • 600M ECHO BIKE • 10 POWER CLEANS • 600M ECHO BIKE • 10 FRONT SQUATS • 600M ECHO BIKE • 10 SHOULDER TO OVERHEADS • 600M ECHO BIKE • 10 PULL-UPS",
+      "rows": [
+        {
+          "primary": "20×",
+          "name": "Echo Bike",
+          "nameWithLoad": "600m Echo Bike",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "10",
+          "name": "Deadlifts",
+          "nameWithLoad": "Deadlifts @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "40 total reps",
+          "totalNote": "40 total reps",
+          "mineKey": "Deadlift",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "20×",
+          "name": "Echo Bike",
+          "nameWithLoad": "600m Echo Bike",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "10",
+          "name": "Power Cleans",
+          "nameWithLoad": "Power Cleans @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "40 total reps",
+          "totalNote": "40 total reps",
+          "mineKey": "Power Clean",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "20×",
+          "name": "Echo Bike",
+          "nameWithLoad": "600m Echo Bike",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "10",
+          "name": "Front Squats",
+          "nameWithLoad": "Front Squats @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "40 total reps",
+          "totalNote": "40 total reps",
+          "mineKey": "Front Squat",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "20×",
+          "name": "Echo Bike",
+          "nameWithLoad": "600m Echo Bike",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "10",
+          "name": "Shoulder to Overheads",
+          "nameWithLoad": "Shoulder to Overheads @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "40 total reps",
+          "totalNote": "40 total reps",
+          "mineKey": "Shoulder to Overhead",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "20×",
+          "name": "Echo Bike",
+          "nameWithLoad": "600m Echo Bike",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "10",
+          "name": "Pull-ups",
+          "subNote": "40 total",
+          "totalNote": "40 total",
+          "mineKey": "Pull-up",
+          "accent": "magenta",
+          "repeatCount": 4
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "4 Rounds For Time",
+        "blueprint": "4 rounds for time",
+        "blueprintSub": "600M ECHO BIKE • 10 DEADLIFTS • 600M ECHO BIKE • 10 POWER CLEANS • 600M ECHO BIKE • 10 FRONT SQUATS • 600M ECHO BIKE • 10 SHOULDER TO OVERHEADS • 600M ECHO BIKE • 10 PULL-UPS",
+        "rows": [
+          {
+            "primary": "20×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Deadlifts",
+            "nameWithLoad": "Deadlifts @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "40 total reps",
+            "totalNote": "40 total reps",
+            "mineKey": "Deadlift",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "20×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Power Cleans",
+            "nameWithLoad": "Power Cleans @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "40 total reps",
+            "totalNote": "40 total reps",
+            "mineKey": "Power Clean",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "20×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Front Squats",
+            "nameWithLoad": "Front Squats @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "40 total reps",
+            "totalNote": "40 total reps",
+            "mineKey": "Front Squat",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "20×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Shoulder to Overheads",
+            "nameWithLoad": "Shoulder to Overheads @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "40 total reps",
+            "totalNote": "40 total reps",
+            "mineKey": "Shoulder to Overhead",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "20×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Pull-ups",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Pull-up",
+            "accent": "magenta",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "35:20",
+    "unit": "MIN",
+    "formatLine": "4 Rounds For Time",
+    "storyLine": "40 deadlift · 40 power clean · 40 front squat · 40 shoulder to overhead · 40 pull-up · 12.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "12.0km total",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "600m"
+      },
+      {
+        "perRound": "10",
+        "name": "Deadlift",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Power Clean",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Front Squat",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Shoulder to Overhead",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Pull-up",
+        "total": "40 total",
+        "color": "magenta",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike",
+        "load": "",
+        "mine": "12.00km",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Deadlifts",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "40 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike",
+        "load": "",
+        "mine": "12.00km",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Power Cleans",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "40 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike",
+        "load": "",
+        "mine": "12.00km",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Front Squats",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "40 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike",
+        "load": "",
+        "mine": "12.00km",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Shoulder to Overheads",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "40 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike",
+        "load": "",
+        "mine": "12.00km",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Pull-ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "40 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "12.00km",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Deadlifts",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "40 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "12.00km",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Power Cleans",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "40 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "12.00km",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Front Squats",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "40 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "12.00km",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Shoulder to Overheads",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "40 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "12.00km",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

@@ -1,0 +1,241 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "8 Round Alternating For Time",
+      "blueprint": "8 rounds for time",
+      "blueprintSub": "2.0KM ECHO BIKE • 8 PUSH PRESSES • 8 THRUSTERS • 8 WEIGHTED BOX STEP-UPS",
+      "rows": [
+        {
+          "primary": "8",
+          "name": "Push Presses",
+          "nameWithLoad": "Push Presses @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "64 total reps",
+          "totalNote": "64 total reps",
+          "mineKey": "Push Press",
+          "accent": "yellow",
+          "repeatCount": 8
+        },
+        {
+          "primary": "8",
+          "name": "Thrusters",
+          "nameWithLoad": "Thrusters @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "64 total reps",
+          "totalNote": "64 total reps",
+          "mineKey": "Thruster",
+          "accent": "yellow",
+          "repeatCount": 8
+        },
+        {
+          "primary": "30m",
+          "name": "Weighted Box Step-ups",
+          "nameWithLoad": "Weighted Box Step-ups @ 35kg",
+          "loadNote": "35kg",
+          "subNote": "240 m total",
+          "totalNote": "240 m total",
+          "mineKey": "Weighted Box Step-up",
+          "accent": "magenta",
+          "repeatCount": 8
+        },
+        {
+          "primary": "2000m",
+          "name": "Echo Bike",
+          "subNote": "16.00 km total",
+          "totalNote": "16.00 km total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 8
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "8 Round Alternating For Time",
+        "blueprint": "8 rounds for time",
+        "blueprintSub": "2.0KM ECHO BIKE • 8 PUSH PRESSES • 8 THRUSTERS • 8 WEIGHTED BOX STEP-UPS",
+        "rows": [
+          {
+            "primary": "8",
+            "name": "Push Presses",
+            "nameWithLoad": "Push Presses @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "64 total reps",
+            "totalNote": "64 total reps",
+            "mineKey": "Push Press",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "8",
+            "name": "Thrusters",
+            "nameWithLoad": "Thrusters @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "64 total reps",
+            "totalNote": "64 total reps",
+            "mineKey": "Thruster",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "30m",
+            "name": "Weighted Box Step-ups",
+            "nameWithLoad": "Weighted Box Step-ups @ 35kg",
+            "loadNote": "35kg",
+            "subNote": "240 m total",
+            "totalNote": "240 m total",
+            "mineKey": "Weighted Box Step-up",
+            "accent": "magenta",
+            "repeatCount": 8
+          },
+          {
+            "primary": "2000m",
+            "name": "Echo Bike",
+            "subNote": "16.00 km total",
+            "totalNote": "16.00 km total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "42:00",
+    "unit": "MIN",
+    "formatLine": "8 Rounds For Time",
+    "storyLine": "64 push press · 64 thruster · 240m weighted box step-up · 16.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "2.0km",
+        "name": "Echo Bike",
+        "total": "16.0km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Push Press",
+        "total": "64 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Thruster",
+        "total": "64 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30m",
+        "name": "Weighted Box Step-up",
+        "total": "240m total",
+        "color": "yellow",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "8 rounds for time"
+      },
+      {
+        "kind": "line",
+        "rx": "8 Push Presses",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "64 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "8 Thrusters",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "64 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "30m Weighted Box Step-ups",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "240 m total"
+      },
+      {
+        "kind": "line",
+        "rx": "2000m Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "16.00 km total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "8 rounds for time"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Push Presses",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "64 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Thrusters",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "64 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "30m Weighted Box Step-ups",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "240 m total"
+        },
+        {
+          "kind": "line",
+          "rx": "2000m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "16.00 km total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

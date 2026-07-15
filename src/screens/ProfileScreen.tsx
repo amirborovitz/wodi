@@ -67,7 +67,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
   const { workouts } = useWorkouts();
   const weeklyStats = useWeeklyStats();
   const { prCount } = usePRCount();
-  const { monthRecap, seasonRecap } = useRecapData(workouts);
+  const { recaps, newRecapIds } = useRecapData(workouts);
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -282,7 +282,8 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
 
       {/* Your Wrapped \u2014 permanent home, independent of the period toggle */}
       <MeWrappedHub
-        items={[monthRecap, seasonRecap].filter((d): d is RecapData => d !== null)}
+        items={recaps}
+        newIds={newRecapIds}
         onOpen={(data) => onOpenRecap?.(data)}
       />
     </div>

@@ -10,6 +10,7 @@ WodBoard (codename **Wodi**) is a premium CrossFit workout logging app.
 
 - **Read the design system PDF** (`wodi · Design System.pdf`, project root) before any visual, layout, or component-design decision — not just the markdown summary.
 - **The user builds, deploys, and tests on production themselves.** Do not run `npm run build`, `npm run dev`, `firebase deploy`, or start dev servers unless explicitly asked. Do not block completion on "verify in browser" — finish the code change and let the user test it live.
+- **Testing/verification agents may use the browser directly** (Claude in Chrome tools) against the tab the user already has open — navigate, click, read state, screenshot, etc. — instead of asking the user to manually walk through a flow. The one exception: **if a step requires uploading a WOD photo, don't attempt the file upload yourself — ask the user to do it from the tab you're working in**, then continue once it lands.
 
 ---
 

@@ -11,9 +11,14 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'f
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
-import { buildPosterWod, buildPosterWodFromPage, getPrimaryCarouselPageIndex } from './posterData';
+import { buildPosterWod, buildPosterWodFromPage, getPrimaryCarouselPageIndex, formatIsoPosterDate } from './posterData';
 import { useFitScale } from './useFitScale';
 import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
+import { CorrectionSheet } from '../../CorrectionSheet';
+import { TextSticker } from './TextSticker';
+import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
+import type { PosterSticker, PosterVibeOffset } from '../../../../types';
+import { shareWorkoutCard } from '../../../../utils/shareUtils';
 import styles from './index.module.css';
 
 // ─── Bottom bar icons ───────────────────────────────────────────────────────
@@ -21,23 +26,81 @@ import styles from './index.module.css';
 function StyleIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 function FeltIcon(): React.JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2.5s6 6.7 6 11a6 6 0 1 1-12 0c0-4.3 6-11 6-11Z" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2c1 3-1 4-2 6-1 1.6-1 3 .2 4 .8.7.7-1 .5-2 2 1 3 2.6 3 4.4A4.7 4.7 0 0 1 12 22a4.7 4.7 0 0 1-4.7-4.7c0-3 2.2-4.6 2.5-7 .2 1.4 1 2.2 2 2.6-.7-2 .6-3.4 1.4-4.6C14.4 6 13.6 3.6 12 2z" />
     </svg>
   );
 }
 
+function DateIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4M16 3v4" />
+    </svg>
+  );
+}
+
+function StickerIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M4 4h11l5 5v11H4z" />
+      <path d="M15 4v5h5" />
+    </svg>
+  );
+}
+
+function FlagIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 3v18" />
+      <path d="M5 4h11l-2 4 2 4H5" />
+    </svg>
+  );
+}
+
+function ShareIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+// ─── Date helpers ────────────────────────────────────────────────────────────
+
+function toIsoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function isoYesterday(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toIsoDate(d);
+}
+
+// ─── Text sticker (TEXT tab) ────────────────────────────────────────────────
+
+const STICKER_MAX = 24;
+// Default lands center-canvas, clear of both the header/title zone (top) and the
+// hero result + FELT stamp + footer strip (bottom of every skin) — the one zone
+// that's consistently open across all skins. The athlete drags it from there.
+const STICKER_DEFAULT_POS = { x: 50, y: 46 };
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, onBack, onDone, onPosterCustomizationChange,
+  data, onBack, onDone, onPosterCustomizationChange, onCorrection,
 }: CelebrationFaceProps): React.JSX.Element {
   const [skinIdx, setSkinIdx]         = useState<number>(() => {
     const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
@@ -48,11 +111,20 @@ export function HandwrittenFace({
   const [pulse, setPulse]             = useState<number>(0);
   const [showHint, setShowHint]       = useState<boolean>(true);
   const [carouselPage, setCarouselPage] = useState<number>(0);
-  const [activePanel, setActivePanel] = useState<'style' | 'felt' | null>(null);
+  const [activePanel, setActivePanel] = useState<'style' | 'felt' | 'date' | 'sticker' | null>(null);
   const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
+  const [dateOverride, setDateOverride] = useState<string | null>(null);
+  const [dateDraft, setDateDraft]     = useState<string>(() => data.sourceDate ?? toIsoDate(data.workoutDate));
+  const [showCorrection, setShowCorrection] = useState<boolean>(false);
+  const [sharing, setSharing]         = useState<boolean>(false);
+  const [sticker, setSticker]         = useState<PosterSticker | null>(() => data.posterSticker ?? null);
+  const [stickerDraft, setStickerDraft] = useState<string>(() => data.posterSticker?.text ?? '');
+  const [vibeOffset, setVibeOffset]   = useState<PosterVibeOffset | null>(() => data.posterVibeOffset ?? null);
+  const [pendingDelete, setPendingDelete] = useState<'text' | 'vibe' | null>(null);
 
   const carouselViewportRef = useRef<HTMLDivElement>(null);
   const skinChipRowRef    = useRef<HTMLDivElement>(null);
+  const shareCardRef      = useRef<HTMLDivElement>(null);
   const carouselX         = useMotionValue(0);
   const dragRef           = useRef<{ x: number; t: number } | null>(null);
 
@@ -84,14 +156,14 @@ export function HandwrittenFace({
   );
 
   const Skin = SKINS[skinIdx].Comp;
-  const currentSkin = SKINS[skinIdx];
   const currentFelt = VIBE[vibe];
-  const bottomBarStyle = { '--felt-color': currentFelt.color } as React.CSSProperties;
 
   const { containerRef: cardAreaRef, contentRef: cardContentRef, scale: cardScale } =
     useFitScale<HTMLDivElement, HTMLDivElement>([singleWod, skinIdx]);
   const { containerRef: carouselAreaRef, contentRef: carouselContentRef, scale: carouselScale } =
     useFitScale<HTMLDivElement, HTMLDivElement>([pageWods, skinIdx, carouselPage]);
+  const cardNeedsFit = cardScale < 0.999;
+  const carouselNeedsFit = carouselScale < 0.999;
 
   // ── Skin controls ──────────────────────────────────────────────────────
 
@@ -118,6 +190,90 @@ export function HandwrittenFace({
     onPosterCustomizationChange?.({ posterSkin: SKINS[i].id });
   };
 
+  // ── Date override (persists to workout.sourceDate) ─────────────────────
+
+  const displayDate = dateOverride ? formatIsoPosterDate(dateOverride) : null;
+
+  const applyDate = (iso: string): void => {
+    if (!formatIsoPosterDate(iso)) return;
+    setDateOverride(iso);
+    setDateDraft(iso);
+    setPulse((p) => p + 1);
+    onPosterCustomizationChange?.({ sourceDate: iso });
+  };
+
+  // ── Text sticker (persists to workout.posterSticker) ───────────────────
+
+  const applySticker = (): void => {
+    const text = stickerDraft.trim().slice(0, STICKER_MAX);
+    if (!text) return;
+    const next: PosterSticker = sticker
+      ? { ...sticker, text }
+      : { text, ...STICKER_DEFAULT_POS };
+    setSticker(next);
+    setPulse((p) => p + 1);
+    setActivePanel(null);
+    onPosterCustomizationChange?.({ posterSticker: next });
+  };
+
+  const removeSticker = (): void => {
+    setSticker(null);
+    setStickerDraft('');
+    setPulse((p) => p + 1);
+    onPosterCustomizationChange?.({ posterSticker: null });
+  };
+
+  // Live position while dragging — persisted only on release to avoid write spam.
+  const moveSticker = (pos: { x: number; y: number }): void => {
+    setSticker((s) => (s ? { ...s, ...pos } : s));
+  };
+
+  const dropSticker = (pos: { x: number; y: number }): void => {
+    if (!sticker) return;
+    const next = { ...sticker, ...pos };
+    setSticker(next);
+    onPosterCustomizationChange?.({ posterSticker: next });
+  };
+
+  // ── Vibe stamp drag (persists to workout.posterVibeOffset) ─────────────
+  // A nudge on top of wherever each skin naturally places the stamp, not a
+  // global anchor — see DraggableVibeStamp for why.
+
+  const moveVibe = (next: PosterVibeOffset): void => setVibeOffset(next);
+
+  const dropVibe = (next: PosterVibeOffset): void => {
+    setVibeOffset(next);
+    onPosterCustomizationChange?.({ posterVibeOffset: next });
+  };
+
+  const removeVibe = (): void => {
+    setVibeConfirmed(false);
+    setVibeOffset(null);
+    onPosterCustomizationChange?.({ posterVibe: null, posterVibeOffset: null });
+  };
+
+  // ── Sticker deletion (long-press either sticker → confirm sheet) ───────
+
+  const confirmDelete = (): void => {
+    if (pendingDelete === 'text') removeSticker();
+    if (pendingDelete === 'vibe') removeVibe();
+    setPendingDelete(null);
+  };
+
+  // ── Share (native share sheet, download fallback) ──────────────────────
+
+  const handleShare = async (): Promise<void> => {
+    const el = shareCardRef.current;
+    if (!el || sharing) return;
+    const shareWod = isCarousel && pageWods ? pageWods[carouselPage] : singleWod;
+    setSharing(true);
+    try {
+      await shareWorkoutCard(el, shareWod.title ?? shareWod.type);
+    } finally {
+      setSharing(false);
+    }
+  };
+
   // ── Bottom bar panel ───────────────────────────────────────────────────
 
   const measureSkinScroll = (): void => {
@@ -136,6 +292,8 @@ export function HandwrittenFace({
 
   const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
+  const toggleDatePanel = (): void => setActivePanel((p) => (p === 'date' ? null : 'date'));
+  const toggleStickerPanel = (): void => setActivePanel((p) => (p === 'sticker' ? null : 'sticker'));
   const toggleVibe = (nextVibe: VibeKey): void => {
     if (vibeConfirmed && nextVibe === vibe) {
       setVibeConfirmed(false);
@@ -192,7 +350,7 @@ export function HandwrittenFace({
   // ─── Shared bottom bar ────────────────────────────────────────────────
 
   const bottomBar = (
-    <div className={styles.bottomBar} style={bottomBarStyle}>
+    <div className={styles.bottomBar}>
       <AnimatePresence initial={false}>
         {activePanel === 'style' && (
           <motion.div key="style-panel" className={styles.panel}
@@ -228,26 +386,118 @@ export function HandwrittenFace({
             </div>
           </motion.div>
         )}
+        {activePanel === 'date' && (
+          <motion.div key="date-panel" className={styles.panel}
+            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
+            <div className={styles.dateRow}>
+              <button className={styles.dateQuickChip}
+                onClick={(e) => { e.stopPropagation(); applyDate(isoYesterday()); setActivePanel(null); }}>
+                Yesterday
+              </button>
+              <input
+                type="date"
+                className={styles.dateInput}
+                value={dateDraft}
+                onChange={(e) => setDateDraft(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Workout date"
+              />
+              <button className={styles.dateSetBtn} disabled={!dateDraft}
+                onClick={(e) => { e.stopPropagation(); applyDate(dateDraft); setActivePanel(null); }}>
+                Set
+              </button>
+            </div>
+          </motion.div>
+        )}
+        {activePanel === 'sticker' && (
+          <motion.div key="sticker-panel" className={styles.panel}
+            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
+            <div className={styles.stickerRow}>
+              <input
+                type="text"
+                className={styles.stickerInput}
+                value={stickerDraft}
+                maxLength={STICKER_MAX}
+                placeholder="e.g. legs are jelly"
+                onChange={(e) => setStickerDraft(e.target.value.slice(0, STICKER_MAX))}
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Poster note text"
+              />
+              <button className={styles.dateSetBtn} disabled={!stickerDraft.trim()}
+                onClick={(e) => { e.stopPropagation(); applySticker(); }}>
+                {sticker ? 'Update' : 'Add'}
+              </button>
+            </div>
+            <div className={styles.stickerMetaRow}>
+              <span className={styles.stickerMeta}>{stickerDraft.length}/{STICKER_MAX} · drag it anywhere on the poster</span>
+              {sticker && (
+                <button className={styles.stickerRemoveBtn}
+                  onClick={(e) => { e.stopPropagation(); removeSticker(); }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      {/* Quiet flag-a-mistake control — deliberately small + dim, not a peer of the tabs */}
+      {onCorrection && data.workoutId && (
+        <div className={styles.flagRow}>
+          <button className={styles.flagBtn} onClick={() => setShowCorrection(true)}>
+            <FlagIcon />
+            <span>AI got it wrong?</span>
+          </button>
+        </div>
+      )}
 
       <div className={styles.tabRow}>
         <button className={`${styles.tabBtn} ${activePanel === 'style' ? styles.tabBtnActive : ''}`}
           onClick={toggleStylePanel} aria-pressed={activePanel === 'style'} aria-label="Change poster style">
-          <span className={styles.tabIcon}><StyleIcon /></span>
-          <span className={styles.tabCopy}>
-            <span className={styles.tabLabel}>Style</span>
-            <span className={styles.tabValue}>{currentSkin.name}</span>
-          </span>
+          <StyleIcon />
+          <span className={styles.tabLabel}>Style</span>
         </button>
         <button className={`${styles.tabBtn} ${activePanel === 'felt' ? styles.tabBtnActive : ''}`}
           onClick={toggleFeltPanel} aria-pressed={activePanel === 'felt'} aria-label="Change how it felt">
-          <span className={styles.tabIcon}><FeltIcon /></span>
-          <span className={styles.tabCopy}>
-            <span className={styles.tabLabel}>Felt</span>
-            <span className={styles.tabValue}>{vibeConfirmed ? currentFelt.label : 'Pick one'}</span>
-          </span>
+          <FeltIcon />
+          <span className={styles.tabLabel}>Felt</span>
+        </button>
+        <button className={`${styles.tabBtn} ${activePanel === 'date' ? styles.tabBtnActive : ''}`}
+          onClick={toggleDatePanel} aria-pressed={activePanel === 'date'} aria-label="Change workout date">
+          <DateIcon />
+          <span className={styles.tabLabel}>Date</span>
+        </button>
+        <button className={`${styles.tabBtn} ${activePanel === 'sticker' ? styles.tabBtnActive : ''}`}
+          onClick={toggleStickerPanel} aria-pressed={activePanel === 'sticker'} aria-label="Add a note to the poster">
+          <StickerIcon />
+          <span className={styles.tabLabel}>Text</span>
+        </button>
+        <button className={styles.shareBtn} disabled={sharing}
+          onClick={() => { void handleShare(); }} aria-label="Share poster">
+          <ShareIcon />
+          <span>Share</span>
         </button>
       </div>
+
+      {showCorrection && onCorrection && (
+        <CorrectionSheet onSubmit={onCorrection} onClose={() => setShowCorrection(false)} />
+      )}
+    </div>
+  );
+
+  // ─── Story background (behind nav / card / bottom bar) ────────────────
+
+  const storyBg = (
+    <div className={styles.storyBg} aria-hidden="true">
+      <div className={styles.storyBgBase} />
+      <div
+        className={styles.storyBgGlow}
+        style={{ background: `radial-gradient(78% 48% at 22% 16%, rgba(120, 150, 190, 0.26) 0%, transparent 60%), radial-gradient(72% 50% at 86% 90%, ${currentFelt.color}2a 0%, transparent 60%)` }}
+      />
+      <div className={styles.storyBgNoise} />
+      <div className={styles.storyBgScrim} />
     </div>
   );
 
@@ -257,9 +507,11 @@ export function HandwrittenFace({
 
   if (isCarousel && pageWods) {
     const navTitle = pageWods[carouselPage]?.title ?? pageWods[carouselPage]?.type ?? singleWod.type;
+    const shownPageWods = displayDate ? pageWods.map((w) => ({ ...w, date: displayDate })) : pageWods;
 
     return (
       <div className={styles.root}>
+        {storyBg}
         <div className={styles.nav}>
           <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
           <span className={styles.navTitle}>{navTitle}</span>
@@ -286,11 +538,19 @@ export function HandwrittenFace({
           onTouchEnd={handleTouchEnd}
         >
           <motion.div className={styles.carouselSlider} style={{ x: carouselX }}>
-            {pageWods.map((pageWod, i) => (
-              <div key={i} className={`${styles.carouselSlide} ${activePanel ? styles.carouselSlidePanelOpen : ''}`}>
+            {shownPageWods.map((pageWod, i) => (
+              <div
+                key={i}
+                className={[
+                  styles.carouselSlide,
+                  activePanel ? styles.carouselSlidePanelOpen : '',
+                  i === carouselPage && carouselNeedsFit ? styles.carouselSlideFitTop : '',
+                ].filter(Boolean).join(' ')}
+              >
                 <div
                   key={`${pulse}-${i}`}
                   ref={i === carouselPage ? carouselContentRef : undefined}
+                  className={i === carouselPage && carouselNeedsFit ? styles.cardWrapperFitTop : undefined}
                   style={{
                     width: '100%',
                     transformOrigin: 'center top',
@@ -298,7 +558,19 @@ export function HandwrittenFace({
                     animation: i === carouselPage ? 'flipIn 0.4s cubic-bezier(0.2,0.7,0.3,1)' : undefined,
                   }}
                 >
-                  <Skin wod={pageWod} vibe={vibeConfirmed ? vibe : null} />
+                  <div ref={i === carouselPage ? shareCardRef : undefined} className={styles.stickerLayer}>
+                    <Skin
+                      wod={pageWod}
+                      vibe={vibeConfirmed ? vibe : null}
+                      vibeOffset={vibeOffset}
+                      onVibeMove={i === carouselPage ? moveVibe : undefined}
+                      onVibeDrop={i === carouselPage ? dropVibe : undefined}
+                      onVibeLongPress={i === carouselPage ? () => setPendingDelete('vibe') : undefined}
+                    />
+                    {sticker && i === carouselPage && (
+                      <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -306,6 +578,13 @@ export function HandwrittenFace({
         </div>
 
         {bottomBar}
+
+        <DeleteActionSheet
+          title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
+          deleteLabel="Remove"
+          onDelete={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
       </div>
     );
   }
@@ -314,8 +593,11 @@ export function HandwrittenFace({
   // RENDER — SINGLE CARD PATH
   // ─────────────────────────────────────────────────────────────────────
 
+  const shownWod = displayDate ? { ...singleWod, date: displayDate } : singleWod;
+
   return (
     <div className={styles.root}>
+      {storyBg}
       <div className={styles.nav}>
         <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
         <span className={styles.navTitle}>{singleWod.title ?? singleWod.type}</span>
@@ -324,18 +606,46 @@ export function HandwrittenFace({
 
       <div
         ref={cardAreaRef}
-        className={`${styles.cardArea} ${activePanel ? styles.cardAreaPanelOpen : ''}`}
+        className={[
+          styles.cardArea,
+          activePanel ? styles.cardAreaPanelOpen : '',
+          cardNeedsFit ? styles.cardAreaFitTop : '',
+        ].filter(Boolean).join(' ')}
         onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
         role="button"
         aria-label="Tap left for previous style, right for next style"
       >
-        <div key={pulse} ref={cardContentRef} className={styles.cardWrapper} style={{ transform: `scale(${cardScale})` }}>
-          <Skin wod={singleWod} vibe={vibeConfirmed ? vibe : null} />
+        <div
+          key={pulse}
+          ref={cardContentRef}
+          className={`${styles.cardWrapper} ${cardNeedsFit ? styles.cardWrapperFitTop : ''}`}
+          style={{ transform: `scale(${cardScale})` }}
+        >
+          <div ref={shareCardRef} className={styles.stickerLayer}>
+            <Skin
+              wod={shownWod}
+              vibe={vibeConfirmed ? vibe : null}
+              vibeOffset={vibeOffset}
+              onVibeMove={moveVibe}
+              onVibeDrop={dropVibe}
+              onVibeLongPress={() => setPendingDelete('vibe')}
+            />
+            {sticker && (
+              <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
+            )}
+          </div>
         </div>
         {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
       </div>
 
       {bottomBar}
+
+      <DeleteActionSheet
+        title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
+        deleteLabel="Remove"
+        onDelete={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

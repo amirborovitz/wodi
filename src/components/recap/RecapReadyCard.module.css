@@ -1,3 +1,25 @@
+.collapseShell {
+  display: grid;
+  grid-template-rows: 1fr;
+  margin-top: 22px;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.28s ease,
+    opacity 0.22s ease,
+    margin-top 0.28s ease;
+}
+
+.collapseShellClosing {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  opacity: 0;
+}
+
+.collapseInner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .card {
   position: relative;
   border-radius: 20px;
@@ -12,7 +34,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  display: flex;
+  background: #f5c200;
 }
 
 .glow {

@@ -1,0 +1,502 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "4-round pyramid for time",
+      "rows": [],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "A",
+      "rows": [
+        {
+          "primary": "900 M Echo Bike (together)",
+          "name": "",
+          "mineKey": "Echo Bike",
+          "suppressMine": true,
+          "partnerSplit": "reps",
+          "accent": "magenta"
+        },
+        {
+          "primary": "100 Power Cleans @ 35/50kg",
+          "name": "",
+          "mineKey": "Power Clean",
+          "partnerSplit": "reps",
+          "teamShare": "50",
+          "accent": "yellow"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "B",
+      "rows": [
+        {
+          "primary": "900 M Echo Bike (together)",
+          "name": "",
+          "mineKey": "Echo Bike",
+          "suppressMine": true,
+          "partnerSplit": "reps",
+          "accent": "magenta"
+        },
+        {
+          "primary": "80 Shoulder to Overheads @ 35/50kg",
+          "name": "",
+          "mineKey": "Shoulder to Overhead",
+          "partnerSplit": "reps",
+          "teamShare": "40",
+          "accent": "yellow"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "C",
+      "rows": [
+        {
+          "primary": "900 M Echo Bike (together)",
+          "name": "",
+          "mineKey": "Echo Bike",
+          "suppressMine": true,
+          "partnerSplit": "reps",
+          "accent": "magenta"
+        },
+        {
+          "primary": "60 Thrusters @ 35/50kg",
+          "name": "",
+          "mineKey": "Thruster",
+          "partnerSplit": "reps",
+          "teamShare": "30",
+          "accent": "yellow"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "D",
+      "rows": [
+        {
+          "primary": "900 M Echo Bike (together)",
+          "name": "",
+          "mineKey": "Echo Bike",
+          "suppressMine": true,
+          "partnerSplit": "reps",
+          "accent": "magenta"
+        },
+        {
+          "primary": "300 M Farmer Carry",
+          "name": "",
+          "mineKey": "Farmer Carry",
+          "suppressMine": true,
+          "partnerSplit": "reps",
+          "teamShare": "150m",
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    }
+  ],
+  "pages": [
+    [],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "4-round pyramid for time",
+        "rows": [],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "A",
+        "rows": [
+          {
+            "primary": "900 M Echo Bike (together)",
+            "name": "",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "partnerSplit": "reps",
+            "accent": "magenta"
+          },
+          {
+            "primary": "100 Power Cleans @ 35/50kg",
+            "name": "",
+            "mineKey": "Power Clean",
+            "partnerSplit": "reps",
+            "teamShare": "50",
+            "accent": "yellow"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "B",
+        "rows": [
+          {
+            "primary": "900 M Echo Bike (together)",
+            "name": "",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "partnerSplit": "reps",
+            "accent": "magenta"
+          },
+          {
+            "primary": "80 Shoulder to Overheads @ 35/50kg",
+            "name": "",
+            "mineKey": "Shoulder to Overhead",
+            "partnerSplit": "reps",
+            "teamShare": "40",
+            "accent": "yellow"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "C",
+        "rows": [
+          {
+            "primary": "900 M Echo Bike (together)",
+            "name": "",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "partnerSplit": "reps",
+            "accent": "magenta"
+          },
+          {
+            "primary": "60 Thrusters @ 35/50kg",
+            "name": "",
+            "mineKey": "Thruster",
+            "partnerSplit": "reps",
+            "teamShare": "30",
+            "accent": "yellow"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "D",
+        "rows": [
+          {
+            "primary": "900 M Echo Bike (together)",
+            "name": "",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "partnerSplit": "reps",
+            "accent": "magenta"
+          },
+          {
+            "primary": "300 M Farmer Carry",
+            "name": "",
+            "mineKey": "Farmer Carry",
+            "suppressMine": true,
+            "partnerSplit": "reps",
+            "teamShare": "150m",
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      }
+    ]
+  ],
+  "hero": {
+    "value": "24:30",
+    "unit": "MIN",
+    "formatLine": "For Time · In Pairs",
+    "storyLine": "100 power clean · 80 shoulder to overhead · 60 thruster · 3.6km echo bike · 300m farmer carry",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "300m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "together",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "900m"
+      },
+      {
+        "perRound": "100",
+        "name": "Power Clean",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 50",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "300m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "together",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "900m"
+      },
+      {
+        "perRound": "80",
+        "name": "Shoulder to Overhead",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 40",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "300m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "together",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "900m"
+      },
+      {
+        "perRound": "60",
+        "name": "Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 30",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "300m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "together",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "900m"
+      },
+      {
+        "perRound": "300m",
+        "name": "Farmer Carry",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "your part 150m",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "4-ROUND PYRAMID FOR TIME",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "A",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "900 M Echo Bike (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "100 Power Cleans @ 35/50kg",
+        "load": "",
+        "mine": "40kg",
+        "team": "50"
+      },
+      {
+        "kind": "block",
+        "label": "B",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "900 M Echo Bike (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "80 Shoulder to Overheads @ 35/50kg",
+        "load": "",
+        "mine": "40kg",
+        "team": "40"
+      },
+      {
+        "kind": "block",
+        "label": "C",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "900 M Echo Bike (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "60 Thrusters @ 35/50kg",
+        "load": "",
+        "mine": "40kg",
+        "team": "30"
+      },
+      {
+        "kind": "block",
+        "label": "D",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "900 M Echo Bike (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "300 M Farmer Carry",
+        "load": "",
+        "mine": "",
+        "team": "150m"
+      }
+    ],
+    "pages": [
+      [],
+      [
+        {
+          "kind": "block",
+          "label": "4-ROUND PYRAMID FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "A",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "900 M Echo Bike (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "100 Power Cleans @ 35/50kg",
+          "load": "",
+          "mine": "40kg",
+          "team": "50"
+        },
+        {
+          "kind": "block",
+          "label": "B",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "900 M Echo Bike (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "80 Shoulder to Overheads @ 35/50kg",
+          "load": "",
+          "mine": "40kg",
+          "team": "40"
+        },
+        {
+          "kind": "block",
+          "label": "C",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "900 M Echo Bike (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "60 Thrusters @ 35/50kg",
+          "load": "",
+          "mine": "40kg",
+          "team": "30"
+        },
+        {
+          "kind": "block",
+          "label": "D",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "900 M Echo Bike (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "300 M Farmer Carry",
+          "load": "",
+          "mine": "",
+          "team": "150m"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": "you & your partner - four blocks",
+    "pages": [
+      null,
+      "you & your partner - four blocks"
+    ]
+  }
+}

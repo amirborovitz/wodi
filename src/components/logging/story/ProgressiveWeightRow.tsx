@@ -48,6 +48,13 @@ interface ProgressiveWeightRowProps {
   onChange: (start: number | undefined, peak: number | undefined) => void;
   label?: string;
   footer?: ReactNode;
+  /** One column only (no Start/Peak split) — for a single attempt with exactly one
+   * meaningful number (e.g. "build a heavy Clean & Jerk for the day"). Peak always
+   * mirrors the single value; no header/badge (the exercise name above already
+   * carries that context). */
+  singleColumn?: boolean;
+  /** Column label in single-column mode. Defaults to "Weight". */
+  columnLabel?: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -61,6 +68,8 @@ export function ProgressiveWeightRow({
   onChange,
   label = 'Barbell',
   footer,
+  singleColumn = false,
+  columnLabel = 'Weight',
 }: ProgressiveWeightRowProps) {
   const peakTouched = useRef(false);
   const peakRef = useRef<number | undefined>(peakWeight);
@@ -107,6 +116,27 @@ export function ProgressiveWeightRow({
     peakRef.current = value;
     onChange(weightRef.current, value);
   }, [onChange]);
+
+  // ── Single-column mode: one value, no peak concept — every change mirrors both. ──
+  const handleSingleChange = useCallback((raw: string) => {
+    const value = parseInput(raw);
+    weightRef.current = value;
+    peakRef.current = value;
+    onChange(value, value);
+  }, [onChange]);
+
+  const stepSingle = useCallback((delta: number) => {
+    const next = Math.max(0, (weightRef.current ?? 0) + delta);
+    weightRef.current = next;
+    peakRef.current = next;
+    onChange(next, next);
+  }, [onChange]);
+
+  const commitSingleDraft = useCallback(() => {
+    if (startDraft == null) return;
+    handleSingleChange(startDraft);
+    setStartDraft(null);
+  }, [handleSingleChange, startDraft]);
 
   const commitStartDraft = useCallback(() => {
     if (startDraft == null) return;
@@ -186,7 +216,11 @@ export function ProgressiveWeightRow({
     const field = dragRef.current.field;
 
     if (field === 'start') {
-      if (!peakTouched.current) {
+      if (singleColumn) {
+        weightRef.current = newWeight || undefined;
+        peakRef.current = newWeight || undefined;
+        onChange(newWeight || undefined, newWeight || undefined);
+      } else if (!peakTouched.current) {
         const peak = suggestPeak(newWeight || undefined);
         weightRef.current = newWeight || undefined;
         peakRef.current = peak;
@@ -200,7 +234,7 @@ export function ProgressiveWeightRow({
       peakRef.current = newWeight || undefined;
       onChange(weightRef.current, newWeight || undefined);
     }
-  }, [onChange]);
+  }, [onChange, singleColumn]);
 
   const onOvalUp = useCallback((_e: React.PointerEvent<HTMLDivElement>, field: 'start' | 'peak') => {
     if (!dragRef.current) return;
@@ -218,21 +252,23 @@ export function ProgressiveWeightRow({
 
   return (
     <div className={styles.card}>
-      {/* Header */}
-      <div className={styles.header}>
-        <span className={styles.label}>{label.toUpperCase()}</span>
-        {badge && <span className={styles.totalBadge}>{badge}</span>}
-      </div>
+      {/* Header — omitted in single-column mode; the exercise name above already carries it */}
+      {!singleColumn && (
+        <div className={styles.header}>
+          <span className={styles.label}>{label.toUpperCase()}</span>
+          {badge && <span className={styles.totalBadge}>{badge}</span>}
+        </div>
+      )}
 
-      {/* Two oval columns */}
+      {/* One or two oval columns */}
       <div className={styles.columnsRow}>
-        {/* START */}
+        {/* START / single value */}
         <div className={styles.column}>
-          <span className={styles.columnLabel}>Start weight</span>
+          <span className={styles.columnLabel}>{singleColumn ? columnLabel : 'Start weight'}</span>
           <button className={styles.chevron}
-            onPointerDown={() => startHold(() => stepStart(STEP))}
+            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(STEP) : stepStart(STEP)))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
-            type="button" aria-label="Increase start weight">
+            type="button" aria-label={singleColumn ? `Increase ${columnLabel.toLowerCase()}` : 'Increase start weight'}>
             <ChevronUp />
           </button>
 
@@ -244,7 +280,7 @@ export function ProgressiveWeightRow({
             <input
               ref={startInputRef}
               type="text" inputMode="decimal"
-              pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="next"
+              pattern="[0-9]*[.,]?[0-9]*" enterKeyHint={singleColumn ? 'done' : 'next'}
               className={styles.ovalInput}
               value={startDraft ?? weight ?? ''} placeholder={placeholderStr}
               onFocus={(e) => {
@@ -253,64 +289,66 @@ export function ProgressiveWeightRow({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => setStartDraft(e.target.value)}
-              onBlur={commitStartDraft}
-              aria-label="Start weight in kg"
+              onBlur={singleColumn ? commitSingleDraft : commitStartDraft}
+              aria-label={singleColumn ? `${columnLabel} in kg` : 'Start weight in kg'}
             />
           </div>
           <span className={styles.unit}>KG</span>
 
           <button className={styles.chevron}
-            onPointerDown={() => startHold(() => stepStart(-STEP))}
+            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(-STEP) : stepStart(-STEP)))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
-            type="button" aria-label="Decrease start weight">
+            type="button" aria-label={singleColumn ? `Decrease ${columnLabel.toLowerCase()}` : 'Decrease start weight'}>
             <ChevronDown />
           </button>
         </div>
 
-        <div className={styles.columnDivider} />
+        {!singleColumn && <div className={styles.columnDivider} />}
 
         {/* PEAK */}
-        <div className={styles.column}>
-          <span className={styles.columnLabel}>Peak weight</span>
-          <button className={styles.chevron}
-            onPointerDown={() => startHold(() => stepPeak(STEP))}
-            onPointerUp={stopHold} onPointerLeave={stopHold}
-            type="button" aria-label="Increase peak weight">
-            <ChevronUp />
-          </button>
+        {!singleColumn && (
+          <div className={styles.column}>
+            <span className={styles.columnLabel}>Peak weight</span>
+            <button className={styles.chevron}
+              onPointerDown={() => startHold(() => stepPeak(STEP))}
+              onPointerUp={stopHold} onPointerLeave={stopHold}
+              type="button" aria-label="Increase peak weight">
+              <ChevronUp />
+            </button>
 
-          <div className={styles.oval}
-            onPointerDown={(e) => onOvalDown(e, 'peak')}
-            onPointerMove={onOvalMove}
-            onPointerUp={(e) => onOvalUp(e, 'peak')}
-            onPointerCancel={() => { dragRef.current = null; }}>
-            <input
-              ref={peakInputRef}
-              type="text" inputMode="decimal"
-              pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done"
-              className={styles.ovalInput}
-              value={peakDraft ?? peakWeight ?? peakRef.current ?? ''}
-              placeholder={weight ? String(weight) : placeholderStr}
-              onFocus={(e) => {
-                handlePeakFocus();
-                setPeakDraft(peakWeight != null ? String(peakWeight) : peakRef.current != null ? String(peakRef.current) : '');
-                selectAllInput(e.currentTarget);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onChange={(e) => setPeakDraft(e.target.value)}
-              onBlur={commitPeakDraft}
-              aria-label="Peak weight in kg"
-            />
+            <div className={styles.oval}
+              onPointerDown={(e) => onOvalDown(e, 'peak')}
+              onPointerMove={onOvalMove}
+              onPointerUp={(e) => onOvalUp(e, 'peak')}
+              onPointerCancel={() => { dragRef.current = null; }}>
+              <input
+                ref={peakInputRef}
+                type="text" inputMode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done"
+                className={styles.ovalInput}
+                value={peakDraft ?? peakWeight ?? peakRef.current ?? ''}
+                placeholder={weight ? String(weight) : placeholderStr}
+                onFocus={(e) => {
+                  handlePeakFocus();
+                  setPeakDraft(peakWeight != null ? String(peakWeight) : peakRef.current != null ? String(peakRef.current) : '');
+                  selectAllInput(e.currentTarget);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onChange={(e) => setPeakDraft(e.target.value)}
+                onBlur={commitPeakDraft}
+                aria-label="Peak weight in kg"
+              />
+            </div>
+            <span className={styles.unit}>KG</span>
+
+            <button className={styles.chevron}
+              onPointerDown={() => startHold(() => stepPeak(-STEP))}
+              onPointerUp={stopHold} onPointerLeave={stopHold}
+              type="button" aria-label="Decrease peak weight">
+              <ChevronDown />
+            </button>
           </div>
-          <span className={styles.unit}>KG</span>
-
-          <button className={styles.chevron}
-            onPointerDown={() => startHold(() => stepPeak(-STEP))}
-            onPointerUp={stopHold} onPointerLeave={stopHold}
-            type="button" aria-label="Decrease peak weight">
-            <ChevronDown />
-          </button>
-        </div>
+        )}
       </div>
 
       {footer && (

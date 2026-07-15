@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType } from '../types';
-import { postProcessParsedWorkout } from './workoutPostProcessor';
+import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
 
@@ -9,20 +9,24 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true // Required for client-side usage
 });
 
-const WORKOUT_PARSE_PROMPT = `You are an expert CrossFit coach and workout parser. You understand workout structure — buy-ins, cash-outs, chippers, EMOMs, intervals, supersets, partner WODs. Parse the workout image into structured JSON, matching the workout's logical blocks.
+// Shared by the segmentation and structuring prompts — canonical-name normalization must be
+// identical at both stages or the second stage re-interprets the first stage's output.
+const MOVEMENT_ALIASES_SECTION = `## MOVEMENT ALIASES (use canonical names)
+Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
+Gymnastics: hspu → Handstand Push-up, t2b/ttb → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
+Cardio: du → Double Under, su → Single Under, cal → Calories
+Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
+CRITICAL: Compound movements written as "X to Y" or "X + Y" (e.g., "Power Clean to Push Press", "Hang Clean to Overhead", "Deadlift to Hang Power Clean") are a SINGLE movement. Preserve the FULL compound name — do NOT simplify to just the first movement ("Power Clean to Push Press" is NOT "Power Clean").
+CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walking, Alternating/Alt. "20 goblet alt lunges" → "Goblet Alt Lunge", not plain "Lunge".
+CRITICAL: A rep-style qualifier (t&g/tng → Touch-and-Go, ub → Unbroken) describes HOW the reps are done, not a second movement — keep it as a prefix on the one movement it modifies. "8 T&G Power Cleans" → "Touch-and-Go Power Clean", NEVER "Touch + Power Clean" (that reads as the "X + Y compound movement" pattern above, which this is not).`;
+
+const PARSE_INTRO = `You are an expert CrossFit coach and workout parser. You understand workout structure — buy-ins, cash-outs, chippers, EMOMs, intervals, supersets, partner WODs. Parse the workout text into structured JSON, matching the workout's logical blocks.
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON:
 {
   "title": "workout name — see TITLE RULES below",
-  "rawText": "full workout text from the image (OCR-style, line breaks ok) — the WHOLE image, every block",
-  // TRANSCRIPTION FIDELITY: transcribe every visible line, including a short line that repeats
-  // a phrase you already transcribed (e.g. "200m run" appearing 5 times in one round, once
-  // before each movement). A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S.,
-  // A.M.R.A.P.) is NOT a line or sentence terminator — do not let it cause you to skip or merge
-  // the line that follows it. Before finalizing rawText, recount the visible lines in the image;
-  // a short repeating connector line positioned immediately before the LAST movement in a round
-  // is the single most commonly dropped line during transcription — verify that exact position.
+  "rawText": "the full input text — every line, line breaks preserved",
   // sourceDate: date printed on the original WOD/whiteboard, not the date the user logs it.
   // If a full date is visible, return ISO "YYYY-MM-DD". If only day/month is visible, infer the
   // current year. If no original WOD date is visible, return null.
@@ -52,7 +56,7 @@ Return ONLY valid JSON:
     {
       "name": "Exercise or Block Name",
       "type": "strength" | "cardio" | "skill" | "wod",
-      "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets",
+      "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets" | "free",
       "prescription": "human-readable prescription",
       // isSecondary: see HIGH-LEVEL PARTS section below. false for the session's main part(s)
       // (the strength piece and/or the metcon), true for everything else (warm-up, body armor,
@@ -81,7 +85,7 @@ Return ONLY valid JSON:
       "movements": [
         // Each movement can have a "role": "buy_in" (done once before rounds), "cash_out" (done once after rounds), or omit for normal per-round work.
         // Use "role" when a buy-in/cash-out movement naturally belongs in the movements array (e.g., "200m Run into AMRAP: ...").
-        { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
+        { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "equipment": "barbell", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
         { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
       ],
       // Cash-out work that happens ONCE after all rounds goes into "cashOut".
@@ -119,33 +123,23 @@ Return ONLY valid JSON:
       "partnerSplit": "rounds"
     }
   ]
-}
+}`;
 
-## HIGH-LEVEL PARTS — isSecondary
+const RULES_BLOCKS = `## BLOCKS — isSecondary
 
-A CrossFit session has AT MOST 2 main parts: a strength/skill piece and a metcon/WOD (the
-conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's "isSecondary":
-- false — for the strength piece (e.g. "Bench Press 5x5 @70-85%") and the metcon/WOD. These are
-  the parts the athlete trains for and the recap should foreground.
-- true — for everything else: warm-ups, "body armor", mobility/prehab circuits, activation work,
-  skill practice unrelated to the main lifts. These exist to support the main parts, not stand
-  alongside them.
-- A session NEVER has more than 2 exercises with "isSecondary": false. If your parse has 3+
-  non-secondary exercises, reconsider — at least one of them is accessory/secondary work, even
-  if it's still substantial (e.g. a 2-set shoulder activation circuit before the real lifting).
-- A session can have ZERO secondary parts (a clean strength + metcon day) or just one main part
-  (metcon-only, or strength-only) — don't force a 3-part structure that isn't there.
-- This is purely about session structure, not about how each part is logged or scored — it has
-  no effect on "type"/"loggingMode"/"format", which are decided independently per their own rules.
-- CRITICAL — EVERY PART IS A STANDALONE PRACTICE. All structure fields ("loggingMode",
+You usually receive ONE part of a session (a strength piece OR a metcon OR accessory work) —
+the session was already split upstream. Parse what you're given; never force extra blocks.
+- "isSecondary": true for support work (warm-up, "body armor", mobility/prehab, activation,
+  "in between sets" accessories, cool-down); false for the piece the athlete trains for
+  (the main lift or the metcon). At most 2 non-secondary exercises.
+- CRITICAL — EVERY BLOCK IS A STANDALONE PRACTICE. All structure fields ("loggingMode",
   "stationRotation", "intervalCount", "workDuration", "restDuration", and movement-level
   "stationLabel"/"stationIndex"/"countingMode") describe ONE exercise only — set them on the
-  exercise they belong to and nowhere else. NEVER copy a flag from one part onto its siblings:
-  an interval-shaped part A does not make part B's plain AMRAP "stationRotation": true, and a
-  cool-down never carries the metcon's flags. Top-level "format"/"scoreType" describe the main
-  metcon/WOD part, not a blend of all parts.
+  exercise they belong to and nowhere else. NEVER copy a flag from one exercise onto its
+  siblings (an interval-shaped block does not make a sibling plain AMRAP "stationRotation":
+  true). Top-level "format"/"scoreType" describe the main metcon/WOD exercise.`;
 
-## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x [BLOCK] -> CASH-OUT)
+const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x [BLOCK] -> CASH-OUT)
 
 - Workouts often have this structure:
   - Optional buy-in (one-time work, usually a machine or run)
@@ -222,9 +216,9 @@ conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's 
 | amrap | "AMRAP 12" (single) | rounds_reps |
 | emom | "EMOM", "every 1:00", "E2MOM" | reps |
 | strength | "5x5", "3x8 @70%", "build to 1RM" | load |
-| tabata | "tabata", "20s on/10s off" | reps |
+| tabata | "tabata", "20s on/10s off" | reps |`;
 
-## WEIGHT PARSING
+const RULES_QUANTITIES = `## WEIGHT PARSING
 - "40/60 kg" → rxWeights: { female: 40, male: 60, unit: "kg" } (higher = male)
 - "@60kg" → rxWeights: { male: 60, female: 60, unit: "kg" }
 - "twin kb 16kg" or "2 kb 24kg" → rxWeights: 16 (per implement), implementCount: 2
@@ -233,6 +227,13 @@ conditioning piece — for_time, AMRAP, EMOM, intervals). Mark every exercise's 
 - "~50m" or "approx 50m" → distance: 50 (use the numeric value as-is, ignore ~ / approx)
 - "50m" → distance: 50
 - Carries (farmer carry, suitcase carry, yoke, etc.) with prescribed distance: set distance field, inputType: "none"
+- Equipment DIMENSIONS are never distances: box height ("box step-ups (30cm)", "24\" box"), wall ball target height, sled/rig heights. Do NOT set "distance" from them — keep the movement's reps: "8 weighted box step-ups (30cm)" → { "name": "Weighted Box Step-up", "reps": 8 } (30cm is the box height)
+
+## REP RANGES
+When a movement prescribes a rep RANGE ("10-12 pull-ups", "16-20 KB swings"), set "reps" to the
+midpoint rounded to the nearest whole rep and "repsDisplay" to the range exactly as the coach
+wrote it: "10-12" → reps: 11, repsDisplay: "10-12". The midpoint exists only so computed totals
+are fair — every displayed prescription uses "repsDisplay". Omit "repsDisplay" for single rep counts.
 
 ## CARDIO MACHINES IN WODs (Echo Bike, Assault Bike, Row, Ski Erg, etc.)
 Cardio machines are NEVER measured in "reps". They use calories or distance:
@@ -248,11 +249,21 @@ Every movement MUST include "inputType":
 - "calories": cardio machines when the user must LOG calories (standalone cardio — "max cal", open-ended calorie target)
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
+- CRITICAL: a missing written weight does NOT make a loaded movement "none". A push press, thruster, or "weighted X" with no weight on the board is still inputType "weight" — that is exactly when the athlete must be asked what they lifted.
 
-## ROTATING STATION LABELS
+## MOVEMENT EQUIPMENT
+Every movement performed with an external load MUST also include "equipment" — the implement the load is on (include it even when the board writes no weight):
+- "barbell": barbell lifts (deadlift, back/front squat, press family, clean, snatch, thruster with a bar)
+- "dumbbell": DB movements
+- "kettlebell": KB movements
+- "other": everything else — wall ball / med ball, plate, sandbag, D-ball, sled, weighted vest, and any "weighted X" with no stated implement ("weighted box step-ups", "weighted pull-ups"). When unsure which implement, use "other".
+The logging UI merges same-equipment movements into ONE weight input, so "equipment" decides what shares a bar and what gets asked separately. Omit the field for unweighted movements.`;
+
+const RULES_STATIONS = `## ROTATING STATION LABELS
 When an interval workout has labeled stations (A, B, C… or Station 1, 2, 3…), set "stationLabel" on the FIRST movement of each station only.
 - "A. MAX BIKE\nB. 10 Renegade Row + MAX Step Up\nC. MAX ROW" → Bike gets stationLabel "A", Renegade Row gets stationLabel "B" (Step Up omits it), Row gets stationLabel "C"
-- Only emit stationLabel when the workout explicitly uses letters/numbers to label rotating stations.
+- EMOM minute slots are stations too: "min 1: 10-12 pull-ups\nmin 2: 16-20 KB swings\nmin 3: 15 box jumps" → stationLabel "Min 1" / "Min 2" / "Min 3". This is a display label only — keep reps as the per-minute value and suggestedSets as usual.
+- Only emit stationLabel when the workout explicitly labels its stations (letters, numbers, or minute slots).
 
 ## MOVEMENT SEMANTICS
 When the workout structure makes counting explicit, every movement SHOULD include:
@@ -267,9 +278,9 @@ Rules:
 - Rotating station workouts → countingMode: "per_station_visit" for station movements
 - In rotating station workouts, the athlete logs one result per station visit pattern, so MAX bike cal / MAX row cal / MAX step-ups / MAX rope jumps should usually use scoreEntryMode: "per_round"
 - Use scoreEntryMode: "total" only when the athlete is explicitly entering one final total for the whole workout or whole block
-- Prescribed per-round values that should still be multiplied by rounds/visits (e.g. 10 Renegade Row, 20 DB Snatch) also use scoreEntryMode: "per_round"
+- Prescribed per-round values that should still be multiplied by rounds/visits (e.g. 10 Renegade Row, 20 DB Snatch) also use scoreEntryMode: "per_round"`;
 
-## IMPLEMENT COUNT (DB/KB)
+const RULES_MOVEMENT_CORE = `## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
 - rxWeights is ALWAYS the weight of ONE implement (never pre-doubled)
 - implementCount: 2 when "twin", "double", "2x", "pair" is explicit, OR the movement naturally uses two (DB Thrusters, DB Front Squats, Farmers Carry)
@@ -290,7 +301,11 @@ Every exercise MUST include "loggingMode" — this is the MOST IMPORTANT field p
 - "cardio": machine work scored by calories (single machine, no other movements)
 - "cardio_distance": cardio scored by distance (single machine, no other movements)
 - "bodyweight": reps-only bodyweight work (no weight needed)
-- "sets": generic fallback
+- "sets": generic fallback for sets-based work (weight/reps per set)
+- "free": ESCAPE HATCH — the part's structure genuinely fits none of the modes above. NEVER
+  force-fit an exotic structure into the wrong mode just to avoid "free": a wrong mode corrupts
+  the athlete's numbers, "free" just asks them for one score. Still transcribe the part's own
+  rawText faithfully and list its movements with any visible reps/weights.
 
 CRITICAL emom vs intervals: "Every 4:00 min x 4 rounds: 8 Thrusters + 8 TTB + 8 Box Jumps" → "emom" (prescribed window, log weight). "5 sets for time, 2 min rest" → "intervals" (race the clock, log split times). When in doubt: if the time is the window you work WITHIN, it's "emom". If the time is WHAT YOU'RE MEASURING, it's "intervals".
 
@@ -304,13 +319,7 @@ When movements share input fields, add "loggingHints":
 - Only for movements physically sharing one implement (barbell, single KB).
 - Do NOT group movements using different implements (barbell squat + KB swing).
 
-## MOVEMENT ALIASES (use canonical names)
-Barbell: s2oh/stoh → Shoulder to Overhead, dl → Deadlift, bs → Back Squat, fs → Front Squat, pc → Power Clean, sqcl → Squat Clean, ps → Power Snatch, ohs → Overhead Squat, c&j → Clean and Jerk
-Gymnastics: hspu → Handstand Push-up, t2b/ttb → Toes to Bar, k2e → Knees to Elbow, mu → Muscle-up, bmu/b.m.u → Bar Muscle-up, rmu → Ring Muscle-up, c2b → Chest to Bar Pull-up, hs walk → Handstand Walk
-Cardio: du → Double Under, su → Single Under, cal → Calories
-Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
-CRITICAL: Compound movements written as "X to Y" or "X + Y" (e.g., "Power Clean to Push Press", "Hang Clean to Overhead", "Deadlift to Hang Power Clean") are a SINGLE movement. Preserve the FULL compound name — do NOT simplify to just the first movement ("Power Clean to Push Press" is NOT "Power Clean").
-CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walking, Alternating/Alt. "20 goblet alt lunges" → "Goblet Alt Lunge", not plain "Lunge".
+${MOVEMENT_ALIASES_SECTION}
 
 ## TITLE RULES
 - If a workout name is clearly written/printed on the board (e.g. "RIFT", "MURPH", "WEDNESDAY WOD"), use it exactly as written.
@@ -330,19 +339,20 @@ CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walk
 5. Prescription fidelity: "prescription" MUST paraphrase the actual whiteboard text. NEVER invent descriptors like "build to heavy", "heavy singles", "for quality" unless those exact words appear in the source.
 6. RPE / RIR strength work: "@0-1 R.I.R" / "@2-3 R.I.R" / "@7 RPE" are intensity constraints, NOT rep counts. Set suggestedReps from the rep count in the prescription (e.g., "5 C2B @0-1 RIR" → suggestedReps: 5). NEVER sum multiple movement reps across a superset to produce suggestedReps. For a superset exercise with different rep counts per movement, omit suggestedReps entirely.
 7. Compound movement names: ALWAYS preserve the full name — "Burpee Step Up", "Burpee Box Jump Over", "Burpee Broad Jump" are distinct movements. Do NOT simplify to "Burpee".
+8. ROUND-ALTERNATING PAIRS: one line offering two movements marked "(alternates)" / "alternating" inside a rounds structure (e.g. "Push press/thrusters (alternates)" in "8 rounds of:") means the athlete switches movement each round — half the rounds are one, half the other. Emit ONE movement named as the pair ("Push Press / Thruster") with the per-round reps if the board OR the athlete's context note gives a count (the note is authoritative — "it is 8 alternating push press/thrusters" → reps: 8). If neither gives one, OMIT "reps" entirely — never invent it. Do NOT emit two separate per-round movements (that double-counts the work every round), and do NOT use the "alternative" field (that means an either/or scaling choice, not alternation).`;
 
-## CONTAINER/BENCHMARK RECOGNITION
+const RULES_BENCHMARKS = `## CONTAINER/BENCHMARK RECOGNITION
 - containerRounds: outer rounds wrapping a benchmark (7 in "7 rounds of Cindy")
 - benchmarkName: Cindy, DT, Fran, Grace, Isabel, Helen, Diane, Elizabeth, Jackie, Karen, Annie, Mary
 - benchmarkModified: true if weight/reps differ from standard
-- If definition is provided in text, use that; otherwise use standard benchmark
+- If definition is provided in text, use that; otherwise use standard benchmark`;
 
-## VARIABLE REP SCHEMES
+const RULES_REP_SCHEMES = `## VARIABLE REP SCHEMES
 "[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
 Bracket notation like "[20-16-12-8-4]" in a for_time workout → suggestedRepsPerSet: [20, 16, 12, 8, 4], suggestedSets: 5.
-CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.
+CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.`;
 
-## ASCENDING LADDER REP SCHEMES
+const RULES_LADDERS_PARTNERS = `## ASCENDING LADDER REP SCHEMES
 When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to the sequence.
 - "2-4-6-8-10---" → ladderReps: [2, 4, 6, 8, 10], loggingMode: "amrap"
 - "1-2-3-4-5 each" → ladderReps: [1, 2, 3, 4, 5], loggingMode: "amrap"
@@ -353,6 +363,7 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 ## PARTNER / TEAM WORKOUTS
 - "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N
+- A board TITLED or headed "Partner WOD" / "Partner Metcon" is a partner workout even when no other partner phrasing appears in the body → partnerWorkout: true, teamSize: 2 (unless a different team size is stated). Keep that heading line in rawText — it is part of the board.
 - "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
 - "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
@@ -370,18 +381,16 @@ Both athletes do both exercises during the workout (they switch), so both exerci
 
 This is fundamentally different from IGUG for-time (same movements, alternating) — in split-station IGYG, P1 and P2 have INDEPENDENT, non-overlapping scores at all times. Do NOT merge them into one exercise.
 
-The relay unit can be ANY movement type: a run (200m), a bodyweight movement (10 box jumps), a machine (10 cal Echo Bike), or a distance carry. The split-station rule applies universally.
+The relay unit can be ANY movement type: a run (200m), a bodyweight movement (10 box jumps), a machine (10 cal Echo Bike), or a distance carry. The split-station rule applies universally.`;
 
-## SKILL / PRACTICE BLOCKS
+const RULES_SKILL_TIMECAP = `## SKILL / PRACTICE BLOCKS
 "Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
 Example: "A. 3 sets, for quality: 10 ring rows, 15 prone T-raises" → exercise type: "skill", suggestedSets: 3.
 
 ## TIME CAP
-"T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.
+"T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.`;
 
-## EXAMPLES
-
-### 1. Buy-in + Rounds + Cash-out
+const EXAMPLES_METCON_BASIC = `### 1. Buy-in + Rounds + Cash-out
 Input: "For Time: 600m Run (buy in), 8 RFT: 8 Push Press 40/50kg, 8 TTB, 8 KB Swings 24/16kg, then 600m Run"
 Output:
 {
@@ -424,15 +433,17 @@ Output:
     ] }]
 }
 
-### 4. Strength
+`;
+
+const EXAMPLE_STRENGTH = `### 4. Strength
 Input: "Back Squat 5x5 @75%"
 Output:
 {
   "type": "strength", "format": "strength", "scoreType": "load",
   "exercises": [{ "name": "Back Squat", "type": "strength", "loggingMode": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
-}
+}`;
 
-### 5. Intervals
+const EXAMPLES_METCON_ADVANCED = `### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
 Output:
 {
@@ -461,17 +472,12 @@ Output:
 }
 NOTE: stationLabel goes on the first movement of each station only. "Renegade Row" is a weighted movement (inputType: "weight"), not a cardio machine.
 
-### 6. Mixed session (Strength + EMOM + Cool Down)
-Input: "A. STRENGTH (squat)\nBack Squat\n5 sets x 5 reps @80-85%\n\nB. METCON (Intervals)\nEvery 04:00 min x 4 rounds:\n2 rounds of:\n8 Thrusters @30/40kg\n8 T.T.B\n8 box jumps\n\nC. Cool down\n~01:30 min/side box Pigeon stretch\n~01:30 min/side banded lat stretch (elbow)"
+### 6. Strength block with nested-round EMOM sibling
+Input: "Every 04:00 min x 4 rounds:\n2 rounds of:\n8 Thrusters @30/40kg\n8 T.T.B\n8 box jumps"
 Output:
 {
-  "title": "IRON SURGE", "type": "mixed", "format": "emom", "scoreType": "load",
+  "title": "IRON SURGE", "type": "emom", "format": "emom", "scoreType": "load",
   "exercises": [
-    {
-      "name": "Back Squat", "type": "strength", "loggingMode": "strength", "isSecondary": false,
-      "prescription": "5x5 @80-85%", "suggestedSets": 5, "suggestedReps": 5,
-      "movements": []
-    },
     {
       "name": "Every 4:00 min x 4 rounds", "type": "wod", "loggingMode": "emom", "isSecondary": false,
       "prescription": "2 rounds of: 8 Thrusters @30/40kg, 8 T.T.B, 8 Box Jumps", "suggestedSets": 8,
@@ -480,28 +486,10 @@ Output:
         { "name": "Toes to Bar", "reps": 8, "inputType": "none" },
         { "name": "Box Jump", "reps": 8, "inputType": "none" }
       ]
-    },
-    {
-      "name": "Cool Down", "type": "skill", "loggingMode": "sets", "isSecondary": true,
-      "prescription": "~1:30 min/side box Pigeon stretch, ~1:30 min/side banded lat stretch", "suggestedSets": 1,
-      "movements": []
     }
   ]
 }
-NOTE: Each exercise has its own loggingMode set independently. "Every 4:00 min x 4 rounds" → "emom" (prescribed time window, log weight). suggestedSets = 8 = 4 intervals × 2 inner rounds — always multiply through so totalReps is correct. Cool Down → isSecondary: true (not a primary scored part). The workout-level format reflects the metcon's format.
-
-### 6b. Mixed session (Strength + Superset + Metcon)
-Input: "Cycle 1 - Push: Strict Press 5x3. Superset 3x12: Goblet Squat, V-ups. Metcon: 15 min max cal Ecobike"
-Output:
-{
-  "title": "Cycle 1 - Push", "type": "mixed", "format": "strength", "scoreType": "load",
-  "exercises": [
-    { "name": "Strict Shoulder Press", "type": "strength", "loggingMode": "strength", "prescription": "5x3", "suggestedSets": 5, "suggestedReps": 3 },
-    { "name": "Superset: Goblet Squat + V-ups", "type": "strength", "loggingMode": "sets", "prescription": "3x12 each movement", "suggestedSets": 3, "suggestedReps": 12,
-      "movements": [{ "name": "Goblet Squat", "reps": 12, "inputType": "weight" }, { "name": "V-up", "reps": 12, "inputType": "none" }] },
-    { "name": "Metcon: Max Cal Ecobike", "type": "cardio", "loggingMode": "cardio", "prescription": "15 min max calories", "suggestedSets": 1, "timeCap": 900 }
-  ]
-}
+NOTE: "Every 4:00 min x 4 rounds" → "emom" (prescribed time window, log weight). suggestedSets = 8 = 4 intervals × 2 inner rounds — always multiply through so totalReps is correct.
 
 ### 7. Partner RFT with time cap
 Input: "With a partner IGUG (6 each): 10 Deadlifts 60/40kg, 40 D.U./60 Singles, 15 Box Jumps. 16 min T.C."
@@ -782,6 +770,31 @@ Output:
 }
 NOTE: "8/10 calories bike" → Bike, calories: 10, rxCalories: { male: 10, female: 8 }. The Bike is movement #1 in AMRAP 1 — it is NOT a buy-in. No buy-in is present in this workout. Each numbered section becomes its own exercise.
 
+### 14b. ALTERNATING stations under one clock — ONE exercise, never separate exercises
+Input: "[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):
+B.1. 200m run
+Max single DB alt' Devil press @15/22.5kg
+B.2. 50 D.U. / 80 singles
+Max sit ups
+* Two groups, starting at different stations. (B.1 / B.2)"
+Output:
+{
+  "title": "ALT STATIONS", "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps",
+  "timeCap": 1080, "intervalTime": 120, "sets": 6,
+  "exercises": [{
+    "name": "02:00 min AMRAP x 6", "type": "wod", "loggingMode": "amrap_intervals",
+    "prescription": "[02:00 AMRAP / 01:00 REST] x 6 (alt'): B.1 200m Run + Max Devil Press, B.2 50 Double Unders + Max Sit-ups",
+    "suggestedSets": 1, "stationRotation": true, "intervalCount": 6, "workDuration": 720, "restDuration": 360,
+    "movements": [
+      { "name": "Run", "distance": 200, "stationLabel": "B.1", "countingMode": "per_station_visit", "inputType": "distance" },
+      { "name": "Single DB Alt Devil Press", "isMaxReps": true, "countingMode": "per_station_visit", "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" } },
+      { "name": "Double Under", "reps": 50, "alternative": { "name": "Single Under", "reps": 80 }, "stationLabel": "B.2", "countingMode": "per_station_visit", "inputType": "none" },
+      { "name": "Sit-up", "isMaxReps": true, "countingMode": "per_station_visit", "inputType": "none" }
+    ]
+  }]
+}
+NOTE: The difference from example 14 is the ROTATION: "(alt)" / "alternate" / "two groups starting at different stations" means the SAME interval clock cycles through the stations — that is ONE exercise with stationRotation: true and stationLabel on the first movement of each station, NEVER separate exercises per station. 6 total intervals ÷ 2 stations = 3 visits per station. workDuration/restDuration stay CUMULATIVE across all 6 intervals (720 / 360).
+
 ### 15. IGYG AMRAP — split stations (P1 and P2 do different movements)
 Input: "15 min AMRAP with a partner (I go you go): P1: 200m Run. P2: AMRAP: 4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups."
 Output:
@@ -878,29 +891,71 @@ Output:
     ]
   }]
 }
-NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The movements[] at top lists unique movements (deduplicated) for reference. DO NOT flatten all sections into one movement list — the pyramid structure must be preserved.
+NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The movements[] at top lists unique movements (deduplicated) for reference. DO NOT flatten all sections into one movement list — the pyramid structure must be preserved.`;
 
-If image is not a workout, return: {"error": "Could not parse workout from image"}`;
+const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not parse workout from text"}';
+
+const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP].join('\n\n');
+const RULES_METCON = [RULES_METCON_STRUCTURE, RULES_STATIONS, RULES_BENCHMARKS, RULES_LADDERS_PARTNERS].join('\n\n');
+
+// Kind-scoped prompt: a strength/accessory part skips the metcon structure rules and examples it
+// can never use (~70% of the prompt's tokens). Beyond cost, this is what lets a multi-part
+// session structure its parts in PARALLEL without bursting through OpenAI's per-minute token
+// limit. No kind (single-pass fallback, corpus/check-wod scripts) gets the full prompt.
+function buildParsePrompt(kind?: WorkoutPartSegment['kind']): string {
+  const liftOnly = kind === 'strength' || kind === 'accessory';
+  return [
+    PARSE_INTRO,
+    RULES_CORE,
+    ...(liftOnly ? [] : [RULES_METCON]),
+    '## EXAMPLES',
+    ...(liftOnly ? [EXAMPLE_STRENGTH] : [EXAMPLES_METCON_BASIC, EXAMPLE_STRENGTH, EXAMPLES_METCON_ADVANCED]),
+    PARSE_FOOTER,
+  ].join('\n\n');
+}
+
+// Athlete-supplied context/correction, injected into segmentation and structuring calls.
+// It outranks the board text: the athlete may state facts that were never written down
+// (e.g. the coach said "grab a partner" verbally, so the whiteboard has no partner marking).
+function athleteContextBlock(note: string): { type: 'text'; text: string } {
+  return {
+    type: 'text',
+    text: 'ATHLETE CONTEXT — the athlete who did this workout added the note below. '
+      + 'It is authoritative: it comes from the athlete directly and may state facts that are '
+      + 'NOT written in the workout text (e.g. that it was a partner workout, the real time cap, '
+      + 'a movement the text got wrong). Apply it even where it contradicts the text.\n\n'
+      + note,
+  };
+}
 
 /**
  * Parse a workout from plain text (no image).
+ * `kind` scopes the prompt to the part's shape (see buildParsePrompt); omit it for full coverage.
  * Returns the raw AI JSON string for debugging, plus the parsed result.
  */
-export async function parseWorkoutText(text: string, sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT'): Promise<{ raw: string; parsed: ParsedWorkout }> {
+export async function parseWorkoutText(
+  text: string,
+  sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT',
+  kind?: WorkoutPartSegment['kind'],
+  athleteNote?: string,
+): Promise<{ raw: string; parsed: ParsedWorkout }> {
+  const startedAt = performance.now();
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     messages: [
       {
         role: 'user',
         content: [
-          { type: 'text', text: WORKOUT_PARSE_PROMPT },
+          { type: 'text', text: buildParsePrompt(kind) },
           { type: 'text', text: `Here is the workout text to parse:\n\n${text}` },
+          ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
         ],
       },
     ],
     max_tokens: 4000,
     temperature: 0.2,
   });
+  console.info(`[TIMING] structure (${kind ?? 'full'}): ${Math.round(performance.now() - startedAt)}ms`);
 
   const content = response.choices[0]?.message?.content || '';
   let jsonStr = content;
@@ -938,6 +993,8 @@ function movementDebugRow(value: unknown, index: number): Record<string, unknown
       : '',
     calories: typeof movement.calories === 'number' ? movement.calories : '',
     weight: rxWeights?.male ?? rxWeights?.female ?? '',
+    input: typeof movement.inputType === 'string' ? movement.inputType : '',
+    equip: typeof movement.equipment === 'string' ? movement.equipment : '',
   };
 }
 
@@ -968,127 +1025,324 @@ function logAiWorkoutSummary(label: string, workout: unknown): void {
   });
 }
 
-// Deliberately tiny — this call's only job is faithful transcription. Keeping the 863-line
-// WORKOUT_PARSE_PROMPT out of it means the model isn't simultaneously reading pixels and
-// tracking structuring rules, which is what was causing it to silently drop repeated short
-// lines (e.g. a "200m run" connector) that a plain "what does this say" read gets right every
-// time. Structuring still happens afterward via parseWorkoutText, against this clean text.
-const IMAGE_TRANSCRIBE_PROMPT = `Transcribe every piece of text visible in this workout whiteboard/image exactly as written — title, date, section labels, all movements, reps, weights, and numbers — preserving line breaks and order.
-
-This is a literal transcription task only. Do not interpret, restructure, summarize, correct, or omit anything:
-- Include every line, even a short line that repeats one you already transcribed (e.g. a connector like "200m run" appearing multiple times, once before each of several movements).
-- A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S., A.M.R.A.P.) is not a line or sentence terminator — do not let it cause you to skip or merge the next line.
-- Before answering, recount the visible lines in the image and verify your transcription has that many lines.
-
-Return ONLY the transcribed text. No JSON, no markdown formatting, no commentary.`;
-
-async function transcribeWorkoutImage(base64Image: string): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: IMAGE_TRANSCRIBE_PROMPT },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`,
-              detail: 'high',
-            },
-          },
-        ],
-      },
-    ],
-    max_tokens: 600,
-    temperature: 0,
-  });
-
-  const content = response.choices[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error('No response from OpenAI (image transcription)');
-  }
-  return content;
-}
-
 export async function parseWorkoutImage(base64Image: string): Promise<ParsedWorkout> {
   try {
-    const transcribedText = await transcribeWorkoutImage(base64Image);
-    console.info('[IMAGE TRANSCRIBE]', transcribedText);
-
-    const { parsed } = await parseWorkoutText(transcribedText, 'IMAGE');
-    return parsed;
+    const startedAt = performance.now();
+    const segmented = await segmentWorkoutImage(base64Image);
+    console.info(`[TIMING] transcribe+segment: ${Math.round(performance.now() - startedAt)}ms`);
+    if (!segmented) {
+      throw new Error('Could not parse workout from image');
+    }
+    // The board's text is the segmented parts themselves — stage 1 transcribes and splits in one
+    // read, so there is no separate verbatim transcription to fall back on.
+    const boardText = segmented.parts.map((part) => part.text).join('\n\n');
+    return await structureSegments(boardText, segmented, 'IMAGE');
   } catch (error) {
     console.error('Error parsing workout image:', error);
     throw error;
   }
 }
 
-const WORKOUT_REFINE_PROMPT = `You are a CrossFit workout parser refinement engine. You receive rawText + parsed JSON and return corrected JSON.
+// ─── Stage 1: read + normalize + segment ─────────────────────────────────────
+// One small prompt with one job: produce the session's CLEANED text (canonical movement names,
+// expanded shorthand) split into its standalone parts. For images this same call also does the
+// transcription — reading pixels pairs safely with line-grouping because neither requires
+// interpretation; it was the huge STRUCTURING prompt that caused dropped lines when combined
+// with OCR. Structure interpretation happens AFTERWARD, once per part — so no session-level
+// reading can leak into a sibling part, and the structuring prompt never has to juggle
+// multi-part bookkeeping.
 
-Return ONLY valid JSON matching the same schema as the parsed input.
+export interface WorkoutPartSegment {
+  label?: string;
+  kind: 'strength' | 'metcon' | 'accessory';
+  text: string;
+}
 
-Rules:
-- Only split into multiple exercises for truly separate blocks (Strength + Metcon, Skill + WOD).
-- "5x3" = suggestedSets: 5, suggestedReps: 3.
-- Every exercise MUST include "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets".
-- Preserve repeated movement occurrences that appear inside a single round or chipper sequence.
-  Do not dedupe repeated movements inside the movement list. Example: "4 RFT: 200m Run,
-  10 Deadlift, 200m Run, 10 Power Clean" must keep Run twice in movements[].
-- Do not duplicate the entire round block to simulate rounds. Keep one per-round sequence and
-  set suggestedSets/rounds for the round count.
-- If rawText says a movement quantity (for example 200m Run), the matching structured movement
-  must use that same quantity unless the raw text explicitly gives a different value.
-- Preserve "loggingHints" (including sharedWeightMovements) from the original parsed data.
-- Preserve "workDuration" and "restDuration" from the original parsed data.
-- Preserve each exercise's "rawText" (its own scoped slice of the whiteboard) from the original parsed data unchanged — never copy one exercise's rawText onto another.
-- Preserve original structure when unsure — only correct obvious errors.`;
+export interface SegmentedWorkout {
+  title?: string;
+  parts: WorkoutPartSegment[];
+}
 
-export async function refineParsedWorkout(
-  parsed: ParsedWorkout,
-  rawText: string
-): Promise<ParsedWorkout> {
+const SEGMENT_SPEC = `Return ONLY valid JSON:
+{
+  "title": "session title if one is clearly written on the board, else omit",
+  "parts": [
+    { "label": "A", "kind": "strength" | "metcon" | "accessory", "text": "the part's lines, cleaned, newline-separated" }
+  ]
+}
+
+NORMALIZATION (apply inside each part's text):
+- Replace shorthand/abbreviations with canonical movement names. Fix obvious typos and OCR noise.
+- PRESERVE everything else exactly: every line, every quantity (reps, weights, distances, calories, times, percentages), line order, round markers ("x 6", "(alt')", "21-15-9"), and coach notes. Never merge, reorder, summarize, or drop a line — even a short line repeating an earlier one.
+
+${MOVEMENT_ALIASES_SECTION}
+
+SEGMENTATION:
+- A session has 1-3+ parts, usually labeled (A./B./C.) or separated by headers (STRENGTH, METCON, WOD, Cool Down). Every input line belongs to EXACTLY ONE part.
+- The unit of a part is the SCORE, not the label: blocks completed under ONE clock/score (a chipper flowing "Into:", "A+B+C for time", a partner piece with one finish time) are ONE part — keep the internal labels inside its text. Blocks scored independently (own clock, own result) are separate parts even when unlabeled.
+- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", unrelated skill practice.
+- A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
+- A date written on the board goes into the FIRST part's text (a later step reads it from there).
+- Single-part boards return one part. Never invent parts that are not on the board.
+
+If the input is not a workout, return: {"error": "Could not parse workout"}`;
+
+const WORKOUT_SEGMENT_PROMPT = `You are a CrossFit session editor. You receive the raw transcription of a gym whiteboard and return it CLEANED and SPLIT INTO PARTS as JSON. You do NOT interpret structure (rounds, scoring, logging) — a later step does that per part.
+
+${SEGMENT_SPEC}`;
+
+const IMAGE_SEGMENT_PROMPT = `You are a CrossFit session editor. Read the workout whiteboard/photo and return its text TRANSCRIBED, CLEANED and SPLIT INTO PARTS as JSON. You do NOT interpret structure (rounds, scoring, logging) — a later step does that per part.
+
+TRANSCRIPTION (do this first — fidelity is the whole job):
+- Transcribe every piece of visible text exactly as written — title, date, section labels, all movements, reps, weights, and numbers — preserving line breaks and order.
+- Include every line, even a short line that repeats one you already transcribed (e.g. a connector like "200m run" appearing multiple times, once before each of several movements).
+- A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S., A.M.R.A.P.) is NOT a line or sentence terminator — do not let it cause you to skip or merge the line that follows it. The single most commonly dropped line is a short repeating connector immediately before the LAST movement in a round — verify that exact position.
+- Before answering, recount the visible lines in the image and verify every one of them appears in exactly one part.
+
+${SEGMENT_SPEC}`;
+
+// 'not_workout' = the model explicitly said the input isn't a workout (don't bother retrying);
+// 'invalid' = malformed/empty response (a retry may succeed).
+type SegmentationOutcome = SegmentedWorkout | 'not_workout' | 'invalid';
+
+function validateSegmentedWorkout(data: unknown): SegmentationOutcome {
+  const root = asRecord(data);
+  if (!root) return 'invalid';
+  if (typeof root.error === 'string') return 'not_workout';
+  const rawParts = Array.isArray(root.parts) ? root.parts : [];
+  const parts = rawParts.flatMap((entry): WorkoutPartSegment[] => {
+    const part = asRecord(entry);
+    if (!part || typeof part.text !== 'string' || part.text.trim().length === 0) return [];
+    const kind = part.kind === 'strength' || part.kind === 'accessory' ? part.kind : 'metcon';
+    return [{
+      ...(typeof part.label === 'string' && part.label.trim() ? { label: part.label.trim() } : {}),
+      kind,
+      text: part.text.trim(),
+    }];
+  });
+  if (parts.length === 0) return 'invalid';
+  return {
+    ...(typeof root.title === 'string' && root.title.trim() ? { title: root.title.trim() } : {}),
+    parts,
+  };
+}
+
+async function requestSegmentation(
+  content: OpenAI.Chat.Completions.ChatCompletionContentPart[],
+): Promise<SegmentationOutcome> {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: WORKOUT_REFINE_PROMPT },
-          {
-            type: 'text',
-            text: JSON.stringify({
-              rawText,
-              parsed,
-            }),
-          },
-        ],
-      },
-    ],
+    messages: [{ role: 'user', content }],
+    max_tokens: 1500,
     temperature: 0,
+    response_format: { type: 'json_object' },
   });
 
-  const text = response.choices[0]?.message?.content || '';
+  const raw = response.choices[0]?.message?.content || '';
+  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const jsonStr = (jsonMatch ? jsonMatch[1] : raw).trim();
+  try {
+    return validateSegmentedWorkout(JSON.parse(jsonStr));
+  } catch {
+    return 'invalid';
+  }
+}
 
-  // Strip markdown code blocks if present (```json ... ```)
-  let jsonStr = text;
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (jsonMatch) {
-    jsonStr = jsonMatch[1];
+async function segmentWorkoutText(text: string, athleteNote?: string): Promise<SegmentedWorkout | null> {
+  const outcome = await requestSegmentation([
+    { type: 'text', text: WORKOUT_SEGMENT_PROMPT },
+    { type: 'text', text: `Here is the transcribed workout text:\n\n${text}` },
+    ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
+  ]);
+  return typeof outcome === 'object' ? outcome : null;
+}
+
+async function segmentWorkoutImage(base64Image: string): Promise<SegmentedWorkout | null> {
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    { type: 'text', text: IMAGE_SEGMENT_PROMPT },
+    {
+      type: 'image_url',
+      image_url: { url: `data:image/jpeg;base64,${base64Image}`, detail: 'high' },
+    },
+  ];
+  // One retry on malformed output only — recapturing the photo is expensive for the user,
+  // but a "this isn't a workout" verdict is final.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const outcome = await requestSegmentation(content).catch((): SegmentationOutcome => 'invalid');
+    if (typeof outcome === 'object') return outcome;
+    if (outcome === 'not_workout') return null;
+    console.warn(`[SEGMENT] image segmentation attempt ${attempt + 1} returned invalid JSON`);
+  }
+  return null;
+}
+
+// ─── Stage 3: structure each part independently, then merge ──────────────────
+// Each part is a STANDALONE practice: it gets its own structuring call over its own text, so
+// there is exactly one authoritative reading of each part and no session-level field can
+// redefine a sibling. Session-level fields on the merged result describe the primary part.
+
+function mergeSegmentedParses(
+  originalText: string,
+  segmented: SegmentedWorkout,
+  partParses: ParsedWorkout[],
+): ParsedWorkout {
+  // Primary = the part the poster leads with, whose session-level fields (format, scoreType…)
+  // describe the merged workout. A part can be segmented as 'metcon' yet contain only
+  // isSecondary exercises (the AI marks a skill-practice EMOM secondary) — its format must not
+  // become the session format over the real main metcon's.
+  const isMainPart = (index: number): boolean =>
+    partParses[index].exercises.some((exercise) => exercise.isSecondary !== true);
+  const primaryIndex = (() => {
+    const mainMetcon = segmented.parts.findIndex((part, index) => part.kind === 'metcon' && isMainPart(index));
+    if (mainMetcon >= 0) return mainMetcon;
+    const anyMetcon = segmented.parts.findIndex((part) => part.kind === 'metcon');
+    return anyMetcon >= 0 ? anyMetcon : 0;
+  })();
+  const primary = partParses[primaryIndex];
+
+  const exercises: ParsedExercise[] = partParses.flatMap((parse, index) => {
+    const part = segmented.parts[index];
+    return parse.exercises.map((exercise) => ({
+      ...exercise,
+      rawText: exercise.rawText || part.text,
+      ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
+    }));
+  });
+
+  const firstDefined = <K extends keyof ParsedWorkout>(key: K): ParsedWorkout[K] =>
+    primary[key] ?? partParses.find((parse) => parse[key] != null)?.[key] as ParsedWorkout[K];
+
+  return {
+    ...primary,
+    title: segmented.title || primary.title,
+    rawText: originalText,
+    exercises,
+    teamSize: firstDefined('teamSize'),
+    // A session is a partner session when ANY part is partnered. firstDefined alone gets this
+    // wrong: the primary (first metcon) part may be a solo sibling whose post-processed
+    // explicit `false` would win over another part's `true` (?? only skips null/undefined).
+    partnerWorkout: partParses.some((parse) => parse.partnerWorkout === true)
+      ? true
+      : firstDefined('partnerWorkout'),
+    sourceDate: firstDefined('sourceDate'),
+  };
+}
+
+/**
+ * Full text→workout pipeline: segment the session into standalone parts, structure each part
+ * with its own AI call (in parallel), and merge. Falls back to the single-pass parse when
+ * segmentation is unavailable — never worse than the legacy behavior.
+ */
+export async function parseWorkoutSession(
+  text: string,
+  sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT',
+  athleteNote?: string,
+): Promise<ParsedWorkout> {
+  const segmented = await segmentWorkoutText(text, athleteNote).catch((error): null => {
+    console.warn('[SEGMENT] segmentation failed, falling back to single-pass parse:', error);
+    return null;
+  });
+
+  if (!segmented) {
+    const { parsed } = await parseWorkoutText(text, sourceLabel, undefined, athleteNote);
+    return withUserContext(parsed, athleteNote);
   }
 
-  // Validate/whitelist exactly like the initial parse — the refine step is a second AI call
-  // and is just as capable of hallucinating fields (e.g. an invented "isSecondary" flag, or
-  // ladderReps copied onto the wrong exercise) as the first one. A raw `as ParsedWorkout` cast
-  // would let any such hallucination survive untouched into the saved workout.
-  const parsedRefined = JSON.parse(jsonStr.trim());
-  const refined = validateParsedWorkout(parsedRefined);
+  return withUserContext(await structureSegments(text, segmented, sourceLabel, athleteNote), athleteNote);
+}
 
-  // Post-process the refined workout
-  const postProcessed = postProcessParsedWorkout(refined);
-  logAiWorkoutSummary('REFINE AI', parsedRefined);
-  logAiWorkoutSummary('REFINE POST', postProcessed);
-  return postProcessed;
+// Stamps the athlete's note on the parse so it persists with the workout and future
+// re-parses can include the full correction history.
+function withUserContext(parsed: ParsedWorkout, athleteNote?: string): ParsedWorkout {
+  return athleteNote ? { ...parsed, userContext: athleteNote } : parsed;
+}
+
+async function structureSegments(
+  originalText: string,
+  segmented: SegmentedWorkout,
+  sourceLabel: 'TEXT' | 'IMAGE',
+  athleteNote?: string,
+): Promise<ParsedWorkout> {
+  console.info('[SEGMENT]', {
+    title: segmented.title,
+    parts: segmented.parts.map((part) => `${part.label ?? '?'} ${part.kind} (${part.text.split('\n').length} lines)`),
+  });
+
+  if (segmented.parts.length === 1) {
+    const part = segmented.parts[0];
+    const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote);
+    // The part was structured without the session title, so the title-aware partner
+    // override runs here — once the title is back on the workout.
+    return applyTitlePartnerOverride({
+      ...parsed,
+      rawText: originalText,
+      ...(segmented.title ? { title: segmented.title } : {}),
+    });
+  }
+
+  // Parallel: kind-scoped prompts (see buildParsePrompt) keep a multi-part burst inside the
+  // per-minute token limit that used to force this loop sequential, and structurePart's retry
+  // ladder absorbs any 429 stragglers.
+  const startedAt = performance.now();
+  const partParses = await Promise.all(
+    segmented.parts.map((part) => structurePart(part, sourceLabel, athleteNote)),
+  );
+  console.info(`[TIMING] structured ${segmented.parts.length} parts in parallel: ${Math.round(performance.now() - startedAt)}ms`);
+  return applyTitlePartnerOverride(mergeSegmentedParses(originalText, segmented, partParses));
+}
+
+// Structures one segmented part, retrying failures before demoting to 'free' (a parseable
+// part must never end up as a bare score screen because of a transient error). The second
+// delay is long on purpose: multi-part sessions fire several full-prompt calls back to back,
+// and OpenAI's tokens-per-MINUTE limit doesn't clear in 2 seconds — a short retry lands in
+// the same window and fails identically. An empty parse (possible stochastic refusal) gets
+// one more chance; a second empty is a real refusal (e.g. a cool-down blurb) and degrades.
+const STRUCTURE_RETRY_DELAYS_MS = [2_000, 20_000];
+
+async function structurePart(part: WorkoutPartSegment, sourceLabel: 'TEXT' | 'IMAGE', athleteNote?: string): Promise<ParsedWorkout> {
+  const label = part.label ?? '?';
+  for (let attempt = 0; attempt <= STRUCTURE_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote);
+      if (parsed.exercises.length > 0) return parsed;
+      if (attempt >= 1) {
+        console.warn(`[SEGMENT] part ${label} structured empty twice — keeping it as a free part`);
+        return buildFreePartFallback(part);
+      }
+      console.warn(`[SEGMENT] part ${label} structured empty — retrying once`);
+    } catch (error) {
+      if (attempt >= STRUCTURE_RETRY_DELAYS_MS.length) {
+        console.warn(`[SEGMENT] part ${label} failed to structure after ${attempt + 1} attempts — keeping it as a free part:`, error);
+        return buildFreePartFallback(part);
+      }
+      console.warn(`[SEGMENT] part ${label} structure attempt ${attempt + 1} failed — retrying:`, error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, STRUCTURE_RETRY_DELAYS_MS[Math.min(attempt, STRUCTURE_RETRY_DELAYS_MS.length - 1)]));
+  }
+  return buildFreePartFallback(part);
+}
+
+// Minimal ParsedWorkout wrapper for a part the structuring step could not handle: one 'free'
+// exercise carrying the part's verbatim text. Never used as the session's primary metadata
+// unless every other part failed too.
+function buildFreePartFallback(part: WorkoutPartSegment): ParsedWorkout {
+  const lines = part.text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const name = lines[0] ?? 'Workout Part';
+  return {
+    title: name,
+    type: 'mixed',
+    format: 'for_time',
+    scoreType: 'time',
+    exercises: [{
+      name,
+      type: part.kind === 'strength' ? 'strength' : 'wod',
+      prescription: lines.slice(1).join(', ') || name,
+      suggestedSets: 1,
+      loggingMode: 'free',
+      rawText: part.text,
+      ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
+    }],
+  };
 }
 
 function validateRxWeights(data: unknown): RxWeights | undefined {
@@ -1138,6 +1392,12 @@ function validateMovement(data: unknown): ParsedMovement | null {
     ? (raw.inputType as ParsedMovement['inputType'])
     : undefined;
 
+  // Validate equipment
+  const validEquipment = ['barbell', 'dumbbell', 'kettlebell', 'other', 'none'] as const;
+  const equipment = validEquipment.includes(raw.equipment as typeof validEquipment[number])
+    ? (raw.equipment as ParsedMovement['equipment'])
+    : undefined;
+
   const validCountingModes = ['per_round', 'per_interval', 'per_station_visit', 'once'] as const;
   const countingMode = validCountingModes.includes(raw.countingMode as typeof validCountingModes[number])
     ? (raw.countingMode as ParsedMovement['countingMode'])
@@ -1167,6 +1427,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
   return {
     name: raw.name,
     reps: typeof raw.reps === 'number' ? raw.reps : undefined,
+    repsDisplay: typeof raw.repsDisplay === 'string' && raw.repsDisplay.trim() ? raw.repsDisplay.trim() : undefined,
     distance: typeof raw.distance === 'number' ? raw.distance : undefined,
     time: typeof raw.time === 'number' ? raw.time : undefined,
     calories: typeof raw.calories === 'number' ? raw.calories : undefined,
@@ -1174,6 +1435,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
     inputType,
+    equipment,
     implementCount,
     isMaxReps: raw.isMaxReps === true ? true : undefined,
     // "role": "buy_in" or "cash_out" from AI means this movement is not repeated per round
@@ -1189,7 +1451,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
   };
 }
 
-function validateParsedWorkout(data: unknown): ParsedWorkout {
+export function validateParsedWorkout(data: unknown): ParsedWorkout {
   const raw = data as Record<string, unknown>;
   const sourceDate = typeof raw.sourceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.sourceDate)
     ? raw.sourceDate
@@ -1270,8 +1532,8 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
 
       // Validate optional sections (buy-in / rounds blocks / cash-out)
       let sections: ParsedSection[] | undefined = undefined;
-      if (Array.isArray((exercise as any).sections)) {
-        const rawSections = (exercise as any).sections as unknown[];
+      if (Array.isArray(exercise.sections)) {
+        const rawSections = exercise.sections as unknown[];
         const parsedSections: ParsedSection[] = [];
 
         for (const sec of rawSections) {
@@ -1360,7 +1622,7 @@ function validateParsedWorkout(data: unknown): ParsedWorkout {
       }
 
       // Validate loggingMode
-      const validLoggingModes: ExerciseLoggingMode[] = ['strength', 'for_time', 'amrap', 'amrap_intervals', 'intervals', 'emom', 'cardio', 'cardio_distance', 'bodyweight', 'sets'];
+      const validLoggingModes: ExerciseLoggingMode[] = ['strength', 'for_time', 'amrap', 'amrap_intervals', 'intervals', 'emom', 'cardio', 'cardio_distance', 'bodyweight', 'sets', 'free'];
       const loggingMode = validLoggingModes.includes(exercise.loggingMode as ExerciseLoggingMode)
         ? (exercise.loggingMode as ExerciseLoggingMode)
         : undefined;

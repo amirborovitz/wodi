@@ -8,12 +8,18 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
+import { DraggableVibeStamp } from './DraggableVibeStamp';
+import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinStadiumProps {
   wod: PosterWod;
   vibe: VibeKey | null;
+  vibeOffset?: PosterVibeOffset | null;
+  onVibeMove?: (offset: PosterVibeOffset) => void;
+  onVibeDrop?: (offset: PosterVibeOffset) => void;
+  onVibeLongPress?: () => void;
 }
 
 const GLOW_SOFT = `0 0 8px ${BRAND.yellow}40`;
@@ -82,13 +88,13 @@ function DotMatrixScore({ value }: { value: string }): React.JSX.Element {
 
 // ─── Skin ──────────────────────────────────────────────────────────────────
 
-export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element {
+export function SkinStadium({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeLongPress }: SkinStadiumProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = !!wod.title;
-  const scorePrimary = wod.result.value.split(' ')[0];
-  const scoreUnit = wod.result.value.includes(' ')
-    ? wod.result.value.split(' ').slice(1).join(' ')
-    : null;
+  const subtitle = named ? wod.format : wod.sub;
+  const scoreParts = splitResultValue(wod.result.value);
+  const scorePrimary = scoreParts.primary;
+  const scoreUnit = scoreParts.unit || null;
 
   return (
     <div style={{
@@ -129,14 +135,16 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
           }}>
             {named ? wod.title : wod.format}
           </div>
+          {(subtitle || (named && wod.sub)) && (
           <div style={{ fontFamily: fD, fontSize: 17, fontWeight: 800, letterSpacing: '0.04em', color: BRAND.yellow, marginTop: 3 }}>
-            {named ? wod.format : wod.sub}
+            {subtitle}
             {named && wod.sub && (
               <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 600, color: BRAND.dim, letterSpacing: '0.01em', marginLeft: 8 }}>
                 {wod.sub}
               </span>
             )}
           </div>
+          )}
         </div>
 
         {/* Movement rows */}
@@ -151,7 +159,7 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
                 dimColor={BRAND.dim}
                 glow
               />
-            ) : wod.split === 'reps' ? (
+            ) : shouldShowPairsLegend(wod, rows) ? (
               <PairsLegend teamColor="rgba(255,255,255,0.35)" meColor="rgba(255,255,255,0.35)" />
             ) : null
           )}
@@ -183,6 +191,11 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
                         </span>
                         <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
                       </div>
+                    ) : parts.isStrength && wod.repsScheme ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fM, fontSize: 11, color: BRAND.dim }}>{wod.repsScheme}</span>
+                      </div>
                     ) : (
                       <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
                         {parts.movName}
@@ -199,17 +212,17 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                        <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, textShadow: GLOW_SOFT, display: 'inline-block', whiteSpace: 'nowrap' }}>
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.82)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, textShadow: GLOW_SOFT, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={{ fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, textShadow: GLOW_SOFT, display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -245,13 +258,21 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
           }} />
 
           <div style={{ position: 'relative' }}>
-            <div style={{ fontFamily: fM, fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', color: `${BRAND.yellow}55`, marginBottom: 8 }}>
-              {wod.result.label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+              <div style={{ fontFamily: fM, fontSize: 9, fontWeight: 700, letterSpacing: '0.22em', color: `${BRAND.yellow}55` }}>
+                {wod.result.label}
+              </div>
+              {wod.rx && <AchievementBadge label={wod.rx} />}
             </div>
             <DotMatrixScore value={scorePrimary} />
             {scoreUnit && (
-              <div style={{ fontFamily: fD, fontSize: 22, fontWeight: 700, color: `${BRAND.yellow}a8`, marginTop: 4 }}>
+              <div style={{ fontFamily: fD, fontSize: 18, fontWeight: 700, color: `${BRAND.yellow}a8`, marginTop: 4 }}>
                 {scoreUnit}
+              </div>
+            )}
+            {wod.result.narrative && (
+              <div style={{ fontFamily: fH, fontSize: 26, fontWeight: 700, color: BRAND.yellow, marginTop: 2, lineHeight: 0.9 }}>
+                {wod.result.narrative}
               </div>
             )}
             {wod.result.meta && (
@@ -262,21 +283,16 @@ export function SkinStadium({ wod, vibe }: SkinStadiumProps): React.JSX.Element 
           </div>
           {/* Stamp overlaps the digit area — does not compress digit width */}
           {vibe && (
-            <div style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 1 }}>
+            <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}
+              style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 1 }}>
               <VibeStamp vibe={vibe} scale={0.78} />
-            </div>
+            </DraggableVibeStamp>
           )}
         </div>
       </div>
 
-      {/* Yellow footer */}
-      <div style={{ background: BRAND.yellow, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {wod.rx && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.ink, color: BRAND.yellow, borderRadius: 999, padding: '4px 12px 3px', fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em' }}>
-            ★ {wod.rx}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
+      {/* Yellow footer — wordmark only. The achievement badge lives on whichever page earned it. */}
+      <div style={{ background: BRAND.yellow, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={BRAND.ink} dot={BRAND.ink} size={17} />
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import styles from './StepperInput.module.css';
 
 function selectAllInput(target: HTMLInputElement) {
@@ -40,6 +41,19 @@ interface StepperInputProps {
 const INITIAL_DELAY = 400;   // ms before repeat starts
 const FAST_DELAY = 150;      // ms after 1s of holding
 const TURBO_DELAY = 60;      // ms after 2s of holding
+const TAP_MOVE_TOLERANCE = 10;
+const TAP_MAX_DURATION = 300;
+const SCROLL_SETTLE_DELAY = 150;
+
+interface PointerTrace {
+  direction: 'plus' | 'minus';
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startTime: number;
+  moved: boolean;
+  didStepDuringHold: boolean;
+}
 
 export function StepperInput({
   value,
@@ -57,8 +71,12 @@ export function StepperInput({
   active = false,
 }: StepperInputProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdStartRef = useRef<number>(0);
   const heldBtnRef = useRef<'plus' | 'minus' | null>(null);
+  const pointerTraceRef = useRef<PointerTrace | null>(null);
+  const isScrollingRef = useRef(false);
 
   const clamp = useCallback((v: number) => {
     return Math.max(min, Math.min(max, v));
@@ -69,6 +87,40 @@ export function StepperInput({
     const next = clamp(current + delta);
     onChange(next);
   }, [value, min, clamp, onChange]);
+
+  const clearHoldTimers = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (holdStartTimerRef.current) {
+      clearTimeout(holdStartTimerRef.current);
+      holdStartTimerRef.current = null;
+    }
+    heldBtnRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      isScrollingRef.current = true;
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+      scrollTimerRef.current = setTimeout(() => {
+        isScrollingRef.current = false;
+      }, SCROLL_SETTLE_DELAY);
+      clearHoldTimers();
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+      clearHoldTimers();
+    };
+  }, [clearHoldTimers]);
 
   // ── Long-press logic ──
   const scheduleNext = useCallback((direction: 'plus' | 'minus') => {
@@ -81,21 +133,65 @@ export function StepperInput({
     }, delay);
   }, [adjust, step]);
 
-  const handlePointerDown = useCallback((direction: 'plus' | 'minus') => {
-    // Immediate first step
+  const startHold = useCallback((direction: 'plus' | 'minus') => {
+    if (isScrollingRef.current) return;
+    const trace = pointerTraceRef.current;
+    if (!trace || trace.direction !== direction || trace.moved) return;
+
     adjust(direction === 'plus' ? step : -step);
+    trace.didStepDuringHold = true;
     holdStartRef.current = Date.now();
     heldBtnRef.current = direction;
     scheduleNext(direction);
-  }, [adjust, step, scheduleNext, label, unit, value]);
+  }, [adjust, step, scheduleNext]);
+
+  const handlePointerDown = useCallback((direction: 'plus' | 'minus', event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (isScrollingRef.current) return;
+
+    pointerTraceRef.current = {
+      direction,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startTime: Date.now(),
+      moved: false,
+      didStepDuringHold: false,
+    };
+
+    heldBtnRef.current = direction;
+    holdStartTimerRef.current = setTimeout(() => startHold(direction), TAP_MAX_DURATION);
+  }, [startHold]);
+
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
+    const trace = pointerTraceRef.current;
+    if (!trace || trace.pointerId !== event.pointerId) return;
+
+    const dx = event.clientX - trace.startX;
+    const dy = event.clientY - trace.startY;
+    if (Math.hypot(dx, dy) > TAP_MOVE_TOLERANCE) {
+      trace.moved = true;
+      clearHoldTimers();
+    }
+  }, [clearHoldTimers]);
 
   const handlePointerUp = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+    const trace = pointerTraceRef.current;
+    clearHoldTimers();
+
+    if (!trace) return;
+    pointerTraceRef.current = null;
+
+    const elapsed = Date.now() - trace.startTime;
+    const isTap = !trace.moved && elapsed <= TAP_MAX_DURATION && !trace.didStepDuringHold && !isScrollingRef.current;
+    if (isTap) {
+      adjust(trace.direction === 'plus' ? step : -step);
     }
-    heldBtnRef.current = null;
-  }, []);
+  }, [adjust, step, clearHoldTimers]);
+
+  const handlePointerCancel = useCallback(() => {
+    pointerTraceRef.current = null;
+    clearHoldTimers();
+  }, [clearHoldTimers]);
 
   const handleInputChange = useCallback((raw: string) => {
     if (raw === '') {
@@ -109,7 +205,7 @@ export function StepperInput({
   }, [onChange, clamp]);
 
   const containerStyle = color
-    ? { '--stepper-color': color } as React.CSSProperties
+    ? { '--stepper-color': color } as CSSProperties
     : undefined;
 
   const displayStr = value != null ? String(value) : '';
@@ -121,10 +217,11 @@ export function StepperInput({
         <button
           type="button"
           className={`${styles.arcadeZone} ${heldBtnRef.current === 'minus' ? styles.arcadeZoneHeld : ''}`}
-          onPointerDown={() => handlePointerDown('minus')}
+          onPointerDown={(event) => handlePointerDown('minus', event)}
+          onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerCancel}
+          onPointerCancel={handlePointerCancel}
           aria-label="Decrease"
         >
           <span className={styles.arcadeIcon} aria-hidden="true">−</span>
@@ -143,10 +240,11 @@ export function StepperInput({
         <button
           type="button"
           className={`${styles.arcadeZone} ${heldBtnRef.current === 'plus' ? styles.arcadeZoneHeld : ''}`}
-          onPointerDown={() => handlePointerDown('plus')}
+          onPointerDown={(event) => handlePointerDown('plus', event)}
+          onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerCancel}
+          onPointerCancel={handlePointerCancel}
           aria-label="Increase"
         >
           <span className={styles.arcadeIcon} aria-hidden="true">+</span>
@@ -198,10 +296,11 @@ export function StepperInput({
         <button
           type="button"
           className={`${styles.btn} ${heldBtnRef.current === 'plus' ? styles.btnHeld : ''}`}
-          onPointerDown={() => handlePointerDown('plus')}
+          onPointerDown={(event) => handlePointerDown('plus', event)}
+          onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerCancel}
+          onPointerCancel={handlePointerCancel}
           aria-label="Increase"
         >
           +
@@ -209,10 +308,11 @@ export function StepperInput({
         <button
           type="button"
           className={`${styles.btn} ${heldBtnRef.current === 'minus' ? styles.btnHeld : ''}`}
-          onPointerDown={() => handlePointerDown('minus')}
+          onPointerDown={(event) => handlePointerDown('minus', event)}
+          onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerLeave={handlePointerCancel}
+          onPointerCancel={handlePointerCancel}
           aria-label="Decrease"
         >
           −

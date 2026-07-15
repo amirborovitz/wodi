@@ -2106,7 +2106,7 @@
 .heroStoryProgressionBlock {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 0;
 }
 
@@ -2125,12 +2125,41 @@
 }
 
 /* Weight chain row: "60 → 70 → 80 → 90 kg" */
+.heroStrengthSetRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.heroStrengthSetName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: var(--font-semibold);
+  color: rgba(255, 255, 255, 0.70);
+  letter-spacing: 0.005em;
+}
+
+.heroStrengthRepScheme {
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.34);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .heroStoryProgressionChain {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 2px;
   font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .heroStoryProgressionStep {
@@ -2143,7 +2172,7 @@
 .heroProgressionArrowIcon {
   display: inline-block;
   vertical-align: middle;
-  margin: 0 10px;
+  margin: 0 6px;
   flex-shrink: 0;
 }
 
@@ -2158,11 +2187,8 @@
 
 /* Peak weight — full yellow, larger, glowing */
 .heroStoryProgressionPeak {
-  color: #FFD600;
+  color: #f5c200;
   font-size: 20px;
-  text-shadow:
-    0 0 12px rgba(255, 214, 0, 0.55),
-    0 0 24px rgba(255, 214, 0, 0.20);
 }
 
 /* Dropset weight — suppressed, smaller */
@@ -2184,27 +2210,45 @@
 
 /* --- Burnout / Max-rep row --- */
 .heroBurnoutRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 30px;
 }
 
-.heroBurnoutIcon {
-  font-size: 14px;
-  line-height: 1;
+.heroBurnoutLabel {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: var(--font-bold);
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.heroBurnoutWeight {
+  justify-self: start;
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.34);
+  font-variant-numeric: tabular-nums;
 }
 
 .heroBurnoutReps {
+  grid-column: 3;
   font-family: var(--font-mono);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  color: #FF00E5;
+  color: #f5c200;
+  white-space: nowrap;
 }
 
-.heroBurnoutName {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.50);
+.heroBurnoutReps span {
+  margin-left: 3px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  color: rgba(255, 255, 255, 0.42);
 }
 
 /* --- Strength total reps (muted footer) --- */

@@ -89,7 +89,7 @@ export type IntensityRating =
 export type FeelRating = IntensityRating;
 
 /** Poster skin choice on the celebration screen. Must match SKINS in HandwrittenFace/index.tsx */
-export type PosterSkinId = 'slab' | 'chalk' | 'flare' | 'stadium' | 'blueprint' | 'press' | 'hazard' | 'ink' | 'bout';
+export type PosterSkinId = 'slab' | 'chalk' | 'flare' | 'stadium' | 'blueprint' | 'press' | 'hazard' | 'ink' | 'foil';
 
 /** Poster "FELT" vibe choice. Must match VIBE_KEYS in HandwrittenFace/brand.ts */
 export type PosterVibeKey = 'chill' | 'solid' | 'sweaty' | 'cooked' | 'smoked' | 'wrecked';
@@ -109,6 +109,24 @@ export const INTENSITY_DISPLAY: Record<IntensityRating, string> = {
   survived:   'SURVIVED',
   dialed_in:  'DIALED IN',
 };
+
+/** Free-text handwritten note the athlete places on the poster (TEXT tab). */
+export interface PosterSticker {
+  text: string;  // max 24 chars
+  x: number;     // % of poster width, center anchor
+  y: number;     // % of poster height, center anchor
+}
+
+/**
+ * Manual nudge of the "FELT" vibe stamp away from its natural per-skin position.
+ * Unlike PosterSticker, this is a relative offset (px, in the poster's native/
+ * unscaled coordinate space) applied on top of wherever each skin lays the stamp
+ * out by default — not a global anchor — since every skin places it differently.
+ */
+export interface PosterVibeOffset {
+  dx: number;
+  dy: number;
+}
 
 export interface Workout {
   id: string;
@@ -130,12 +148,16 @@ export interface Workout {
   duration?: number;       // minutes
   notes?: string;
   rawText?: string;
+  userContext?: string;    // Athlete-supplied context/correction used when parsing (kept for reproducible re-parses)
+  corrections?: string[];  // Athlete-flagged AI mistakes ("AI got it wrong?" on the poster) awaiting a fix pass
   timeCap?: number;        // seconds, from parsedWorkout.timeCap
   format?: WorkoutFormat;  // workout format for EP recalculation
   difficultyLevel?: number; // AI-assessed programmed difficulty 1–10
   feelRating?: FeelRating;  // user-entered metcon feel rating
   posterSkin?: PosterSkinId;   // chosen celebration poster skin (Slab/Chalk/Flare/Stadium)
   posterVibe?: PosterVibeKey;  // chosen "FELT" vibe on the celebration poster
+  posterSticker?: PosterSticker; // free-text note placed on the celebration poster
+  posterVibeOffset?: PosterVibeOffset; // manual drag nudge of the "FELT" vibe stamp
   heroAchievement?: Achievement;
   achievements?: Achievement[];
   isPR?: boolean;
@@ -167,6 +189,8 @@ export interface Exercise {
   restDuration?: number;   // AI-parsed programmed rest time in seconds between rounds/intervals
   ladderStep?: number;     // How many rungs completed (continuous across intervals)
   ladderPartial?: number;  // Partial reps into next incomplete rung
+  partialReps?: number;        // Extra reps into the incomplete AMRAP round (derived from partialMovements)
+  partialMovements?: string[]; // Movement names finished in the incomplete AMRAP round
   intensity?: IntensityRating | null; // user-entered metcon block intensity
   aiPartName?: string;     // Generated poster wordmark for this workout part
   partNameOverride?: string; // User-edited poster wordmark override
@@ -175,6 +199,10 @@ export interface Exercise {
   // the whole photo. Carried through from ParsedExercise.rawText so poster-time text matching
   // (e.g. parseDescLadderScheme) stays scoped per part in multi-exercise workouts.
   rawText?: string;
+  // This part's own logging mode, persisted so detail-mode rendering never falls back to the
+  // session-level format (parts are standalone practices). 'free' routes the poster to
+  // verbatim-prescription rendering with the entered score as hero.
+  loggingMode?: ExerciseLoggingMode;
   // True if this is an auxiliary/accessory block (warm-up, body armor, mobility, skill practice)
   // rather than one of the session's main parts (typically a strength piece and a metcon/WOD).
   isSecondary?: boolean;
@@ -238,6 +266,7 @@ export interface ParsedWorkout {
   partnerWorkout?: boolean;     // Detected partner workout (IGUG, "in pairs", etc.)
   teamSize?: number;            // Team size (2 for pairs, N for "team of N")
   difficultyLevel?: number;     // AI-assessed programmed difficulty 1–10
+  userContext?: string;         // Athlete-supplied context/correction fed into the parse (may state facts not on the board)
 }
 
 // Workload breakdown types
@@ -270,18 +299,28 @@ export interface WorkloadBreakdown {
   grandTotalCalories?: number;
   containerRounds?: number;
   benchmarkName?: string;
+  // True when any movement total was derived by GUESSWORK rather than understood structure
+  // (unknown/free loggingMode, station counting without station structure, session-level
+  // round fallbacks). Poster truth standard: estimated totals never render on the poster;
+  // EP and stats aggregates still consume them (approximate beats absent there).
+  estimated?: boolean;
 }
 
 // Unit types for measurements
 export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
 export type MovementCountingMode = 'per_round' | 'per_interval' | 'per_station_visit' | 'once';
 export type MovementScoreEntryMode = 'per_round' | 'total';
+// Implement a weighted movement's load is on. 'other' = athlete-chosen/odd implements
+// (plate, sandbag, D-ball, med ball, vest, "weighted X" with no stated implement) — these
+// never share a logging weight input with another movement. 'none' = unweighted.
+export type MovementEquipment = 'barbell' | 'dumbbell' | 'kettlebell' | 'other' | 'none';
 
 // Individual movement within a workout
 export interface ParsedMovement {
   name: string;                 // Canonical movement name
   sets?: number;                // Number of sets for this movement
-  reps?: number;                // Rep count (undefined if max reps)
+  reps?: number;                // Rep count (undefined if max reps); midpoint when a range was prescribed
+  repsDisplay?: string;         // Coach-written rep text when a range was prescribed (e.g. "10-12")
   isMaxReps?: boolean;          // True if user does max reps (label shows "max", user enters actual count)
   distance?: number;            // Distance in meters
   time?: number;                // Time in seconds
@@ -291,6 +330,7 @@ export interface ParsedMovement {
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
   inputType?: 'weight' | 'calories' | 'distance' | 'none';  // AI-classified input type
+  equipment?: MovementEquipment; // AI-classified implement — drives weight-input grouping in logging
   implementCount?: 1 | 2;       // 1=single, 2=pair (DB/KB). Default 1 when ambiguous.
   perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
   role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
@@ -518,7 +558,8 @@ export type ExerciseLoggingMode =
   | 'intervals'          // time per set
   | 'bodyweight'         // reps only
   | 'emom'               // EMOM minute-by-minute weight logging
-  | 'sets';              // generic sets (weight/reps)
+  | 'sets'               // generic sets (weight/reps)
+  | 'free';              // escape hatch — unrecognized shape: verbatim prescription + one generic score
 
 // Fields to show/hide for logging an exercise
 export interface LoggingPatternFields {

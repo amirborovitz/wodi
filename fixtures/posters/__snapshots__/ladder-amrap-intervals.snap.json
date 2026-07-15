@@ -1,0 +1,170 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "3:00 Min AMRAP x 4",
+      "rows": [
+        {
+          "primary": "",
+          "name": "KB Snatches + Weighted Box Step Ups",
+          "loadNote": "24kg",
+          "accent": "yellow",
+          "ladderTrack": {
+            "reps": [
+              4,
+              6,
+              8,
+              10,
+              12
+            ],
+            "step": 8,
+            "cadence": "+2 REPS EVERY ROUND"
+          }
+        },
+        {
+          "primary": "",
+          "name": "Burpees",
+          "loadNote": "5 EVERY ROUND",
+          "accent": "magenta"
+        }
+      ],
+      "hiddenCount": 0
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "3:00 Min AMRAP x 4",
+        "rows": [
+          {
+            "primary": "",
+            "name": "KB Snatches + Weighted Box Step Ups",
+            "loadNote": "24kg",
+            "accent": "yellow",
+            "ladderTrack": {
+              "reps": [
+                4,
+                6,
+                8,
+                10,
+                12
+              ],
+              "step": 8,
+              "cadence": "+2 REPS EVERY ROUND"
+            }
+          },
+          {
+            "primary": "",
+            "name": "Burpees",
+            "loadNote": "5 EVERY ROUND",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
+  ],
+  "hero": {
+    "value": "8",
+    "formatLine": "AMRAP Intervals",
+    "storyLine": "88 kb snatch · 88 weighted box step up · 40 burpees",
+    "storyMovements": [
+      {
+        "perRound": "4→18",
+        "name": "KB Snatch @24kg",
+        "total": "88 reps total",
+        "color": "yellow",
+        "weight": 24
+      },
+      {
+        "perRound": "4→18",
+        "name": "Weighted Box Step Up @20kg",
+        "total": "88 reps total",
+        "color": "yellow",
+        "weight": 20
+      },
+      {
+        "perRound": "5",
+        "name": "Burpees",
+        "total": "×8 = 40",
+        "color": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "WOD"
+      },
+      {
+        "kind": "line",
+        "rx": "KB Snatches + Weighted Box Step Ups",
+        "load": "",
+        "mine": "24kg",
+        "team": "",
+        "ladderTrack": {
+          "reps": [
+            4,
+            6,
+            8,
+            10,
+            12
+          ],
+          "step": 8,
+          "cadence": "+2 REPS EVERY ROUND"
+        }
+      },
+      {
+        "kind": "line",
+        "rx": "Burpees",
+        "load": "",
+        "mine": "5 EVERY ROUND",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "WOD"
+        },
+        {
+          "kind": "line",
+          "rx": "KB Snatches + Weighted Box Step Ups",
+          "load": "",
+          "mine": "24kg",
+          "team": "",
+          "ladderTrack": {
+            "reps": [
+              4,
+              6,
+              8,
+              10,
+              12
+            ],
+            "step": 8,
+            "cadence": "+2 REPS EVERY ROUND"
+          }
+        },
+        {
+          "kind": "line",
+          "rx": "Burpees",
+          "load": "",
+          "mine": "5 EVERY ROUND",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

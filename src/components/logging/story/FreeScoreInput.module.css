@@ -1,0 +1,58 @@
+/* ═══════════════════════════════════════════
+   FreeScoreInput — generic score for 'free' parts
+   ═══════════════════════════════════════════ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.prompt {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pickerRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pickerChip {
+  background: var(--glass-bg);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.pickerChip:active {
+  transform: scale(0.95);
+}
+
+.pickerChipActive {
+  border-color: rgba(245, 194, 0, 0.5);
+  color: var(--wodi-yellow);
+  background: rgba(245, 194, 0, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pickerChip {
+    transition: none;
+  }
+  .pickerChip:active {
+    transform: none;
+  }
+}

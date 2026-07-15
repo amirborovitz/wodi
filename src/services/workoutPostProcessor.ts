@@ -283,7 +283,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     type: correctedType,
     format: correctedFormat,
     timeCap,
-    partnerWorkout: workout.partnerWorkout ?? partnerResult.partnerWorkout ?? undefined,
+    // partnerResult true outranks an explicit AI false ONLY via the title override inside
+    // detectAndAdjustPartnerWorkout — the detector already trusts an AI false for body text.
+    partnerWorkout: partnerResult.partnerWorkout === true
+      ? true
+      : (workout.partnerWorkout ?? partnerResult.partnerWorkout ?? undefined),
     teamSize: workout.teamSize || partnerResult.teamSize || undefined,
     sets: partnerResult.adjustedSets ?? workout.sets,
     exercises: processedExercises.map(ex => ({
@@ -894,6 +898,28 @@ function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
  */
 function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
   if (!workout.partnerWorkout) return workout; // session isn't partnered at all — nothing to do
+
+  // A single-exercise partnered workout IS the partnered block — the session-level partner
+  // detection ("In pairs, I go you go" in the block's preamble) can have no other owner. The
+  // AI routinely drops that preamble from the exercise's own rawText slice, so the exercise
+  // text cannot re-prove partner status; and an exercise-level `false` here contradicts the
+  // same parse's session-level `true` (AI-vs-AI — reconciled like the title override in
+  // detectAndAdjustPartnerWorkout). Without this, the manufactured/contradictory false is
+  // persisted and detectPartnerSplit trusts it forever, killing the partner poster treatment.
+  if (workout.exercises.length === 1) {
+    const ex = workout.exercises[0];
+    if (ex.partnerWorkout === true) return workout;
+    const hasRoundStructure = (ex.suggestedSets ?? 1) > 1
+      || (ex.sections?.some(s => (s.rounds ?? 1) > 1) ?? false);
+    return {
+      ...workout,
+      exercises: [{
+        ...ex,
+        partnerWorkout: true,
+        partnerSplit: ex.partnerSplit ?? (hasRoundStructure ? 'rounds' : 'reps'),
+      }],
+    };
+  }
 
   let changed = false;
   const exercises = workout.exercises.map(ex => {
@@ -1608,8 +1634,22 @@ function normalizeMovementName(name: string): string {
     }
   }
 
+  // Round-alternating pair names ("Push Press / Thruster") keep BOTH sides — the alias scan
+  // below would truncate to whichever single movement matches first. Only when every side
+  // reads like a movement name: Rx loads also use slashes ("40/30kg", "40 DU / 60 singles").
+  const slashParts = strippedLower.split('/').map(part => part.trim());
+  if (slashParts.length > 1 && slashParts.every(part => /^[a-z]/i.test(part))) {
+    return prefix + slashParts
+      .map(part => normalizeSingleMovementName(part))
+      .join(' / ');
+  }
+
+  // "and" only counts as a compound-movement joiner when it's a standalone word (real
+  // whitespace on both sides) — matching it as a bare substring would also fire inside any
+  // movement name that merely contains those letters (Sandbag, Handstand, Standing, a
+  // hyphenated "Touch-and-Go" qualifier), splitting one movement into two garbled halves.
   const compoundParts = strippedLower
-    .split(/\s*(?:\+|and)\s*/i)
+    .split(/\s*\+\s*|\s+and\s+/i)
     .map(part => part.trim())
     .filter(Boolean);
   if (compoundParts.length > 1) {
@@ -1853,6 +1893,24 @@ const PARTNER_PATTERNS = [
 ];
 
 /**
+ * Session-level partner reconciliation. The segmented pipeline structures each part from its
+ * own text slice, so the title-aware partner override inside detectAndAdjustPartnerWorkout
+ * never sees the session title — a board headed "Partner WOD" whose body has no partner
+ * phrasing ends up partnerWorkout: false even though the heading IS the partner designation.
+ * Run this once on the assembled session, after title + full rawText are stamped.
+ */
+export function applyTitlePartnerOverride(workout: ParsedWorkout): ParsedWorkout {
+  if (workout.partnerWorkout) return workout;
+  const detected = detectAndAdjustPartnerWorkout(workout);
+  if (!detected.partnerWorkout) return workout;
+  return {
+    ...workout,
+    partnerWorkout: true,
+    teamSize: workout.teamSize || detected.teamSize,
+  };
+}
+
+/**
  * Detect partner workout patterns in raw text and adjust rounds
  */
 function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
@@ -1869,8 +1927,14 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
 
   const lower = text.toLowerCase();
 
+  // The board's own TITLE saying "Partner WOD" outranks an explicit AI false: both come from
+  // the same parse, but the flag is judged from the transcription, which can drop the heading
+  // line — the title is the AI's verbatim reading of that heading. Body-text patterns still
+  // never override an explicit false (trust the AI's call there).
+  const titleSaysPartner = PARTNER_PATTERNS.some(p => p.test(workout.title ?? ''));
   // Trust an explicit AI `false` — only fall back to regex when the AI left the field unset.
   const isPartner = workout.partnerWorkout === true
+    || titleSaysPartner
     || (workout.partnerWorkout !== false && PARTNER_PATTERNS.some(p => p.test(lower)));
 
   if (!isPartner) {
@@ -2124,7 +2188,9 @@ function backfillLoggingModes(workout: ParsedWorkout): ParsedWorkout {
         }
       }
 
-      return inferred ? { ...ex, loggingMode: inferred } : ex;
+      // Nothing matched: 'free' instead of a blind guess. The athlete gets a generic score
+      // entry and a verbatim poster — a wrong mode would corrupt their numbers instead.
+      return { ...ex, loggingMode: inferred ?? 'free' };
     }),
   };
 }

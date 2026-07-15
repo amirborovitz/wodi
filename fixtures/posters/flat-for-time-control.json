@@ -1,0 +1,32 @@
+{
+  "name": "flat-for-time-control",
+  "description": "Plain 3-rounds-for-time with a flat movement list and no substitutions — control fixture; should stay boring",
+  "workout": {
+    "rawText": "3 rounds for time\n400m run\n21 kettlebell swings @24kg\n12 pull-ups",
+    "format": "for_time",
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "3 Rounds For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "3 rounds for time: 400m run, 21 KB swings, 12 pull-ups",
+        "rawText": "3 rounds for time\n400m run\n21 kettlebell swings @24kg\n12 pull-ups",
+        "rounds": 3,
+        "sets": [{ "id": "set-0", "setNumber": 1, "time": 780, "completed": true }],
+        "movements": [
+          { "name": "Run", "distance": 400, "inputType": "distance" },
+          { "name": "Kettlebell Swing", "reps": 21, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+          { "name": "Pull-up", "reps": 12 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Run", "totalDistance": 1200, "unit": "m", "color": "magenta" },
+        { "name": "Kettlebell Swing", "totalReps": 63, "weight": 24, "unit": "kg", "color": "yellow" },
+        { "name": "Pull-up", "totalReps": 36, "color": "cyan" }
+      ]
+    }
+  }
+}

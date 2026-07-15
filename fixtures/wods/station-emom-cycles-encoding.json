@@ -1,0 +1,15 @@
+{
+  "name": "station-emom-cycles-encoding",
+  "rawText": "METCON (Medium)\nEMOM for 15 minutes (5 rounds):\nmin 1 : 10-12 pull-ups\nmin 2 : 16-20 Alternating Kettlebell swings @16/24kg\nmin 3 : 15 box jumps\n",
+  "aiResponse": "{\n  \"title\": \"EMOM Challenge\",\n  \"rawText\": \"METCON (Medium)\\nEMOM for 15 minutes (5 rounds):\\nmin 1 : 10-12 pull-ups\\nmin 2 : 16-20 Alternating Kettlebell swings @16/24kg\\nmin 3 : 15 box jumps\",\n  \"sourceDate\": null,\n  \"type\": \"emom\",\n  \"format\": \"emom\",\n  \"scoreType\": \"reps\",\n  \"sets\": 5,\n  \"timeCap\": 900,\n  \"intervalTime\": 60,\n  \"containerRounds\": null,\n  \"benchmarkName\": null,\n  \"benchmarkModified\": false,\n  \"partnerWorkout\": false,\n  \"teamSize\": null,\n  \"difficultyLevel\": 6,\n  \"exercises\": [\n    {\n      \"name\": \"EMOM 15\",\n      \"type\": \"wod\",\n      \"loggingMode\": \"emom\",\n      \"prescription\": \"EMOM for 15 minutes (5 rounds): min 1 : 10-12 pull-ups, min 2 : 16-20 Alternating Kettlebell swings @16/24kg, min 3 : 15 box jumps\",\n      \"isSecondary\": false,\n      \"rawText\": \"EMOM for 15 minutes (5 rounds):\\nmin 1 : 10-12 pull-ups\\nmin 2 : 16-20 Alternating Kettlebell swings @16/24kg\\nmin 3 : 15 box jumps\",\n      \"suggestedSets\": 5,\n      \"movements\": [\n        {\n          \"name\": \"Pull-up\",\n          \"reps\": 11,\n          \"repsDisplay\": \"10-12\",\n          \"inputType\": \"none\",\n          \"stationLabel\": \"Min 1\",\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\"\n        },\n        {\n          \"name\": \"Alternating Kettlebell Swing\",\n          \"reps\": 18,\n          \"repsDisplay\": \"16-20\",\n          \"inputType\": \"weight\",\n          \"rxWeights\": {\n            \"male\": 24,\n            \"female\": 16,\n            \"unit\": \"kg\"\n          },\n          \"implementCount\": 1,\n          \"stationLabel\": \"Min 2\",\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\"\n        },\n        {\n          \"name\": \"Box Jump\",\n          \"reps\": 15,\n          \"inputType\": \"none\",\n          \"stationLabel\": \"Min 3\",\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\"\n        }\n      ]\n    }\n  ]\n}",
+  "expect": {
+    "format": "emom",
+    "loggingModes": "emom",
+    "movementNames": "Pull-up, Alt American Kettlebell Swing, Box Jump",
+    "totals.reps": "220",
+    "totals.volume": "2160",
+    "totals.distance": "",
+    "hero.value": "220",
+    "hero.unit": "REPS"
+  }
+}

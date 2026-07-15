@@ -1,0 +1,282 @@
+{
+    "name":  "real-single-forttime-gorillot-20260707",
+    "description":  "REAL saved doc: GORILLOT - FIT FOR LIFE For Time",
+    "workout":  {
+                    "date":  "2026-07-07T09:56:39.132Z",
+                    "title":  "Today Workout",
+                    "format":  "for_time",
+                    "rawText":  "Today Workout\n\nGORILLOT - FIT FOR LIFE\n\nEndurance\n\nMetcon\n\nFor time:\n\n2 rounds:\n600m run\n20 alt’ DB snatches @15/22.5kg\n20 alt’ weighted box step ups (same DB)\n\n2 rounds:\n600m run\n20 push ups\n20 T.T.B\n\n2 rounds:\n20 burpees\n20 goblet squats\n40 D.U. / 80 singles",
+                    "exercises":  [
+                                      {
+                                          "id":  "exercise-0",
+                                          "name":  "GORILLOT - FIT FOR LIFE For Time",
+                                          "type":  "wod",
+                                          "prescription":  "2 rounds of 600m Run, 20 Alt Dumbbell Snatches, 20 Alt Weighted Box Step Ups, then 2 rounds of 600m Run, 20 Push Ups, 20 Toes to Bar, then 2 rounds of 20 Burpees, 20 Goblet Squats, 40 Double Unders / 80 Singles",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-summary",
+                                                           "setNumber":  1,
+                                                           "completed":  true,
+                                                           "actualReps":  960,
+                                                           "weight":  17.5,
+                                                           "time":  1980
+                                                       }
+                                                   ],
+                                          "movements":  [
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  1800,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Alt DB Snatch",
+                                                                "reps":  20,
+                                                                "rxWeights":  {
+                                                                                  "male":  22.5,
+                                                                                  "female":  15,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "implementCount":  1,
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Alt Weighted Box Step Up",
+                                                                "reps":  20,
+                                                                "rxWeights":  {
+                                                                                  "male":  17.5,
+                                                                                  "female":  17.5,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "implementCount":  1,
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Push-up",
+                                                                "reps":  20,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Toes to Bar",
+                                                                "reps":  20,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Burpee",
+                                                                "reps":  20,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Goblet Squat",
+                                                                "reps":  20,
+                                                                "rxWeights":  {
+                                                                                  "male":  17.5,
+                                                                                  "female":  17.5,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "implementCount":  1,
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Double Under",
+                                                                "reps":  40,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round",
+                                                                "alternative":  {
+                                                                                    "name":  "Single Under",
+                                                                                    "reps":  80
+                                                                                }
+                                                            }
+                                                        ],
+                                          "sections":  [
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  2,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Run",
+                                                                                     "distance":  600,
+                                                                                     "unit":  "m",
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Alt Dumbbell Snatch",
+                                                                                     "reps":  20,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  22.5,
+                                                                                                       "female":  15,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "implementCount":  1,
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Alt Weighted Box Step Up",
+                                                                                     "reps":  20,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  22.5,
+                                                                                                       "female":  15,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "implementCount":  1,
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 }
+                                                                             ]
+                                                           },
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  2,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Run",
+                                                                                     "distance":  600,
+                                                                                     "unit":  "m",
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Push-up",
+                                                                                     "reps":  20,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Toes to Bar",
+                                                                                     "reps":  20,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 }
+                                                                             ]
+                                                           },
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  2,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Burpee",
+                                                                                     "reps":  20,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Goblet Squat",
+                                                                                     "reps":  20,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  22.5,
+                                                                                                       "female":  15,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "implementCount":  1,
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Double Under",
+                                                                                     "reps":  40,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round",
+                                                                                     "alternative":  {
+                                                                                                         "name":  "Single Under",
+                                                                                                         "reps":  80
+                                                                                                     }
+                                                                                 }
+                                                                             ]
+                                                           }
+                                                       ],
+                                          "rounds":  6,
+                                          "loggingMode":  "for_time",
+                                          "aiPartName":  "ANVIL"
+                                      }
+                                  ],
+                    "workloadBreakdown":  {
+                                              "movements":  [
+                                                                {
+                                                                    "name":  "Double Under",
+                                                                    "totalReps":  80,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Alt Dumbbell Snatch",
+                                                                    "totalReps":  40,
+                                                                    "weight":  17.5,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Alt Weighted Box Step Up",
+                                                                    "totalReps":  40,
+                                                                    "weight":  17.5,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Push-up",
+                                                                    "totalReps":  40,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Toes to Bar",
+                                                                    "totalReps":  40,
+                                                                    "color":  "cyan"
+                                                                },
+                                                                {
+                                                                    "name":  "Burpee",
+                                                                    "totalReps":  40,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Goblet Squat",
+                                                                    "totalReps":  40,
+                                                                    "weight":  17.5,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Echo Bike",
+                                                                    "totalReps":  0,
+                                                                    "totalDistance":  7200,
+                                                                    "totalCalories":  0,
+                                                                    "totalTime":  0,
+                                                                    "unit":  "m",
+                                                                    "wasSubstituted":  true,
+                                                                    "originalMovement":  "Run",
+                                                                    "substitutionType":  "equivalent",
+                                                                    "implementCount":  1,
+                                                                    "distancePerRep":  1800,
+                                                                    "color":  "magenta"
+                                                                }
+                                                            ],
+                                              "grandTotalReps":  320,
+                                              "grandTotalVolume":  700,
+                                              "grandTotalDistance":  7200
+                                          },
+                    "timeCap":  1980
+                }
+}

@@ -9,6 +9,7 @@ export interface CelebrationFaceProps {
   onDone?: () => void;
   onEdit?: () => void;
   onPosterCustomizationChange?: (update: PosterCustomizationUpdate) => void;
+  onCorrection?: (reason: string, note: string) => void;
 }
 
 export interface CelebrationFace {

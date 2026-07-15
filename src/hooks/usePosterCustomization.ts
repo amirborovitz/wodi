@@ -1,13 +1,16 @@
 import { useCallback } from 'react';
 import { deleteField, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import type { PosterSkinId, PosterVibeKey } from '../types';
+import type { PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset } from '../types';
 
 export const POSTER_CUSTOMIZATION_EVENT = 'wodi:poster-customization';
 
 export interface PosterCustomizationUpdate {
   posterSkin?: PosterSkinId;
   posterVibe?: PosterVibeKey | null;
+  sourceDate?: string;  // YYYY-MM-DD — the date shown on the poster (DATE tab)
+  posterSticker?: PosterSticker | null;  // free-text note on the poster (TEXT tab); null removes it
+  posterVibeOffset?: PosterVibeOffset | null;  // manual drag nudge of the "FELT" stamp; null resets it
 }
 
 export interface PosterCustomizationEventDetail {
@@ -30,6 +33,8 @@ export function usePosterCustomization(workoutId: string | undefined): {
     const firestoreUpdate = {
       ...update,
       ...(update.posterVibe === null ? { posterVibe: deleteField() } : {}),
+      ...(update.posterSticker === null ? { posterSticker: deleteField() } : {}),
+      ...(update.posterVibeOffset === null ? { posterVibeOffset: deleteField() } : {}),
     };
 
     void updateDoc(doc(db, 'workouts', workoutId), firestoreUpdate).catch((err) => {

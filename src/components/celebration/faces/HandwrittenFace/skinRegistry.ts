@@ -15,7 +15,7 @@ import { SkinBlueprint } from './SkinBlueprint';
 import { SkinPress } from './SkinPress';
 import { SkinHazard } from './SkinHazard';
 import { SkinInk } from './SkinInk';
-import { SkinBout } from './SkinBout';
+import { SkinFoil } from './SkinFoil';
 
 export const SKINS = [
   { id: 'slab',      name: 'Slab',      Comp: SkinSlab      },
@@ -26,7 +26,7 @@ export const SKINS = [
   { id: 'blueprint', name: 'Blueprint', Comp: SkinBlueprint },
   { id: 'hazard',    name: 'Hazard',    Comp: SkinHazard    },
   { id: 'ink',       name: 'Ink',       Comp: SkinInk       },
-  { id: 'bout',      name: 'Bout',      Comp: SkinBout      },
+  { id: 'foil',      name: 'Foil',      Comp: SkinFoil      },
 ] as const;
 
 export function getSkin(id: string | undefined): (typeof SKINS)[number] {

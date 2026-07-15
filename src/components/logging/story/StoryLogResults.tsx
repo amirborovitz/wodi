@@ -7,6 +7,7 @@ import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
 import { getPrescribedSetCount } from './types';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAuth } from '../../../context/AuthContext';
 
 // ─── Public type for WizardOverview ─────────────────────────────
@@ -71,6 +72,12 @@ function isPrimaryExercise(
 ): boolean {
   const ex = workout.exercises[index];
   if (!ex) return false;
+  // The AI's own main/secondary verdict is authoritative — the SAME gate the poster uses
+  // (posterMainExercises): a part the poster gives no page to (cash-out tabata, warm-up,
+  // skill practice) must not demand a logging step either. It still lands in the saved
+  // workout as prescribed/completed via its auto-built result. The text/type checks below
+  // are the fallback for legacy parses without the flag.
+  if (ex.isSecondary != null) return !ex.isSecondary;
   const text = `${ex.name || ''} ${ex.prescription || ''}`.toLowerCase();
   if (NON_PRIMARY_PATTERN.test(text)) return false;
 
@@ -244,7 +251,12 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       return { exercise: r.exercise, sets, rounds: step, notes: r.notes, ladderStep: step, ...(partial > 0 && { ladderPartial: partial }), ...buildMaps() };
     }
     sets.push({ id: 'set-0', setNumber: 1, completed: true });
-    return { exercise: r.exercise, sets, rounds: rc, notes: r.notes, ...buildMaps() };
+    return {
+      exercise: r.exercise, sets, rounds: rc, notes: r.notes,
+      ...(r.partialReps ? { partialReps: r.partialReps } : {}),
+      ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}),
+      ...buildMaps(),
+    };
   }
 
   if ((r.movementResults?.length ?? 0) > 1) {
@@ -283,7 +295,7 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         const sr = rps?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
         sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: rps?.[i] ?? r.exercise.suggestedReps, actualReps: sr, weight, completed: true });
       }
-      if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, completed: true });
+      if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, isMax: true, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount && r.implementCount > 1 ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
     }
     case 'reps':
@@ -300,13 +312,37 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined, notes: r.notes };
     case 'score_rounds':
       sets.push({ id: 'set-0', setNumber: 1, completed: true });
-      return { exercise: r.exercise, sets, rounds: r.rounds, notes: r.notes };
+      return {
+        exercise: r.exercise, sets, rounds: r.rounds, notes: r.notes,
+        ...(r.partialReps ? { partialReps: r.partialReps } : {}),
+        ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}),
+      };
     case 'intervals': {
       const eit = Math.max(r.intervalsTotal ?? 0, effectiveSetsTotal);
       const count = r.intervalsCompleted === r.intervalsTotal && eit > (r.intervalsTotal ?? 0) ? eit : (r.intervalsCompleted ?? eit);
       for (let i = 0; i < count; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, weight: r.intervalWeight, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes, rounds: count, ...buildMaps() };
     }
+    case 'free_score':
+      // Whichever score the athlete picked lands on the single set (time / reps / weight);
+      // rounds ride on the exercise-level field, same as score_rounds. Weight fills for any
+      // parsed movements flow through buildMaps as usual.
+      sets.push({
+        id: 'set-0',
+        setNumber: 1,
+        ...(r.timeSeconds ? { time: r.timeSeconds } : {}),
+        ...(r.repsTotal ? { actualReps: r.repsTotal } : {}),
+        ...(r.weight ? { weight: r.weight } : {}),
+        completed: true,
+      });
+      return {
+        exercise: r.exercise,
+        sets,
+        ...(r.timeSeconds ? { completionTime: r.timeSeconds } : {}),
+        ...(r.rounds ? { rounds: r.rounds } : {}),
+        notes: r.notes,
+        ...buildMaps(),
+      };
     default:
       sets.push({ id: 'set-0', setNumber: 1, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes };
@@ -390,7 +426,7 @@ export function StoryLogResults({
   }, [currentBlock, goToNextBlock, results, saveLegacyResults]);
 
   // ── Exercise advance (within block) ──
-  const handleExerciseDone = useCallback(() => {
+  const advanceExercise = useCallback(() => {
     // AMRAP interval seeding
     if (parsedWorkout.format === 'amrap_intervals' && !hasSeededAmrapIntervals) {
       const finalRounds = results[currentGlobalIdx]?.rounds;
@@ -409,6 +445,31 @@ export function StoryLogResults({
       handleBlockAdvance();
     }
   }, [parsedWorkout.format, hasSeededAmrapIntervals, results, currentGlobalIdx, isLastExercise, handleBlockAdvance]);
+
+  // A scored exercise's score IS the workout result (time for for_time, rounds for AMRAP).
+  // Leaving it empty is allowed, but never silently — the poster hero falls back to EP and
+  // the athlete usually just forgot. Ask before advancing: stay and add it, or keep anyway.
+  const getMissingScoreLabel = (result: StoryExerciseResult | null): 'time' | 'rounds' | null => {
+    if (!result || result.skipped) return null;
+    if (result.kind === 'score_time' && !((result.timeSeconds ?? 0) > 0)) return 'time';
+    if (result.kind === 'score_rounds'
+      && !((result.rounds ?? 0) > 0)
+      && !((result.ladderStep ?? 0) > 0)
+      && !((result.partialReps ?? 0) > 0)
+      && (result.partialMovements?.length ?? 0) === 0) return 'rounds';
+    return null;
+  };
+
+  const [missingScoreConfirm, setMissingScoreConfirm] = useState<'time' | 'rounds' | null>(null);
+
+  const handleExerciseDone = useCallback(() => {
+    const missing = getMissingScoreLabel(currentResult);
+    if (missing) {
+      setMissingScoreConfirm(missing);
+      return;
+    }
+    advanceExercise();
+  }, [currentResult, advanceExercise]);
 
   const handleExerciseMarkDone = useCallback(() => {
     if (!isLastExercise) {
@@ -492,6 +553,21 @@ export function StoryLogResults({
         )}
 
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={missingScoreConfirm != null}
+        title={missingScoreConfirm === 'time' ? 'No time logged' : 'No rounds logged'}
+        message={missingScoreConfirm === 'time'
+          ? 'This piece is scored by your finish time — without it the recap can’t show a real score. Save it anyway?'
+          : 'This AMRAP is scored by rounds — without them the recap can’t show a real score. Save it anyway?'}
+        confirmText="Keep anyway"
+        cancelText={missingScoreConfirm === 'time' ? 'Add time' : 'Add rounds'}
+        onConfirm={() => {
+          setMissingScoreConfirm(null);
+          advanceExercise();
+        }}
+        onCancel={() => setMissingScoreConfirm(null)}
+      />
     </>
   );
 }

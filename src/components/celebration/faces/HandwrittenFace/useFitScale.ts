@@ -19,11 +19,14 @@ export function useFitScale<C extends HTMLElement, T extends HTMLElement>(
 
     const measure = (): void => {
       const containerHeight = container.clientHeight;
-      const contentHeight = content.scrollHeight;
+      const previousTransform = content.style.transform;
+      content.style.transform = 'none';
+      const rectHeight = content.getBoundingClientRect().height;
+      content.style.transform = previousTransform;
+
+      const contentHeight = Math.max(content.scrollHeight, rectHeight);
       if (containerHeight > 0 && contentHeight > 0) {
-        // Long pyramid/chipper posters need a little give, but staying near
-        // full size is more important than forcing every tall skin to fit.
-        setScale(Math.min(1, Math.max(0.84, containerHeight / contentHeight)));
+        setScale(Math.min(1, containerHeight / contentHeight));
       }
     };
 

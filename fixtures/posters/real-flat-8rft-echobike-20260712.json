@@ -1,0 +1,95 @@
+{
+  "name": "real-flat-8rft-echobike-20260712",
+  "description": "REAL saved doc: flat 8-rounds-of for time whose title ALSO says '8 Round' — the same rounds phrase must not multiply itself into 64 repeats (Echo Bike 16km was 'repaired' to 128km). Step-up distance:30 is the AI mis-reading the 30cm box height as a distance (legacy docs keep it).",
+  "workout": {
+    "date": "2026-07-12T07:06:45.447Z",
+    "title": "8 Round Alternating For Time",
+    "format": "for_time",
+    "rawText": "For time:\n8 rounds of:\n2000 m echo bike\nPush Press/Thrusters (alternates)\n8 Weighted Box Step-ups (30cm)",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "8 Round Alternating For Time",
+        "type": "wod",
+        "prescription": "8 rounds of: 2000m Echo Bike, alternate 8 Push Press and 8 Thrusters, 8 Weighted Box Step-ups (30cm)",
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 192,
+            "weight": 35,
+            "time": 2520
+          }
+        ],
+        "movements": [
+          {
+            "name": "Echo Bike",
+            "distance": 2000,
+            "unit": "m",
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Push Press",
+            "reps": 8,
+            "rxWeights": { "male": 35, "female": 35, "unit": "kg" },
+            "inputType": "weight",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Thruster",
+            "reps": 8,
+            "rxWeights": { "male": 35, "female": 35, "unit": "kg" },
+            "inputType": "weight",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Weighted Box Step-up",
+            "reps": 8,
+            "distance": 30,
+            "rxWeights": { "male": 35, "female": 35, "unit": "kg" },
+            "inputType": "weight",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          }
+        ],
+        "rounds": 8,
+        "rawText": "For time:\n8 rounds of:\n2000 m echo bike\n8 Push Press\n8 Thrusters\n8 Weighted Box Step-ups (30cm)",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "aiPartName": "GRIND"
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Push Press", "totalReps": 64, "weight": 35, "unit": "kg", "color": "yellow" },
+        { "name": "Thruster", "totalReps": 64, "weight": 35, "unit": "kg", "color": "yellow" },
+        {
+          "name": "Weighted Box Step-up",
+          "totalReps": 64,
+          "totalDistance": 240,
+          "weight": 35,
+          "unit": "m",
+          "distancePerRep": 30,
+          "color": "yellow"
+        },
+        {
+          "name": "Echo Bike",
+          "totalDistance": 16000,
+          "unit": "m",
+          "distancePerRep": 2000,
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 192,
+      "grandTotalVolume": 2240,
+      "grandTotalDistance": 16240
+    },
+    "timeCap": 2520
+  }
+}

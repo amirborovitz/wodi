@@ -11,10 +11,7 @@ import type {
 } from '../types';
 import { ShareLaunchSheet } from '../components/share/ShareLaunchSheet';
 import {
-  type ArtifactRow,
-  type ArtifactSection,
   type HeroResult,
-  type HighlightStampData,
   type StoryMovementLine,
 } from '../components/celebration';
 
@@ -23,7 +20,9 @@ import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { useAuth } from '../context/AuthContext';
 import { useCelebrationData } from '../hooks/useCelebrationData';
 import { usePosterCustomization } from '../hooks/usePosterCustomization';
+import { useWorkoutCorrection } from '../hooks/useWorkoutCorrection';
 import { getFace, DEFAULT_FACE_ID } from '../components/celebration/faces/registry';
+import { findMovementTotal } from '../components/celebration/movementResolution';
 import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW, EP_METCON_RATE, EP_DISTANCE_RATE, EP_BODYWEIGHT_RATE, EP_PR_BONUS } from '../utils/xpCalculations';
 import type { EPBreakdown } from '../types';
 import { calculateWorkloadFromExercises, assignMovementColors, isBwVolumeMovement } from '../services/workloadCalculation';
@@ -137,7 +136,6 @@ function formatDate(date: Date): string {
     day: 'numeric',
   });
 }
-
 
 function formatDurationSplit(minutes: number): { num: string; unit: string } {
   if (minutes === 0) return { num: '\u2014', unit: '' };
@@ -298,32 +296,6 @@ function inferPosterDifficultyLevel(params: {
 // Hero Result — pick the single best "show-off" number
 // ============================================
 
-
-function formatPrescriptionMovementLine(movements: NonNullable<Exercise['movements']>): string | undefined {
-  const parts = movements
-    .map((movement) => {
-      const qty = movement.reps != null
-        ? `${movement.reps}`
-        : movement.calories != null
-          ? `${movement.calories} CAL`
-          : movement.distance != null
-            ? (movement.distance >= 1000 ? `${(movement.distance / 1000).toFixed(1)}KM` : `${movement.distance}M`)
-            : '';
-      const name = formatStickerMovementName(movement.name);
-      return [qty, name].filter(Boolean).join(' ');
-    })
-    .filter(Boolean);
-  return parts.length ? parts.join(' • ') : undefined;
-}
-
-export function stableRotation(seed: string, index: number): number {
-  let hash = index * 97;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 600;
-  }
-  return parseFloat((-3 + hash / 100).toFixed(1));
-}
-
 export function getPrescribedRoundCount(exercises: Exercise[], rawText?: string): number | undefined {
   const candidates = [
     rawText,
@@ -351,40 +323,6 @@ export function getPrescribedRoundCount(exercises: Exercise[], rawText?: string)
   return undefined;
 }
 
-export function getSectionedMovementRepeatCounts(exercise?: Exercise | null): Map<string, number> | undefined {
-  if (!exercise?.sections?.length) return undefined;
-  const repeatCounts = new Map<string, number>();
-
-  for (const section of exercise.sections) {
-    const repeats = section.sectionType === 'rounds' ? (section.rounds ?? 1) : 1;
-    for (const movement of section.movements || []) {
-      const key = movement.name.toLowerCase();
-      repeatCounts.set(key, (repeatCounts.get(key) || 0) + repeats);
-    }
-  }
-
-  return repeatCounts.size > 0 ? repeatCounts : undefined;
-}
-
-export function getSectionedForTimeLabel(exercise?: Exercise | null): string | undefined {
-  const roundSections = exercise?.sections?.filter((section) => section.sectionType === 'rounds') || [];
-  if (roundSections.length <= 1) return undefined;
-
-  // Progressive chipper: every round section has rounds === 1 and movement counts differ
-  const isProgressive = roundSections.every((s) => (s.rounds ?? 1) === 1)
-    && roundSections.some((s, i) => i > 0 && (s.movements ?? []).length !== (roundSections[i - 1].movements ?? []).length);
-  if (isProgressive) return `progressive ${roundSections.length}-round chipper`;
-
-  const roundCounts = roundSections
-    .map((section) => section.rounds)
-    .filter((rounds): rounds is number => typeof rounds === 'number' && rounds > 0);
-  if (roundCounts.length === roundSections.length && new Set(roundCounts).size === 1) {
-    return `${roundSections.length} x ${roundCounts[0]} rounds for time`;
-  }
-  return `${roundSections.length} sections for time`;
-}
-
-
 export function fmtTimeSocial(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
@@ -396,7 +334,6 @@ export function fmtTimeSocial(seconds: number): string {
 }
 
 /** Find the last partial movement name for AMRAP display */
-
 
 export function formatStickerMovementName(name: string): string {
   return name
@@ -448,237 +385,6 @@ export function getPrescriptionRepeatCount(exercise: Exercise): number | undefin
     || exercise.sets?.filter((set) => set.completed).length
     || exercise.sets?.length
     || undefined;
-}
-
-export function inferRoundCountFromMovements(
-  exercise: Exercise,
-  movements: MovementTotal[],
-): number | undefined {
-  for (const pMov of (exercise.movements || [])) {
-    const name = pMov.name.toLowerCase();
-    const actual = movements.find(m => m.name.toLowerCase() === name);
-    if (pMov.reps && pMov.reps > 0 && actual?.totalReps && actual.totalReps > 0) {
-      const ratio = actual.totalReps / pMov.reps;
-      if (Number.isInteger(ratio) && ratio >= 2 && ratio <= 50) return ratio;
-    }
-    if (pMov.distance && pMov.distance > 0 && actual?.totalDistance && actual.totalDistance > 0) {
-      const ratio = actual.totalDistance / pMov.distance;
-      if (Number.isInteger(ratio) && ratio >= 2 && ratio <= 50) return ratio;
-    }
-  }
-  return undefined;
-}
-export function findBreakdownForParsedMovement(
-  movement: NonNullable<Exercise['movements']>[number],
-  breakdownMovements: MovementTotal[],
-): MovementTotal | undefined {
-  const target = movement.name.toLowerCase();
-  return breakdownMovements.find((candidate) => {
-    const name = candidate.name.toLowerCase();
-    const original = candidate.originalMovement?.toLowerCase();
-    return name === target || original === target;
-  });
-}
-
-function getMovementDisplayNameFromContext(
-  movement: NonNullable<Exercise['movements']>[number],
-  contextText?: string,
-): string {
-  const name = movement.name;
-  if (!contextText || /\b(?:db|dumbbell|kb|kettlebell|twin|double)\b/i.test(name)) {
-    return name;
-  }
-
-  const nameWords = name.toLowerCase().split(/\s+/).filter(Boolean);
-  const clauses = contextText
-    .split(/[\n,;]+/)
-    .map((clause) => clause.trim())
-    .filter(Boolean);
-  const matchingClause = clauses.find((clause) => {
-    const lower = clause.toLowerCase();
-    return nameWords.every((word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`).test(lower));
-  });
-  if (!matchingClause) return name;
-  const escapedName = nameWords
-    .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('\\s+');
-  const compoundMatch = matchingClause.match(new RegExp(`\\b(${escapedName})(\\s*(?:&|\\+|and|to)\\s+[a-z][a-z\\s-]*)`, 'i'));
-  if (compoundMatch) {
-    const suffix = compoundMatch[2]
-      .replace(/\s+(?:@|\d+(?:\.\d+)?\s*(?:kg|lb|lbs)?|rx|tc|cap).*$/i, '')
-      .trim();
-    if (suffix) {
-      const displaySuffix = suffix
-        .toLowerCase()
-        .replace(/\b[a-z]/g, (char) => char.toUpperCase())
-        .replace(/\bAnd\b/g, 'and')
-        .replace(/\bTo\b/g, 'to');
-      return `${name}${suffix}`
-        .replace(suffix, displaySuffix)
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-  }
-  const source = matchingClause.toLowerCase();
-  const hasDb = /\b(?:db'?s?|dumbbells?)\b/i.test(source);
-  const hasKb = /\b(?:kb'?s?|kettlebells?)\b/i.test(source);
-  if (!hasDb && !hasKb) return name;
-
-  const isPair = movement.implementCount === 2
-    || /\b(?:twin|double|pair|two|2x|2\s*x)\b/i.test(source);
-  const equipment = hasDb ? 'DB' : 'KB';
-  const prefix = isPair ? `Twin ${equipment}` : equipment;
-  return `${prefix} ${name}`;
-}
-
-function buildCelebrationMovementRow(params: {
-  movementName: string;
-  prescribed?: {
-    reps?: number;
-    distance?: number;
-    calories?: number;
-    weight?: number;
-    implementCount?: 1 | 2;
-  };
-  actual?: MovementTotal;
-  repeatCount?: number;
-  isStrength?: boolean;
-  suppressCalorieTotal?: boolean;
-  suppressDistanceTotal?: boolean;
-}): ArtifactRow {
-  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal } = params;
-  const weight = prescribed?.implementCount === 2 && prescribed.weight
-    ? prescribed.weight
-    : actual?.weight ?? prescribed?.weight;
-  const weightEachSuffix = prescribed?.implementCount === 2 ? ' each' : '';
-  const unit = actual?.unit === 'lb' ? 'lb' : 'kg';
-  const unitUpper = unit.toUpperCase();
-  const hasWeight = (weight || 0) > 0;
-  let accent: ArtifactRow['accent'] = hasWeight ? 'yellow' : (actual?.color || 'magenta');
-  const subNoteParts: string[] = [];
-  const totalLabel = (value: number, unit?: string) => `${value}${unit ? ` ${unit}` : ''} total`;
-
-  const perRoundReps = prescribed?.reps || (
-    repeatCount && repeatCount > 1 && actual?.totalReps
-      ? Math.round(actual.totalReps / repeatCount)
-      : actual?.totalReps
-  );
-  const substitutedDistance = actual?.wasSubstituted
-    ? actual.distancePerRep
-      || (
-        actual.totalDistance && repeatCount && repeatCount > 1 && prescribed?.distance
-          && actual.totalDistance > prescribed.distance * repeatCount
-          ? Math.round(actual.totalDistance / repeatCount)
-          : actual?.totalDistance
-      )
-    : undefined;
-  // actual.distancePerRep carries the real per-trip distance including substitutions
-  // (e.g. 700m Echo Bike when substituting 200m Run). Falls back to prescribed.distance
-  // for non-substituted relay movements.
-  const perRoundDistance = actual?.distancePerRep
-    || prescribed?.distance
-    || substitutedDistance
-    || (
-      actual?.wasSubstituted && repeatCount && repeatCount > 1 && actual?.totalDistance
-        ? actual.totalDistance
-        : repeatCount && repeatCount > 1 && actual?.totalDistance
-          ? Math.round(actual.totalDistance / repeatCount)
-          : actual?.totalDistance
-    );
-  const perRoundCalories = prescribed?.calories || (
-    actual?.wasSubstituted && repeatCount && repeatCount > 1 && actual?.totalCalories
-      ? actual.totalCalories
-      : repeatCount && repeatCount > 1 && actual?.totalCalories
-        ? Math.round(actual.totalCalories / repeatCount)
-        : actual?.totalCalories
-  );
-
-  const totalReps = actual?.totalReps
-    || (repeatCount && repeatCount > 1 && perRoundReps ? perRoundReps * repeatCount : undefined);
-  // Trust actual.totalDistance when present — repairUndercountedBreakdown has already fixed
-  // undercounts, and multiplying here would overcount cash-out/buy-in movements (done once).
-  const totalDistance = actual?.totalDistance && actual.totalDistance > 0
-    ? actual.totalDistance
-    : (perRoundDistance && repeatCount && repeatCount > 1 ? perRoundDistance * repeatCount : perRoundDistance);
-  const totalCalories = actual?.totalCalories
-    || (repeatCount && repeatCount > 1 && perRoundCalories ? perRoundCalories * repeatCount : undefined);
-
-  let primary = '-';
-  if (perRoundDistance && perRoundDistance > 0) {
-    // Substitution relay rows use a compact trip count. Normal repeated-distance
-    // rows keep the per-set prescription visible and put the accumulated distance
-    // in the total note.
-    const hasPrescribedDist = (prescribed?.distance ?? 0) > 0;
-    const relayCount = hasPrescribedDist && totalDistance && totalDistance > perRoundDistance
-      ? Math.round(totalDistance / perRoundDistance)
-      : 0;
-    const isCleanRelay = actual?.wasSubstituted && relayCount >= 2
-      && Math.abs(relayCount * perRoundDistance - (totalDistance ?? 0)) < 1;
-    primary = isCleanRelay ? `${relayCount}×` : `${perRoundDistance}m`;
-    if (!suppressDistanceTotal && totalDistance && totalDistance !== perRoundDistance) {
-      subNoteParts.push(`${formatDistanceValue(totalDistance).toLowerCase()} total`);
-    }
-    accent = 'magenta';
-  } else if (perRoundCalories && perRoundCalories > 0) {
-    primary = `${perRoundCalories} CAL`;
-    if (!suppressCalorieTotal && totalCalories && totalCalories !== perRoundCalories) {
-      subNoteParts.push(totalLabel(totalCalories, 'cal'));
-    }
-    accent = 'magenta';
-  } else if (isStrength && hasWeight) {
-    if (actual?.weightProgression && actual.weightProgression.length > 1) {
-      const min = Math.min(...actual.weightProgression);
-      const max = Math.max(...actual.weightProgression);
-      primary = min === max ? `${max}${unitUpper}` : `${min}->${max}${unitUpper}`;
-    } else {
-      primary = `${weight}${unitUpper}`;
-    }
-    if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
-    accent = 'yellow';
-  } else if (perRoundReps && perRoundReps > 0) {
-    primary = `${perRoundReps}`;
-    if (hasWeight) {
-      if (totalReps && totalReps > 0) subNoteParts.push(`${totalReps} total reps`);
-      accent = 'yellow';
-    } else if (totalReps && totalReps !== perRoundReps) {
-      subNoteParts.push(totalLabel(totalReps));
-    }
-  } else if (hasWeight) {
-    primary = `${weight}${unitUpper}`;
-    accent = 'yellow';
-  }
-
-  const displayName = actual?.wasSubstituted && actual.name ? actual.name : movementName;
-  const hasLoggedWeight = (actual?.weight || 0) > 0;
-  // Relay rows: embed the per-trip distance in the name column ("1.2km Echo Bike") so
-  // the short primary ("5×") fits the narrow grid column without collision.
-  // Weighted metcon rows: only show "@weight" when the user actually logged it —
-  // AI rxWeights alone don't count (prevents phantom "@40kg" for open prescriptions).
-  const hasPrescribedDistForRelay = (prescribed?.distance ?? 0) > 0 && (perRoundDistance ?? 0) > 0;
-  const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
-    ? Math.round(totalDistance / perRoundDistance)
-    : 0;
-  const isRelayRow = actual?.wasSubstituted && relayCountForName >= 2
-    && perRoundDistance != null
-    && Math.abs(relayCountForName * perRoundDistance - (totalDistance ?? 0)) < 1;
-  const relayDistLabel = isRelayRow && perRoundDistance != null
-    ? (perRoundDistance >= 1000 ? `${(perRoundDistance / 1000).toFixed(1)}km` : `${perRoundDistance}m`)
-    : null;
-  const nameWithLoad = relayDistLabel != null
-    ? `${relayDistLabel} ${displayName}`
-    : hasLoggedWeight && (perRoundReps ?? 0) > 0 && !isStrength
-      ? `${displayName} @ ${weight}${unit}${weightEachSuffix}`
-      : undefined;
-
-  return {
-    primary,
-    name: displayName,
-    nameWithLoad,
-    loadNote: hasWeight ? `${weight}${unit}${weightEachSuffix}` : undefined,
-    subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
-    totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
-    accent,
-  };
 }
 
 export function repairUndercountedBreakdown(
@@ -884,20 +590,46 @@ function formatRepScheme(repsPerSet?: number[]): string | undefined {
   return repsPerSet && repsPerSet.length > 1 ? repsPerSet.join('-') : undefined;
 }
 
-// Parse "[20-16-12-8-4]" bracket notation from text ? [20,16,12,8,4], or undefined.
-export function parseDescLadderScheme(
-  exercise: Exercise,
-  rawText?: string,
-): number[] | undefined {
-  if (exercise.suggestedRepsPerSet && exercise.suggestedRepsPerSet.length >= 3) {
-    return exercise.suggestedRepsPerSet;
-  }
-  const searchText = [rawText, exercise.prescription, exercise.name].filter(Boolean).join(' ');
-  const match = searchText.match(/\[(\d+(?:\s*[-–]\s*\d+){2,})\]/);
-  if (!match) return undefined;
-  const nums = match[1].split(/\s*[-–]\s*/).map(Number).filter(n => n > 0);
-  return nums.length >= 3 ? nums : undefined;
+function getCompletedStrengthSets(exercise: Exercise): NonNullable<Exercise['sets']> {
+  return (exercise.sets || []).filter(set => set.completed && ((set.actualReps ?? set.targetReps ?? 0) > 0));
 }
+
+function getStrengthSetReps(sets: NonNullable<Exercise['sets']>): number[] {
+  return sets
+    .filter(set => !set.isMax)
+    .map(set => set.actualReps ?? set.targetReps)
+    .filter((reps): reps is number => typeof reps === 'number' && reps > 0);
+}
+
+function getMaxRepStrengthSet(sets: NonNullable<Exercise['sets']>): { reps: number; weight: number } | undefined {
+  const explicitMax = [...sets].reverse().find(set => set.isMax && (set.actualReps ?? 0) > 0);
+  if (explicitMax) {
+    return { reps: explicitMax.actualReps ?? 0, weight: explicitMax.weight || 0 };
+  }
+
+  if (sets.length < 2) return undefined;
+  const lastSet = sets[sets.length - 1];
+  const previousSets = sets.slice(0, -1);
+  const previousMaxReps = Math.max(...previousSets.map(set => set.actualReps ?? set.targetReps ?? 0), 0);
+  const previousMaxWeight = Math.max(...previousSets.map(set => set.weight ?? 0), 0);
+  const lastReps = lastSet.actualReps ?? 0;
+  const lastWeight = lastSet.weight ?? 0;
+
+  if (lastReps > previousMaxReps && lastWeight > 0 && lastWeight < previousMaxWeight) {
+    return { reps: lastReps, weight: lastWeight };
+  }
+
+  return undefined;
+}
+
+function getStrengthWorkingWeights(sets: NonNullable<Exercise['sets']>, maxSet?: { reps: number; weight: number }): number[] {
+  return sets
+    .filter(set => !(maxSet && (set.actualReps ?? 0) === maxSet.reps && (set.weight ?? 0) === maxSet.weight))
+    .map(set => set.weight)
+    .filter((weight): weight is number => typeof weight === 'number' && weight > 0);
+}
+
+// Parse "[20-16-12-8-4]" bracket notation from text ? [20,16,12,8,4], or undefined.
 
 function buildStoryMovements(
   movements: MovementTotal[],
@@ -1177,32 +909,6 @@ function buildSectionedStoryMovements(
 }
 
 /**
- * Find a MovementTotal by name, preferring an exercise-index-scoped match.
- * Falls back to name-only matching for backward compatibility with stored data
- * that doesn't have exerciseIndex.
- */
-export function findMovementTotal(
-  movements: MovementTotal[],
-  movName: string,
-  exerciseIndex?: number,
-): MovementTotal | undefined {
-  const lower = movName.toLowerCase();
-  // Prefer scoped match (same exercise block)
-  if (exerciseIndex !== undefined) {
-    const scoped = movements.find(
-      m => m.exerciseIndex === exerciseIndex &&
-        (m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower)
-    );
-    if (scoped) return scoped;
-  }
-  // Fallback: name-only (for legacy stored data without exerciseIndex)
-  return movements.find(
-    m => m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower
-  );
-}
-
-
-/**
  * Build story movements for mixed workouts (Strength + Metcon).
  * Groups movements under exercise headers so the celebration shows the full workout structure.
  */
@@ -1331,13 +1037,19 @@ function buildMixedStoryMovements(
           const wUnit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit || 'kg');
           // Total reps for this movement
           const movTotalReps = totalReps || (perRoundReps > 0 && rounds > 0 ? perRoundReps * rounds : undefined);
+          const completedSets = getCompletedStrengthSets(ex);
+          const maxRepSet = getMaxRepStrengthSet(completedSets);
+          const workingWeights = getStrengthWorkingWeights(completedSets, maxRepSet);
+          const strengthSetReps = getStrengthSetReps(completedSets);
           lines.push({
             perRound: '',
             name: displayName,
             total: '',
             color: color ?? 'yellow',
-            weightProgression: movProgression,
+            weightProgression: workingWeights.length > 0 ? workingWeights : movProgression,
             unit: wUnit,
+            burnout: maxRepSet,
+            strengthSetReps: strengthSetReps.length > 0 ? strengthSetReps : undefined,
             strengthTotalReps: movTotalReps && movTotalReps > 0 ? movTotalReps : undefined,
           });
           continue;
@@ -1374,23 +1086,11 @@ function buildMixedStoryMovements(
       }
     } else {
       // Strength exercise without movements array — show weight progression
-      const sets = ex.sets || [];
-      const perSetWeights: number[] = [];
-      for (const set of sets) {
-        if (set.weight && set.weight > 0) perSetWeights.push(set.weight);
-      }
+      const completedSets = getCompletedStrengthSets(ex);
+      const burnout = getMaxRepStrengthSet(completedSets);
+      const perSetWeights = getStrengthWorkingWeights(completedSets, burnout);
+      const strengthSetReps = getStrengthSetReps(completedSets);
       const hasVarying = perSetWeights.length > 1 && !perSetWeights.every(w => w === perSetWeights[0]);
-
-      // Detect burnout/max-rep set: last set with more reps than previous, or isMax flag
-      let burnout: { reps: number; weight: number } | undefined;
-      const completedSets = sets.filter(s => s.completed && s.actualReps && s.actualReps > 0);
-      if (completedSets.length >= 2) {
-        const lastSet = completedSets[completedSets.length - 1];
-        const prevSet = completedSets[completedSets.length - 2];
-        if (lastSet.isMax || (lastSet.actualReps! > prevSet.actualReps! && lastSet.weight && lastSet.weight < Math.max(...perSetWeights))) {
-          burnout = { reps: lastSet.actualReps!, weight: lastSet.weight || 0 };
-        }
-      }
 
       // Total reps across all strength sets
       const strengthTotalReps = completedSets.reduce((sum, s) => sum + (s.actualReps || 0), 0);
@@ -1398,28 +1098,27 @@ function buildMixedStoryMovements(
       const cleanExName = ex.name.replace(/^(?:part\s+)?[A-Z][).:\s-]+/i, '').replace(/^(?:STRENGTH|METCON)\s*(?:\([^)]*\))?\s*[-:]\s*/i, '').trim() || ex.name;
 
       if (hasVarying) {
-        // Exclude burnout weight from the progression chain
-        const ladderWeights = burnout ? perSetWeights.slice(0, -1) : perSetWeights;
         lines.push({
           perRound: '',
           name: cleanExName,
           total: '',
           color: 'yellow',
-          weightProgression: ladderWeights,
+          weightProgression: perSetWeights,
           unit: 'kg',
           burnout,
+          strengthSetReps: strengthSetReps.length > 0 ? strengthSetReps : undefined,
           strengthTotalReps: strengthTotalReps > 0 ? strengthTotalReps : undefined,
         });
       } else if (perSetWeights.length > 0) {
-        // Single weight — show it
-        const matched = findMovementTotal(movements, ex.name, exIdx);
         lines.push({
-          perRound: `${perSetWeights[0]}`,
+          perRound: '',
           name: ex.name,
-          total: matched?.totalReps ? `${matched.totalReps} reps` : '',
+          total: '',
           color: 'yellow',
-          weight: perSetWeights[0],
+          weightProgression: perSetWeights,
           unit: 'kg',
+          burnout,
+          strengthSetReps: strengthSetReps.length > 0 ? strengthSetReps : undefined,
           strengthTotalReps: strengthTotalReps > 0 ? strengthTotalReps : undefined,
         });
       }
@@ -1566,30 +1265,6 @@ function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined
 }
 
 /** Build a human-readable format line: "18 min AMRAP", "For Time · In Pairs", "5×3 Back Squat" */
-export function inferWorkoutFormatForExercise(ex: Exercise, globalFormat?: WorkoutFormat): WorkoutFormat | undefined {
-  const rx = normalizeIntervalNotation(`${ex.name || ''} ${ex.prescription || ''}`).toLowerCase();
-  if (ex.type === 'strength') return 'strength';
-  if (/\b(?:teams?\s+of|i\s*go\s*y(?:ou|o?u?)\s*go|igug|partner|in\s+pairs?)\b/i.test(rx)) return 'intervals';
-  if (/amrap/i.test(rx) && /every\s+\d+:\d+|e\d+mom|emom/i.test(rx)) return 'amrap_intervals';
-  if (/amrap/i.test(rx)) return 'amrap';
-  if (/for\s*time|\brft\b|\d+\s*rounds?\s*for\s*time/i.test(rx)) return 'for_time';
-  if (/every\s+\d+:\d+|e\d+mom|emom/i.test(rx)) return 'emom';
-  if (/intervals?/i.test(rx)) return 'intervals';
-  return globalFormat;
-}
-
-export function inferTeamSizeFromText(text?: string): number | undefined {
-  if (!text) return undefined;
-  const teamOf = text.match(/\bteams?\s+of\s+(\d+)\b/i)
-    || text.match(/\bgroups?\s+of\s+(\d+)\b/i)
-    || text.match(/\b(\d+)[-\s]*(?:person|people|athlete)\b/i);
-  if (teamOf) {
-    const size = parseInt(teamOf[1], 10);
-    if (size > 1 && size <= 12) return size;
-  }
-  if (/\b(?:in\s+pairs?|partner)\b/i.test(text)) return 2;
-  return undefined;
-}
 
 function buildFormatLine(
   format: string | undefined,
@@ -1849,9 +1524,12 @@ export function computeHeroResult(
     const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
       ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)
       : (amrapExercise.rounds || 0);
+    // Partial round logged via the movement checklist counts as a half round → "5½ ROUNDS".
+    const hasPartial = (amrapExercise.partialMovements?.length ?? 0) > 0
+      || (amrapExercise.partialReps ?? 0) > 0;
     if (totalRounds > 0) {
       return {
-        value: formatAmrapRounds(totalRounds),
+        value: formatAmrapRounds(totalRounds + (hasPartial ? 0.5 : 0)),
         unit: 'ROUNDS',
         formatLine,
         storyLine,
@@ -1994,853 +1672,16 @@ export function computeHeroResult(
   return { value: '\u2713', unit: '', formatLine, storyLine, accentClass: 'accentCyan' };
 }
 
-
-export function getRewardVibeLabel(
-  format: WorkoutFormat | undefined,
-  totalReps: number,
-  durationMinutes: number,
-  totalDistance: number,
-  totalCalories: number,
-  hasLadder?: boolean,
-): string {
-  if (hasLadder) return 'THE CLIMB';
-  if (format === 'strength') return 'STRENGTH';
-  if (durationMinutes > 0 && durationMinutes <= 12) return 'SPRINT';
-  if (totalCalories >= 80 || totalDistance >= 2000) return 'ENGINE';
-  if (totalReps >= 220 || format === 'amrap') return 'GRIND';
-  if (format === 'intervals' || format === 'emom' || format === 'amrap_intervals') return 'SURGE';
-  return 'LOCKED IN';
-}
-
-export function formatStampLoad(weight: number, unit?: string): string {
-  const rounded = Number.isInteger(weight) ? `${weight}` : weight.toFixed(1);
-  return `${rounded}${unit === 'lb' ? 'LB' : 'KG'}`;
-}
-
-function formatStampDuration(durationMinutes: number): string {
-  const totalSeconds = Math.max(0, Math.round(durationMinutes * 60));
-  if (totalSeconds === 0) return 'DONE';
-  return fmtTimeSocial(totalSeconds);
-}
-
-function normalizeStampMovementName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-type ExerciseWithMovementResultMaps = Exercise & {
-  movementWeights?: Record<string, number>;
-  implementCounts?: Record<string, number>;
-};
-
-function lookupMovementResultMapValue<T>(
-  map: Record<string, T> | undefined,
-  movementName: string,
-): T | undefined {
-  if (!map) return undefined;
-  return map[movementName]
-    ?? map[normalizeStampMovementName(movementName)]
-    ?? Object.entries(map).find(([key]) =>
-      normalizeStampMovementName(key) === normalizeStampMovementName(movementName)
-    )?.[1];
-}
-
-function resolveMovementEnteredLoad(
-  movement: MovementTotal,
-  exercises: Exercise[],
-): { weight: number; unit?: string } | null {
-  const movementKey = normalizeStampMovementName(movement.name);
-  const originalKey = movement.originalMovement
-    ? normalizeStampMovementName(movement.originalMovement)
-    : undefined;
-
-  for (const exercise of exercises as ExerciseWithMovementResultMaps[]) {
-    const parsedMovements = exercise.sections?.length
-      ? exercise.sections.flatMap((section) => section.movements || [])
-      : (exercise.movements || []);
-
-    const parsed = parsedMovements.find((candidate) => {
-      const candidateKey = normalizeStampMovementName(candidate.name);
-      return candidateKey === movementKey || candidateKey === originalKey;
-    });
-    if (!parsed) continue;
-
-    const enteredWeight = lookupMovementResultMapValue(exercise.movementWeights, parsed.name)
-      ?? lookupMovementResultMapValue(exercise.movementWeights, movement.name);
-    const prescribedWeight = parsed.rxWeights?.male ?? parsed.rxWeights?.female;
-    const perImplementWeight = enteredWeight ?? prescribedWeight;
-    if (!perImplementWeight || perImplementWeight <= 0) continue;
-
-    const enteredImplementCount = lookupMovementResultMapValue(exercise.implementCounts, parsed.name)
-      ?? lookupMovementResultMapValue(exercise.implementCounts, movement.name);
-    const implementCount = enteredImplementCount
-      ?? movement.implementCount
-      ?? parsed.implementCount
-      ?? 1;
-
-    return {
-      weight: implementCount > 1 ? perImplementWeight * implementCount : perImplementWeight,
-      unit: movement.unit ?? parsed.rxWeights?.unit,
-    };
-  }
-
-  return null;
-}
-
-export function getEngineThresholdStamp(
-  movements: MovementTotal[],
-  config: CelebrationStickerConfig,
-): HighlightStampData | null {
-  const running = [...movements]
-    .filter((movement) => /run|running/i.test(movement.name) && (movement.totalDistance || 0) > config.runDistanceStickerMinMeters)
-    .sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0))[0];
-  if (running) {
-    return {
-      title: 'RUN DISTANCE',
-      value: formatDistanceValue(running.totalDistance || 0).toUpperCase(),
-      note: running.name.toUpperCase(),
-      color: 'yellow',
-      rotation: -2,
-    };
-  }
-
-  const rowing = [...movements]
-    .filter((movement) => /row|rowing|rower/i.test(movement.name) && (movement.totalDistance || 0) > config.rowDistanceStickerMinMeters)
-    .sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0))[0];
-  if (rowing) {
-    return {
-      title: 'ROW DISTANCE',
-      value: formatDistanceValue(rowing.totalDistance || 0).toUpperCase(),
-      note: rowing.name.toUpperCase(),
-      color: 'yellow',
-      rotation: -2,
-    };
-  }
-
-  const biking = [...movements]
-    .filter((movement) => /bike|cycling|cycle|echo|assault|airbike|erg bike/i.test(movement.name) && (movement.totalDistance || 0) > config.bikeDistanceStickerMinMeters)
-    .sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0))[0];
-  if (biking) {
-    return {
-      title: 'BIKE DISTANCE',
-      value: formatDistanceValue(biking.totalDistance || 0).toUpperCase(),
-      note: biking.name.toUpperCase(),
-      color: 'yellow',
-      rotation: -2,
-    };
-  }
-
-  const calories = [...movements]
-    .filter((movement) => (movement.totalCalories || 0) > config.calorieStickerMinCalories)
-    .sort((a, b) => (b.totalCalories || 0) - (a.totalCalories || 0))[0];
-  if (calories) {
-    return {
-      title: 'CAL BURN',
-      value: `${calories.totalCalories} CAL`,
-      note: calories.name.toUpperCase(),
-      color: 'yellow',
-      rotation: -2,
-    };
-  }
-
-  return null;
-}
-
-function achievementMatchesMovementList(
-  achievement: NonNullable<RewardData['achievements']>[number],
-  movements: MovementTotal[],
-): boolean {
-  if (!achievement.movement) return false;
-  const achievementName = normalizeStampMovementName(achievement.movement);
-  return movements.some((movement) => {
-    const movementName = normalizeStampMovementName(movement.name);
-    return movementName === achievementName
-      || movementName.includes(achievementName)
-      || achievementName.includes(movementName);
-  });
-}
-
-
-export function getFlexHighlightStamp(
-  movements: MovementTotal[],
-  achievements?: RewardData['achievements'],
-  exercises: Exercise[] = [],
-  format?: WorkoutFormat,
-  durationMinutes: number = 0,
-  isMetconContext?: boolean,
-  stickerConfig: CelebrationStickerConfig = DEFAULT_CELEBRATION_STICKER_CONFIG,
-): HighlightStampData | null {
-  if (!movements || movements.length === 0) return null;
-
-  const prAchievement = achievements?.find((achievement) =>
-    achievement.type === 'pr'
-    && achievement.movement
-    && achievement.value
-    && achievementMatchesMovementList(achievement, movements)
-  );
-  if (prAchievement?.movement && prAchievement.value) {
-    return {
-      title: '? NEW PR ?',
-      value: formatStampLoad(prAchievement?.value),
-      note: prAchievement.movement.toUpperCase(),
-      color: 'yellow',
-      rotation: -3,
-    };
-  }
-
-  const emomStickerHasCardio = format === 'emom'
-    && movements.some(m => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
-  const isConditioningStickerContext = isMetconContext
-    || emomStickerHasCardio
-    || format === 'amrap'
-    || format === 'amrap_intervals'
-    || format === 'for_time'
-    || format === 'intervals'
-    || format === 'tabata';
-  if (isConditioningStickerContext) {
-    const conditioningEngineThreshold = getEngineThresholdStamp(movements, stickerConfig);
-    if (conditioningEngineThreshold) return conditioningEngineThreshold;
-  }
-
-  const peakWeight = (m: MovementTotal) => {
-    const movementLoad = resolveMovementEnteredLoad(m, exercises);
-    if (movementLoad) return movementLoad.weight;
-    if (isConditioningStickerContext) return m.weight || 0;
-    return m.weightProgression && m.weightProgression.length > 0
-      ? Math.max(...m.weightProgression)
-      : (m.weight || 0);
-  };
-  const peakUnit = (m: MovementTotal) =>
-    resolveMovementEnteredLoad(m, exercises)?.unit ?? m.unit;
-
-  const heaviest = [...movements]
-    .filter((movement) => peakWeight(movement) > 0)
-    .sort((a, b) => peakWeight(b) - peakWeight(a))[0];
-  const hasStrengthBlock = !isMetconContext && (format === 'strength' || format === 'emom' || exercises.some((exercise) => exercise.type === 'strength'));
-  if (!isConditioningStickerContext && !isMetconContext && heaviest && (peakWeight(heaviest) >= 60 || hasStrengthBlock)) {
-    const stampRounds = exercises.length === 1
-      ? (exercises[0]?.sets?.filter(s => s.completed)?.length || exercises[0]?.sets?.length || 1)
-      : 1;
-    const complex = detectBarbellComplex(movements, stampRounds);
-    if (complex) {
-      // PR within the complex takes priority over HEAVIEST HIT
-      const complexMovementNames = complex.complexName.toLowerCase();
-      const complexPR = achievements?.find(a =>
-        a.type === 'pr' && a.movement &&
-        complexMovementNames.includes(a.movement.toLowerCase())
-      );
-      const peakW = complex.weightEnd ?? complex.weight;
-      const peakLabel = formatStampLoad(peakW, complex.unit);
-      if (complexPR) {
-        return {
-          title: '? NEW PR ?',
-          value: `${peakLabel} COMPLEX`,
-          note: complex.abbreviatedName,
-          color: 'magenta',
-          rotation: 2,
-          variant: 'complex',
-        };
-      }
-      const weightLabel = complex.weightEnd
-        ? `${formatStampLoad(complex.weight, complex.unit)}?${peakLabel}`
-        : peakLabel;
-      return {
-        title: 'HEAVIEST HIT',
-        value: `${weightLabel} COMPLEX`,
-        note: complex.abbreviatedName,
-        color: 'magenta',
-        rotation: 2,
-        variant: 'complex',
-      };
-    }
-    return {
-      title: 'HEAVIEST HIT',
-      value: formatStampLoad(peakWeight(heaviest), peakUnit(heaviest)),
-      note: heaviest.name.toUpperCase(),
-      color: 'yellow',
-      rotation: -3,
-    };
-  }
-
-  const engineThreshold = getEngineThresholdStamp(movements, stickerConfig);
-  if (engineThreshold) return engineThreshold;
-
-  // Importance score: weighted reps beat pure bodyweight reps.
-  // Calories and distance get normalized equivalents so they stay competitive.
-  //   weighted:  totalReps × weight  (e.g. 60 devil press @ 17.5kg = 1050)
-  //   bodyweight: totalReps × 1      (e.g. 200 jump rope = 200)
-  //   calories:  totalCalories × 10  (e.g. 30 cal Echo Bike = 300)
-  //   distance:  totalDistance × 0.5 (e.g. 1000m row = 500)
-  // Using max() across metrics avoids double-counting movements that have both (e.g. rower with cals+distance).
-  const workhorseScore = (m: MovementTotal): number => {
-    const wtReps = (m.totalReps || 0) * Math.max(1, m.weight || 0);
-    const calEq  = (m.totalCalories || 0) * 10;
-    const distEq = (m.totalDistance || 0) * 0.5;
-    return Math.max(wtReps, calEq, distEq);
-  };
-
-  const workhorse = [...movements]
-    .filter(m => workhorseScore(m) > 0)
-    .sort((a, b) => workhorseScore(b) - workhorseScore(a))[0];
-
-  if (workhorse) {
-    const value = workhorse.totalCalories
-      ? `${workhorse.totalCalories} CAL`
-      : workhorse.totalDistance
-        ? formatDistanceValue(workhorse.totalDistance).toUpperCase()
-        : `${workhorse.totalReps} REPS`;
-    return {
-      title: 'WORKHORSE',
-      value,
-      note: workhorse.name.toUpperCase(),
-      color: 'magenta',
-      rotation: 2.5,
-    };
-  }
-
-  const distanceBased = [...movements]
-    .filter((movement) => (movement.totalDistance || 0) > 0)
-    .sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0))[0];
-  const calorieFallback = [...movements]
-    .filter((movement) => (movement.totalCalories || 0) > 0)
-    .sort((a, b) => (b.totalCalories || 0) - (a.totalCalories || 0))[0];
-  const pureEngine = movements.every((movement) =>
-    (movement.totalDistance || 0) > 0 || (movement.totalCalories || 0) > 0 || (movement.totalTime || 0) > 0
-  );
-  if (pureEngine || distanceBased || calorieFallback || durationMinutes > 0) {
-    if (format === 'for_time' && durationMinutes > 0) return null;
-    const sprintLabel = durationMinutes > 0 && durationMinutes <= 12;
-    return {
-      title: sprintLabel ? 'SPRINT' : 'THE GRIND',
-      value: durationMinutes > 0
-        ? formatStampDuration(durationMinutes)
-        : calorieFallback
-          ? `${calorieFallback.totalCalories} CAL`
-          : formatDistanceValue(distanceBased?.totalDistance || 0).toUpperCase(),
-      note: durationMinutes > 0
-        ? (format === 'for_time' ? 'RFT' : 'UNBROKEN')
-        : (calorieFallback?.name || distanceBased?.name || 'ENGINE').toUpperCase(),
-      color: 'magenta',
-      rotation: -2,
-    };
-  }
-
-  return null;
-}
-
 /**
  * Clean up abbreviation dots in prescription text for display.
  * R.P.E ? RPE, R.I.R ? RIR. Preserves the AI's original casing.
  */
-export function normalizeBlueprint(text: string): string {
-  return text
-    .replace(/\bR\.P\.E\.?\b/gi, 'RPE')
-    .replace(/\bR\.I\.R\.?\b/gi, 'RIR')
-    .replace(/\bE\.M\.O\.M\.?\b/gi, 'EMOM');
-}
 
 /**
  * Extract an interval cadence label from workout text.
  * Matches "Every 03:00 min x 5", "Every 3:00 x 5", "Every 3 min x 5", etc.
  * Returns "EVERY 3:00" or "EVERY 3 MIN" — caller appends the round count.
  */
-export function extractEveryXCadence(text: string): string | undefined {
-  const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?(?:\s*[x×]|(?=\s|$))/i);
-  if (mmss) {
-    const mins = parseInt(mmss[1]);
-    const secs = parseInt(mmss[2]);
-    return secs === 0 ? `EVERY ${mins} MIN` : `EVERY ${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-  // Match "every X min" with or without trailing ×
-  const simple = text.match(/every\s+(\d+(?:\.\d+)?)\s*min(?:utes?)?\b/i);
-  if (simple) return `EVERY ${simple[1]} MIN`;
-  return undefined;
-}
-
-export function buildRewardArtifactSections(
-  exercises: Exercise[],
-  movements: MovementTotal[],
-  rawText?: string,
-  format?: WorkoutFormat,
-): ArtifactSection[] {
-  // IMPORTANT: This is the active artifact builder for single-workout reward/detail
-  // screens, including one-part metcons like "5 RFT". Multi-part carousel pages use
-  // buildPageArtifactSection below. Keep round-count, substitution, and per-round/total
-  // display fixes in both paths when changing celebration movement rows.
-  if (!movements || movements.length === 0) return [];
-
-  const mainExercise = exercises[0];
-  const capText = `${mainExercise?.name || ''} ${mainExercise?.prescription || ''} ${rawText || ''}`;
-  const capMatch = capText.match(/\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i);
-  const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
-  const isForTime = /for\s*time|\brft\b/i.test(capText);
-  const repeatCount = getPrescribedRoundCount(exercises, rawText)
-    || (mainExercise ? getPrescriptionRepeatCount(mainExercise) : undefined)
-    // Fallback: infer from prescribed-per-round vs actual totals (for_time only)
-    || (isForTime && mainExercise ? inferRoundCountFromMovements(mainExercise, movements) : undefined);
-  const everyCadence = !isForTime ? extractEveryXCadence(capText) : undefined;
-  const blueprintRaw = repeatCount && repeatCount > 1
-    ? [
-        isForTime ? (getSectionedForTimeLabel(mainExercise) || `${repeatCount} rounds for time`)
-          : everyCadence ? `${everyCadence} · ${repeatCount} rounds`
-          : `${repeatCount} rounds`,
-        timeCapLabel ? `· ${timeCapLabel}` : null,
-      ].filter(Boolean).join(' ')
-    : rawText
-      ? rawText.split('\n').map((line) => line.trim()).find(Boolean)
-      : exercises.map((exercise) => exercise.prescription).find(Boolean);
-  const blueprint = blueprintRaw ? normalizeBlueprint(blueprintRaw) : undefined;
-
-  const prescribedByName = new Map<string, { reps?: number; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2 }>();
-  const prescribedMovements = mainExercise?.sections?.length
-    ? mainExercise.sections.flatMap((section) => section.movements || [])
-    : (mainExercise?.movements || []);
-  for (const movement of prescribedMovements) {
-    prescribedByName.set(movement.name.toLowerCase(), {
-      reps: movement.reps,
-      distance: movement.distance,
-      calories: movement.calories,
-      weight: movement.rxWeights?.male || movement.rxWeights?.female,
-      implementCount: movement.implementCount,
-    });
-  }
-
-  // Barbell complex: group all movements under one header row
-  const stampRounds = exercises.length === 1
-    ? (exercises[0]?.sets?.filter(s => s.completed)?.length || exercises[0]?.sets?.length || 1)
-    : 1;
-  const complex = detectBarbellComplex(movements, stampRounds);
-  if (complex) {
-    const unit = complex.unit;
-    const startLabel = `${complex.weight}${unit.toUpperCase()}`;
-    const peakLabel = complex.weightEnd ? `${complex.weightEnd}${unit.toUpperCase()}` : startLabel;
-    const weightDisplay = complex.weightEnd ? `${startLabel} ? ${peakLabel}` : startLabel;
-    const primaryDisplay = complex.weightEnd ? `${startLabel}?${peakLabel}` : startLabel;
-    return [{
-      eyebrow: complex.complexName.toUpperCase(),
-      title: 'Complex',
-      blueprint: `${complex.totalRounds}× ${weightDisplay}`,
-      watermark: 'COMPLEX',
-      rows: [{
-        primary: primaryDisplay,
-        name: `× ${complex.totalRounds} COMPLEX`,
-        subNote: `${complex.repsPerRound} REP${complex.repsPerRound !== 1 ? 'S' : ''} EA. · ${complex.abbreviatedName}`,
-        accent: 'yellow',
-      }],
-    }];
-  }
-
-  // Re-sort movements by prescribed order (workload breakdown sorts by Trinity color, not position).
-  // Use fuzzy matching: exact ? contains ? word-overlap, to handle name variations between
-  // AI-parsed movement names and workload-computed names (e.g. "Russian Kettlebell Swing" vs
-  // "Russian KB Swing", "400m Run" vs "Run").
-  const prescribedOrder = prescribedMovements.map(m => m.name.toLowerCase());
-  const getPrescribedIndex = (movName: string): number => {
-    const n = movName.toLowerCase();
-    // 1. Exact match
-    let idx = prescribedOrder.findIndex(p => p === n);
-    if (idx !== -1) return idx;
-    // 2. One contains the other
-    idx = prescribedOrder.findIndex(p => p.includes(n) || n.includes(p));
-    if (idx !== -1) return idx;
-    // 3. Significant word overlap (=2 non-trivial words match)
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for']);
-    const words = (s: string) => s.split(/[\s\-/]+/).filter(w => w.length > 2 && !stopWords.has(w));
-    const nWords = new Set(words(n));
-    idx = prescribedOrder.findIndex(p => {
-      const shared = words(p).filter(w => nWords.has(w));
-      return shared.length >= 2 || (shared.length === 1 && nWords.size === 1 && words(p).length === 1);
-    });
-    return idx;
-  };
-  const orderedForRows = prescribedOrder.length > 1
-    ? [...movements].sort((a, b) => {
-        const ai = getPrescribedIndex(a.originalMovement ?? a.name);
-        const bi = getPrescribedIndex(b.originalMovement ?? b.name);
-        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-      })
-    : movements;
-
-  const displayBlueprint = blueprint;
-
-  // Detect IGYG single-exercise: relay (distancePerRep > 0) + AMRAP movements in same exercise
-  const isIGYG = /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(capText);
-  const relayMovement = isIGYG
-    ? movements.find(m => (m.distancePerRep ?? 0) > 0 && (m.totalDistance ?? 0) > 0)
-    : undefined;
-
-  let blueprintSub: string | undefined;
-  if (relayMovement) {
-    const perTrip = relayMovement.distancePerRep!;
-    const relayLabel = `${perTrip >= 1000 ? `${(perTrip / 1000).toFixed(1)}KM` : `${perTrip}M`} ${relayMovement.name.toUpperCase()}`;
-    const relayOriginalName = relayMovement.originalMovement?.toLowerCase() ?? relayMovement.name.toLowerCase();
-    const amrapPrescribed = prescribedMovements.filter(m =>
-      m.name.toLowerCase() !== relayMovement.name.toLowerCase() &&
-      m.name.toLowerCase() !== relayOriginalName
-    );
-    const amrapLine = formatPrescriptionMovementLine(amrapPrescribed);
-    blueprintSub = amrapLine ? `P1: ${relayLabel} ? P2: ${amrapLine}` : `RELAY: ${relayLabel}`;
-  } else {
-    blueprintSub = prescribedMovements.length > 0
-      ? formatPrescriptionMovementLine(prescribedMovements)
-      : undefined;
-  }
-
-  const movementRepeatCounts = getSectionedMovementRepeatCounts(mainExercise);
-  const rows = orderedForRows.map((movement): ArtifactRow => {
-    const prescribed = prescribedByName.get(movement.name.toLowerCase())
-      ?? (movement.originalMovement ? prescribedByName.get(movement.originalMovement.toLowerCase()) : undefined);
-    const parsedMovement = mainExercise?.movements?.find((candidate) => {
-      const candidateName = candidate.name.toLowerCase();
-      const movName = movement.name.toLowerCase();
-      const origName = movement.originalMovement?.toLowerCase();
-      // Exact match first; then allow the stored exercise name to be a compound that
-      // STARTS WITH the workload name (e.g. "Power Clean to Push Press" starting with
-      // "Power Clean") — the AI sometimes truncates compound names in the workload key.
-      return candidateName === movName
-        || candidateName === origName
-        || candidateName.startsWith(movName + ' ')
-        || (origName != null && candidateName.startsWith(origName + ' '));
-    });
-
-    return buildCelebrationMovementRow({
-      movementName: parsedMovement
-        ? getMovementDisplayNameFromContext(parsedMovement, capText)
-        : movement.name,
-      prescribed,
-      actual: movement,
-      repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? repeatCount,
-    });
-  });
-
-  if (shouldLogCelebrationDebug()) {
-    console.warn('[CelebrationDebug:v20260503-single-artifact]', {
-      path: 'buildRewardArtifactSections',
-      rawText,
-      exercises: exercises.map((exercise) => ({
-        name: exercise.name,
-        prescription: exercise.prescription,
-        rounds: exercise.rounds,
-        movementNames: exercise.movements?.map((movement) => movement.name),
-      })),
-      repeatCount,
-      blueprint,
-      inputMovements: movements.map((movement) => ({
-        name: movement.name,
-        totalReps: movement.totalReps,
-        totalDistance: movement.totalDistance,
-        totalCalories: movement.totalCalories,
-        weight: movement.weight,
-        unit: movement.unit,
-        wasSubstituted: movement.wasSubstituted,
-        originalMovement: movement.originalMovement,
-        distancePerRep: movement.distancePerRep,
-      })),
-      rows,
-    });
-  }
-
-  return [{
-    eyebrow: isIGYG ? 'I GO YOU GO' : isForTime ? 'FOR TIME' : format === 'emom' ? undefined : 'METCON',
-    title: 'Blueprint',
-    blueprint: displayBlueprint ?? undefined,
-    blueprintSub,
-    rows,
-    hiddenCount: 0,
-  }];
-}
-
-export function buildPageArtifactSection(
-  exercise: Exercise,
-  movements: MovementTotal[],
-  isStrength: boolean,
-  rawText?: string,
-  teamSize?: number,
-): ArtifactSection | null {
-  if (!movements || movements.length === 0) return null;
-
-  // Build station-label, prescribed-reps maps, and station order from exercise.movements
-  const stationLabelMap: Record<string, string> = {};
-  const prescribedRepsMap: Record<string, number> = {};
-  const prescribedCalsMap: Record<string, number> = {};
-  const prescribedDistMap: Record<string, number> = {};
-  const prescribedWeightMap: Record<string, number> = {};
-  const prescribedImplementMap: Record<string, 1 | 2> = {};
-  const stationOrderMap: Record<string, number> = {};
-  let stationIdx = 0;
-  const prescribedMovements = exercise.sections?.length
-    ? exercise.sections.flatMap((section) => section.movements || [])
-    : (exercise.movements || []);
-  for (const m of prescribedMovements) {
-    const key = m.name.toLowerCase();
-    if (m.stationLabel) stationLabelMap[key] = m.stationLabel;
-    if (m.reps) prescribedRepsMap[key] = m.reps;
-    if (m.calories) prescribedCalsMap[key] = m.calories;
-    if (m.distance) prescribedDistMap[key] = m.distance;
-    if (m.rxWeights?.male || m.rxWeights?.female) prescribedWeightMap[key] = m.rxWeights.male || m.rxWeights.female || 0;
-    if (m.implementCount) prescribedImplementMap[key] = m.implementCount;
-    if (!(key in stationOrderMap)) stationOrderMap[key] = stationIdx++;
-  }
-  const hasStations = Object.keys(stationLabelMap).length > 0;
-
-  // Always sort by prescription position (stationOrderMap covers all movements, not just stations).
-  // Breakdown movements are Trinity-color sorted; this restores the original whiteboard order.
-  const orderedMovements = [...movements].sort((a, b) => {
-    const aPos = stationOrderMap[a.name.toLowerCase()]
-      ?? (a.originalMovement ? stationOrderMap[a.originalMovement.toLowerCase()] : undefined)
-      ?? 999;
-    const bPos = stationOrderMap[b.name.toLowerCase()]
-      ?? (b.originalMovement ? stationOrderMap[b.originalMovement.toLowerCase()] : undefined)
-      ?? 999;
-    return aPos - bPos;
-  });
-
-  // Scope cap + forTime detection to this exercise only — rawText covers the whole workout
-  // and bleeds a metcon's time cap / "for time" into adjacent strength/skill sections.
-  const exerciseOnlyText = `${exercise.name || ''} ${exercise.prescription || ''}`;
-  const scopedExerciseText = exerciseOnlyText.trim() || rawText;
-  const repeatCount = getPrescribedRoundCount([exercise], scopedExerciseText)
-    || getPrescriptionRepeatCount(exercise)
-    || inferRoundCountFromMovements(exercise, movements);
-  const isTeamIGUG = !!teamSize && teamSize > 1
-    && /\b(?:teams?\s+of|i\s*go\s*y(?:ou|o?u?)\s*go|igug|partner|in\s+pairs?)\b/i.test(exerciseOnlyText);
-  const eachRoundsMatch = exerciseOnlyText.match(/\((\d+)\s*each\)/i);
-  const personalRepeatCount = isTeamIGUG
-    ? eachRoundsMatch
-      ? parseInt(eachRoundsMatch[1], 10)
-      : repeatCount && repeatCount > 1
-        ? Math.max(1, Math.round(repeatCount / teamSize))
-        : repeatCount
-    : repeatCount;
-  const capMatch = exerciseOnlyText.match(
-    /\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i
-  );
-  const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
-
-  // Compact blueprint — sentence-cased, no uppercase enforcement
-  let blueprint: string | undefined;
-  if (hasStations) {
-    const stationCount = Object.keys(stationLabelMap).length;
-    const roundsMatch = (exercise.prescription || '').match(/(\d+)\s*rounds?/i);
-    const rounds = roundsMatch ? parseInt(roundsMatch[1]) : null;
-    blueprint = [
-      rounds ? `${rounds} rounds` : null,
-      `${stationCount} stations`,
-      '1 min each',
-    ].filter(Boolean).join(' · ');
-  } else if (!isStrength && repeatCount && repeatCount > 1) {
-    const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
-    const descScheme = forTime ? parseDescLadderScheme(exercise, rawText) : undefined;
-    const pageCadence = !forTime ? extractEveryXCadence(exerciseOnlyText) : undefined;
-    const amrapMinMatch = !forTime && !pageCadence
-      ? exerciseOnlyText.match(/\b(\d+)\s*(?:min(?:ute)?s?)\s*amrap\b/i)
-      : undefined;
-    const amrapMin = amrapMinMatch ? parseInt(amrapMinMatch[1], 10) : undefined;
-    blueprint = [
-      descScheme ? `[${descScheme.join('-')}] for time`
-        : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
-        : amrapMin ? `${amrapMin} min AMRAP`
-        : pageCadence ? `${pageCadence} · ${repeatCount} rounds`
-        : `${repeatCount} rounds`,
-      timeCapLabel ? `(${timeCapLabel})` : null,
-    ].filter(Boolean).join(' ');
-  } else if (isStrength) {
-    const setCount = repeatCount
-      || exercise.sets?.filter((set) => set.completed).length
-      || exercise.sets?.length
-      || exercise.rounds;
-    blueprint = setCount && setCount > 1 ? `${setCount} sets` : 'Strength';
-  } else {
-    const raw = normalizeBlueprint(exercise.prescription || exercise.name || '');
-    const isForTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
-    if (raw.length > 55) {
-      blueprint = isForTime
-        ? (timeCapLabel ? `For time (${timeCapLabel})` : 'For time')
-        : raw.slice(0, 52) + '…';
-    } else {
-      blueprint = raw;
-    }
-  }
-  // Relay exercise detection (used for eyebrow + blueprintSub)
-  const isRelaySection = /relay/i.test(exerciseOnlyText)
-    || (movements.length === 1 && (movements[0].distancePerRep ?? 0) > 0 && !movements[0].totalReps);
-
-  // For relay sections use actual movement distance (shows substituted value); otherwise prescribed movements
-  const blueprintSub = !isStrength && !isRelaySection && prescribedMovements.length > 0
-    ? formatPrescriptionMovementLine(prescribedMovements)
-    : undefined;
-
-  // Detect descending ladder for pill track + corrected movement totals.
-  // Only applies to for-time exercises — AMRAP/EMOM etc. must not pick up bracket
-  // notation from other exercises' rawText (e.g. strength [8-7-6-5-4] bleeding in).
-  const isExerciseForTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
-  const descSchemeGlobal = !isStrength && isExerciseForTime
-    ? parseDescLadderScheme(exercise, rawText)
-    : undefined;
-  const descSchemeCompleted = descSchemeGlobal
-    ? (exercise.rounds != null && exercise.rounds < descSchemeGlobal.length
-        ? exercise.rounds
-        : descSchemeGlobal.length)
-    : undefined;
-  // For strength exercises: show rep scheme bubbles from suggestedRepsPerSet only
-  // (does NOT apply row-content overrides — those stay for-time only via descSchemeGlobal).
-  const strengthBubbleScheme = isStrength && (exercise.suggestedRepsPerSet?.length ?? 0) >= 3
-    ? exercise.suggestedRepsPerSet
-    : undefined;
-
-  const movementRepeatCounts = getSectionedMovementRepeatCounts(exercise);
-  const rows = orderedMovements.map((movement): ArtifactRow => {
-    let primary = '—';
-    let accent: ArtifactRow['accent'] = movement.color || 'magenta';
-
-    const key = movement.name.toLowerCase();
-    const stationLabel = stationLabelMap[key];
-
-    if (hasStations) {
-      // Narrative station row:
-      //   name  = "MIN 1 · POWER CLEAN"  (grey prescription label, shown at L3)
-      //   primary = "8 REPS @ 45KG"      (neon result line, monospace, shown at L2)
-      //   subNote = "32 total"            (readable total annotation)
-      const prescReps = prescribedRepsMap[key];
-      const prescCals = prescribedCalsMap[key];
-      const prescDist = prescribedDistMap[key];
-      const wUnit = movement.unit === 'lb' ? 'LB' : 'KG';
-
-      // Hero metric (L2 neon): per-round result only — "8 @ 45KG", "8 REPS", "40M", "7 CAL"
-      // Total moves to subNote as "32 total" — separate hierarchy, not one busy line.
-      const totalR = movement.totalReps || 0;
-      const totalC = movement.totalCalories || 0;
-      const totalD = movement.totalDistance || 0;
-
-      let totalNote: string | undefined;
-
-      if (prescDist && prescDist > 0) {
-        primary = prescDist >= 1000 ? `${(prescDist / 1000).toFixed(1)}KM` : `${prescDist}M`;
-        accent = 'magenta';
-        const displayTotalD = isTeamIGUG && personalRepeatCount ? prescDist * personalRepeatCount : totalD;
-        if (displayTotalD > 0 && displayTotalD !== prescDist) {
-          totalNote = displayTotalD >= 1000 ? `${(displayTotalD / 1000).toFixed(1)} km total` : `${displayTotalD}m total`;
-        }
-      } else if (prescCals && prescCals > 0) {
-        primary = `${prescCals} CAL`;
-        accent = 'magenta';
-        const displayTotalC = isTeamIGUG && personalRepeatCount ? prescCals * personalRepeatCount : totalC;
-        if (displayTotalC > 0 && displayTotalC !== prescCals) totalNote = `${displayTotalC} cal total`;
-      } else if (prescReps && prescReps > 0) {
-        if ((movement.weight || 0) > 0) {
-          // Weighted: "8 @ 45KG" — weight makes unit obvious, drop "REPS"
-          primary = `${prescReps} @ ${movement.weight}${wUnit}`;
-          accent = 'yellow';
-        } else {
-          // Bodyweight/skill: "8 REPS"
-          primary = `${prescReps} REPS`;
-        }
-        const displayTotalR = isTeamIGUG && personalRepeatCount ? prescReps * personalRepeatCount : totalR;
-        if (displayTotalR > 0 && displayTotalR !== prescReps) totalNote = `${displayTotalR} total`;
-      } else if ((movement.weight || 0) > 0) {
-        primary = `${movement.weight} ${wUnit}`;
-        accent = 'yellow';
-      }
-
-      // Grey prescription label: "MIN 1 · POWER CLEAN"
-      const prescLabel = stationLabel
-        ? `${stationLabel.toUpperCase()} · ${movement.name.toUpperCase()}`
-        : movement.name.toUpperCase();
-
-      return { primary, name: prescLabel, subNote: totalNote, accent, stationRow: true };
-    }
-
-    const prescribed = {
-      reps: prescribedRepsMap[key],
-      distance: prescribedDistMap[key],
-      calories: prescribedCalsMap[key],
-      weight: prescribedWeightMap[key],
-      implementCount: prescribedImplementMap[key],
-    };
-    const parsedMovement = exercise.movements?.find((candidate) => {
-      const candidateName = candidate.name.toLowerCase();
-      const movName = movement.name.toLowerCase();
-      const origName = movement.originalMovement?.toLowerCase();
-      return candidateName === movName
-        || candidateName === origName
-        || candidateName.startsWith(movName + ' ')
-        || (origName != null && candidateName.startsWith(origName + ' '));
-    });
-
-    const row = buildCelebrationMovementRow({
-      movementName: parsedMovement
-        ? getMovementDisplayNameFromContext(parsedMovement, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`)
-        : movement.name,
-      prescribed,
-      actual: movement,
-      repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? personalRepeatCount,
-      isStrength,
-    });
-
-    // For descending ladders: fix primary + subNote so they don't show misleading per-round reps
-    if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {
-      const isLadderMov = prescribed.reps != null && descSchemeGlobal.includes(prescribed.reps);
-      const movWeight = movement.weight ?? prescribed.weight;
-      const wUnit = movement.unit === 'lb' ? 'LB' : 'KG';
-      const isWeighted = (movWeight ?? 0) > 0;
-      if (isWeighted) {
-        row.primary = `@${movWeight}${wUnit}`;
-      } else if (movement.totalReps) {
-        row.primary = `${movement.totalReps}`;
-      }
-      if (isLadderMov) {
-        const schemeTotal = descSchemeGlobal
-          .slice(0, descSchemeCompleted)
-          .reduce((s, n) => s + n, 0);
-        row.subNote = `${schemeTotal} total`;
-      }
-    }
-
-    return row;
-  });
-
-  if (shouldLogCelebrationDebug()) {
-    console.warn('[CelebrationDebug:v20260503-page-artifact]', {
-      path: 'buildPageArtifactSection',
-      exercise: {
-        name: exercise.name,
-        prescription: exercise.prescription,
-        rounds: exercise.rounds,
-        movementNames: exercise.movements?.map((movement) => movement.name),
-      },
-      isStrength,
-      repeatCount,
-      blueprint,
-      inputMovements: movements.map((movement) => ({
-        name: movement.name,
-        totalReps: movement.totalReps,
-        totalDistance: movement.totalDistance,
-        totalCalories: movement.totalCalories,
-        weight: movement.weight,
-        unit: movement.unit,
-        wasSubstituted: movement.wasSubstituted,
-        originalMovement: movement.originalMovement,
-        distancePerRep: movement.distancePerRep,
-      })),
-      rows,
-    });
-  }
-
-  const exerciseOnlyIsIGYG = rawText ? /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(rawText) : false;
-  const sectionEyebrow = isRelaySection ? 'RELAY' : exerciseOnlyIsIGYG ? 'PARTNER AMRAP' : 'WOD';
-
-  return {
-    eyebrow: sectionEyebrow,
-    title: exercise.name,
-    blueprint,
-    blueprintSub,
-    rows,
-    hiddenCount: 0,
-    ...((descSchemeGlobal || strengthBubbleScheme) && {
-      descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
-      descLadderCompleted: descSchemeCompleted ?? strengthBubbleScheme?.length,
-    }),
-  };
-}
 
 // ============================================
 // Ladder Staircase — ascending bar chart
@@ -3199,7 +2040,6 @@ function EPBreakdownSheet({ open, onClose, ep }: {
   );
 }
 
-
 // ============================================
 // Main Component
 // ============================================
@@ -3245,7 +2085,6 @@ export function WorkoutScreen({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   const isReward = mode === 'reward';
   const [stickerConfig, setStickerConfig] = useState<CelebrationStickerConfig>(DEFAULT_CELEBRATION_STICKER_CONFIG);
 
@@ -3267,6 +2106,7 @@ export function WorkoutScreen({
   const celebrationData = useCelebrationData(mode, rewardData, workout, stickerConfig);
   const [faceId] = useState(DEFAULT_FACE_ID);
   const { savePosterCustomization } = usePosterCustomization(celebrationData.workoutId);
+  const { submitCorrection } = useWorkoutCorrection(celebrationData.workoutId);
 
   // -- Normalize data from both modes --------------------------------
 
@@ -3398,7 +2238,6 @@ export function WorkoutScreen({
     ? (rewardData?.workoutSummary?.actualTimeMinutes ?? durationMinutes)
     : durationMinutes;
   const totalSeconds = isReward ? Math.round(displayMinutes * 60) : 0;
-
 
   const activeBreakdown = workloadBreakdown;
   const activeAchievements = isReward ? rewardData?.achievements : workout?.achievements;
@@ -3535,8 +2374,6 @@ export function WorkoutScreen({
     return { ladderReps: reps, ladderStep: step, ladderPartial: amrapEx.ladderPartial };
   }, [exercises, activeBreakdown?.movements]);
 
-
-
   // -- Hero Result — via useCelebrationData ------------------------
   // Priority order (first match wins): chipper ? complex ? ladder ? multi-part ? standard
   // -- Hero Result — pick the single best show-off number (both reward + detail) --
@@ -3643,7 +2480,6 @@ export function WorkoutScreen({
   )?.weight;
 
   // hasEnginePills no longer needed (receipt card removed)
-
 
   // -- Achievement pills (reward mode) — max 2, cool language --------
 
@@ -3802,7 +2638,6 @@ export function WorkoutScreen({
   };
   void renderDifficultyChip;
 
-
   const FaceComponent = getFace(faceId).component;
   const rewardBody = (isReward || posterMode)
     ? <FaceComponent
@@ -3812,6 +2647,7 @@ export function WorkoutScreen({
         onDone={onDone}
         onEdit={isReward ? onEdit : onEditWorkout}
         onPosterCustomizationChange={savePosterCustomization}
+        onCorrection={submitCorrection}
       />
     : null;
 
@@ -4102,37 +2938,45 @@ export function WorkoutScreen({
 
                   const arrowSvg = (
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={styles.heroProgressionArrowIcon}>
-                      <path d="M3 8h10M9.5 4.5 13 8l-3.5 3.5" stroke="rgba(0,242,255,0.55)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M3 8h10M9.5 4.5 13 8l-3.5 3.5" stroke="rgba(245,194,0,0.65)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   );
 
                   return (
                     <div key={i} className={styles.heroStoryProgressionBlock}>
-                      {/* Weight ladder: 70 ? 100 kg */}
-                      <div className={styles.heroStoryProgressionChain}>
-                        {displayProgression.map((w, wi) => {
-                          const isPeakWeight = w === peak && wi > 0;
-                          return (
-                            <span key={wi} className={styles.heroStoryProgressionStep}>
-                              {wi > 0 && arrowSvg}
-                              <span className={[
-                                styles.heroStoryProgressionWeight,
-                                isPeakWeight ? styles.heroStoryProgressionPeak : '',
-                              ].filter(Boolean).join(' ')}>
-                                {w}
+                      <div className={styles.heroStrengthSetRow}>
+                        <span className={styles.heroStrengthSetName}>{line.name}</span>
+                        {line.strengthSetReps && line.strengthSetReps.length > 0 && (
+                          <span className={styles.heroStrengthRepScheme}>
+                            {line.strengthSetReps.join('-')} reps
+                          </span>
+                        )}
+                        <span className={styles.heroStoryProgressionChain}>
+                          {displayProgression.map((w, wi) => {
+                            const isPeakWeight = w === peak && wi > 0;
+                            return (
+                              <span key={wi} className={styles.heroStoryProgressionStep}>
+                                {wi > 0 && arrowSvg}
+                                <span className={[
+                                  styles.heroStoryProgressionWeight,
+                                  isPeakWeight ? styles.heroStoryProgressionPeak : '',
+                                ].filter(Boolean).join(' ')}>
+                                  {w}
+                                </span>
                               </span>
-                            </span>
-                          );
-                        })}
-                        <span className={styles.heroStoryProgressionUnit}>{line.unit ?? 'kg'}</span>
+                            );
+                          })}
+                          <span className={styles.heroStoryProgressionUnit}>{line.unit ?? 'kg'}</span>
+                        </span>
                       </div>
 
-                      {/* Burnout row: ?? 12 Back Squat @50kg */}
                       {line.burnout && (
                         <div className={styles.heroBurnoutRow}>
-                          <span className={styles.heroBurnoutIcon}>??</span>
-                          <span className={styles.heroBurnoutReps}>{line.burnout.reps}</span>
-                          <span className={styles.heroBurnoutName}>{line.name} @{line.burnout.weight}{line.unit ?? 'kg'}</span>
+                          <span className={styles.heroBurnoutLabel}>MAX ROUND</span>
+                          {line.burnout.weight > 0 && (
+                            <span className={styles.heroBurnoutWeight}>{line.burnout.weight}{line.unit ?? 'kg'}</span>
+                          )}
+                          <span className={styles.heroBurnoutReps}>{line.burnout.reps}<span> reps</span></span>
                         </div>
                       )}
 
@@ -4348,4 +3192,3 @@ export function WorkoutScreen({
     </div>
   );
 }
-

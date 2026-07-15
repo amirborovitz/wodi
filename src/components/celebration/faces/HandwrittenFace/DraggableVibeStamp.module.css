@@ -1,0 +1,8 @@
+.draggable {
+  touch-action: none;
+  cursor: grab;
+}
+
+.draggable:active {
+  cursor: grabbing;
+}

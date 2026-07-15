@@ -932,6 +932,40 @@ const fixtures: Array<{ name: string; workout: ParsedWorkout; checks: (p: Parsed
       expectReps(wb, 'American Kettlebell Swing', 36, issues, 'Mixed session');
     },
   },
+
+  // ── 21. Rep-less weighted pair line (round-alternating movements) ────────────
+  // "Push press/thrusters (alternates)" with no rep count on the board: one combined
+  // movement, no reps, weight only. It must SURVIVE the breakdown (weight-only entry) —
+  // dropping it erases the movement from the poster entirely (bug 2026-07-12).
+  {
+    name: 'Rep-less weighted pair — weight-only breakdown entry',
+    workout: {
+      title: '8 Rounds For Time',
+      type: 'for_time',
+      format: 'for_time',
+      scoreType: 'time',
+      exercises: [{
+        name: '8 Rounds For Time',
+        type: 'wod',
+        prescription: '8 rounds of: 2000m Echo Bike, alternating Push Press / Thruster, 8 Weighted Box Step-ups',
+        suggestedSets: 8,
+        loggingMode: 'for_time',
+        movements: [
+          { name: 'Echo Bike', distance: 2000, unit: 'm', inputType: 'none' },
+          { name: 'Push Press / Thruster', inputType: 'weight', equipment: 'barbell', rxWeights: { male: 35, female: 35, unit: 'kg' } },
+          { name: 'Weighted Box Step-up', reps: 8, inputType: 'weight', equipment: 'other', rxWeights: { male: 15, female: 15, unit: 'kg' } },
+        ],
+      }],
+    },
+    checks: (_p, wb, issues) => {
+      const pair = wb.movements.find(m => m.name === 'Push Press / Thruster');
+      if (!pair) issues.push('Pair: weight-only movement dropped from breakdown');
+      else if (pair.weight !== 35) issues.push(`Pair: expected weight 35, got ${pair.weight}`);
+      else if (pair.totalReps) issues.push(`Pair: must not invent reps, got ${pair.totalReps}`);
+      expectReps(wb, 'Weighted Box Step-up', 64, issues, 'Pair fixture');
+      expectDistance(wb, 'Echo Bike', 16000, issues, 'Pair fixture');
+    },
+  },
 ];
 
 // ── Run all fixtures ───────────────────────────────────────────────────────────

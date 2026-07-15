@@ -1,0 +1,347 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "2 x 5 rounds for time (24 MIN CAP)",
+      "rows": [],
+      "isPartnerConfirmed": false
+    },
+    {
+      "title": "A · 5 ROUNDS",
+      "rows": [
+        {
+          "primary": "10 CAL Echo Bike",
+          "name": "",
+          "totalNote": "50 cal total",
+          "mineKey": "Echo Bike",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "primary": "10 Push Presses @ 35/50kg",
+          "name": "",
+          "totalNote": "50 total",
+          "mineKey": "Push Press",
+          "accent": "yellow"
+        },
+        {
+          "primary": "10 T2B",
+          "name": "",
+          "totalNote": "50 total",
+          "mineKey": "Toes to Bar",
+          "suppressMine": true,
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": false
+    },
+    {
+      "title": "B · 5 ROUNDS",
+      "rows": [
+        {
+          "primary": "10 Dips / Push Ups",
+          "name": "",
+          "totalNote": "50 total",
+          "mineKey": "Dips",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "primary": "10 Sumo Deadlift High Pulls @ 35/50kg",
+          "name": "",
+          "totalNote": "50 total",
+          "mineKey": "Sumo Deadlift High Pull",
+          "accent": "yellow"
+        },
+        {
+          "primary": "20 Air Squats",
+          "name": "",
+          "totalNote": "100 total",
+          "mineKey": "Air Squats",
+          "suppressMine": true,
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "2 x 5 rounds for time (24 MIN CAP)",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "A · 5 ROUNDS",
+        "rows": [
+          {
+            "primary": "10 CAL Echo Bike",
+            "name": "",
+            "totalNote": "50 cal total",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "10 Push Presses @ 35/50kg",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Push Press",
+            "accent": "yellow"
+          },
+          {
+            "primary": "10 T2B",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "B · 5 ROUNDS",
+        "rows": [
+          {
+            "primary": "10 Dips / Push Ups",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Dips",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "10 Sumo Deadlift High Pulls @ 35/50kg",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Sumo Deadlift High Pull",
+            "accent": "yellow"
+          },
+          {
+            "primary": "20 Air Squats",
+            "name": "",
+            "totalNote": "100 total",
+            "mineKey": "Air Squats",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "30:00",
+    "unit": "MIN",
+    "formatLine": "For Time",
+    "storyLine": "50 echo bike cals · 50 push press · 50 ttb · 50 dips · 50 sumo deadlift high pull · 100 air squats",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×5 ROUNDS"
+      },
+      {
+        "perRound": "200m",
+        "name": "Echo Bike",
+        "total": "1.0km total",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutedPerRound": "25 cal"
+      },
+      {
+        "perRound": "10",
+        "name": "Push Press",
+        "total": "50 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Toes to Bar",
+        "total": "50 total",
+        "color": "cyan",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×5 ROUNDS"
+      },
+      {
+        "perRound": "10",
+        "name": "Dips",
+        "total": "50 total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Sumo Deadlift High Pull",
+        "total": "50 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Air Squats",
+        "total": "100 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "2 X 5 ROUNDS FOR TIME (24 MIN CAP)",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "A · 5 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 CAL Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "50 cal total"
+      },
+      {
+        "kind": "line",
+        "rx": "10 Push Presses @ 35/50kg",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "50 total"
+      },
+      {
+        "kind": "line",
+        "rx": "10 T2B",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "50 total"
+      },
+      {
+        "kind": "block",
+        "label": "B · 5 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 Dips / Push Ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "50 total"
+      },
+      {
+        "kind": "line",
+        "rx": "10 Sumo Deadlift High Pulls @ 35/50kg",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "50 total"
+      },
+      {
+        "kind": "line",
+        "rx": "20 Air Squats",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "100 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "2 X 5 ROUNDS FOR TIME (24 MIN CAP)",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "A · 5 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 CAL Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "50 cal total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Push Presses @ 35/50kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "block",
+          "label": "B · 5 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Dips / Push Ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Sumo Deadlift High Pulls @ 35/50kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Air Squats",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "100 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

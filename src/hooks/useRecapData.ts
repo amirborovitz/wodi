@@ -13,6 +13,7 @@ export interface RecapFeltStat {
 }
 
 export interface RecapData {
+  id: string;
   scope: 'month' | 'season';
   label: string;
   period: string;
@@ -32,8 +33,14 @@ export interface RecapData {
 }
 
 export interface UseRecapDataResult {
+  /** All completed-period recaps, newest first (season before month on ties). */
+  recaps: RecapData[];
+  /** Recap for the immediately previous calendar month, if it had workouts. */
   monthRecap: RecapData | null;
+  /** Recap for the immediately previous quarter, if it had workouts. */
   seasonRecap: RecapData | null;
+  /** Ids of current-drop recaps (last month / last season) not yet opened. */
+  newRecapIds: string[];
 }
 
 const MONTH_NAMES = [
@@ -56,9 +63,18 @@ function tonnageComp(kg: number): string {
   return 'more than you think';
 }
 
+function monthRecapId(year: number, month: number): string {
+  return `month-${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+function seasonRecapId(year: number, quarter: number): string {
+  return `season-${year}-q${quarter + 1}`;
+}
+
 function buildRecap(
   ws: WorkoutWithStats[],
   scope: 'month' | 'season',
+  id: string,
   period: string,
   periodSub: string,
   year: number,
@@ -117,6 +133,7 @@ function buildRecap(
   const tagline = scope === 'month' ? 'your month, felt' : `season ${year}`;
 
   return {
+    id,
     scope,
     label: scope === 'month' ? 'THE MONTH' : 'THE SEASON',
     period,
@@ -150,41 +167,76 @@ export function getPersonaName(data: RecapData): string {
   return PERSONA_NAMES[data.felt[0].vibe];
 }
 
+const RECAP_VIEWED_PREFIX = 'wodi_recap_viewed_';
+
+export function isRecapViewed(data: RecapData): boolean {
+  return localStorage.getItem(RECAP_VIEWED_PREFIX + data.id) === '1';
+}
+
+export function markRecapViewed(data: RecapData): void {
+  localStorage.setItem(RECAP_VIEWED_PREFIX + data.id, '1');
+}
+
 export function useRecapData(workouts: WorkoutWithStats[]): UseRecapDataResult {
   return useMemo(() => {
     const now = new Date();
+    const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const curQuarter = Math.floor(now.getMonth() / 3);
+    const curQuarterStart = new Date(now.getFullYear(), curQuarter * 3, 1);
 
-    // Last calendar month
+    // Bucket workouts into every completed month / quarter (current period excluded)
+    const monthBuckets = new Map<string, { y: number; m: number; ws: WorkoutWithStats[] }>();
+    const seasonBuckets = new Map<string, { y: number; q: number; ws: WorkoutWithStats[] }>();
+    for (const w of workouts) {
+      const y = w.date.getFullYear();
+      const m = w.date.getMonth();
+      if (w.date < curMonthStart) {
+        const key = monthRecapId(y, m);
+        const bucket = monthBuckets.get(key) ?? { y, m, ws: [] };
+        bucket.ws.push(w);
+        monthBuckets.set(key, bucket);
+      }
+      if (w.date < curQuarterStart) {
+        const q = Math.floor(m / 3);
+        const key = seasonRecapId(y, q);
+        const bucket = seasonBuckets.get(key) ?? { y, q, ws: [] };
+        bucket.ws.push(w);
+        seasonBuckets.set(key, bucket);
+      }
+    }
+
+    const entries: { data: RecapData; end: number }[] = [];
+    for (const { y, m, ws } of monthBuckets.values()) {
+      entries.push({
+        data: buildRecap(ws, 'month', monthRecapId(y, m), MONTH_NAMES[m], String(y), y),
+        end: new Date(y, m + 1, 0).getTime(),
+      });
+    }
+    for (const { y, q, ws } of seasonBuckets.values()) {
+      const info = SEASON_LABELS[q];
+      entries.push({
+        data: buildRecap(ws, 'season', seasonRecapId(y, q), info.name, `${info.sub} ${y}`, y),
+        end: new Date(y, q * 3 + 3, 0).getTime(),
+      });
+    }
+    entries.sort((a, b) =>
+      b.end - a.end
+      || (a.data.scope === 'season' ? 0 : 1) - (b.data.scope === 'season' ? 0 : 1),
+    );
+    const recaps = entries.map(e => e.data);
+
+    // Current drops: the immediately previous month / quarter only
     const lastMonthNum = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
     const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const mStart = new Date(lastMonthYear, lastMonthNum, 1);
-    const mEnd = new Date(lastMonthYear, lastMonthNum + 1, 0, 23, 59, 59, 999);
-    const monthWs = workouts.filter(w => w.date >= mStart && w.date <= mEnd);
+    const lastQ = curQuarter === 0 ? 3 : curQuarter - 1;
+    const lastQYear = curQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const monthRecap = recaps.find(r => r.id === monthRecapId(lastMonthYear, lastMonthNum)) ?? null;
+    const seasonRecap = recaps.find(r => r.id === seasonRecapId(lastQYear, lastQ)) ?? null;
 
-    const monthRecap = monthWs.length >= 1
-      ? buildRecap(monthWs, 'month', MONTH_NAMES[lastMonthNum], String(lastMonthYear), lastMonthYear)
-      : null;
+    const newRecapIds = [monthRecap, seasonRecap]
+      .filter((d): d is RecapData => d !== null && !isRecapViewed(d))
+      .map(d => d.id);
 
-    // Last season (quarter)
-    const curQ = Math.floor(now.getMonth() / 3);
-    const lastQ = curQ === 0 ? 3 : curQ - 1;
-    const lastQYear = curQ === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const qMonthStart = lastQ * 3;
-    const sStart = new Date(lastQYear, qMonthStart, 1);
-    const sEnd = new Date(lastQYear, qMonthStart + 3, 0, 23, 59, 59, 999);
-    const seasonWs = workouts.filter(w => w.date >= sStart && w.date <= sEnd);
-    const seasonInfo = SEASON_LABELS[lastQ];
-
-    const seasonRecap = seasonWs.length >= 1
-      ? buildRecap(
-          seasonWs,
-          'season',
-          seasonInfo.name,
-          `${seasonInfo.sub} ${lastQYear}`,
-          lastQYear,
-        )
-      : null;
-
-    return { monthRecap, seasonRecap };
+    return { recaps, monthRecap, seasonRecap, newRecapIds };
   }, [workouts]);
 }

@@ -15,7 +15,9 @@ import type {
   Exercise,
   MovementTotal,
   PosterSkinId,
+  PosterSticker,
   PosterVibeKey,
+  PosterVibeOffset,
   WorkloadBreakdown,
   WorkoutFormat,
 } from '../types';
@@ -45,7 +47,8 @@ import {
   // Pure computation functions
   computeHeroResult,
   buildRewardArtifactSections,
-  buildPageArtifactSection,
+  buildPageArtifactSections,
+  isStrengthPagePart,
   // Pure helpers re-exported for callers that need them
   detectBarbellComplex,
   getPrescribedRoundCount,
@@ -71,12 +74,12 @@ import {
   getSectionedMovementRepeatCounts,
   getSectionedForTimeLabel,
   findMovementTotal,
-  findBreakdownForParsedMovement,
   parseDescLadderScheme,
   repairUndercountedBreakdown,
   getEngineThresholdStamp,
   BARBELL_PATTERNS,
 } from '../components/celebration/helpers';
+import { achievementMatchesMovementList } from '../components/celebration/faces/HandwrittenFace/posterData';
 
 // Re-export helpers for callers that need them directly
 export {
@@ -104,7 +107,6 @@ export {
   getSectionedMovementRepeatCounts,
   getSectionedForTimeLabel,
   findMovementTotal,
-  findBreakdownForParsedMovement,
   parseDescLadderScheme,
   repairUndercountedBreakdown,
   getEngineThresholdStamp,
@@ -123,6 +125,9 @@ export interface CarouselPage {
 export interface CelebrationData {
   // Raw inputs normalised from both modes
   exercises: Exercise[];
+  // DISPLAY format: when the poster leads with exactly one main part, this is that part's own
+  // format (loggingMode-first) — NOT necessarily the persisted session `format`, which is only
+  // authoritative for EP/aggregate math and can describe a different (secondary) part.
   workoutFormat: WorkoutFormat | undefined;
   rawText: string | undefined;
   durationMinutes: number;
@@ -134,6 +139,8 @@ export interface CelebrationData {
   workoutId: string | undefined;
   posterSkin: PosterSkinId | undefined;
   posterVibe: PosterVibeKey | undefined;
+  posterSticker: PosterSticker | undefined;
+  posterVibeOffset: PosterVibeOffset | undefined;
 
   // Layout decision
   posterLayout: PosterLayout;
@@ -149,7 +156,7 @@ export interface CelebrationData {
 
   // Carousel pages (null when single-page)
   carouselPageData: CarouselPage[] | null;
-  perPageSections: (ArtifactSection | null)[] | null;
+  perPageSections: ArtifactSection[][] | null;
   perPageStamps: (HighlightStampData | null)[] | null;
   perPageHeroResults: HeroResult[] | null;
 
@@ -261,26 +268,6 @@ function inferPosterDifficultyLevel(params: {
   return Math.max(1, Math.min(10, score));
 }
 
-function normalizeStampMovementName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
-function achievementMatchesMovementList(
-  achievement: NonNullable<RewardData['achievements']>[number],
-  movements: MovementTotal[],
-): boolean {
-  if (!achievement.movement) return false;
-  const achievementName = normalizeStampMovementName(achievement.movement);
-  return movements.some((m) => {
-    const movementName = normalizeStampMovementName(m.name);
-    return (
-      movementName === achievementName
-      || movementName.includes(achievementName)
-      || achievementName.includes(movementName)
-    );
-  });
-}
-
 /**
  * Is this exercise one of the session's main parts (vs. a secondary/auxiliary block like a
  * warm-up or body-armor circuit)? Trusts the AI's explicit `isSecondary` when present; for
@@ -291,73 +278,27 @@ function isMainPart(ex: Exercise): boolean {
   return ex.type !== 'skill';
 }
 
-function hasPartnerLanguage(text: string): boolean {
-  return /\bpartner\b|\bin pairs\b|\bpairs\b|\bteams?\s+of\s+\d+\b|\b\d+[- ]person\b|\bigug\b|\bigyg\b|\bi\s*go\s*you\s*go\b|\bgroups?\s+of\s+\d+\b/i.test(text);
-}
-
-function hasForTimeLanguage(text: string, workoutFormat?: WorkoutFormat): boolean {
-  return workoutFormat === 'for_time' || /for\s*time|\brft\b|\b\d+\s*rounds?\s+for\s+time\b/i.test(text);
-}
-
-function getSectionRoundCount(exercise: Exercise): number | undefined {
-  return getPrescribedRoundCount([exercise], `${exercise.rawText ?? ''} ${exercise.name} ${exercise.prescription}`)
-    ?? getPrescriptionRepeatCount(exercise)
-    ?? exercise.rounds
-    ?? exercise.sets?.filter((set) => set.completed).length
-    ?? exercise.sets?.length;
-}
-
-function buildPosterOnlySectionedPartnerExercise(
-  mainExercises: Exercise[],
-  rawText: string | undefined,
-  workoutFormat: WorkoutFormat | undefined,
-  teamSize: number | undefined,
-  displayMinutes: number,
-): Exercise | null {
-  if (mainExercises.length <= 1) return null;
-  if (!teamSize || teamSize <= 1) return null;
-  if (mainExercises.some((exercise) => exercise.type === 'strength' || exercise.type === 'skill')) return null;
-
-  const combinedText = [
-    rawText ?? '',
-    ...mainExercises.map((exercise) => `${exercise.rawText ?? ''} ${exercise.name} ${exercise.prescription}`),
-  ].join('\n');
-  if (!hasPartnerLanguage(combinedText) || !hasForTimeLanguage(combinedText, workoutFormat)) return null;
-
-  const sections = mainExercises.map((exercise) => {
-    const sectionMovements = exercise.sections?.length
-      ? exercise.sections.flatMap((section) => section.movements ?? [])
-      : (exercise.movements ?? []);
-    const rounds = getSectionRoundCount(exercise);
-    return sectionMovements.length > 0 && rounds && rounds > 0
-      ? { sectionType: 'rounds' as const, rounds, movements: sectionMovements }
-      : null;
-  });
-
-  if (sections.some((section) => section === null)) return null;
-
-  return {
-    ...mainExercises[0],
-    id: `${mainExercises[0].id}-sectioned-partner-poster`,
-    name: 'Partner WOD',
-    prescription: `${sections.length} sections for time`,
-    movements: sections.flatMap((section) => section!.movements),
-    sections: sections.map((section) => section!),
-    rounds: undefined,
-    sets: displayMinutes > 0
-      ? [{
-          id: 'set-0',
-          setNumber: 1,
-          time: Math.round(displayMinutes * 60),
-          completed: true,
-        }]
-      : mainExercises.flatMap((exercise) => exercise.sets ?? []),
-    partnerWorkout: true,
-    partnerSplit: 'reps',
-    rawText: combinedText,
-    aiPartName: undefined,
-    partNameOverride: undefined,
-  };
+/**
+ * Movements from the workload breakdown that belong to the given exercises (matched by
+ * exercise name, prescribed movement names, or substitution origin). Parts are standalone
+ * practices: a poster section rendering one part must never receive a sibling part's movements.
+ */
+function movementsForExercises(target: Exercise[], all: MovementTotal[]): MovementTotal[] {
+  const names = new Set<string>();
+  for (const ex of target) {
+    names.add(ex.name.toLowerCase());
+    const prescribed = ex.sections?.length
+      ? ex.sections.flatMap((section) => section.movements ?? [])
+      : (ex.movements ?? []);
+    for (const m of prescribed) names.add(m.name.toLowerCase());
+  }
+  const scoped = all.filter((m) =>
+    names.has(m.name.toLowerCase())
+    || (m.originalMovement != null && names.has(m.originalMovement.toLowerCase())),
+  );
+  // Name-matching failed entirely (aliases, renames) — a wrongly-empty poster is worse than
+  // the unscoped list, so fall back rather than render nothing.
+  return scoped.length > 0 ? scoped : all;
 }
 
 // ─── The hook ─────────────────────────────────────────────────────────────────
@@ -392,6 +333,21 @@ export function useCelebrationData(
     ? rewardData?.heroAchievement?.type === 'pr'
     : workout?.isPR;
 
+  // ── Session team size — the ONE source for every partner gate ──────────────
+  // AI-set field first; else inferred from the workout TITLE + raw text. The title matters:
+  // boards often carry the partner designation only as a heading ("Partner WOD"), which the
+  // AI may drop from rawText while keeping it as the workout title. Every consumer (hero,
+  // artifact sections, carousel pages, squad tag) reads this same value so the poster's
+  // partner treatment can never disagree with itself. Per-block partner CONFIRMATION still
+  // happens inside detectPartnerSplit against each block's own text.
+  const workoutTitleText: string | undefined = isReward
+    ? rewardData?.workoutSummary?.title
+    : workout?.title;
+  const sessionTeamSize: number | undefined =
+    rewardData?.teamSize
+    ?? workout?.teamSize
+    ?? inferTeamSizeFromText([workoutTitleText, rawText].filter(Boolean).join('\n'));
+
   // The workout's actual date — never "now at render time". Reward mode carries it on
   // rewardData (set at save time); detail mode reads the persisted Firestore field.
   const workoutDate: Date = (isReward ? rewardData?.date : workout?.date) ?? new Date();
@@ -405,6 +361,8 @@ export function useCelebrationData(
   const workoutId: string | undefined = isReward ? rewardData?.workoutId : workout?.id;
   const posterSkin: PosterSkinId | undefined = workout?.posterSkin;
   const posterVibe: PosterVibeKey | undefined = workout?.posterVibe;
+  const posterSticker: PosterSticker | undefined = workout?.posterSticker;
+  const posterVibeOffset: PosterVibeOffset | undefined = workout?.posterVibeOffset;
 
   const activeAchievements: Achievement[] | undefined = isReward
     ? rewardData?.achievements
@@ -428,57 +386,35 @@ export function useCelebrationData(
 
   // ── Workload breakdown ────────────────────────────────────────────────────
 
+  // Single source of truth: for reward mode, use the breakdown computed at save time (fresh,
+  // built by this same code). For detail mode (viewing a saved workout), ALWAYS recompute from
+  // workout.exercises via calculateWorkloadFromExercises — never trust+patch the persisted
+  // workout.workloadBreakdown snapshot, which can go stale relative to the current calculation
+  // logic (e.g. weightProgression) and was previously "enriched" via fragile per-exercise name
+  // matching that silently no-op'd for many real shapes, leaving the row's value stale while the
+  // hero (which always re-scans exercise.sets directly) stayed correct. One computation, one
+  // result, for both.
+  // Single source of truth PER PART: the stored workout.workloadBreakdown was built at save
+  // time by calculateWorkloadBreakdown, which correctly expands each exercise's own
+  // movements[]/sections[] (strength vs metcon parts are handled independently there — one
+  // part's structure never leaks into another's). calculateWorkloadFromExercises is a much
+  // narrower fallback: it only aggregates by exercise.name + exercise.sets and has no concept
+  // of a movements[] sub-structure at all, so using it as the PRIMARY source (as a previous
+  // pass here did) silently collapsed every multi-movement metcon exercise into one garbage
+  // row keyed off the exercise's own name. Trust the stored breakdown when it exists; only
+  // recompute from raw exercises when there's truly nothing stored to fall back to.
   const activeBreakdown = useMemo((): WorkloadBreakdown | null => {
-    const sourceExercises = isReward ? rewardData?.exercises : workout?.exercises;
     if (isReward) {
       const rewardBreakdown = rewardData?.workloadBreakdown;
-      return rewardBreakdown && sourceExercises
-        ? repairUndercountedBreakdown(rewardBreakdown, sourceExercises)
+      return rewardBreakdown && rewardData?.exercises
+        ? repairUndercountedBreakdown(rewardBreakdown, rewardData.exercises)
         : rewardBreakdown ?? null;
     }
     if (workout?.workloadBreakdown) {
       const stored = workout.workloadBreakdown;
-      const enrichedMovements = stored.movements.map((mov) => {
-        const enriched = { ...mov };
-        if (workout.exercises) {
-          for (const ex of workout.exercises) {
-            const isDirectMatch = ex.name.toLowerCase() === mov.name.toLowerCase();
-            const isSingleMovementMatch =
-              (ex.movements?.length ?? 0) === 1
-              && ex.movements?.[0]?.name.toLowerCase() === mov.name.toLowerCase();
-            if (isDirectMatch || isSingleMovementMatch) {
-              const perSetWeights: number[] = [];
-              let setVolume = 0;
-              let setReps = 0;
-              for (const set of ex.sets) {
-                if (set.weight) {
-                  perSetWeights.push(set.weight);
-                  setVolume += set.weight * (set.actualReps ?? 0);
-                  setReps += set.actualReps ?? 0;
-                }
-              }
-              if (
-                perSetWeights.length > 1
-                && !perSetWeights.every((w) => w === perSetWeights[0])
-              ) {
-                enriched.weightProgression = perSetWeights;
-                if (setReps > 0 && setVolume > 0) {
-                  enriched.weight = setVolume / setReps;
-                }
-              }
-              break;
-            }
-          }
-        }
-        return enriched;
-      });
-      const enrichedBreakdown: WorkloadBreakdown = {
-        ...stored,
-        movements: assignMovementColors(enrichedMovements),
-      };
-      return sourceExercises
-        ? repairUndercountedBreakdown(enrichedBreakdown, sourceExercises)
-        : enrichedBreakdown;
+      return workout.exercises
+        ? repairUndercountedBreakdown(stored, workout.exercises)
+        : stored;
     }
     if (workout?.exercises && workout.exercises.length > 0) {
       const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
@@ -737,7 +673,7 @@ export function useCelebrationData(
       const candidates: WCandidate[] = (
         exercise?.movements
           ?.map((movement) => {
-            const actual = findBreakdownForParsedMovement(movement, allBreakdown);
+            const actual = findMovementTotal(allBreakdown, movement.name);
             const weight =
               actual?.weight ?? movement.rxWeights?.male ?? movement.rxWeights?.female;
             if (!weight || weight <= 0) return null;
@@ -797,25 +733,21 @@ export function useCelebrationData(
   // are shaping concerns for ONE exercise's own page, not a reason to collapse a session with
   // multiple main parts (e.g. strength + metcon) into one combined poster. The carousel's
   // per-page builders already handle ladder/chipper/complex shaping for whichever page needs it.
-  const baseMainExercises = useMemo((): Exercise[] => exercises.filter(isMainPart), [exercises]);
+  // One exercise = one part, decided once at segmentation (the unit of a part is the SCORE).
+  // No poster-layer regrouping: a session with several main parts renders one page per part.
+  const posterMainExercises = useMemo((): Exercise[] => exercises.filter(isMainPart), [exercises]);
 
-  const sectionedPartnerPosterExercise = useMemo(
-    () => buildPosterOnlySectionedPartnerExercise(
-      baseMainExercises,
-      rawText,
-      workoutFormat,
-      rewardData?.teamSize ?? workout?.teamSize ?? inferTeamSizeFromText(rawText),
-      displayMinutes,
-    ),
-    [baseMainExercises, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize, displayMinutes],
-  );
-
-  const posterMainExercises = useMemo(
-    (): Exercise[] => sectionedPartnerPosterExercise
-      ? [sectionedPartnerPosterExercise]
-      : baseMainExercises,
-    [sectionedPartnerPosterExercise, baseMainExercises],
-  );
+  // ── Display format — parts are standalone practices ────────────────────────
+  // When the poster leads with exactly ONE main part, that part's own format (loggingMode
+  // first, then its own text — see inferWorkoutFormatForExercise) IS the workout's display
+  // format. The persisted session `format` describes the merge's primary part and can disagree
+  // with the part the poster is actually about (e.g. a secondary skill EMOM stamping 'emom'
+  // over a for_time metcon). Every DISPLAY decision (hero, poster pill, footer, vibe label)
+  // reads THIS value; the session format remains authoritative only for EP/aggregate math
+  // (session-scoped by design) and as the fallback inside the inference for legacy docs.
+  const mainFormat: WorkoutFormat | undefined = posterMainExercises.length === 1
+    ? inferWorkoutFormatForExercise(posterMainExercises[0], workoutFormat)
+    : workoutFormat;
 
   const posterLayout: PosterLayout = (() => {
     if (posterMainExercises.length > 1) return 'multi-part';
@@ -834,7 +766,7 @@ export function useCelebrationData(
     const allMovements = activeBreakdown?.movements ?? [];
 
     return posterMainExercises.map((ex): CarouselPage => {
-      const isStrength = ex.type === 'strength' || ex.type === 'skill';
+      const isStrength = isStrengthPagePart(ex);
       const exNameLower = ex.name.toLowerCase();
       const subNames = new Set((ex.movements ?? []).map((m) => m.name.toLowerCase()));
 
@@ -882,24 +814,28 @@ export function useCelebrationData(
     const prAch = activeAchievements?.find((a) => a.type === 'pr' && a.movement && a.value);
     const prMovementName = prAch?.movement;
     const prWeight = prAch?.value;
-    const teamSize = isReward
-      ? (rewardData?.teamSize ?? workout?.teamSize)
-      : workout?.teamSize;
+    const teamSize = sessionTeamSize;
     const movements = activeBreakdown?.movements ?? [];
     const heroRawText = isReward ? rewardData?.workoutRawText : workout?.rawText;
     // Only reached when there's at most 1 main part — exclude any secondary exercise (e.g. a
     // warm-up) so it can never be mistaken for "the metcon" just because it comes first and
     // isn't type:'strength'.
     const mainExercises = posterMainExercises;
+    // The hero speaks for the part the poster renders — summing a sibling accessory block's
+    // reps into it produces a number traceable to nothing on the poster (same scoping rule
+    // as artifactSections).
+    const heroMovements = exercises.length > mainExercises.length && mainExercises.length > 0
+      ? movementsForExercises(mainExercises, movements)
+      : movements;
 
     return computeHeroResult(
       mainExercises.length > 0 ? mainExercises : exercises,
-      workoutFormat,
+      mainFormat,
       totalVolume,
       totalEP,
       durationMinutes,
       isPR ?? false,
-      movements,
+      heroMovements,
       undefined,
       prMovementName,
       prWeight,
@@ -918,7 +854,7 @@ export function useCelebrationData(
     isPR,
     activeBreakdown,
     activeAchievements,
-    workoutFormat,
+    mainFormat,
   ]);
 
   // ── Vibe label & display title ────────────────────────────────────────────
@@ -926,14 +862,14 @@ export function useCelebrationData(
   const rewardVibeLabel = useMemo(
     () =>
       getRewardVibeLabel(
-        workoutFormat,
+        mainFormat,
         totalReps,
         durationMinutes,
         totalDistance,
         totalCalories,
         !!(ladderData && ladderData.ladderStep > 0),
       ),
-    [workoutFormat, totalReps, durationMinutes, totalDistance, totalCalories, ladderData],
+    [mainFormat, totalReps, durationMinutes, totalDistance, totalCalories, ladderData],
   );
 
   const baseTitle = isReward
@@ -950,7 +886,7 @@ export function useCelebrationData(
         activeBreakdown?.movements ?? [],
         activeAchievements,
         exercises,
-        workoutFormat,
+        mainFormat,
         durationMinutes,
         undefined,
         stickerConfig,
@@ -959,7 +895,7 @@ export function useCelebrationData(
       activeBreakdown?.movements,
       activeAchievements,
       exercises,
-      workoutFormat,
+      mainFormat,
       durationMinutes,
       stickerConfig,
     ],
@@ -1069,21 +1005,28 @@ export function useCelebrationData(
       // buildRewardArtifactSections' mainExercise is always the actual main part, not whichever
       // exercise happens to be listed first.
       const mainExercises = posterMainExercises;
-      // Explicit AI-set field only — matches posterTeamSize below (the value that actually
-      // drives the poster's visible partner gate). No text-inference fallback here: this feeds
-      // partner-split DISPLAY decisions, and an inferred teamSize disagreeing with the value the
-      // rest of the poster trusts is exactly how a solo-looking poster could get partner-shaped
-      // row math from a stray "partner" mention elsewhere in rawText.
-      const teamSize = rewardData?.teamSize ?? workout?.teamSize;
+      // sessionTeamSize is the single partner gate shared with posterTeamSize below — the old
+      // AI-field-only rule existed so this memo could never disagree with the visible gate;
+      // sharing one (title-aware) value preserves that invariant while letting title-only
+      // partner boards ("Partner WOD") render as partner workouts.
+      const teamSize = sessionTeamSize;
+      const sectionExercises = mainExercises.length > 0 ? mainExercises : exercises;
+      const allMovements = activeBreakdown?.movements ?? [];
+      // The breakdown spans the whole session — when sibling parts exist (e.g. a secondary
+      // accessory block), scope the movements to the exercises this artifact actually renders,
+      // or the sibling's movements leak into this part's prescription list.
+      const scopedMovements = exercises.length > sectionExercises.length
+        ? movementsForExercises(sectionExercises, allMovements)
+        : allMovements;
       return buildRewardArtifactSections(
-        mainExercises.length > 0 ? mainExercises : exercises,
-        activeBreakdown?.movements ?? [],
+        sectionExercises,
+        scopedMovements,
         rawText,
-        workoutFormat,
         teamSize,
+        workoutTitleText,
       );
     },
-    [exercises, posterMainExercises, activeBreakdown?.movements, rawText, workoutFormat, rewardData?.teamSize, workout?.teamSize],
+    [exercises, posterMainExercises, activeBreakdown?.movements, rawText, workoutFormat, sessionTeamSize, workoutTitleText],
   );
 
   // ── Per-page carousel data ────────────────────────────────────────────────
@@ -1103,12 +1046,29 @@ export function useCelebrationData(
     );
   }, [carouselPageData, activeAchievements, workoutFormat, durationMinutes, stickerConfig]);
 
+  const perPageSections = useMemo((): ArtifactSection[][] | null => {
+    if (!carouselPageData) return null;
+    const teamSize = sessionTeamSize;
+    // rawText is shared across every page/part of the workout — only safe to pass through when
+    // there's exactly one page. Otherwise each page must rely on its own exercise.rawText
+    // (handled inside parseDescLadderScheme), so one part's text never matches a sibling part's.
+    const scopedRawText = carouselPageData.length === 1 ? rawText : undefined;
+    return carouselPageData.map((page) =>
+      buildPageArtifactSections(
+        page.exercise,
+        page.movements,
+        page.isStrength,
+        scopedRawText,
+        teamSize,
+      ),
+    );
+  }, [carouselPageData, rawText, sessionTeamSize]);
+
   const perPageHeroResults = useMemo((): HeroResult[] | null => {
     if (!carouselPageData) return null;
-    const teamSize =
-      rewardData?.teamSize ?? workout?.teamSize ?? inferTeamSizeFromText(rawText);
+    const teamSize = sessionTeamSize;
 
-    return carouselPageData.map((page): HeroResult => {
+    return carouselPageData.map((page, pageIndex): HeroResult => {
       const pagePr = (activeAchievements ?? []).find(
         (a) =>
           a.type === 'pr'
@@ -1128,6 +1088,10 @@ export function useCelebrationData(
         (sum, m) => sum + ((m.weight ?? 0) * (m.totalReps ?? 0)),
         0,
       );
+      // teamSize is SESSION-level — only this page's own confirmed partner status may put
+      // partner framing ("· In Pairs", "OUR ___") on its hero. A solo skill block sharing a
+      // session with a partnered metcon stays solo.
+      const pageTeamSize = perPageSections?.[pageIndex]?.[0]?.isPartnerConfirmed ? teamSize : undefined;
       return computeHeroResult(
         [page.exercise],
         pageFormat,
@@ -1139,43 +1103,24 @@ export function useCelebrationData(
         undefined,
         pagePr?.movement,
         pagePr?.value,
-        teamSize,
+        pageTeamSize,
         `${page.exercise.name ?? ''}\n${page.exercise.prescription ?? ''}`,
       );
     });
   }, [
     carouselPageData,
+    perPageSections,
     activeAchievements,
     workoutFormat,
-    rewardData?.teamSize,
-    workout?.teamSize,
+    sessionTeamSize,
     durationMinutes,
     rawText,
   ]);
 
-  const perPageSections = useMemo((): (ArtifactSection | null)[] | null => {
-    if (!carouselPageData) return null;
-    const teamSize =
-      rewardData?.teamSize ?? workout?.teamSize ?? inferTeamSizeFromText(rawText);
-    // rawText is shared across every page/part of the workout — only safe to pass through when
-    // there's exactly one page. Otherwise each page must rely on its own exercise.rawText
-    // (handled inside parseDescLadderScheme), so one part's text never matches a sibling part's.
-    const scopedRawText = carouselPageData.length === 1 ? rawText : undefined;
-    return carouselPageData.map((page) =>
-      buildPageArtifactSection(
-        page.exercise,
-        page.movements,
-        page.isStrength,
-        scopedRawText,
-        teamSize,
-      ),
-    );
-  }, [carouselPageData, rawText, rewardData?.teamSize, workout?.teamSize]);
-
   // ── Footer stats ──────────────────────────────────────────────────────────
 
   const recordedCompletionSeconds =
-    workoutFormat === 'for_time'
+    mainFormat === 'for_time'
       ? exercises
           .filter((ex) => ex.type !== 'strength')
           .flatMap((ex) => ex.sets ?? [])
@@ -1203,7 +1148,7 @@ export function useCelebrationData(
 
   // ── Partner metadata ──────────────────────────────────────────────────────
 
-  const posterTeamSize = rewardData?.teamSize ?? workout?.teamSize ?? 0;
+  const posterTeamSize = sessionTeamSize ?? 0;
   const isPosterTeam = posterTeamSize > 1;
   const posterPartnerNames: string[] = rewardData?.partnerNames ?? workout?.partnerNames ?? [];
   const squadTagText: string | null = isPosterTeam
@@ -1221,7 +1166,7 @@ export function useCelebrationData(
 
   return {
     exercises,
-    workoutFormat,
+    workoutFormat: mainFormat,
     rawText,
     durationMinutes,
     displayMinutes,
@@ -1230,6 +1175,8 @@ export function useCelebrationData(
     workoutId,
     posterSkin,
     posterVibe,
+    posterSticker,
+    posterVibeOffset,
     posterLayout,
     isCarousel,
     heroResult,

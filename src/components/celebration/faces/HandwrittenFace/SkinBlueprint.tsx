@@ -7,12 +7,18 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
+import { DraggableVibeStamp } from './DraggableVibeStamp';
+import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinBlueprintProps {
   wod: PosterWod;
   vibe: VibeKey | null;
+  vibeOffset?: PosterVibeOffset | null;
+  onVibeMove?: (offset: PosterVibeOffset) => void;
+  onVibeDrop?: (offset: PosterVibeOffset) => void;
+  onVibeLongPress?: () => void;
 }
 
 const NAVY = '#192640';
@@ -28,9 +34,10 @@ function CrossHair({ right }: { right?: boolean }): React.JSX.Element {
   );
 }
 
-export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Element {
+export function SkinBlueprint({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeLongPress }: SkinBlueprintProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = !!wod.title;
+  const subtitle = named ? wod.format : wod.sub;
   let lineNum = 0;
 
   return (
@@ -81,14 +88,16 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
           }}>
             {named ? wod.title : wod.format}
           </div>
+          {(subtitle || (named && wod.sub)) && (
           <div style={{ fontFamily: fD, fontSize: 17, fontWeight: 800, letterSpacing: '0.08em', color: BRAND.yellow, marginTop: 3 }}>
-            {named ? wod.format : wod.sub}
+            {subtitle}
             {named && wod.sub && (
               <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: BRAND.dim, letterSpacing: '0.04em', marginLeft: 8 }}>
                 {wod.sub}
               </span>
             )}
           </div>
+          )}
         </div>
 
         {/* Movement rows */}
@@ -102,7 +111,7 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
                 pendingColor="rgba(140,180,255,0.18)"
                 dimColor={GRID_DIM}
               />
-            ) : wod.split === 'reps' ? (
+            ) : shouldShowPairsLegend(wod, rows) ? (
               <PairsLegend teamColor="rgba(255,255,255,0.42)" meColor="rgba(255,255,255,0.42)" />
             ) : null
           )}
@@ -140,12 +149,19 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
                         {String(num + 1).padStart(2, '0')}
                       </span>
                     )}
-                    <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 800, lineHeight: 1.25 }}>
-                      {parts.movName}
-                      {parts.loadTag && (
-                        <span style={{ fontFamily: fM, fontSize: 13, fontWeight: 700, color: GRID_DIM, marginLeft: 6 }}>{parts.loadTag}</span>
-                      )}
-                    </span>
+                    {parts.isStrength && wod.repsScheme ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 800, lineHeight: 1.25 }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fM, fontSize: 11, color: GRID_DIM }}>{wod.repsScheme}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 800, lineHeight: 1.25 }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fM, fontSize: 13, fontWeight: 700, color: GRID_DIM, marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
+                    )}
                     {parts.isStrength ? (
                       parts.strengthValue ? (
                         <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 900, color: BRAND.yellow, whiteSpace: 'nowrap', textAlign: 'right' }}>
@@ -154,11 +170,11 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                        <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.team}</span>
-                        {parts.me && <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.58)', whiteSpace: 'nowrap' }}>{parts.me}</span>}
+                        <span style={{ fontFamily: fD, fontSize: 19, fontWeight: 900, color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.team}</span>
+                        {parts.me && <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.82)', whiteSpace: 'nowrap' }}>{parts.me}</span>}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={{ fontFamily: fD, fontSize: 19, fontWeight: 900, color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -188,6 +204,7 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
           <span style={{ fontFamily: fM, fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', color: GRID_DIM, textTransform: 'uppercase' }}>
             {wod.result.label}
           </span>
+          {wod.rx && <AchievementBadge label={wod.rx} />}
           <div style={{ flex: 1, height: 1, background: 'rgba(140,180,255,0.22)' }} />
           <span style={{ color: GRID_DIM, fontSize: 10, lineHeight: 1 }}>►</span>
         </div>
@@ -196,14 +213,12 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'nowrap' }}>
-              <span style={{ fontFamily: fD, fontSize: 90, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.yellow, whiteSpace: 'nowrap' }}>
-                {wod.result.value.split(' ')[0]}
-              </span>
-              {wod.result.value.includes(' ') && (
-                <span style={{ fontFamily: fD, fontSize: 28, fontWeight: 700, color: `${BRAND.yellow}99`, whiteSpace: 'nowrap', paddingBottom: 8 }}>
-                  {wod.result.value.split(' ').slice(1).join(' ')}
-                </span>
-              )}
+              <ResultValue
+                value={wod.result.value}
+                narrative={wod.result.narrative}
+                primaryStyle={{ fontFamily: fD, fontSize: 90, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.yellow, whiteSpace: 'nowrap' }}
+                unitStyle={{ fontFamily: fD, fontWeight: 700, color: `${BRAND.yellow}99`, paddingBottom: 8 }}
+              />
             </div>
             {wod.result.meta && (
               <div style={{ fontFamily: fM, fontSize: 10, fontWeight: 700, color: GRID_DIM, marginTop: 2, letterSpacing: '0.04em' }}>
@@ -211,18 +226,16 @@ export function SkinBlueprint({ wod, vibe }: SkinBlueprintProps): React.JSX.Elem
               </div>
             )}
           </div>
-          {vibe && <VibeStamp vibe={vibe} scale={0.78} color={BRAND.yellow} />}
+          {vibe && (
+            <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}>
+              <VibeStamp vibe={vibe} scale={0.78} color={BRAND.yellow} />
+            </DraggableVibeStamp>
+          )}
         </div>
       </div>
 
-      {/* Footer */}
-      <div style={{ background: BRAND.yellow, color: BRAND.ink, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {wod.rx && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.ink, color: BRAND.yellow, borderRadius: 999, padding: '4px 12px 3px', fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em' }}>
-            ★ {wod.rx}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
+      {/* Footer — wordmark only. The achievement badge lives on whichever page earned it. */}
+      <div style={{ background: BRAND.yellow, color: BRAND.ink, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={BRAND.ink} dot={BRAND.ink} size={17} />
       </div>
     </div>

@@ -7,12 +7,31 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
+import { DraggableVibeStamp } from './DraggableVibeStamp';
+import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinInkProps {
   wod: PosterWod;
   vibe: VibeKey | null;
+  vibeOffset?: PosterVibeOffset | null;
+  onVibeMove?: (offset: PosterVibeOffset) => void;
+  onVibeDrop?: (offset: PosterVibeOffset) => void;
+  onVibeLongPress?: () => void;
+}
+
+// Wet-ink bleed for the hero blot — a hidden defs block once per card; duplicate ids
+// across multiple Ink cards on the same page (e.g. gallery) harmlessly resolve to the first.
+function InkWetFilterDefs(): React.JSX.Element {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+      <filter id="wodiInkWet" x="-25%" y="-25%" width="150%" height="150%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.025" numOctaves={2} seed={4} result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale={8} xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+  );
 }
 
 function InkRule({ heavy = false }: { heavy?: boolean }): React.JSX.Element {
@@ -30,9 +49,10 @@ function InkRule({ heavy = false }: { heavy?: boolean }): React.JSX.Element {
   );
 }
 
-export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
+export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeLongPress }: SkinInkProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = Boolean(wod.title);
+  const subtitle = named ? wod.format : wod.sub;
   const loggedLoad = rows.reduce<string | undefined>((found, row) => {
     if (found || row.kind !== 'line') return found;
     const parts = getMovementValueParts(wod, row);
@@ -70,6 +90,7 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
           ].join(', '),
         }}
       />
+      <InkWetFilterDefs />
 
       <div style={{ position: 'relative', padding: '20px 20px 14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -93,16 +114,20 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
           >
             {named ? wod.title : wod.format}
           </div>
+          {(subtitle || (named && wod.sub)) && (
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
-            <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 900, letterSpacing: '0.03em', color: '#2d2c25' }}>
-              {named ? wod.format : wod.sub}
-            </span>
+            {subtitle && (
+              <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 900, letterSpacing: '0.03em', color: '#2d2c25' }}>
+                {subtitle}
+              </span>
+            )}
             {named && wod.sub && (
               <span style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, color: 'rgba(23,24,20,0.42)' }}>
                 {wod.sub}
               </span>
             )}
           </div>
+          )}
         </div>
 
         <InkRule heavy />
@@ -118,7 +143,7 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
                 dimColor="rgba(23,24,20,0.45)"
                 glow={false}
               />
-            ) : wod.split === 'reps' ? (
+            ) : shouldShowPairsLegend(wod, rows) ? (
               <PairsLegend teamColor="rgba(23,24,20,0.42)" meColor="rgba(23,24,20,0.42)" />
             ) : null
           )}
@@ -155,18 +180,32 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
                     ) : (
                       <span style={{ fontSize: 16, lineHeight: 1 }}>•</span>
                     )}
-                    <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>
-                      {parts.movName}
-                      {parts.loadTag && (
-                        <span style={{ fontFamily: fD, fontSize: 12.5, fontWeight: 700, color: 'rgba(23,24,20,0.45)', marginLeft: 6 }}>{parts.loadTag}</span>
-                      )}
-                    </span>
+                    {parts.isStrength && wod.repsScheme ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fD, fontSize: 11, color: 'rgba(23,24,20,0.5)' }}>{wod.repsScheme}</span>
+                      </div>
+                    ) : (
+                      <span style={{ fontFamily: fB, fontSize: 14, fontWeight: 900, lineHeight: 1.22 }}>
+                        {parts.movName}
+                        {parts.loadTag && (
+                          <span style={{ fontFamily: fD, fontSize: 12.5, fontWeight: 700, color: 'rgba(23,24,20,0.45)', marginLeft: 6 }}>{parts.loadTag}</span>
+                        )}
+                      </span>
+                    )}
                     {parts.isStrength && parts.strengthValue ? (
                       <span style={{ fontFamily: fB, fontSize: 12, fontWeight: 800, color: 'rgba(23,24,20,0.34)' }}>{parts.strengthValue}</span>
                     ) : parts.team ? (
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, transform: 'rotate(-3deg)', whiteSpace: 'nowrap' }}>{parts.team}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
+                        <span style={{ fontFamily: fH, fontSize: 22, fontWeight: 700, color: '#171814', transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.team}</span>
+                        {parts.me && (
+                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(23,24,20,0.78)', whiteSpace: 'nowrap' }}>
+                            {parts.me}
+                          </span>
+                        )}
+                      </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, transform: 'rotate(-3deg)', whiteSpace: 'nowrap' }}>{parts.single}</span>
+                      <span style={{ fontFamily: fH, fontSize: 22, fontWeight: 700, color: '#171814', transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.single}</span>
                     ) : <span />}
                   </div>
                   {r.ladderTrack && (
@@ -190,42 +229,52 @@ export function SkinInk({ wod, vibe }: SkinInkProps): React.JSX.Element {
 
         <div style={{ marginTop: 18, position: 'relative', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
           <div style={{ position: 'relative', minWidth: 0, paddingLeft: 6 }}>
-            <div style={{ fontFamily: fH, fontSize: 16, fontWeight: 700, color: 'rgba(23,24,20,0.72)', transform: 'rotate(-2deg)', marginBottom: 4 }}>
-              {resultNote}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
+              <div style={{ fontFamily: fH, fontSize: 16, fontWeight: 700, color: 'rgba(23,24,20,0.72)', transform: 'rotate(-2deg)' }}>
+                {resultNote}
+              </div>
+              {wod.rx && <AchievementBadge label={wod.rx} variant="onPaper" paperInkColor="#171814" />}
             </div>
-            <span
-              style={{
-                display: 'inline-block',
-                background: BRAND.yellow,
-                color: '#050504',
-                fontFamily: fD,
-                fontSize: 66,
-                fontWeight: 900,
-                lineHeight: 0.82,
-                letterSpacing: '-0.04em',
-                padding: '3px 12px 8px',
-                transform: 'rotate(-1.5deg)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {wod.result.value}
+            <span style={{ position: 'relative', display: 'inline-block' }}>
+              {/* hand-painted yellow ink stamp behind the hero — a true circle (fixed diameter),
+                  not sized to the text: hero values are always wider than tall, so a box that
+                  "hugs" the rendered value renders an oval under border-radius, never a circle. */}
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '50%', left: '50%',
+                  width: 132, height: 132,
+                  transform: 'translate(-50%, -50%) rotate(-1.5deg)',
+                  background: BRAND.yellow,
+                  backgroundImage: 'radial-gradient(circle at 38% 32%, rgba(255,255,255,0.34), transparent 58%)',
+                  filter: 'url(#wodiInkWet)',
+                  opacity: 0.9,
+                  borderRadius: '50%',
+                  zIndex: 0,
+                }}
+              />
+              <span style={{ position: 'relative', zIndex: 1, display: 'inline-block' }}>
+                <ResultValue
+                  value={wod.result.value}
+                  narrative={wod.result.narrative}
+                  primaryStyle={{ fontFamily: fD, fontSize: 66, fontWeight: 900, lineHeight: 0.82, letterSpacing: '-0.04em', color: '#050504', whiteSpace: 'nowrap' }}
+                  unitStyle={{ paddingBottom: 3 }}
+                  narrativeStyle={{ color: '#050504' }}
+                />
+              </span>
             </span>
           </div>
           {vibe && (
-            <div style={{ transform: 'rotate(-7deg)', marginRight: 2, marginTop: -4 }}>
+            <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}
+              style={{ marginRight: 2, marginTop: -4 }} rotateDeg={-7}>
               <VibeStamp vibe={vibe} scale={0.64} />
-            </div>
+            </DraggableVibeStamp>
           )}
         </div>
       </div>
 
-      <div style={{ background: '#171814', color: BRAND.white, padding: '8px 15px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {wod.rx && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: '#171814', borderRadius: 999, padding: '4px 11px 3px', fontFamily: fB, fontSize: 10.5, fontWeight: 900, letterSpacing: '0.1em' }}>
-            {wod.rx}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
+      {/* Footer — wordmark only. The achievement badge lives on whichever page earned it. */}
+      <div style={{ background: '#171814', color: BRAND.white, padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={BRAND.white} dot={BRAND.yellow} size={16} />
       </div>
     </div>

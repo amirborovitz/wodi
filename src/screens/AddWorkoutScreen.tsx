@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
-import { parseWorkoutImage, parseWorkoutText, refineParsedWorkout } from '../services/openai';
+import { parseWorkoutImage, parseWorkoutSession } from '../services/openai';
 import { assignMovementColors, getStationVisitCountsForExercise } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
@@ -23,6 +23,7 @@ import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscl
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
+import { TellWodiSheet } from '../components/workouts/TellWodiSheet';
 import {
   getAlternativeType,
   getDefaultEasierAlternative,
@@ -47,7 +48,6 @@ interface AddWorkoutScreenProps {
   onBack: () => void;
   onWorkoutCreated: () => void;
   onSavedForLater?: () => void;
-  saveForLaterMode?: boolean;
   initialImage?: File | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
@@ -85,6 +85,34 @@ interface ExerciseResult {
   ladderStep?: number;
   ladderPartial?: number;
   metconName?: string;
+}
+
+function getSavedMaxStrengthSet(sets: ExerciseSet[]): ExerciseSet | undefined {
+  const explicit = [...sets].reverse().find(set => set.isMax && (set.actualReps ?? 0) > 0);
+  if (explicit) return explicit;
+
+  const completed = sets.filter(set => set.completed && (set.actualReps ?? 0) > 0);
+  if (completed.length < 2) return undefined;
+  const last = completed[completed.length - 1];
+  const previous = completed.slice(0, -1);
+  const previousMaxReps = Math.max(...previous.map(set => set.actualReps ?? set.targetReps ?? 0), 0);
+  const previousMaxWeight = Math.max(...previous.map(set => set.weight ?? 0), 0);
+  const lastReps = last.actualReps ?? 0;
+  const lastWeight = last.weight ?? 0;
+  return lastReps > previousMaxReps && lastWeight > 0 && lastWeight < previousMaxWeight ? last : undefined;
+}
+
+function getSavedWorkingStrengthSets(sets: ExerciseSet[]): ExerciseSet[] {
+  const completed = sets.filter(set => set.completed && ((set.actualReps ?? set.targetReps ?? 0) > 0 || (set.weight ?? 0) > 0));
+  const maxSet = getSavedMaxStrengthSet(completed);
+  return maxSet ? completed.filter(set => set !== maxSet) : completed;
+}
+
+function getSavedStrengthRepScheme(sets: ExerciseSet[]): number[] | undefined {
+  const reps = getSavedWorkingStrengthSets(sets)
+    .map(set => set.targetReps ?? set.actualReps)
+    .filter((rep): rep is number => typeof rep === 'number' && rep > 0);
+  return reps.length > 0 ? reps : undefined;
 }
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
@@ -180,6 +208,14 @@ function inferStationVisitCounts(
   return null;
 }
 
+interface EffectiveRoundsResult {
+  rounds: number;
+  // True when the multiplier had to be GUESSED (station counting without station structure,
+  // or a session-level sets/containerRounds fallback that may belong to a sibling part).
+  // Flows into WorkloadBreakdown.estimated — poster totals never render off a guess.
+  estimated: boolean;
+}
+
 function getMovementEffectiveRounds(
   movement: ParsedMovement,
   movementRounds: number,
@@ -187,23 +223,27 @@ function getMovementEffectiveRounds(
   exercise: ParsedExercise,
   result: ExerciseResult,
   parsedWorkout?: ParsedWorkout
-): number {
-  const intervalMultiplier = exercise.intervalCount
+): EffectiveRoundsResult {
+  const exerciseIntervals = exercise.intervalCount
     || exercise.suggestedSets
     || result.sets.length
-    || result.rounds
-    || parsedWorkout?.sets
-    || parsedWorkout?.containerRounds
-    || movementRounds
-    || 1;
+    || result.rounds;
+  // Session-level fields describe the primary part, not necessarily THIS one — a multiplier
+  // sourced from them is a guess (parts are standalone practices).
+  const sessionIntervals = parsedWorkout?.sets || parsedWorkout?.containerRounds;
+  const intervalMultiplier = exerciseIntervals || sessionIntervals || movementRounds || 1;
+  const intervalIsGuess = !exerciseIntervals && !!sessionIntervals;
 
   switch (movement.countingMode) {
     case 'once':
-      return 1;
+      return { rounds: 1, estimated: false };
     case 'per_interval':
-      return intervalMultiplier;
+      return { rounds: intervalMultiplier, estimated: intervalIsGuess };
     case 'per_station_visit':
-      return stationVisits ?? intervalMultiplier;
+      // No station structure to distribute over — the interval-chain fallback is a guess.
+      return stationVisits != null
+        ? { rounds: stationVisits, estimated: false }
+        : { rounds: intervalMultiplier, estimated: true };
     case 'per_round':
     default:
       break;
@@ -212,8 +252,8 @@ function getMovementEffectiveRounds(
   const isBuyInCashOut = movement.role === 'buy_in' || movement.role === 'cash_out' || movement.perRound === false;
 
   return isBuyInCashOut
-    ? 1
-    : (stationVisits ?? movementRounds);
+    ? { rounds: 1, estimated: false }
+    : { rounds: stationVisits ?? movementRounds, estimated: false };
 }
 
 function buildWorkloadBreakdownFromResults(
@@ -227,6 +267,8 @@ function buildWorkloadBreakdownFromResults(
   let grandTotalDistance = 0;
   let grandTotalCalories = 0;
   let grandTotalWeightedDistance = 0;
+  // Poster truth standard: totals derived by guesswork never render on the poster.
+  let estimated = false;
   const roundOverrides = parseCindyDtRounds(
     parsedWorkout?.rawText || results.map((result) => result.exercise.prescription).join(' ')
   );
@@ -330,6 +372,11 @@ function buildWorkloadBreakdownFromResults(
     }
 
     if (movements && movements.length > 0) {
+      // A free/unclassified part's movement totals are estimates by definition — the structure
+      // was never understood, so any multiplier is a guess.
+      if (!result.exercise.loggingMode || result.exercise.loggingMode === 'free') {
+        estimated = true;
+      }
       // When exercise has sections, the flat movements[] only contains UNIQUE movements
       // (e.g., 5 entries for a 4-section workout). We need to iterate the section-expanded
       // list instead so each movement appears once per section with the correct round count.
@@ -436,8 +483,8 @@ function buildWorkloadBreakdownFromResults(
       // Buy-in/cash-out sections are done once, not per AMRAP/round block.
       const stationVisits = stationVisitCounts?.[movIdx];
       const sectionType = perMovementSectionTypes[movIdx];
-      const effectiveRounds = sectionType && sectionType !== 'rounds'
-        ? 1
+      const effective = sectionType && sectionType !== 'rounds'
+        ? { rounds: 1, estimated: false }
         : getMovementEffectiveRounds(
           mov,
           movementRounds,
@@ -446,6 +493,8 @@ function buildWorkloadBreakdownFromResults(
           result,
           parsedWorkout
         );
+      const effectiveRounds = effective.rounds;
+      if (effective.estimated) estimated = true;
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round
       const isPartialMove = result.partialMovements?.includes(mov.name) ?? false;
@@ -716,6 +765,7 @@ function buildWorkloadBreakdownFromResults(
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: parsedWorkout?.containerRounds,
     benchmarkName: parsedWorkout?.benchmarkName,
+    ...(estimated ? { estimated: true } : {}),
   };
 }
 
@@ -1067,6 +1117,23 @@ function shouldForceForTimeMode(exercise: ParsedExercise): boolean {
   return hasForTimeSignal;
 }
 
+// Preview readback: what the logging step will ask for, per mode. Shown under each exercise
+// on the preview so a wrong interpretation ("weight?" on a bodyweight piece) is visible
+// BEFORE logging starts, in the athlete's terms — not as an internal mode name.
+const LOGGING_MODE_HINTS: Record<ExerciseLoggingMode, string> = {
+  strength: 'weight × sets',
+  sets: 'reps × sets',
+  for_time: 'your time',
+  amrap: 'rounds + reps',
+  amrap_intervals: 'rounds per interval',
+  intervals: 'score per interval',
+  emom: 'reps per minute',
+  cardio: 'time / calories',
+  cardio_distance: 'distance',
+  bodyweight: 'reps',
+  free: 'your score',
+};
+
 function getExerciseLoggingMode(
   exercise: ParsedExercise,
   workoutContext?: { format: string; scoreType: string; exerciseCount: number },
@@ -1299,168 +1366,6 @@ function isForTimeWorkout(exercise: ParsedExercise, _workoutType: string, _worko
   return mode === 'for_time';
 }
 
-function analyzeRefineNeed(parsed: ParsedWorkout): { shouldRefine: boolean; reasons: string[]; rawText: string } {
-  const rawText = [
-    parsed.rawText,
-    parsed.title,
-    ...parsed.exercises.map((exercise) => `${exercise.name} ${exercise.prescription}`),
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const text = rawText.toLowerCase();
-  const reasons: string[] = [];
-
-  const roundMatches = [...text.matchAll(/(\d+)\s*rounds?\s*of/gi)];
-  const benchmarkMatches = text.match(/\b(cindy|dt|fran|grace|helen|diane|jackie|karen|annie|mary)\b/gi);
-  const hasMixedBlocks = text.includes('+') || text.includes(' then ');
-  const hasStructuredBlocks = /superset|cycle|metcon|interval|teams? of|cash[- ]?out|finisher/i.test(text);
-  const duplicateExercises = parsed.exercises.some((exercise, index) => {
-    if (index === 0) return false;
-    const prev = parsed.exercises[index - 1];
-    return exercise.name === prev.name && exercise.prescription === prev.prescription;
-  });
-
-  // New triggers for multi-block workouts
-  const hasMultipleBlocks = parsed.exercises.length >= 2;
-  const hasMixedTypes = new Set(parsed.exercises.map(e => e.type)).size > 1;
-
-  // Count block keywords in raw text to detect potentially missing blocks
-  const blockKeywords = text.match(/superset|metcon|finisher|cash[- ]?out|cycle|interval|amrap|emom|strength|warmup|warm[- ]?up/gi) || [];
-  const numberedItems = text.match(/^\s*\d+\.\s+/gm) || [];
-  const expectedBlockCount = Math.max(blockKeywords.length, numberedItems.length);
-  const rawTextHasMoreBlocks = expectedBlockCount > parsed.exercises.length;
-
-  if (roundMatches.length >= 2) reasons.push('multiple_round_blocks');
-  if (benchmarkMatches && benchmarkMatches.length >= 2) reasons.push('multiple_benchmarks');
-  if (hasMixedBlocks && roundMatches.length > 0) reasons.push('mixed_blocks_with_rounds');
-  if (hasStructuredBlocks) reasons.push('structured_blocks');
-  if (duplicateExercises) reasons.push('duplicate_exercises');
-  if (hasMultipleBlocks && hasMixedTypes) reasons.push('mixed_exercise_types');
-  if (rawTextHasMoreBlocks) reasons.push('potentially_missing_blocks');
-  if (hasRepeatedMovementFidelityRisk(parsed)) reasons.push('movement_occurrence_mismatch');
-
-  return { shouldRefine: reasons.length > 0, reasons, rawText };
-}
-
-function hasRepeatedMovementFidelityRisk(parsed: ParsedWorkout): boolean {
-  return parsed.exercises.some((exercise) => {
-    const sourceText = getExerciseFidelityText(parsed, exercise);
-    if (!sourceText || !/\b(?:rft|rounds?\s+for\s+time|for\s+time)\b/i.test(sourceText)) {
-      return false;
-    }
-
-    const movements = getExerciseMovementSequence(exercise);
-    if (movements.length < 2) return false;
-
-    const structuredCounts = new Map<string, number>();
-    for (const movement of movements) {
-      const key = movementFidelityKey(movement.name);
-      if (!key) continue;
-      structuredCounts.set(key, (structuredCounts.get(key) ?? 0) + 1);
-    }
-
-    for (const [key, structuredCount] of structuredCounts) {
-      const rawCount = countMovementMentions(sourceText, key);
-      if (rawCount >= 2 && rawCount > structuredCount) {
-        console.warn('[Refine] Movement occurrence mismatch:', {
-          exercise: exercise.name,
-          movement: key,
-          rawCount,
-          structuredCount,
-        });
-        return true;
-      }
-    }
-
-    for (const movement of movements) {
-      const key = movementFidelityKey(movement.name);
-      if (!key || !movement.distance || movement.distance <= 0) continue;
-      const rawDistances = extractMovementDistances(sourceText, key);
-      if (rawDistances.length > 0 && !rawDistances.includes(movement.distance)) {
-        console.warn('[Refine] Movement distance mismatch:', {
-          exercise: exercise.name,
-          movement: key,
-          rawDistances,
-          structuredDistance: movement.distance,
-        });
-        return true;
-      }
-    }
-
-    return false;
-  });
-}
-
-function getExerciseFidelityText(parsed: ParsedWorkout, exercise: ParsedExercise): string {
-  if (parsed.exercises.length === 1 && parsed.rawText?.trim()) return parsed.rawText;
-  if (exercise.rawText?.trim()) return exercise.rawText;
-  return `${exercise.name ?? ''} ${exercise.prescription ?? ''}`;
-}
-
-function getExerciseMovementSequence(exercise: ParsedExercise): ParsedMovement[] {
-  if (exercise.sections?.length) {
-    return exercise.sections.flatMap((section) => section.movements ?? []);
-  }
-  return exercise.movements ?? [];
-}
-
-function movementFidelityKey(name: string): string | null {
-  const normalized = name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  if (!normalized) return null;
-
-  if (/\brun(?:ning)?\b/.test(normalized)) return 'run';
-  if (/\bdeadlifts?\b/.test(normalized)) return 'deadlift';
-  if (/\bpower\s+cleans?\b/.test(normalized)) return 'power clean';
-  if (/\bfront\s+squats?\b/.test(normalized)) return 'front squat';
-  if (/\bshoulder\s+to\s+overheads?\b|\bstoh\b|\bs\s*t\s*o\s*h\b/.test(normalized)) return 'shoulder to overhead';
-  if (/\bpull\s*ups?\b|\bpullups?\b/.test(normalized)) return 'pull-up';
-  if (/\b(?:echo\s+)?bikes?\b/.test(normalized)) return 'bike';
-  if (/\brows?\b/.test(normalized)) return 'row';
-  if (/\bski(?:\s+erg)?\b/.test(normalized)) return 'ski';
-
-  return normalized;
-}
-
-function countMovementMentions(text: string, key: string): number {
-  const normalizedText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-  const patterns: Record<string, RegExp> = {
-    run: /\bruns?\b|\brunning\b/g,
-    deadlift: /\bdeadlifts?\b|\bdl\b/g,
-    'power clean': /\bpower\s+cleans?\b|\bpc\b/g,
-    'front squat': /\bfront\s+squats?\b|\bfs\b/g,
-    'shoulder to overhead': /\bshoulder\s+to\s+overheads?\b|\bstoh\b|\bs\s*t\s*o\s*h\b/g,
-    'pull-up': /\bpull\s*ups?\b|\bpullups?\b/g,
-    bike: /\b(?:echo\s+|assault\s+|air\s+)?bikes?\b/g,
-    row: /\brows?\b|\browing\b/g,
-    ski: /\bski(?:\s+erg)?\b/g,
-  };
-
-  const pattern = patterns[key] ?? new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`, 'g');
-  return [...normalizedText.matchAll(pattern)].length;
-}
-
-function extractMovementDistances(text: string, key: string): number[] {
-  const normalizedText = text.toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-  const names: Record<string, string> = {
-    run: 'run(?:s|ning)?',
-    row: 'row(?:s|ing)?',
-    bike: '(?:echo |assault |air )?bike',
-    ski: 'ski(?: erg)?',
-  };
-  const namePattern = names[key] ?? key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-  const distancePattern = new RegExp(`\\b(\\d+)\\s*(m|km|mi)\\s+${namePattern}\\b`, 'g');
-  const distances: number[] = [];
-
-  for (const match of normalizedText.matchAll(distancePattern)) {
-    const value = parseInt(match[1], 10);
-    if (Number.isNaN(value)) continue;
-    const unit = match[2];
-    distances.push(unit === 'km' ? value * 1000 : value);
-  }
-
-  return distances;
-}
-
 function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   const normalizedExercises = parsed.exercises.map((exercise) => {
     const combined = `${exercise.name} ${exercise.prescription}`;
@@ -1500,53 +1405,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-async function refineWorkoutIfNeeded(
-  parsed: ParsedWorkout,
-  userId?: string
-): Promise<ParsedWorkout> {
-  const analysis = analyzeRefineNeed(parsed);
-
-  console.info('[REFINE CHECK]', {
-    shouldRefine: analysis.shouldRefine,
-    reasons: analysis.reasons,
-  });
-
-  if (!analysis.shouldRefine) return parsed;
-
-  try {
-    const refined = await refineParsedWorkout(parsed, analysis.rawText);
-    // Preserve rawText from original parse if refine AI didn't echo it back
-    if (!refined.rawText && parsed.rawText) {
-      refined.rawText = parsed.rawText;
-    }
-    if (!refined.sourceDate && parsed.sourceDate) {
-      refined.sourceDate = parsed.sourceDate;
-    }
-    if (userId) {
-      try {
-        await addDoc(
-          collection(db, 'workoutParseRefinements'),
-          removeUndefined({
-            userId,
-            createdAt: serverTimestamp(),
-            reasons: analysis.reasons,
-            rawText: analysis.rawText,
-            parsed,
-            refined,
-          })
-        );
-      } catch {
-        // Refinement is user-facing; audit logging is best-effort.
-      }
-    }
-    return refined;
-  } catch (error) {
-    console.warn('Failed to refine workout parse, using original:', error);
-    return parsed;
-  }
-}
-
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, saveForLaterMode = false, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = user?.email === ADMIN_EMAIL;
   const canUseSavedWorkouts = user?.email?.toLowerCase() === SAVED_WORKOUTS_EMAIL;
@@ -1619,6 +1478,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
   const [loggingGuidance, setLoggingGuidance] = useState<Record<number, LoggingGuidanceResponse>>({});
   // Track user mode overrides (when user manually selects a different mode)
   const [modeOverrides, setModeOverrides] = useState<Record<number, ExerciseLoggingMode>>({});
+
+  // "Tell Wodi" — athlete adds context the board doesn't have (partner setup, real time cap…)
+  // on the preview step; the note is fed back into the parse as authoritative context.
+  const [tellWodiOpen, setTellWodiOpen] = useState(false);
+  const [tellWodiPrefill, setTellWodiPrefill] = useState('');
+  const [tellWodiBusy, setTellWodiBusy] = useState(false);
+  const [tellWodiError, setTellWodiError] = useState<string | null>(null);
   // Track if AI is currently loading guidance
   const [, setIsLoadingGuidance] = useState(false);
 
@@ -1663,9 +1529,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       try {
         const base64 = await fileToBase64(initialImage);
         const workout = await parseWorkoutImage(base64);
-        const refined = await refineWorkoutIfNeeded(workout, user?.id);
-        setParsedWorkout(refined);
-        addSavedWorkout(refined);
+        setParsedWorkout(workout);
+        addSavedWorkout(workout);
         setStep('preview');
       } catch (err) {
         console.error('Error parsing workout:', err);
@@ -1704,6 +1569,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       sourceDate: editWorkout.sourceDate,
       timeCap: editWorkout.duration ? editWorkout.duration * 60 : undefined,
       exercises: editWorkout.exercises.map(ex => {
+        const workingSets = getSavedWorkingStrengthSets(ex.sets);
+        const repScheme = getSavedStrengthRepScheme(ex.sets);
         // Reconstruct movements from workloadBreakdown for multi-movement exercises
         const breakdownMvts = editWorkout.workloadBreakdown?.movements || [];
         const movements: ParsedMovement[] | undefined = breakdownMvts.length > 1
@@ -1718,10 +1585,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
         return {
           name: ex.name,
           type: ex.type,
+          loggingMode: ex.loggingMode,
           prescription: ex.prescription,
           suggestedSets: ex.sets.length || 3,
-          suggestedReps: ex.sets[0]?.targetReps || ex.sets[0]?.actualReps,
-          suggestedWeight: ex.sets[0]?.weight,
+          suggestedReps: repScheme?.[0] ?? workingSets[0]?.targetReps ?? workingSets[0]?.actualReps,
+          suggestedRepsPerSet: repScheme,
+          suggestedWeight: workingSets[0]?.weight,
           movements,
         };
       }),
@@ -1747,8 +1616,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       // Overlay saved values based on kind
       switch (result.kind) {
         case 'load': {
-          const firstWeight = savedEx.sets[0]?.weight;
-          const lastWeight = savedEx.sets[savedEx.sets.length - 1]?.weight;
+          const maxSet = getSavedMaxStrengthSet(savedEx.sets);
+          const workingSets = getSavedWorkingStrengthSets(savedEx.sets);
+          const weightedSets = workingSets.filter(set => set.weight != null);
+          const firstWeight = weightedSets[0]?.weight;
+          const lastWeight = weightedSets[weightedSets.length - 1]?.weight;
           if (firstWeight != null) result.weight = firstWeight;
           if (lastWeight != null && lastWeight !== firstWeight) {
             result.weightEnd = lastWeight;
@@ -1758,6 +1630,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
           } else {
             result.loadMode = 'same';
           }
+          const repScheme = getSavedStrengthRepScheme(savedEx.sets);
+          if (repScheme?.length === 1) {
+            result.repsPerSet = repScheme[0];
+          }
+          if (maxSet) {
+            result.maxReps = maxSet.actualReps;
+            result.maxRepsWeight = maxSet.weight;
+          }
+          result.setsTotal = Math.max(result.setsTotal, savedEx.sets.length);
           result.setsCompleted = savedEx.sets.length;
           break;
         }
@@ -1785,8 +1666,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
         }
         case 'score_rounds': {
           if (savedEx.rounds != null) result.rounds = savedEx.rounds;
-          const partialReps = savedEx.sets[0]?.actualReps;
-          if (partialReps != null) result.partialReps = partialReps;
+          // Explicit partial-round fields (movement checklist) win over the legacy
+          // sets[0].actualReps carrier, which newer saves use for a derived rep total.
+          if (savedEx.partialMovements != null && savedEx.partialMovements.length > 0) {
+            result.partialMovements = savedEx.partialMovements;
+          }
+          if (savedEx.partialReps != null) {
+            result.partialReps = savedEx.partialReps;
+          } else if (savedEx.partialMovements == null) {
+            const partialReps = savedEx.sets[0]?.actualReps;
+            if (partialReps != null) result.partialReps = partialReps;
+          }
           if (savedEx.ladderStep != null) result.ladderStep = savedEx.ladderStep;
           if (savedEx.ladderPartial != null) result.ladderPartial = savedEx.ladderPartial;
           break;
@@ -1835,13 +1725,22 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       setImageUrl(null);
       setError(null);
 
-      if (plannedWorkout.parsedWorkout) {
-        setParsedWorkout(plannedWorkout.parsedWorkout);
+      const stored = plannedWorkout.parsedWorkout;
+      const raw = plannedWorkout.raw.trim();
+      // An exercise with loggingMode 'free' and no movements is the crash-path parse fallback
+      // frozen at save time (AI-chosen 'free' parts always list their movements). If the
+      // original text is still around, reparse it and heal the doc instead of replaying the
+      // degraded parse on every open.
+      const storedDegraded = stored
+        ? stored.exercises.some((exercise) => exercise.loggingMode === 'free' && !exercise.movements?.length)
+        : false;
+
+      if (stored && (!storedDegraded || !raw)) {
+        setParsedWorkout(stored);
         setStep('log-results');
         return;
       }
 
-      const raw = plannedWorkout.raw.trim();
       if (!raw) {
         setError('Saved WOD is missing its original text.');
         setStep('capture');
@@ -1850,12 +1749,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
 
       setStep('processing');
       try {
-        const { parsed } = await parseWorkoutText(raw);
+        const parsed = await parseWorkoutSession(raw);
         if (cancelled) return;
         setParsedWorkout(parsed);
         setStep('log-results');
+
+        const parsedDegraded = parsed.exercises.some(
+          (exercise) => exercise.loggingMode === 'free' && !exercise.movements?.length,
+        );
+        if (storedDegraded && plannedWorkout.id && !parsedDegraded) {
+          console.info('[SavedWod] healed degraded saved parse:', plannedWorkout.id);
+          // JSON round-trip strips undefined values that Firestore rejects
+          const cleanParsed = JSON.parse(JSON.stringify(parsed)) as typeof parsed;
+          void setDoc(doc(db, 'savedWods', plannedWorkout.id), { parsedWorkout: cleanParsed }, { merge: true });
+        }
       } catch (err) {
         if (cancelled) return;
+        if (stored) {
+          // Reparse failed — the degraded parse still logs a score; better than blocking.
+          console.warn('[SavedWod] reparse of degraded saved parse failed — using stored parse:', err);
+          setParsedWorkout(stored);
+          setStep('log-results');
+          return;
+        }
         console.error('[SavedWod] Failed to parse raw saved WOD:', err);
         setError('Could not parse this saved WOD. Try adding it again.');
         setStep('capture');
@@ -2085,9 +2001,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
       // Convert to base64 for API
       const base64 = await fileToBase64(file);
       const workout = await parseWorkoutImage(base64);
-      const refined = await refineWorkoutIfNeeded(workout, user?.id);
-      setParsedWorkout(refined);
-      addSavedWorkout(refined);
+      setParsedWorkout(workout);
+      addSavedWorkout(workout);
       setStep('preview');
     } catch (err) {
       console.error('Error parsing workout:', err);
@@ -2101,15 +2016,46 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
     setStep('processing');
     setError(null);
     try {
-      const { parsed } = await parseWorkoutText(text.trim());
-      const refined = await refineWorkoutIfNeeded(parsed, user?.id);
-      setParsedWorkout(refined);
-      addSavedWorkout(refined);
+      const parsed = await parseWorkoutSession(text.trim());
+      setParsedWorkout(parsed);
+      addSavedWorkout(parsed);
       setStep('preview');
     } catch (err) {
       console.error('Error parsing voice workout:', err);
       setError('Could not parse workout. Try editing the text and trying again.');
       setStep('voice');
+    }
+  };
+
+  // Re-parse requires the board's transcription; without it there is nothing to re-read.
+  const canTellWodi = Boolean(parsedWorkout?.rawText?.trim());
+
+  const openTellWodi = (prefill: string) => {
+    setTellWodiPrefill(prefill);
+    setTellWodiError(null);
+    setTellWodiOpen(true);
+  };
+
+  const handleTellWodiSubmit = async (note: string) => {
+    const raw = parsedWorkout?.rawText?.trim();
+    if (!raw || !note) return;
+    setTellWodiBusy(true);
+    setTellWodiError(null);
+    try {
+      // Corrections accumulate: a second note must not erase what the first one fixed.
+      const combinedNote = [parsedWorkout?.userContext, note].filter(Boolean).join('\n');
+      const reparsed = await parseWorkoutSession(raw, 'TEXT', combinedNote);
+      setParsedWorkout(reparsed);
+      // Index-keyed caches from the previous parse no longer line up with the new exercises
+      setModeOverrides({});
+      setSmartClassifications({});
+      setLoggingGuidance({});
+      setTellWodiOpen(false);
+    } catch (err) {
+      console.error('Tell Wodi re-parse failed:', err);
+      setTellWodiError("Couldn't update the workout — try again.");
+    } finally {
+      setTellWodiBusy(false);
     }
   };
 
@@ -3004,6 +2950,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
               ...(set.actualReps !== undefined && { actualReps: set.actualReps }),
               ...(set.weight !== undefined && { weight: set.weight }),
               ...(set.time !== undefined && { time: set.time }),
+              ...(set.isMax !== undefined && { isMax: set.isMax }),
             }));
           } else {
             // Single set or empty — create summary
@@ -3034,6 +2981,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
               ...(set.time !== undefined && { time: set.time }),
               ...(set.distance !== undefined && { distance: set.distance }),
               ...(set.calories !== undefined && { calories: set.calories }),
+              ...(set.isMax !== undefined && { isMax: set.isMax }),
             };
             return cleanSet;
           });
@@ -3079,7 +3027,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
           ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),
           ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
           ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
+          ...(result.partialReps != null && result.partialReps > 0 && { partialReps: result.partialReps }),
+          ...(result.partialMovements && result.partialMovements.length > 0 && { partialMovements: result.partialMovements }),
           ...(result.exercise.rawText && { rawText: result.exercise.rawText }),
+          // Persist this part's own logging mode — detail-mode rendering must never fall back
+          // to the session-level format (parts are standalone practices).
+          ...(result.exercise.loggingMode && { loggingMode: result.exercise.loggingMode }),
           ...(typeof result.exercise.isSecondary === 'boolean' && { isSecondary: result.exercise.isSecondary }),
           ...(typeof result.exercise.partnerWorkout === 'boolean' && { partnerWorkout: result.exercise.partnerWorkout }),
           ...(result.exercise.partnerSplit && { partnerSplit: result.exercise.partnerSplit }),
@@ -3192,6 +3145,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
         durationSeconds: effectiveDuration > 0 ? effectiveDuration : null,
         notes: null,
         rawText: parsedWorkout.rawText?.trim() || null,
+        ...(parsedWorkout.userContext && { userContext: parsedWorkout.userContext }),
         timeCap: effectiveDuration > 0 ? effectiveDuration : (parsedWorkout.timeCap || null),
         format: parsedWorkout.format || null,
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
@@ -3637,17 +3591,34 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
               {parsedWorkout.title || 'Today\'s Workout'}
             </h2>
             <div className={styles.previewTypes}>
-              <span className={styles.previewType}>{parsedWorkout.type}</span>
-              <span className={styles.previewFormat}>{parsedWorkout.format}</span>
+              <span className={styles.previewFormatChip}>{parsedWorkout.format}</span>
               {parsedWorkout.sets && parsedWorkout.sets > 1 && (
-                <span className={styles.previewFormat}>{parsedWorkout.sets} sets</span>
+                <span className={styles.previewMetaChip}>{parsedWorkout.sets} sets</span>
               )}
               {parsedWorkout.timeCap && (
-                <span className={styles.previewFormat}>
+                <span className={styles.previewMetaChip}>
                   {Math.floor(parsedWorkout.timeCap / 60)} min cap
                 </span>
               )}
             </div>
+            {isPartnerWorkout ? (
+              <button
+                type="button"
+                className={styles.previewPartnerChip}
+                disabled={!canTellWodi}
+                onClick={() => openTellWodi('This is NOT a partner workout — I did it alone. ')}
+              >
+                Partner · Team of {teamSize}
+              </button>
+            ) : canTellWodi && (
+              <button
+                type="button"
+                className={styles.previewGhostChip}
+                onClick={() => openTellWodi('This is a partner workout, teams of 2. ')}
+              >
+                + Partner?
+              </button>
+            )}
 
             <div className={styles.exerciseList}>
               {parsedWorkout.exercises.map((exercise, index) => (
@@ -3664,33 +3635,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
                       {m.name}{m.distance ? ` ${m.distance}${m.unit ?? 'm'}` : m.reps ? ` ${m.reps} reps` : ''}
                     </span>
                   ))}
+                  <span className={styles.previewLogHint}>
+                    You&apos;ll log: {LOGGING_MODE_HINTS[getExerciseLoggingMode(exercise, {
+                      format: parsedWorkout.format,
+                      scoreType: parsedWorkout.scoreType,
+                      exerciseCount: parsedWorkout.exercises.length,
+                    })]}
+                  </span>
                 </div>
               ))}
             </div>
           </Card>
 
           <div className={styles.previewActions}>
-            {saveForLaterMode ? (
-              <>
-                <Button
-                  variant="secondary"
-                  onClick={onBack}
-                  size="lg"
-                  className={styles.secondaryCta}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSaveForLater}
-                  size="lg"
-                  variant="primary"
-                  className={styles.primaryCta}
-                >
-                  Save for later
-                </Button>
-              </>
-            ) : (
-              <>
             <Button
               variant="secondary"
               onClick={onBack}
@@ -3707,11 +3664,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
             >
               Looks Good
             </Button>
-              </>
-            )}
           </div>
 
-          {!saveForLaterMode && (
           <button
             type="button"
             className={styles.saveLaterLink}
@@ -3719,7 +3673,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, sa
           >
             Save for later <span aria-hidden="true">-&gt;</span>
           </button>
+
+          {canTellWodi && (
+            <button
+              type="button"
+              className={styles.tellWodiLink}
+              onClick={() => openTellWodi('')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 3v18" />
+                <path d="M5 4h11l-2 4 2 4H5" />
+              </svg>
+              Something off? Tell wodi
+            </button>
           )}
+
+          <TellWodiSheet
+            open={tellWodiOpen}
+            prefill={tellWodiPrefill}
+            busy={tellWodiBusy}
+            error={tellWodiError}
+            onSubmit={handleTellWodiSubmit}
+            onClose={() => setTellWodiOpen(false)}
+          />
         </motion.div>
       )}
 

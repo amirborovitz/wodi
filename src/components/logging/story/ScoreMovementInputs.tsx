@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MovementResult } from './types';
-import type { ParsedSectionType } from '../../../types';
+import type { ParsedMovement, ParsedSectionType } from '../../../types';
 import { getWeightStep } from './types';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
@@ -20,21 +20,58 @@ interface ScoreMovementInputsProps {
   onBatch?: (next: MovementResult[]) => void;
   onSubstitutionOpenChange?: (open: boolean) => void;
   /** Team size for partner workouts. When > 1, buy-in/cash-out movements
-   *  show a "{total} {unit} total ÷{teamSize}" annotation below the movement
+   *  show a "{total} {unit} total /{teamSize}" annotation below the movement
    *  name so the athlete knows they are logging their personal share. */
   teamSize?: number;
-  /** True only in AMRAP/relay workouts where a prescribed distance movement represents
+  /** True only in partner/relay AMRAPs where a prescribed distance movement represents
    *  a relay trip count (how many times the athlete ran X meters), not a total distance. */
   isRelayContext?: boolean;
+  /** True in solo rounds-scored workouts: a prescribed-distance movement (e.g. 300m run
+   *  per round) is fully counted by the ROUNDS input, so it renders display-only. */
+  distanceDerivedFromRounds?: boolean;
 }
 
 // Classify a movement by equipment type for weight propagation grouping.
 // Barbell movements only propagate to other barbell movements, not KB or DB.
-function getEquipmentType(name: string): 'barbell' | 'kb' | 'db' {
+// Weight-input grouping bucket: same-bucket load movements share ONE weight input (the
+// shared hero screen). 'other' movements never share — each renders its own WeightField.
+type SharedEquipment = 'barbell' | 'kb' | 'db';
+type LoadEquipment = SharedEquipment | 'other';
+
+// AI-stamped ParsedMovement.equipment → grouping bucket. The AI is the authority for the
+// implement; the name regexes below are the fallback for docs parsed before the field existed.
+// 'none' on a load-kind movement means the athlete added a load of their own choosing.
+function equipmentFromAi(mov: ParsedMovement): LoadEquipment | null {
+  switch (mov.equipment) {
+    case 'barbell': return 'barbell';
+    case 'dumbbell': return 'db';
+    case 'kettlebell': return 'kb';
+    case 'other':
+    case 'none': return 'other';
+    default: return null;
+  }
+}
+
+function getEquipmentType(name: string): LoadEquipment {
   const lower = name.toLowerCase();
   if (/\bdb\b|dumbbell/.test(lower)) return 'db';
-  if (/\bkb\b|kettlebell|\bgoblet\b|\bsuitcase\b|\bfarmer'?s?\b|\bcarry\b/.test(lower)) return 'kb';
+  if (/\bkb\b|kettlebell|\bsuitcase\b|\bfarmer'?s?\b|\bcarry\b/.test(lower)) return 'kb';
+  if (isImplicitHeldLoad(lower)) return 'other';
   return 'barbell';
+}
+
+// "Weighted X" with no stated implement (weighted box step-up, weighted pull-up, weighted
+// sit-up) is a held load the athlete picks — DBs/KBs/plate — never the session's barbell.
+function isImplicitHeldLoad(name: string): boolean {
+  return /\bweighted\b/i.test(name) && getExplicitEquipmentType(name) === null;
+}
+
+function getExplicitEquipmentType(name: string): 'barbell' | 'kb' | 'db' | null {
+  const lower = name.toLowerCase();
+  if (/\bdb\b|dumbbell/.test(lower)) return 'db';
+  if (/\bkb\b|kettlebell/.test(lower)) return 'kb';
+  if (/\bbarbell\b/.test(lower)) return 'barbell';
+  return null;
 }
 
 function getEquipmentLabel(type: 'barbell' | 'kb' | 'db'): string {
@@ -65,9 +102,10 @@ function getDefaultMetconWeight(mr: MovementResult): number | undefined {
   return roundToLegalWeight(rx * 0.8, mr);
 }
 
-function getFallbackWeight(type: 'barbell' | 'kb' | 'db'): number | undefined {
+function getFallbackWeight(type: LoadEquipment): number | undefined {
   if (type === 'kb') return 16;
-  if (type === 'db') return undefined;
+  // No default prior for DBs or odd implements — the athlete states the load.
+  if (type === 'db' || type === 'other') return undefined;
   return 40;
 }
 
@@ -84,8 +122,35 @@ function movementHasAlternate(mr: MovementResult): boolean {
   return hasAlternatives(mr.movement.name) || !!mr.movement.alternative || !!mr.substitution;
 }
 
-function movementHasInput(mr: MovementResult): boolean {
-  return getTileConfig(mr) != null;
+function movementAlternateKey(mr: MovementResult): string {
+  return (cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name)
+    .replace(/^(Buy-In|Cash-Out):\s*/i, '')
+    .toLowerCase()
+    .trim();
+}
+
+function movementHasInput(mr: MovementResult, distanceDerivedFromRounds: boolean): boolean {
+  return getTileConfig(mr, distanceDerivedFromRounds) != null;
+}
+
+// A distance-kind movement measured in calories rather than meters (prescribed cals,
+// calorie inputType, or a cardio machine with no prescribed distance).
+function isCalorieBased(mr: MovementResult): boolean {
+  const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
+  return mr.movement.inputType === 'calories'
+    || (mr.movement.calories != null && mr.movement.calories > 0)
+    || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
+}
+
+// Per-trip prescribed distance of a distance movement, honoring a distance substitution
+// (e.g. 200m run -> 1200m bike). 0 when the movement is calorie-based or unprescribed.
+function getPrescribedTripDistance(mr: MovementResult): number {
+  if (mr.kind !== 'distance' || isCalorieBased(mr)) return 0;
+  const sub = mr.substitution;
+  const perTripSub = sub?.targetUnit === 'distance' && sub.adjustedValue != null
+    ? sub.adjustedValue
+    : null;
+  return perTripSub ?? mr.movement.distance ?? 0;
 }
 
 // Human-readable labels for section types
@@ -97,7 +162,7 @@ function sectionLabel(type: ParsedSectionType, rounds: number): string {
 
 // Returns the partner-split annotation string for a movement in a partner workout.
 // Shows the workout total and division so athletes know what to log.
-// Examples: "100 cal total · your part 50", "600 m total · your part 300"
+// Examples: "100 cal total - your part 50", "600 m total - your part 300"
 // "Together" movements show "together" instead of a split.
 function partnerAnnotation(mr: MovementResult, teamSize: number): string | null {
   if (teamSize <= 1) return null;
@@ -107,7 +172,7 @@ function partnerAnnotation(mr: MovementResult, teamSize: number): string | null 
     return 'together';
   }
 
-  // Runs are independent in IGYG — each partner runs the full distance, no split annotation
+  // Runs are independent in IGYG: each partner runs the full distance, no split annotation
   if (/\b(run|running|sprint)\b/i.test(mr.movement.name)) return null;
 
   const isCal =
@@ -116,16 +181,16 @@ function partnerAnnotation(mr: MovementResult, teamSize: number): string | null 
 
   if (isCal && mr.movement.calories) {
     const personal = Math.round(mr.movement.calories / teamSize);
-    return `${mr.movement.calories} cal total · your part ${personal}`;
+    return `${mr.movement.calories} cal total - your part ${personal}`;
   }
   if (mr.movement.distance) {
     const unit = mr.distanceUnit ?? mr.movement.unit ?? 'm';
     const personal = Math.round(mr.movement.distance / teamSize);
-    return `${mr.movement.distance} ${unit} total · your part ${personal}`;
+    return `${mr.movement.distance} ${unit} total - your part ${personal}`;
   }
   if (mr.movement.reps) {
     const personal = Math.round(mr.movement.reps / teamSize);
-    return `${mr.movement.reps} total · your part ${personal}`;
+    return `${mr.movement.reps} total - your part ${personal}`;
   }
   return null;
 }
@@ -175,16 +240,16 @@ function getIntervalPatch(mr: MovementResult, value: number): Partial<MovementRe
   return { reps: nextValue };
 }
 
-// ─── Strip weight from movement name for display ─────────────────
+// Strip weight from movement name for display
 // Removes leading/trailing weight patterns like "22.5kg", "95lb", "135#"
 // so the label reads "Alt DB Snatch" instead of "22.5kg Alt DB Snatch".
 function stripWeightFromName(name: string): string {
   return name
-    // Leading: "22.5kg Alt DB Snatch" → "Alt DB Snatch"
+    // Leading: "22.5kg Alt DB Snatch" -> "Alt DB Snatch"
     .replace(/^\d+(\.\d+)?\s*(kg|lb|lbs|#)\s+/i, '')
-    // Trailing: "Alt DB Snatch 22.5kg" → "Alt DB Snatch"
+    // Trailing: "Alt DB Snatch 22.5kg" -> "Alt DB Snatch"
     .replace(/\s+\d+(\.\d+)?\s*(kg|lb|lbs|#)$/i, '')
-    // Parenthetical: "Thruster (95lb)" → "Thruster"
+    // Parenthetical: "Thruster (95lb)" -> "Thruster"
     .replace(/\s*\(\d+(\.\d+)?\s*(kg|lb|lbs|#)\)/i, '')
     .trim();
 }
@@ -200,7 +265,7 @@ function clampValue(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-// ─── Substitution state summary ───────────────────────────────────
+// Substitution state summary
 // Returns the currently displayed movement name (substituted or original)
 // and whether a substitution is active.
 
@@ -208,7 +273,7 @@ interface SubState {
   displayName: string;
   isSubstituted: boolean;
   badgeType: 'scaled' | 'rx-plus' | 'equal' | null;
-  /** Human-readable conversion, e.g. "400m → 1200m" */
+  /** Human-readable conversion, e.g. "400m -> 1200m" */
   conversionNote: string | null;
 }
 
@@ -225,11 +290,11 @@ function getSubState(mr: MovementResult): SubState {
   const type = sub.substitutionType;
   const badgeType = type === 'easier' ? 'scaled' as const : type === 'harder' ? 'rx-plus' as const : 'equal' as const;
 
-  // Build conversion note: "400m → 1200m" or "30 → 90"
+  // Build conversion note: "400m -> 1200m" or "30 -> 90"
   let conversionNote: string | null = null;
   if (sub.originalValue != null && sub.adjustedValue != null && sub.originalValue !== sub.adjustedValue) {
     const isDistance = (mr.movement.distance != null && mr.movement.distance > 0);
-    conversionNote = `${fmtValue(sub.originalValue, isDistance)} → ${fmtValue(sub.adjustedValue, isDistance)}`;
+    conversionNote = `${fmtValue(sub.originalValue, isDistance)} -> ${fmtValue(sub.adjustedValue, isDistance)}`;
   }
 
   return {
@@ -240,9 +305,9 @@ function getSubState(mr: MovementResult): SubState {
   };
 }
 
-// ─── AI quick-toggle ─────────────────────────────────────────────
+// AI quick-toggle
 // When the AI parsed two slash-alternatives (e.g. "40 DU / 60 singles"),
-// we show an inline chip to flip between them — no sheet needed.
+// We show an inline chip to flip between them; no sheet needed.
 
 interface AiToggleProps {
   mr: MovementResult;
@@ -279,14 +344,14 @@ function AiAlternativeToggle({ mr, onChange }: AiToggleProps) {
       onClick={handleToggle}
     >
       {isUsingAiAlt
-        ? `← ${mr.movement.name}`
-        : `${aiAlt.name} ↔`
+        ? `<- ${mr.movement.name}`
+        : `${aiAlt.name} <->`
       }
     </button>
   );
 }
 
-// ─── Prescribed value tag ────────────────────────────────────────
+// Prescribed value tag
 // Returns the inline prescribed value (e.g. "10", "400m", "15 cal")
 // and its Trinity color class for display next to the movement name.
 
@@ -305,7 +370,7 @@ interface TileConfig {
 const LOAD_TILE_COLOR = '#f5c200';
 const METRIC_TILE_COLOR = '#f5c200';
 
-function getTileConfig(mr: MovementResult): TileConfig | null {
+function getTileConfig(mr: MovementResult, distanceDerivedFromRounds = false): TileConfig | null {
   const isMaxBodyweight =
     mr.kind === 'reps' &&
     mr.movement.reps == null &&
@@ -317,7 +382,7 @@ function getTileConfig(mr: MovementResult): TileConfig | null {
       field: 'weight',
       value: mr.weight,
       placeholder: mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0',
-      unit: mr.implementCount === 2 ? '2× kg' : 'kg',
+      unit: mr.implementCount === 2 ? '2x kg' : 'kg',
       color: LOAD_TILE_COLOR,
       step: getWeightStep(mr.movement.name, mr.implementCount),
       min: 0,
@@ -327,10 +392,10 @@ function getTileConfig(mr: MovementResult): TileConfig | null {
   }
 
   if (mr.kind === 'distance') {
-    const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
-    const isCal = mr.movement.inputType === 'calories'
-      || (mr.movement.calories != null && mr.movement.calories > 0)
-      || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
+    const isCal = isCalorieBased(mr);
+    // Solo rounds-scored workout: the ROUNDS counter already counts every trip of a
+    // prescribed-distance movement, so it takes no input of its own.
+    if (distanceDerivedFromRounds && getPrescribedTripDistance(mr) > 0) return null;
     const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
     return {
       field: isCal ? 'calories' : 'distance',
@@ -364,7 +429,7 @@ function getTileConfig(mr: MovementResult): TileConfig | null {
   return null;
 }
 
-// ─── Swap icon (two-arrow cycle symbol) ─────────────────────────
+// Swap icon (two-arrow cycle symbol)
 
 function SwapIcon() {
   return (
@@ -412,7 +477,7 @@ function groupBySections(mrs: MovementResult[]): SectionGroup[] | null {
  * Compact inline inputs for scored exercises (for_time, AMRAP, intervals).
  * Each movement row includes a swap affordance when alternatives exist.
  * When an AI-detected alternative is present, shows a quick-toggle chip.
- * When teamSize > 1, buy-in/cash-out movements show "100 cal total ÷2".
+ * When teamSize > 1, buy-in/cash-out movements show "100 cal total /2".
  */
 export function ScoreMovementInputs({
   movements,
@@ -424,6 +489,7 @@ export function ScoreMovementInputs({
   onSubstitutionOpenChange,
   teamSize,
   isRelayContext = false,
+  distanceDerivedFromRounds = false,
 }: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
@@ -433,17 +499,51 @@ export function ScoreMovementInputs({
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
 
-  const loadGroups = useMemo(() => {
-    const groups = new Map<'barbell' | 'kb' | 'db', { type: 'barbell' | 'kb' | 'db'; movements: MovementResult[] }>();
+  const equipmentByKey = useMemo(() => {
+    const explicitTypes = new Set<SharedEquipment>();
     movements.forEach((mr) => {
       if (mr.kind !== 'load') return;
-      const type = getEquipmentType(mr.movement.name);
+      const explicit = getExplicitEquipmentType(mr.movement.name);
+      if (explicit) explicitTypes.add(explicit);
+    });
+
+    const sharedExplicitType = explicitTypes.size === 1 ? [...explicitTypes][0] : null;
+    const byKey = new Map<string, LoadEquipment>();
+    movements.forEach((mr) => {
+      if (mr.kind !== 'load') return;
+      // AI-stamped equipment outranks every name heuristic. Below it, implicit held loads
+      // must not adopt a sibling's explicit equipment either — a "Weighted Pull-up" next
+      // to a "Barbell Bench" is not done with the barbell.
+      byKey.set(
+        mr.movementKey,
+        equipmentFromAi(mr.movement)
+          ?? getExplicitEquipmentType(mr.movement.name)
+          ?? (isImplicitHeldLoad(mr.movement.name) ? 'other' : null)
+          ?? sharedExplicitType
+          ?? getEquipmentType(mr.movement.name),
+      );
+    });
+    return byKey;
+  }, [movements]);
+
+  const getMovementEquipment = useCallback((mr: MovementResult) => (
+    equipmentByKey.get(mr.movementKey) ?? getEquipmentType(mr.movement.name)
+  ), [equipmentByKey]);
+
+  const loadGroups = useMemo(() => {
+    const groups = new Map<SharedEquipment, { type: SharedEquipment; movements: MovementResult[] }>();
+    movements.forEach((mr) => {
+      if (mr.kind !== 'load') return;
+      const type = getMovementEquipment(mr);
+      // 'other' implements never share a weight input — they stay out of every group and
+      // render as individual WeightField tiles.
+      if (type === 'other') return;
       const group = groups.get(type) ?? { type, movements: [] };
       group.movements.push(mr);
       groups.set(type, group);
     });
     return [...groups.values()];
-  }, [movements]);
+  }, [movements, getMovementEquipment]);
 
   // Only the first (focused) load group uses the hero shared-weight screen.
   // Secondary groups (different equipment type) are rendered as individual tiles.
@@ -459,12 +559,22 @@ export function ScoreMovementInputs({
     const seen = new Set<string>();
     return movements.filter((mr) => {
       if (!movementHasAlternate(mr)) return false;
-      const key = cleanTileLabel(mr.movement.name).toLowerCase();
+      const key = movementAlternateKey(mr);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }, [movements]);
+
+  const firstAlternateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    alternateMovements.forEach((mr) => keys.add(mr.movementKey));
+    return keys;
+  }, [alternateMovements]);
+
+  const canOpenAlternate = useCallback((mr: MovementResult): boolean => (
+    movementHasAlternate(mr) && firstAlternateKeys.has(mr.movementKey)
+  ), [firstAlternateKeys]);
 
   const handleWeightChange = useCallback((globalIndex: number, mr: MovementResult, weight: number | undefined) => {
     const w = weight != null ? Math.max(0, weight) : undefined;
@@ -472,27 +582,28 @@ export function ScoreMovementInputs({
     manuallyEditedRef.current.add(mr.movementKey);
 
     // On the first manual weight edit, propagate atomically to all same-equipment
-    // load movements that haven't been manually edited yet (barbell→barbell, KB→KB, DB→DB).
-    if (w != null && manuallyEditedRef.current.size === 1 && onBatch) {
-      const srcEquip = getEquipmentType(mr.movement.name);
+    // load movements that haven't been manually edited yet (barbell -> barbell, KB -> KB,
+    // DB -> DB). 'other' implements are each their own thing — never propagate between them.
+    if (w != null && manuallyEditedRef.current.size === 1 && onBatch && getMovementEquipment(mr) !== 'other') {
+      const srcEquip = getMovementEquipment(mr);
       const next = movements.map((other, otherIdx) => {
         if (otherIdx === globalIndex) return { ...other, weight: w };
         if (other.kind !== 'load') return other;
         if (manuallyEditedRef.current.has(other.movementKey)) return other;
-        if (getEquipmentType(other.movement.name) !== srcEquip) return other;
+        if (getMovementEquipment(other) !== srcEquip) return other;
         return { ...other, weight: w };
       });
       onBatch(next);
     } else {
       onChange(globalIndex, { weight: w });
     }
-  }, [movements, onChange, onBatch]);
+  }, [movements, onChange, onBatch, getMovementEquipment]);
 
   const handleSharedWeightChange = useCallback((equipmentType: 'barbell' | 'kb' | 'db', weight: number | undefined) => {
     const w = weight != null ? Math.max(0, weight) : undefined;
     const next = movements.map((mr) => {
       if (mr.kind !== 'load') return mr;
-      if (getEquipmentType(mr.movement.name) !== equipmentType) return mr;
+      if (getMovementEquipment(mr) !== equipmentType) return mr;
       return { ...mr, weight: w };
     });
     if (onBatch) {
@@ -502,7 +613,7 @@ export function ScoreMovementInputs({
     next.forEach((mr, index) => {
       if (mr !== movements[index]) onChange(index, { weight: mr.weight });
     });
-  }, [movements, onBatch, onChange]);
+  }, [movements, onBatch, onChange, getMovementEquipment]);
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -534,9 +645,9 @@ export function ScoreMovementInputs({
       if (mr.kind !== 'load' || mr.weight != null) return mr;
       // Seed from Rx weight (80% of prescribed) when available, otherwise fall back to
       // the equipment default (barbell=40, KB=16). This keeps the persisted value consistent
-      // with what the hero weight screen visually displays — without seeding, the screen
+      // with what the hero weight screen visually displays; without seeding, the screen
       // shows a fallback weight that is lost if the user never taps +/-.
-      const defaultWeight = getDefaultMetconWeight(mr) ?? getFallbackWeight(getEquipmentType(mr.movement.name));
+      const defaultWeight = getDefaultMetconWeight(mr) ?? getFallbackWeight(getMovementEquipment(mr));
       return defaultWeight != null ? { ...mr, weight: defaultWeight } : mr;
     });
     const changed = next.some((mr, i) => mr !== movements[i]);
@@ -552,7 +663,7 @@ export function ScoreMovementInputs({
     next.forEach((mr, index) => {
       if (mr !== movements[index]) onChange(index, { weight: mr.weight });
     });
-  }, [movements, onBatch, onChange]);
+  }, [movements, onBatch, onChange, getMovementEquipment]);
 
   // Which movement key has the substitution sheet open
   const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
@@ -581,8 +692,8 @@ export function ScoreMovementInputs({
     const patch: Partial<MovementResult> = { substitution: sub };
     if (sub) {
       if (sub.adjustedValue != null) {
-        // Use targetUnit from the substitution sheet if available — it knows
-        // the target movement's default unit (e.g., Run→Echo Bike = calories).
+        // Use targetUnit from the substitution sheet if available; it knows
+        // the target movement's default unit (e.g., Run -> Echo Bike = calories).
         if (sub.targetUnit) {
           if (sub.targetUnit === 'distance') {
             patch.distance = sub.adjustedValue;
@@ -634,14 +745,14 @@ export function ScoreMovementInputs({
         // Clear calories if reverting from a calorie-based substitute
         patch.calories = undefined;
       } else if (isDistance) {
-        // Distance-based row but no prescribed distance — clear user-entered distance.
+        // Distance-based row but no prescribed distance: clear user-entered distance.
         patch.distance = undefined;
       }
     }
 
     const sameMovementIndices = movements
       .map((mr, index) => ({ mr, index }))
-      .filter(({ mr }) => cleanTileLabel(mr.movement.name).toLowerCase() === cleanTileLabel(swapMr.movement.name).toLowerCase())
+      .filter(({ mr }) => movementAlternateKey(mr) === movementAlternateKey(swapMr))
       .map(({ index }) => index);
 
     if (onBatch && sameMovementIndices.length > 1) {
@@ -655,9 +766,28 @@ export function ScoreMovementInputs({
     closeSwap();
   };
 
+  const handleAiAlternativeToggle = (mr: MovementResult, patch: Partial<MovementResult>) => {
+    const globalIndex = movements.indexOf(mr);
+    if (globalIndex < 0) return;
+    const sameMovementIndices = movements
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => movementAlternateKey(candidate) === movementAlternateKey(mr))
+      .map(({ index }) => index);
+
+    if (onBatch && sameMovementIndices.length > 1) {
+      const next = movements.map((candidate, index) => (
+        sameMovementIndices.includes(index) ? { ...candidate, ...patch } : candidate
+      ));
+      onBatch(next);
+      return;
+    }
+
+    onChange(globalIndex, patch);
+  };
+
   const editableTiles = useMemo(() => (
     movements.flatMap((mr, globalIndex) => {
-      const config = getTileConfig(mr);
+      const config = getTileConfig(mr, distanceDerivedFromRounds);
       if (!config) return [];
       const sub = getSubState(mr);
       const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
@@ -670,7 +800,7 @@ export function ScoreMovementInputs({
         config,
       }];
     })
-  ), [movements]);
+  ), [movements, distanceDerivedFromRounds]);
 
   const tileRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
@@ -793,7 +923,7 @@ export function ScoreMovementInputs({
   const renderIntervalField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
     const sub = getSubState(mr);
-    const hasAlts = hasAlternatives(mr.movement.name) || !!mr.movement.alternative;
+    const hasAlts = canOpenAlternate(mr);
     const label = (
       cleanTileLabel(sub.isSubstituted ? sub.displayName : mr.movement.name)
       || stripWeightFromName(sub.isSubstituted ? sub.displayName : mr.movement.name)
@@ -931,15 +1061,30 @@ export function ScoreMovementInputs({
     );
   }
 
-  // ── Arcade tile renderer ─────────────────────────────────────────
+  // Arcade tile renderer
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
+    if (focusedLoadStep && focusedLoadGroupKeys.has(mr.movementKey)) {
+      if (mr.movementKey !== focusedLoadFirstKey) return null;
+      return (
+        <React.Fragment key={`shared-${mr.movementKey}`}>
+          {mr.movement.stationLabel && (
+            <div className={styles.stationDivider}>
+              <span className={styles.stationLabel}>{mr.movement.stationLabel}</span>
+              <span className={styles.sectionLine} />
+            </div>
+          )}
+          {focusedLoadStep}
+        </React.Fragment>
+      );
+    }
+
     const sub = getSubState(mr);
     const rawMovName = sub.isSubstituted ? sub.displayName : mr.movement.name;
-    // Strip AI-generated "Buy-In:"/"Cash-Out:" prefix from display — these labels can be
+    // Strip AI-generated "Buy-In:"/"Cash-Out:" prefix from display; these labels can be
     // misparsed for the first movement of a numbered AMRAP block.
     const displayMovName = rawMovName.replace(/^(Buy-In|Cash-Out):\s*/i, '');
-    const hasAlts = hasAlternatives(displayMovName) || !!mr.movement.alternative;
+    const hasAlts = canOpenAlternate(mr);
     const tileName = (
       cleanTileLabel(displayMovName)
       || stripWeightFromName(displayMovName)
@@ -948,6 +1093,7 @@ export function ScoreMovementInputs({
 
     const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
     const isSharedWeight = sharedWeightKeys.has(mr.movementKey);
+    const tileField = getTileConfig(mr, distanceDerivedFromRounds)?.field;
 
     return (
       <React.Fragment key={mr.movementKey}>
@@ -963,7 +1109,7 @@ export function ScoreMovementInputs({
             tileRefs.current[mr.movementKey] = node;
           }}
         >
-          {/* Tile header: name + optional sub badge + swap affordance — tappable for substitution */}
+          {/* Tile header: name + optional sub badge + swap affordance; tappable for substitution */}
           <div
             className={styles.tileHeader}
             onClick={hasAlts ? () => openSwap(mr.movementKey) : undefined}
@@ -1001,7 +1147,7 @@ export function ScoreMovementInputs({
           )}
 
           {/* AI quick-toggle chip */}
-          <AiAlternativeToggle mr={mr} onChange={(patch) => onChange(globalIndex, patch)} />
+          {hasAlts && <AiAlternativeToggle mr={mr} onChange={(patch) => handleAiAlternativeToggle(mr, patch)} />}
 
           {/* Input: arcade stepper or nothing for prescribed-reps display movements */}
           {mr.kind === 'load' && !isSharedWeight && (
@@ -1012,7 +1158,7 @@ export function ScoreMovementInputs({
               active={activeTileId === mr.movementKey}
             />
           )}
-          {mr.kind === 'distance' && (
+          {(tileField === 'distance' || tileField === 'calories') && (
             <DistanceField
               mr={mr}
               onChange={(patch) => onChange(globalIndex, patch)}
@@ -1021,8 +1167,8 @@ export function ScoreMovementInputs({
               isRelayContext={isRelayContext}
             />
           )}
-          {/* MAX bodyweight: no prescribed quantity → let user log their score */}
-          {getTileConfig(mr)?.field === 'reps' && (
+          {/* MAX bodyweight: no prescribed quantity; let user log their score */}
+          {tileField === 'reps' && (
             <RepsField
               mr={mr}
               onChange={(patch) => onChange(globalIndex, patch)}
@@ -1046,7 +1192,7 @@ export function ScoreMovementInputs({
     const currentWeight = base?.weight ?? getDefaultMetconWeight(base) ?? getFallbackWeight(focusedLoadGroup.type) ?? 0;
     const rx = getRxWeight(base);
     const step = getLegalWeightStep(base);
-    const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' · ');
+    const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' - ');
     const groupLabel = getEquipmentLabel(focusedLoadGroup.type);
 
     const setSharedValue = (next: number) => {
@@ -1209,51 +1355,35 @@ export function ScoreMovementInputs({
 
   // Only stop on movements where the athlete can actually change something.
   // Plain bodyweight movements with no alternate are omitted from this input step.
-  const visibleMovements = movements.filter(mr => movementHasInput(mr) || movementHasAlternate(mr));
-  const prioritizeInputs = (items: MovementResult[]) => (
-    [...items].sort((a, b) => Number(movementHasInput(b)) - Number(movementHasInput(a)))
-  );
+  const visibleMovements = movements.filter(mr => movementHasInput(mr, distanceDerivedFromRounds) || canOpenAlternate(mr));
   const visibleSectionGroups = groupBySections(visibleMovements);
   const focusedLoadStep = renderFocusedLoadStep();
-  // Non-load movements (distance, reps) that need their own tile even when the hero weight
-  // picker is showing — e.g. "200m Run" in an IGYG AMRAP alongside Power Cleans.
-  // Secondary load groups (different equipment type from loadGroups[0]) also get tiles here,
-  // because the hero screen only handles the first group (e.g. KB swing gets the hero screen,
-  // but a weighted box step up with barbell equipment type needs its own tile).
-  const secondaryLoadMovements = loadGroups.slice(1).flatMap(g => g.movements);
-  const nonLoadVisibleMovements = prioritizeInputs([
-    ...secondaryLoadMovements,
-    ...visibleMovements.filter(mr => mr.kind !== 'load'),
-  ]);
+  const focusedLoadFirstKey = focusedLoadGroup?.movements[0]?.movementKey ?? null;
+  const focusedLoadGroupKeys = new Set(focusedLoadGroup?.movements.map(mr => mr.movementKey) ?? []);
 
-  const movementTileBlock = focusedLoadStep
-    ? nonLoadVisibleMovements.length > 0
-      ? <div className={styles.multiRow}>{nonLoadVisibleMovements.map(renderMovField)}</div>
-      : null
-    : visibleSectionGroups
-      ? (
-        <div className={styles.multiRow}>
-          {visibleSectionGroups.map((group) => (
-            <div key={group.sectionIndex} className={styles.sectionGroup}>
-              <div className={styles.sectionHeader}>
-                <span className={styles.sectionLabel}>
-                  {sectionLabel(group.sectionType, group.sectionRounds)}
-                </span>
-                <span className={styles.sectionLine} />
-              </div>
-              {prioritizeInputs(group.movements).map(renderMovField)}
+  const movementTileBlock = visibleSectionGroups
+    ? (
+      <div className={styles.multiRow}>
+        {visibleSectionGroups.map((group) => (
+          <div key={group.sectionIndex} className={styles.sectionGroup}>
+            <div className={styles.sectionHeader}>
+              <span className={styles.sectionLabel}>
+                {sectionLabel(group.sectionType, group.sectionRounds)}
+              </span>
+              <span className={styles.sectionLine} />
             </div>
-          ))}
-        </div>
-      )
-      : <div className={styles.multiRow}>{prioritizeInputs(visibleMovements).map(renderMovField)}</div>;
+            {group.movements.map(renderMovField)}
+          </div>
+        ))}
+      </div>
+    )
+    : <div className={styles.multiRow}>{visibleMovements.map(renderMovField)}</div>;
 
   return (
     <>
-      {focusedLoadStep}
       {movementTileBlock}
 
-      {/* Substitution sheet — single instance, driven by swapOpenKey */}
+      {/* Substitution sheet; single instance, driven by swapOpenKey */}
       {swapMr && (
         <SubstitutionSheet
           open={swapOpenKey != null}
@@ -1296,7 +1426,7 @@ function WeightField({
   active: boolean;
 }) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
-  const unitLabel = mr.implementCount === 2 ? '2× kg' : 'kg';
+  const unitLabel = mr.implementCount === 2 ? '2x kg' : 'kg';
   const step = getWeightStep(mr.movement.name, mr.implementCount);
 
   return (
@@ -1330,24 +1460,18 @@ function DistanceField({
   active: boolean;
   isRelayContext?: boolean;
 }) {
-  const isCardioMachine = /\b(bike|row|ski)\b/i.test(mr.movement.name);
-  const isCal = mr.movement.inputType === 'calories'
-    || (mr.movement.calories != null && mr.movement.calories > 0)
-    || (isCardioMachine && !mr.movement.distance && mr.movement.inputType !== 'distance');
+  const isCal = isCalorieBased(mr);
 
-  // In an AMRAP relay, a prescribed distance means "how many trips" — show a count stepper.
-  // In a for-time workout, a prescribed distance is just the fixed target — show normal entry.
-  const perTripSubDist = !isCal && mr.substitution?.targetUnit === 'distance' && mr.substitution.adjustedValue != null
-    ? mr.substitution.adjustedValue
-    : null;
-  const prescribedDist = !isCal ? (perTripSubDist ?? mr.movement.distance ?? 0) : 0;
+  // In a partner/relay AMRAP, a prescribed distance means "how many trips": show a count stepper.
+  // In a for-time workout, a prescribed distance is just the fixed target: show normal entry.
+  const prescribedDist = getPrescribedTripDistance(mr);
   const isRelayCount = isRelayContext && prescribedDist > 0;
 
   if (isRelayCount) {
     const count = mr.distance != null && prescribedDist > 0
       ? Math.round(mr.distance / prescribedDist)
       : undefined;
-    const unit = `× ${prescribedDist}${mr.distanceUnit ?? mr.movement.unit ?? 'm'}`;
+    const unit = `x ${prescribedDist}${mr.distanceUnit ?? mr.movement.unit ?? 'm'}`;
     return (
       <StepperInput
         value={count}
@@ -1422,3 +1546,4 @@ function RepsField({
     />
   );
 }
+

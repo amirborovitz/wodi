@@ -3,6 +3,7 @@ import type { WorkoutWithStats } from '../../hooks/useWorkouts';
 import { useCelebrationData } from '../../hooks/useCelebrationData';
 import { buildPosterWod } from '../celebration/faces/HandwrittenFace/posterData';
 import { getSkin, resolvePosterVibe } from '../celebration/faces/HandwrittenFace/skinRegistry';
+import { TextSticker } from '../celebration/faces/HandwrittenFace/TextSticker';
 import styles from './PosterThumbnail.module.css';
 
 interface PosterThumbnailProps {
@@ -82,7 +83,8 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
           className={styles.card}
           style={{ width: POSTER_REFERENCE_WIDTH, transform: `translateX(-50%) scale(${scale})` }}
         >
-          <Skin wod={wod} vibe={vibe} />
+          <Skin wod={wod} vibe={vibe} vibeOffset={workout.posterVibeOffset} />
+          {workout.posterSticker && <TextSticker sticker={workout.posterSticker} />}
         </div>
       </button>
 

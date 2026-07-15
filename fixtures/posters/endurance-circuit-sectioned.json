@@ -1,0 +1,57 @@
+{
+  "name": "endurance-circuit-sectioned",
+  "description": "Two 5-round for-time blocks (2026-07-09 bug WOD): block chips, dips/push-ups alternative, Run→Echo Bike substitution, weighted movements @35/50kg",
+  "workout": {
+    "rawText": "B. METCON (Long)\nFor time:\n5 rounds:\n200m run\n10 push press @35/50kg\n10 T.T.B\n5 rounds:\n10 dips / push ups\n10 S.D.H.P @35/50kg\n20 air squats\n< 24 minutes T.C. >",
+    "format": "for_time",
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "Endurance Circuit For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "2 x 5 rounds for time, 24 min cap",
+        "rawText": "For time:\n5 rounds:\n200m run\n10 push press @35/50kg\n10 T.T.B\n5 rounds:\n10 dips / push ups\n10 S.D.H.P @35/50kg\n20 air squats\n< 24 minutes T.C. >",
+        "sets": [{ "id": "set-0", "setNumber": 1, "time": 1800, "completed": true }],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 5,
+            "movements": [
+              { "name": "Run", "distance": 200, "inputType": "distance" },
+              { "name": "Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 50, "female": 35, "unit": "kg" } },
+              { "name": "Toes to Bar", "reps": 10 }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 5,
+            "movements": [
+              { "name": "Dips", "reps": 10, "alternative": { "name": "Push Ups", "reps": 10 } },
+              { "name": "Sumo Deadlift High Pull", "reps": 10, "inputType": "weight", "rxWeights": { "male": 50, "female": 35, "unit": "kg" } },
+              { "name": "Air Squats", "reps": 20 }
+            ]
+          }
+        ],
+        "movements": [
+          { "name": "Run", "distance": 200, "inputType": "distance" },
+          { "name": "Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 50, "female": 35, "unit": "kg" } },
+          { "name": "Toes to Bar", "reps": 10 },
+          { "name": "Dips", "reps": 10, "alternative": { "name": "Push Ups", "reps": 10 } },
+          { "name": "Sumo Deadlift High Pull", "reps": 10, "inputType": "weight", "rxWeights": { "male": 50, "female": 35, "unit": "kg" } },
+          { "name": "Air Squats", "reps": 20 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Echo Bike", "originalMovement": "Run", "wasSubstituted": true, "totalCalories": 50, "unit": "cal", "color": "magenta" },
+        { "name": "Push Press", "totalReps": 50, "weight": 35, "unit": "kg", "color": "yellow" },
+        { "name": "Toes to Bar", "totalReps": 50, "color": "cyan" },
+        { "name": "Dips", "totalReps": 50, "color": "magenta" },
+        { "name": "Sumo Deadlift High Pull", "totalReps": 50, "weight": 35, "unit": "kg", "color": "yellow" },
+        { "name": "Air Squats", "totalReps": 100, "color": "magenta" }
+      ]
+    }
+  }
+}

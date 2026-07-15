@@ -1,0 +1,214 @@
+{
+  "reward": [
+    {
+      "eyebrow": "FOR TIME",
+      "title": "Blueprint",
+      "blueprint": "Progressive chipper, 20 min cap",
+      "rows": [
+        {
+          "roundLabel": "R1",
+          "name": "round-1",
+          "primary": "10cal Ski Erg",
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "R2",
+          "name": "round-2",
+          "primary": "+ 10 Wall Balls",
+          "subNote": "9kg",
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "R3",
+          "name": "round-3",
+          "primary": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+          "subNote": "9kg",
+          "accent": "magenta"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "FOR TIME",
+        "title": "Blueprint",
+        "blueprint": "Progressive chipper, 20 min cap",
+        "rows": [
+          {
+            "roundLabel": "R1",
+            "name": "round-1",
+            "primary": "10cal Ski Erg",
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "R2",
+            "name": "round-2",
+            "primary": "+ 10 Wall Balls",
+            "subNote": "9kg",
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "R3",
+            "name": "round-3",
+            "primary": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+            "subNote": "9kg",
+            "accent": "magenta"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "17:00",
+    "unit": "MIN",
+    "formatLine": "For Time",
+    "storyLine": "30 ski erg cals · 20 wall ball · 10 burpees",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "10 cal",
+        "name": "Ski Erg",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Row",
+        "substitutedPerRound": "10 cal"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "10 cal",
+        "name": "Ski Erg",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Row",
+        "substitutedPerRound": "10 cal"
+      },
+      {
+        "perRound": "10",
+        "name": "Wall Ball",
+        "total": "",
+        "color": "yellow",
+        "weight": 9,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "10 cal",
+        "name": "Ski Erg",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Row",
+        "substitutedPerRound": "10 cal"
+      },
+      {
+        "perRound": "10",
+        "name": "Wall Ball",
+        "total": "",
+        "color": "yellow",
+        "weight": 9,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Burpees",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "PROGRESSIVE CHIPPER, 20 MIN CAP",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10cal Ski Erg",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "R1"
+      },
+      {
+        "kind": "line",
+        "rx": "+ 10 Wall Balls",
+        "load": "9kg",
+        "mine": "9kg",
+        "team": "",
+        "roundLabel": "R2"
+      },
+      {
+        "kind": "line",
+        "rx": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+        "load": "9kg",
+        "mine": "9kg",
+        "team": "",
+        "roundLabel": "R3"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "PROGRESSIVE CHIPPER, 20 MIN CAP",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10cal Ski Erg",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "R1"
+        },
+        {
+          "kind": "line",
+          "rx": "+ 10 Wall Balls",
+          "load": "9kg",
+          "mine": "9kg",
+          "team": "",
+          "roundLabel": "R2"
+        },
+        {
+          "kind": "line",
+          "rx": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+          "load": "9kg",
+          "mine": "9kg",
+          "team": "",
+          "roundLabel": "R3"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

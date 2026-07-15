@@ -1,0 +1,180 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "3 Rounds For Time",
+      "blueprint": "3 rounds for time",
+      "blueprintSub": "400M RUN • 21 KB SWINGS • 12 PULL-UPS",
+      "rows": [
+        {
+          "primary": "400m",
+          "name": "Run",
+          "subNote": "1.20 km total",
+          "totalNote": "1.20 km total",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 3
+        },
+        {
+          "primary": "21",
+          "name": "Kettlebell Swings",
+          "nameWithLoad": "Kettlebell Swings @ 24kg",
+          "loadNote": "24kg",
+          "subNote": "63 total reps",
+          "totalNote": "63 total reps",
+          "mineKey": "Kettlebell Swing",
+          "accent": "yellow",
+          "repeatCount": 3
+        },
+        {
+          "primary": "12",
+          "name": "Pull-ups",
+          "subNote": "36 total",
+          "totalNote": "36 total",
+          "mineKey": "Pull-up",
+          "accent": "cyan",
+          "repeatCount": 3
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "3 Rounds For Time",
+        "blueprint": "3 rounds for time",
+        "blueprintSub": "400M RUN • 21 KB SWINGS • 12 PULL-UPS",
+        "rows": [
+          {
+            "primary": "400m",
+            "name": "Run",
+            "subNote": "1.20 km total",
+            "totalNote": "1.20 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "21",
+            "name": "Kettlebell Swings",
+            "nameWithLoad": "Kettlebell Swings @ 24kg",
+            "loadNote": "24kg",
+            "subNote": "63 total reps",
+            "totalNote": "63 total reps",
+            "mineKey": "Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 3
+          },
+          {
+            "primary": "12",
+            "name": "Pull-ups",
+            "subNote": "36 total",
+            "totalNote": "36 total",
+            "mineKey": "Pull-up",
+            "accent": "cyan",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "13:00",
+    "unit": "MIN",
+    "formatLine": "3 Rounds For Time",
+    "storyLine": "1.2km run · 63 kettlebell swing · 36 pull-up",
+    "storyMovements": [
+      {
+        "perRound": "1.2km",
+        "name": "Run",
+        "total": "1.2km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "21",
+        "name": "Kettlebell Swing",
+        "total": "63 total",
+        "color": "yellow",
+        "weight": 24,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "12",
+        "name": "Pull-up",
+        "total": "36 total",
+        "color": "cyan",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "400m Run",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "1.20 km total"
+      },
+      {
+        "kind": "line",
+        "rx": "21 Kettlebell Swings",
+        "load": "",
+        "mine": "24kg",
+        "team": "",
+        "total": "63 total reps"
+      },
+      {
+        "kind": "line",
+        "rx": "12 Pull-ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "36 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "400m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.20 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "21 Kettlebell Swings",
+          "load": "",
+          "mine": "24kg",
+          "team": "",
+          "total": "63 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "12 Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

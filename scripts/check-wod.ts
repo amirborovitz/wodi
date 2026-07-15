@@ -1,15 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Exercise, ExerciseSet, ParsedExercise, ParsedWorkout, WorkoutType } from '../src/types';
+import { fileURLToPath } from 'node:url';
+import type { Exercise, ExerciseSet, ParsedExercise, ParsedWorkout, WorkoutType, WorkloadBreakdown } from '../src/types';
+import type { HeroResult } from '../src/components/celebration';
 
-type Expectation = {
+export type Expectation = {
   raw: string;
   path: string;
   op: 'equals' | 'contains' | 'notEquals' | 'notContains';
   expected: string;
 };
 
-type CliOptions = {
+export type CliOptions = {
   text?: string;
   file?: string;
   expects: Expectation[];
@@ -20,7 +22,15 @@ type CliOptions = {
   };
 };
 
-function loadDotEnv(): void {
+export interface PipelineResult {
+  raw: string;
+  parsed: ParsedWorkout;
+  workload: WorkloadBreakdown;
+  hero: HeroResult;
+  context: Record<string, unknown>;
+}
+
+export function loadDotEnv(): void {
   for (const name of ['.env.local', '.env']) {
     const file = path.resolve(process.cwd(), name);
     if (!fs.existsSync(file)) continue;
@@ -40,7 +50,7 @@ function loadDotEnv(): void {
   }
 }
 
-function parseSeconds(value: string): number {
+export function parseSeconds(value: string): number {
   const trimmed = value.trim();
   const clock = trimmed.match(/^(\d+):(\d{2})$/);
   if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
@@ -49,7 +59,7 @@ function parseSeconds(value: string): number {
   return parseInt(trimmed, 10);
 }
 
-function parseExpectation(raw: string): Expectation {
+export function parseExpectation(raw: string): Expectation {
   const match = raw.match(/^([^=!~]+)(!?=|!?~=)(.*)$/);
   if (!match) {
     throw new Error(`Bad expectation "${raw}". Use path=value, path!=value, path~=text, or path!~=text.`);
@@ -70,12 +80,12 @@ function parseExpectation(raw: string): Expectation {
   };
 }
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = { expects: [], result: {} };
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    const next = () => {
+    const next = (): string => {
       const value = argv[i + 1];
       if (!value) throw new Error(`Missing value for ${arg}`);
       i += 1;
@@ -99,7 +109,7 @@ function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
-function printHelp(): void {
+export function printHelp(): void {
   console.log(`
 Usage:
   npm run check-wod -- --text "Every 3 min x 5 rounds: 40 DU..." --expect format=emom
@@ -113,7 +123,7 @@ Expect operators:
 
 Useful paths:
   title, type, format, scoreType, timeCap, teamSize
-  loggingModes, movementNames
+  loggingModes, movementNames, movementCountingModes
   totals.reps, totals.volume, totals.distance, totals.calories
   hero.value, hero.unit, hero.formatLine
 `);
@@ -133,7 +143,12 @@ function getRepeatCount(workout: ParsedWorkout, exercise: ParsedExercise): numbe
   ) ?? 1;
 }
 
-function exerciseToSavedExercise(workout: ParsedWorkout, exercise: ParsedExercise, index: number, result: CliOptions['result']): Exercise {
+export function exerciseToSavedExercise(
+  workout: ParsedWorkout,
+  exercise: ParsedExercise,
+  index: number,
+  result: CliOptions['result'] = {},
+): Exercise {
   const repeatCount = Math.max(1, result.sets ?? getRepeatCount(workout, exercise));
   const sets: ExerciseSet[] = [];
 
@@ -156,6 +171,7 @@ function exerciseToSavedExercise(workout: ParsedWorkout, exercise: ParsedExercis
     id: `exercise-${index}`,
     name: exercise.name,
     type: exercise.type,
+    stationRotation: exercise.stationRotation,
     prescription: exercise.prescription,
     sets,
     rxWeights: exercise.rxWeights,
@@ -165,14 +181,17 @@ function exerciseToSavedExercise(workout: ParsedWorkout, exercise: ParsedExercis
     suggestedRepsPerSet: exercise.suggestedRepsPerSet,
     ladderReps: exercise.ladderReps,
     intervalCount: exercise.intervalCount,
+    workDuration: exercise.workDuration,
+    restDuration: exercise.restDuration,
     partnerWorkout: exercise.partnerWorkout,
     partnerSplit: exercise.partnerSplit,
     personalRounds: exercise.personalRounds,
+    loggingMode: exercise.loggingMode,
     rawText: exercise.rawText,
   };
 }
 
-function getPath(obj: unknown, dottedPath: string): unknown {
+export function getPath(obj: unknown, dottedPath: string): unknown {
   return dottedPath.split('.').reduce<unknown>((value, segment) => {
     if (value == null) return undefined;
     if (Array.isArray(value) && /^\d+$/.test(segment)) return value[parseInt(segment, 10)];
@@ -181,14 +200,14 @@ function getPath(obj: unknown, dottedPath: string): unknown {
   }, obj);
 }
 
-function stringifyValue(value: unknown): string {
+export function stringifyValue(value: unknown): string {
   if (value == null) return '';
   if (Array.isArray(value)) return value.map(stringifyValue).join(', ');
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
 
-function checkExpectation(context: Record<string, unknown>, expectation: Expectation): string | null {
+export function checkExpectation(context: Record<string, unknown>, expectation: Expectation): string | null {
   const actual = stringifyValue(getPath(context, expectation.path));
   const expected = expectation.expected;
   const passed =
@@ -201,21 +220,84 @@ function checkExpectation(context: Record<string, unknown>, expectation: Expecta
   return `${expectation.raw} failed (actual: "${actual}")`;
 }
 
-async function main(): Promise<void> {
-  loadDotEnv();
-  const options = parseArgs(process.argv.slice(2));
-  const text = options.text ?? (options.file ? fs.readFileSync(path.resolve(options.file), 'utf8') : undefined);
-  if (!text?.trim()) {
-    printHelp();
-    throw new Error('Provide --text or --file.');
-  }
+export function parseAiJson(raw: string): unknown {
+  const trimmed = raw.trim();
+  const jsonMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return JSON.parse((jsonMatch ? jsonMatch[1] : trimmed).trim());
+}
 
+function flattenParsedMovements(parsed: ParsedWorkout): ParsedExercise['movements'] {
+  return parsed.exercises.flatMap((exercise) => {
+    const sectionMovements = exercise.sections?.flatMap((section) => section.movements) ?? [];
+    return sectionMovements.length > 0 ? sectionMovements : (exercise.movements ?? []);
+  });
+}
+
+export function buildContext(parsed: ParsedWorkout, workload: WorkloadBreakdown, hero: HeroResult): Record<string, unknown> {
+  const movements = flattenParsedMovements(parsed);
+  return {
+    title: parsed.title ?? '',
+    type: parsed.type,
+    format: parsed.format,
+    scoreType: parsed.scoreType,
+    timeCap: parsed.timeCap ?? '',
+    teamSize: parsed.teamSize ?? '',
+    exerciseCount: parsed.exercises.length,
+    exerciseNames: parsed.exercises.map((exercise) => exercise.name),
+    loggingModes: parsed.exercises.map((exercise) => exercise.loggingMode ?? ''),
+    movementNames: movements?.map((movement) => movement.name) ?? [],
+    movementCountingModes: movements?.map((movement) => movement.countingMode ?? '') ?? [],
+    stationLabels: movements?.map((movement) => movement.stationLabel ?? '') ?? [],
+    // The semantic that matters for counting: which station each movement belongs to.
+    // The post-processor's carry-forward stamps this whether the AI labeled every movement
+    // or only each station's first one (the rule-732 contract) — assert THIS, not raw labels.
+    stationIndices: movements?.map((movement) => movement.stationIndex ?? '') ?? [],
+    totals: {
+      reps: workload.grandTotalReps,
+      volume: workload.grandTotalVolume,
+      distance: workload.grandTotalDistance ?? '',
+      calories: workload.grandTotalCalories ?? '',
+    },
+    hero,
+    parsed,
+  };
+}
+
+export async function runOfflinePipeline(aiResponse: string, rawText: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
+  const { validateParsedWorkout } = await import('../src/services/openai');
+  const { postProcessParsedWorkout } = await import('../src/services/workoutPostProcessor');
+  const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
+  const { computeHeroResult } = await import('../src/components/celebration/helpers');
+
+  const validated = validateParsedWorkout(parseAiJson(aiResponse));
+  const parsed = postProcessParsedWorkout(validated);
+  const workload = calculateWorkloadBreakdown(parsed);
+  const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, result));
+  const hero = computeHeroResult(
+    exercises,
+    parsed.format,
+    workload.grandTotalVolume,
+    0,
+    Math.round((parsed.timeCap ?? 0) / 60),
+    false,
+    workload.movements,
+    parsed.timeCap,
+    undefined,
+    undefined,
+    parsed.teamSize,
+    parsed.rawText ?? rawText,
+  );
+  return { raw: aiResponse, parsed, workload, hero, context: buildContext(parsed, workload, hero) };
+}
+
+export async function runLivePipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
   const { parseWorkoutText } = await import('../src/services/openai');
   const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
   const { computeHeroResult } = await import('../src/components/celebration/helpers');
-  const parsed = (await parseWorkoutText(text)).parsed;
+
+  const { raw, parsed } = await parseWorkoutText(text);
   const workload = calculateWorkloadBreakdown(parsed);
-  const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, options.result));
+  const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, result));
   const hero = computeHeroResult(
     exercises,
     parsed.format,
@@ -230,38 +312,31 @@ async function main(): Promise<void> {
     parsed.teamSize,
     parsed.rawText ?? text,
   );
+  return { raw, parsed, workload, hero, context: buildContext(parsed, workload, hero) };
+}
 
-  const context: Record<string, unknown> = {
-    title: parsed.title ?? '',
-    type: parsed.type,
-    format: parsed.format,
-    scoreType: parsed.scoreType,
-    timeCap: parsed.timeCap ?? '',
-    teamSize: parsed.teamSize ?? '',
-    exerciseCount: parsed.exercises.length,
-    loggingModes: parsed.exercises.map((exercise) => exercise.loggingMode ?? ''),
-    movementNames: parsed.exercises.flatMap((exercise) => exercise.movements?.map((movement) => movement.name) ?? []),
-    totals: {
-      reps: workload.grandTotalReps,
-      volume: workload.grandTotalVolume,
-      distance: workload.grandTotalDistance ?? '',
-      calories: workload.grandTotalCalories ?? '',
-    },
-    hero,
-    parsed,
-  };
+async function main(): Promise<void> {
+  loadDotEnv();
+  const options = parseArgs(process.argv.slice(2));
+  const text = options.text ?? (options.file ? fs.readFileSync(path.resolve(options.file), 'utf8') : undefined);
+  if (!text?.trim()) {
+    printHelp();
+    throw new Error('Provide --text or --file.');
+  }
+
+  const result = await runLivePipeline(text, options.result);
 
   const failures = options.expects
-    .map((expectation) => checkExpectation(context, expectation))
+    .map((expectation) => checkExpectation(result.context, expectation))
     .filter((failure): failure is string => Boolean(failure));
 
   console.log('\nWOD CHECK');
-  console.log(`Title: ${context.title || '(untitled)'}`);
-  console.log(`Format: ${context.format} | Score: ${context.scoreType} | Exercises: ${context.exerciseCount}`);
-  console.log(`Logging: ${stringifyValue(context.loggingModes)}`);
-  console.log(`Movements: ${stringifyValue(context.movementNames)}`);
-  console.log(`Totals: ${workload.grandTotalReps} reps, ${workload.grandTotalVolume} kg${workload.grandTotalDistance ? `, ${workload.grandTotalDistance}m` : ''}${workload.grandTotalCalories ? `, ${workload.grandTotalCalories} cal` : ''}`);
-  console.log(`Hero: ${hero.value}${hero.unit ? ` ${hero.unit}` : ''}${hero.formatLine ? ` | ${hero.formatLine}` : ''}`);
+  console.log(`Title: ${result.context.title || '(untitled)'}`);
+  console.log(`Format: ${result.context.format} | Score: ${result.context.scoreType} | Exercises: ${result.context.exerciseCount}`);
+  console.log(`Logging: ${stringifyValue(result.context.loggingModes)}`);
+  console.log(`Movements: ${stringifyValue(result.context.movementNames)}`);
+  console.log(`Totals: ${result.workload.grandTotalReps} reps, ${result.workload.grandTotalVolume} kg${result.workload.grandTotalDistance ? `, ${result.workload.grandTotalDistance}m` : ''}${result.workload.grandTotalCalories ? `, ${result.workload.grandTotalCalories} cal` : ''}`);
+  console.log(`Hero: ${result.hero.value}${result.hero.unit ? ` ${result.hero.unit}` : ''}${result.hero.formatLine ? ` | ${result.hero.formatLine}` : ''}`);
 
   if (options.expects.length === 0) {
     console.log('\nNO EXPECTATIONS PROVIDED');
@@ -279,7 +354,10 @@ async function main(): Promise<void> {
   console.log('\nPASS');
 }
 
-main().catch((error) => {
-  console.error(`\nERROR: ${(error as Error).message}`);
-  process.exit(1);
-});
+const currentFile = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === currentFile) {
+  main().catch((error: unknown) => {
+    console.error(`\nERROR: ${(error as Error).message}`);
+    process.exit(1);
+  });
+}

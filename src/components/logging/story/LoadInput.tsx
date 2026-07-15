@@ -42,6 +42,11 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   const prescriptionText = `${result.exercise?.name ?? ''} ${result.exercise?.prescription ?? ''}`;
   const hasMaxSet = /\bmax\b/i.test(prescriptionText) || !!(repsPerSet && result.setsTotal > repsPerSet.length);
   const shouldUseProgressive = result.setsTotal > 1;
+  // A single attempt (e.g. "15 min to build a heavy Clean & Jerk for the day") has exactly one
+  // number worth logging — the weight reached. Start/Top only means something across multiple
+  // sets (a range actually lifted); showing both for a lone set asks for a "start" that was never
+  // part of the prescription and never gets used for anything downstream.
+  const isSingleAttempt = !shouldUseProgressive && !hasMaxSet && result.setsTotal <= 1;
 
   // Derive display values — fall back to rx weight if no user weight yet
   const startVal = result.weight ?? getDefaultWeight(result) ?? 0;
@@ -83,6 +88,12 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
       weightEnd: clampedPeak,
       loadMode: clampedPeak != null && clampedStart != null && clampedPeak !== clampedStart ? 'range' : 'same',
     });
+  }, [onChange, weightStep]);
+
+  // Single attempt: one legal-step value drives both weight and weightEnd — never a range.
+  const handleSingleChange = useCallback((_start: number | undefined, peak: number | undefined) => {
+    const clamped = peak != null ? clampWeight(peak, weightStep) : undefined;
+    onChange({ weight: clamped, weightEnd: clamped, loadMode: 'same' });
   }, [onChange, weightStep]);
 
   const toggleBW = useCallback(() => {
@@ -151,6 +162,23 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
                   />
                 </>
               ) : undefined}
+            />
+          </motion.div>
+        ) : isSingleAttempt ? (
+          <motion.div
+            key="single"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+          >
+            <ProgressiveWeightRow
+              singleColumn
+              columnLabel="Weight"
+              weight={(result.weight ?? startVal) || undefined}
+              placeholder={getDefaultWeight(result)}
+              setsTotal={result.setsTotal}
+              onChange={handleSingleChange}
             />
           </motion.div>
         ) : (

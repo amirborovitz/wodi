@@ -14,7 +14,7 @@ import {
   POSTER_CUSTOMIZATION_EVENT,
   type PosterCustomizationEventDetail,
 } from './usePosterCustomization';
-import type { Achievement, PosterSkinId, PosterVibeKey, Workout, WorkoutType } from '../types';
+import type { Achievement, PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset, Workout, WorkoutType } from '../types';
 
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
@@ -171,6 +171,8 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             difficultyLevel: typeof data.difficultyLevel === 'number' ? data.difficultyLevel : undefined,
             posterSkin: data.posterSkin as PosterSkinId | undefined,
             posterVibe: data.posterVibe as PosterVibeKey | undefined,
+            posterSticker: data.posterSticker as PosterSticker | undefined,
+            posterVibeOffset: data.posterVibeOffset as PosterVibeOffset | undefined,
             heroAchievement,
             achievements,
             isPR,
@@ -213,6 +215,9 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
           ...workout,
           ...(update.posterSkin !== undefined ? { posterSkin: update.posterSkin } : {}),
           ...(update.posterVibe !== undefined ? { posterVibe: update.posterVibe ?? undefined } : {}),
+          ...(update.sourceDate !== undefined ? { sourceDate: update.sourceDate } : {}),
+          ...(update.posterSticker !== undefined ? { posterSticker: update.posterSticker ?? undefined } : {}),
+          ...(update.posterVibeOffset !== undefined ? { posterVibeOffset: update.posterVibeOffset ?? undefined } : {}),
         };
       }));
     };

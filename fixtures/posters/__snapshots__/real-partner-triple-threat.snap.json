@@ -1,0 +1,376 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "3 x 3 rounds for time",
+      "rows": [],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "A · 3 ROUNDS",
+      "rows": [
+        {
+          "primary": "50 Wall Ball Shots @ 20/14kg",
+          "name": "",
+          "totalNote": "150 total",
+          "mineKey": "Wall Ball Shot",
+          "accent": "yellow"
+        },
+        {
+          "primary": "100 DU",
+          "name": "",
+          "totalNote": "300 total",
+          "mineKey": "Double Under",
+          "suppressMine": true,
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "B · 3 ROUNDS",
+      "rows": [
+        {
+          "primary": "50 CAL Machine",
+          "name": "",
+          "totalNote": "150 cal total",
+          "mineKey": "Machine",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "primary": "20 Devil Presses @ 2x22.5/15kg",
+          "name": "",
+          "totalNote": "60 total",
+          "mineKey": "Devil Press",
+          "accent": "yellow"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "C · 3 ROUNDS",
+      "rows": [
+        {
+          "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+          "name": "",
+          "totalNote": "90 total",
+          "mineKey": "Dual Dumbbell Box Step up Over",
+          "accent": "yellow"
+        },
+        {
+          "primary": "20 Bar Muscle-ups",
+          "name": "",
+          "totalNote": "60 total",
+          "mineKey": "Bar Muscle-up",
+          "suppressMine": true,
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "3 x 3 rounds for time",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "A · 3 ROUNDS",
+        "rows": [
+          {
+            "primary": "50 Wall Ball Shots @ 20/14kg",
+            "name": "",
+            "totalNote": "150 total",
+            "mineKey": "Wall Ball Shot",
+            "accent": "yellow"
+          },
+          {
+            "primary": "100 DU",
+            "name": "",
+            "totalNote": "300 total",
+            "mineKey": "Double Under",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "B · 3 ROUNDS",
+        "rows": [
+          {
+            "primary": "50 CAL Machine",
+            "name": "",
+            "totalNote": "150 cal total",
+            "mineKey": "Machine",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "20 Devil Presses @ 2x22.5/15kg",
+            "name": "",
+            "totalNote": "60 total",
+            "mineKey": "Devil Press",
+            "accent": "yellow"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "C · 3 ROUNDS",
+        "rows": [
+          {
+            "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+            "name": "",
+            "totalNote": "90 total",
+            "mineKey": "Dual Dumbbell Box Step up Over",
+            "accent": "yellow"
+          },
+          {
+            "primary": "20 Bar Muscle-ups",
+            "name": "",
+            "totalNote": "60 total",
+            "mineKey": "Bar Muscle-up",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "40:00",
+    "unit": "MIN",
+    "formatLine": "For Time · In Pairs",
+    "storyLine": "300 du · 150 wall ball shot · 90 dual dumbbell box step up over · 60 devil press · 60 bar mu · 150 machine cals",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×3 ROUNDS (2 each)"
+      },
+      {
+        "perRound": "50",
+        "name": "Wall Ball Shot",
+        "total": "100 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "100",
+        "name": "Double Under",
+        "total": "200 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×3 ROUNDS (2 each)"
+      },
+      {
+        "perRound": "50 cal",
+        "name": "Machine",
+        "total": "100 cal total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Devil Press",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×3 ROUNDS (2 each)"
+      },
+      {
+        "perRound": "30",
+        "name": "Dual Dumbbell Box Step up Over",
+        "total": "60 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Bar Muscle-up",
+        "total": "40 total",
+        "color": "cyan",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "3 X 3 ROUNDS FOR TIME",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "A · 3 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "50 Wall Ball Shots @ 20/14kg",
+        "load": "",
+        "mine": "17.5kg",
+        "team": "",
+        "total": "150 total"
+      },
+      {
+        "kind": "line",
+        "rx": "100 DU",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "300 total"
+      },
+      {
+        "kind": "block",
+        "label": "B · 3 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "50 CAL Machine",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "150 cal total"
+      },
+      {
+        "kind": "line",
+        "rx": "20 Devil Presses @ 2x22.5/15kg",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "60 total"
+      },
+      {
+        "kind": "block",
+        "label": "C · 3 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+        "load": "",
+        "mine": "35kg",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "20 Bar Muscle-ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "60 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "3 X 3 ROUNDS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "A · 3 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 Wall Ball Shots @ 20/14kg",
+          "load": "",
+          "mine": "17.5kg",
+          "team": "",
+          "total": "150 total"
+        },
+        {
+          "kind": "line",
+          "rx": "100 DU",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "300 total"
+        },
+        {
+          "kind": "block",
+          "label": "B · 3 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 CAL Machine",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "150 cal total"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Devil Presses @ 2x22.5/15kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "block",
+          "label": "C · 3 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Bar Muscle-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": "you & your partner - three blocks",
+    "pages": [
+      null
+    ]
+  }
+}

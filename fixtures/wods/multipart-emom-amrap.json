@@ -1,0 +1,13 @@
+{
+  "name": "multipart-emom-amrap",
+  "rawText": "A. Every 1:30 x 8:\nalternating Power Clean / Squat Clean\n\nB. 16 min AMRAP:\n5 Deadlift @70/100kg\n10 push ups\n15 air squats",
+  "aiResponse": "{\n  \"title\": \"WOD\",\n  \"type\": \"mixed\",\n  \"format\": \"amrap\",\n  \"scoreType\": \"rounds_reps\",\n  \"timeCap\": 960,\n  \"rawText\": \"A. Every 1:30 x 8:\\nalternating Power Clean / Squat Clean\\n\\nB. 16 min AMRAP:\\n5 Deadlift @70/100kg\\n10 push ups\\n15 air squats\",\n  \"exercises\": [\n    {\n      \"name\": \"A. Every 1:30 x 8\",\n      \"type\": \"wod\",\n      \"prescription\": \"Every 1:30 x 8: alternating Power Clean / Squat Clean\",\n      \"suggestedSets\": 8,\n      \"loggingMode\": \"emom\",\n      \"intervalCount\": 8,\n      \"workDuration\": 720,\n      \"rawText\": \"A. Every 1:30 x 8:\\nalternating Power Clean / Squat Clean\",\n      \"movements\": [\n        {\n          \"name\": \"Power Clean\",\n          \"reps\": 1,\n          \"inputType\": \"weight\",\n          \"countingMode\": \"per_interval\",\n          \"scoreEntryMode\": \"per_round\"\n        },\n        {\n          \"name\": \"Squat Clean\",\n          \"reps\": 1,\n          \"inputType\": \"weight\",\n          \"countingMode\": \"per_interval\",\n          \"scoreEntryMode\": \"per_round\"\n        }\n      ]\n    },\n    {\n      \"name\": \"B. 16 Min AMRAP\",\n      \"type\": \"wod\",\n      \"prescription\": \"16 min AMRAP: 5 Deadlift @70/100kg, 10 push ups, 15 air squats\",\n      \"suggestedSets\": 1,\n      \"loggingMode\": \"amrap\",\n      \"rawText\": \"B. 16 min AMRAP:\\n5 Deadlift @70/100kg\\n10 push ups\\n15 air squats\",\n      \"movements\": [\n        {\n          \"name\": \"Deadlift\",\n          \"reps\": 5,\n          \"inputType\": \"weight\",\n          \"rxWeights\": { \"female\": 70, \"male\": 100, \"unit\": \"kg\" },\n          \"countingMode\": \"per_round\",\n          \"scoreEntryMode\": \"per_round\"\n        },\n        {\n          \"name\": \"Push-up\",\n          \"reps\": 10,\n          \"inputType\": \"none\",\n          \"countingMode\": \"per_round\",\n          \"scoreEntryMode\": \"per_round\"\n        },\n        {\n          \"name\": \"Air Squat\",\n          \"reps\": 15,\n          \"inputType\": \"none\",\n          \"countingMode\": \"per_round\",\n          \"scoreEntryMode\": \"per_round\"\n        }\n      ]\n    }\n  ]\n}",
+  "expect": {
+    "exerciseCount": "2",
+    "loggingModes": "emom, amrap",
+    "parsed.exercises.1.movements.0.countingMode": "per_round",
+    "parsed.exercises.1.movements.1.countingMode": "per_round",
+    "parsed.exercises.1.movements.2.countingMode": "per_round",
+    "movementCountingModes!~=": "per_station_visit"
+  }
+}

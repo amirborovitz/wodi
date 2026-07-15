@@ -1,0 +1,35 @@
+{
+  "name": "ladder-amrap-intervals",
+  "description": "3:00 AMRAP x 4 ascending ladder (4-6-8-10-12...) with weighted KB snatch + box step ups and fixed 5 burpees per round; athlete completed 8 rungs",
+  "workout": {
+    "rawText": "3:00 min AMRAP x 4\n4-6-8-10-12- - - single kettlebell snatch, weighted box step up, 5 burpees after each round",
+    "format": "amrap_intervals",
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "3:00 Min AMRAP x 4",
+        "type": "wod",
+        "loggingMode": "amrap_intervals",
+        "prescription": "4-6-8-10-12... KB snatch + weighted box step up, 5 burpees after each round",
+        "rawText": "3:00 min AMRAP x 4\n4-6-8-10-12- - - single kettlebell snatch, weighted box step up, 5 burpees after each round",
+        "ladderReps": [4, 6, 8, 10, 12],
+        "ladderStep": 8,
+        "intervalCount": 4,
+        "rounds": 8,
+        "sets": [{ "id": "set-0", "setNumber": 1, "actualReps": 176, "completed": true }],
+        "movements": [
+          { "name": "KB Snatch", "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+          { "name": "Weighted Box Step Up", "inputType": "weight", "rxWeights": { "male": 20, "female": 15, "unit": "kg" } },
+          { "name": "Burpees", "reps": 5, "perRound": false }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "KB Snatch", "totalReps": 88, "weight": 24, "unit": "kg", "color": "yellow" },
+        { "name": "Weighted Box Step Up", "totalReps": 88, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Burpees", "totalReps": 40, "color": "magenta" }
+      ]
+    }
+  }
+}

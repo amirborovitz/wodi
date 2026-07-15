@@ -1,0 +1,29 @@
+.sticker {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(-3deg);
+  max-width: 82%;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: rgba(18, 18, 21, 0.7);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  font-family: 'Caveat', cursive;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.stickerDraggable {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stickerDraggable:active {
+  cursor: grabbing;
+}

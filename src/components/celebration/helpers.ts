@@ -30,6 +30,11 @@ import {
   type CelebrationStickerConfig,
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
+import { findMovementTotal, createSubstitutionResolver } from './movementResolution';
+
+// Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
+// downstream consumers (useCelebrationData, WorkoutScreen) import all helpers from this module.
+export { findMovementTotal } from './movementResolution';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -121,6 +126,9 @@ export function normalizeBlueprint(text: string): string {
 }
 
 export function extractEveryXCadence(text: string): string | undefined {
+  // "EMOM 15" / "EMOM for 15 minutes" — the board's own label beats a generic "every 1 min"
+  const emom = text.match(/\bemom\s*(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?\b/i);
+  if (emom) return `EMOM ${emom[1]} MIN`;
   const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?(?:\s*[x×]|(?=\s|$))/i);
   if (mmss) {
     const mins = parseInt(mmss[1]);
@@ -194,11 +202,21 @@ function formatNestedRoundBlueprint(base: string, exercise?: Exercise | null): s
   return `${base} · ${nestedRounds} rounds of`;
 }
 
+// "N rounds of" is a repeat MULTIPLIER only when it nests inside a distinct outer layer —
+// an explicit sets count ("5 sets: 2 rounds of …") or an interval cadence ("Every 4:00 …
+// 2 rounds of …"). A plain "8 rounds of:" board has no outer layer: the base repeat count
+// was parsed from that same phrase, and multiplying squares it (8 rounds → 64 repeats → a
+// 2000m bike "repaired" to 128km).
+function hasOuterRepeatLayer(exercise?: Exercise | null): boolean {
+  const text = `${exercise?.name || ''} ${exercise?.prescription || ''} ${exercise?.rawText || ''}`.replace(/\s+/g, ' ');
+  return /\b\d+\s*sets?\b/i.test(text) || extractEveryXCadence(text) !== undefined;
+}
+
 function getEffectiveMovementRepeatCount(
   exercise: Exercise | null | undefined,
   baseRepeatCount?: number,
 ): number | undefined {
-  const nestedRounds = getNestedRoundsOfMultiplier(exercise);
+  const nestedRounds = hasOuterRepeatLayer(exercise) ? getNestedRoundsOfMultiplier(exercise) : undefined;
   const completedSets = exercise?.sets?.filter((set) => set.completed).length || undefined;
   const plannedSets = exercise?.sets?.length || undefined;
   const candidates = [
@@ -373,7 +391,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
   let unit = 'kg';
   let weightSuffix = '';
   for (const mov of scalingMovements) {
-    const actual = findBreakdownForParsedMovement(mov, movements);
+    const actual = findMovementTotal(movements, mov.name);
     const prescribedWeight = mov.rxWeights?.male || mov.rxWeights?.female;
     const w = deriveDisplayWeight({ weight: prescribedWeight, implementCount: mov.implementCount }, actual);
     if (w != null) {
@@ -392,7 +410,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
   const cadenceLabel = cadence != null ? `+${cadence} REPS EVERY ROUND` : undefined;
 
   const fixedRows: ArtifactRow[] = fixedMovements.map((mov) => {
-    const actual = findBreakdownForParsedMovement(mov, movements);
+    const actual = findMovementTotal(movements, mov.name);
     const perRound = mov.reps ?? mov.calories ?? mov.distance ?? undefined;
     const unitLabel = mov.reps != null ? '' : mov.calories != null ? ' CAL' : mov.distance != null ? 'M' : '';
     return {
@@ -562,38 +580,6 @@ export function detectBarbellComplex(movements: MovementTotal[], rounds: number)
   };
 }
 
-// ─── Movement finders ─────────────────────────────────────────────────────────
-
-export function findMovementTotal(
-  movements: MovementTotal[],
-  movName: string,
-  exerciseIndex?: number,
-): MovementTotal | undefined {
-  const lower = movName.toLowerCase();
-  if (exerciseIndex !== undefined) {
-    const scoped = movements.find(
-      (m) => m.exerciseIndex === exerciseIndex
-        && (m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower),
-    );
-    if (scoped) return scoped;
-  }
-  return movements.find(
-    (m) => m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower,
-  );
-}
-
-export function findBreakdownForParsedMovement(
-  movement: NonNullable<Exercise['movements']>[number],
-  breakdownMovements: MovementTotal[],
-): MovementTotal | undefined {
-  const target = movement.name.toLowerCase();
-  return breakdownMovements.find((candidate) => {
-    const name = candidate.name.toLowerCase();
-    const original = candidate.originalMovement?.toLowerCase();
-    return name === target || original === target;
-  });
-}
-
 // ─── Repair undercounted breakdown ───────────────────────────────────────────
 
 export function repairUndercountedBreakdown(
@@ -726,7 +712,23 @@ export function getRewardVibeLabel(
   return 'LOCKED IN';
 }
 
+// Logging modes that name a workout format directly. cardio/cardio_distance/bodyweight/sets/
+// free don't map to one — those fall through to the text/type inference below.
+const LOGGING_MODE_FORMATS: Partial<Record<NonNullable<Exercise['loggingMode']>, WorkoutFormat>> = {
+  strength: 'strength',
+  for_time: 'for_time',
+  amrap: 'amrap',
+  amrap_intervals: 'amrap_intervals',
+  intervals: 'intervals',
+  emom: 'emom',
+};
+
 export function inferWorkoutFormatForExercise(ex: Exercise, globalFormat?: WorkoutFormat): WorkoutFormat | undefined {
+  // The AI's per-exercise loggingMode is authoritative when it names a format — the text
+  // regexes below (including the partner→intervals heuristic) are fallbacks for legacy data
+  // saved before loggingMode existed. Trust the AI over regex.
+  const modeFormat = ex.loggingMode ? LOGGING_MODE_FORMATS[ex.loggingMode] : undefined;
+  if (modeFormat) return modeFormat;
   const rx = normalizeIntervalNotation(`${ex.name || ''} ${ex.prescription || ''}`).toLowerCase();
   if (ex.type === 'strength') return 'strength';
   if (/\b(?:teams?\s+of|i\s*go\s*y(?:ou|o?u?)\s*go|igug|partner|in\s+pairs?)\b/i.test(rx)) return 'intervals';
@@ -988,7 +990,9 @@ export function getFlexHighlightStamp(
 function formatPrescriptionMovementLine(movements: NonNullable<Exercise['movements']>): string | undefined {
   const parts = movements
     .map((movement) => {
-      const qty = movement.reps != null
+      const qty = movement.repsDisplay
+        ? movement.repsDisplay
+        : movement.reps != null
         ? `${movement.reps}`
         : movement.calories != null
           ? `${movement.calories} CAL`
@@ -1054,7 +1058,7 @@ function getMovementDisplayNameFromContext(
 
 function buildCelebrationMovementRow(params: {
   movementName: string;
-  prescribed?: { reps?: number; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2 };
+  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2 };
   actual?: MovementTotal;
   repeatCount?: number;
   isLadder?: boolean;
@@ -1144,9 +1148,10 @@ function buildCelebrationMovementRow(params: {
     if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
     accent = 'yellow';
   } else if (perRoundReps && perRoundReps > 0) {
-    primary = `${perRoundReps}`;
+    // A prescribed range ("10-12") is what the coach wrote — the midpoint only feeds totals.
+    primary = prescribed?.repsDisplay ?? `${perRoundReps}`;
     if (hasWeight) {
-      if (totalReps && totalReps > 0) subNoteParts.push(`${totalReps} total reps`);
+      if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
       accent = 'yellow';
     } else if (totalReps && totalReps !== perRoundReps) {
       subNoteParts.push(totalLabel(totalReps));
@@ -1181,9 +1186,15 @@ function buildCelebrationMovementRow(params: {
     primary,
     name: displayName,
     nameWithLoad,
-    loadNote: hasWeight ? `${weight}${unit}${weightEachSuffix}` : undefined,
+    // Strength rows must resolve their weight through `mine` (the mineMap-backed lookup that
+    // correctly shows a multi-set progression, e.g. "60-75kg") — never through loadNote/
+    // loadSuffix, which artifactRowToPosterLine treats as a higher-priority override of `mine`.
+    // `weight` here is `actual.weight`, an average across sets, so setting loadNote here for a
+    // strength row always won-and-silently-replaced the correct progression with that average.
+    loadNote: hasWeight && !isStrength ? `${weight}${unit}${weightEachSuffix}` : undefined,
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
     totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
+    mineKey: actual?.name ?? movementName,
     accent,
     repeatCount,
     partnerSplit,
@@ -1255,10 +1266,10 @@ function pluralizeMovementLabel(name: string): string {
   if (!lastWordMatch) return cleaned;
 
   const lastWord = lastWordMatch[1];
-  if (/ups$/i.test(lastWord)) return cleaned;
-  if (/press$/i.test(lastWord)) return cleaned.replace(/press$/i, (match) => `${match}es`);
+  if (/ss$/i.test(lastWord)) return cleaned.replace(/ss$/i, (match) => `${match}es`); // Press → Presses
+  if (/s$/i.test(lastWord)) return cleaned; // already plural (Dips, Push Ups, Burpees)
   if (/[^aeiou]y$/i.test(lastWord)) return cleaned.replace(/y$/i, (match) => (match === 'Y' ? 'IES' : 'ies'));
-  if (/(?:s|x|z|ch|sh)$/i.test(lastWord)) return cleaned.replace(new RegExp(`${lastWord}$`), `${lastWord}es`);
+  if (/(?:x|z|ch|sh)$/i.test(lastWord)) return cleaned.replace(new RegExp(`${lastWord}$`), `${lastWord}es`);
   return `${cleaned}s`;
 }
 
@@ -1288,14 +1299,24 @@ function formatProgressiveMovementData(
   return { movement: (plusPrefix ? '+ ' : '') + parts.join(' · '), weight };
 }
 
-function buildProgressiveChipperRows(sections: ParsedSection[], showAllMovements = false): ArtifactRow[] {
+function buildProgressiveChipperRows(
+  exercise: Exercise,
+  breakdown: MovementTotal[],
+  showAllMovements = false,
+): ArtifactRow[] {
+  const sections = exercise.sections ?? [];
+  // A movement repeats across most chipper sections, so the resolver only renames a
+  // substituted movement — quantities stay prescription-driven (round-diff logic below).
+  const resolveSubstitution = createSubstitutionResolver(exercise, breakdown);
   const rows: ArtifactRow[] = [];
   let roundIndex = 1;
   let prevMovNames: Set<string> = new Set();
   const totalRounds = sections.filter((s) => s.sectionType === 'rounds').length;
 
   for (const section of sections) {
-    const movements = section.movements ?? [];
+    const movements = (section.movements ?? []).map(
+      (m) => resolveSubstitution(m, section.rounds ?? 1).movement,
+    );
     if (section.sectionType === 'buy_in') {
       const { movement, weight } = formatProgressiveMovementData(movements, new Set(), false);
       rows.push({ roundLabel: 'BUY-IN', name: 'buy-in', primary: movement, subNote: weight, accent: 'yellow' });
@@ -1332,6 +1353,19 @@ function hasBodyweightPrescription(exercise: Exercise, movement: ParsedMovement)
   });
 }
 
+// Poster truth: a mixed Rx pair renders in the order the coach wrote it. rxWeights is stored
+// as male/female, but boards write either order ("50/35kg" or "35/50kg") — when the source text
+// contains the reversed pair (and not the stored order), mirror the board.
+export function formatRxPairInBoardOrder(male: number, female: number, sourceText: string): string {
+  const esc = (n: number): string => String(n).replace('.', '\\.');
+  // Digit guards, not \b: boards write "35/50kg" with the unit glued on, and `50\b` never
+  // matches when 'k' follows — a word boundary needs a non-word char, but 'k' is one.
+  const pair = (a: number, b: number): RegExp => new RegExp(`(?<![\\d.])${esc(a)}\\s*/\\s*${esc(b)}(?![\\d.])`);
+  return pair(female, male).test(sourceText) && !pair(male, female).test(sourceText)
+    ? `${female}/${male}`
+    : `${male}/${female}`;
+}
+
 function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): string {
   if (hasBodyweightPrescription(exercise, movement)) return '';
   if (movement.inputType !== 'weight') return '';
@@ -1342,7 +1376,12 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
   const implementPrefix = movement.implementCount && movement.implementCount > 1
     ? `${movement.implementCount}x`
     : '';
-  if (male && female && male !== female) return ` @ ${implementPrefix}${male}/${female}${unit}`;
+  if (male && female && male !== female) {
+    // Verbatim board text ONLY — the AI's own prescription rewrites pairs as male/female,
+    // which would mask the board's order.
+    const pair = formatRxPairInBoardOrder(male, female, exercise.rawText?.trim() || exercise.prescription || '');
+    return ` @ ${implementPrefix}${pair}${unit}`;
+  }
   return ` @ ${implementPrefix}${male ?? female}${unit}`;
 }
 
@@ -1358,8 +1397,20 @@ function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement,
         : '';
   const load = formatSectionRxLoad(exercise, movement);
   const together = movement.together ? ' (together)' : '';
+  // "OR" option from the board ("10 dips / push ups") — same convention as station rows.
+  // The alt quantity is omitted when it matches the main movement's, as boards write it.
+  const alt = movement.alternative;
+  const altQty = alt
+    ? (alt.reps != null && alt.reps !== movement.reps ? `${alt.reps * multiplier}`
+      : alt.calories != null && alt.calories !== movement.calories ? `${alt.calories * multiplier} CAL`
+      : alt.distance != null && alt.distance !== movement.distance ? formatDistanceValue(alt.distance * multiplier).toUpperCase()
+      : '')
+    : '';
+  const altSuffix = alt
+    ? ` / ${[altQty, formatRepMovementNameForPoster(alt.name, alt.reps ?? movement.reps)].filter(Boolean).join(' ')}`
+    : '';
   return {
-    text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${load}`].filter(Boolean).join(' '),
+    text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${altSuffix}${load}`].filter(Boolean).join(' '),
     hasWeight: load !== '',
   };
 }
@@ -1381,21 +1432,20 @@ function buildSequentialMovementRows(
   } = {},
 ): ArtifactRow[] {
   return prescribedMovements.map((movement): ArtifactRow => {
-    const key = movement.name.toLowerCase();
-    const actual = actualMovements.find((m) =>
-      m.name.toLowerCase() === key || m.originalMovement?.toLowerCase() === key,
-    );
+    const actual = findMovementTotal(actualMovements, movement.name);
     return buildCelebrationMovementRow({
-      movementName: movement.name,
+      // A logged substitution replaces the board's movement — the athlete didn't do the Rx one.
+      movementName: actual?.wasSubstituted ? actual.name : movement.name,
       prescribed: {
         reps: movement.reps,
+        repsDisplay: movement.repsDisplay,
         distance: movement.distance,
         calories: movement.calories,
         weight: movement.rxWeights?.male || movement.rxWeights?.female,
         implementCount: movement.implementCount,
       },
       actual,
-      repeatCount: options.movementRepeatCounts?.get(key) ?? options.repeatCount,
+      repeatCount: options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount,
       suppressDistanceTotal: true,
       suppressCalorieTotal: true,
       isStrength: options.isStrength,
@@ -1413,13 +1463,40 @@ function buildSequentialMovementRows(
  * Uses prescribed movement data (not breakdown) so movements that weren't
  * tracked separately (e.g. "together" runs) still appear on the poster.
  */
+function formatTotalNote(totals: { distance?: number; calories?: number; reps?: number }): string | undefined {
+  if ((totals.distance ?? 0) > 0) {
+    const total = totals.distance!;
+    return total >= 1000 ? `${(total / 1000).toFixed(1)} km total` : `${total}m total`;
+  }
+  if ((totals.calories ?? 0) > 0) return `${totals.calories} cal total`;
+  if ((totals.reps ?? 0) > 0) return `${totals.reps} total`;
+  return undefined;
+}
+
+// Per-section aggregate for a fixed prescription row ("40 DU" × 2 rounds → "80 total").
+// Pure prescription math — for_time work is fixed, so this never leans on breakdown
+// aggregation (which merges a movement appearing in several sections into one number
+// that would read wrong repeated on each section's row).
+function formatSectionRowTotal(movement: ParsedMovement, rounds: number): string | undefined {
+  return formatTotalNote({
+    distance: (movement.distance ?? 0) * rounds,
+    calories: (movement.calories ?? 0) * rounds,
+    reps: (movement.reps ?? 0) * rounds,
+  });
+}
+
 function buildMultiSectionForTimeSections(
   exercise: Exercise,
+  movements: MovementTotal[],
   teamSize?: number,
   splitInfo?: PartnerSplitInfo,
   isPartnerConfirmed = !!splitInfo,
 ): ArtifactSection[] {
   if (!exercise.sections?.length) return [];
+
+  // Substitution truth ("200m Run" → Echo Bike) comes from the shared resolver — renderers
+  // never join prescription to breakdown themselves. See movementResolution.ts.
+  const resolveSubstitution = createSubstitutionResolver(exercise, movements);
 
   const sections: ArtifactSection[] = [];
   let tradedRoundOffset = 0;
@@ -1433,8 +1510,11 @@ function buildMultiSectionForTimeSections(
     const sectionLetter = String.fromCharCode(65 + sectionIndex);
     sectionIndex += 1;
 
-    const moveParts = sectionMovements.map((m) => formatSectionMovementPart(exercise, m)).filter((part) => part.text);
-    if (moveParts.length === 0) continue;
+    const moveEntries = sectionMovements
+      .map((m) => resolveSubstitution(m, rounds))
+      .map((entry) => ({ ...entry, part: formatSectionMovementPart(exercise, entry.movement) }))
+      .filter((entry) => entry.part.text);
+    if (moveEntries.length === 0) continue;
 
     let personalRoundsForSection = 0;
     if (splitInfo?.split === 'rounds' && teamSize && teamSize > 1 && section.sectionType === 'rounds' && rounds > 1) {
@@ -1451,15 +1531,48 @@ function buildMultiSectionForTimeSections(
         : rounds > 1
           ? `${sectionLetter} · ${rounds} ROUNDS`
           : sectionLetter;
-    const rows = moveParts.map((part, index): ArtifactRow => {
+    // Flat-share ('reps') split: per-partner share of each movement's team total, computed from
+    // the movement data itself — the display line carries a full sentence, so the poster layer
+    // can't re-derive the quantity from it. (together) movements are done side by side, never
+    // split; multi-round sections prescribe per-round values, which must not be halved either.
+    const teamShareFor = (movement: ParsedMovement): string | undefined => {
+      if (splitInfo?.split !== 'reps' || !teamSize || teamSize <= 1) return undefined;
+      if (movement.together || rounds > 1) return undefined;
+      if (movement.reps && movement.reps > 0) return `${Math.round(movement.reps / teamSize)}`;
+      if (movement.calories && movement.calories > 0) return `${Math.round(movement.calories / teamSize)} cal`;
+      if (movement.distance && movement.distance > 0) {
+        const share = movement.distance / teamSize;
+        return share >= 1000 ? `${(share / 1000).toFixed(2)}km` : `${Math.round(share)}m`;
+      }
+      return undefined;
+    };
+    const rows = moveEntries.map(({ movement, logged, part }): ArtifactRow => {
       const rowPartnerMine = personalRoundsForSection > 0
-        ? formatSectionMovementPart(exercise, sectionMovements[index], personalRoundsForSection).text
+        ? formatSectionMovementPart(exercise, movement, personalRoundsForSection).text
+        : undefined;
+      // Partner rows render full-width with their own personal readout — no totals column.
+      // Substituted movements total from the logged breakdown (exact), not prescription math.
+      const totalNote = !splitInfo && rounds > 1
+        ? (logged
+            ? formatTotalNote({
+                distance: logged.totalDistance,
+                calories: logged.totalCalories,
+                reps: logged.totalReps,
+              })
+            : formatSectionRowTotal(movement, rounds))
         : undefined;
       return {
         primary: part.text,
         name: '',
+        totalNote,
+        mineKey: movement.name,
+        // Non-weighted rows must not surface the breakdown AGGREGATE as "mine" (e.g. the
+        // 4×900m bike total stamped on every single 900m row). Totals are totalNote's job,
+        // and only under a rounds>1 multiplier — the mine slot is for logged loads.
+        ...(part.hasWeight ? {} : { suppressMine: true }),
         partnerSplit: splitInfo?.split,
         partnerMine: rowPartnerMine,
+        teamShare: teamShareFor(movement),
         accent: part.hasWeight ? 'yellow' : 'magenta',
       };
     });
@@ -1478,60 +1591,58 @@ function buildMultiSectionForTimeSections(
 
 // ─── Artifact section builders ────────────────────────────────────────────────
 
+// Free/unclassified part (poster truth standard): render the whiteboard verbatim — no
+// derived structure, no totals. The entered score is the hero; logged weights still attach
+// via the poster's mine map, since the row name carries the movement words.
+function buildVerbatimSection(exercise: Exercise): ArtifactSection | null {
+  const lines = (exercise.rawText ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0);
+  if (lines.length === 0) return null;
+  // No eyebrow/blueprint: the verbatim lines ARE the whole story — a cap block above them
+  // would render as a stray label when the section title matches the poster title.
+  return {
+    title: exercise.name,
+    rows: lines.map((line): ArtifactRow => ({ primary: '', name: line, accent: 'magenta' })),
+    hiddenCount: 0,
+  };
+}
+
+// Whether a part renders as a strength page. The part's own loggingMode outranks its type: a
+// skill/strength-typed part logged as a metcon (e.g. an EMOM of double-unders) must render as a
+// metcon page. Shared by the artifact builders, useCelebrationData's carousel pages, and the
+// poster-corpus harness.
+const METCON_PAGE_MODES: ReadonlySet<string> = new Set(
+  ['for_time', 'amrap', 'amrap_intervals', 'intervals', 'emom', 'cardio', 'cardio_distance', 'free'],
+);
+export function isStrengthPagePart(exercise: Exercise): boolean {
+  return exercise.loggingMode && METCON_PAGE_MODES.has(exercise.loggingMode)
+    ? false
+    : exercise.type === 'strength' || exercise.type === 'skill';
+}
+
+/**
+ * Whole-workout artifact sections (single-page posters). ONE reward-only branch — the barbell
+ * complex, detected across the whole-workout breakdown — then delegates to
+ * buildPageArtifactSections, the per-exercise core every poster path shares.
+ */
 export function buildRewardArtifactSections(
   exercises: Exercise[],
   movements: MovementTotal[],
   rawText?: string,
-  format?: WorkoutFormat,
   teamSize?: number,
+  // Workout-level partner context (the TITLE, e.g. "Partner WOD") — boards often carry the
+  // partner designation only as a heading, which the parse may drop from rawText. Single-page
+  // only: the title speaks for the whole workout here, so it may confirm partner language.
+  partnerContextText?: string,
 ): ArtifactSection[] {
   if (!movements || movements.length === 0) return [];
-
   const mainExercise = exercises[0];
-  // rawText is shared across ALL exercises in the workout — only safe to use as a text-matching
-  // fallback when mainExercise IS the whole workout. Otherwise prefer mainExercise.rawText
-  // (handled inside parseDescLadderScheme) and don't let a sibling block's text leak in here.
-  const scopedRawText = exercises.length === 1 ? rawText : mainExercise?.rawText;
-  const capText = `${mainExercise?.name || ''} ${mainExercise?.prescription || ''} ${scopedRawText || ''}`;
-  const capMatch = capText.match(/\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i);
-  const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
-  const isForTime = /for\s*time|\brft\b/i.test(capText);
-  const repeatCount = getPrescribedRoundCount(exercises, scopedRawText)
-    || (mainExercise ? getPrescriptionRepeatCount(mainExercise) : undefined)
-    || (isForTime && mainExercise ? inferRoundCountFromMovements(mainExercise, movements) : undefined);
-  const everyCadence = !isForTime ? extractEveryXCadence(capText) : undefined;
-  const descLadderScheme = isForTime && mainExercise ? parseForTimeRepScheme(mainExercise, scopedRawText) : undefined;
-  const blueprintRaw = repeatCount && repeatCount > 1
-    ? [
-        isForTime
-          ? (descLadderScheme
-              ? `${descLadderScheme.join('-')} for time`
-              : getSectionedForTimeLabel(mainExercise) || `${repeatCount} rounds for time`)
-          : everyCadence ? formatNestedRoundBlueprint(`${everyCadence} · ${repeatCount} rounds`, mainExercise)
-          : `${repeatCount} rounds`,
-        timeCapLabel ? `· ${timeCapLabel}` : null,
-      ].filter(Boolean).join(' ')
-    : rawText
-      ? rawText.split('\n').map((line) => line.trim()).find(Boolean)
-      : exercises.map((exercise) => exercise.prescription).find(Boolean);
-  const blueprint = blueprintRaw ? normalizeBlueprint(blueprintRaw) : undefined;
-
-  const prescribedByName = new Map<string, { reps?: number; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2 }>();
-  const prescribedMovements = mainExercise?.sections?.length
-    ? mainExercise.sections.flatMap((section) => section.movements || [])
-    : (mainExercise?.movements || []);
-  for (const movement of prescribedMovements) {
-    prescribedByName.set(movement.name.toLowerCase(), {
-      reps: movement.reps,
-      distance: movement.distance,
-      calories: movement.calories,
-      weight: movement.rxWeights?.male || movement.rxWeights?.female,
-      implementCount: movement.implementCount,
-    });
-  }
+  if (!mainExercise) return [];
 
   const stampRounds = exercises.length === 1
-    ? (exercises[0]?.sets?.filter((s) => s.completed)?.length || exercises[0]?.sets?.length || 1)
+    ? (mainExercise.sets?.filter((s) => s.completed)?.length || mainExercise.sets?.length || 1)
     : 1;
   const complex = detectBarbellComplex(movements, stampRounds);
   if (complex) {
@@ -1554,184 +1665,17 @@ export function buildRewardArtifactSections(
     }];
   }
 
-  // Progressive chipper: render section-by-section story instead of flat movement list
-  if (isProgressiveChipper(mainExercise)) {
-    return [{
-      eyebrow: 'FOR TIME',
-      title: 'Blueprint',
-      blueprint: blueprint ?? undefined,
-      rows: buildProgressiveChipperRows(mainExercise!.sections!),
-    }];
-  }
-
-  // Pyramid/palindrome chipper: same movement count per section, different reps/distances
-  if (isPyramidChipper(mainExercise)) {
-    const pyramidSections = mainExercise!.sections!.filter((s) => s.sectionType === 'rounds');
-    const pyramidBlueprint = normalizeBlueprint([
-      `${pyramidSections.length}-round pyramid for time`,
-      timeCapLabel ? `· ${timeCapLabel}` : null,
-    ].filter(Boolean).join(' '));
-    return [{
-      eyebrow: 'FOR TIME',
-      title: 'Blueprint',
-      blueprint: pyramidBlueprint,
-      rows: buildProgressiveChipperRows(mainExercise!.sections!, true),
-    }];
-  }
-
-  const isIGYG = /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(capText);
-  const relayMovement = isIGYG
-    ? movements.find((m) => (m.distancePerRep ?? 0) > 0 && (m.totalDistance ?? 0) > 0)
-    : undefined;
-
-  // Strength is individual even in a team session — a "6 sets" rep scheme is not a round-trade
-  // structure, and each partner lifts their own top set. Never run partner-split detection on it.
-  const isStrengthSection = mainExercise?.type === 'strength';
-  const partnerRoundCount = getSectionedRoundTradeCount(mainExercise) ?? repeatCount;
-  const splitInfo = teamSize && teamSize > 1 && !isStrengthSection
-    ? detectPartnerSplit({
-        teamSize,
-        scopedText: capText,
-        prescribedRoundCount: partnerRoundCount,
-        aiPartnerWorkout: mainExercise?.partnerWorkout,
-        aiPartnerSplit: mainExercise?.partnerSplit,
-        aiPersonalRounds: mainExercise?.personalRounds,
-      })
-    : undefined;
-  const roundLedger = splitInfo?.split === 'rounds' && mainExercise
-    ? {
-        totalRounds: splitInfo.totalRounds!,
-        personalRounds: splitInfo.personalRounds!,
-        rounds: buildRoundLedger(
-          splitInfo.totalRounds!,
-          inferPartnerRoundLedgerCompletedRounds(splitInfo.totalRounds!, mainExercise, movements),
-        ),
-      }
-    : undefined;
-
-  // Multi-section For Time: independent sections with their own round counts
-  // (e.g. "3 rounds of A, then 3 rounds of B, then cash-out C"). Not progressive
-  // or pyramid chippers — those are handled above. This path shows each section
-  // on its own row with a [N×] chip so the poster tells the full structural story.
-  const roundSectionsCount = (mainExercise?.sections ?? []).filter(
-    (s) => s.sectionType === 'rounds',
-  ).length;
-  if (roundSectionsCount > 1 && isForTime) {
-    // Sectioned partner for-time workouts are one social story with A/B/C prescription rows.
-    // Even if a section says IGUG, rendering the whole card as a round ledger collapses the
-    // workout into unreadable full-width rows. Keep the partner hero/title, but only use the
-    // flat-share TEAM/ME row contract when the detected split is truly 'reps'.
-    const sectionSplitInfo = splitInfo?.split === 'reps' ? splitInfo : undefined;
-    const multiSectionSections = buildMultiSectionForTimeSections(mainExercise!, teamSize, sectionSplitInfo, !!splitInfo);
-    if (multiSectionSections.length > 0) {
-      return multiSectionSections;
-    }
-  }
-
-  // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
-  // range or movement names repeated once per round
-  if (mainExercise?.ladderReps && mainExercise.ladderReps.length > 0) {
-    const ladderRows = buildLadderRows(mainExercise, movements);
-    if (ladderRows) {
-      return [{
-        eyebrow: 'AMRAP',
-        title: 'Blueprint',
-        blueprint: blueprint ?? undefined,
-        rows: ladderRows,
-      }];
-    }
-  }
-
-  const prescribedOrder = prescribedMovements.map((m) => normalizeStampMovementName(m.name));
-
-  function findPrescribedIndex(movName: string): number {
-    const norm = normalizeStampMovementName(movName);
-    // 1. Exact normalized match
-    let idx = prescribedOrder.findIndex((n) => n === norm);
-    if (idx !== -1) return idx;
-    // 2. Substring match (handles aliases like "KBS" ↔ "Kettlebell Swing")
-    idx = prescribedOrder.findIndex((n) => n.includes(norm) || norm.includes(n));
-    return idx;
-  }
-
-  const orderedForRows = prescribedOrder.length > 1
-    ? [...movements].sort((a, b) => {
-        const aCandidates = [a.originalMovement, a.name].filter(Boolean) as string[];
-        const bCandidates = [b.originalMovement, b.name].filter(Boolean) as string[];
-        const ai = Math.min(...aCandidates.map(findPrescribedIndex).map((i) => i === -1 ? 999 : i));
-        const bi = Math.min(...bCandidates.map(findPrescribedIndex).map((i) => i === -1 ? 999 : i));
-        return ai - bi;
-      })
-    : movements;
-
-  let blueprintSub: string | undefined;
-  if (relayMovement) {
-    const perTrip = relayMovement.distancePerRep!;
-    const relayLabel = `${perTrip >= 1000 ? `${(perTrip / 1000).toFixed(1)}KM` : `${perTrip}M`} ${relayMovement.name.toUpperCase()}`;
-    const relayOriginalName = relayMovement.originalMovement?.toLowerCase() ?? relayMovement.name.toLowerCase();
-    const amrapPrescribed = prescribedMovements.filter((m) =>
-      m.name.toLowerCase() !== relayMovement.name.toLowerCase()
-      && m.name.toLowerCase() !== relayOriginalName,
-    );
-    const amrapLine = formatPrescriptionMovementLine(amrapPrescribed);
-    blueprintSub = amrapLine ? `P1: ${relayLabel} ↔ P2: ${amrapLine}` : `RELAY: ${relayLabel}`;
-  } else {
-    blueprintSub = prescribedMovements.length > 0
-      ? formatPrescriptionMovementLine(prescribedMovements)
-      : undefined;
-  }
-
-  const movementRepeatCounts = getSectionedMovementRepeatCounts(mainExercise);
-  const rowRepeatCount = getEffectiveMovementRepeatCount(mainExercise, repeatCount);
-  const rows = (!mainExercise?.sections?.length && hasIntraRoundRepeat(prescribedMovements))
-    ? buildSequentialMovementRows(prescribedMovements, movements, {
-        repeatCount: rowRepeatCount,
-        movementRepeatCounts,
-        descLadderScheme,
-        partnerSplit: splitInfo?.split,
-      })
-    : orderedForRows.map((movement): ArtifactRow => {
-        const prescribed = prescribedByName.get(movement.name.toLowerCase())
-          ?? (movement.originalMovement ? prescribedByName.get(movement.originalMovement.toLowerCase()) : undefined);
-        const parsedMovement = mainExercise?.movements?.find((candidate) => {
-          const name = candidate.name.toLowerCase();
-          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
-        });
-
-        return buildCelebrationMovementRow({
-          movementName: parsedMovement
-            ? getMovementDisplayNameFromContext(parsedMovement, capText)
-            : movement.name,
-          prescribed,
-          actual: movement,
-          repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
-          suppressDistanceTotal: true,
-          isLadder: !!descLadderScheme,
-          partnerSplit: splitInfo?.split,
-        });
-      });
-
-  if (shouldLogCelebrationDebug()) {
-    console.warn('[CelebrationDebug:v20260503-single-artifact]', {
-      path: 'buildRewardArtifactSections',
-      rawText,
-      exercises: exercises.map((ex) => ({ name: ex.name, prescription: ex.prescription, rounds: ex.rounds })),
-      repeatCount,
-      blueprint,
-      rows,
-    });
-  }
-
-  return [{
-    eyebrow: isIGYG ? 'I GO YOU GO' : isForTime ? 'FOR TIME' : format === 'emom' ? undefined : 'METCON',
-    title: 'Blueprint',
-    blueprint: blueprint ?? undefined,
-    blueprintSub,
-    rows,
-    hiddenCount: 0,
-    roundLedger,
-    isPartnerConfirmed: !!splitInfo,
-  }];
+  // rawText is shared across ALL exercises in the workout — only safe to pass through when
+  // mainExercise IS the whole workout; otherwise the part's own scoped text applies.
+  const scopedRawText = exercises.length === 1 ? rawText : mainExercise.rawText;
+  return buildPageArtifactSections(
+    mainExercise,
+    movements,
+    isStrengthPagePart(mainExercise),
+    scopedRawText,
+    teamSize,
+    exercises.length === 1 ? partnerContextText : undefined,
+  );
 }
 
 // ─── Explicit work/rest durations from prescription text ─────────────────────
@@ -1760,31 +1704,42 @@ function parseExplicitWorkSeconds(text: string): number | undefined {
   return match ? clockTokenToSeconds(match[1].trim()) : undefined;
 }
 
-export function buildPageArtifactSection(
+export function buildPageArtifactSections(
   exercise: Exercise,
   movements: MovementTotal[],
   isStrength: boolean,
   rawText?: string,
   teamSize?: number,
-): ArtifactSection | null {
-  if (!movements || movements.length === 0) return null;
+  // Extra text allowed to CONFIRM partner language for this exercise (the workout title, passed
+  // only when this exercise IS the whole workout — never for one page of a multi-part session,
+  // where a session-level heading must not flip a solo sibling block to partner).
+  partnerContextText?: string,
+): ArtifactSection[] {
+  if (!movements || movements.length === 0) return [];
+
+  // Free/unclassified part: whiteboard-verbatim rendering, same as buildRewardArtifactSections.
+  if (exercise.loggingMode === 'free') {
+    const verbatim = buildVerbatimSection(exercise);
+    if (verbatim) return [verbatim];
+  }
 
   // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
   // range or movement names repeated once per round
   if (exercise.ladderReps && exercise.ladderReps.length > 0) {
     const ladderRows = buildLadderRows(exercise, movements);
     if (ladderRows) {
-      return {
+      return [{
         eyebrow: 'WOD',
         title: exercise.name,
         rows: ladderRows,
         hiddenCount: 0,
-      };
+      }];
     }
   }
 
   const stationLabelMap: Record<string, string> = {};
   const prescribedRepsMap: Record<string, number> = {};
+  const prescribedRepsDisplayMap: Record<string, string> = {};
   const prescribedCalsMap: Record<string, number> = {};
   const prescribedDistMap: Record<string, number> = {};
   const prescribedWeightMap: Record<string, number> = {};
@@ -1810,6 +1765,7 @@ export function buildPageArtifactSection(
       if (!stationLabelsInOrder.includes(m.stationLabel)) stationLabelsInOrder.push(m.stationLabel);
     }
     if (m.reps) prescribedRepsMap[key] = m.reps;
+    if (m.repsDisplay) prescribedRepsDisplayMap[key] = m.repsDisplay;
     if (m.calories) prescribedCalsMap[key] = m.calories;
     if (m.distance) prescribedDistMap[key] = m.distance;
     if (m.rxWeights?.male || m.rxWeights?.female) {
@@ -1817,7 +1773,8 @@ export function buildPageArtifactSection(
       const rxUnit = m.rxWeights.unit === 'lb' ? 'lb' : 'kg';
       const { male, female } = m.rxWeights;
       prescribedRxLabelMap[key] = male && female && male !== female
-        ? `${male}/${female}${rxUnit}`
+        // Verbatim board text ONLY — the AI's prescription rewrites pairs as male/female.
+        ? `${formatRxPairInBoardOrder(male, female, exercise.rawText?.trim() || exercise.prescription || '')}${rxUnit}`
         : `${male || female}${rxUnit}`;
     }
     if (m.alternative?.name) {
@@ -1856,12 +1813,23 @@ export function buildPageArtifactSection(
     const secs = rounded % 60;
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
+  // repeatCount may be either the total interval count (rotation boards: "×6" with 2 stations)
+  // or the complete-cycle count (minute EMOMs: "5 rounds" over 3 stations). Same normalization
+  // heuristic as getStationVisitCountsForExercise in workloadCalculation: a count larger than
+  // the station count and divisible by it already IS the total; otherwise multiply through.
+  const stationTotalIntervals = (stationCount: number): number => {
+    if (!repeatCount) return 0;
+    return repeatCount > stationCount && repeatCount % stationCount === 0
+      ? repeatCount
+      : repeatCount * stationCount;
+  };
   const getStationHeaderCap = (stationLabel?: string): string | undefined => {
     if (!stationLabel || !repeatCount || stationLabelsInOrder.length <= 1) return undefined;
     const stationIndex = Math.max(0, stationLabelsInOrder.indexOf(stationLabel));
-    const visits = getStationVisitCount(repeatCount, stationLabelsInOrder.length, stationIndex);
-    const workPerVisit = exercise.workDuration && repeatCount > 0
-      ? formatStationHeaderDuration(exercise.workDuration / repeatCount)
+    const totalIntervals = stationTotalIntervals(stationLabelsInOrder.length);
+    const visits = getStationVisitCount(totalIntervals, stationLabelsInOrder.length, stationIndex);
+    const workPerVisit = exercise.workDuration && totalIntervals > 0
+      ? formatStationHeaderDuration(exercise.workDuration / totalIntervals)
       : undefined;
     return [`${visits} rds`, workPerVisit].filter(Boolean).join(' · ');
   };
@@ -1874,9 +1842,17 @@ export function buildPageArtifactSection(
   // already uses; kept separate from exerciseOnlyText itself since that's relied on by several
   // unrelated pre-existing regex checks below (for_time/relay/AMRAP-minute detection) that this
   // fix shouldn't touch.
-  const exercisePartnerScopedText = `${exercise.rawText || ''} ${exerciseOnlyText}`;
+  const exercisePartnerScopedText = `${partnerContextText || ''} ${exercise.rawText || ''} ${exerciseOnlyText}`;
   const partnerRoundCount = getSectionedRoundTradeCount(exercise) ?? repeatCount;
-  const splitInfo = teamSize && teamSize > 1 && !isStrength
+  // AMRAP-intervals is never a real team score, even when the AI stamps partnerWorkout/
+  // partnerSplit — "work in pairs" here means alternating solo turns on shared equipment
+  // (each athlete's rounds are entirely their own), not a round-trade/shared-total WOD. The
+  // round ledger, "OUR ___" hero label, and partner blueprint override all exist for genuine
+  // round-trade structures (RFT, sectioned metcons) where a discrete round unit is meaningfully
+  // handed off between partners — that model doesn't apply to a variable, self-paced AMRAP
+  // performed during your own turn. Never confirm partner status for this loggingMode.
+  const isAmrapIntervalsExercise = exercise.loggingMode === 'amrap_intervals';
+  const splitInfo = teamSize && teamSize > 1 && !isStrength && !isAmrapIntervalsExercise
     ? detectPartnerSplit({
         teamSize,
         scopedText: exercisePartnerScopedText,
@@ -1895,6 +1871,7 @@ export function buildPageArtifactSection(
         rounds: buildRoundLedger(
           splitInfo!.totalRounds!,
           inferPartnerRoundLedgerCompletedRounds(splitInfo!.totalRounds!, exercise, movements),
+          teamSize,
         ),
       }
     : undefined;
@@ -1917,33 +1894,40 @@ export function buildPageArtifactSection(
     const stationCount = Object.keys(stationLabelMap).length;
     const roundsMatch = (exercise.prescription || '').match(/(\d+)\s*rounds?/i);
     const rounds = exercise.rounds || (roundsMatch ? parseInt(roundsMatch[1]) : null);
-    // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
-    // hardcoded "1 min each" here would silently lie about the actual work/rest split.
-    const formatStationDuration = (seconds: number): string => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
-    };
-    // workDuration/restDuration are CUMULATIVE across all rounds (per the AI's own contract —
-    // e.g. "2:00 AMRAP x 6" -> workDuration: 720), not per-round — divide back down to get the
-    // single work/rest interval to display. The AI sometimes violates the contract and returns
-    // the PER-INTERVAL value instead: when the exercise's own text prescribes exactly that
-    // duration (e.g. "[02:00 AMRAP / 01:00 REST] x 6" saved with restDuration: 60), dividing
-    // would invent a fictional split ("0:10 rest") — so a value matching the text's explicit
-    // work/rest is shown as-is.
-    const timingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-    const perIntervalSeconds = (cumulative: number | undefined, explicit: number | undefined): number | undefined => {
-      if (!cumulative || !rounds) return undefined;
-      return cumulative === explicit ? explicit : cumulative / rounds;
-    };
-    const workSeconds = perIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText));
-    const restSeconds = perIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText));
-    const workLabel = workSeconds ? formatStationDuration(workSeconds) : undefined;
-    const restLabel = restSeconds ? formatStationDuration(restSeconds) : undefined;
-    const timingLabel = workLabel
-      ? (restLabel ? `${workLabel} work / ${restLabel} rest` : `${workLabel} each`)
-      : `${stationCount} stations`;
-    blueprint = [rounds ? `${rounds} rounds` : null, timingLabel].filter(Boolean).join(' · ');
+    // Minute-slot EMOM stations: the board's own header ("EMOM 15 MIN") is the structure line —
+    // a derived work/rest split would restate it worse.
+    const stationCadence = extractEveryXCadence(exerciseOnlyText);
+    if (stationCadence && /^emom/i.test(stationCadence)) {
+      blueprint = [stationCadence, rounds ? `${rounds} rounds` : null].filter(Boolean).join(' · ');
+    } else {
+      // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
+      // hardcoded "1 min each" here would silently lie about the actual work/rest split.
+      const formatStationDuration = (seconds: number): string => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
+      };
+      // workDuration/restDuration are CUMULATIVE across all rounds (per the AI's own contract —
+      // e.g. "2:00 AMRAP x 6" -> workDuration: 720), not per-round — divide back down to get the
+      // single work/rest interval to display. The AI sometimes violates the contract and returns
+      // the PER-INTERVAL value instead: when the exercise's own text prescribes exactly that
+      // duration (e.g. "[02:00 AMRAP / 01:00 REST] x 6" saved with restDuration: 60), dividing
+      // would invent a fictional split ("0:10 rest") — so a value matching the text's explicit
+      // work/rest is shown as-is.
+      const timingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+      const perIntervalSeconds = (cumulative: number | undefined, explicit: number | undefined): number | undefined => {
+        if (!cumulative || !rounds) return undefined;
+        return cumulative === explicit ? explicit : cumulative / rounds;
+      };
+      const workSeconds = perIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText));
+      const restSeconds = perIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText));
+      const workLabel = workSeconds ? formatStationDuration(workSeconds) : undefined;
+      const restLabel = restSeconds ? formatStationDuration(restSeconds) : undefined;
+      const timingLabel = workLabel
+        ? (restLabel ? `${workLabel} work / ${restLabel} rest` : `${workLabel} each`)
+        : `${stationCount} stations`;
+      blueprint = [rounds ? `${rounds} rounds` : null, timingLabel].filter(Boolean).join(' · ');
+    }
   } else if (!isStrength && repeatCount && repeatCount > 1) {
     const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
     const descScheme = forTime ? parseForTimeRepScheme(exercise, rawText) : undefined;
@@ -1978,21 +1962,57 @@ export function buildPageArtifactSection(
     }
   }
 
+  // Progressive/pyramid chippers render the same section-by-section story on a carousel page
+  // as on the whole-workout path — these checks must run BEFORE the generic multi-section
+  // branch below, which would otherwise claim them (they are also multi-round-section shapes).
+  // EXCEPT when the block is a confirmed partner split: the compact R1..Rn story has no
+  // partner columns (team shares, me values), so partnered shapes fall through to the
+  // sectioned partner path below instead of silently rendering as solo.
+  if (!isStrength && !splitInfo && isProgressiveChipper(exercise)) {
+    return [{
+      eyebrow: 'FOR TIME',
+      title: 'Blueprint',
+      blueprint,
+      rows: buildProgressiveChipperRows(exercise, movements),
+    }];
+  }
+  if (!isStrength && !splitInfo && isPyramidChipper(exercise)) {
+    const pyramidSections = exercise.sections!.filter((s) => s.sectionType === 'rounds');
+    const pyramidBlueprint = normalizeBlueprint([
+      `${pyramidSections.length}-round pyramid for time`,
+      timeCapLabel ? `· ${timeCapLabel}` : null,
+    ].filter(Boolean).join(' '));
+    return [{
+      eyebrow: 'FOR TIME',
+      title: 'Blueprint',
+      blueprint: pyramidBlueprint,
+      rows: buildProgressiveChipperRows(exercise, movements, true),
+    }];
+  }
+
   const pageRoundSectionsCount = (exercise.sections ?? []).filter((s) => s.sectionType === 'rounds').length;
   const pageIsSectionedForTime = !isStrength && pageRoundSectionsCount > 1 && /for\s*time|\brft\b/i.test(exercisePartnerScopedText);
   if (pageIsSectionedForTime) {
     const sectionSplitInfo = splitInfo?.split === 'reps' ? splitInfo : undefined;
-    const sections = buildMultiSectionForTimeSections(exercise, teamSize, sectionSplitInfo, !!splitInfo);
+    const sections = buildMultiSectionForTimeSections(exercise, movements, teamSize, sectionSplitInfo, !!splitInfo);
     if (sections.length > 0) {
-      return {
-        ...sections[0],
-        title: exercise.name,
-        blueprint,
-        rows: sections.flatMap((section) => section.rows),
-        hiddenCount: 0,
-        isPartnerConfirmed: !!splitInfo,
-        partnerDisplayMode: splitInfo ? 'sections' : undefined,
+      // The structure line ("3 x 3 rounds for time") leads as its OWN header block — gluing it
+      // to block A's cap reads as if it described only that block. The generic 'Blueprint'
+      // title makes sectionsToRows promote the cap into the label slot; partner pages also
+      // read sections[0].blueprint for their format line. Prefer the structural label over the
+      // shared blueprint: the latter degrades to a bare "For time" when repeatCount is 1
+      // (e.g. a pyramid of single-round sections).
+      const sectionedLabel = getSectionedForTimeLabel(exercise);
+      const headerSection: ArtifactSection = {
+        title: 'Blueprint',
+        blueprint: sectionedLabel
+          ? normalizeBlueprint([sectionedLabel, timeCapLabel ? `(${timeCapLabel})` : null].filter(Boolean).join(' '))
+          : blueprint,
+        rows: [],
+        isPartnerConfirmed: sections[0].isPartnerConfirmed,
+        partnerDisplayMode: sections[0].partnerDisplayMode,
       };
+      return [headerSection, ...sections];
     }
   }
 
@@ -2008,7 +2028,7 @@ export function buildPageArtifactSection(
 
   if (descSchemeGlobal && descSchemeCompleted) {
     const rows = buildDescendingLadderRows(exercise, movements, descSchemeGlobal, descSchemeCompleted);
-    return {
+    return [{
       eyebrow: 'WOD',
       title: exercise.name,
       blueprint,
@@ -2018,7 +2038,7 @@ export function buildPageArtifactSection(
       descLadderScheme: descSchemeGlobal,
       descLadderCompleted: descSchemeCompleted,
       isPartnerConfirmed: !!splitInfo,
-    };
+    }];
   }
 
   const movementRepeatCounts = getSectionedMovementRepeatCounts(exercise);
@@ -2071,7 +2091,7 @@ export function buildPageArtifactSection(
             // ST. header already says how many times it ran — no derived totals.
             const qty = prescDist && prescDist > 0 ? formatStationDistance(prescDist)
               : prescCals && prescCals > 0 ? `${prescCals} cal`
-              : `${prescReps}`;
+              : prescribedRepsDisplayMap[key] ?? `${prescReps}`;
             const altSuffix = prescribedAltMap[key] ? ` / ${prescribedAltMap[key]}` : '';
             const loadSuffix = (movement.weight || 0) > 0 ? ` @ ${movement.weight}${wUnit}`
               : prescribedRxLabelMap[key] ? ` @ ${prescribedRxLabelMap[key]}` : '';
@@ -2102,6 +2122,7 @@ export function buildPageArtifactSection(
 
         const prescribed = {
           reps: prescribedRepsMap[key],
+          repsDisplay: prescribedRepsDisplayMap[key],
           distance: prescribedDistMap[key],
           calories: prescribedCalsMap[key],
           weight: prescribedWeightMap[key],
@@ -2144,7 +2165,7 @@ export function buildPageArtifactSection(
 
   if (shouldLogCelebrationDebug()) {
     console.warn('[CelebrationDebug:v20260503-page-artifact]', {
-      path: 'buildPageArtifactSection',
+      path: 'buildPageArtifactSections',
       exercise: { name: exercise.name, prescription: exercise.prescription, rounds: exercise.rounds },
       isStrength,
       repeatCount,
@@ -2156,7 +2177,7 @@ export function buildPageArtifactSection(
   const exerciseOnlyIsIGYG = rawText ? /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(rawText) : false;
   const sectionEyebrow = isRelaySection ? 'RELAY' : exerciseOnlyIsIGYG ? 'PARTNER AMRAP' : 'WOD';
 
-  return {
+  return [{
     eyebrow: sectionEyebrow,
     title: exercise.name,
     blueprint,
@@ -2169,7 +2190,7 @@ export function buildPageArtifactSection(
     }),
     roundLedger,
     isPartnerConfirmed: !!splitInfo,
-  };
+  }];
 }
 
 // ─── Hero result ──────────────────────────────────────────────────────────────
@@ -2190,6 +2211,19 @@ function findMetconExercise(exercises: Exercise[]): Exercise {
 
 function formatRepScheme(repsPerSet?: number[]): string | undefined {
   return repsPerSet && repsPerSet.length > 1 ? repsPerSet.join('-') : undefined;
+}
+
+function getAmrapNarrative(exercise: Exercise): string | undefined {
+  const completedPartialMovements = new Set((exercise.partialMovements ?? []).map(normalizeStampMovementName));
+  const movementPartialReps = completedPartialMovements.size > 0
+    ? (exercise.movements ?? [])
+      .filter((movement) => completedPartialMovements.has(normalizeStampMovementName(movement.name)))
+      .reduce((sum, movement) => sum + (movement.reps ?? 0), 0)
+    : 0;
+  const partialReps = exercise.partialReps && exercise.partialReps > 0
+    ? exercise.partialReps
+    : movementPartialReps;
+  return partialReps > 0 ? '+ some change' : undefined;
 }
 
 function buildAccomplishmentStory(movements: MovementTotal[]): string | undefined {
@@ -2410,7 +2444,7 @@ function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined
   return globalLabels[globalFormat || ''] || 'WOD';
 }
 
-function buildFormatLine(format: string | undefined, exercises: Exercise[], _durationMinutes: number, timeCap?: number, teamSize?: number): string | undefined {
+function buildFormatLine(format: string | undefined, exercises: Exercise[], _durationMinutes: number, _timeCap?: number, teamSize?: number): string | undefined {
   const formatLabels: Record<string, string> = { for_time: 'For Time', amrap: 'AMRAP', amrap_intervals: 'AMRAP', emom: 'EMOM', intervals: 'Intervals', strength: 'Strength', tabata: 'Tabata' };
   if (!format) return undefined;
   const partnerSuffix = teamSize && teamSize > 1 ? (teamSize === 2 ? ' · In Pairs' : ` · Team of ${teamSize}`) : '';
@@ -2421,44 +2455,46 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
   }
   const label = formatLabels[format] || format.replace(/_/g, ' ');
   let base = label;
+  // Every branch below only overrides `base` with STRUCTURE detail the FormatTag pill can't
+  // carry (cadence, rounds, duration) — never the format word itself, which the pill already
+  // shows. A branch that can't add real structure returns undefined so posterData.ts's own
+  // (single, correct) per-format line is used instead of a second copy of the bare word.
   if (format === 'amrap_intervals') {
     const ex = exercises[0];
     const count = exercises.length > 1 ? exercises.length : 0;
     const minMatch = (ex?.name || '').match(/(\d+)\s*min/i);
     const mins = minMatch ? parseInt(minMatch[1], 10) : 0;
-    if (count > 0 && mins > 0) base = count + ' × ' + mins + ' MIN AMRAP';
-    else if (count > 0) base = count + ' × AMRAP';
-    else base = 'AMRAP Intervals';
+    if (count > 0 && mins > 0) base = `${count} × ${mins} MIN`;
+    else if (count > 0) base = `${count} ×`;
+    else return undefined;
   } else if (format === 'amrap') {
-    const cap = timeCap ? Math.round(timeCap / 60) : 0;
-    base = cap > 0 ? `${cap} min ${label}` : label;
+    return undefined;
   } else if (format === 'emom') {
     const ex = exercises[0];
     const intervalSets = ex?.sets?.length || 0;
     const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
     const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
-    else { const cap = timeCap ? Math.round(timeCap / 60) : 0; base = cap > 0 ? `${cap} min ${label}` : label; }
+    else return undefined;
   } else if (format === 'intervals') {
     const ex = exercises[0];
     const intervalSets = ex?.sets?.length || ex?.rounds || 0;
     const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
     const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
-    else { const rounds = ex?.rounds; base = rounds && rounds > 1 ? `${rounds} Sets ${label}` : label; }
+    else return undefined;
   } else if (format === 'for_time') {
     const ex = exercises[0];
     const hasSections = ex?.sections && ex.sections.length > 1;
-    if (!hasSections) { const rounds = ex?.rounds; if (rounds && rounds > 1) base = `${rounds} Rounds ${label}`; }
+    const rounds = ex?.rounds;
+    if (!hasSections && rounds && rounds > 1) base = `${rounds} Rounds`;
+    else return undefined;
   } else if (format === 'strength') {
-    const ex = exercises[0];
-    if (ex) {
-      const completedSets = ex.sets.filter((s) => s.completed);
-      const reps = completedSets[0]?.actualReps ?? completedSets[0]?.targetReps;
-      if (completedSets.length > 0 && reps) base = `${completedSets.length}×${reps} ${ex.name}`;
-    }
-    // Strength work is individual even in team sessions — team designation belongs on the metcon
-    return base;
+    // The strength scheme line ("N SETS") is built once, correctly, in posterData.ts's
+    // formatPosterStrengthScheme — returning undefined here lets that be the only source
+    // instead of duplicating it with a sets×reps figure that also restates the movement name
+    // (already the poster title) a second time.
+    return undefined;
   }
   return base + partnerSuffix;
 }
@@ -2647,6 +2683,25 @@ export function computeHeroResult(
     return { value: `${prWeight}`, unit: 'KG PR', subtitle: prMovementName?.toUpperCase(), formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentGold' };
   }
 
+  // Free/unclassified part: the hero is exactly what the athlete entered — whichever score
+  // type they picked. No derivation; if they logged nothing, fall through to EP/duration.
+  const freeExercise = !isMixed && exercises[0]?.loggingMode === 'free' ? exercises[0] : undefined;
+  if (freeExercise) {
+    const scoreSet = freeExercise.sets.find((s) => s.completed) ?? freeExercise.sets[0];
+    if (scoreSet?.time && scoreSet.time > 0) {
+      return { value: fmtTimeSocial(scoreSet.time), unit: 'MIN', formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentMagenta' };
+    }
+    if (freeExercise.rounds && freeExercise.rounds > 0) {
+      return { value: formatAmrapRounds(freeExercise.rounds), unit: 'ROUNDS', formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentMagenta' };
+    }
+    if (scoreSet?.actualReps && scoreSet.actualReps > 0) {
+      return { value: `${scoreSet.actualReps}`, unit: 'REPS', formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentMagenta' };
+    }
+    if (scoreSet?.weight && scoreSet.weight > 0) {
+      return { value: `${scoreSet.weight}`, unit: 'KG', formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentGold' };
+    }
+  }
+
   const amrapExercise = isMixed
     ? exercises.find((ex) => /amrap/i.test((ex.name + ' ' + ex.prescription).toLowerCase()))
     : (format === 'amrap' || format === 'amrap_intervals') ? exercises[0] : undefined;
@@ -2686,7 +2741,7 @@ export function computeHeroResult(
     if (isStationRotation) {
       const maxTotalReps = stationMovements
         .filter((m) => m.isMaxReps || /\bmax\b/i.test(m.name))
-        .reduce((sum, m) => sum + (findBreakdownForParsedMovement(m, movements)?.totalReps || 0), 0);
+        .reduce((sum, m) => sum + (findMovementTotal(movements, m.name)?.totalReps || 0), 0);
       if (maxTotalReps > 0) {
         return {
           value: `${maxTotalReps}`,
@@ -2701,7 +2756,19 @@ export function computeHeroResult(
       const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
         ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)
         : (amrapExercise.rounds || 0);
-      if (totalRounds > 0) return { value: formatAmrapRounds(totalRounds), unit: 'ROUNDS', formatLine, storyLine, storyMovements: buildStory(Math.floor(totalRounds)), accentClass: 'accentMagenta' };
+      const hasPartial = (amrapExercise.partialMovements?.length ?? 0) > 0
+        || (amrapExercise.partialReps ?? 0) > 0;
+      if (totalRounds > 0) {
+        return {
+          value: formatAmrapRounds(totalRounds),
+          unit: 'ROUNDS',
+          formatLine,
+          storyLine,
+          storyMovements: buildStory(Math.floor(totalRounds)),
+          accentClass: 'accentMagenta',
+          amrapNarrative: hasPartial ? getAmrapNarrative(amrapExercise) : undefined,
+        };
+      }
     }
   }
 
@@ -2712,7 +2779,11 @@ export function computeHeroResult(
   const isFixedCadence = /\b(?:emom|e\d+mom|every\s+\d+(?::\d{2})?\s*(?:min(?:ute)?s?)?)\b/i.test(cadenceText);
   const prescribedCadenceRounds = isFixedCadence ? getPrescribedRoundCount(exercises, rawText) : undefined;
   const isForTimeFormat = format === 'for_time' || (format === 'intervals' && !prescribedCadenceRounds);
-  const metconIsForTime = isMixed && /for\s*time|rft|\d+\s*rounds?\s*for/i.test((metconEx.name + ' ' + metconEx.prescription).toLowerCase());
+  // The exercise's OWN loggingMode outranks the session format: a session whose primary part
+  // is a secondary skill EMOM stamps format 'emom', but the poster's main part can still be a
+  // for_time metcon with a logged finish time — that time IS the hero (parts are standalone).
+  const metconIsForTime = metconEx.loggingMode === 'for_time'
+    || (isMixed && /for\s*time|rft|\d+\s*rounds?\s*for/i.test((metconEx.name + ' ' + metconEx.prescription).toLowerCase()));
 
   if (isForTimeFormat || metconIsForTime) {
     const heroTime = metconTime ?? anyTime;
@@ -2728,7 +2799,9 @@ export function computeHeroResult(
 
   const emomHasCardio = format === 'emom' && movements.some((m) => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
 
-  // Fixed-cadence EMOM/intervals: the score is the prescribed structure, not a finish time.
+  // Fixed-cadence EMOM/intervals: the score is never a finish time — and the rounds are
+  // prescribed, not earned (everyone who finishes an EMOM 15 did its rounds). The athlete's
+  // counted work inside the windows is the interesting number; rounds only when nothing counted.
   if ((format === 'emom' || (format === 'intervals' && prescribedCadenceRounds)) && !emomHasCardio) {
     const ex0 = exercises[0];
     const prescribedRounds =
@@ -2737,6 +2810,16 @@ export function computeHeroResult(
       ex0?.intervalCount ??
       ex0?.sets?.length ??
       0;
+    const emomReps = movements.reduce((sum, m) => sum + (m.totalReps || 0), 0);
+    if (emomReps > 0) {
+      return {
+        value: `${emomReps}`,
+        unit: 'REPS',
+        formatLine, storyLine,
+        storyMovements: buildStory(prescribedRounds || 1),
+        accentClass: 'accentMagenta',
+      };
+    }
     if (prescribedRounds > 0) {
       return {
         value: `${prescribedRounds}`,
@@ -2760,6 +2843,13 @@ export function computeHeroResult(
   if ((totalCaloriesAcrossMovements >= 50 || (format === 'emom' && emomHasCardio && totalCaloriesAcrossMovements > 0)) && topCalorieMovement) {
     const storyWithoutCalTotal = buildStory(singleExerciseRounds)?.map((line) => (line.total?.endsWith('cal total') ? { ...line, total: '' } : line));
     return { value: `${totalCaloriesAcrossMovements}`, unit: 'CAL', subtitle: topCalorieMovement.name.toUpperCase(), formatLine, storyLine, storyMovements: storyWithoutCalTotal, accentClass: 'accentMagenta' };
+  }
+
+  // Countable work beats app currency: "+78 EP" means nothing to anyone outside wodi, while
+  // "220 REPS" is legible in a screenshot. EP stays the hero only when there is no counted work.
+  const totalRepsAcrossMovements = movements.reduce((sum, m) => sum + (m.totalReps || 0), 0);
+  if (totalRepsAcrossMovements > 0) {
+    return { value: `${totalRepsAcrossMovements}`, unit: 'REPS', formatLine, storyLine, storyMovements: buildStory(singleExerciseRounds), accentClass: 'accentMagenta' };
   }
 
   if (totalEP > 0) return { value: `+${totalEP}`, unit: 'EP', formatLine, storyLine, storyMovements: buildStory(singleExerciseRounds), accentClass: 'accentGreen' };

@@ -1,12 +1,13 @@
 import type { StoryExerciseResult, MovementResult } from './types';
 import { LoadInput } from './LoadInput';
-import { ScoreTimeInput, ScoreRoundsInput } from './ScoreInputs';
+import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
 import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
 import { ScoreMovementInputs } from './ScoreMovementInputs';
 import { LadderInput } from './LadderInput';
 import { DescendingSetTrack } from './DescendingSetTrack';
+import { FreeScoreInput } from './FreeScoreInput';
 
 interface InputRouterProps {
   result: StoryExerciseResult;
@@ -37,8 +38,32 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     const inputMovements = visibleMovements.filter(
       mr => mr.kind === 'load' || mr.kind === 'distance'
     );
-    const showMovements = visibleMovements.length > 0;
     const isAmrapIntervals = result.exercise.loggingMode === 'amrap_intervals';
+
+    // Round-alternating partner AMRAP-intervals (IGUG "I go, you go"): whoever's up for an
+    // interval does the FULL prescribed round, so per-movement per-round precision is both
+    // unnecessary and (via the interval grid's teamSize divide) actively wrong. Swap the grid for
+    // a single "rounds per interval" estimate + weight-only tiles. Flat-shared-total partner
+    // AMRAP-intervals (partnerSplit === 'reps') and solo AMRAP-intervals keep the existing grid.
+    const isRoundsSplitPartner = result.exercise.partnerWorkout === true
+      && result.exercise.partnerSplit === 'rounds';
+    const useSimplifiedIntervalRounds = isAmrapIntervals && isRoundsSplitPartner && !isLadder;
+    const useIntervalGridVariant = isAmrapIntervals && !isLadder && !useSimplifiedIntervalRounds;
+
+    // `exercise.intervalCount` is the board's TOTAL turn count across the whole shared session
+    // (e.g. "x4" = 4 turns total). When partners alternate, only half those turns are this
+    // athlete's own — dividing by teamSize here is what keeps the "rounds per interval" estimate
+    // from silently doubling into a fictional team total (this is never a team score; see the
+    // partner-split note above).
+    const totalIntervalCount = result.exercise.intervalCount ?? result.setsTotal ?? 1;
+    const personalIntervalCount = useSimplifiedIntervalRounds && teamSize && teamSize > 1
+      ? Math.max(1, Math.round(totalIntervalCount / teamSize))
+      : totalIntervalCount;
+
+    // The simplified path only ever needs weight/distance tiles (bodyweight reps are derived from
+    // the rounds estimate, same as a plain AMRAP) — everything else keeps showing all movements.
+    const displayMovements = useSimplifiedIntervalRounds ? inputMovements : visibleMovements;
+    const showMovements = displayMovements.length > 0;
 
     const descRepsPerSet = result.exercise.suggestedRepsPerSet;
     const isDescLadder = !isLadder
@@ -46,16 +71,19 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       && descRepsPerSet
       && descRepsPerSet.length >= 3;
 
-    // A relay-distance movement is a prescribed fixed distance (e.g. 200m run) that
-    // renders as a relay-count stepper. When one exists the ROUNDS counter is redundant —
-    // the relay stepper IS the score input. We hide ScoreRoundsInput and sync the relay
-    // count back into result.rounds so the celebration screen still gets the right number.
+    // A relay-distance movement is a prescribed fixed distance (e.g. 200m run) whose personal
+    // trip count can diverge from the team's round count — that only happens in partner/relay
+    // workouts (teamSize > 1), where it renders as a relay-count stepper. When it's the only
+    // scored movement the ROUNDS counter is redundant — the relay stepper IS the score input:
+    // we hide ScoreRoundsInput and sync the relay count back into result.rounds.
+    // For a solo athlete the ROUNDS counter already counts every trip, so prescribed-distance
+    // movements render display-only instead (distanceDerivedFromRounds).
     const relayMr = inputMovements.find(
       mr => mr.kind === 'distance' &&
         (mr.movement.distance ?? 0) > 0 &&
         !(mr.movement.inputType === 'calories' || (mr.movement.calories ?? 0) > 0)
     );
-    const hasRelay = !!relayMr;
+    const hasRelay = !!relayMr && (teamSize ?? 1) > 1;
     // Pure relay: run IS the score (no other scored movements). In IGYG workouts the relay
     // count and AMRAP rounds are separate — both inputs are shown independently.
     const isPureRelay = hasRelay && inputMovements.filter(mr => mr !== relayMr).length === 0;
@@ -78,6 +106,13 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {kind === 'score_rounds' && !isAmrapIntervals && !isLadder && !isPureRelay && (
           <ScoreRoundsInput result={result} onChange={onChange} />
         )}
+        {useSimplifiedIntervalRounds && (
+          <RoundsPerIntervalInput
+            result={result}
+            intervalCount={personalIntervalCount}
+            onChange={onChange}
+          />
+        )}
         {isLadder && (
           <LadderInput result={result} onChange={onChange} />
         )}
@@ -90,16 +125,17 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         )}
         {showMovements && (
           <ScoreMovementInputs
-            movements={visibleMovements}
+            movements={displayMovements}
             inputMovements={inputMovements}
-            variant={isAmrapIntervals ? 'amrap_intervals' : 'default'}
-            roundsTotal={isAmrapIntervals ? (result.exercise.intervalCount ?? result.setsTotal) : undefined}
+            variant={useIntervalGridVariant ? 'amrap_intervals' : 'default'}
+            roundsTotal={useIntervalGridVariant ? (result.exercise.intervalCount ?? result.setsTotal) : undefined}
             isRelayContext={hasRelay && kind === 'score_rounds'}
+            distanceDerivedFromRounds={kind === 'score_rounds' && !hasRelay}
             teamSize={teamSize}
             onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {
               const next = [...movements];
-              const key = visibleMovements[index]?.movementKey;
+              const key = displayMovements[index]?.movementKey;
               const globalIdx = key ? next.findIndex(m => m.movementKey === key) : -1;
               const i = globalIdx >= 0 ? globalIdx : index;
               next[i] = { ...next[i], ...patch };
@@ -113,6 +149,32 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
               });
               onChange({ movementResults: next, ...syncRelay(next) });
             }}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Free/unclassified part: one generic score entry (athlete picks time/rounds/reps/load)
+  // plus the usual weight/distance fills for any movements the parser did extract.
+  // Must run BEFORE the superset branch — a multi-movement free part is not a superset.
+  if (kind === 'free_score') {
+    const freeInputMovements = movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance');
+    return (
+      <>
+        <FreeScoreInput result={result} onChange={onChange} />
+        {freeInputMovements.length > 0 && (
+          <ScoreMovementInputs
+            movements={movements}
+            inputMovements={freeInputMovements}
+            teamSize={teamSize}
+            onSubstitutionOpenChange={onSubstitutionOpenChange}
+            onChange={(index: number, patch: Partial<MovementResult>) => {
+              const next = [...movements];
+              next[index] = { ...next[index], ...patch };
+              onChange({ movementResults: next });
+            }}
+            onBatch={(next) => onChange({ movementResults: next })}
           />
         )}
       </>

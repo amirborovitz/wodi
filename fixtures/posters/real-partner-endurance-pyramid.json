@@ -1,0 +1,148 @@
+﻿{
+  "name": "real-partner-endurance-pyramid",
+  "description": "Multi-part board (secondary DU EMOM + partner metcon 'In pairs, I go you go'), saved doc from the 2026-07-10 re-log. Traps: (1) partner treatment must come from exercises[1].partnerWorkout/partnerSplit alone - the AI dropped the partner preamble from the exercise rawText; (2) session format is 'emom' (primary-part leak) but the main part is for_time with a logged 24:30 - the hero must be that time, not a reps fallback; (3) the together-bike rows must NOT surface the 4x900m breakdown aggregate as a per-row mine value.",
+  "workout": {
+    "title": "WOD",
+    "format": "emom",
+    "teamSize": 2,
+    "rawText": "Movement focus of the day\nDouble Unders\nAdvanced: EMOM for 8 minutes:\n\"X\" Double Unders (aim for ~30 sec work)\n* You can also practice Triple Unders / cross over\n\nMETCON (Long)\nIn pairs, I go you go\nFor time:\n300m run (together)\n100 Power Cleans\n300m run (together)\n80 Shoulder to Overhead\n300m run (together)\n60 Thrusters\n300m run (together)\nInto: 300m Farmer Carry\nWEIGHT: 35/50kg, Advanced: 40/60kg\n28 minutes T.C.",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "EMOM 8 Double Unders",
+        "type": "skill",
+        "loggingMode": "emom",
+        "isSecondary": true,
+        "partnerWorkout": false,
+        "aiPartName": "TANK",
+        "prescription": "\"X\" Double Unders (aim for ~30 sec work)",
+        "rawText": "Advanced: EMOM for 8 minutes:\n\"X\" Double Unders (aim for ~30 sec work)\n* You can also practice Triple Unders / cross over",
+        "rounds": 8,
+        "workDuration": 480,
+        "movements": [
+          {
+            "name": "Double Under",
+            "countingMode": "per_round",
+            "inputType": "none",
+            "isMaxReps": true,
+            "scoreEntryMode": "total"
+          }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true },
+          { "id": "set-1", "setNumber": 2, "completed": true },
+          { "id": "set-2", "setNumber": 3, "completed": true },
+          { "id": "set-3", "setNumber": 4, "completed": true },
+          { "id": "set-4", "setNumber": 5, "completed": true },
+          { "id": "set-5", "setNumber": 6, "completed": true },
+          { "id": "set-6", "setNumber": 7, "completed": true },
+          { "id": "set-7", "setNumber": 8, "completed": true }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Endurance Relay For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "partnerWorkout": true,
+        "partnerSplit": "reps",
+        "aiPartName": "SLAB",
+        "prescription": "300m run (together), 100 Power Cleans, 300m run (together), 80 Shoulder to Overhead, 300m run (together), 60 Thrusters, 300m run (together), Into: 300m Farmer Carry",
+        "rawText": "300m run (together)\n100 Power Cleans\n300m run (together)\n80 Shoulder to Overhead\n300m run (together)\n60 Thrusters\n300m run (together)\nInto: 300m Farmer Carry\nWEIGHT: 35/50kg, Advanced: 40/60kg",
+        "movements": [
+          {
+            "name": "Echo Bike",
+            "countingMode": "per_round",
+            "distance": 900,
+            "inputType": "none",
+            "scoreEntryMode": "per_round",
+            "together": true,
+            "unit": "m"
+          },
+          {
+            "name": "Power Clean",
+            "countingMode": "per_round",
+            "inputType": "weight",
+            "reps": 100,
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" },
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Shoulder to Overhead",
+            "countingMode": "per_round",
+            "inputType": "weight",
+            "reps": 80,
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" },
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Thruster",
+            "countingMode": "per_round",
+            "inputType": "weight",
+            "reps": 60,
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" },
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Farmer Carry",
+            "countingMode": "per_round",
+            "distance": 300,
+            "inputType": "none",
+            "scoreEntryMode": "per_round",
+            "unit": "m"
+          }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Run", "countingMode": "per_round", "distance": 300, "inputType": "none", "scoreEntryMode": "per_round", "together": true, "unit": "m" },
+              { "name": "Power Clean", "countingMode": "per_round", "inputType": "weight", "reps": 100, "rxWeights": { "male": 50, "female": 35, "unit": "kg" }, "scoreEntryMode": "per_round" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Run", "countingMode": "per_round", "distance": 300, "inputType": "none", "scoreEntryMode": "per_round", "together": true, "unit": "m" },
+              { "name": "Shoulder to Overhead", "countingMode": "per_round", "inputType": "weight", "reps": 80, "rxWeights": { "male": 50, "female": 35, "unit": "kg" }, "scoreEntryMode": "per_round" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Run", "countingMode": "per_round", "distance": 300, "inputType": "none", "scoreEntryMode": "per_round", "together": true, "unit": "m" },
+              { "name": "Thruster", "countingMode": "per_round", "inputType": "weight", "reps": 60, "rxWeights": { "male": 50, "female": 35, "unit": "kg" }, "scoreEntryMode": "per_round" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Run", "countingMode": "per_round", "distance": 300, "inputType": "none", "scoreEntryMode": "per_round", "together": true, "unit": "m" },
+              { "name": "Farmer Carry", "countingMode": "per_round", "distance": 300, "inputType": "none", "scoreEntryMode": "per_round", "unit": "m" }
+            ]
+          }
+        ],
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 240, "time": 1470, "weight": 40 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "grandTotalReps": 240,
+      "grandTotalVolume": 9600,
+      "grandTotalDistance": 3900,
+      "movements": [
+        { "name": "Power Clean", "color": "yellow", "totalReps": 100, "weight": 40, "unit": "kg" },
+        { "name": "Shoulder to Overhead", "color": "yellow", "totalReps": 80, "weight": 40, "unit": "kg" },
+        { "name": "Thruster", "color": "yellow", "totalReps": 60, "weight": 40, "unit": "kg" },
+        { "name": "Echo Bike", "color": "magenta", "originalMovement": "Run", "wasSubstituted": true, "substitutionType": "equivalent", "together": true, "implementCount": 1, "distancePerRep": 900, "totalDistance": 3600, "totalReps": 0, "totalCalories": 0, "totalTime": 0, "unit": "m" },
+        { "name": "Farmer Carry", "color": "magenta", "distancePerRep": 300, "totalDistance": 300, "unit": "m" }
+      ]
+    }
+  }
+}

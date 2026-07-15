@@ -1,0 +1,182 @@
+{
+    "name":  "real-interval-amrap-20260706",
+    "description":  "REAL saved doc: Every 1:30 min x 8 sets",
+    "workout":  {
+                    "date":  "2026-07-06T18:59:19.652Z",
+                    "title":  "Today Workout",
+                    "format":  "amrap",
+                    "rawText":  "Hi עמיר!\n\nToday Workout\n\nGORILLOT – FIT FOR LIFE\n\nWOD\n\nMetcon\n\nA. WEIGHTLIFTING\nEvery 01:30 min x 8 sets:\n2 power clean + 1 hang squat clean\n\n* Start at ~65% and build up weight\n\nB. METCON (Medium)\n16 min AMRAP:\n5 Deadlift @70/100kg\n10 push ups\n15 air squats\n\nC. Cool down\n2 sets:\n30-45 sec passive hang\n~01:00 min/side Pigeon stretch\n\nMy favorites",
+                    "exercises":  [
+                                      {
+                                          "id":  "exercise-0",
+                                          "name":  "Every 1:30 min x 8 sets",
+                                          "type":  "wod",
+                                          "prescription":  "2 Power Clean + 1 Hang Squat Clean, start at ~65% and build up weight",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-0",
+                                                           "setNumber":  1,
+                                                           "completed":  true,
+                                                           "weight":  40
+                                                       },
+                                                       {
+                                                           "id":  "set-7",
+                                                           "setNumber":  8,
+                                                           "completed":  true,
+                                                           "weight":  50
+                                                       }
+                                                   ],
+                                          "movements":  [
+                                                            {
+                                                                "name":  "Power Clean",
+                                                                "reps":  2,
+                                                                "rxWeights":  {
+                                                                                  "male":  40,
+                                                                                  "female":  40,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Squat Clean",
+                                                                "reps":  1,
+                                                                "rxWeights":  {
+                                                                                  "male":  40,
+                                                                                  "female":  40,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            }
+                                                        ],
+                                          "rounds":  8,
+                                          "rawText":  "Every 01:30 min x 8 sets:\n2 Power Clean + 1 Hang Squat Clean\n\n* Start at ~65% and build up weight",
+                                          "loggingMode":  "emom",
+                                          "isSecondary":  false,
+                                          "partnerWorkout":  false,
+                                          "workDuration":  720,
+                                          "aiPartName":  "TANK"
+                                      },
+                                      {
+                                          "id":  "exercise-1",
+                                          "name":  "16 min AMRAP",
+                                          "type":  "wod",
+                                          "prescription":  "5 Deadlift @70/100kg, 10 Push-ups, 15 Air Squats",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-summary",
+                                                           "setNumber":  1,
+                                                           "completed":  true,
+                                                           "actualReps":  405,
+                                                           "weight":  75
+                                                       }
+                                                   ],
+                                          "rxWeights":  {
+                                                            "male":  100,
+                                                            "female":  70,
+                                                            "unit":  "kg"
+                                                        },
+                                          "movements":  [
+                                                            {
+                                                                "name":  "Deadlift",
+                                                                "reps":  5,
+                                                                "rxWeights":  {
+                                                                                  "male":  75,
+                                                                                  "female":  75,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Push-up",
+                                                                "reps":  10,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Air Squat",
+                                                                "reps":  15,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            }
+                                                        ],
+                                          "rounds":  13.5,
+                                          "rawText":  "16 min AMRAP:\n5 Deadlift @70/100kg\n10 Push-ups\n15 Air Squats",
+                                          "loggingMode":  "amrap",
+                                          "isSecondary":  false,
+                                          "workDuration":  960,
+                                          "aiPartName":  "SLAB"
+                                      },
+                                      {
+                                          "id":  "exercise-2",
+                                          "name":  "2 sets:",
+                                          "type":  "wod",
+                                          "prescription":  "30-45 sec Passive Hang, ~01:00 min/side Pigeon Stretch",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-0",
+                                                           "setNumber":  1,
+                                                           "completed":  true
+                                                       }
+                                                   ],
+                                          "rawText":  "2 sets:\n30-45 sec Passive Hang\n~01:00 min/side Pigeon Stretch",
+                                          "loggingMode":  "free",
+                                          "isSecondary":  true,
+                                          "aiPartName":  "SPARK"
+                                      }
+                                  ],
+                    "workloadBreakdown":  {
+                                              "movements":  [
+                                                                {
+                                                                    "name":  "Air Squat",
+                                                                    "totalReps":  203,
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Push-up",
+                                                                    "totalReps":  135,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Deadlift",
+                                                                    "totalReps":  68,
+                                                                    "weight":  75,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Power Clean",
+                                                                    "totalReps":  16,
+                                                                    "weight":  45,
+                                                                    "weightProgression":  [
+                                                                                              40,
+                                                                                              50
+                                                                                          ],
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Squat Clean",
+                                                                    "totalReps":  8,
+                                                                    "weight":  45,
+                                                                    "weightProgression":  [
+                                                                                              40,
+                                                                                              50
+                                                                                          ],
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                }
+                                                            ],
+                                              "grandTotalReps":  430,
+                                              "grandTotalVolume":  6180
+                                          },
+                    "timeCap":  1680
+                }
+}

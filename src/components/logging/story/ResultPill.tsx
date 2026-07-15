@@ -64,6 +64,17 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
     return { text: rds };
   }
 
+  // Free/unclassified part: the generic score is the headline, whatever type was picked.
+  // Must run before the superset count — a multi-movement free part is scored, not counted.
+  if (r.kind === 'free_score') {
+    if ((r.timeSeconds ?? 0) > 0) return { text: formatTime(r.timeSeconds!) };
+    if ((r.rounds ?? 0) > 0) return { text: `${r.rounds} rds` };
+    if ((r.repsTotal ?? 0) > 0) return { text: `${r.repsTotal} reps` };
+    if ((r.weight ?? 0) > 0) return { text: formatWeight(r.weight!, r.implementCount) };
+    if (r.notes && r.notes.trim()) return { text: 'Noted' };
+    return { text: 'Add score' };
+  }
+
   // Superset: show filled count
   if (r.movementResults && r.movementResults.length > 1) {
     const total = r.movementResults.length;

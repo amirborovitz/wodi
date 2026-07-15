@@ -5,16 +5,22 @@
  */
 
 import React from 'react';
-import { BRAND, fD, fH, fBL } from './brand';
+import { BRAND, fD, fB, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
+import { DraggableVibeStamp } from './DraggableVibeStamp';
+import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinChalkProps {
   wod: PosterWod;
   vibe: VibeKey | null;
+  vibeOffset?: PosterVibeOffset | null;
+  onVibeMove?: (offset: PosterVibeOffset) => void;
+  onVibeDrop?: (offset: PosterVibeOffset) => void;
+  onVibeLongPress?: () => void;
 }
 
 function hl(color = BRAND.yellow) {
@@ -25,18 +31,17 @@ function hl(color = BRAND.yellow) {
   };
 }
 
-export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
+export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeLongPress }: SkinChalkProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = !!wod.title;
+  const subtitle = named ? wod.format : wod.sub;
   const lineRows = rows.filter((r) => r.kind === 'line');
   const longLineCount = lineRows.filter((r) => r.rx.length > 44).length;
   const compact = rows.length >= 6 || longLineCount >= 2;
-  const movementFont = compact ? 19.5 : 23;
   const movementLineHeight = compact ? 1.02 : 1.1;
-  const valueFont = compact ? 20 : 23;
-  const resultParts = wod.result.value.split(' ');
-  const resultPrimary = resultParts[0] ?? wod.result.value;
-  const resultUnit = resultParts.slice(1).join(' ');
+  const resultParts = splitResultValue(wod.result.value);
+  const resultPrimary = resultParts.primary;
+  const resultUnit = resultParts.unit;
 
   return (
     <div style={{ width: '100%', position: 'relative', transform: 'rotate(-1.3deg)' }}>
@@ -64,9 +69,11 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
         <div style={{ fontFamily: fD, fontSize: named ? (compact ? 25 : 28) : (compact ? 29 : 32), fontWeight: 900, lineHeight: 1, marginTop: compact ? 6 : 8, color: BRAND.paperInk, whiteSpace: 'normal' }}>
           <span style={named ? hl() : undefined}>{named ? wod.title : wod.format}</span>
         </div>
-        <div style={{ fontFamily: fH, fontSize: compact ? 19 : 22, color: '#5a4628', marginTop: compact ? 1 : 3 }}>
-          {named ? wod.format.toLowerCase() : wod.sub}
-        </div>
+        {subtitle && (
+          <div style={{ fontFamily: fH, fontSize: compact ? 19 : 22, color: '#5a4628', marginTop: compact ? 1 : 3 }}>
+            {subtitle.toLowerCase()}
+          </div>
+        )}
 
         {/* Dashed divider */}
         <div style={{ height: 2, background: 'repeating-linear-gradient(90deg, #211d15 0 6px, transparent 6px 10px)', opacity: 0.35, margin: compact ? '8px 0 5px' : '12px 0 8px' }} />
@@ -83,8 +90,8 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                 dimColor="#5a4628"
                 glow={false}
               />
-            ) : wod.split === 'reps' ? (
-              <PairsLegend teamColor="rgba(33,29,21,0.4)" meColor="rgba(33,29,21,0.4)" />
+            ) : shouldShowPairsLegend(wod, rows) ? (
+              <PairsLegend teamColor="rgba(33,29,21,0.4)" meColor="rgba(33,29,21,0.4)" variant="chalk" />
             ) : null
           )}
           {rows.map((r, i) =>
@@ -109,10 +116,15 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                         <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: compact ? '1px 5px' : '2px 6px', fontFamily: fD, fontSize: compact ? 9 : 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {parts.roundLabel}
                         </span>
-                        <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fB, fontSize: parts.isStrength ? 16 : 15.5, fontWeight: 900, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                      </div>
+                    ) : parts.isStrength && wod.repsScheme ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontFamily: fB, fontSize: 16, fontWeight: 900, lineHeight: movementLineHeight }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: '#7a6038' }}>{wod.repsScheme}</span>
                       </div>
                     ) : (
-                      <span style={{ fontFamily: fH, fontSize: movementFont, fontWeight: 500, lineHeight: movementLineHeight }}>
+                      <span style={{ fontFamily: fB, fontSize: parts.isStrength ? 16 : 15.5, fontWeight: 900, lineHeight: movementLineHeight }}>
                         {parts.movName}
                         {parts.loadTag && (
                           <span style={{ fontFamily: fD, fontSize: 13, fontWeight: 700, color: '#7a6038', marginLeft: 6 }}>{parts.loadTag}</span>
@@ -125,17 +137,17 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
-                        <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: fH, fontSize: compact ? 20 : 23, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                           <span style={hl()}>{parts.team}</span>
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fD, fontSize: 12, fontWeight: 700, color: '#5a4628', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 800, color: 'rgba(33,29,21,0.8)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: valueFont, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontFamily: fH, fontSize: compact ? 20 : 23, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         <span style={hl()}>{parts.single}</span>
                       </span>
                     ) : <span />}
@@ -165,14 +177,22 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
         {/* Result — hero number, flanked by the vibe stamp */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: compact ? 6 : 10, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0, flex: '1 1 0' }}>
-            <div style={{ fontFamily: fH, fontSize: compact ? 16 : 18, color: '#5a4628', lineHeight: 1 }}>{wod.result.label.toLowerCase()}</div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: compact ? 4 : 6, flexWrap: 'wrap', marginTop: compact ? 0 : 2, maxWidth: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ fontFamily: fH, fontSize: compact ? 16 : 18, color: '#5a4628', lineHeight: 1 }}>{wod.result.label.toLowerCase()}</div>
+              {wod.rx && <AchievementBadge label={wod.rx} variant="onPaper" paperInkColor={BRAND.paperInk} />}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', width: 'auto', marginTop: 8 }}>
               <span style={{ fontFamily: fD, fontSize: compact ? 60 : 74, fontWeight: 900, lineHeight: 0.88, color: BRAND.paperInk, whiteSpace: 'nowrap' }}>
                 <span style={hl()}>{resultPrimary}</span>
               </span>
               {resultUnit && (
-                <span style={{ fontFamily: fD, fontSize: compact ? 20 : 24, fontWeight: 700, color: '#7a6038', whiteSpace: 'nowrap', paddingBottom: compact ? 4 : 6 }}>
+                <span style={{ fontFamily: fD, fontSize: compact ? 16 : 20, fontWeight: 700, color: '#7a6038', whiteSpace: 'nowrap', paddingBottom: compact ? 4 : 6 }}>
                   {resultUnit}
+                </span>
+              )}
+              {wod.result.narrative && (
+                <span style={{ fontFamily: fH, fontSize: compact ? 21 : 26, fontWeight: 700, lineHeight: 0.9, color: BRAND.paperInk, marginTop: -3 }}>
+                  {wod.result.narrative}
                 </span>
               )}
             </div>
@@ -183,20 +203,15 @@ export function SkinChalk({ wod, vibe }: SkinChalkProps): React.JSX.Element {
             )}
           </div>
           {vibe && (
-            <div style={{ flex: '0 0 auto', marginLeft: 'auto', paddingBottom: compact ? 1 : 3 }}>
+            <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}
+              style={{ flex: '0 0 auto', marginLeft: 'auto', paddingBottom: compact ? 1 : 3 }}>
               <VibeStamp vibe={vibe} color={BRAND.paperInk} scale={compact ? 0.56 : 0.62} />
-            </div>
+            </DraggableVibeStamp>
           )}
         </div>
 
-        {/* Footer: RX/PR stamp + wordmark */}
-        <div style={{ display: 'flex', gap: 10, marginTop: compact ? 8 : 12, alignItems: 'center' }}>
-          {wod.rx && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', border: `2px solid ${BRAND.paperInk}`, borderRadius: 999, padding: '2px 12px', fontFamily: fBL, fontSize: 17, fontWeight: 900, letterSpacing: '0.06em', color: BRAND.paperInk, transform: 'rotate(-1.5deg)' }}>
-              {wod.rx}
-            </span>
-          )}
-          <span style={{ flex: 1 }} />
+        {/* Footer: wordmark only — the achievement badge lives on whichever page earned it. */}
+        <div style={{ display: 'flex', marginTop: compact ? 8 : 12, alignItems: 'center', justifyContent: 'flex-end' }}>
           <Wordmark color={BRAND.paperInk} dot={BRAND.yellow} size={17} />
         </div>
       </div>

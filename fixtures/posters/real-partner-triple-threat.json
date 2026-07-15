@@ -1,0 +1,224 @@
+{
+    "name":  "real-partner-triple-threat",
+    "description":  "REAL saved doc (2026-07-10): board titled Partner WOD but AI dropped the title from rawText and stamped no teamSize/partnerWorkout - partner rendering must come from the title fallback. 3x3-round sectioned for-time.",
+    "workout":  {
+                    "title":  "Partner WOD",
+                    "format":  "for_time",
+                    "rawText":  "For Time:\n3 Rounds:\n50 Wall Ball Shots @20/14\n100 Double Under\n3 Rounds:\n50 Cal Machine\n20 Devil Presses @2x22.5/15 kg\n3 Rounds:\n30 Dual Dumbbell Box Step up Overs @2x22.5/15 kg\n20 Bar Muscle-up",
+                    "exercises":  [
+                                      {
+                                          "id":  "exercise-0",
+                                          "name":  "Triple Threat For Time",
+                                          "type":  "wod",
+                                          "prescription":  "3 rounds of 50 Wall Ball Shots @20/14, 100 Double Under, 3 rounds of 50 Cal Machine, 20 Devil Presses @2x22.5/15 kg, 3 rounds of 30 Dual Dumbbell Box Step up Overs @2x22.5/15 kg, 20 Bar Muscle-up",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-summary",
+                                                           "setNumber":  1,
+                                                           "completed":  true,
+                                                           "actualReps":  1980,
+                                                           "weight":  17.5,
+                                                           "time":  2400
+                                                       }
+                                                   ],
+                                          "rxWeights":  {
+                                                            "male":  22.5,
+                                                            "female":  15,
+                                                            "unit":  "kg"
+                                                        },
+                                          "movements":  [
+                                                            {
+                                                                "name":  "Wall Ball",
+                                                                "reps":  50,
+                                                                "rxWeights":  {
+                                                                                  "male":  20,
+                                                                                  "female":  14,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Double Under",
+                                                                "reps":  100,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Machine",
+                                                                "calories":  50,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Devil Press",
+                                                                "reps":  20,
+                                                                "rxWeights":  {
+                                                                                  "male":  17.5,
+                                                                                  "female":  17.5,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "implementCount":  2,
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Dual Dumbbell Box Step Up Over",
+                                                                "reps":  30,
+                                                                "rxWeights":  {
+                                                                                  "male":  22.5,
+                                                                                  "female":  15,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "implementCount":  2,
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Bar Muscle-up",
+                                                                "reps":  20,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            }
+                                                        ],
+                                          "sections":  [
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  3,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Wall Ball Shot",
+                                                                                     "reps":  50,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  20,
+                                                                                                       "female":  14,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Double Under",
+                                                                                     "reps":  100,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 }
+                                                                             ]
+                                                           },
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  3,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Machine",
+                                                                                     "calories":  50,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Devil Press",
+                                                                                     "reps":  20,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  22.5,
+                                                                                                       "female":  15,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "implementCount":  2,
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 }
+                                                                             ]
+                                                           },
+                                                           {
+                                                               "sectionType":  "rounds",
+                                                               "rounds":  3,
+                                                               "movements":  [
+                                                                                 {
+                                                                                     "name":  "Dual Dumbbell Box Step up Over",
+                                                                                     "reps":  30,
+                                                                                     "rxWeights":  {
+                                                                                                       "male":  22.5,
+                                                                                                       "female":  15,
+                                                                                                       "unit":  "kg"
+                                                                                                   },
+                                                                                     "inputType":  "weight",
+                                                                                     "implementCount":  2,
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Bar Muscle-up",
+                                                                                     "reps":  20,
+                                                                                     "inputType":  "none",
+                                                                                     "countingMode":  "per_round",
+                                                                                     "scoreEntryMode":  "per_round"
+                                                                                 }
+                                                                             ]
+                                                           }
+                                                       ],
+                                          "rounds":  9,
+                                          "rawText":  "For Time:\n3 Rounds:\n50 Wall Ball Shots @20/14\n100 Double Under\n3 Rounds:\n50 Cal Machine\n20 Devil Presses @2x22.5/15 kg\n3 Rounds:\n30 Dual Dumbbell Box Step up Overs @2x22.5/15 kg\n20 Bar Muscle-up",
+                                          "loggingMode":  "for_time",
+                                          "isSecondary":  false,
+                                          "aiPartName":  "TANK"
+                                      }
+                                  ],
+                    "workloadBreakdown":  {
+                                              "movements":  [
+                                                                {
+                                                                    "name":  "Double Under",
+                                                                    "totalReps":  300,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Wall Ball Shot",
+                                                                    "totalReps":  150,
+                                                                    "weight":  17.5,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Dual Dumbbell Box Step up Over",
+                                                                    "totalReps":  90,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "implementCount":  2,
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Devil Press",
+                                                                    "totalReps":  60,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "implementCount":  2,
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Bar Muscle-up",
+                                                                    "totalReps":  60,
+                                                                    "color":  "cyan"
+                                                                },
+                                                                {
+                                                                    "name":  "Machine",
+                                                                    "totalCalories":  150,
+                                                                    "unit":  "cal",
+                                                                    "color":  "magenta"
+                                                                }
+                                                            ],
+                                              "grandTotalReps":  660,
+                                              "grandTotalVolume":  7875,
+                                              "grandTotalCalories":  150
+                                          },
+                    "timeCap":  2400
+                }
+}

@@ -9,17 +9,24 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend } from './PosterComponents';
+import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
+import { DraggableVibeStamp } from './DraggableVibeStamp';
+import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinFlareProps {
   wod: PosterWod;
   vibe: VibeKey | null;
+  vibeOffset?: PosterVibeOffset | null;
+  onVibeMove?: (offset: PosterVibeOffset) => void;
+  onVibeDrop?: (offset: PosterVibeOffset) => void;
+  onVibeLongPress?: () => void;
 }
 
-export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
+export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeLongPress }: SkinFlareProps): React.JSX.Element {
   const rows = rowsOf(wod);
   const named = !!wod.title;
+  const subtitle = named ? wod.format : wod.sub;
 
   return (
     <div style={{
@@ -44,14 +51,16 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
           <div style={{ fontFamily: fD, fontSize: named ? 26 : 34, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.01em', whiteSpace: 'normal' }}>
             {named ? wod.title : wod.format}
           </div>
+          {(subtitle || (named && wod.sub)) && (
           <div style={{ fontFamily: fD, fontSize: 17, fontWeight: 800, letterSpacing: '0.04em', color: 'rgba(0,0,0,0.62)', marginTop: 3 }}>
-            {named ? wod.format : wod.sub}
+            {subtitle}
             {named && wod.sub && (
               <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 600, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.01em', marginLeft: 8 }}>
                 {wod.sub}
               </span>
             )}
           </div>
+          )}
         </div>
 
         {/* Movement rows */}
@@ -66,7 +75,7 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
                 dimColor="rgba(0,0,0,0.5)"
                 glow={false}
               />
-            ) : wod.split === 'reps' ? (
+            ) : shouldShowPairsLegend(wod, rows) ? (
               <PairsLegend teamColor="rgba(0,0,0,0.35)" meColor="rgba(0,0,0,0.35)" />
             ) : null
           )}
@@ -94,6 +103,11 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
                         </span>
                         <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
                       </div>
+                    ) : parts.isStrength && wod.repsScheme ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>{parts.movName}</span>
+                        <span style={{ fontFamily: fM, fontSize: 11, color: 'rgba(0,0,0,0.5)' }}>{wod.repsScheme}</span>
+                      </div>
                     ) : (
                       <span style={{ fontFamily: fB, fontSize: 14.5, fontWeight: 700, lineHeight: 1.25 }}>
                         {parts.movName}
@@ -110,17 +124,17 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                        <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 11, fontWeight: 700, color: 'rgba(0,0,0,0.5)', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.75)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: 19, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={{ fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -147,37 +161,37 @@ export function SkinFlare({ wod, vibe }: SkinFlareProps): React.JSX.Element {
         {/* Result — hero number, flanked by the vibe stamp */}
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 8 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontFamily: fB, fontSize: 8.5, fontWeight: 900, letterSpacing: '0.2em', color: 'rgba(0,0,0,0.6)' }}>
-              {wod.result.label}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ fontFamily: fB, fontSize: 8.5, fontWeight: 900, letterSpacing: '0.2em', color: 'rgba(0,0,0,0.6)' }}>
+                {wod.result.label}
+              </div>
+              {wod.rx && <AchievementBadge label={wod.rx} />}
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, flexWrap: 'nowrap', marginTop: 2 }}>
-              <span style={{ fontFamily: fD, fontSize: 90, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.ink, whiteSpace: 'nowrap' }}>
-                {wod.result.value.split(' ')[0]}
-              </span>
-              {wod.result.value.includes(' ') && (
-                <span style={{ fontFamily: fD, fontSize: 28, fontWeight: 700, color: 'rgba(0,0,0,0.5)', whiteSpace: 'nowrap', paddingBottom: 8 }}>
-                  {wod.result.value.split(' ').slice(1).join(' ')}
-                </span>
-              )}
-            </div>
+            <ResultValue
+              value={wod.result.value}
+              narrative={wod.result.narrative}
+              style={{ marginTop: 2 }}
+              primaryStyle={{ fontFamily: fD, fontSize: 90, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.ink, whiteSpace: 'nowrap' }}
+              unitStyle={{ fontFamily: fD, fontWeight: 700, color: 'rgba(0,0,0,0.5)', paddingBottom: 8 }}
+              narrativeStyle={{ color: BRAND.ink }}
+            />
             {wod.result.meta && (
               <div style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, color: 'rgba(0,0,0,0.55)', marginTop: 2, letterSpacing: '0.04em' }}>
                 {wod.result.meta}
               </div>
             )}
           </div>
-          {vibe && <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />}
+          {vibe && (
+            <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}>
+              <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />
+            </DraggableVibeStamp>
+          )}
         </div>
       </div>
 
-      {/* Black brand strip — RX/PR badge + wordmark */}
-      <div style={{ background: BRAND.ink, color: BRAND.yellow, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        {wod.rx && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 999, padding: '4px 12px 3px', fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em' }}>
-            {wod.rx}
-          </span>
-        )}
-        <span style={{ flex: 1 }} />
+      {/* Black brand strip — wordmark only. Static and non-swipable: the achievement badge
+          lives on whichever poster page actually earned it (see the hero above), never here. */}
+      <div style={{ background: BRAND.ink, color: BRAND.yellow, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={BRAND.white} dot={BRAND.yellow} size={17} />
       </div>
     </div>

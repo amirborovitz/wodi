@@ -1,0 +1,55 @@
+{
+  "name": "progressive-chipper-substitution",
+  "description": "Building chipper (each round adds a movement) where the athlete substituted Row → Ski Erg; the substituted name must appear in every round row",
+  "workout": {
+    "rawText": "For time, 20 min cap\nRound 1: 10 cal row\nRound 2: 10 cal row, 10 wall balls\nRound 3: 10 cal row, 10 wall balls, 10 burpees",
+    "format": "for_time",
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "Progressive Chipper For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "Progressive chipper, 20 min cap",
+        "rawText": "For time, 20 min cap\nRound 1: 10 cal row\nRound 2: 10 cal row, 10 wall balls\nRound 3: 10 cal row, 10 wall balls, 10 burpees",
+        "sets": [{ "id": "set-0", "setNumber": 1, "time": 1020, "completed": true }],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [{ "name": "Row", "calories": 10, "inputType": "calories" }]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Row", "calories": 10, "inputType": "calories" },
+              { "name": "Wall Ball", "reps": 10, "rxWeights": { "male": 9, "female": 6, "unit": "kg" } }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Row", "calories": 10, "inputType": "calories" },
+              { "name": "Wall Ball", "reps": 10, "rxWeights": { "male": 9, "female": 6, "unit": "kg" } },
+              { "name": "Burpees", "reps": 10 }
+            ]
+          }
+        ],
+        "movements": [
+          { "name": "Row", "calories": 10, "inputType": "calories" },
+          { "name": "Wall Ball", "reps": 10, "rxWeights": { "male": 9, "female": 6, "unit": "kg" } },
+          { "name": "Burpees", "reps": 10 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Ski Erg", "originalMovement": "Row", "wasSubstituted": true, "totalCalories": 30, "unit": "cal", "color": "magenta" },
+        { "name": "Wall Ball", "totalReps": 20, "weight": 9, "unit": "kg", "color": "yellow" },
+        { "name": "Burpees", "totalReps": 10, "color": "magenta" }
+      ]
+    }
+  }
+}

@@ -70,11 +70,17 @@ export function detectPartnerSplit(params: {
 
 export type RoundLedgerEntry = 'me' | 'partner' | 'pending';
 
-// Completed rounds alternate me/partner starting with 'me' (the athlete logging the workout is
-// "I" in "I go, you go"). Rounds beyond what was actually completed are 'pending' — a flat
-// symbolic state, never a computed partial (mirrors the ladderTrack ghost-rung convention: a
-// round is several movements, so "how far into round 7" can't be rendered as a fraction).
-export function buildRoundLedger(totalRounds: number, completedRounds: number): RoundLedgerEntry[] {
+// Completed rounds cycle through the team starting with 'me' (the athlete logging the workout
+// is "I" in "I go, you go"): in a pair every other round is mine; in a team of 3 every third
+// round is. Rounds beyond what was actually completed are 'pending' — a flat symbolic state,
+// never a computed partial (mirrors the ladderTrack ghost-rung convention: a round is several
+// movements, so "how far into round 7" can't be rendered as a fraction).
+export function buildRoundLedger(
+  totalRounds: number,
+  completedRounds: number,
+  teamSize = 2,
+): RoundLedgerEntry[] {
+  const cycle = Math.max(2, teamSize);
   return Array.from({ length: totalRounds }, (_, i) =>
-    i >= completedRounds ? 'pending' : (i % 2 === 0 ? 'me' : 'partner'));
+    i >= completedRounds ? 'pending' : (i % cycle === 0 ? 'me' : 'partner'));
 }

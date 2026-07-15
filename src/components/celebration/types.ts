@@ -11,6 +11,7 @@ export interface HeroResult {
   // total for a ladder score (a round is often several movements, so it can't be verified at a
   // glance) — that reconciliation belongs in the log/edit view, never on the shared poster.
   ladderIntoRound?: number;
+  amrapNarrative?: string;
 }
 
 export interface StoryMovementLine {
@@ -24,6 +25,7 @@ export interface StoryMovementLine {
   sectionHeader?: string;
   sectionColor?: 'yellow' | 'magenta' | 'cyan';
   burnout?: { reps: number; weight: number };
+  strengthSetReps?: number[];
   strengthTotalReps?: number;
   partnerNote?: string;
   wasSubstituted?: boolean;
@@ -48,6 +50,11 @@ export interface ArtifactRow {
   loadNote?: string;
   subNote?: string;
   totalNote?: string;
+  // Canonical breakdown movement name this row is about, stamped at row-build time (where the
+  // builder holds the joined MovementTotal). The poster layer resolves the athlete's "mine"
+  // value with an EXACT map lookup on this key — never fuzzy word matching. Rows without it
+  // (whiteboard-verbatim lines) fall back to word matching by design.
+  mineKey?: string;
   accent: 'yellow' | 'magenta' | 'cyan';
   missing?: boolean;
   stationRow?: boolean;
@@ -65,6 +72,11 @@ export interface ArtifactRow {
   // TEAM/ME contract for split-round partner posters: when present, this is the athlete's
   // accumulated personal work for the row. The round ledger is context, not the only ME stat.
   partnerMine?: string;
+  // Per-partner share of a flat team total ("50", "150m", "40 cal"), computed from the movement
+  // data at row-build time. Preferred over regex-parsing the display line, which fails when the
+  // row's primary carries a full sentence (sectioned partner prescriptions). Never set for
+  // (together) movements — work done side by side is not split.
+  teamShare?: string;
   // Poster rows that already carry their load inline (e.g. sectioned partner prescriptions)
   // should not render a second handwritten/logged load value on the right.
   suppressMine?: boolean;

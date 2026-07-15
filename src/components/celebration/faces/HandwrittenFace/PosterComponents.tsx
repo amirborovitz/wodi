@@ -3,9 +3,9 @@
  */
 
 import React from 'react';
-import { BRAND, VIBE, fD, fB } from './brand';
+import { BRAND, VIBE, fD, fB, fH } from './brand';
 import type { VibeKey } from './brand';
-import type { PosterWod, PosterLine } from './posterData';
+import type { PosterWod, PosterLine, PosterRow } from './posterData';
 
 export function parseRxLoad(rx: string): { name: string; load: string } {
   const match = rx.match(/^(\d+(?:\.\d+)?(?:\s*->\s*\d+(?:\.\d+)?)?\s*(?:kg|lb))\s+(.+)$/i);
@@ -31,6 +31,42 @@ export interface MovementValueParts {
   loadTag?: string | null;
 }
 
+export function splitResultValue(value: string): { primary: string; unit: string } {
+  const match = value.match(/^(-?\d+(?:\.\d+)?)(kg|lb)$/i);
+  if (!match) return { primary: value, unit: '' };
+  return { primary: match[1], unit: match[2].toLowerCase() };
+}
+
+interface ResultValueProps {
+  value: string;
+  narrative?: string;
+  primaryStyle?: React.CSSProperties;
+  unitStyle?: React.CSSProperties;
+  narrativeStyle?: React.CSSProperties;
+  style?: React.CSSProperties;
+}
+
+export function ResultValue({ value, narrative, primaryStyle, unitStyle, narrativeStyle, style }: ResultValueProps): React.JSX.Element {
+  const parts = splitResultValue(value);
+  const score = parts.unit ? (
+    <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2 }}>
+      <span style={primaryStyle}>{parts.primary}</span>
+      <span style={{ fontSize: '0.28em', lineHeight: 1.05, ...unitStyle }}>{parts.unit}</span>
+    </span>
+  ) : (
+    <span style={primaryStyle}>{value}</span>
+  );
+  if (!narrative) return <span style={style}>{score}</span>;
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', ...style }}>
+      {score}
+      <span style={{ fontFamily: fH, fontSize: 24, fontWeight: 700, lineHeight: 0.9, marginTop: -5, color: BRAND.yellow, ...narrativeStyle }}>
+        {narrative}
+      </span>
+    </span>
+  );
+}
+
 function formatTotalNote(note: string | undefined): string | null {
   if (!note) return null;
   return note
@@ -50,7 +86,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     return {
       movName,
       isStrength: true,
-      strengthValue: embeddedLoad || r.load || null,
+      strengthValue: r.mine || r.load || embeddedLoad || null,
       team: null,
       me: null,
       single: null,
@@ -87,6 +123,25 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     };
   }
 
+  // A loaded movement with a logged rep/distance/calorie total (e.g. "8 Power Cleans @ 40kg" →
+  // 128 total reps) needs BOTH the total and the weight shown — reuse the same big-value/
+  // small-caption slot every skin already renders for team/me, since there's no separate
+  // "value + weight" pair. `single` only ever holds one string, so without this the weight
+  // silently wins and the total is dropped.
+  const mineIsWeight = !!r.mine && /(kg|lb)\b/i.test(r.mine);
+  if (mineIsWeight && total) {
+    return {
+      movName,
+      isStrength: false,
+      strengthValue: null,
+      team: total,
+      me: r.mine,
+      single: null,
+      total,
+      roundLabel: r.roundLabel,
+    };
+  }
+
   // An Rx load alongside a logged total is context, not the row's value — render it as the
   // quiet inline tag ("Max DB Devil Press 22.5/15kg — 18 reps") and let the total own the
   // value column.
@@ -104,6 +159,15 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   };
 }
 
+export function shouldShowPairsLegend(wod: PosterWod, rows: PosterRow[]): boolean {
+  if (!wod.isPartnerConfirmed || wod.split === 'rounds') return false;
+  return rows.some((row) => {
+    if (row.kind !== 'line') return false;
+    const parts = getMovementValueParts(wod, row);
+    return !!(parts.team && parts.me);
+  });
+}
+
 // ─── Ladder track ───────────────────────────────────────────────────────────
 
 /** Mirrors getLadderRungValue in celebration/helpers.ts — extrapolates beyond the prescribed array. */
@@ -116,7 +180,7 @@ function ladderRungValue(reps: number[], idx: number): number {
 export interface LadderTrackChartProps {
   track: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
   /** Filled bar / lit rung color (the skin's accent — yellow on dark skins, ink on the
-   * all-yellow Flare skin, gold on Bout, etc). Used ONLY for completed rounds. */
+   * all-yellow Flare skin, gold on Foil, etc). Used ONLY for completed rounds. */
   barColor?: string;
   /** Peak (current completed) bar color — usually a brighter/emphasized version of barColor. */
   peakColor?: string;
@@ -174,10 +238,15 @@ export function LadderTrackChart({
   const resolvedMutedFill = mutedFill ?? barColor;
   const ghostLabelColor = usingDefaultFill ? BRAND.ink : resolvedMutedAccent;
   const { reps, step, partial = 0, cadence, complete = false } = track;
-  const MAX_BARS = complete ? Math.max(7, Math.min(10, reps.length)) : 7;
+  // Bars slim down as the climb grows so the whole ladder stays on the poster; the
+  // sliding window (··· trimming the earliest rungs) only kicks in past MAX_BARS.
+  const MAX_BARS = 11;
   const totalNeeded = complete ? step : step + 1; // completed rungs + optional in-progress ghost rung
   const startIdx = Math.max(0, totalNeeded - MAX_BARS);
   const endIdx = Math.max(startIdx, totalNeeded - 1);
+  const barCount = endIdx - startIdx + 1;
+  const barW = barCount <= 7 ? 18 : barCount <= 9 ? 15 : 12;
+  const barGap = barCount <= 7 ? 5 : 4;
   const bars = Array.from({ length: endIdx - startIdx + 1 }, (_, i) => {
     const idx = startIdx + i;
     return { idx, value: ladderRungValue(reps, idx), completed: idx < step, isNext: idx === step };
@@ -188,7 +257,7 @@ export function LadderTrackChart({
 
   return (
     <div style={{ padding: '4px 0 6px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: barGap }}>
         {startIdx > 0 && <span style={{ fontFamily: fB, fontSize: 11, color: emptyColor, alignSelf: 'center' }}>···</span>}
         {bars.map(({ idx, value, completed, isNext }) => {
           const barH = Math.max(6, Math.round((value / maxVal) * MAX_H));
@@ -197,7 +266,7 @@ export function LadderTrackChart({
             <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{
                 position: 'relative',
-                width: isNext ? 22 : 18,
+                width: isNext ? barW + 4 : barW,
                 height: barH,
                 borderRadius: '3px 3px 1px 1px',
                 background: completed ? barColor : 'transparent',
@@ -234,6 +303,68 @@ export function LadderTrackChart({
         </div>
       )}
     </div>
+  );
+}
+
+interface BadgeStarProps {
+  color: string;
+  size?: number;
+}
+
+/** The star mark inside the PR/RX achievement badge — same shape everywhere, color follows the badge. */
+export function BadgeStar({ color, size = 10 }: BadgeStarProps): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color} style={{ display: 'block', flexShrink: 0 }}>
+      <path d="M12 2l2.9 6.1 6.7.7-5 4.5 1.4 6.6L12 17.8 6 21.5l1.4-6.6-5-4.5 6.7-.7z" />
+    </svg>
+  );
+}
+
+interface AchievementBadgeProps {
+  label: string;
+  /** 'onPaper' for cream/paper-toned skins (Chalk, Press, Ink) — an outlined pill in the skin's
+   * own ink colour, matching how FormatTag reads on the same surface. 'onDark' (default) for
+   * every other skin — a filled ink pill with a yellow star, which reads on any dark, yellow, or
+   * metallic field. */
+  variant?: 'onPaper' | 'onDark';
+  /** onPaper only: the skin's own ink colour for the border/text/star. */
+  paperInkColor?: string;
+}
+
+/**
+ * Brand-locked achievement badge (PR / RX'D / etc.) — flanks the hero result label, never the
+ * footer. The footer is static and non-swipable; a multi-part carousel needs the badge tied to
+ * whichever page actually earned it, so it lives inline next to that page's own result label.
+ */
+export function AchievementBadge({ label, variant = 'onDark', paperInkColor = BRAND.paperInk }: AchievementBadgeProps): React.JSX.Element {
+  if (variant === 'onPaper') {
+    return (
+      <span
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          border: `1.5px solid ${paperInkColor}`, color: paperInkColor,
+          borderRadius: 999, padding: '2px 9px 1px', transform: 'rotate(-1.5deg)',
+          fontFamily: fD, fontSize: 12, fontWeight: 900, letterSpacing: '0.04em',
+          whiteSpace: 'nowrap', verticalAlign: 'middle',
+        }}
+      >
+        <BadgeStar color={paperInkColor} size={9} />{label}
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        background: BRAND.ink, color: BRAND.white,
+        border: `1px solid ${BRAND.yellow}55`,
+        borderRadius: 999, padding: '3px 9px 2px',
+        fontFamily: fB, fontSize: 10.5, fontWeight: 900, letterSpacing: '0.08em',
+        whiteSpace: 'nowrap', verticalAlign: 'middle',
+      }}
+    >
+      <BadgeStar color={BRAND.yellow} size={9} />{label}
+    </span>
   );
 }
 
@@ -358,6 +489,7 @@ interface PairsLegendProps {
   /** Right label ("Me") color — matches whatever color each skin already used for its old bare
    * "Me" label, so this is a drop-in replacement, not a restyle. */
   meColor: string;
+  variant?: 'default' | 'chalk';
 }
 
 /**
@@ -366,17 +498,19 @@ interface PairsLegendProps {
  * skin's old bare "Me" span when wod.split === 'reps'. Both labels share the same quiet weight;
  * the personal number's prominence comes from the value below, not the label itself.
  */
-export function PairsLegend({ teamColor, meColor }: PairsLegendProps): React.JSX.Element {
+export function PairsLegend({ teamColor, meColor, variant = 'default' }: PairsLegendProps): React.JSX.Element {
+  const isChalk = variant === 'chalk';
   const labelStyle = (color: string): React.CSSProperties => ({
-    fontFamily: fB,
-    fontSize: 9,
-    fontWeight: 800,
-    letterSpacing: '0.14em',
+    fontFamily: isChalk ? fH : fB,
+    fontSize: isChalk ? 20 : 12.5,
+    fontWeight: isChalk ? 700 : 800,
+    letterSpacing: isChalk ? 0 : '0.14em',
     color,
     textTransform: 'uppercase',
+    lineHeight: 1,
   });
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: isChalk ? 4 : 3 }}>
       <span style={labelStyle(teamColor)}>Team</span>
       <span style={labelStyle(meColor)}>Me</span>
     </div>

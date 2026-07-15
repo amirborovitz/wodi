@@ -1,0 +1,214 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Rack Reverse Lunges",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "35->45KG",
+            "name": "Lunge",
+            "loadNote": "40kg",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Lunge",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Seated Shoulder External Rotations",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "10",
+            "name": "Seated Shoulder External Rotation",
+            "subNote": "30 total",
+            "totalNote": "30 total",
+            "mineKey": "Seated Shoulder External Rotation",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "03:00 min AMRAP x 4",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Weighted Box Step Ups",
+            "loadNote": "20kg",
+            "accent": "yellow",
+            "ladderTrack": {
+              "reps": [
+                4,
+                6,
+                8,
+                10,
+                12
+              ],
+              "step": 8,
+              "cadence": "+2 REPS EVERY ROUND"
+            }
+          },
+          {
+            "primary": "",
+            "name": "KB Snatch",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "Burpees",
+            "loadNote": "5 EVERY ROUND",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
+  ],
+  "hero": {
+    "value": "8",
+    "formatLine": "2 × AMRAP",
+    "storyLine": "88 weighted box step up · 40 lunge · 30 seated shoulder external rotation · 25 burpee",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · LUNGE",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Lunge",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          35,
+          45
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 40
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "03:00 MIN AMRAP X 4",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "4-6-8-10-12",
+        "name": "Weighted Box Step Up",
+        "total": "88 total",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg"
+      },
+      {
+        "perRound": "4-6-8-10-12",
+        "name": "Burpee",
+        "total": "25 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "35->45KG Lunge",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "40 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "SEATED SHOULDER EXTERNAL ROTATIONS",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Seated Shoulder External Rotation",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "03:00 MIN AMRAP X 4",
+          "cap": "WOD"
+        },
+        {
+          "kind": "line",
+          "rx": "Weighted Box Step Ups",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "ladderTrack": {
+            "reps": [
+              4,
+              6,
+              8,
+              10,
+              12
+            ],
+            "step": 8,
+            "cadence": "+2 REPS EVERY ROUND"
+          }
+        },
+        {
+          "kind": "line",
+          "rx": "KB Snatch",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "Burpees",
+          "load": "",
+          "mine": "5 EVERY ROUND",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  }
+}

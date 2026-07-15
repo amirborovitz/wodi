@@ -1,6 +1,3 @@
-import { fetchAndActivate, getRemoteConfig, getValue, isSupported } from 'firebase/remote-config';
-import { app } from './firebase';
-
 export interface CelebrationStickerConfig {
   runDistanceStickerMinMeters: number;
   rowDistanceStickerMinMeters: number;
@@ -35,6 +32,11 @@ export async function fetchCelebrationStickerConfig(): Promise<CelebrationSticke
   if (cachedConfig) return cachedConfig;
 
   try {
+    // Lazy-loaded so importing this module (e.g. from the pure celebration helpers or the
+    // poster-corpus Node harness) never initializes Firebase — only the first fetch does.
+    const [{ fetchAndActivate, getRemoteConfig, getValue, isSupported }, { app }] =
+      await Promise.all([import('firebase/remote-config'), import('./firebase')]);
+
     if (!(await isSupported())) {
       cachedConfig = DEFAULT_CELEBRATION_STICKER_CONFIG;
       return cachedConfig;

@@ -1,0 +1,303 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "3 Sets of Strength & Flexibility",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "20-25",
+            "name": "Pike Leg Raises",
+            "subNote": "69 total",
+            "totalNote": "69 total",
+            "mineKey": "Pike Leg Raises",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "8",
+            "name": "Tempo Good Morning",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Tempo Good Morning",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "8",
+            "name": "Cossack Squats Transitions",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Cossack Squats Transitions",
+            "accent": "yellow",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "2 x 5 rounds for time",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "A · 5 ROUNDS",
+        "rows": [
+          {
+            "primary": "600 M Echo Bike",
+            "name": "",
+            "totalNote": "3.0 km total",
+            "mineKey": "Echo Bike",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "10 Push Presses @ 35/50kg",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Push Press",
+            "accent": "yellow"
+          },
+          {
+            "primary": "10 T2B",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "B · 5 ROUNDS",
+        "rows": [
+          {
+            "primary": "10 Dips / Push-ups",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Dip",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "10 Sumo Deadlift High Pulls @ 35/50kg",
+            "name": "",
+            "totalNote": "50 total",
+            "mineKey": "Sumo Deadlift High Pull",
+            "accent": "yellow"
+          },
+          {
+            "primary": "20 Air Squats",
+            "name": "",
+            "totalNote": "100 total",
+            "mineKey": "Air Squat",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "24:00",
+    "unit": "MIN",
+    "formatLine": "Strength + 10 RFT",
+    "storyLine": "100 air squat · 69 pike leg raises · 50 push press · 50 ttb · 50 dip · 50 sumo deadlift high pull · 24 tempo good morning · 24 cossack squats transitions · 3.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "3 SETS OF STRENGTH & FLEXIBILITY",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "8",
+        "name": "Tempo Good Morning",
+        "total": "24 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "8",
+        "name": "Cossack Squats Transitions",
+        "total": "24 total",
+        "color": "yellow",
+        "unit": "kg"
+      },
+      {
+        "perRound": "23",
+        "name": "Pike Leg Raises",
+        "total": "69 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "METCON LONG FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "3.0km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Push Press",
+        "total": "50 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Toes to Bar",
+        "total": "50 total",
+        "color": "cyan",
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Dip",
+        "total": "50 total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Sumo Deadlift High Pull",
+        "total": "50 total",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg"
+      },
+      {
+        "perRound": "20",
+        "name": "Air Squat",
+        "total": "100 total",
+        "color": "yellow",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "20-25 Pike Leg Raises",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "69 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Tempo Good Morning",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "24 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Cossack Squats Transitions",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2 X 5 ROUNDS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "A · 5 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "600 M Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "3.0 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Push Presses @ 35/50kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "block",
+          "label": "B · 5 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 Dips / Push-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Sumo Deadlift High Pulls @ 35/50kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Air Squats",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "100 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  }
+}

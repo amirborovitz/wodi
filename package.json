@@ -1,13 +1,17 @@
 {
   "name": "wodboard",
   "private": true,
-  "version": "0.1.14",
+  "version": "0.1.15",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "check-wod": "tsx scripts/check-wod.ts",
+    "corpus": "tsx scripts/wod-corpus.ts",
+    "corpus:add": "tsx scripts/wod-corpus.ts --add",
+    "posters": "tsx scripts/poster-corpus.ts",
+    "posters:update": "tsx scripts/poster-corpus.ts --update",
     "preview": "vite preview"
   },
   "dependencies": {

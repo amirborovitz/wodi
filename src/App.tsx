@@ -19,6 +19,7 @@ import { WrappedStoryScreen } from './components/recap/WrappedStoryScreen';
 import { DEFAULT_USER_GOALS } from './types';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
+import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
 
@@ -29,7 +30,6 @@ function AppContent() {
   const { user, loading, refreshUser, updateUserProfile, updateUserGoals, signOut } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
-  const [saveForLaterMode, setSaveForLaterMode] = useState(false);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
@@ -41,13 +41,13 @@ function AppContent() {
   const [pendingRecapData, setPendingRecapData] = useState<RecapData | null>(null);
 
   const handleOpenRecap = (recapData: RecapData) => {
+    markRecapViewed(recapData);
     setPendingRecapData(recapData);
     setCurrentScreen('recap');
   };
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
     setShowRecentWorkoutsOnOpen(false);
-    setSaveForLaterMode(false);
     setEditingWorkout(null); // Clear any editing state
     setCurrentScreen('add-workout');
   };
@@ -56,7 +56,6 @@ function AppContent() {
     setEditingWorkout(workout);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
-    setSaveForLaterMode(false);
     setCurrentScreen('add-workout');
   };
 
@@ -64,7 +63,6 @@ function AppContent() {
     setPendingPlannedWorkout(planned);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
-    setSaveForLaterMode(false);
     setEditingWorkout(null);
     setCurrentScreen('add-workout');
   };
@@ -116,7 +114,6 @@ function AppContent() {
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
-              setSaveForLaterMode(false);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
             onWorkoutCreated={async () => {
@@ -131,7 +128,6 @@ function AppContent() {
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
-              setSaveForLaterMode(false);
               setHomeRingsKey((prev) => prev + 1);
               setCurrentScreen('home');
             }}
@@ -140,14 +136,12 @@ function AppContent() {
               setShowRecentWorkoutsOnOpen(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
-              setSaveForLaterMode(false);
               setCurrentScreen('home');
             }}
             initialImage={pendingImage}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
             plannedWorkout={pendingPlannedWorkout}
-            saveForLaterMode={saveForLaterMode}
           />
         );
       case 'workout-detail': {
@@ -271,7 +265,6 @@ function AppContent() {
               setPendingImage(null);
               setPendingPlannedWorkout(null);
               setShowRecentWorkoutsOnOpen(false);
-              setSaveForLaterMode(false);
               setCurrentScreen('add-workout');
             }}
             onImageSelected={handleImageSelected}

@@ -151,7 +151,13 @@ function hasAlternatingStationText(workout: ParsedWorkout, exercise: ParsedExerc
     exercise.name,
     exercise.prescription,
   ].filter(Boolean).join('\n');
-  return /\b(?:alt|alternat(?:e|ing)|stations?)\b/i.test(text)
+  // "alt"/"alternating" is only a station-structure signal when it stands alone or introduces
+  // structure words ("alternating between stations", "(alt)", "× 6, alternating") — as a movement
+  // adjective ("Alternating Kettlebell Swing", "Alt DB Snatch") it says nothing about stations,
+  // and treating it as one collapses a minute-EMOM's round count into a station rotation.
+  const structuralAlt = /\b(?:alt|alternat(?:e|ing))\b\s*(?:$|[).,:;\-\]]|between\b|stations?\b|groups?\b)/im.test(text);
+  return structuralAlt
+    || /\bstations?\b/i.test(text)
     || /\b[A-Z]\.\d+\b/.test(text);
 }
 
@@ -280,6 +286,14 @@ export function getStationVisitCountsForExercise(
   return null;
 }
 
+interface MovementMultiplierResult {
+  multiplier: number;
+  // True when the multiplier had to be GUESSED (station counting without station structure,
+  // or a session-level sets/containerRounds fallback that may belong to a sibling part).
+  // Flows into WorkloadBreakdown.estimated — poster totals never render off a guess.
+  estimated: boolean;
+}
+
 function getMovementMultiplier(
   movement: ParsedMovement,
   movementIndex: number,
@@ -287,25 +301,48 @@ function getMovementMultiplier(
   workout: ParsedWorkout,
   fallbackMultiplier: number,
   stationVisitCounts: number[] | null
-): number {
-  const intervalMultiplier = exercise.intervalCount || exercise.suggestedSets || workout.sets || workout.containerRounds || fallbackMultiplier || 1;
+): MovementMultiplierResult {
+  const exerciseIntervals = exercise.intervalCount || exercise.suggestedSets;
+  // Session-level fields describe the primary part, not necessarily THIS one — a multiplier
+  // sourced from them is a guess (parts are standalone practices).
+  const sessionIntervals = workout.sets || workout.containerRounds;
+  const intervalMultiplier = exerciseIntervals || sessionIntervals || fallbackMultiplier || 1;
+  const intervalIsGuess = !exerciseIntervals && !!sessionIntervals && !fallbackMultiplier;
 
   switch (movement.countingMode) {
     case 'once':
-      return 1;
+      return { multiplier: 1, estimated: false };
     case 'per_interval':
-      return intervalMultiplier;
-    case 'per_station_visit':
+      return { multiplier: intervalMultiplier, estimated: intervalIsGuess };
+    case 'per_station_visit': {
+      // The per-exercise station computation is authoritative — it normalizes the AI's
+      // ambiguous cycle-vs-total-interval encodings (suggestedSets 5 or 15 for the same
+      // 15-min 3-station EMOM). The stationIndex arithmetic below is only a fallback for
+      // movements whose exercise-level station structure couldn't be derived.
+      if (stationVisitCounts?.[movementIndex] != null) {
+        return { multiplier: stationVisitCounts[movementIndex], estimated: false };
+      }
       if (movement.stationIndex != null) {
         const stationCount = Math.max(
           ...((exercise.movements || []).map((mov) => mov.stationIndex ?? -1)),
           ...((exercise.sections?.flatMap((section) => section.movements.map((mov) => mov.stationIndex ?? -1)) || [-1]))
         ) + 1;
         if (stationCount > 0) {
-          return getStationVisitCount(intervalMultiplier, stationCount, movement.stationIndex);
+          // Same normalization as getStationTotalIntervals: a count larger than the station
+          // count and divisible by it already IS the total-interval count; otherwise it
+          // counts cycles and multiplies through.
+          const totalIntervals = intervalMultiplier > stationCount && intervalMultiplier % stationCount === 0
+            ? intervalMultiplier
+            : intervalMultiplier * stationCount;
+          return {
+            multiplier: getStationVisitCount(totalIntervals, stationCount, movement.stationIndex),
+            estimated: intervalIsGuess,
+          };
         }
       }
-      return stationVisitCounts?.[movementIndex] ?? intervalMultiplier;
+      // No station structure to distribute over — the interval-chain fallback is a guess.
+      return { multiplier: intervalMultiplier, estimated: true };
+    }
     case 'per_round':
     default:
       break;
@@ -315,8 +352,8 @@ function getMovementMultiplier(
   const hasSections = !!(exercise.sections && exercise.sections.length > 0);
   const isBuyInCashOut = hasSections && movement.perRound === false;
   return isBuyInCashOut
-    ? 1
-    : (stationVisitCounts?.[movementIndex] ?? fallbackMultiplier);
+    ? { multiplier: 1, estimated: false }
+    : { multiplier: stationVisitCounts?.[movementIndex] ?? fallbackMultiplier, estimated: false };
 }
 
 function getVariableSchemeMovementReps(
@@ -344,10 +381,18 @@ export function calculateWorkloadBreakdown(
   let grandTotalDistance = 0;
   let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
+  // Poster truth standard: totals derived by guesswork never render on the poster.
+  let estimated = false;
 
   workout.exercises.forEach((exercise, exerciseIndex) => {
     const multiplier = getContainerMultiplier(workout, exercise);
     const stationVisitCounts = getStationVisitCountsForExercise(workout, exercise, exerciseIndex);
+    // A free/unclassified part's movement totals are estimates by definition — the structure
+    // was never understood, so any multiplier is a guess.
+    if ((exercise.movements?.length || exercise.sections?.length)
+      && (!exercise.loggingMode || exercise.loggingMode === 'free')) {
+      estimated = true;
+    }
 
     // Prefer structured sections when present. They preserve semantic repeat
     // scope from the single AI parse: buy-in/cash-out sections are once,
@@ -379,7 +424,7 @@ export function calculateWorkloadBreakdown(
         const movementForCounting = forceOnce && !movement.countingMode
           ? { ...movement, countingMode: 'once' as const }
           : movement;
-        const movMultiplier = getMovementMultiplier(
+        const multiplierResult = getMovementMultiplier(
           movementForCounting,
           movementIndex,
           exercise,
@@ -387,6 +432,8 @@ export function calculateWorkloadBreakdown(
           fallbackMultiplier,
           stationVisitCounts
         );
+        const movMultiplier = multiplierResult.multiplier;
+        if (multiplierResult.estimated) estimated = true;
         const schemeReps = getVariableSchemeMovementReps(movement, exercise);
         const reps = schemeReps ?? ((movement.reps || 0) * movMultiplier);
         const distance = (movement.distance || 0) * movMultiplier;
@@ -499,7 +546,13 @@ export function calculateWorkloadBreakdown(
   // Convert map to array and sort by color priority (yellow first, then magenta, then cyan)
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
   const movements = Array.from(movementMap.values())
-    .filter(m => (m.totalReps && m.totalReps > 0) || (m.totalDistance && m.totalDistance > 0) || (m.totalCalories && m.totalCalories > 0))
+    // A logged weight keeps the movement even with no countable quantity — an unprescribed
+    // rep count (e.g. an alternating pair line the coach wrote without reps) still happened
+    // and must reach the poster as a weight-only line.
+    .filter(m => (m.totalReps && m.totalReps > 0)
+      || (m.totalDistance && m.totalDistance > 0)
+      || (m.totalCalories && m.totalCalories > 0)
+      || (m.weight && m.weight > 0))
     .sort((a, b) => {
       const colorDiff = (colorOrder[a.color || 'magenta'] || 1) - (colorOrder[b.color || 'magenta'] || 1);
       if (colorDiff !== 0) return colorDiff;
@@ -524,6 +577,7 @@ export function calculateWorkloadBreakdown(
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: workout.containerRounds,
     benchmarkName: workout.benchmarkName,
+    ...(estimated ? { estimated: true } : {}),
   };
 }
 
@@ -638,10 +692,13 @@ export function calculateWorkloadFromExercises(
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
   const factor = partnerFactor || 1;
   const movements = Array.from(movementMap.values())
-    // Keep movements with any meaningful metric: reps, calories, or distance
+    // Keep movements with any meaningful metric: reps, calories, distance — or a logged
+    // weight (a rep-less coach line like an alternating pair still happened and must
+    // reach the poster as a weight-only line).
     .filter(m => (m.totalReps && m.totalReps > 0)
       || (m.totalCalories && m.totalCalories > 0)
-      || (m.totalDistance && m.totalDistance > 0))
+      || (m.totalDistance && m.totalDistance > 0)
+      || (m.weight && m.weight > 0))
     .map((movement) => {
       // Runs are never divided — each person runs the full distance
       const isRun = /\b(run|running|sprint)\b/i.test(movement.name);

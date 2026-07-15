@@ -20,6 +20,7 @@ export type ExerciseKind =
   | 'score_time'       // "for time" metcon — mm:ss completion time
   | 'score_rounds'     // AMRAP — rounds + partial reps
   | 'intervals'        // EMOM / every X:XX — cadence + sets completed
+  | 'free_score'       // unrecognized shape — user picks what they scored (time/rounds/reps/load)
   | 'note';            // fallback — free text
 
 // ─── Load Capture Mode ──────────────────────────────────────────
@@ -85,6 +86,10 @@ export interface StoryExerciseResult {
   intervalsCompleted?: number;        // how many intervals done
   intervalsTotal?: number;            // prescribed intervals
   intervalWeight?: number;            // weight used (if loaded interval)
+
+  // free_score — which score the athlete chose to log for an unrecognized shape.
+  // The value itself lands in the matching field above (timeSeconds / rounds / repsTotal / weight).
+  freeScoreType?: 'time' | 'rounds' | 'reps' | 'load';
 
   // Superset / multi-movement support
   movementResults?: MovementResult[]; // per-movement overrides for supersets
@@ -244,6 +249,7 @@ const LOGGING_MODE_TO_KIND: Record<ExerciseLoggingMode, ExerciseKind> = {
   // same as for_time — only EMOM has no time score (fixed cadence, reps-based).
   intervals:        'score_time',
   emom:             'intervals',
+  free:             'free_score',
 };
 
 export function loggingModeToKind(mode: ExerciseLoggingMode): ExerciseKind {
@@ -461,6 +467,16 @@ export function getRowState(result: StoryExerciseResult): RowState {
       }
       return 'empty';
 
+    case 'free_score':
+      // Filled once ANY score value is entered — whichever kind the athlete picked.
+      // A bare note also counts: for an unrecognized shape, "done + note" is a valid log.
+      if ((result.timeSeconds ?? 0) > 0
+        || (result.rounds ?? 0) > 0
+        || (result.repsTotal ?? 0) > 0
+        || (result.weight ?? 0) > 0
+        || (result.notes && result.notes.trim().length > 0)) return 'filled';
+      return 'empty';
+
     case 'note':
       if (result.notes && result.notes.trim().length > 0) return 'filled';
       return 'empty';
@@ -487,6 +503,7 @@ export function getMissingLabel(kind: ExerciseKind): string {
     case 'score_time':   return 'completion time';
     case 'score_rounds': return 'rounds';
     case 'intervals':    return 'intervals completed';
+    case 'free_score':   return 'score';
     case 'note':         return 'notes';
     default:             return 'data';
   }
@@ -503,6 +520,7 @@ export function kindToTrinityColor(kind: ExerciseKind): string {
     case 'score_time':   return 'var(--color-metcon)';   // magenta
     case 'score_rounds': return 'var(--color-metcon)';   // magenta
     case 'intervals':    return 'var(--color-sessions)'; // cyan
+    case 'free_score':   return 'var(--color-metcon)';   // magenta
     case 'note':         return 'var(--color-text-secondary)';
     default:             return 'var(--color-text-secondary)';
   }
@@ -571,6 +589,7 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
           targetReps: undefined, // max = no target
           actualReps: result.maxReps ?? 0,
           weight: result.maxRepsWeight ?? result.weightEnd ?? result.weight,
+          isMax: true,
           completed: true,
         });
       }
@@ -644,6 +663,20 @@ export function toFirestoreExercise(result: StoryExerciseResult): Exercise {
           completed: true,
         });
       }
+      break;
+    }
+
+    case 'free_score': {
+      // Whichever score the athlete picked lands on the single set; rounds ride on the
+      // exercise-level `rounds` field below, same as score_rounds.
+      sets.push({
+        id: 'set-0',
+        setNumber: 1,
+        ...(result.timeSeconds ? { time: result.timeSeconds } : {}),
+        ...(result.repsTotal ? { actualReps: result.repsTotal } : {}),
+        ...(result.weight ? { weight: result.weight } : {}),
+        completed: true,
+      });
       break;
     }
 
@@ -732,6 +765,12 @@ export function fillMinimalResult(result: StoryExerciseResult): StoryExerciseRes
     case 'distance':
       if (!patched.distanceValue) {
         patched.distanceValue = 1;
+      }
+      break;
+    case 'free_score':
+      // Fast-path "Done" without a score: record completion via a note, never invent a number.
+      if (getRowState(patched) === 'empty') {
+        patched.notes = 'Done';
       }
       break;
     case 'note':
@@ -875,10 +914,13 @@ export function createBlankResult(
         mr.sectionRounds = sectionRounds;
         mr.sectionIndex = sectionIndex;
       }
-      // Partner division: all movements are split among the team in IGUG workouts.
-      // Each person logs their personal share (total ÷ teamSize).
+      // Partner division: all movements are split among the team when partners share one flat
+      // total ('reps' split). Each person logs their personal share (total ÷ teamSize).
       // Exception: "together" movements — everyone does the full amount.
-      const isPartner = teamSize && teamSize > 1;
+      // Round-trade partners ('rounds' split, IGUG) never divide — whoever's up for a round does
+      // the FULL prescribed amount, not a shared slice of it (see partnerSplit.ts).
+      const isRoundsSplit = exercise.partnerWorkout === true && exercise.partnerSplit === 'rounds';
+      const isPartner = teamSize && teamSize > 1 && !isRoundsSplit;
       // Runs are never divided — each person runs the full distance
       const isRun = /\b(run|running|sprint)\b/i.test(mov.name);
       const shareDivisor = (isPartner && !mov.together && !isRun) ? teamSize : 1;

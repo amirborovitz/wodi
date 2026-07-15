@@ -1,0 +1,213 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Every 1:30 min x 8 sets",
+        "blueprint": "EVERY 1:30 · 8 rounds",
+        "blueprintSub": "2 POWER CLEANS • 1 SQUAT CLEAN",
+        "rows": [
+          {
+            "primary": "2",
+            "name": "Power Cleans",
+            "nameWithLoad": "Power Cleans @ 45kg",
+            "loadNote": "45kg",
+            "subNote": "16 total reps",
+            "totalNote": "16 total reps",
+            "mineKey": "Power Clean",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "1",
+            "name": "Squat Clean",
+            "nameWithLoad": "Squat Clean @ 45kg",
+            "loadNote": "45kg",
+            "subNote": "8 total reps",
+            "totalNote": "8 total reps",
+            "mineKey": "Squat Clean",
+            "accent": "yellow",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "16 min AMRAP",
+        "blueprint": "16 min AMRAP",
+        "blueprintSub": "5 DEADLIFTS • 10 PUSH-UPS • 15 AIR SQUATS",
+        "rows": [
+          {
+            "primary": "15",
+            "name": "Air Squats",
+            "subNote": "203 total",
+            "totalNote": "203 total",
+            "mineKey": "Air Squat",
+            "accent": "yellow",
+            "repeatCount": 13.5
+          },
+          {
+            "primary": "10",
+            "name": "Push-ups",
+            "subNote": "135 total",
+            "totalNote": "135 total",
+            "mineKey": "Push-up",
+            "accent": "magenta",
+            "repeatCount": 13.5
+          },
+          {
+            "primary": "5",
+            "name": "Deadlifts",
+            "nameWithLoad": "Deadlifts @ 75kg",
+            "loadNote": "75kg",
+            "subNote": "68 total reps",
+            "totalNote": "68 total reps",
+            "mineKey": "Deadlift",
+            "accent": "yellow",
+            "repeatCount": 13.5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    []
+  ],
+  "hero": {
+    "value": "13½",
+    "unit": "ROUNDS",
+    "formatLine": "E1:30MOM × 8 + 16 min AMRAP",
+    "storyLine": "203 air squat · 135 push-up · 68 deadlift · 16 power clean · 8 squat clean",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "E1:30MOM × 8",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "Power Clean",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 16
+      },
+      {
+        "perRound": "",
+        "name": "Squat Clean",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "16 MIN AMRAP",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "5",
+        "name": "Deadlift",
+        "total": "68 total",
+        "color": "yellow",
+        "weight": 75,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Push-up",
+        "total": "135 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "15",
+        "name": "Air Squat",
+        "total": "203 total",
+        "color": "yellow",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "EVERY 1:30 · 8 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "2 Power Cleans",
+          "load": "",
+          "mine": "45kg",
+          "team": "",
+          "total": "16 total reps"
+        },
+        {
+          "kind": "line",
+          "rx": "1 Squat Clean",
+          "load": "",
+          "mine": "45kg",
+          "team": "",
+          "total": "8 total reps"
+        }
+      ],
+      [
+        {
+          "kind": "line",
+          "rx": "15 Air Squats",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "203 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Push-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "135 total"
+        },
+        {
+          "kind": "line",
+          "rx": "5 Deadlifts",
+          "load": "",
+          "mine": "75kg",
+          "team": "",
+          "total": "68 total reps"
+        }
+      ],
+      []
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  }
+}

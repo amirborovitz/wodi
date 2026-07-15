@@ -9,10 +9,18 @@ const TIER_LABEL: Record<RecapData['scope'], string> = { month: 'MONTH', season:
 
 interface MeWrappedHubProps {
   items: RecapData[];
+  /** Ids of recaps not yet opened — rendered with a NEW dot. */
+  newIds: string[];
   onOpen: (data: RecapData) => void;
 }
 
-function FeaturedTile({ data, onOpen }: { data: RecapData; onOpen: () => void }): React.JSX.Element {
+interface TileProps {
+  data: RecapData;
+  isNew: boolean;
+  onOpen: () => void;
+}
+
+function FeaturedTile({ data, isNew, onOpen }: TileProps): React.JSX.Element {
   return (
     <button className={styles.featuredTile} onClick={onOpen} aria-label={`Open ${data.period} recap`}>
       <div className={styles.featuredInner}>
@@ -22,7 +30,8 @@ function FeaturedTile({ data, onOpen }: { data: RecapData; onOpen: () => void })
         </div>
         <div className={styles.featuredCopy}>
           <span className={styles.featuredEyebrow} style={{ fontFamily: fM }}>
-            LATEST · {TIER_LABEL[data.scope]} WRAPPED
+            {isNew && <span className={styles.newDot} />}
+            {isNew ? 'NEW' : 'LATEST'} · {TIER_LABEL[data.scope]} WRAPPED
           </span>
           <div className={styles.featuredPeriod} style={{ fontFamily: fD }}>{data.period}</div>
           <div className={styles.featuredMeta} style={{ fontFamily: fB }}>
@@ -42,12 +51,13 @@ function FeaturedTile({ data, onOpen }: { data: RecapData; onOpen: () => void })
   );
 }
 
-function GridTile({ data, onOpen }: { data: RecapData; onOpen: () => void }): React.JSX.Element {
+function GridTile({ data, isNew, onOpen }: TileProps): React.JSX.Element {
   return (
     <button className={styles.gridTile} onClick={onOpen} aria-label={`Open ${data.period} recap`}>
       <div className={styles.gridPeek}>
         <RecapPeek data={data} />
         <span className={styles.tierBadge} style={{ fontFamily: fM }}>{TIER_LABEL[data.scope]}</span>
+        {isNew && <span className={styles.newDotCorner} />}
       </div>
       <div className={styles.gridCaption}>
         <div className={styles.gridPeriod} style={{ fontFamily: fD }}>{data.period}</div>
@@ -59,7 +69,7 @@ function GridTile({ data, onOpen }: { data: RecapData; onOpen: () => void }): Re
   );
 }
 
-export function MeWrappedHub({ items, onOpen }: MeWrappedHubProps): React.JSX.Element | null {
+export function MeWrappedHub({ items, newIds, onOpen }: MeWrappedHubProps): React.JSX.Element | null {
   if (items.length === 0) return null;
   const [featured, ...rest] = items;
   return (
@@ -69,11 +79,11 @@ export function MeWrappedHub({ items, onOpen }: MeWrappedHubProps): React.JSX.El
         <span className={styles.hubDivider} />
         <span className={styles.hubCount} style={{ fontFamily: fM }}>{items.length} recap{items.length > 1 ? 's' : ''}</span>
       </div>
-      <FeaturedTile data={featured} onOpen={() => onOpen(featured)} />
+      <FeaturedTile data={featured} isNew={newIds.includes(featured.id)} onOpen={() => onOpen(featured)} />
       {rest.length > 0 && (
         <div className={styles.grid}>
-          {rest.map((item, i) => (
-            <GridTile key={i} data={item} onOpen={() => onOpen(item)} />
+          {rest.map((item) => (
+            <GridTile key={item.id} data={item} isNew={newIds.includes(item.id)} onOpen={() => onOpen(item)} />
           ))}
         </div>
       )}

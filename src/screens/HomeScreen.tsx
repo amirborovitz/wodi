@@ -78,18 +78,13 @@ export function HomeScreen({
   }, [monthRecap, seasonRecap]);
 
   const recapHandledKey = recapForToday
-    ? `wodi_recap_handled_${recapForToday.period}_${recapForToday.periodSub}`
+    ? `wodi_recap_handled_${recapForToday.id}`
     : null;
   const [recapHandled, setRecapHandled] = useState(() => {
     if (!recapHandledKey) return false;
     return localStorage.getItem(recapHandledKey) === '1';
   });
   const showRecapCard = Boolean(recapForToday) && !recapHandled;
-
-  const handleDismissRecap = () => {
-    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
-    setRecapHandled(true);
-  };
   const handleOpenRecap = () => {
     if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
     setRecapHandled(true);
@@ -99,7 +94,10 @@ export function HomeScreen({
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recapSlotRef = useRef<HTMLDivElement>(null);
+  const pendingRecapScrollOffsetRef = useRef(0);
   const touchStartYRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
   const isPullingRef = useRef(false);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -107,6 +105,25 @@ export function HomeScreen({
 
   const firstName = user?.displayName?.split(' ')[0] ?? 'Athlete';
   const greeting = getGreeting();
+
+  const handleRecapDismissStart = () => {
+    const slot = recapSlotRef.current;
+    pendingRecapScrollOffsetRef.current = slot ? slot.getBoundingClientRect().height : 0;
+  };
+
+  const handleDismissRecap = () => {
+    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
+    setRecapHandled(true);
+    const offset = pendingRecapScrollOffsetRef.current;
+    pendingRecapScrollOffsetRef.current = 0;
+    if (offset <= 0) return;
+
+    requestAnimationFrame(() => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      scroller.scrollTop = Math.max(0, scroller.scrollTop - offset);
+    });
+  };
 
   const weekStart = useMemo(() => getStartOfWeek(), []);
   const monthStart = useMemo(() => getStartOfMonth(), []);
@@ -195,12 +212,26 @@ export function HomeScreen({
     const scroller = scrollRef.current;
     if (!scroller || scroller.scrollTop > 0 || isRefreshing) return;
     touchStartYRef.current = event.touches[0].clientY;
+    touchStartXRef.current = event.touches[0].clientX;
     isPullingRef.current = true;
   };
 
   const handleTouchMove = (event: React.TouchEvent) => {
     if (!isPullingRef.current || touchStartYRef.current == null || isRefreshing) return;
     const delta = event.touches[0].clientY - touchStartYRef.current;
+    // Axis lock: a horizontally-dominant gesture (swiping the poster rail) must never engage
+    // the pull indicator — the slight vertical drift of a sideways swipe would grow the
+    // indicator under the finger, shifting the rail mid-gesture and killing its native
+    // horizontal scroll. Once a gesture reads as horizontal it stays disengaged until the
+    // next touch.
+    const deltaX = touchStartXRef.current != null
+      ? event.touches[0].clientX - touchStartXRef.current
+      : 0;
+    if (Math.abs(deltaX) > Math.abs(delta)) {
+      isPullingRef.current = false;
+      setPullDistance(0);
+      return;
+    }
     if (delta <= 0) { setPullDistance(0); return; }
     setPullDistance(Math.min(80, delta * 0.5));
   };
@@ -276,20 +307,6 @@ export function HomeScreen({
           </div>
         </motion.header>
 
-        {/* ── Recap ready card (first 7 days of a new period) ── */}
-        {showRecapCard && recapForToday && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.03, duration: 0.28 }}
-          >
-            <RecapReadyCard
-              data={recapForToday}
-              onOpen={handleOpenRecap}
-              onDismiss={handleDismissRecap}
-            />
-          </motion.div>
-        )}
 
         {/* ── Log CTA ── */}
         <motion.button
@@ -352,6 +369,10 @@ export function HomeScreen({
         )}
 
         {/* ── Poster gallery ── */}
+        {/* No `layout` here: this section contains the horizontal poster rail, and layout
+            projection re-measures/transforms it on every re-render (the pull-to-refresh
+            indicator re-renders per frame), fighting the rail's native scroll. The recap slot
+            sits BELOW this section, so its appearance/dismissal never moves the gallery. */}
         <motion.section
           className={styles.gallery}
           initial={{ opacity: 0 }}
@@ -387,6 +408,25 @@ export function HomeScreen({
             </div>
           )}
         </motion.section>
+
+        {/* Season Drop / recap card (first 7 days of a new period) */}
+        {showRecapCard && recapForToday && (
+          <motion.div
+            ref={recapSlotRef}
+            className={styles.recapSlot}
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16, duration: 0.28 }}
+          >
+            <RecapReadyCard
+              data={recapForToday}
+              onOpen={handleOpenRecap}
+              onDismissStart={handleRecapDismissStart}
+              onDismiss={handleDismissRecap}
+            />
+          </motion.div>
+        )}
       </div>
 
       <DeleteActionSheet

@@ -9,7 +9,12 @@ interface WizardOverviewProps {
   onBack: () => void;
 }
 
-export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOverviewProps) {
+export function WizardOverview({
+  blocks,
+  onSelect,
+  onSkipAll,
+  onBack,
+}: WizardOverviewProps): React.JSX.Element {
   return (
     <motion.div
       className={styles.container}
@@ -43,11 +48,10 @@ export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOv
               transition={{ duration: 0.26, delay: idx * 0.06, ease: [0.16, 1, 0.3, 1] }}
               whileTap={{ scale: 0.975 }}
             >
-              {/* Badge above; name+chevron on the same row → chevron aligns with name */}
               <span className={styles.blockType}>{block.typeLabel}</span>
               <div className={styles.nameRow}>
                 <span className={styles.blockName}>{block.displayName}</span>
-                <span className={styles.blockChevron} aria-hidden>›</span>
+                <span className={styles.blockChevron} aria-hidden>{'>'}</span>
               </div>
             </motion.button>
           ))}
@@ -58,7 +62,7 @@ export function WizardOverview({ blocks, onSelect, onSkipAll, onBack }: WizardOv
           className={styles.skipAll}
           onClick={onSkipAll}
         >
-          Skip all → just mark complete
+          Skip all - just mark complete
         </button>
       </div>
     </motion.div>

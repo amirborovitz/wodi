@@ -1,0 +1,15 @@
+{
+  "name": "alternating-stations-amrap",
+  "rawText": "[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):\nB.1 200m run\nMax single DB alt' Devil press @15/22.5kg\nB.2 50 D.U./80 singles\nMax sit ups",
+  "aiResponse": "{\n  \"title\": \"02:00 Min AMRAP x 6 (Alt)\",\n  \"type\": \"amrap\",\n  \"format\": \"amrap_intervals\",\n  \"scoreType\": \"rounds_reps\",\n  \"timeCap\": 1080,\n  \"sets\": 6,\n  \"rawText\": \"[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):\\nB.1 200m run\\nMax single DB alt' Devil press @15/22.5kg\\nB.2 50 D.U./80 singles\\nMax sit ups\",\n  \"exercises\": [\n    {\n      \"name\": \"02:00 Min AMRAP x 6 (Alt)\",\n      \"type\": \"wod\",\n      \"prescription\": \"[02:00 min AMRAP / 01:00 min REST] x 6 (alt'): B.1 200m run, Max single DB alt' Devil press @15/22.5kg, B.2 50 D.U./80 singles, Max sit ups\",\n      \"suggestedSets\": 6,\n      \"loggingMode\": \"amrap_intervals\",\n      \"intervalCount\": 6,\n      \"workDuration\": 720,\n      \"restDuration\": 360,\n      \"rawText\": \"[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):\\nB.1 200m run\\nMax single DB alt' Devil press @15/22.5kg\\nB.2 50 D.U./80 singles\\nMax sit ups\",\n      \"movements\": [\n        {\n          \"name\": \"Run\",\n          \"distance\": 200,\n          \"unit\": \"m\",\n          \"inputType\": \"none\",\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\",\n          \"stationLabel\": \"B.1\",\n          \"stationIndex\": 0\n        },\n        {\n          \"name\": \"Single DB Alternating Devil Press\",\n          \"inputType\": \"weight\",\n          \"isMaxReps\": true,\n          \"rxWeights\": { \"female\": 15, \"male\": 22.5, \"unit\": \"kg\" },\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\",\n          \"stationLabel\": \"B.1\",\n          \"stationIndex\": 0\n        },\n        {\n          \"name\": \"Double Under\",\n          \"reps\": 50,\n          \"inputType\": \"none\",\n          \"alternative\": { \"name\": \"Single Under\", \"reps\": 80 },\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\",\n          \"stationLabel\": \"B.2\",\n          \"stationIndex\": 1\n        },\n        {\n          \"name\": \"Sit-up\",\n          \"inputType\": \"none\",\n          \"isMaxReps\": true,\n          \"countingMode\": \"per_station_visit\",\n          \"scoreEntryMode\": \"per_round\",\n          \"stationLabel\": \"B.2\",\n          \"stationIndex\": 1\n        }\n      ]\n    }\n  ]\n}",
+  "expect": {
+    "exerciseCount": "1",
+    "format": "amrap_intervals",
+    "loggingModes": "amrap_intervals",
+    "movementCountingModes": "per_station_visit, per_station_visit, per_station_visit, per_station_visit",
+    "stationIndices": "0, 0, 1, 1",
+    "totals.distance": "600",
+    "totals.reps": "150",
+    "hero.value!=": "6"
+  }
+}

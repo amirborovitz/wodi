@@ -2,6 +2,9 @@
   padding: 4px 18px 0;
   margin-top: 26px;
   padding-bottom: 24px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .hubHeader {
@@ -75,10 +78,40 @@
 }
 
 .featuredEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.16em;
   color: #f5c200;
+}
+
+/* ── NEW (unviewed) markers ── */
+.newDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f5c200;
+  flex-shrink: 0;
+  animation: newPulse 1.6s ease-in-out infinite;
+}
+
+.newDotCorner {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #f5c200;
+  box-shadow: 0 0 8px rgba(245, 194, 0, 0.7);
+  animation: newPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes newPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 .featuredPeriod {
