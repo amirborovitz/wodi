@@ -49,6 +49,7 @@ interface PosterFixture {
     rawText?: string;
     format?: WorkoutFormat;
     teamSize?: number;
+    partnerWorkout?: boolean;
   };
 }
 
@@ -78,9 +79,12 @@ function buildSnapshot(fixture: PosterFixture): unknown {
       ).movements
     : [];
   const scopedRawText = exercises.length === 1 ? rawText : undefined;
-  // Mirrors useCelebrationData.sessionTeamSize: AI-set field, else title+rawText inference.
+  // Mirrors useCelebrationData.sessionTeamSize: AI-set field, else title+rawText inference —
+  // suppressed when the doc explicitly says partnerWorkout: false (pair-paced pieces).
   const teamSize = fixture.workout.teamSize
-    ?? inferTeamSizeFromText([title, rawText].filter(Boolean).join('\n'));
+    ?? (fixture.workout.partnerWorkout === false
+      ? undefined
+      : inferTeamSizeFromText([title, rawText].filter(Boolean).join('\n')));
   // Mirrors useCelebrationData: the whole-workout artifact and every display decision follow
   // the MAIN part(s) — one main part owns the artifact even when secondary siblings exist,
   // and its own format (loggingMode-first) outranks the persisted session format.

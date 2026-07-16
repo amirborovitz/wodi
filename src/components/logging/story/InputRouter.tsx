@@ -72,18 +72,19 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       && descRepsPerSet.length >= 3;
 
     // A relay-distance movement is a prescribed fixed distance (e.g. 200m run) whose personal
-    // trip count can diverge from the team's round count — that only happens in partner/relay
-    // workouts (teamSize > 1), where it renders as a relay-count stepper. When it's the only
-    // scored movement the ROUNDS counter is redundant — the relay stepper IS the score input:
-    // we hide ScoreRoundsInput and sync the relay count back into result.rounds.
-    // For a solo athlete the ROUNDS counter already counts every trip, so prescribed-distance
+    // trip count can diverge from the round count — the AI stamps `relay: true` on pair-paced
+    // pacers ("P1 runs while P2 AMRAPs, swap"); teamSize > 1 stays as the fallback for partner
+    // docs saved before the flag existed. It renders as a relay-count stepper. When it's the
+    // only scored movement the ROUNDS counter is redundant — the relay stepper IS the score
+    // input: we hide ScoreRoundsInput and sync the relay count back into result.rounds.
+    // For a plain solo AMRAP the ROUNDS counter already counts every trip, so prescribed-distance
     // movements render display-only instead (distanceDerivedFromRounds).
     const relayMr = inputMovements.find(
       mr => mr.kind === 'distance' &&
         (mr.movement.distance ?? 0) > 0 &&
         !(mr.movement.inputType === 'calories' || (mr.movement.calories ?? 0) > 0)
     );
-    const hasRelay = !!relayMr && (teamSize ?? 1) > 1;
+    const hasRelay = !!relayMr && (relayMr.movement.relay === true || (teamSize ?? 1) > 1);
     // Pure relay: run IS the score (no other scored movements). In IGYG workouts the relay
     // count and AMRAP rounds are separate — both inputs are shown independently.
     const isPureRelay = hasRelay && inputMovements.filter(mr => mr !== relayMr).length === 0;

@@ -346,7 +346,12 @@ export function useCelebrationData(
   const sessionTeamSize: number | undefined =
     rewardData?.teamSize
     ?? workout?.teamSize
-    ?? inferTeamSizeFromText([workoutTitleText, rawText].filter(Boolean).join('\n'));
+    // An explicit `partnerWorkout: false` on the doc is the parse's judgment that the pair
+    // language in the text is NOT shared work (e.g. pair-paced AMRAPs where the pair is only
+    // the clock) — trust it instead of re-inferring a team from that same text.
+    ?? (workout?.partnerWorkout === false
+      ? undefined
+      : inferTeamSizeFromText([workoutTitleText, rawText].filter(Boolean).join('\n')));
 
   // The workout's actual date — never "now at render time". Reward mode carries it on
   // rewardData (set at save time); detail mode reads the persisted Firestore field.

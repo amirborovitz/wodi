@@ -1,0 +1,230 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Front Squat",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "40->50KG",
+            "name": "Front Squat",
+            "subNote": "12 total",
+            "totalNote": "12 total",
+            "mineKey": "Front Squat",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Pairs AMRAP 12",
+        "blueprint": "8 rounds",
+        "structureNote": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Thrusters",
+            "nameWithLoad": "Thrusters @ 50kg",
+            "loadNote": "50kg",
+            "subNote": "48 total",
+            "totalNote": "48 total",
+            "mineKey": "Thruster",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "6",
+            "name": "Burpees",
+            "subNote": "48 total",
+            "totalNote": "48 total",
+            "mineKey": "Burpee",
+            "accent": "magenta",
+            "repeatCount": 8
+          },
+          {
+            "primary": "5×",
+            "name": "Run",
+            "nameWithLoad": "200m Run",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 8,
+            "roundLabel": "SWAP"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Cash Out",
+        "blueprint": "2 sets",
+        "rows": [
+          {
+            "primary": "15-20",
+            "name": "Tibialis Raise",
+            "subNote": "36 total",
+            "totalNote": "36 total",
+            "mineKey": "Tibialis Raise",
+            "accent": "cyan",
+            "repeatCount": 2
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "8",
+    "unit": "ROUNDS",
+    "formatLine": "Strength + 12 min AMRAP + AMRAP",
+    "storyLine": "12 front squat · 48 thruster · 48 burpee · 1.0km run · 36 tibialis raise",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · FRONT SQUAT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Front Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          45,
+          45,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 12
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "PAIRS AMRAP 12",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.0km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "6",
+        "name": "Thruster",
+        "total": "48 total",
+        "color": "yellow",
+        "weight": 50,
+        "unit": "kg"
+      },
+      {
+        "perRound": "6",
+        "name": "Burpee",
+        "total": "48 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CASH OUT",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "18",
+        "name": "Tibialis Raise",
+        "total": "36 total",
+        "color": "cyan",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "40->50KG Front Squat",
+          "load": "",
+          "mine": "40-45-50kg",
+          "team": "",
+          "total": "12 total"
+        }
+      ],
+      [
+        {
+          "kind": "line",
+          "rx": "6 Thrusters",
+          "load": "",
+          "mine": "50kg",
+          "team": "",
+          "total": "48 total"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Burpees",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "48 total"
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total",
+          "roundLabel": "SWAP"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "CASH OUT",
+          "cap": "2 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "15-20 Tibialis Raise",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  }
+}

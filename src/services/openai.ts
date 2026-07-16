@@ -361,7 +361,8 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - FIXED ADD-ON MOVEMENTS: if a movement is done every round at a CONSTANT rep count alongside the ladder (e.g. "2-4-6-8-10-12 KB lunges + push press, 6 burpees after each set"), set "perRound": false on that movement and keep its real fixed reps value. Decide this from the "after each round/set" language, NOT from whether its rep count happens to match one of the ladder rungs — a fixed "6 burpees" stays fixed even if the ladder also passes through 6.
 
 ## PARTNER / TEAM WORKOUTS
-- "IGUG", "I go you go", "in pairs", "with a partner" → partnerWorkout: true, teamSize: 2
+- A partner workout means the WORK IS SHARED OR SPLIT between athletes: a team total divided up, whole rounds traded (IGUG), or one shared score built by both. Pair language alone is NOT enough — see PAIR-PACED below for pairs that only time each other.
+- "IGUG", "I go you go", "in pairs", "with a partner" WITH shared/split work → partnerWorkout: true, teamSize: 2
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N
 - A board TITLED or headed "Partner WOD" / "Partner Metcon" is a partner workout even when no other partner phrasing appears in the body → partnerWorkout: true, teamSize: 2 (unless a different team size is stated). Keep that heading line in rawText — it is part of the board.
 - "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
@@ -372,16 +373,15 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - PER-EXERCISE partnerWorkout/partnerSplit (on EACH exercise object, separate from and in addition to the top-level fields above): the top-level fields describe the whole SESSION (for EP/volume math); they do NOT mean every exercise is partnered. On EACH exercise, set its OWN partnerWorkout/partnerSplit: a strength or skill block is partnerWorkout: false even when a sibling metcon block in the same session is partnered — set this explicitly, don't omit it. For the exercise that IS partnered: partnerSplit: "rounds" when partners trade whole rounds (IGUG/"I go you go"/"(N each)"), or partnerSplit: "reps" when partners share one flat/continuous total with no round structure (e.g. "100 wall balls between you, split however"). The per-person round count for "rounds" continues to be suggestedSets, per the "(N each)" rule above — do not add a separate count field.
 - ROTATING STATION HEADCOUNT: "5 groups starting at different stations (7 people max)" / "max 6 per station" are logistics notes, NOT team designations. Do NOT set partnerWorkout or teamSize from headcount-per-station language. Only set teamSize when athletes are explicitly working together as one unit (IGUG, In Pairs, Team of N completing a shared target).
 
-### IGYG AMRAP WITH SPLIT STATIONS (two independent streams)
-When an IGYG / partner AMRAP has P1 and P2 doing DIFFERENT activities simultaneously (e.g., "P1: 200m Run while P2: AMRAP of 4 Power Clean + 6 Push-up + 8 Sit-up"), you MUST split into TWO separate exercises:
-1. **Relay exercise** — the movement one partner does while the other AMRAPs. loggingMode: "amrap", movements: ONE entry describing the relay unit (e.g., { name: "Run", distance: 200, inputType: "distance" }). Rounds = how many relay trips the athlete completed. The UI shows a relay-count tile (tap + for each trip).
-2. **AMRAP exercise** — the block the other partner does during the relay. loggingMode: "amrap", full movements array.
+### PAIR-PACED AMRAP (pairs as the clock — NOT a partner workout)
+When P1 and P2 do DIFFERENT activities simultaneously and swap ("In pairs: P1 200m run, P2 AMRAP of 6 Thrusters + 6 Burpees", "continue from where you stopped"), the pair structure only PACES the work: each athlete performs the full work of both stations and owns their own score — the partner's fixed task is just the interval timer. This is NOT a partner workout:
+- partnerWorkout: false and NO teamSize at the top level, AND partnerWorkout: false on the exercise (set it explicitly).
+- Emit ONE exercise (never split P1/P2 into separate exercises). loggingMode: "amrap", workDuration = the piece's total time.
+- movements = the pacer movement FIRST, stamped "relay": true (any modality: 200m run, 10 cal Echo Bike, 10 box jumps — keep its real per-trip quantity, inputType "distance" for distance pacers), followed by the AMRAP movements.
+- prescription = a short narration of the swap structure so a viewer understands the format (e.g., "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped"), NOT a movement list.
+- The score is the athlete's OWN rounds ("score is total rounds completed" in this shape means each athlete counts their own).
 
-Both athletes do both exercises during the workout (they switch), so both exercises appear in the session. Each gets its own logging wizard screen and its own hero score on the recap.
-
-This is fundamentally different from IGUG for-time (same movements, alternating) — in split-station IGYG, P1 and P2 have INDEPENDENT, non-overlapping scores at all times. Do NOT merge them into one exercise.
-
-The relay unit can be ANY movement type: a run (200m), a bodyweight movement (10 box jumps), a machine (10 cal Echo Bike), or a distance carry. The split-station rule applies universally.`;
+Only treat such a piece as a true partner workout when the board explicitly makes the score one shared team total that both athletes build together.`;
 
 const RULES_SKILL_TIMECAP = `## SKILL / PRACTICE BLOCKS
 "Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
@@ -795,37 +795,27 @@ Output:
 }
 NOTE: The difference from example 14 is the ROTATION: "(alt)" / "alternate" / "two groups starting at different stations" means the SAME interval clock cycles through the stations — that is ONE exercise with stationRotation: true and stationLabel on the first movement of each station, NEVER separate exercises per station. 6 total intervals ÷ 2 stations = 3 visits per station. workDuration/restDuration stay CUMULATIVE across all 6 intervals (720 / 360).
 
-### 15. IGYG AMRAP — split stations (P1 and P2 do different movements)
-Input: "15 min AMRAP with a partner (I go you go): P1: 200m Run. P2: AMRAP: 4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups."
+### 15. Pair-paced AMRAP (P1 and P2 do different activities and swap — NOT a partner workout)
+Input: "In pairs, 15 minutes AMRAP: P1 - 200m run. P2 - AMRAP: 4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups. * Continue from where you stopped. ** Score is the total rounds completed."
 Output:
 {
-  "title": "Partner AMRAP",
+  "title": "Pairs AMRAP 15",
   "type": "amrap",
   "format": "amrap",
   "scoreType": "rounds_reps",
-  "partnerWorkout": true,
-  "teamSize": 2,
+  "partnerWorkout": false,
   "timeCap": 900,
   "exercises": [
     {
-      "name": "200m Run — Relay",
+      "name": "Pairs AMRAP 15",
       "type": "wod",
       "loggingMode": "amrap",
-      "prescription": "200m Run relay while partner AMRAPs. Each round = one 200m run.",
+      "partnerWorkout": false,
+      "prescription": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
       "suggestedSets": 1,
       "workDuration": 900,
       "movements": [
-        { "name": "Run", "distance": 200, "inputType": "distance" }
-      ]
-    },
-    {
-      "name": "Partner AMRAP 15 Min",
-      "type": "wod",
-      "loggingMode": "amrap",
-      "prescription": "4 Power Cleans @40/60kg, 6 Push-ups, 8 Sit-ups",
-      "suggestedSets": 1,
-      "workDuration": 900,
-      "movements": [
+        { "name": "Run", "distance": 200, "unit": "m", "relay": true, "inputType": "distance" },
         { "name": "Power Clean", "reps": 4, "inputType": "weight", "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
         { "name": "Push-up", "reps": 6, "inputType": "none" },
         { "name": "Sit-up", "reps": 8, "inputType": "none" }
@@ -833,7 +823,7 @@ Output:
     }
   ]
 }
-NOTE: Same rule applies when the relay movement is bodyweight (e.g., "P1: 10 Box Jumps while P2 AMRAPs" → relay exercise name "10 Box Jumps — Relay", movements: [{ name: "Box Jump", reps: 10, inputType: "none" }]). The relay exercise always has exactly ONE movement describing the relay unit. The athlete logs relay trips via the relay tile (each tap = one trip). NEVER use movements: [] for relay exercises.
+NOTE: ONE exercise — the pacer keeps its per-trip quantity with "relay": true (the athlete logs how many trips they did; the AMRAP rounds counter is separate). Same shape when the pacer is a machine or bodyweight movement ("P1: 10 cal Echo Bike while P2 AMRAPs" → { "name": "Echo Bike", "calories": 10, "relay": true, "inputType": "calories" }). partnerWorkout stays false: nothing is shared or split — the pair is only the clock.
 
 ### 16. Progressive / building chipper (each round adds a movement)
 Input: "For time (TC 41 min): Buy In: 100 DB Hip Thrusts (17.5/22.5 kg). Into: Round 1: 10 Burpees Over Bar, 10 Cal Row. Round 2 - Add 20 Thrusters (30/40 kg). Round 3 - Add 30 Power Cleans. Round 4 - Add 40 Back Squats. Round 5: 10 BOB, 20 Thrusters, 30 Power Cleans, 40 Back Squats, 50 Bent Over Rows, 10 Cal Row. Cash Out: 50 Deadlifts (70/90 kg)"
@@ -1445,6 +1435,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
     stationLabel: typeof raw.stationLabel === 'string' ? raw.stationLabel : undefined,
     stationIndex: typeof raw.stationIndex === 'number' ? raw.stationIndex : undefined,
     together: raw.together === true ? true : undefined,
+    relay: raw.relay === true ? true : undefined,
     alternative,
     // Preserve role so downstream code can distinguish buy-in from cash-out
     ...(raw.role === 'buy_in' || raw.role === 'cash_out' ? { role: raw.role as 'buy_in' | 'cash_out' } : {}),

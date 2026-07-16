@@ -1,0 +1,74 @@
+{
+  "name": "pair-paced-amrap-gorillot",
+  "description": "Pair-paced AMRAP (In pairs: P1 200m run while P2 AMRAPs, swap) — real 2026-07-16 GORILLOT doc shape: ONE merged metcon exercise, partnerWorkout false, relay-flagged pacer. Poster must render solo (no ledger, no OUR, no team share) with the swap pacer as a SWAP-chip row (5× 200m Run) whose logged 1000m total is NOT round-multiplied (8 rounds × 200m = 1.6km was the repair bug), and the swap structure note as the sub-line. rounds (8) deliberately differs from trips (5).",
+  "workout": {
+    "title": "GORILLOT - FIT FOR LIFE",
+    "format": "amrap",
+    "partnerWorkout": false,
+    "rawText": "STRENGTH (squat)\nFront Squat\n4 sets x 3 reps @70➔85+% (Climbing)\n\nMETCON (Medium)\nIn pairs, 12 minutes AMRAP:\nP1 - 200m run\nP2 - AMRAP:\n6 Thrusters @35/50kg\n6 Burpees\n* Continue from where you stopped\n** Score is the total rounds completed\n\nCash out\n2 sets:\n15-20 Tibialis Raises\n25-30 sec/side Single Arm Plank Hold",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Front Squat",
+        "type": "strength",
+        "loggingMode": "strength",
+        "partnerWorkout": false,
+        "prescription": "4 sets x 3 reps @70➔85+% (Climbing)",
+        "rawText": "Front Squat\n4 sets x 3 reps @70➔85+% (Climbing)",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "actualReps": 3, "weight": 40, "completed": true },
+          { "id": "set-1", "setNumber": 2, "actualReps": 3, "weight": 45, "completed": true },
+          { "id": "set-2", "setNumber": 3, "actualReps": 3, "weight": 45, "completed": true },
+          { "id": "set-3", "setNumber": 4, "actualReps": 3, "weight": 50, "completed": true }
+        ],
+        "movements": [
+          { "name": "Front Squat", "reps": 3, "inputType": "weight", "equipment": "barbell" }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Pairs AMRAP 12",
+        "type": "wod",
+        "loggingMode": "amrap",
+        "partnerWorkout": false,
+        "prescription": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
+        "rawText": "In pairs, 12 minutes AMRAP:\nP1 - 200m run\nP2 - AMRAP:\n6 Thrusters @35/50kg\n6 Burpees\n* Continue from where you stopped\n** Score is the total rounds completed",
+        "rounds": 8,
+        "workDuration": 720,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "actualReps": 96, "weight": 50, "completed": true }
+        ],
+        "movements": [
+          { "name": "Run", "distance": 200, "unit": "m", "relay": true, "inputType": "distance" },
+          { "name": "Thruster", "reps": 6, "inputType": "weight", "equipment": "barbell", "rxWeights": { "male": 50, "female": 35, "unit": "kg" } },
+          { "name": "Burpee", "reps": 6, "inputType": "none" }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "name": "Cash Out",
+        "type": "skill",
+        "loggingMode": "sets",
+        "prescription": "2 sets: 15-20 Tibialis Raises, 25-30 sec/side Single Arm Plank Hold",
+        "rawText": "2 sets:\n15-20 Tibialis Raises\n25-30 sec/side Single Arm Plank Hold",
+        "rounds": 2,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "actualReps": 36, "completed": true }
+        ],
+        "movements": [
+          { "name": "Tibialis Raise", "reps": 18, "repsDisplay": "15-20", "inputType": "none" },
+          { "name": "Single Arm Plank Hold", "inputType": "none" }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Front Squat", "totalReps": 12, "weight": 45, "weightProgression": [40, 45, 45, 50], "unit": "kg", "color": "yellow" },
+        { "name": "Thruster", "totalReps": 48, "weight": 50, "unit": "kg", "color": "yellow" },
+        { "name": "Burpee", "totalReps": 48, "color": "magenta" },
+        { "name": "Run", "totalDistance": 1000, "distancePerRep": 200, "unit": "m", "color": "magenta" },
+        { "name": "Tibialis Raise", "totalReps": 36, "color": "cyan" }
+      ]
+    }
+  }
+}

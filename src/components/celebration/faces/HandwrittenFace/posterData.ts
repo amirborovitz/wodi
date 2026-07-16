@@ -121,6 +121,8 @@ const GENERIC_TITLE_PATTERNS = [
   /^\d+\s*rounds?$/i,                 // "5 Rounds"
   /^\d+\s*sections?\s+for\s+time(?:\s*[•·-]\s*.*)?$/i,
   /^\d+[-\s]min\s+amrap$/i,           // "12-Min AMRAP"
+  /^amrap\s+\d+(\s*min)?$/i,          // "AMRAP 12", "AMRAP 12 Min"
+  /^pairs?\s+amrap(\s+\d+)?(\s*min)?$/i, // "Pairs AMRAP 12" — pair-paced; the pairs story lives in the structure sub-line
   /^\d+[-\s]min\s+emom$/i,
   /^\d+\s*min\s+cap$/i,
 ];
@@ -344,6 +346,24 @@ function extractAmrapMinutes(exercise: CelebrationData['exercises'][number] | un
   const source = `${exercise.rawText ?? ''} ${exercise.prescription ?? ''} ${exercise.name ?? ''}`;
   const match = source.match(/(\d+)\s*min(?:ute)?s?\s*amrap/i) ?? source.match(/amrap\s*(\d+)\s*min/i);
   return match ? parseInt(match[1], 10) : undefined;
+}
+
+// The clock must always land on an AMRAP poster (design spec: "one round, stated plainly …
+// × UNTIL CLOCK"). The format line ("20 MIN") may only be dropped when the title actually
+// carries the duration — a blanket isAmrap clear erases the clock entirely both when the
+// title was nulled as a duplicate of the format and when the workout has a real name.
+function dedupeAmrapFormat(
+  title: string | null,
+  format: string,
+  type: string,
+  isAmrap: boolean,
+  amrapMinutes: number | undefined,
+): string {
+  if (isAmrap && amrapMinutes) {
+    const titleCarriesClock = !!title && title.toUpperCase().includes(`${amrapMinutes} MIN`);
+    return titleCarriesClock ? '' : format;
+  }
+  return title && format.toUpperCase() === type.toUpperCase() ? '' : format;
 }
 
 function explicitTimeCapSub(exercise: CelebrationData['exercises'][number] | undefined, rawText?: string): string {
@@ -970,6 +990,9 @@ export function buildPosterWodFromPage(
   const sub = (() => {
     if (section?.partnerDisplayMode === 'sections') return partnerBlocksSub(data.artifactSections);
     if (isPartnerPage) return '';
+    // Pair-paced pieces state their swap structure ("in pairs · swap each 200m run") — the
+    // format is unreadable from the movement rows alone.
+    if (section?.structureNote) return section.structureNote;
     // Station pages: the "alt. stations" format line stands alone (the clock title already
     // carries the durations).
     if (stationClock) return '';
@@ -1034,9 +1057,7 @@ export function buildPosterWodFromPage(
 
   // Same rule as buildPosterWod: on a named page the format renders as the sub-line under the
   // title — drop it when it just repeats the type pill verbatim ("FOR TIME" pill + "FOR TIME").
-  const dedupedFormat = isAmrap && amrapMinutes
-    ? ''
-    : title && format.toUpperCase() === type.toUpperCase() ? '' : format;
+  const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
 
   return {
     type, title, date: formatSourceDate(data.sourceDate, date), format: dedupedFormat, sub, repsScheme,
@@ -1079,7 +1100,9 @@ export function buildPosterWod(
     title = `${amrapMinutes} MIN`;
   }
   const format = buildFormatLine(data);
-  const sub = isAmrap && amrapMinutes ? '' : buildSubLine(data);
+  // Pair-paced structure note outranks the generic sub-line — same rule as the page builder.
+  const structureNote = data.artifactSections.find((s) => s.structureNote)?.structureNote;
+  const sub = structureNote ?? (isAmrap && amrapMinutes ? '' : buildSubLine(data));
   const isStrengthWod = data.workoutFormat === 'strength' || data.exercises[0]?.type === 'strength';
   const repsScheme = isStrengthWod && data.exercises[0]
     ? formatPosterStrengthRepsSequence(data.exercises[0])
@@ -1123,9 +1146,7 @@ export function buildPosterWod(
   // On a named poster the format renders as the sub-line under the title — when it just
   // repeats the type pill verbatim ("EMOM" pill + "EMOM" sub-line), drop it. Unnamed posters
   // keep it: there the format IS the headline.
-  const dedupedFormat = isAmrap && amrapMinutes
-    ? ''
-    : title && format.toUpperCase() === type.toUpperCase() ? '' : format;
+  const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
   const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub }, teamSize);
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
 

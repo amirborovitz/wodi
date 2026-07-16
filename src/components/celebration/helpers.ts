@@ -620,6 +620,11 @@ export function repairUndercountedBreakdown(
       // this repair exists to heal.
       if (movement.stationLabel != null || movement.stationIndex != null) continue;
 
+      // Relay pacers (pair-paced AMRAPs): the logged total is trips × per-trip and the trip
+      // count is independent of the AMRAP round count — rounds × prescription would fabricate
+      // distance that was never run (8 rounds × 200m = 1.6km when the athlete ran 5 × 200m).
+      if (movement.relay === true) continue;
+
       const isVariableSchemeMovement = !!(
         repScheme
         && movement.reps
@@ -985,28 +990,19 @@ export function getFlexHighlightStamp(
   return null;
 }
 
-// ─── Prescription movement line ───────────────────────────────────────────────
+// ─── Pair-paced structure note ────────────────────────────────────────────────
 
-function formatPrescriptionMovementLine(movements: NonNullable<Exercise['movements']>): string | undefined {
-  const parts = movements
-    .map((movement) => {
-      const qty = movement.repsDisplay
-        ? movement.repsDisplay
-        : movement.reps != null
-        ? `${movement.reps}`
-        : movement.calories != null
-          ? `${movement.calories} CAL`
-          : movement.distance != null
-            ? (movement.distance >= 1000 ? `${(movement.distance / 1000).toFixed(1)}KM` : `${movement.distance}M`)
-            : '';
-      const displayName = movement.reps != null && movement.reps !== 1
-        ? pluralizeMovementLabel(movement.name)
-        : movement.name;
-      const name = formatStickerMovementName(displayName);
-      return [qty, name].filter(Boolean).join(' ');
-    })
-    .filter(Boolean);
-  return parts.length ? parts.join(' • ') : undefined;
+// "in pairs · swap each 200m run" — the poster sub-line for pair-paced AMRAPs, built from the
+// relay-flagged pacer movement so the swap structure is read off the data, never AI prose.
+function buildPairPacerNote(mov: ParsedMovement): string {
+  const qty = (mov.distance ?? 0) > 0
+    ? `${mov.distance}m `
+    : (mov.calories ?? 0) > 0
+      ? `${mov.calories} cal `
+      : (mov.reps ?? 0) > 0
+        ? `${mov.reps} `
+        : '';
+  return `in pairs · swap each ${qty}${mov.name.toLowerCase()}`;
 }
 
 // ─── Celebration movement row builder ────────────────────────────────────────
@@ -1058,7 +1054,7 @@ function getMovementDisplayNameFromContext(
 
 function buildCelebrationMovementRow(params: {
   movementName: string;
-  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2 };
+  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean };
   actual?: MovementTotal;
   repeatCount?: number;
   isLadder?: boolean;
@@ -1124,7 +1120,9 @@ function buildCelebrationMovementRow(params: {
     const relayCount = hasPrescribedDist && totalDistance && totalDistance > perRoundDistance
       ? Math.round(totalDistance / perRoundDistance)
       : 0;
-    const isCleanRelay = actual?.wasSubstituted && relayCount >= 2
+    // Trip-count rendering ("5×"): relay-flagged pacers (pair-paced AMRAPs) and substituted
+    // relay legs, where the logged total is trips × per-trip rather than rounds × per-round.
+    const isCleanRelay = (actual?.wasSubstituted || prescribed?.relay) && relayCount >= 2
       && Math.abs(relayCount * perRoundDistance - (totalDistance ?? 0)) < 1;
     primary = isCleanRelay ? `${relayCount}×` : `${perRoundDistance}m`;
     if (!suppressDistanceTotal && totalDistance && totalDistance !== perRoundDistance) {
@@ -1170,7 +1168,7 @@ function buildCelebrationMovementRow(params: {
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
     ? Math.round(totalDistance / perRoundDistance)
     : 0;
-  const isRelayRow = actual?.wasSubstituted && relayCountForName >= 2
+  const isRelayRow = (actual?.wasSubstituted || prescribed?.relay) && relayCountForName >= 2
     && perRoundDistance != null
     && Math.abs(relayCountForName * perRoundDistance - (totalDistance ?? 0)) < 1;
   const relayDistLabel = isRelayRow && perRoundDistance != null
@@ -1198,6 +1196,9 @@ function buildCelebrationMovementRow(params: {
     accent,
     repeatCount,
     partnerSplit,
+    // Pair-paced pacer rows get a SWAP chip: the run/bike is the swap task between AMRAP
+    // turns, not a movement inside the round — the chip keeps the story readable.
+    ...(prescribed?.relay ? { roundLabel: 'SWAP' } : {}),
   };
 
   if (shouldLogCelebrationDebug()) {
@@ -2018,8 +2019,14 @@ export function buildPageArtifactSections(
 
   const isRelaySection = /relay/i.test(exerciseOnlyText)
     || (movements.length === 1 && (movements[0].distancePerRep ?? 0) > 0 && !movements[0].totalReps);
-  const blueprintSub = !isStrength && !isRelaySection && prescribedMovements.length > 0
-    ? formatPrescriptionMovementLine(prescribedMovements)
+  // Pair-paced pieces ("P1 runs while P2 AMRAPs, swap") state their swap structure as the page
+  // sub-line — an outside viewer must be able to reproduce the exact workout from the poster.
+  // The AI's prescription IS that narration by contract (the prompt mandates it for pair-paced
+  // exercises: who does what, when to swap, continue where you stopped); the movement-derived
+  // note is the fallback when a doc carries no prescription.
+  const pacerMovement = prescribedMovements.find((m) => m.relay === true);
+  const structureNote = pacerMovement
+    ? (exercise.prescription?.trim() || buildPairPacerNote(pacerMovement))
     : undefined;
 
   const strengthBubbleScheme = isStrength && (exercise.suggestedRepsPerSet?.length ?? 0) >= 3
@@ -2032,7 +2039,6 @@ export function buildPageArtifactSections(
       eyebrow: 'WOD',
       title: exercise.name,
       blueprint,
-      blueprintSub,
       rows,
       hiddenCount: 0,
       descLadderScheme: descSchemeGlobal,
@@ -2120,6 +2126,10 @@ export function buildPageArtifactSections(
           return base;
         }
 
+        const parsedMovement = exercise.movements?.find((candidate) => {
+          const name = candidate.name.toLowerCase();
+          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
+        });
         const prescribed = {
           reps: prescribedRepsMap[key],
           repsDisplay: prescribedRepsDisplayMap[key],
@@ -2127,11 +2137,8 @@ export function buildPageArtifactSections(
           calories: prescribedCalsMap[key],
           weight: prescribedWeightMap[key],
           implementCount: prescribedImplementMap[key],
+          relay: parsedMovement?.relay,
         };
-        const parsedMovement = exercise.movements?.find((candidate) => {
-          const name = candidate.name.toLowerCase();
-          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
-        });
 
         const row = buildCelebrationMovementRow({
           movementName: parsedMovement
@@ -2174,15 +2181,23 @@ export function buildPageArtifactSections(
     });
   }
 
-  const exerciseOnlyIsIGYG = rawText ? /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(rawText) : false;
+  // IGYG language alone doesn't make a partner page — the split must be confirmed (pair-paced
+  // pieces can carry "I go you go" phrasing while being solo work).
+  const exerciseOnlyIsIGYG = !!splitInfo && (rawText ? /\b(?:i\s*go\s*you\s*go|igug|igyg)\b/i.test(rawText) : false);
   const sectionEyebrow = isRelaySection ? 'RELAY' : exerciseOnlyIsIGYG ? 'PARTNER AMRAP' : 'WOD';
+
+  // The SWAP pacer line is structure, not part of the round — render it after the round's own
+  // movements regardless of breakdown ordering.
+  const swapLast = rows.some((r) => r.roundLabel === 'SWAP' && !r.stationRow)
+    ? [...rows.filter((r) => r.roundLabel !== 'SWAP'), ...rows.filter((r) => r.roundLabel === 'SWAP')]
+    : rows;
 
   return [{
     eyebrow: sectionEyebrow,
     title: exercise.name,
     blueprint,
-    blueprintSub,
-    rows,
+    structureNote,
+    rows: swapLast,
     hiddenCount: 0,
     ...((descSchemeGlobal || strengthBubbleScheme) && {
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,

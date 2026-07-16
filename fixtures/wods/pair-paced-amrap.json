@@ -1,0 +1,16 @@
+{
+  "name": "pair-paced-amrap",
+  "rawText": "GORILLOT - FIT FOR LIFE\nWOD\nMetcon\nA. STRENGTH (squat)\nFront Squat\n4 sets x 3 reps @70➔85+% (Climbing)\nB. METCON (Medium)\nIn pairs, 12 minutes AMRAP:\nP1 - 200m run\nP2 - AMRAP:\n6 thrusters @35/50kg\n6 Burpees\n* Continue from where you stopped\n** Score is the total rounds completed\nC. Cash out\n2 sets:\n15-20 Tibialis raises\n25-30 sec/side single arm plank hold",
+  "aiResponse": "{\n  \"title\": \"GORILLOT - FIT FOR LIFE\",\n  \"type\": \"mixed\",\n  \"format\": \"amrap\",\n  \"scoreType\": \"rounds_reps\",\n  \"timeCap\": 720,\n  \"partnerWorkout\": false,\n  \"exercises\": [\n    {\n      \"name\": \"Front Squat\",\n      \"type\": \"strength\",\n      \"loggingMode\": \"strength\",\n      \"isSecondary\": false,\n      \"prescription\": \"4 sets x 3 reps @70➔85+% (Climbing)\",\n      \"suggestedSets\": 4,\n      \"suggestedReps\": 3,\n      \"rawText\": \"Front Squat\\n4 sets x 3 reps @70➔85+% (Climbing)\",\n      \"movements\": [\n        { \"name\": \"Front Squat\", \"reps\": 3, \"inputType\": \"weight\", \"equipment\": \"barbell\" }\n      ]\n    },\n    {\n      \"name\": \"Pairs AMRAP 12\",\n      \"type\": \"wod\",\n      \"loggingMode\": \"amrap\",\n      \"isSecondary\": false,\n      \"partnerWorkout\": false,\n      \"prescription\": \"In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped\",\n      \"suggestedSets\": 1,\n      \"workDuration\": 720,\n      \"rawText\": \"In pairs, 12 minutes AMRAP:\\nP1 - 200m run\\nP2 - AMRAP:\\n6 thrusters @35/50kg\\n6 Burpees\\n* Continue from where you stopped\\n** Score is the total rounds completed\",\n      \"movements\": [\n        { \"name\": \"Run\", \"distance\": 200, \"unit\": \"m\", \"relay\": true, \"inputType\": \"distance\" },\n        { \"name\": \"Thruster\", \"reps\": 6, \"inputType\": \"weight\", \"equipment\": \"barbell\", \"rxWeights\": { \"male\": 50, \"female\": 35, \"unit\": \"kg\" } },\n        { \"name\": \"Burpee\", \"reps\": 6, \"inputType\": \"none\" }\n      ]\n    },\n    {\n      \"name\": \"Cash Out\",\n      \"type\": \"skill\",\n      \"loggingMode\": \"sets\",\n      \"isSecondary\": true,\n      \"prescription\": \"2 sets: 15-20 Tibialis Raises, 25-30 sec/side Single Arm Plank Hold\",\n      \"suggestedSets\": 2,\n      \"rawText\": \"2 sets:\\n15-20 Tibialis raises\\n25-30 sec/side single arm plank hold\",\n      \"movements\": [\n        { \"name\": \"Tibialis Raise\", \"reps\": 18, \"repsDisplay\": \"15-20\", \"inputType\": \"none\" },\n        { \"name\": \"Single Arm Plank Hold\", \"time\": 30, \"inputType\": \"none\" }\n      ]\n    }\n  ]\n}",
+  "expect": {
+    "exerciseCount": "3",
+    "loggingModes": "strength, amrap, sets",
+    "parsed.partnerWorkout": "false",
+    "teamSize": "",
+    "parsed.exercises.1.partnerWorkout": "false",
+    "parsed.exercises.1.partnerSplit": "",
+    "parsed.exercises.1.movements.0.relay": "true",
+    "parsed.exercises.1.movements.0.distance": "200",
+    "exerciseNames": "Front Squat, Pairs AMRAP 12, Cash Out"
+  }
+}

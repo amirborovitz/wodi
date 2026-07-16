@@ -93,7 +93,10 @@ export interface ArtifactSection {
   title: string;
   eyebrow?: string;
   blueprint?: string;
-  blueprintSub?: string;
+  // Pair-paced structure sub-line ("in pairs · swap each 200m run") — rendered as the poster
+  // page's sub so an outside viewer understands the swap format. Built from the relay-flagged
+  // pacer movement, never from AI prose.
+  structureNote?: string;
   rows: ArtifactRow[];
   hiddenCount?: number;
   watermark?: string;

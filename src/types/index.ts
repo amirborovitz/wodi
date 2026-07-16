@@ -335,6 +335,10 @@ export interface ParsedMovement {
   perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
   role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
   together?: boolean;           // Partner workouts: true if all partners do this movement together (not split). E.g., "600m run (together)".
+  relay?: boolean;              // Pair-paced pacer movement ("P1 runs 200m while P2 AMRAPs, swap"): the athlete's trip
+                                // count is independent of the AMRAP round count. Logged distance is a TOTAL (trips ×
+                                // per-trip), never multiplied by rounds. NOT a partner-workout signal — pair-paced
+                                // pieces are solo work (partnerWorkout: false).
   stationLabel?: string;        // Rotating interval station label (e.g., "A", "B", "C"). First movement of each station gets this.
   stationIndex?: number;        // Explicit 0-based station index for rotating station workouts.
   countingMode?: MovementCountingMode;   // How the movement scales: per round, per interval, per station visit, or once overall.

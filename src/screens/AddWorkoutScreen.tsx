@@ -513,7 +513,9 @@ function buildWorkloadBreakdownFromResults(
       ) * repsFactor);
       // Story logging can prefill distance/calories from the prescription. Those values
       // still repeat by rounds; only true total-entry fields should bypass round math.
-      const useDistanceAsTotal = userDistance !== undefined && ((mov.distance ?? 0) <= 0 || mov.scoreEntryMode === 'total');
+      // Relay pacer movements log a TOTAL (trip stepper writes trips × per-trip) whose trip
+      // count is independent of the AMRAP round count — never multiply it by rounds.
+      const useDistanceAsTotal = userDistance !== undefined && ((mov.distance ?? 0) <= 0 || mov.scoreEntryMode === 'total' || mov.relay === true);
       const useCaloriesAsTotal = userCalories !== undefined && ((mov.calories ?? 0) <= 0 || mov.scoreEntryMode === 'total');
       const movementDistance = Math.round((
         useDistanceAsTotal
@@ -1496,7 +1498,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
   const [savedWorkoutMeta, setSavedWorkoutMeta] = useState<{ id: string; totalVolume: number; date: Date } | null>(null);
   const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
   const [editInitialResults, setEditInitialResults] = useState<StoryExerciseResult[] | undefined>(undefined);
-  const isPartnerWorkout = Boolean(
+  // Trust an explicit AI `false` (post-processor title override already reconciled it) — pair
+  // language alone doesn't make a partner workout (pair-paced AMRAPs are solo work; the pair is
+  // only the clock). The regex fallback below runs only when the AI left the field unset.
+  const isPartnerWorkout = parsedWorkout?.partnerWorkout === false ? false : Boolean(
     parsedWorkout?.partnerWorkout ||
     parsedWorkout?.rawText?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of \d+\b|\b\d+[- ]person\b|\bigug\b|\bi\s*go\s*you\s*go\b|\bgroups? of \d+\b/i) ||
     parsedWorkout?.title?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of \d+\b|\b\d+[- ]person\b|\bigug\b|\bi\s*go\s*you\s*go\b|\bgroups? of \d+\b/i) ||
@@ -2872,7 +2877,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
             ...mov,
             name: selectedName,
             ...(selectedReps !== undefined ? { reps: selectedReps } : {}),
-            ...(selectedDistance !== undefined ? { distance: selectedDistance } : {}),
+            // Relay pacers keep their prescribed per-trip distance — the logged value is a TOTAL
+            // (already in the breakdown), and detail mode needs the per-trip prescription to
+            // reconstruct the "N×" trip count.
+            ...(selectedDistance !== undefined && mov.relay !== true ? { distance: selectedDistance } : {}),
             ...(selectedWeight && selectedWeight > 0 ? {
               rxWeights: {
                 male: selectedWeight,
@@ -3286,7 +3294,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         workoutContext: workoutContextLine || undefined,
         workoutRawText: parsedWorkout.rawText?.trim() || undefined,
         sourceDate: parsedWorkout.sourceDate,
-        ...(teamSize > 1 && { teamSize }),
+        // Always set (1 = solo): sessionTeamSize must not fall back to re-inferring a team from
+        // pair language in rawText when the parse already judged this a non-partner workout.
+        teamSize,
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         ...(persistedWorkoutId && { workoutId: persistedWorkoutId }),
         date: workoutDate,
