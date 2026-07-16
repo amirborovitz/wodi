@@ -227,41 +227,38 @@ export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
           )}
         </div>
 
-        <div style={{ marginTop: 18, position: 'relative', minHeight: 88, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
-          <div style={{ position: 'relative', minWidth: 0, paddingLeft: 6 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-              <div style={{ fontFamily: fH, fontSize: 16, fontWeight: 700, color: 'rgba(23,24,20,0.72)', transform: 'rotate(-2deg)' }}>
+        <div style={{ marginTop: 16, position: 'relative', minHeight: 118, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+          <div style={{ position: 'relative', minWidth: 0, minHeight: 118, paddingLeft: 6, paddingTop: 12, paddingBottom: 6 }}>
+            <span
+              style={{
+                position: 'absolute',
+                top: 2,
+                left: 0,
+                width: 118,
+                height: 118,
+                transform: 'rotate(-1.5deg)',
+                background: BRAND.yellow,
+                backgroundImage: 'radial-gradient(circle at 38% 32%, rgba(255,255,255,0.34), transparent 58%)',
+                filter: 'url(#wodiInkWet)',
+                opacity: 0.92,
+                borderRadius: '50%',
+                zIndex: 0,
+              }}
+            />
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+              <div style={{ fontFamily: fB, fontSize: 9.5, fontWeight: 900, letterSpacing: '0.16em', color: '#171814', textTransform: 'uppercase' }}>
                 {resultNote}
               </div>
               {wod.rx && <AchievementBadge label={wod.rx} variant="onPaper" paperInkColor="#171814" />}
             </div>
-            <span style={{ position: 'relative', display: 'inline-block' }}>
-              {/* hand-painted yellow ink stamp behind the hero — a true circle (fixed diameter),
-                  not sized to the text: hero values are always wider than tall, so a box that
-                  "hugs" the rendered value renders an oval under border-radius, never a circle. */}
-              <span
-                style={{
-                  position: 'absolute',
-                  top: '50%', left: '50%',
-                  width: 132, height: 132,
-                  transform: 'translate(-50%, -50%) rotate(-1.5deg)',
-                  background: BRAND.yellow,
-                  backgroundImage: 'radial-gradient(circle at 38% 32%, rgba(255,255,255,0.34), transparent 58%)',
-                  filter: 'url(#wodiInkWet)',
-                  opacity: 0.9,
-                  borderRadius: '50%',
-                  zIndex: 0,
-                }}
+            <span style={{ position: 'relative', zIndex: 1, display: 'inline-block' }}>
+              <ResultValue
+                value={wod.result.value}
+                narrative={wod.result.narrative}
+                primaryStyle={{ fontFamily: fD, fontSize: 66, fontWeight: 900, lineHeight: 0.82, letterSpacing: '-0.04em', color: '#050504', whiteSpace: 'nowrap' }}
+                unitStyle={{ paddingBottom: 3 }}
+                narrativeStyle={{ color: '#050504' }}
               />
-              <span style={{ position: 'relative', zIndex: 1, display: 'inline-block' }}>
-                <ResultValue
-                  value={wod.result.value}
-                  narrative={wod.result.narrative}
-                  primaryStyle={{ fontFamily: fD, fontSize: 66, fontWeight: 900, lineHeight: 0.82, letterSpacing: '-0.04em', color: '#050504', whiteSpace: 'nowrap' }}
-                  unitStyle={{ paddingBottom: 3 }}
-                  narrativeStyle={{ color: '#050504' }}
-                />
-              </span>
             </span>
           </div>
           {vibe && (
