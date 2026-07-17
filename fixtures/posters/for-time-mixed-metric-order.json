@@ -1,0 +1,30 @@
+{
+  "name": "for-time-mixed-metric-order",
+  "description": "For-time rows preserve whiteboard movement order even when workload breakdown is sorted by reps before distance",
+  "workout": {
+    "rawText": "20 rounds for time\n1000m echo bike\n5 push press",
+    "format": "for_time",
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "20 Rounds For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "20 rounds for time: 1000m echo bike, 5 push press",
+        "rawText": "20 rounds for time\n1000m echo bike\n5 push press",
+        "rounds": 20,
+        "sets": [{ "id": "set-0", "setNumber": 1, "time": 2400, "completed": true }],
+        "movements": [
+          { "name": "Echo Bike", "distance": 1000, "inputType": "distance" },
+          { "name": "Push Press", "reps": 5, "inputType": "weight", "rxWeights": { "male": 40, "female": 30, "unit": "kg" } }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Push Press", "totalReps": 100, "weight": 40, "unit": "kg", "color": "yellow" },
+        { "name": "Echo Bike", "totalDistance": 20000, "unit": "m", "color": "magenta" }
+      ]
+    }
+  }
+}

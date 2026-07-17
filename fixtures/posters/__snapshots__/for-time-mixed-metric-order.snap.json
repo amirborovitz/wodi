@@ -1,0 +1,137 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "20 Rounds For Time",
+      "blueprint": "20 rounds for time",
+      "rows": [
+        {
+          "primary": "1000m",
+          "name": "Echo Bike",
+          "subNote": "20.00 km total",
+          "totalNote": "20.00 km total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 20
+        },
+        {
+          "primary": "5",
+          "name": "Push Presses",
+          "nameWithLoad": "Push Presses @ 40kg",
+          "loadNote": "40kg",
+          "subNote": "100 total",
+          "totalNote": "100 total",
+          "mineKey": "Push Press",
+          "accent": "yellow",
+          "repeatCount": 20
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "20 Rounds For Time",
+        "blueprint": "20 rounds for time",
+        "rows": [
+          {
+            "primary": "1000m",
+            "name": "Echo Bike",
+            "subNote": "20.00 km total",
+            "totalNote": "20.00 km total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 20
+          },
+          {
+            "primary": "5",
+            "name": "Push Presses",
+            "nameWithLoad": "Push Presses @ 40kg",
+            "loadNote": "40kg",
+            "subNote": "100 total",
+            "totalNote": "100 total",
+            "mineKey": "Push Press",
+            "accent": "yellow",
+            "repeatCount": 20
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "40:00",
+    "unit": "MIN",
+    "formatLine": "20 Rounds",
+    "storyLine": "100 push press · 20.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "20.0km",
+        "name": "Echo Bike",
+        "total": "20.0km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "5",
+        "name": "Push Press",
+        "total": "100 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "1000m Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "20.00 km total"
+      },
+      {
+        "kind": "line",
+        "rx": "5 Push Presses",
+        "load": "",
+        "mine": "40kg",
+        "team": "",
+        "total": "100 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "1000m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "20.00 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "5 Push Presses",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "100 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

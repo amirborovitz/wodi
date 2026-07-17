@@ -801,6 +801,51 @@ function normalizeStampMovementName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+function getPrescribedMovementsInOrder(exercise: Exercise | null | undefined): ParsedMovement[] {
+  if (!exercise) return [];
+  return exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements || [])
+    : (exercise.movements || []);
+}
+
+function findPrescribedMovementIndex(movement: MovementTotal, prescribedOrder: string[]): number {
+  const candidates = [movement.name, movement.originalMovement]
+    .filter((name): name is string => Boolean(name))
+    .map(normalizeStampMovementName)
+    .filter(Boolean);
+
+  for (const candidate of candidates) {
+    const exact = prescribedOrder.findIndex((name) => name === candidate);
+    if (exact >= 0) return exact;
+  }
+
+  for (const candidate of candidates) {
+    const partial = prescribedOrder.findIndex((name) => name.includes(candidate) || candidate.includes(name));
+    if (partial >= 0) return partial;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function orderMovementTotalsByPrescription(exercise: Exercise | null | undefined, movements: MovementTotal[]): MovementTotal[] {
+  const prescribedOrder = getPrescribedMovementsInOrder(exercise)
+    .map((movement) => normalizeStampMovementName(movement.name))
+    .filter(Boolean);
+  if (prescribedOrder.length <= 1 || movements.length <= 1) return movements;
+
+  const withOrder = movements.map((movement, index) => ({
+    movement,
+    index,
+    order: findPrescribedMovementIndex(movement, prescribedOrder),
+  }));
+
+  if (!withOrder.some((entry) => entry.order !== Number.MAX_SAFE_INTEGER)) return movements;
+
+  return withOrder
+    .sort((a, b) => (a.order - b.order) || (a.index - b.index))
+    .map((entry) => entry.movement);
+}
+
 type ExerciseWithMovementResultMaps = Exercise & {
   movementWeights?: Record<string, number>;
   implementCounts?: Record<string, number>;
@@ -1795,7 +1840,7 @@ export function buildPageArtifactSections(
     ? [...movements].sort((a, b) =>
         (stationOrderMap[a.name.toLowerCase()] ?? 999) - (stationOrderMap[b.name.toLowerCase()] ?? 999),
       )
-    : movements;
+    : orderMovementTotalsByPrescription(exercise, movements);
 
   const exerciseOnlyText = `${exercise.name || ''} ${exercise.prescription || ''}`;
   const scopedExerciseText = exerciseOnlyText.trim() || rawText;
@@ -2677,20 +2722,7 @@ export function computeHeroResult(
     const ex = exercises[0];
     if (ex?.ladderReps && ex.ladderReps.length > 0 && ex.ladderStep != null && ex.ladderStep > 0) return buildLadderStoryMovements(ex, movements);
     if (ex?.sections && ex.sections.length > 1) return buildSectionedStoryMovements(ex.sections, movements, teamSize, 0);
-    const originalOrder = ex?.movements?.map((m) => normalizeStampMovementName(m.name)) ?? [];
-    const orderedMovements = originalOrder.length > 1
-      ? [...movements].sort((a, b) => {
-          const findIdx = (name: string) => {
-            const norm = normalizeStampMovementName(name);
-            let i = originalOrder.findIndex((n) => n === norm);
-            if (i === -1) i = originalOrder.findIndex((n) => n.includes(norm) || norm.includes(n));
-            return i === -1 ? 999 : i;
-          };
-          const ai = Math.min(findIdx(a.name), a.originalMovement ? findIdx(a.originalMovement) : 999);
-          const bi = Math.min(findIdx(b.name), b.originalMovement ? findIdx(b.originalMovement) : 999);
-          return ai - bi;
-        })
-      : movements;
+    const orderedMovements = orderMovementTotalsByPrescription(ex, movements);
     return buildStoryMovements(orderedMovements, rounds, teamSize, ex?.suggestedRepsPerSet);
   }
 
