@@ -27,7 +27,7 @@ import type {
   HeroResult,
   HighlightStampData,
   PosterLayout,
-} from '../components/celebration';
+} from '../components/celebration/types';
 import type { WorkoutWithStats } from './useWorkouts';
 import { useAuth } from '../context/AuthContext';
 import {

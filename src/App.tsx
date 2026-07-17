@@ -24,7 +24,7 @@ import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
-const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'stats', 'settings'];
+const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'settings'];
 
 function AppContent() {
   const { user, loading, refreshUser, updateUserProfile, updateUserGoals, signOut } = useAuth();
