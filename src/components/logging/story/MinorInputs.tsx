@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
-import { getWeightStep } from './types';
 import type { MeasurementUnit } from '../../../types';
 import { StepperInput } from './StepperInput';
 import styles from './MinorInputs.module.css';
@@ -152,95 +151,6 @@ export function DistanceInput({ result, onChange }: DistanceInputProps) {
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// IntervalsInput — completed/total stepper + optional weight
-// For: EMOM, every 1:30 x 8, tabata
-// ═══════════════════════════════════════════════════════════════════
-
-interface IntervalsInputProps {
-  result: StoryExerciseResult;
-  onChange: (patch: Partial<StoryExerciseResult>) => void;
-  /** Show weight input for loaded intervals */
-  showWeight?: boolean;
-}
-
-export function IntervalsInput({ result, onChange, showWeight = false }: IntervalsInputProps) {
-  const total = result.intervalsTotal ?? result.setsTotal;
-  const completed = result.intervalsCompleted ?? total; // Default: all completed
-  const hasWeight = (result.intervalWeight ?? 0) > 0;
-  const [showWeightInput, setShowWeightInput] = useState(hasWeight);
-  const movements = result.exercise?.movements;
-  // Derive Rx weight placeholder from first weighted movement
-  const rxWeight = movements?.find(m => m.rxWeights)?.rxWeights?.male;
-
-  const adjust = useCallback((delta: number) => {
-    onChange({ intervalsCompleted: Math.max(0, Math.min(total, completed + delta)) });
-  }, [completed, total, onChange]);
-
-  return (
-    <div className={styles.center}>
-      <div className={styles.intervalsDisplay}>
-        <AnimatePresence mode="popLayout">
-          <motion.span
-            key={completed}
-            className={styles.intervalsCompleted}
-            initial={{ y: 12, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -12, opacity: 0 }}
-            transition={{ duration: 0.12 }}
-          >
-            {completed}
-          </motion.span>
-        </AnimatePresence>
-        <span className={styles.intervalsSlash}>/</span>
-        <span className={styles.intervalsTotal}>{total}</span>
-      </div>
-
-      <span className={styles.intervalsLabel}>intervals completed</span>
-
-      <div className={styles.intervalsStepperRow}>
-        <button type="button" className={styles.intervalsBtn} onClick={() => adjust(-1)}>−</button>
-        <button
-          type="button"
-          className={`${styles.quickChip} ${completed === total ? styles.quickChipActive : ''}`}
-          onClick={() => onChange({ intervalsCompleted: total })}
-        >
-          All {total}
-        </button>
-        <button type="button" className={styles.intervalsBtn} onClick={() => adjust(1)}>+</button>
-      </div>
-
-      {/* Weight — collapsed by default */}
-      {showWeight && (showWeightInput || hasWeight ? (
-        <div className={styles.intervalWeightRow}>
-          <StepperInput
-            value={result.intervalWeight}
-            onChange={(v) => onChange({ intervalWeight: v })}
-            step={getWeightStep(result.exercise?.movements?.[0]?.name ?? result.exercise?.name ?? '', result.implementCount)}
-            min={0}
-            max={500}
-            placeholder={rxWeight ? String(rxWeight) : '0'}
-            unit="kg"
-            label="Weight used"
-            color="var(--color-volume)"
-            inputMode="decimal"
-            size="sm"
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          className={styles.optionalToggle}
-          onClick={() => setShowWeightInput(true)}
-        >
-          Add a number (optional)
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════
 // NoteInput — simple textarea fallback
 // ═══════════════════════════════════════════════════════════════════

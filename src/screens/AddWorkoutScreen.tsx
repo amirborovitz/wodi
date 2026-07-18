@@ -2755,81 +2755,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
     setStep('log-results');
   };
 
-  // Handle renaming the workout title from the reward screen
-  const handleRenameWorkout = async (newTitle: string) => {
-    // Update local state
-    if (rewardData) {
-      setRewardData({
-        ...rewardData,
-        workoutSummary: { ...rewardData.workoutSummary, title: newTitle },
-      });
-    }
-    // Persist to Firestore
-    if (savedWorkoutMeta?.id) {
-      try {
-        const workoutRef = doc(db, 'workouts', savedWorkoutMeta.id);
-        await setDoc(workoutRef, { title: newTitle }, { merge: true });
-      } catch (err) {
-        console.error('Failed to rename workout:', err);
-      }
-    }
-  };
-
-  // Handle renaming a movement from the reward screen
-  const handleRenameMovement = (oldName: string, newName: string) => {
-    if (!rewardData?.workloadBreakdown) return;
-
-    const updatedMovements = rewardData.workloadBreakdown.movements.map(m =>
-      m.name === oldName ? { ...m, name: newName } : m
-    );
-
-    setRewardData({
-      ...rewardData,
-      workloadBreakdown: {
-        ...rewardData.workloadBreakdown,
-        movements: updatedMovements,
-      },
-    });
-  };
-
-  // Handle deleting a movement from the reward screen
-  const handleDeleteMovement = (name: string) => {
-    if (!rewardData?.workloadBreakdown) return;
-
-    const updatedMovements = rewardData.workloadBreakdown.movements.filter(m => m.name !== name);
-
-    // Recalculate totals
-    const grandTotalReps = updatedMovements.reduce((sum, m) => sum + (m.totalReps || 0), 0);
-    const grandTotalDistance = updatedMovements.reduce((sum, m) => sum + (m.totalDistance || 0), 0);
-    const grandTotalCalories = updatedMovements.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
-
-    // Recalculate volume (weight × reps for each movement)
-    const grandTotalVolume = updatedMovements.reduce((sum, m) => {
-      const weight = m.weight || 0;
-      const reps = m.totalReps || 0;
-      return sum + (weight * reps);
-    }, 0);
-
-    setRewardData({
-      ...rewardData,
-      workloadBreakdown: {
-        ...rewardData.workloadBreakdown,
-        movements: updatedMovements,
-        grandTotalReps,
-        grandTotalVolume,
-        grandTotalDistance,
-        grandTotalCalories,
-      },
-      // Update workout summary if movement had significant data
-      workoutSummary: {
-        ...rewardData.workoutSummary,
-        totalReps: grandTotalReps,
-        totalVolume: grandTotalVolume,
-      },
-    });
-
-  };
-
   const saveWorkout = async (results: ExerciseResult[]) => {
     if (!user || !parsedWorkout) return;
 
@@ -3755,10 +3680,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           rewardData={rewardData}
           onDone={onWorkoutCreated}
           onEdit={handleEditFromReward}
-          onRenameMovement={handleRenameMovement}
-          onDeleteMovement={handleDeleteMovement}
-          onRenameWorkout={handleRenameWorkout}
-          originalTitle={parsedWorkout?.title}
         />
       )}
     </div>

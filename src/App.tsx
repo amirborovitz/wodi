@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
@@ -24,7 +24,7 @@ import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
-const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'stats', 'settings'];
+const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'settings'];
 
 function AppContent() {
   const { user, loading, refreshUser, updateUserProfile, updateUserGoals, signOut } = useAuth();
@@ -151,21 +151,10 @@ function AppContent() {
           <WorkoutScreen
             key={selectedWorkout.id}
             mode="detail"
-            posterMode
             enterFrom={enterFrom}
             workout={selectedWorkout}
             onBack={() => { setNavDir(null); setCurrentScreen(workoutDetailOrigin); }}
             onEditWorkout={() => handleEditWorkout(selectedWorkout)}
-            onRenameWorkoutDetail={async (newTitle: string) => {
-              if (!selectedWorkout?.id) return;
-              try {
-                const workoutRef = doc(db, 'workouts', selectedWorkout.id);
-                await setDoc(workoutRef, { title: newTitle }, { merge: true });
-                setSelectedWorkout({ ...selectedWorkout, title: newTitle });
-              } catch (err) {
-                console.error('Failed to rename workout:', err);
-              }
-            }}
             onPrevWorkout={selectedIdx > 0 ? () => {
               setNavDir('down');
               setSelectedWorkout(workoutList[selectedIdx - 1]);
