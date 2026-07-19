@@ -136,7 +136,6 @@
   "hero": {
     "value": "30:00",
     "unit": "MIN",
-    "formatLine": "For Time",
     "storyLine": "50 echo bike cals · 50 push press · 50 ttb · 50 dips · 50 sumo deadlift high pull · 100 air squats",
     "storyMovements": [
       {

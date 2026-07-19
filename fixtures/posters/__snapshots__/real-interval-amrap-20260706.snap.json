@@ -6,15 +6,14 @@
         "eyebrow": "WOD",
         "title": "Every 1:30 min x 8 sets",
         "blueprint": "EVERY 1:30 · 8 rounds",
-        "blueprintSub": "2 POWER CLEANS • 1 SQUAT CLEAN",
         "rows": [
           {
             "primary": "2",
             "name": "Power Cleans",
             "nameWithLoad": "Power Cleans @ 45kg",
             "loadNote": "45kg",
-            "subNote": "16 total reps",
-            "totalNote": "16 total reps",
+            "subNote": "16 total",
+            "totalNote": "16 total",
             "mineKey": "Power Clean",
             "accent": "yellow",
             "repeatCount": 8
@@ -24,8 +23,8 @@
             "name": "Squat Clean",
             "nameWithLoad": "Squat Clean @ 45kg",
             "loadNote": "45kg",
-            "subNote": "8 total reps",
-            "totalNote": "8 total reps",
+            "subNote": "8 total",
+            "totalNote": "8 total",
             "mineKey": "Squat Clean",
             "accent": "yellow",
             "repeatCount": 8
@@ -40,14 +39,15 @@
         "eyebrow": "WOD",
         "title": "16 min AMRAP",
         "blueprint": "16 min AMRAP",
-        "blueprintSub": "5 DEADLIFTS • 10 PUSH-UPS • 15 AIR SQUATS",
         "rows": [
           {
-            "primary": "15",
-            "name": "Air Squats",
-            "subNote": "203 total",
-            "totalNote": "203 total",
-            "mineKey": "Air Squat",
+            "primary": "5",
+            "name": "Deadlifts",
+            "nameWithLoad": "Deadlifts @ 75kg",
+            "loadNote": "75kg",
+            "subNote": "68 total",
+            "totalNote": "68 total",
+            "mineKey": "Deadlift",
             "accent": "yellow",
             "repeatCount": 13.5
           },
@@ -61,13 +61,11 @@
             "repeatCount": 13.5
           },
           {
-            "primary": "5",
-            "name": "Deadlifts",
-            "nameWithLoad": "Deadlifts @ 75kg",
-            "loadNote": "75kg",
-            "subNote": "68 total reps",
-            "totalNote": "68 total reps",
-            "mineKey": "Deadlift",
+            "primary": "15",
+            "name": "Air Squats",
+            "subNote": "203 total",
+            "totalNote": "203 total",
+            "mineKey": "Air Squat",
             "accent": "yellow",
             "repeatCount": 13.5
           }
@@ -162,7 +160,7 @@
           "load": "",
           "mine": "45kg",
           "team": "",
-          "total": "16 total reps"
+          "total": "16 total"
         },
         {
           "kind": "line",
@@ -170,17 +168,17 @@
           "load": "",
           "mine": "45kg",
           "team": "",
-          "total": "8 total reps"
+          "total": "8 total"
         }
       ],
       [
         {
           "kind": "line",
-          "rx": "15 Air Squats",
+          "rx": "5 Deadlifts",
           "load": "",
-          "mine": "",
+          "mine": "75kg",
           "team": "",
-          "total": "203 total"
+          "total": "68 total"
         },
         {
           "kind": "line",
@@ -192,11 +190,11 @@
         },
         {
           "kind": "line",
-          "rx": "5 Deadlifts",
+          "rx": "15 Air Squats",
           "load": "",
-          "mine": "75kg",
+          "mine": "",
           "team": "",
-          "total": "68 total reps"
+          "total": "203 total"
         }
       ],
       []

@@ -4,15 +4,23 @@
       "eyebrow": "WOD",
       "title": "8 Round Alternating For Time",
       "blueprint": "8 rounds for time",
-      "blueprintSub": "2.0KM ECHO BIKE • 8 PUSH PRESSES • 8 THRUSTERS • 8 WEIGHTED BOX STEP-UPS",
       "rows": [
+        {
+          "primary": "2000m",
+          "name": "Echo Bike",
+          "subNote": "16.00 km total",
+          "totalNote": "16.00 km total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 8
+        },
         {
           "primary": "8",
           "name": "Push Presses",
           "nameWithLoad": "Push Presses @ 35kg",
           "loadNote": "35kg",
-          "subNote": "64 total reps",
-          "totalNote": "64 total reps",
+          "subNote": "64 total",
+          "totalNote": "64 total",
           "mineKey": "Push Press",
           "accent": "yellow",
           "repeatCount": 8
@@ -22,8 +30,8 @@
           "name": "Thrusters",
           "nameWithLoad": "Thrusters @ 35kg",
           "loadNote": "35kg",
-          "subNote": "64 total reps",
-          "totalNote": "64 total reps",
+          "subNote": "64 total",
+          "totalNote": "64 total",
           "mineKey": "Thruster",
           "accent": "yellow",
           "repeatCount": 8
@@ -38,15 +46,6 @@
           "mineKey": "Weighted Box Step-up",
           "accent": "magenta",
           "repeatCount": 8
-        },
-        {
-          "primary": "2000m",
-          "name": "Echo Bike",
-          "subNote": "16.00 km total",
-          "totalNote": "16.00 km total",
-          "mineKey": "Echo Bike",
-          "accent": "magenta",
-          "repeatCount": 8
         }
       ],
       "hiddenCount": 0,
@@ -59,15 +58,23 @@
         "eyebrow": "WOD",
         "title": "8 Round Alternating For Time",
         "blueprint": "8 rounds for time",
-        "blueprintSub": "2.0KM ECHO BIKE • 8 PUSH PRESSES • 8 THRUSTERS • 8 WEIGHTED BOX STEP-UPS",
         "rows": [
+          {
+            "primary": "2000m",
+            "name": "Echo Bike",
+            "subNote": "16.00 km total",
+            "totalNote": "16.00 km total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 8
+          },
           {
             "primary": "8",
             "name": "Push Presses",
             "nameWithLoad": "Push Presses @ 35kg",
             "loadNote": "35kg",
-            "subNote": "64 total reps",
-            "totalNote": "64 total reps",
+            "subNote": "64 total",
+            "totalNote": "64 total",
             "mineKey": "Push Press",
             "accent": "yellow",
             "repeatCount": 8
@@ -77,8 +84,8 @@
             "name": "Thrusters",
             "nameWithLoad": "Thrusters @ 35kg",
             "loadNote": "35kg",
-            "subNote": "64 total reps",
-            "totalNote": "64 total reps",
+            "subNote": "64 total",
+            "totalNote": "64 total",
             "mineKey": "Thruster",
             "accent": "yellow",
             "repeatCount": 8
@@ -93,15 +100,6 @@
             "mineKey": "Weighted Box Step-up",
             "accent": "magenta",
             "repeatCount": 8
-          },
-          {
-            "primary": "2000m",
-            "name": "Echo Bike",
-            "subNote": "16.00 km total",
-            "totalNote": "16.00 km total",
-            "mineKey": "Echo Bike",
-            "accent": "magenta",
-            "repeatCount": 8
           }
         ],
         "hiddenCount": 0,
@@ -112,7 +110,7 @@
   "hero": {
     "value": "42:00",
     "unit": "MIN",
-    "formatLine": "8 Rounds For Time",
+    "formatLine": "8 Rounds",
     "storyLine": "64 push press · 64 thruster · 240m weighted box step-up · 16.0km echo bike",
     "storyMovements": [
       {
@@ -159,11 +157,19 @@
       },
       {
         "kind": "line",
+        "rx": "2000m Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "16.00 km total"
+      },
+      {
+        "kind": "line",
         "rx": "8 Push Presses",
         "load": "",
         "mine": "35kg",
         "team": "",
-        "total": "64 total reps"
+        "total": "64 total"
       },
       {
         "kind": "line",
@@ -171,7 +177,7 @@
         "load": "",
         "mine": "35kg",
         "team": "",
-        "total": "64 total reps"
+        "total": "64 total"
       },
       {
         "kind": "line",
@@ -180,14 +186,6 @@
         "mine": "35kg",
         "team": "",
         "total": "240 m total"
-      },
-      {
-        "kind": "line",
-        "rx": "2000m Echo Bike",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "16.00 km total"
       }
     ],
     "pages": [
@@ -199,11 +197,19 @@
         },
         {
           "kind": "line",
+          "rx": "2000m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "16.00 km total"
+        },
+        {
+          "kind": "line",
           "rx": "8 Push Presses",
           "load": "",
           "mine": "35kg",
           "team": "",
-          "total": "64 total reps"
+          "total": "64 total"
         },
         {
           "kind": "line",
@@ -211,7 +217,7 @@
           "load": "",
           "mine": "35kg",
           "team": "",
-          "total": "64 total reps"
+          "total": "64 total"
         },
         {
           "kind": "line",
@@ -220,14 +226,6 @@
           "mine": "35kg",
           "team": "",
           "total": "240 m total"
-        },
-        {
-          "kind": "line",
-          "rx": "2000m Echo Bike",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "16.00 km total"
         }
       ]
     ]

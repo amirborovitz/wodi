@@ -194,7 +194,6 @@
   "hero": {
     "value": "33:00",
     "unit": "MIN",
-    "formatLine": "For Time",
     "storyLine": "80 du · 40 alt dumbbell snatch · 40 alt weighted box step up · 40 push-up · 40 ttb · 40 burpee · 40 goblet squat · 7.2km echo bike",
     "storyMovements": [
       {

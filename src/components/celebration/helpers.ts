@@ -2525,7 +2525,9 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
     const minMatch = (ex?.name || '').match(/(\d+)\s*min/i);
     const mins = minMatch ? parseInt(minMatch[1], 10) : 0;
     if (count > 0 && mins > 0) base = `${count} × ${mins} MIN`;
-    else if (count > 0) base = `${count} ×`;
+    // Unknown interval length: a dangling "2 ×" reads as a typo — state the
+    // interval count in full instead (the AMRAP word lives on the format pill).
+    else if (count > 0) base = `${count} INTERVALS`;
     else return undefined;
   } else if (format === 'amrap') {
     return undefined;

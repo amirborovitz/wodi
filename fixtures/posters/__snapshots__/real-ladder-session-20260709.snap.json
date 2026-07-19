@@ -10,7 +10,6 @@
           {
             "primary": "35->45KG",
             "name": "Lunge",
-            "loadNote": "40kg",
             "subNote": "40 total",
             "totalNote": "40 total",
             "mineKey": "Lunge",
@@ -82,7 +81,7 @@
   ],
   "hero": {
     "value": "8",
-    "formatLine": "2 × AMRAP",
+    "formatLine": "2 INTERVALS",
     "storyLine": "88 weighted box step up · 40 lunge · 30 seated shoulder external rotation · 25 burpee",
     "storyMovements": [
       {
@@ -142,7 +141,7 @@
           "kind": "line",
           "rx": "35->45KG Lunge",
           "load": "",
-          "mine": "40kg",
+          "mine": "35-45kg",
           "team": "",
           "total": "40 total"
         }

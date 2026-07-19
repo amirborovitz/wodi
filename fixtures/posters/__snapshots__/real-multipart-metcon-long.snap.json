@@ -8,15 +8,6 @@
         "blueprint": "3 sets",
         "rows": [
           {
-            "primary": "20-25",
-            "name": "Pike Leg Raises",
-            "subNote": "69 total",
-            "totalNote": "69 total",
-            "mineKey": "Pike Leg Raises",
-            "accent": "magenta",
-            "repeatCount": 3
-          },
-          {
             "primary": "8",
             "name": "Tempo Good Morning",
             "subNote": "24 total",
@@ -32,6 +23,15 @@
             "totalNote": "24 total",
             "mineKey": "Cossack Squats Transitions",
             "accent": "yellow",
+            "repeatCount": 3
+          },
+          {
+            "primary": "20-25",
+            "name": "Pike Leg Raises",
+            "subNote": "69 total",
+            "totalNote": "69 total",
+            "mineKey": "Pike Leg Raises",
+            "accent": "magenta",
             "repeatCount": 3
           }
         ],
@@ -203,14 +203,6 @@
         },
         {
           "kind": "line",
-          "rx": "20-25 Pike Leg Raises",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "69 total"
-        },
-        {
-          "kind": "line",
           "rx": "8 Tempo Good Morning",
           "load": "",
           "mine": "",
@@ -224,6 +216,14 @@
           "mine": "",
           "team": "",
           "total": "24 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20-25 Pike Leg Raises",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "69 total"
         }
       ],
       [

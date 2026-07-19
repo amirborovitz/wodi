@@ -62,7 +62,6 @@
   "hero": {
     "value": "17:00",
     "unit": "MIN",
-    "formatLine": "For Time",
     "storyLine": "30 ski erg cals · 20 wall ball · 10 burpees",
     "storyMovements": [
       {

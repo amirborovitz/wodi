@@ -209,7 +209,6 @@
   "hero": {
     "value": "24:30",
     "unit": "MIN",
-    "formatLine": "For Time · In Pairs",
     "storyLine": "100 power clean · 80 shoulder to overhead · 60 thruster · 3.6km echo bike · 300m farmer carry",
     "storyMovements": [
       {

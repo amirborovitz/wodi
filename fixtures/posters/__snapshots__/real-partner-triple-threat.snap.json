@@ -150,7 +150,6 @@
   "hero": {
     "value": "40:00",
     "unit": "MIN",
-    "formatLine": "For Time · In Pairs",
     "storyLine": "300 du · 150 wall ball shot · 90 dual dumbbell box step up over · 60 devil press · 60 bar mu · 150 machine cals",
     "storyMovements": [
       {
