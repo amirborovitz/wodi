@@ -151,10 +151,11 @@ export function WorkoutScreen({
   // Face registry — no flip UI yet, users always get the default handwritten face.
   // Adding a new face: create src/components/celebration/faces/YourFace/
   // and add it to the registry. faceId state here will drive switching.
-  const celebrationData = useCelebrationData(mode, rewardData, workout, stickerConfig);
+  const workoutId = isReward ? rewardData?.workoutId : workout?.id;
+  const { submitCorrection, sessionCorrections } = useWorkoutCorrection(workoutId);
+  const celebrationData = useCelebrationData(mode, rewardData, workout, stickerConfig, sessionCorrections);
   const [faceId] = useState(DEFAULT_FACE_ID);
   const { savePosterCustomization } = usePosterCustomization(celebrationData.workoutId);
-  const { submitCorrection } = useWorkoutCorrection(celebrationData.workoutId);
 
   if (!isReward && !workout) return null;
 

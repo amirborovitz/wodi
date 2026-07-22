@@ -43,6 +43,7 @@ import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
 } from '../services/celebrationStickerConfig';
+import { hasStructuralCorrection } from '../components/celebration/corrections';
 import {
   // Pure computation functions
   computeHeroResult,
@@ -308,15 +309,33 @@ export function useCelebrationData(
   rewardData: RewardData | undefined,
   workout: WorkoutWithStats | undefined,
   stickerConfig: CelebrationStickerConfig = DEFAULT_CELEBRATION_STICKER_CONFIG,
+  // Corrections flagged in THIS session ("AI got it wrong?"), so the poster downgrades
+  // immediately — the persisted workout.corrections only lands on the next fetch.
+  sessionCorrections: readonly string[] = [],
 ): CelebrationData {
   const { user } = useAuth();
   const isReward = mode === 'reward';
 
+  // ── Correction fallback (poster truth standard) ────────────────────────────
+  // A structural "AI got it wrong?" flag (movement / reps-load / format) means the parse's
+  // structured interpretation can't be trusted. Downgrade every part that carries its own
+  // board text to 'free' so the poster renders the whiteboard verbatim with only the
+  // athlete's entered scores — the same path genuinely unclassifiable parts already use.
+  // Parts without rawText keep structured rendering (verbatim would have nothing to show).
+  // Derived shaping (complex/ladder/chipper detection, derived stat stickers) is gated off
+  // below for the same reason; PR stickers stay — they carry user-entered weights.
+  const verbatimMode = hasStructuralCorrection([
+    ...(workout?.corrections ?? []),
+    ...sessionCorrections,
+  ]);
+
   // ── Basic normalisation ───────────────────────────────────────────────────
 
-  const exercises: Exercise[] = isReward
-    ? (rewardData?.exercises ?? [])
-    : (workout?.exercises ?? []);
+  const exercises = useMemo((): Exercise[] => {
+    const base = isReward ? (rewardData?.exercises ?? []) : (workout?.exercises ?? []);
+    if (!verbatimMode) return base;
+    return base.map((ex) => (ex.rawText?.trim() ? { ...ex, loggingMode: 'free' as const } : ex));
+  }, [isReward, rewardData?.exercises, workout?.exercises, verbatimMode]);
 
   const workoutFormat: WorkoutFormat | undefined = isReward
     ? rewardData?.workoutSummary?.format
@@ -485,6 +504,7 @@ export function useCelebrationData(
   // ── Barbell complex ───────────────────────────────────────────────────────
 
   const barbellComplex = useMemo(() => {
+    if (verbatimMode) return null;
     const movements = activeBreakdown?.movements ?? [];
     if (!movements.length) return null;
     const prescribedRounds = getPrescribedRoundCount(exercises, rawText);
@@ -496,7 +516,7 @@ export function useCelebrationData(
             ?? 1)
         : 1;
     return detectBarbellComplex(movements, stampRounds);
-  }, [activeBreakdown?.movements, exercises, rawText]);
+  }, [verbatimMode, activeBreakdown?.movements, exercises, rawText]);
 
   const isComplex = barbellComplex !== null;
 
@@ -575,6 +595,7 @@ export function useCelebrationData(
     ladderStep: number;
     ladderPartial?: number;
   } | null => {
+    if (verbatimMode) return null;
     const amrapEx = exercises.find((ex) => ex.ladderReps && ex.ladderReps.length > 0);
     if (!amrapEx) return null;
     const reps = amrapEx.ladderReps!;
@@ -596,7 +617,7 @@ export function useCelebrationData(
 
     if (!step) return null;
     return { ladderReps: reps, ladderStep: step, ladderPartial: amrapEx.ladderPartial };
-  }, [exercises, activeBreakdown?.movements]);
+  }, [verbatimMode, exercises, activeBreakdown?.movements]);
 
   // ── Chipper ───────────────────────────────────────────────────────────────
 
@@ -621,7 +642,8 @@ export function useCelebrationData(
     /for\s*time|\brft\b|\b\d+\s*rounds?\s+for\s+time\b/i.test(chipperSourceText);
 
   const isChipper =
-    !ladderData
+    !verbatimMode
+    && !ladderData
     && hasForTimePrescription
     && chipperMovementCount > 1
     && exercises.every((ex) => ex.type !== 'strength' && ex.type !== 'skill');
@@ -887,16 +909,21 @@ export function useCelebrationData(
 
   const highlightStamp = useMemo(
     () =>
-      getFlexHighlightStamp(
-        activeBreakdown?.movements ?? [],
-        activeAchievements,
-        exercises,
-        mainFormat,
-        durationMinutes,
-        undefined,
-        stickerConfig,
-      ),
+      // Derived-claim stickers (workhorse totals, engine thresholds) restate the structured
+      // interpretation — suppressed under a structural correction, unlike PR stickers.
+      verbatimMode
+        ? null
+        : getFlexHighlightStamp(
+            activeBreakdown?.movements ?? [],
+            activeAchievements,
+            exercises,
+            mainFormat,
+            durationMinutes,
+            undefined,
+            stickerConfig,
+          ),
     [
+      verbatimMode,
       activeBreakdown?.movements,
       activeAchievements,
       exercises,
@@ -1038,6 +1065,7 @@ export function useCelebrationData(
 
   const perPageStamps = useMemo((): (HighlightStampData | null)[] | null => {
     if (!carouselPageData) return null;
+    if (verbatimMode) return carouselPageData.map(() => null);
     return carouselPageData.map((page) =>
       getFlexHighlightStamp(
         page.movements,
@@ -1049,7 +1077,7 @@ export function useCelebrationData(
         stickerConfig,
       ),
     );
-  }, [carouselPageData, activeAchievements, workoutFormat, durationMinutes, stickerConfig]);
+  }, [verbatimMode, carouselPageData, activeAchievements, workoutFormat, durationMinutes, stickerConfig]);
 
   const perPageSections = useMemo((): ArtifactSection[][] | null => {
     if (!carouselPageData) return null;

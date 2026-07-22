@@ -67,6 +67,7 @@
   ],
   "hero": {
     "value": "8",
+    "formatLine": "4 × 3 MIN",
     "storyLine": "88 kb snatch · 88 weighted box step up · 40 burpees",
     "storyMovements": [
       {

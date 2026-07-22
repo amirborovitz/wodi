@@ -62,6 +62,7 @@ interface ExerciseResult {
   completionTime?: number; // seconds - for "for time" workouts
   notes?: string;
   movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
+  movementWeightProgressions?: Record<string, number[]>; // Per-movement start->peak (sequential complex blocks)
   movementAlternatives?: Record<string, string>; // Selected alternatives for movements
   movementDistances?: Record<string, number>; // Per-movement distance overrides
   movementDistancesPerRep?: Record<string, number>; // Per-movement per-trip distance (relay)
@@ -555,8 +556,13 @@ function buildWorkloadBreakdownFromResults(
             : undefined;
       const existing = movementMap.get(key);
 
-      // Only attach weight progression to weighted movements
-      const movWeightProgression = weight && setWeightProgression ? setWeightProgression : undefined;
+      // Only attach weight progression to weighted movements. A PER-MOVEMENT progression
+      // (sequential complex: each block builds its own weight) takes precedence over the
+      // per-exercise set progression, which would otherwise smear one block's climb onto both.
+      const perMovementProgression = movementLookup(result.movementWeightProgressions || {}, mk, mov.name);
+      const movWeightProgression = weight
+        ? (perMovementProgression && perMovementProgression.length > 1 ? perMovementProgression : setWeightProgression)
+        : undefined;
 
       if (existing) {
         movementMap.set(key, {
@@ -1127,7 +1133,7 @@ const LOGGING_MODE_HINTS: Record<ExerciseLoggingMode, string> = {
   sets: 'reps × sets',
   for_time: 'your time',
   amrap: 'rounds + reps',
-  amrap_intervals: 'rounds per interval',
+  amrap_intervals: 'total rounds',
   intervals: 'score per interval',
   emom: 'reps per minute',
   cardio: 'time / calories',

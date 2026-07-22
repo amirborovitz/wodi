@@ -28,6 +28,8 @@ export interface LegacyExerciseResult {
   completionTime?: number;
   notes?: string;
   movementWeights?: Record<string, number>;
+  // Per-movement start->peak weight (sequential complex: each block builds its own weight).
+  movementWeightProgressions?: Record<string, number[]>;
   movementAlternatives?: Record<string, string>;
   movementDistances?: Record<string, number>;
   movementDistancesPerRep?: Record<string, number>;
@@ -196,10 +198,17 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     const mw: Record<string, number> = {}, md: Record<string, number> = {},
           mr: Record<string, number> = {}, mc: Record<string, number> = {},
           ic: Record<string, number> = {}, ma: Record<string, string> = {},
-          mdpr: Record<string, number> = {};
+          mdpr: Record<string, number> = {}, mwp: Record<string, number[]> = {};
     for (const m of r.movementResults ?? []) {
       const n = m.movementKey || m.movement.name;
-      if (m.kind === 'load' && m.weight != null && m.weight > 0) mw[n] = m.weight;
+      if (m.kind === 'load' && m.weight != null && m.weight > 0) {
+        mw[n] = m.weight;
+        // Per-movement start->peak progression (sequential complex: each block builds its own
+        // weight). Only when the block was logged as a range — a single weight has no progression.
+        if (m.weightEnd != null && m.weightEnd > 0 && m.weightEnd !== m.weight) {
+          mwp[n] = [m.weight, m.weightEnd];
+        }
+      }
       if (m.distance != null && m.distance > 0) md[n] = m.distance;
       if (m.reps != null && m.reps > 0) mr[n] = m.reps;
       if (m.calories != null && m.calories > 0) mc[n] = m.calories;
@@ -220,6 +229,7 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     }
     return {
       ...(Object.keys(mw).length > 0 ? { movementWeights: mw } : {}),
+      ...(Object.keys(mwp).length > 0 ? { movementWeightProgressions: mwp } : {}),
       ...(Object.keys(md).length > 0 ? { movementDistances: md } : {}),
       ...(Object.keys(mdpr).length > 0 ? { movementDistancesPerRep: mdpr } : {}),
       ...(Object.keys(mr).length > 0 ? { movementReps: mr } : {}),

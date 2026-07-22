@@ -8,7 +8,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "A · 3 ROUNDS",
+      "title": "3 ROUNDS",
       "rows": [
         {
           "primary": "50 Wall Ball Shots @ 20/14kg",
@@ -30,7 +30,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "B · 3 ROUNDS",
+      "title": "3 ROUNDS",
       "rows": [
         {
           "primary": "50 CAL Machine",
@@ -52,7 +52,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "C · 3 ROUNDS",
+      "title": "3 ROUNDS",
       "rows": [
         {
           "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
@@ -83,7 +83,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "A · 3 ROUNDS",
+        "title": "3 ROUNDS",
         "rows": [
           {
             "primary": "50 Wall Ball Shots @ 20/14kg",
@@ -104,7 +104,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "B · 3 ROUNDS",
+        "title": "3 ROUNDS",
         "rows": [
           {
             "primary": "50 CAL Machine",
@@ -125,7 +125,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "C · 3 ROUNDS",
+        "title": "3 ROUNDS",
         "rows": [
           {
             "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
@@ -231,7 +231,7 @@
       },
       {
         "kind": "block",
-        "label": "A · 3 ROUNDS",
+        "label": "3 ROUNDS",
         "cap": ""
       },
       {
@@ -252,7 +252,7 @@
       },
       {
         "kind": "block",
-        "label": "B · 3 ROUNDS",
+        "label": "3 ROUNDS",
         "cap": ""
       },
       {
@@ -273,7 +273,7 @@
       },
       {
         "kind": "block",
-        "label": "C · 3 ROUNDS",
+        "label": "3 ROUNDS",
         "cap": ""
       },
       {
@@ -302,7 +302,7 @@
         },
         {
           "kind": "block",
-          "label": "A · 3 ROUNDS",
+          "label": "3 ROUNDS",
           "cap": ""
         },
         {
@@ -323,7 +323,7 @@
         },
         {
           "kind": "block",
-          "label": "B · 3 ROUNDS",
+          "label": "3 ROUNDS",
           "cap": ""
         },
         {
@@ -344,7 +344,7 @@
         },
         {
           "kind": "block",
-          "label": "C · 3 ROUNDS",
+          "label": "3 ROUNDS",
           "cap": ""
         },
         {

@@ -42,13 +42,13 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
 
     // Round-alternating partner AMRAP-intervals (IGUG "I go, you go"): whoever's up for an
     // interval does the FULL prescribed round, so per-movement per-round precision is both
-    // unnecessary and (via the interval grid's teamSize divide) actively wrong. Swap the grid for
-    // a single "rounds per interval" estimate + weight-only tiles. Flat-shared-total partner
-    // AMRAP-intervals (partnerSplit === 'reps') and solo AMRAP-intervals keep the existing grid.
+    // unnecessary and actively wrong. Swap the rounds counter for a single "rounds per
+    // interval" estimate + weight-only tiles. Solo and flat-shared-total partner
+    // AMRAP-intervals score like a plain AMRAP: total rounds + weight/substitution tiles —
+    // prescribed reps are prescription, never an input.
     const isRoundsSplitPartner = result.exercise.partnerWorkout === true
       && result.exercise.partnerSplit === 'rounds';
     const useSimplifiedIntervalRounds = isAmrapIntervals && isRoundsSplitPartner && !isLadder;
-    const useIntervalGridVariant = isAmrapIntervals && !isLadder && !useSimplifiedIntervalRounds;
 
     // `exercise.intervalCount` is the board's TOTAL turn count across the whole shared session
     // (e.g. "x4" = 4 turns total). When partners alternate, only half those turns are this
@@ -104,7 +104,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {kind === 'score_time' && (
           <ScoreTimeInput result={result} onChange={onChange} />
         )}
-        {kind === 'score_rounds' && !isAmrapIntervals && !isLadder && !isPureRelay && (
+        {kind === 'score_rounds' && !useSimplifiedIntervalRounds && !isLadder && !isPureRelay && (
           <ScoreRoundsInput result={result} onChange={onChange} />
         )}
         {useSimplifiedIntervalRounds && (
@@ -128,8 +128,6 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
           <ScoreMovementInputs
             movements={displayMovements}
             inputMovements={inputMovements}
-            variant={useIntervalGridVariant ? 'amrap_intervals' : 'default'}
-            roundsTotal={useIntervalGridVariant ? (result.exercise.intervalCount ?? result.setsTotal) : undefined}
             isRelayContext={hasRelay && kind === 'score_rounds'}
             distanceDerivedFromRounds={kind === 'score_rounds' && !hasRelay}
             teamSize={teamSize}

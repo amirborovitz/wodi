@@ -1,5 +1,6 @@
 import type {
   ExerciseLoggingMode,
+  MovementEquipment,
   ParsedExercise,
   ParsedMovement,
   ParsedSectionType,
@@ -526,16 +527,13 @@ export function kindToTrinityColor(kind: ExerciseKind): string {
 
 // ─── Weight step size ────────────────────────────────────────────
 // KB movements use 2kg steps (standard jumps: 8,10,12,16,20,24…)
-// DB movements use 2.5kg steps
-// Barbell movements use 2.5kg (plate increments)
+// Everything else (barbell/DB) uses 2.5kg (plate increments).
+// Steps only drive the +/− buttons — typed values are never snapped to this grid.
 
 const KB_PATTERN = /\b(kb|kettlebell)\b/i;
-const DB_PATTERN = /\b(db|dumbbell)\b/i;
 
-export function getWeightStep(movementName: string, implementCount?: number): number {
-  if (KB_PATTERN.test(movementName)) return 2;
-  if (DB_PATTERN.test(movementName) || implementCount === 2) return 2.5;
-  return 2.5;
+export function getWeightStep(movementName: string, equipment?: MovementEquipment): number {
+  return equipment === 'kettlebell' || KB_PATTERN.test(movementName) ? 2 : 2.5;
 }
 
 // ─── Create blank result from parsed exercise ───────────────────
@@ -553,11 +551,23 @@ export function createBlankResult(
     : baseKind;
   // "weighted" in exercise name contradicts a 'reps' classification — override to load.
   // Guard against distance/calorie movements (e.g. "Weighted Vest Run").
-  const kind = (
+  const weightedKind = (
     cadenceKind === 'reps'
     && /\bweighted\b/i.test(exercise.name)
     && !exercise.movements?.some(m => m.inputType === 'distance' || m.inputType === 'calories')
   ) ? 'load' : cadenceKind;
+  // The reverse contradiction: a strength-block exercise whose movements are all
+  // bodyweight (e.g. "8 Strict Toes to Bar" inside "3 sets: …") has no weight to log —
+  // the block's loggingMode says 'strength' but there is nothing to put on a bar.
+  // Follow the movement classification (movementToKind trusts AI isBodyweight /
+  // inputType / rxWeights, so weighted or Rx'd movements are never downgraded).
+  const allMovements = exercise.sections?.length
+    ? exercise.sections.flatMap(s => s.movements)
+    : exercise.movements ?? [];
+  const isAllBodyweight = allMovements.length > 0
+    ? allMovements.every(m => movementToKind(m) === 'reps')
+    : !exercise.rxWeights && classifyMovementName(exercise.name) === 'bodyweight';
+  const kind = weightedKind === 'load' && isAllBodyweight ? 'reps' : weightedKind;
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
@@ -752,11 +762,9 @@ export function createBlankResult(
       break;
     }
 
-    case 'score_rounds':
-      if (exercise.loggingMode === 'amrap_intervals') {
-        base.rounds = exercise.intervalCount ?? setsTotal;
-      }
-      break;
+    // score_rounds: no prefill — an AMRAP's rounds are the athlete's SCORE. Prefilling from
+    // intervalCount stamped the prescribed interval count as the result without the athlete
+    // ever entering it (saved docs showed rounds=4 for "x 4" boards regardless of performance).
   }
 
   return base;

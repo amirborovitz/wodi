@@ -15,8 +15,10 @@ interface LoadInputProps {
 
 // ─── Helpers ────────────────────────────────────────────────────
 
-function clampWeight(w: number, step = 0.5): number {
-  return Math.max(0, Math.round(w / step) * step);
+// Weights are only floored at 0 — never snapped to the step grid. The step
+// drives the +/− buttons; a typed value (e.g. 28 on a 2.5 grid) must stick.
+function clampWeight(w: number): number {
+  return Math.max(0, w);
 }
 
 function getDefaultWeight(result: StoryExerciseResult): number | undefined {
@@ -32,8 +34,9 @@ function canUseBodyweightMode(name: string): boolean {
 export function LoadInput({ result, onChange, showImplement = false }: LoadInputProps) {
   const mode = result.loadMode ?? 'same';
   const topTouched = useRef(false);
-  const movName = result.exercise?.movements?.[0]?.name ?? result.exercise?.name ?? '';
-  const weightStep = getWeightStep(movName, result.implementCount);
+  const firstMovement = result.exercise?.movements?.[0];
+  const movName = firstMovement?.name ?? result.exercise?.name ?? '';
+  const weightStep = getWeightStep(movName, firstMovement?.equipment);
   const showBodyweightToggle = mode === 'bodyweight' || canUseBodyweightMode(movName);
 
   // Detect max set pattern (e.g., [8-6-4-2-max] → repsPerSet has 4 items, setsTotal=5)
@@ -53,7 +56,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   const topVal = result.weightEnd ?? startVal;
 
   const handleStartChange = useCallback((raw: number | undefined) => {
-    const clamped = raw != null ? clampWeight(raw, weightStep) : undefined;
+    const clamped = raw != null ? clampWeight(raw) : undefined;
     const patch: Partial<StoryExerciseResult> = { weight: clamped };
 
     // Auto-mirror to Top until user manually edits Top
@@ -64,37 +67,37 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
       patch.loadMode = clamped === (result.weightEnd ?? clamped) ? 'same' : 'range';
     }
     onChange(patch);
-  }, [onChange, result.weightEnd, weightStep]);
+  }, [onChange, result.weightEnd]);
 
   const handleTopChange = useCallback((raw: number | undefined) => {
     topTouched.current = true;
-    const clamped = raw != null ? clampWeight(raw, weightStep) : undefined;
+    const clamped = raw != null ? clampWeight(raw) : undefined;
     const currentStart = result.weight ?? 0;
     onChange({
       weightEnd: clamped,
       loadMode: clamped === currentStart ? 'same' : 'range',
     });
-  }, [onChange, result.weight, weightStep]);
+  }, [onChange, result.weight]);
 
   const handleTopFocus = useCallback(() => {
     topTouched.current = true;
   }, []);
 
   const handleProgressiveChange = useCallback((start: number | undefined, peak: number | undefined) => {
-    const clampedStart = start != null ? Math.max(0, start) : undefined;
-    const clampedPeak = peak != null ? clampWeight(peak, weightStep) : undefined;
+    const clampedStart = start != null ? clampWeight(start) : undefined;
+    const clampedPeak = peak != null ? clampWeight(peak) : undefined;
     onChange({
       weight: clampedStart,
       weightEnd: clampedPeak,
       loadMode: clampedPeak != null && clampedStart != null && clampedPeak !== clampedStart ? 'range' : 'same',
     });
-  }, [onChange, weightStep]);
+  }, [onChange]);
 
-  // Single attempt: one legal-step value drives both weight and weightEnd — never a range.
+  // Single attempt: one value drives both weight and weightEnd — never a range.
   const handleSingleChange = useCallback((_start: number | undefined, peak: number | undefined) => {
-    const clamped = peak != null ? clampWeight(peak, weightStep) : undefined;
+    const clamped = peak != null ? clampWeight(peak) : undefined;
     onChange({ weight: clamped, weightEnd: clamped, loadMode: 'same' });
-  }, [onChange, weightStep]);
+  }, [onChange]);
 
   const toggleBW = useCallback(() => {
     if (mode === 'bodyweight') {
@@ -134,6 +137,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               placeholder={getDefaultWeight(result)}
               setsTotal={result.setsTotal}
               repsPerSet={result.exercise.suggestedReps}
+              step={weightStep}
               onChange={handleProgressiveChange}
               label={movName || result.exercise.name}
               footer={hasMaxSet ? (
@@ -178,6 +182,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               weight={(result.weight ?? startVal) || undefined}
               placeholder={getDefaultWeight(result)}
               setsTotal={result.setsTotal}
+              step={weightStep}
               onChange={handleSingleChange}
             />
           </motion.div>

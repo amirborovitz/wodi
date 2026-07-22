@@ -1,0 +1,162 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Weightlifting",
+      "blueprint": "8 sets",
+      "rows": [
+        {
+          "primary": "45->55KG",
+          "name": "Push Press",
+          "subNote": "8 total",
+          "totalNote": "8 total",
+          "mineKey": "Push Press",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "60->70KG",
+          "name": "Push Jerk",
+          "subNote": "8 total",
+          "totalNote": "8 total",
+          "mineKey": "Push Jerk",
+          "accent": "yellow",
+          "repeatCount": 4
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Weightlifting",
+        "blueprint": "8 sets",
+        "rows": [
+          {
+            "primary": "45->55KG",
+            "name": "Push Press",
+            "subNote": "8 total",
+            "totalNote": "8 total",
+            "mineKey": "Push Press",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "60->70KG",
+            "name": "Push Jerk",
+            "subNote": "8 total",
+            "totalNote": "8 total",
+            "mineKey": "Push Jerk",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "70",
+    "unit": "KG",
+    "subtitle": "PUSH JERK",
+    "formatLine": "2 × every 1:30",
+    "storyLine": "8 push press · 8 push jerk",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×4 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Push Press",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          45,
+          55
+        ],
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×4 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Push Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          60,
+          70
+        ],
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentGold"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "8 sets"
+      },
+      {
+        "kind": "line",
+        "rx": "45->55KG Push Press",
+        "load": "",
+        "mine": "45-55kg",
+        "team": "",
+        "total": "8 total"
+      },
+      {
+        "kind": "line",
+        "rx": "60->70KG Push Jerk",
+        "load": "",
+        "mine": "60-70kg",
+        "team": "",
+        "total": "8 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "8 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "45->55KG Push Press",
+          "load": "",
+          "mine": "45-55kg",
+          "team": "",
+          "total": "8 total"
+        },
+        {
+          "kind": "line",
+          "rx": "60->70KG Push Jerk",
+          "load": "",
+          "mine": "60-70kg",
+          "team": "",
+          "total": "8 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

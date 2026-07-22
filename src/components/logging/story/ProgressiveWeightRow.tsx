@@ -9,9 +9,8 @@ function selectAllInput(target: HTMLInputElement | null) {
   });
 }
 
-const STEP = 2.5;
 const DRAG_THRESHOLD = 6;   // px before drag mode activates
-const PX_PER_STEP = 16;     // px of drag per 2.5kg step
+const PX_PER_STEP = 16;     // px of drag per weight step
 
 /** Round down to nearest multiple of 5 */
 function suggestPeak(start: number | undefined): number | undefined {
@@ -45,6 +44,8 @@ interface ProgressiveWeightRowProps {
   placeholder?: number;
   setsTotal: number;
   repsPerSet?: number;
+  /** Chevron/drag increment in kg (2 for KBs, 2.5 for plates). Typed values ignore it. */
+  step?: number;
   onChange: (start: number | undefined, peak: number | undefined) => void;
   label?: string;
   footer?: ReactNode;
@@ -65,6 +66,7 @@ export function ProgressiveWeightRow({
   placeholder,
   setsTotal,
   repsPerSet,
+  step = 2.5,
   onChange,
   label = 'Barbell',
   footer,
@@ -212,7 +214,7 @@ export function ProgressiveWeightRow({
     if (!dragRef.current.didDrag) return;
 
     const steps = Math.round(dy / PX_PER_STEP);
-    const newWeight = Math.max(0, dragRef.current.baseWeight + steps * STEP);
+    const newWeight = Math.max(0, dragRef.current.baseWeight + steps * step);
     const field = dragRef.current.field;
 
     if (field === 'start') {
@@ -234,7 +236,7 @@ export function ProgressiveWeightRow({
       peakRef.current = newWeight || undefined;
       onChange(weightRef.current, newWeight || undefined);
     }
-  }, [onChange, singleColumn]);
+  }, [onChange, singleColumn, step]);
 
   const onOvalUp = useCallback((_e: React.PointerEvent<HTMLDivElement>, field: 'start' | 'peak') => {
     if (!dragRef.current) return;
@@ -266,7 +268,7 @@ export function ProgressiveWeightRow({
         <div className={styles.column}>
           <span className={styles.columnLabel}>{singleColumn ? columnLabel : 'Start weight'}</span>
           <button className={styles.chevron}
-            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(STEP) : stepStart(STEP)))}
+            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(step) : stepStart(step)))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
             type="button" aria-label={singleColumn ? `Increase ${columnLabel.toLowerCase()}` : 'Increase start weight'}>
             <ChevronUp />
@@ -296,7 +298,7 @@ export function ProgressiveWeightRow({
           <span className={styles.unit}>KG</span>
 
           <button className={styles.chevron}
-            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(-STEP) : stepStart(-STEP)))}
+            onPointerDown={() => startHold(() => (singleColumn ? stepSingle(-step) : stepStart(-step)))}
             onPointerUp={stopHold} onPointerLeave={stopHold}
             type="button" aria-label={singleColumn ? `Decrease ${columnLabel.toLowerCase()}` : 'Decrease start weight'}>
             <ChevronDown />
@@ -310,7 +312,7 @@ export function ProgressiveWeightRow({
           <div className={styles.column}>
             <span className={styles.columnLabel}>Peak weight</span>
             <button className={styles.chevron}
-              onPointerDown={() => startHold(() => stepPeak(STEP))}
+              onPointerDown={() => startHold(() => stepPeak(step))}
               onPointerUp={stopHold} onPointerLeave={stopHold}
               type="button" aria-label="Increase peak weight">
               <ChevronUp />
@@ -342,7 +344,7 @@ export function ProgressiveWeightRow({
             <span className={styles.unit}>KG</span>
 
             <button className={styles.chevron}
-              onPointerDown={() => startHold(() => stepPeak(-STEP))}
+              onPointerDown={() => startHold(() => stepPeak(-step))}
               onPointerUp={stopHold} onPointerLeave={stopHold}
               type="button" aria-label="Decrease peak weight">
               <ChevronDown />

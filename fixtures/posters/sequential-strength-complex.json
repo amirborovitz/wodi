@@ -1,0 +1,39 @@
+{
+  "name": "sequential-strength-complex",
+  "description": "Sequential strength complex ('4 sets Push Press, Into: 4 sets Push Jerk') stored as two 'rounds' sections. Each block must render as its OWN row with its own set count and its own logged start->peak weight (Push Press 45->55, Push Jerk 60->70) — never collapsed to one shared '4 rounds' tally, never one shared weight.",
+  "workout": {
+    "title": "Weightlifting",
+    "format": "strength",
+    "rawText": "WEIGHTLIFTING\n4 sets, Every 01:30 minutes:\n2 Push Press\nInto:\n4 sets, Every 01:30 minutes:\n2 Push Jerk\nstart at ~65% and build up",
+    "exercises": [
+      {
+        "id": "ex-weightlifting",
+        "name": "Weightlifting",
+        "type": "strength",
+        "loggingMode": "emom",
+        "prescription": "4 sets Every 1:30: 2 Push Press, then 4 sets Every 1:30: 2 Push Jerk — start ~65% and build up, from the floor",
+        "rawText": "WEIGHTLIFTING\n4 sets, Every 01:30 minutes:\n2 Push Press\nInto:\n4 sets, Every 01:30 minutes:\n2 Push Jerk\nstart at ~65% and build up",
+        "rounds": 4,
+        "suggestedSets": 8,
+        "sets": [
+          { "id": "s0", "setNumber": 1, "weight": 45, "actualReps": 2, "completed": true },
+          { "id": "s4", "setNumber": 4, "weight": 55, "actualReps": 2, "completed": true }
+        ],
+        "movements": [
+          { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" },
+          { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" }
+        ],
+        "sections": [
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] },
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Push Press", "totalReps": 8, "weight": 45, "weightProgression": [45, 55], "unit": "kg", "color": "yellow" },
+        { "name": "Push Jerk", "totalReps": 8, "weight": 60, "weightProgression": [60, 70], "unit": "kg", "color": "yellow" }
+      ]
+    }
+  }
+}

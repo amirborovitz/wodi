@@ -11,7 +11,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "A",
+        "title": "",
         "rows": [
           {
             "primary": "1.10 KM Echo Bike (together)",
@@ -34,7 +34,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "B",
+        "title": "",
         "rows": [
           {
             "primary": "1.10 KM Echo Bike (together)",
@@ -57,7 +57,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "C",
+        "title": "",
         "rows": [
           {
             "primary": "1.10 KM Echo Bike (together)",
@@ -80,7 +80,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "D",
+        "title": "",
         "rows": [
           {
             "primary": "1.10 KM Echo Bike (together)",
@@ -175,11 +175,6 @@
           "cap": ""
         },
         {
-          "kind": "block",
-          "label": "A",
-          "cap": ""
-        },
-        {
           "kind": "line",
           "rx": "1.10 KM Echo Bike (together)",
           "load": "",
@@ -192,11 +187,6 @@
           "load": "",
           "mine": "35kg",
           "team": "50"
-        },
-        {
-          "kind": "block",
-          "label": "B",
-          "cap": ""
         },
         {
           "kind": "line",
@@ -213,11 +203,6 @@
           "team": "40"
         },
         {
-          "kind": "block",
-          "label": "C",
-          "cap": ""
-        },
-        {
           "kind": "line",
           "rx": "1.10 KM Echo Bike (together)",
           "load": "",
@@ -230,11 +215,6 @@
           "load": "",
           "mine": "35kg",
           "team": "30"
-        },
-        {
-          "kind": "block",
-          "label": "D",
-          "cap": ""
         },
         {
           "kind": "line",

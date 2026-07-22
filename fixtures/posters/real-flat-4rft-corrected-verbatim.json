@@ -1,0 +1,187 @@
+{
+    "name":  "real-flat-4rft-corrected-verbatim",
+    "description":  "Same doc as real-flat-4rft-20260706 but with a structural \"AI got it wrong?\" correction - the poster must downgrade to whiteboard-verbatim rendering (free mode), no derived structure.",
+    "workout":  {
+                    "date":  "2026-07-06T05:58:31.268Z",
+                    "title":  "GORILLOT",
+                    "format":  "for_time",
+                    "rawText":  "Hi עמיר!\nToday Workout\n\nGORILLOT - FIT FOR LIFE\n\nEndurance\n\nMetcon\n\n4 RFT:\n200m run\n10 deadlift\n200m run\n10 power cleans\n200m run\n10 front squats\n200m run\n10 S.T.O.H.\n200m run\n10 pull ups\n\n◃ WEIGHT: 35/50kg (barbell) ▹",
+                    "exercises":  [
+                                      {
+                                          "id":  "exercise-0",
+                                          "name":  "4 Rounds For Time",
+                                          "type":  "wod",
+                                          "prescription":  "4 RFT: 200m run, 10 deadlift, 200m run, 10 power cleans, 200m run, 10 front squats, 200m run, 10 S.T.O.H., 200m run, 10 pull ups",
+                                          "sets":  [
+                                                       {
+                                                           "id":  "set-summary",
+                                                           "setNumber":  1,
+                                                           "completed":  true,
+                                                           "actualReps":  200,
+                                                           "weight":  35,
+                                                           "time":  2120
+                                                       }
+                                                   ],
+                                          "movements":  [
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  600,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Deadlift",
+                                                                "reps":  10,
+                                                                "rxWeights":  {
+                                                                                  "male":  35,
+                                                                                  "female":  35,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  600,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Power Clean",
+                                                                "reps":  10,
+                                                                "rxWeights":  {
+                                                                                  "male":  35,
+                                                                                  "female":  35,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  600,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Front Squat",
+                                                                "reps":  10,
+                                                                "rxWeights":  {
+                                                                                  "male":  35,
+                                                                                  "female":  35,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  600,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Shoulder to Overhead",
+                                                                "reps":  10,
+                                                                "rxWeights":  {
+                                                                                  "male":  35,
+                                                                                  "female":  35,
+                                                                                  "unit":  "kg"
+                                                                              },
+                                                                "inputType":  "weight",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Echo Bike",
+                                                                "distance":  600,
+                                                                "unit":  "m",
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            },
+                                                            {
+                                                                "name":  "Pull-up",
+                                                                "reps":  10,
+                                                                "inputType":  "none",
+                                                                "countingMode":  "per_round",
+                                                                "scoreEntryMode":  "per_round"
+                                                            }
+                                                        ],
+                                          "rounds":  4,
+                                          "rawText":  "4 RFT:\n200m run\n10 deadlift\n200m run\n10 power cleans\n200m run\n10 front squats\n200m run\n10 S.T.O.H.\n200m run\n10 pull ups\n\n◃ WEIGHT: 35/50kg (barbell) ▹",
+                                          "isSecondary":  false,
+                                          "aiPartName":  "PULSE"
+                                      }
+                                  ],
+                    "workloadBreakdown":  {
+                                              "movements":  [
+                                                                {
+                                                                    "name":  "Deadlift",
+                                                                    "totalReps":  40,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Power Clean",
+                                                                    "totalReps":  40,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Front Squat",
+                                                                    "totalReps":  40,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Shoulder to Overhead",
+                                                                    "totalReps":  40,
+                                                                    "weight":  35,
+                                                                    "unit":  "kg",
+                                                                    "color":  "yellow"
+                                                                },
+                                                                {
+                                                                    "name":  "Pull-up",
+                                                                    "totalReps":  40,
+                                                                    "color":  "magenta"
+                                                                },
+                                                                {
+                                                                    "name":  "Echo Bike",
+                                                                    "totalReps":  0,
+                                                                    "totalDistance":  12000,
+                                                                    "totalCalories":  0,
+                                                                    "totalTime":  0,
+                                                                    "unit":  "m",
+                                                                    "wasSubstituted":  true,
+                                                                    "originalMovement":  "Run",
+                                                                    "substitutionType":  "equivalent",
+                                                                    "implementCount":  1,
+                                                                    "distancePerRep":  600,
+                                                                    "color":  "magenta"
+                                                                }
+                                                            ],
+                                              "grandTotalReps":  200,
+                                              "grandTotalVolume":  1400,
+                                              "grandTotalDistance":  12000
+                                          },
+                    "timeCap":  2120,
+                    "corrections":  [
+                                        "Wrong reps/load: bike calories were misread"
+                                    ]
+                }
+}

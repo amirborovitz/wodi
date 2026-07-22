@@ -102,6 +102,10 @@ Return ONLY valid JSON:
         }
       ],
       "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] },
+      // intervalCount: how many repeating clock intervals this block has.
+      // Examples: "AMRAP 3:00 x 4" → 4, "Every 4:00 x 3 AMRAP" → 3.
+      // Omit for single-block pieces (a plain "AMRAP 12" has no intervals).
+      "intervalCount": 4,
       // workDuration: programmed work time for THIS EXERCISE in SECONDS.
       // If the exercise represents one block: total work time for that block.
       // Examples: "AMRAP 12" (single block) → 720, "AMRAP 3:00 x 4" (single exercise, 4 intervals) → 720 (180*4),
@@ -153,6 +157,11 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
   - "movements": the per-round block of movements for that section.
 - Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
   Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
+- LETTERED SUB-BLOCKS UNDER ONE SCORE: a single for-time piece may label its sequential blocks
+  A./B./C. under ONE "For time" header and ONE time cap (e.g. "For time: A. 10 rounds: [block]
+  B. 10 rounds: [block] C. 10 rounds: [block], 40 min T.C."). These are round sections of ONE
+  exercise — one "sections" entry per block with that block's "rounds" count — NOT separate
+  exercises. The athlete logs one total time for the whole piece.
 - CRITICAL DISTINCTION: The previous rule only means "do not copy the whole round block N
   times." It does NOT mean dedupe repeated movements that appear multiple times inside the
   round block itself. If the per-round prescription says "200m run, 10 deadlift, 200m run,
@@ -257,6 +266,7 @@ Every movement performed with an external load MUST also include "equipment" —
 - "dumbbell": DB movements
 - "kettlebell": KB movements
 - "other": everything else — wall ball / med ball, plate, sandbag, D-ball, sled, weighted vest, and any "weighted X" with no stated implement ("weighted box step-ups", "weighted pull-ups"). When unsure which implement, use "other".
+A DOUBLE implement (implementCount 2 — "twin", "double", "2x", "pair" of DBs or KBs, e.g. "twin DB's / KB's push press", "double DB thrusters") is ALWAYS "dumbbell" or "kettlebell", NEVER "barbell" — you cannot hold two barbells. Keep implementCount 2 AND set equipment "dumbbell" (or "kettlebell" if the board says KB). A press/clean/thruster done with two DBs/KBs is NOT a barbell lift.
 The logging UI merges same-equipment movements into ONE weight input, so "equipment" decides what shares a bar and what gets asked separately. Omit the field for unweighted movements.`;
 
 const RULES_STATIONS = `## ROTATING STATION LABELS
@@ -332,11 +342,11 @@ ${MOVEMENT_ALIASES_SECTION}
 - NEVER return "Today's Workout", a format label ("For Time"), a description ("8 Round Barbell Metcon"), or any sentence.
 
 ## KEY GUIDELINES
-1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise — UNLESS the workout alternates between different movement blocks (A.1/A.2, odd/even minutes with different movements). Alternating blocks need separate exercises for separate round scores.
+1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise — UNLESS the workout alternates between different movement blocks (A.1/A.2, odd/even minutes with different movements). Alternating blocks need separate exercises for separate round scores. SEQUENTIAL LIFTS UNDER ONE HEADING = ONE exercise with SECTIONS (not separate exercises, not one flat block): when a strength piece flows one movement "Into:"/"then" another under a single heading and EACH block has its OWN set count — e.g. "4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" — emit ONE exercise whose "sections" has one "rounds" section PER block, each with that block's own "rounds" (set count) and its own movement(s). Also list each movement once in top-level "movements[]" for reference. These blocks are done SEQUENTIALLY at INDEPENDENT weights (Push Press across its 4 sets, THEN Push Jerk across its 4 sets), so they must NOT be flattened into one shared block. This differs from a SIMULTANEOUS "+"-joined complex done together each set on one bar (e.g. "1 Power Clean + 1 Push Jerk"), which stays a single flat "movements[]" list with NO sections (one shared weight). See examples 4b (sequential → sections) and 4c (simultaneous → flat).
 2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
 3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
 4. ALWAYS include "difficultyLevel" (1–10) at the top level. Rate the programmed difficulty, not athlete fitness. Use the full range: 1=active recovery, 3=easy, 5=moderate benchmark pace, 7=hard, 8=very hard, 10=brutal. Consider load relative to body weight, total volume, time cap, and movement complexity. Example: "50 cal Echo Bike + 50 Thrusters @30kg × 3 rounds" = 8.
-5. Prescription fidelity: "prescription" MUST paraphrase the actual whiteboard text. NEVER invent descriptors like "build to heavy", "heavy singles", "for quality" unless those exact words appear in the source.
+5. Prescription fidelity: "prescription" MUST paraphrase the actual whiteboard text. NEVER invent descriptors like "build to heavy", "heavy singles", "for quality" unless those exact words appear in the source. But DO preserve coach LOADING & EXECUTION cues that ARE written — starting/target percentages ("start at ~65%", "@70% build up"), progression cues ("build up weight", "add weight each set", "ascending"), tempo, and setup notes ("from the floor", "touch and go"). These tell the athlete how to load; keep them in the prescription (e.g. "4 sets Every 1:30: 2 Push Press — start ~65% and build up, from the floor"). Do NOT drop a written percentage or "build up" cue.
 6. RPE / RIR strength work: "@0-1 R.I.R" / "@2-3 R.I.R" / "@7 RPE" are intensity constraints, NOT rep counts. Set suggestedReps from the rep count in the prescription (e.g., "5 C2B @0-1 RIR" → suggestedReps: 5). NEVER sum multiple movement reps across a superset to produce suggestedReps. For a superset exercise with different rep counts per movement, omit suggestedReps entirely.
 7. Compound movement names: ALWAYS preserve the full name — "Burpee Step Up", "Burpee Box Jump Over", "Burpee Broad Jump" are distinct movements. Do NOT simplify to "Burpee".
 8. ROUND-ALTERNATING PAIRS: one line offering two movements marked "(alternates)" / "alternating" inside a rounds structure (e.g. "Push press/thrusters (alternates)" in "8 rounds of:") means the athlete switches movement each round — half the rounds are one, half the other. Emit ONE movement named as the pair ("Push Press / Thruster") with the per-round reps if the board OR the athlete's context note gives a count (the note is authoritative — "it is 8 alternating push press/thrusters" → reps: 8). If neither gives one, OMIT "reps" entirely — never invent it. Do NOT emit two separate per-round movements (that double-counts the work every round), and do NOT use the "alternative" field (that means an either/or scaling choice, not alternation).`;
@@ -350,7 +360,15 @@ const RULES_BENCHMARKS = `## CONTAINER/BENCHMARK RECOGNITION
 const RULES_REP_SCHEMES = `## VARIABLE REP SCHEMES
 "[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
 Bracket notation like "[20-16-12-8-4]" in a for_time workout → suggestedRepsPerSet: [20, 16, 12, 8, 4], suggestedSets: 5.
-CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.`;
+CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.
+CRITICAL — PER-MOVEMENT INDEPENDENT SCHEMES: when SEVERAL movements EACH carry their OWN bracketed rep scheme and the schemes DIFFER (e.g. "[50-40-30] air squats, [30-20-10] push press, 15 box jumps after each set"), a single "suggestedRepsPerSet" CANNOT represent them — it holds only ONE scheme, so applying it to every movement falsely claims they all descend 50-40-30. Instead emit ONE "rounds":1 section PER round, each listing EVERY movement with ITS OWN rep for that round (the pyramid model). A fixed-rep add-on ("15 box jumps after each set") repeats its CONSTANT rep count every round. Do NOT collapse divergent per-movement schemes into one suggestedRepsPerSet, and do NOT drop the fixed add-on movement.
+Example: "For time: [50-40-30] air squats / [30-20-10] twin DB/KB push press / 15 box jumps after each set" ->
+  sections: [
+    { sectionType: "rounds", rounds: 1, movements: [Air Squat 50, DB Push Press 30 (implementCount 2), Box Jump 15] },
+    { sectionType: "rounds", rounds: 1, movements: [Air Squat 40, DB Push Press 20 (implementCount 2), Box Jump 15] },
+    { sectionType: "rounds", rounds: 1, movements: [Air Squat 30, DB Push Press 10 (implementCount 2), Box Jump 15] }
+  ]
+  (top-level movements[] lists each unique movement once, with its round-1 reps, for reference.)`;
 
 const RULES_LADDERS_PARTNERS = `## ASCENDING LADDER REP SCHEMES
 When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to the sequence.
@@ -441,7 +459,46 @@ Output:
 {
   "type": "strength", "format": "strength", "scoreType": "load",
   "exercises": [{ "name": "Back Squat", "type": "strength", "loggingMode": "strength", "prescription": "5x5 @75%", "suggestedSets": 5, "suggestedReps": 5 }]
-}`;
+}
+
+### 4b. SEQUENTIAL strength complex chained by "Into:" — ONE exercise, one SECTION per block
+Input: "4 sets, Every 01:30: 2 Push Press / Into: / 4 sets, Every 01:30: 2 Push Jerk / start at ~65% and build up, from the floor"
+Output:
+{
+  "type": "strength", "format": "emom", "scoreType": "load",
+  "exercises": [{
+    "name": "Weightlifting", "type": "strength", "loggingMode": "emom",
+    "prescription": "4 sets Every 1:30: 2 Push Press, then 4 sets Every 1:30: 2 Push Jerk — start ~65% and build up, from the floor",
+    "suggestedSets": 8,
+    "movements": [
+      { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" },
+      { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" }
+    ],
+    "sections": [
+      { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] },
+      { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] }
+    ]
+  }]
+}
+Why sections: each lift is its OWN block at its OWN building weight — the athlete logs Push Press across its 4 sets, THEN Push Jerk across its 4 sets. One "rounds" section per block keeps the two progressions independent for logging and the poster. Generalizes to N blocks (3+ lifts chained by "Into:"/"then") and any per-block set count.
+
+### 4c. SIMULTANEOUS barbell complex ("+"-joined, done together each set) — ONE flat block, NO sections
+Input: "Every 2:00 x 5: 1 Power Clean + 1 Hang Clean + 1 Push Jerk (same bar)"
+Output:
+{
+  "type": "strength", "format": "emom", "scoreType": "load",
+  "exercises": [{
+    "name": "Barbell Complex", "type": "strength", "loggingMode": "emom",
+    "prescription": "Every 2:00 x 5: 1 Power Clean + 1 Hang Clean + 1 Push Jerk",
+    "suggestedSets": 5,
+    "movements": [
+      { "name": "Power Clean", "reps": 1, "inputType": "weight", "equipment": "barbell" },
+      { "name": "Hang Clean", "reps": 1, "inputType": "weight", "equipment": "barbell" },
+      { "name": "Push Jerk", "reps": 1, "inputType": "weight", "equipment": "barbell" }
+    ]
+  }]
+}
+Why NO sections: the three lifts are ONE unbroken set on ONE bar at ONE weight, all done every round (a "+"-joined complex). A single flat "movements[]" is correct — one shared weight. Contrast 4b, where "Into:" separates blocks each with its own set count and its own building weight.`;
 
 const EXAMPLES_METCON_ADVANCED = `### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
@@ -582,7 +639,7 @@ Output:
 {
   "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps",
   "intervalTime": 240, "restTime": 0, "sets": 3,
-  "exercises": [{ "name": "Every 4:00 x 3 AMRAP", "type": "wod", "loggingMode": "amrap_intervals", "prescription": "200m Run buy-in, then AMRAP: 4 Bar Muscle-up, 8 Box Jumps, 10 KB Swings @24/32kg", "suggestedSets": 3, "workDuration": 720, "restDuration": 0,
+  "exercises": [{ "name": "Every 4:00 x 3 AMRAP", "type": "wod", "loggingMode": "amrap_intervals", "prescription": "200m Run buy-in, then AMRAP: 4 Bar Muscle-up, 8 Box Jumps, 10 KB Swings @24/32kg", "suggestedSets": 3, "intervalCount": 3, "workDuration": 720, "restDuration": 0,
     "buyIn": [{ "name": "Run", "distance": 200, "unit": "m", "inputType": "none" }],
     "movements": [
       { "name": "Bar Muscle-up", "reps": 4, "inputType": "none", "alternative": { "name": "Chest to Bar Pull-up", "reps": 6 } },
@@ -1069,7 +1126,9 @@ ${MOVEMENT_ALIASES_SECTION}
 
 SEGMENTATION:
 - A session has 1-3+ parts, usually labeled (A./B./C.) or separated by headers (STRENGTH, METCON, WOD, Cool Down). Every input line belongs to EXACTLY ONE part.
-- The unit of a part is the SCORE, not the label: blocks completed under ONE clock/score (a chipper flowing "Into:", "A+B+C for time", a partner piece with one finish time) are ONE part — keep the internal labels inside its text. Blocks scored independently (own clock, own result) are separate parts even when unlabeled.
+- The unit of a part is the SCORE, never the label. Before splitting on A./B./C. labels, check what governs the labeled blocks: a format/scoring header written ONCE above them ("For time:", "AMRAP 25", "Chipper") and/or a single time cap written once below covering all of them means the blocks run on ONE clock toward ONE score — they are ONE part, with the internal labels kept inside its text. The same holds for blocks joined by connectors ("Into:", "then", "A+B+C for time") and for a partner piece with one finish time. Example: "For time: / A. 10 rounds: [...] / B. 10 rounds: [...] / C. 10 rounds: [...] / 40 min T.C." is ONE metcon part.
+- Labels split into separate parts only when each labeled block is SEPARATELY LETTERED (its own A./B./C.) AND scored on its own — it carries its own format/scoring line ("A. Every 1:30 x 8: ...", "B. 16 min AMRAP: ..."), its own clock or time cap, or is a different kind of training. Blocks scored independently are separate parts even when unlabeled.
+- A per-block cadence/scheme line alone does NOT promote a sub-block to its own part. What binds sub-blocks into ONE part is a SHARED GOVERNING SCOPE: they sit under a single top-level label (one "A."), or under one scoring header / one time cap. Sub-bullets or lines within that scope stay ONE part even when each repeats its own cadence/scheme line — and whether or not a connector ("Into:", "then", "immediately into") joins them. The connector is a hint, not the trigger; the trigger is the shared scope. Contrast: "A. 4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" is ONE strength part (both bullets share the single label A.) — do NOT split it into Push Press and Push Jerk parts; whereas "A. Every 1:30 x 8: [...] / B. 16 min AMRAP: [...]" is TWO parts (two separate top-level letters, each with its own scoring).
 - "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", unrelated skill practice.
 - A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
 - A date written on the board goes into the FIRST part's text (a later step reads it from there).

@@ -1,0 +1,194 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Every 3:15 min x 10",
+      "blueprint": "EVERY 3:15 · 10 rounds",
+      "rows": [
+        {
+          "primary": "1000m",
+          "name": "Echo Bike",
+          "subNote": "10.00 km total",
+          "totalNote": "10.00 km total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 10
+        },
+        {
+          "primary": "20",
+          "name": "Russian Kettlebell Swings",
+          "nameWithLoad": "Russian Kettlebell Swings @ 20kg",
+          "loadNote": "20kg",
+          "subNote": "200 total",
+          "totalNote": "200 total",
+          "mineKey": "Russian Kettlebell Swing",
+          "accent": "yellow",
+          "repeatCount": 10
+        },
+        {
+          "primary": "15",
+          "name": "Goblet Squats",
+          "nameWithLoad": "Goblet Squats @ 20kg",
+          "loadNote": "20kg",
+          "subNote": "150 total",
+          "totalNote": "150 total",
+          "mineKey": "Goblet Squat",
+          "accent": "yellow",
+          "repeatCount": 10
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Every 3:15 min x 10",
+        "blueprint": "EVERY 3:15 · 10 rounds",
+        "rows": [
+          {
+            "primary": "1000m",
+            "name": "Echo Bike",
+            "subNote": "10.00 km total",
+            "totalNote": "10.00 km total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 10
+          },
+          {
+            "primary": "20",
+            "name": "Russian Kettlebell Swings",
+            "nameWithLoad": "Russian Kettlebell Swings @ 20kg",
+            "loadNote": "20kg",
+            "subNote": "200 total",
+            "totalNote": "200 total",
+            "mineKey": "Russian Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 10
+          },
+          {
+            "primary": "15",
+            "name": "Goblet Squats",
+            "nameWithLoad": "Goblet Squats @ 20kg",
+            "loadNote": "20kg",
+            "subNote": "150 total",
+            "totalNote": "150 total",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow",
+            "repeatCount": 10
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "10.0",
+    "unit": "KM",
+    "subtitle": "ECHO BIKE",
+    "storyLine": "200 russian kettlebell swing · 150 goblet squat · 10.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "1.0km",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Russian Kettlebell Swing",
+        "total": "200 total",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "15",
+        "name": "Goblet Squat",
+        "total": "150 total",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "EVERY 3:15 · 10 rounds"
+      },
+      {
+        "kind": "line",
+        "rx": "1000m Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "10.00 km total"
+      },
+      {
+        "kind": "line",
+        "rx": "20 Russian Kettlebell Swings",
+        "load": "",
+        "mine": "20kg",
+        "team": "",
+        "total": "200 total"
+      },
+      {
+        "kind": "line",
+        "rx": "15 Goblet Squats",
+        "load": "",
+        "mine": "20kg",
+        "team": "",
+        "total": "150 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "EVERY 3:15 · 10 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "1000m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "10.00 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Russian Kettlebell Swings",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "200 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Goblet Squats",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "150 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

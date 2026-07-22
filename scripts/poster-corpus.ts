@@ -37,6 +37,7 @@ import {
   buildMineMapFromStory,
   partnerBlocksSub,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
+import { hasStructuralCorrection } from '../src/components/celebration/corrections';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
 
 interface PosterFixture {
@@ -50,6 +51,7 @@ interface PosterFixture {
     format?: WorkoutFormat;
     teamSize?: number;
     partnerWorkout?: boolean;
+    corrections?: string[];
   };
 }
 
@@ -69,7 +71,12 @@ function scopePageMovements(exercise: Exercise, allMovements: MovementTotal[]): 
 }
 
 function buildSnapshot(fixture: PosterFixture): unknown {
-  const { title, exercises, rawText, format } = fixture.workout;
+  const { title, rawText, format } = fixture.workout;
+  // Mirrors useCelebrationData's correction fallback: a structural "AI got it wrong?" flag
+  // downgrades every part carrying its own board text to 'free' (whiteboard-verbatim rendering).
+  const exercises = hasStructuralCorrection(fixture.workout.corrections ?? [])
+    ? fixture.workout.exercises.map((ex) => (ex.rawText?.trim() ? { ...ex, loggingMode: 'free' as const } : ex))
+    : fixture.workout.exercises;
   // Mirrors useCelebrationData.activeBreakdown: the stored breakdown passes through
   // repairUndercountedBreakdown before ANY builder sees it.
   const movements = fixture.workout.workloadBreakdown

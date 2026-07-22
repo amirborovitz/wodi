@@ -1,0 +1,384 @@
+{
+  "reward": [
+    {
+      "title": "4 Rounds For Time",
+      "rows": [
+        {
+          "primary": "",
+          "name": "4 RFT:",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "200m run",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "10 deadlift",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "200m run",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "10 power cleans",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "200m run",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "10 front squats",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "200m run",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "10 S.T.O.H.",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "200m run",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "10 pull ups",
+          "accent": "magenta"
+        },
+        {
+          "primary": "",
+          "name": "◃ WEIGHT: 35/50kg (barbell) ▹",
+          "accent": "magenta"
+        }
+      ],
+      "hiddenCount": 0
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "4 Rounds For Time",
+        "rows": [
+          {
+            "primary": "",
+            "name": "4 RFT:",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "200m run",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "10 deadlift",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "200m run",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "10 power cleans",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "200m run",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "10 front squats",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "200m run",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "10 S.T.O.H.",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "200m run",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "10 pull ups",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "◃ WEIGHT: 35/50kg (barbell) ▹",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
+  ],
+  "hero": {
+    "value": "35:20",
+    "unit": "MIN",
+    "formatLine": "4 Rounds",
+    "storyLine": "40 deadlift · 40 power clean · 40 front squat · 40 shoulder to overhead · 40 pull-up · 12.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "12.0km",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "600m"
+      },
+      {
+        "perRound": "40",
+        "name": "Deadlift",
+        "total": "",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Power Clean",
+        "total": "",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Front Squat",
+        "total": "",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Shoulder to Overhead",
+        "total": "",
+        "color": "yellow",
+        "weight": 35,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Pull-up",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "4 RFT:",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "200m run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 deadlift",
+        "load": "",
+        "mine": "35kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "200m run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 power cleans",
+        "load": "",
+        "mine": "35kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "200m run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 front squats",
+        "load": "",
+        "mine": "35kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "200m run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 S.T.O.H.",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "200m run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "10 pull ups",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "◃ WEIGHT: 35/50kg (barbell) ▹",
+        "load": "",
+        "mine": "",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "4 RFT:",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "200m run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 deadlift",
+          "load": "",
+          "mine": "35kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "200m run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 power cleans",
+          "load": "",
+          "mine": "35kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "200m run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 front squats",
+          "load": "",
+          "mine": "35kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "200m run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 S.T.O.H.",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "200m run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "10 pull ups",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "◃ WEIGHT: 35/50kg (barbell) ▹",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

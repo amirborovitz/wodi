@@ -1,0 +1,215 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Squat",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "80->100KG",
+            "name": "Back Squat",
+            "subNote": "12 total",
+            "totalNote": "12 total",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Max Height Squat Jumps",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Max Height Squat Jump",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Max Height Squat Jump",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "03:00 min AMRAP x 4",
+        "blueprint": "3 min AMRAP · 1 min rest · 4 rounds",
+        "rows": [
+          {
+            "primary": "8",
+            "name": "Chest-to-Bar Pull-ups",
+            "subNote": "32 total",
+            "totalNote": "32 total",
+            "mineKey": "Chest-to-Bar Pull-ups",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "8",
+            "name": "Box Jumps",
+            "subNote": "32 total",
+            "totalNote": "32 total",
+            "mineKey": "Box Jump",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "16",
+            "name": "Alt DB Snatches",
+            "nameWithLoad": "Alt DB Snatches @ 22.5kg",
+            "loadNote": "22.5kg",
+            "subNote": "64 total",
+            "totalNote": "64 total",
+            "mineKey": "Alt DB Snatch",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "4",
+    "unit": "ROUNDS",
+    "formatLine": "4 × 3 MIN",
+    "storyLine": "64 alt db snatch · 32 c2b pull-ups · 32 box jump · 24 max height squat jump · 12 back squat",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BACK SQUAT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Back Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          80,
+          100
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 12
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "03:00 MIN AMRAP X 4",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "8",
+        "name": "Chest-to-Bar Pull-ups",
+        "total": "32 total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "8",
+        "name": "Box Jump",
+        "total": "32 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "16",
+        "name": "Alt DB Snatch",
+        "total": "64 total",
+        "color": "yellow",
+        "weight": 22.5,
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "80->100KG Back Squat",
+          "load": "",
+          "mine": "80-100kg",
+          "team": "",
+          "total": "12 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "MAX HEIGHT SQUAT JUMPS",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Max Height Squat Jump",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "03:00 MIN AMRAP X 4",
+          "cap": "3 min AMRAP · 1 min rest · 4 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Chest-to-Bar Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "32 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "32 total"
+        },
+        {
+          "kind": "line",
+          "rx": "16 Alt DB Snatches",
+          "load": "",
+          "mine": "22.5kg",
+          "team": "",
+          "total": "64 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  }
+}

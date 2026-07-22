@@ -1,0 +1,239 @@
+{
+  "reward": [
+    {
+      "eyebrow": "FOR TIME",
+      "title": "Blueprint",
+      "blueprint": "3 rounds for time",
+      "rows": [
+        {
+          "primary": "50-40-30",
+          "name": "Air Squats",
+          "totalNote": "120 total",
+          "mineKey": "Air Squat",
+          "accent": "magenta"
+        },
+        {
+          "primary": "30-20-10",
+          "name": "DB Push Presses",
+          "subNote": "20KG ea",
+          "totalNote": "60 total",
+          "mineKey": "Dumbbell Push Press",
+          "accent": "yellow"
+        },
+        {
+          "primary": "15",
+          "name": "Box Jumps",
+          "totalNote": "45 total",
+          "mineKey": "Box Jump",
+          "accent": "magenta"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "FOR TIME",
+        "title": "Blueprint",
+        "blueprint": "3 rounds for time",
+        "rows": [
+          {
+            "primary": "50-40-30",
+            "name": "Air Squats",
+            "totalNote": "120 total",
+            "mineKey": "Air Squat",
+            "accent": "magenta"
+          },
+          {
+            "primary": "30-20-10",
+            "name": "DB Push Presses",
+            "subNote": "20KG ea",
+            "totalNote": "60 total",
+            "mineKey": "Dumbbell Push Press",
+            "accent": "yellow"
+          },
+          {
+            "primary": "15",
+            "name": "Box Jumps",
+            "totalNote": "45 total",
+            "mineKey": "Box Jump",
+            "accent": "magenta"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "10:40",
+    "unit": "MIN",
+    "storyLine": "120 air squat · 60 dumbbell push press · 45 box jump",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "50",
+        "name": "Air Squat",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Dumbbell Push Press",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "15",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "40",
+        "name": "Air Squat",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Dumbbell Push Press",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "15",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "30",
+        "name": "Air Squat",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Dumbbell Push Press",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "15",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "3 ROUNDS FOR TIME",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "50-40-30 Air Squats",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "120 total"
+      },
+      {
+        "kind": "line",
+        "rx": "30-20-10 DB Push Presses",
+        "load": "20KG ea",
+        "mine": "40kg",
+        "team": "",
+        "total": "60 total"
+      },
+      {
+        "kind": "line",
+        "rx": "15 Box Jumps",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "45 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "3 ROUNDS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50-40-30 Air Squats",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "120 total"
+        },
+        {
+          "kind": "line",
+          "rx": "30-20-10 DB Push Presses",
+          "load": "20KG ea",
+          "mine": "40kg",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "45 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

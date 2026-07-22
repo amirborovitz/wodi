@@ -1,0 +1,14 @@
+{
+  "name": "lettered-blocks-one-score",
+  "rawText": "Endurance\nMetcon\nFor time:\nA. 10 rounds:\n4 burpees\n6 air squats\n8 sit ups\nB. 10 rounds:\n4 pull ups\n6 push ups\n20 D.U. / 40 singles\nC. 10 rounds:\n5/6 calories echo bike\n8 A.KB swings\n40 minutes T.C.",
+  "aiResponse": "{\"title\":\"Endurance\",\"type\":\"for_time\",\"format\":\"for_time\",\"scoreType\":\"time\",\"timeCap\":2400,\"sets\":30,\"rawText\":\"Endurance\\nMetcon\\nFor time:\\nA. 10 rounds:\\n4 Burpees\\n6 Air Squats\\n8 Sit-ups\\nB. 10 rounds:\\n4 Pull-ups\\n6 Push-ups\\n20 Double Unders / 40 Single Unders\\nC. 10 rounds:\\n5/6 calories Echo Bike\\n8 American Kettlebell Swings\\n40 minutes T.C.\",\"exercises\":[{\"name\":\"Endurance For Time\",\"type\":\"wod\",\"loggingMode\":\"for_time\",\"prescription\":\"For time: A. 10 rounds of 4 Burpees + 6 Air Squats + 8 Sit-ups, into B. 10 rounds of 4 Pull-ups + 6 Push-ups + 20 Double Unders, into C. 10 rounds of 5/6 cal Echo Bike + 8 American Kettlebell Swings. 40 min time cap\",\"suggestedSets\":30,\"rawText\":\"Endurance\\nMetcon\\nFor time:\\nA. 10 rounds:\\n4 Burpees\\n6 Air Squats\\n8 Sit-ups\\nB. 10 rounds:\\n4 Pull-ups\\n6 Push-ups\\n20 Double Unders / 40 Single Unders\\nC. 10 rounds:\\n5/6 calories Echo Bike\\n8 American Kettlebell Swings\\n40 minutes T.C.\",\"movements\":[{\"name\":\"Burpee\",\"reps\":4,\"inputType\":\"none\"},{\"name\":\"Air Squat\",\"reps\":6,\"inputType\":\"none\"},{\"name\":\"Sit-up\",\"reps\":8,\"inputType\":\"none\"},{\"name\":\"Pull-up\",\"reps\":4,\"inputType\":\"none\"},{\"name\":\"Push-up\",\"reps\":6,\"inputType\":\"none\"},{\"name\":\"Double Under\",\"reps\":20,\"inputType\":\"none\"},{\"name\":\"Echo Bike\",\"calories\":6,\"rxCalories\":{\"male\":6,\"female\":5},\"inputType\":\"none\"},{\"name\":\"American Kettlebell Swing\",\"reps\":8,\"inputType\":\"weight\",\"equipment\":\"kettlebell\",\"implementCount\":1}],\"sections\":[{\"sectionType\":\"rounds\",\"rounds\":10,\"movements\":[{\"name\":\"Burpee\",\"reps\":4,\"inputType\":\"none\"},{\"name\":\"Air Squat\",\"reps\":6,\"inputType\":\"none\"},{\"name\":\"Sit-up\",\"reps\":8,\"inputType\":\"none\"}]},{\"sectionType\":\"rounds\",\"rounds\":10,\"movements\":[{\"name\":\"Pull-up\",\"reps\":4,\"inputType\":\"none\"},{\"name\":\"Push-up\",\"reps\":6,\"inputType\":\"none\"},{\"name\":\"Double Under\",\"reps\":20,\"inputType\":\"none\"}]},{\"sectionType\":\"rounds\",\"rounds\":10,\"movements\":[{\"name\":\"Echo Bike\",\"calories\":6,\"rxCalories\":{\"male\":6,\"female\":5},\"inputType\":\"none\"},{\"name\":\"American Kettlebell Swing\",\"reps\":8,\"inputType\":\"weight\",\"equipment\":\"kettlebell\",\"implementCount\":1}]}]}]}",
+  "expect": {
+    "exerciseCount": "1",
+    "format": "for_time",
+    "loggingModes": "for_time",
+    "parsed.timeCap": "2400",
+    "parsed.exercises.0.sections.0.rounds": "10",
+    "parsed.exercises.0.sections.1.rounds": "10",
+    "parsed.exercises.0.sections.2.rounds": "10"
+  }
+}

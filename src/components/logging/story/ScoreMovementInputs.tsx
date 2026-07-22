@@ -14,8 +14,6 @@ interface ScoreMovementInputsProps {
   movements: MovementResult[];
   inputMovements: MovementResult[];
   onChange: (index: number, patch: Partial<MovementResult>) => void;
-  variant?: 'default' | 'amrap_intervals';
-  roundsTotal?: number;
   /** Called when multiple movements need to update atomically (e.g. weight propagation). */
   onBatch?: (next: MovementResult[]) => void;
   onSubstitutionOpenChange?: (open: boolean) => void;
@@ -60,6 +58,15 @@ function getEquipmentType(name: string): LoadEquipment {
   return 'barbell';
 }
 
+// Name-based classification, but a DOUBLE implement (twin/double DBs or KBs) can NEVER be a
+// barbell — you can't hold two barbells — so it must resolve to DB/KB, not the barbell default.
+// Defense for docs whose equipment field the AI/post-processor didn't stamp. General.
+function getMovementEquipmentType(mov: ParsedMovement): LoadEquipment {
+  const named = getEquipmentType(mov.name);
+  if (mov.implementCount === 2 && named === 'barbell') return 'db';
+  return named;
+}
+
 // "Weighted X" with no stated implement (weighted box step-up, weighted pull-up, weighted
 // sit-up) is a held load the athlete picks — DBs/KBs/plate — never the session's barbell.
 function isImplicitHeldLoad(name: string): boolean {
@@ -81,7 +88,7 @@ function getEquipmentLabel(type: 'barbell' | 'kb' | 'db'): string {
 }
 
 function getLegalWeightStep(mr: MovementResult): number {
-  return getWeightStep(mr.movement.name, mr.implementCount);
+  return getWeightStep(mr.movement.name, mr.movement.equipment);
 }
 
 function roundToLegalWeight(value: number, mr: MovementResult): number {
@@ -193,51 +200,6 @@ function partnerAnnotation(mr: MovementResult, teamSize: number): string | null 
     return `${mr.movement.reps} total - your part ${personal}`;
   }
   return null;
-}
-
-function getIntervalValue(mr: MovementResult): number {
-  if (mr.kind === 'distance') {
-    const isCal = mr.movement.inputType === 'calories'
-      || (mr.movement.calories != null && mr.movement.calories > 0);
-    return isCal
-      ? (mr.calories ?? mr.movement.calories ?? 0)
-      : (mr.distance ?? mr.movement.distance ?? 0);
-  }
-  return mr.reps ?? mr.movement.reps ?? 0;
-}
-
-function getIntervalUnit(mr: MovementResult): string {
-  if (mr.kind === 'distance') {
-    const isCal = mr.movement.inputType === 'calories'
-      || (mr.movement.calories != null && mr.movement.calories > 0);
-    return isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
-  }
-  return 'reps';
-}
-
-function getIntervalRx(mr: MovementResult): number {
-  if (mr.kind === 'distance') {
-    const isCal = mr.movement.inputType === 'calories'
-      || (mr.movement.calories != null && mr.movement.calories > 0);
-    return isCal ? (mr.movement.calories ?? 0) : (mr.movement.distance ?? 0);
-  }
-  return mr.movement.reps ?? 0;
-}
-
-function formatLoadNote(mr: MovementResult): string | null {
-  const weight = mr.weight ?? mr.movement.rxWeights?.male ?? mr.movement.rxWeights?.female;
-  if (weight == null || weight <= 0) return null;
-  return mr.implementCount === 2 ? `@ ${weight}kg each` : `@ ${weight}kg`;
-}
-
-function getIntervalPatch(mr: MovementResult, value: number): Partial<MovementResult> {
-  const nextValue = Math.max(0, Math.round(value));
-  if (mr.kind === 'distance') {
-    const isCal = mr.movement.inputType === 'calories'
-      || (mr.movement.calories != null && mr.movement.calories > 0);
-    return isCal ? { calories: nextValue } : { distance: nextValue };
-  }
-  return { reps: nextValue };
 }
 
 // Strip weight from movement name for display
@@ -384,7 +346,7 @@ function getTileConfig(mr: MovementResult, distanceDerivedFromRounds = false): T
       placeholder: mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0',
       unit: mr.implementCount === 2 ? '2x kg' : 'kg',
       color: LOAD_TILE_COLOR,
-      step: getWeightStep(mr.movement.name, mr.implementCount),
+      step: getWeightStep(mr.movement.name, mr.movement.equipment),
       min: 0,
       max: 500,
       inputMode: 'decimal',
@@ -483,8 +445,6 @@ export function ScoreMovementInputs({
   movements,
   inputMovements: _inputMovements,
   onChange,
-  variant = 'default',
-  roundsTotal,
   onBatch,
   onSubstitutionOpenChange,
   teamSize,
@@ -520,14 +480,14 @@ export function ScoreMovementInputs({
           ?? getExplicitEquipmentType(mr.movement.name)
           ?? (isImplicitHeldLoad(mr.movement.name) ? 'other' : null)
           ?? sharedExplicitType
-          ?? getEquipmentType(mr.movement.name),
+          ?? getMovementEquipmentType(mr.movement),
       );
     });
     return byKey;
   }, [movements]);
 
   const getMovementEquipment = useCallback((mr: MovementResult) => (
-    equipmentByKey.get(mr.movementKey) ?? getEquipmentType(mr.movement.name)
+    equipmentByKey.get(mr.movementKey) ?? getMovementEquipmentType(mr.movement)
   ), [equipmentByKey]);
 
   const loadGroups = useMemo(() => {
@@ -920,147 +880,6 @@ export function ScoreMovementInputs({
     openTile(nextTile.tileId);
   }, [activeTileId, closeNumpad, editableTiles, openTile]);
 
-  const renderIntervalField = (mr: MovementResult) => {
-    const globalIndex = movements.indexOf(mr);
-    const sub = getSubState(mr);
-    const hasAlts = canOpenAlternate(mr);
-    const label = (
-      cleanTileLabel(sub.isSubstituted ? sub.displayName : mr.movement.name)
-      || stripWeightFromName(sub.isSubstituted ? sub.displayName : mr.movement.name)
-      || (sub.isSubstituted ? sub.displayName : mr.movement.name)
-    ).toUpperCase();
-    const value = getIntervalValue(mr);
-    const rx = getIntervalRx(mr);
-    const unit = getIntervalUnit(mr);
-    const loadNote = formatLoadNote(mr);
-    const progress = rx > 0 ? clampValue((value / rx) * 100, 0, 140) : (value > 0 ? 100 : 0);
-
-    const setValue = (next: number) => onChange(globalIndex, getIntervalPatch(mr, next));
-    const handleInput = (raw: string) => {
-      const parsed = parseInt(raw.replace(/\D/g, ''), 10);
-      setValue(Number.isNaN(parsed) ? 0 : parsed);
-    };
-
-    return (
-      <div key={mr.movementKey} className={styles.intervalTile}>
-        <div
-          className={styles.intervalHeader}
-          onClick={hasAlts ? () => openSwap(mr.movementKey) : undefined}
-          role={hasAlts ? 'button' : undefined}
-        >
-          <div className={styles.intervalTitleBlock}>
-            {sub.isSubstituted && (
-              <span className={styles.intervalOriginal}>
-                {(cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name).toUpperCase()}
-              </span>
-            )}
-            <span className={styles.intervalName}>{label}</span>
-            <span className={styles.intervalMeta}>
-              {rx > 0 ? `${rx} rx` : 'per round'}
-              {loadNote ? ` - ${loadNote}` : ''}
-            </span>
-          </div>
-          {hasAlts && (
-            <span className={styles.tileSwapIcon} aria-hidden="true">
-              <SwapIcon />
-            </span>
-          )}
-        </div>
-
-        <div className={styles.intervalControl}>
-          <button
-            type="button"
-            className={styles.intervalStep}
-            onClick={() => setValue(value - 1)}
-            aria-label={`Decrease ${label}`}
-          >
-            -
-          </button>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            className={styles.intervalValue}
-            value={String(value)}
-            onChange={(event) => handleInput(event.target.value)}
-            aria-label={`${label} per round`}
-          />
-          <span className={styles.intervalUnit}>{unit}</span>
-          <button
-            type="button"
-            className={styles.intervalStep}
-            onClick={() => setValue(value + 1)}
-            aria-label={`Increase ${label}`}
-          >
-            +
-          </button>
-        </div>
-
-        <div className={styles.intervalTrack} aria-hidden="true">
-          <span
-            className={styles.intervalFill}
-            style={{ width: `${Math.min(progress, 100)}%` }}
-          />
-        </div>
-
-        {mr.kind === 'load' && (
-          <div className={styles.intervalWeightRow}>
-            <button
-              type="button"
-              className={styles.intervalWeightStep}
-              onClick={() => onChange(globalIndex, { weight: Math.max(0, roundToLegalWeight((mr.weight ?? 0) - getLegalWeightStep(mr), mr)) })}
-              aria-label={`Decrease ${label} weight`}
-            >
-              -
-            </button>
-            <span className={styles.intervalWeightValue}>{mr.weight ?? 0}</span>
-            <span className={styles.intervalWeightLabel}>KG</span>
-            <button
-              type="button"
-              className={styles.intervalWeightStep}
-              onClick={() => onChange(globalIndex, { weight: roundToLegalWeight((mr.weight ?? 0) + getLegalWeightStep(mr), mr) })}
-              aria-label={`Increase ${label} weight`}
-            >
-              +
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  if (variant === 'amrap_intervals') {
-    const roundLabel = roundsTotal && roundsTotal > 0
-      ? `${roundsTotal} rounds - totals calculated from your per-round reps`
-      : 'Totals calculated from your per-round reps';
-
-    return (
-      <>
-        <div className={styles.intervalPrompt}>
-          Roughly how many of each did you hit per round?
-        </div>
-        <div className={styles.intervalList}>
-          {movements.map(renderIntervalField)}
-        </div>
-        <div className={styles.intervalFootnote}>{roundLabel}</div>
-
-        {swapMr && (
-          <SubstitutionSheet
-            open={swapOpenKey != null}
-            originalName={swapMr.movement.name.replace(/^(Buy-In|Cash-Out):\s*/i, '')}
-            originalReps={swapMr.movement.reps}
-            originalDistance={swapMr.movement.distance}
-            originalCalories={swapMr.movement.calories}
-            currentSubstitution={swapMr.substitution}
-            aiAlternative={swapMr.movement.alternative}
-            onSelect={handleSubstitution}
-            onClose={closeSwap}
-          />
-        )}
-      </>
-    );
-  }
-
   // Arcade tile renderer
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
@@ -1427,7 +1246,7 @@ function WeightField({
 }) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
   const unitLabel = mr.implementCount === 2 ? '2x kg' : 'kg';
-  const step = getWeightStep(mr.movement.name, mr.implementCount);
+  const step = getWeightStep(mr.movement.name, mr.movement.equipment);
 
   return (
     <StepperInput

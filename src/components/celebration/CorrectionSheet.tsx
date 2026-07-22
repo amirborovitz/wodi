@@ -8,8 +8,7 @@ import { useState } from 'react';
 import type React from 'react';
 import { motion } from 'framer-motion';
 import styles from './CorrectionSheet.module.css';
-
-const CORRECTION_REASONS = ['Wrong movement', 'Wrong reps/load', 'Wrong format', 'Wrong PR badge'];
+import { CORRECTION_REASONS, isStructuralCorrectionReason } from './corrections';
 
 interface CorrectionSheetProps {
   onSubmit: (reason: string, note: string) => void;
@@ -68,7 +67,11 @@ export function CorrectionSheet({ onSubmit, onClose }: CorrectionSheetProps): Re
         ) : (
           <div className={styles.sentWrap}>
             <div className={styles.sentTitle}>Got it.</div>
-            <div className={styles.sentSub}>This workout&apos;s data will be corrected.</div>
+            <div className={styles.sentSub}>
+              {reason && isStructuralCorrectionReason(reason)
+                ? 'Your poster now sticks to the board as written.'
+                : 'Saved — this will be reviewed.'}
+            </div>
           </div>
         )}
       </motion.div>

@@ -1081,10 +1081,7 @@ function getMovementDisplayNameFromContext(
         .replace(/\b[a-z]/g, (char) => char.toUpperCase())
         .replace(/\bAnd\b/g, 'and')
         .replace(/\bTo\b/g, 'to');
-      return `${name}${suffix}`
-        .replace(suffix, displaySuffix)
-        .replace(/\s+/g, ' ')
-        .trim();
+      return `${name} ${displaySuffix}`.replace(/\s+/g, ' ').trim();
     }
   }
   const source = matchingClause.toLowerCase();
@@ -1384,6 +1381,63 @@ function buildProgressiveChipperRows(
   return rows;
 }
 
+// Whether the SAME movement sits at every position across all round sections — i.e. the same
+// movements recur each round, only their reps change (e.g. air squats/push press/box jumps every
+// round). This is the "per-movement independent scheme" board, distinct from a palindrome pyramid
+// whose movements themselves differ round to round (600m run → 400m run, KB SDHP → C2B).
+function hasSameMovementsEveryRound(exercise: Exercise): boolean {
+  const roundSections = (exercise.sections ?? []).filter((s) => s.sectionType === 'rounds');
+  if (roundSections.length < 2) return false;
+  const first = roundSections[0].movements ?? [];
+  if (first.length === 0) return false;
+  return roundSections.every((s) =>
+    (s.movements ?? []).length === first.length
+    && (s.movements ?? []).every((m, j) => m.name.toLowerCase() === first[j].name.toLowerCase()),
+  );
+}
+
+// Board-faithful render for a ladder where the same movements recur each round with their OWN rep
+// scheme: ONE row per movement showing its scheme exactly as the coach wrote it (air squats
+// 50-40-30, DB push press 30-20-10, box jumps a flat 15) — NOT expanded into Round 1/2/3, NOT
+// collapsed into a single shared 50-40-30. A movement whose reps are constant every round shows
+// that single value.
+function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal[]): ArtifactRow[] {
+  const roundSections = (exercise.sections ?? []).filter((s) => s.sectionType === 'rounds');
+  const resolveSubstitution = createSubstitutionResolver(exercise, breakdown);
+  const first = roundSections[0].movements ?? [];
+  return first.map((_, j): ArtifactRow => {
+    const perRound = roundSections.map((s) => resolveSubstitution((s.movements ?? [])[j], 1).movement);
+    const m0 = perRound[0];
+    const isCal = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) > 0;
+    const isDist = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) === 0 && (m?.distance ?? 0) > 0;
+    const qtyOf = (m?: ParsedMovement) => m?.reps ?? m?.calories ?? m?.distance ?? 0;
+    const seq = perRound.map(qtyOf);
+    const allSame = seq.every((v) => v === seq[0]);
+    const suffix = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
+    const schemeStr = allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`;
+    const total = seq.reduce((sum, v) => sum + v, 0);
+    const bd = breakdown.find((b) => b.name.toLowerCase() === m0.name.toLowerCase());
+    // Show the per-implement load (un-double a twin DB/KB total) so a twin-DB press reads "20kg",
+    // never the doubled "40kg". Prefer the coach's Rx; fall back to the logged breakdown weight.
+    const implementCount = m0.implementCount ?? bd?.implementCount ?? 1;
+    const rxW = m0.rxWeights?.male ?? m0.rxWeights?.female;
+    const perImplementW = rxW && rxW > 0
+      ? rxW
+      : (bd?.weight ? Math.round((bd.weight / (implementCount > 1 ? implementCount : 1)) * 10) / 10 : undefined);
+    const unit = (m0.rxWeights?.unit ?? bd?.unit ?? 'kg').toUpperCase();
+    const hasWeight = (perImplementW ?? 0) > 0;
+    const totalUnitLabel = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
+    return {
+      primary: schemeStr,
+      name: formatRepMovementNameForPoster(m0.name, Math.max(...seq)),
+      ...(hasWeight ? { subNote: `${perImplementW}${unit}${implementCount > 1 ? ' ea' : ''}` } : {}),
+      totalNote: total > 0 ? `${total}${totalUnitLabel} total` : undefined,
+      mineKey: m0.name,
+      accent: hasWeight ? 'yellow' : (bd?.color ?? 'magenta'),
+    };
+  });
+}
+
 // ─── Multi-section For Time renderer ─────────────────────────────────────────
 
 function hasBodyweightPrescription(exercise: Exercise, movement: ParsedMovement): boolean {
@@ -1546,15 +1600,19 @@ function buildMultiSectionForTimeSections(
 
   const sections: ArtifactSection[] = [];
   let tradedRoundOffset = 0;
-  let sectionIndex = 0;
+
+  // A single-round tier is titled "1 ROUND" (and keeps its totals) ONLY inside a MIXED ladder —
+  // i.e. when a sibling round tier has rounds > 1 (a descending 3/2/1). When EVERY round section
+  // is a single round (a pyramid/chipper of one-round blocks, a partner piece), those render as
+  // clean untitled inline lines, so forcing a "1 ROUND" block on each would be noise/regression.
+  const hasMultiRoundTier = exercise.sections
+    .some((s) => s.sectionType === 'rounds' && (s.rounds ?? 1) > 1);
 
   for (const section of exercise.sections) {
     const sectionMovements = section.movements ?? [];
     if (sectionMovements.length === 0) continue;
 
     const rounds = section.rounds ?? 1;
-    const sectionLetter = String.fromCharCode(65 + sectionIndex);
-    sectionIndex += 1;
 
     const moveEntries = sectionMovements
       .map((m) => resolveSubstitution(m, rounds))
@@ -1571,12 +1629,17 @@ function buildMultiSectionForTimeSections(
     }
 
     const sectionTitle = section.sectionType === 'buy_in'
-      ? `${sectionLetter} · BUY-IN`
+      ? 'BUY-IN'
       : section.sectionType === 'cash_out'
-        ? `${sectionLetter} · BUY-OUT`
+        ? 'BUY-OUT'
+        // A single-round tier gets its own "1 ROUND" title only when it sits beside multi-round
+        // tiers (a descending ladder) — dropping it left the ladder's last tier untitled. A
+        // pyramid of all-single-round blocks stays untitled (renders as clean inline lines).
         : rounds > 1
-          ? `${sectionLetter} · ${rounds} ROUNDS`
-          : sectionLetter;
+          ? `${rounds} ROUNDS`
+          : hasMultiRoundTier
+            ? '1 ROUND'
+            : '';
     // Flat-share ('reps') split: per-partner share of each movement's team total, computed from
     // the movement data itself — the display line carries a full sentence, so the poster layer
     // can't re-derive the quantity from it. (together) movements are done side by side, never
@@ -1598,7 +1661,10 @@ function buildMultiSectionForTimeSections(
         : undefined;
       // Partner rows render full-width with their own personal readout — no totals column.
       // Substituted movements total from the logged breakdown (exact), not prescription math.
-      const totalNote = !splitInfo && rounds > 1
+      // A single-round tier keeps its totals column too, but ONLY inside a mixed ladder (beside
+      // multi-round tiers) — so the last tier isn't left with an empty column beside its siblings.
+      // An all-single-round pyramid keeps its clean inline rows (no redundant "20 total").
+      const totalNote = !splitInfo && (rounds > 1 || hasMultiRoundTier)
         ? (logged
             ? formatTotalNote({
                 distance: logged.totalDistance,
@@ -1662,7 +1728,23 @@ function buildVerbatimSection(exercise: Exercise): ArtifactSection | null {
 const METCON_PAGE_MODES: ReadonlySet<string> = new Set(
   ['for_time', 'amrap', 'amrap_intervals', 'intervals', 'emom', 'cardio', 'cardio_distance', 'free'],
 );
+// A strength-typed piece whose work is entirely barbell/weight — even when its cadence is
+// EMOM/intervals (e.g. "Every 1:30: 2 Push Press, build up") — is genuine strength work: the story
+// is the WEIGHT (peak / start->peak per block), not a rep count. THE single source of truth for
+// "this is strength work" — shared by both the poster page routing (isStrengthPagePart) and the
+// hero (computeHeroResult) so the two can never disagree (a metcon-mode bodyweight/cardio EMOM,
+// like double-unders, is NOT strength work and stays reps-scored).
+export function isWeightedStrengthWork(exercise: Exercise): boolean {
+  const movs = exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements)
+    : (exercise.movements ?? []);
+  return exercise.type === 'strength'
+    && movs.length > 0
+    && movs.every((m) => m.inputType === 'weight' || m.rxWeights != null);
+}
+
 export function isStrengthPagePart(exercise: Exercise): boolean {
+  if (isWeightedStrengthWork(exercise)) return true;
   return exercise.loggingMode && METCON_PAGE_MODES.has(exercise.loggingMode)
     ? false
     : exercise.type === 'strength' || exercise.type === 'skill';
@@ -1683,14 +1765,16 @@ export function buildRewardArtifactSections(
   // only: the title speaks for the whole workout here, so it may confirm partner language.
   partnerContextText?: string,
 ): ArtifactSection[] {
-  if (!movements || movements.length === 0) return [];
   const mainExercise = exercises[0];
   if (!mainExercise) return [];
+  // Free/unclassified part: verbatim rendering needs no movement totals and outranks complex
+  // detection — the structured interpretation is exactly what 'free' says not to trust.
+  if (mainExercise.loggingMode !== 'free' && (!movements || movements.length === 0)) return [];
 
   const stampRounds = exercises.length === 1
     ? (mainExercise.sets?.filter((s) => s.completed)?.length || mainExercise.sets?.length || 1)
     : 1;
-  const complex = detectBarbellComplex(movements, stampRounds);
+  const complex = mainExercise.loggingMode === 'free' ? null : detectBarbellComplex(movements, stampRounds);
   if (complex) {
     const unit = complex.unit;
     const startLabel = `${complex.weight}${unit.toUpperCase()}`;
@@ -1738,6 +1822,34 @@ function clockTokenToSeconds(token: string): number | undefined {
 
 const TIME_TOKEN_PATTERN = String.raw`(\d{1,2}:\d{2}|\d+(?:\.\d+)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?))`;
 
+function formatIntervalDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
+}
+
+// Coach-written interval repeat ("[3:00 AMRAP, 1:00 REST] x 4 rounds") — the only rounds
+// figure allowed on a structure line. An exercise's `rounds`/repeatCount is the EARNED
+// score for AMRAPs and must never masquerade as prescription.
+function parsePrescribedIntervalCount(text: string): number | undefined {
+  const match = text.match(/[x×]\s*(\d+)(?:\s*(?:sets?|rounds?|intervals?))?\b(?!\s*reps?)/i);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+// The AI's workDuration/restDuration are CUMULATIVE across all intervals per its contract —
+// divide by the interval count to get the single interval to display. The AI sometimes
+// violates the contract and returns the PER-INTERVAL value: when the value equals what the
+// coach's own text prescribes for one interval, dividing would invent a fictional split
+// ("0:45 AMRAP") — a value matching the explicit text is shown as-is.
+function resolvePerIntervalSeconds(
+  cumulative: number | undefined,
+  explicitSeconds: number | undefined,
+  count: number | undefined,
+): number | undefined {
+  if (!cumulative || !count || count <= 0) return undefined;
+  return cumulative === explicitSeconds ? explicitSeconds : Math.round(cumulative / count);
+}
+
 function parseExplicitRestSeconds(text: string): number | undefined {
   const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?rest`, 'i'))
     ?? text.match(new RegExp(`rest\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
@@ -1761,13 +1873,14 @@ export function buildPageArtifactSections(
   // where a session-level heading must not flip a solo sibling block to partner).
   partnerContextText?: string,
 ): ArtifactSection[] {
-  if (!movements || movements.length === 0) return [];
-
   // Free/unclassified part: whiteboard-verbatim rendering, same as buildRewardArtifactSections.
+  // Checked before the movements guard — verbatim lines need no movement totals.
   if (exercise.loggingMode === 'free') {
     const verbatim = buildVerbatimSection(exercise);
     if (verbatim) return [verbatim];
   }
+
+  if (!movements || movements.length === 0) return [];
 
   // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
   // range or movement names repeated once per round
@@ -1948,11 +2061,6 @@ export function buildPageArtifactSections(
     } else {
       // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
       // hardcoded "1 min each" here would silently lie about the actual work/rest split.
-      const formatStationDuration = (seconds: number): string => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
-      };
       // workDuration/restDuration are CUMULATIVE across all rounds (per the AI's own contract —
       // e.g. "2:00 AMRAP x 6" -> workDuration: 720), not per-round — divide back down to get the
       // single work/rest interval to display. The AI sometimes violates the contract and returns
@@ -1961,14 +2069,10 @@ export function buildPageArtifactSections(
       // would invent a fictional split ("0:10 rest") — so a value matching the text's explicit
       // work/rest is shown as-is.
       const timingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-      const perIntervalSeconds = (cumulative: number | undefined, explicit: number | undefined): number | undefined => {
-        if (!cumulative || !rounds) return undefined;
-        return cumulative === explicit ? explicit : cumulative / rounds;
-      };
-      const workSeconds = perIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText));
-      const restSeconds = perIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText));
-      const workLabel = workSeconds ? formatStationDuration(workSeconds) : undefined;
-      const restLabel = restSeconds ? formatStationDuration(restSeconds) : undefined;
+      const workSeconds = resolvePerIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText), rounds ?? undefined);
+      const restSeconds = resolvePerIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText), rounds ?? undefined);
+      const workLabel = workSeconds ? formatIntervalDuration(workSeconds) : undefined;
+      const restLabel = restSeconds ? formatIntervalDuration(restSeconds) : undefined;
       const timingLabel = workLabel
         ? (restLabel ? `${workLabel} work / ${restLabel} rest` : `${workLabel} each`)
         : `${stationCount} stations`;
@@ -1978,20 +2082,45 @@ export function buildPageArtifactSections(
     const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
     const descScheme = forTime ? parseForTimeRepScheme(exercise, rawText) : undefined;
     const pageCadence = !forTime ? extractEveryXCadence(exerciseOnlyText) : undefined;
-    const amrapMinMatch = !forTime && !pageCadence
-      ? exerciseOnlyText.match(/\b(\d+)\s*(?:min(?:ute)?s?)\s*amrap\b/i)
+    // AMRAP interval structure: AI fields first (intervalCount + cumulative work/rest — no
+    // text parsing), coach text as fallback via the mm:ss-aware token parser. A bare
+    // (\d+) min regex captured the "00" of "[03:00 min AMRAP …]" and silently dropped the
+    // whole structure line. Rest is coach-written structure, so it renders alongside.
+    const amrapTimingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+    const isIntervalAmrap = !forTime && !pageCadence && /amrap/i.test(amrapTimingText);
+    const amrapExplicitWork = isIntervalAmrap ? parseExplicitWorkSeconds(amrapTimingText) : undefined;
+    const amrapCount = isIntervalAmrap
+      ? (exercise.intervalCount ?? parsePrescribedIntervalCount(amrapTimingText))
       : undefined;
-    const amrapMin = amrapMinMatch ? parseInt(amrapMinMatch[1], 10) : undefined;
+    const amrapWorkSeconds = isIntervalAmrap
+      ? (resolvePerIntervalSeconds(exercise.workDuration, amrapExplicitWork, amrapCount) ?? amrapExplicitWork)
+      : undefined;
+    const amrapExplicitRest = amrapWorkSeconds ? parseExplicitRestSeconds(amrapTimingText) : undefined;
+    const amrapRestSeconds = amrapWorkSeconds
+      ? (resolvePerIntervalSeconds(exercise.restDuration, amrapExplicitRest, amrapCount) ?? amrapExplicitRest)
+      : undefined;
     blueprint = [
       descScheme ? `[${descScheme.join('-')}] for time`
         : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
-        : amrapMin ? `${amrapMin} min AMRAP`
+        : amrapWorkSeconds ? [
+            `${formatIntervalDuration(amrapWorkSeconds)} AMRAP`,
+            amrapRestSeconds ? `${formatIntervalDuration(amrapRestSeconds)} rest` : null,
+            amrapCount && amrapCount > 1 ? `${amrapCount} rounds` : null,
+          ].filter(Boolean).join(' · ')
         : pageCadence ? formatNestedRoundBlueprint(`${pageCadence} · ${repeatCount} rounds`, exercise)
         : `${repeatCount} rounds`,
       timeCapLabel ? `(${timeCapLabel})` : null,
     ].filter(Boolean).join(' ');
   } else if (isStrength) {
-    const setCount = repeatCount
+    // Sequential complex (e.g. "4 sets Push Press, Into: 4 sets Push Jerk", stored as two 'rounds'
+    // sections): the header must reflect the TOTAL working sets across ALL blocks (4+4=8), not one
+    // block's count. Sum every round section (generalizes to N blocks with any per-block count).
+    const roundSections = (exercise.sections ?? []).filter((s) => s.sectionType === 'rounds');
+    const sequentialSetTotal = roundSections.length > 1
+      ? roundSections.reduce((sum, s) => sum + (s.rounds ?? 1), 0)
+      : undefined;
+    const setCount = sequentialSetTotal
+      || repeatCount
       || exercise.sets?.filter((set) => set.completed).length
       || exercise.sets?.length
       || exercise.rounds;
@@ -2024,15 +2153,24 @@ export function buildPageArtifactSections(
   }
   if (!isStrength && !splitInfo && isPyramidChipper(exercise)) {
     const pyramidSections = exercise.sections!.filter((s) => s.sectionType === 'rounds');
+    // Board fidelity: when the SAME movements recur each round with their own rep scheme, mirror
+    // the coach's compact notation — one row per movement with its own scheme (50-40-30 air
+    // squats / 30-20-10 push press / 15 box jumps). Only a true palindrome pyramid, whose
+    // movements themselves change round to round, is told round-by-round.
+    const sameMovements = hasSameMovementsEveryRound(exercise);
     const pyramidBlueprint = normalizeBlueprint([
-      `${pyramidSections.length}-round pyramid for time`,
+      sameMovements
+        ? `${pyramidSections.length} rounds for time`
+        : `${pyramidSections.length}-round pyramid for time`,
       timeCapLabel ? `· ${timeCapLabel}` : null,
     ].filter(Boolean).join(' '));
     return [{
       eyebrow: 'FOR TIME',
       title: 'Blueprint',
       blueprint: pyramidBlueprint,
-      rows: buildProgressiveChipperRows(exercise, movements, true),
+      rows: sameMovements
+        ? buildPerMovementLadderRows(exercise, movements)
+        : buildProgressiveChipperRows(exercise, movements, true),
     }];
   }
 
@@ -2480,8 +2618,11 @@ function formatSegmentForExercise(ex: Exercise, globalFormat: string | undefined
     return 'AMRAP Intervals';
   }
   if (hasAmrap) {
-    const capMatch = rx.match(/(\d+)\s*min(?:ute)?s?\s*amrap/i) || rx.match(/amrap\s*:?\s*(\d{1,2})(?!\d|m)/i);
+    // mm:ss-aware: "[03:00 min AMRAP …]" must read as 3 min, not the "00" of a bare \d+ capture.
+    const capMatch = rx.match(/(\d+)(?::(\d{2}))?\s*min(?:ute)?s?\s*amrap/i) || rx.match(/amrap\s*:?\s*(\d{1,2})(?!\d|m)/i);
     const mins = capMatch ? parseInt(capMatch[1], 10) : 0;
+    const secs = capMatch?.[2] ? parseInt(capMatch[2], 10) : 0;
+    if (mins > 0 && secs > 0) return `${mins}:${capMatch![2]} min AMRAP`;
     return mins > 0 ? `${mins} min AMRAP` : 'AMRAP';
   }
   if (hasEmom) {
@@ -2520,11 +2661,15 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
   // shows. A branch that can't add real structure returns undefined so posterData.ts's own
   // (single, correct) per-format line is used instead of a second copy of the bare word.
   if (format === 'amrap_intervals') {
-    const ex = exercises[0];
-    const count = exercises.length > 1 ? exercises.length : 0;
-    const minMatch = (ex?.name || '').match(/(\d+)\s*min/i);
-    const mins = minMatch ? parseInt(minMatch[1], 10) : 0;
-    if (count > 0 && mins > 0) base = `${count} × ${mins} MIN`;
+    // Multi-part sessions save the interval AMRAP as ONE exercise among sibling parts —
+    // the structure must come from that exercise, never from counting session parts
+    // (which rendered "2 INTERVALS" for a strength + 4×3:00-AMRAP session).
+    const ex = exercises.find((e) => /amrap/i.test(`${e.name} ${e.prescription || ''}`)) ?? exercises[0];
+    const timingText = `${ex?.rawText || ''} ${ex?.name || ''} ${ex?.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+    const explicitWork = parseExplicitWorkSeconds(timingText);
+    const count = ex?.intervalCount ?? parsePrescribedIntervalCount(timingText) ?? 0;
+    const workSeconds = resolvePerIntervalSeconds(ex?.workDuration, explicitWork, count) ?? explicitWork;
+    if (count > 0 && workSeconds) base = `${count} × ${formatIntervalDuration(workSeconds).toUpperCase()}`;
     // Unknown interval length: a dangling "2 ×" reads as a typo — state the
     // interval count in full instead (the AMRAP word lives on the format pill).
     else if (count > 0) base = `${count} INTERVALS`;
@@ -2802,8 +2947,13 @@ export function computeHeroResult(
       }
       // No max-effort reps logged — fall through to calories/EP/duration, never the structure.
     } else {
+      // Sum across exercises only for old-shape docs that saved each interval as its own
+      // exercise — and only over AMRAP-named ones: in a multi-PART session a sibling part's
+      // rounds (e.g. a 4-set strength block) must never inflate the AMRAP score.
       const totalRounds = (format === 'amrap_intervals' && exercises.length > 1)
-        ? exercises.reduce((sum, ex) => sum + (ex.rounds || 0), 0)
+        ? exercises
+            .filter((ex) => /amrap/i.test(`${ex.name} ${ex.prescription || ''}`))
+            .reduce((sum, ex) => sum + (ex.rounds || 0), 0)
         : (amrapExercise.rounds || 0);
       const hasPartial = (amrapExercise.partialMovements?.length ?? 0) > 0
         || (amrapExercise.partialReps ?? 0) > 0;
@@ -2846,7 +2996,61 @@ export function computeHeroResult(
     }
   }
 
-  const emomHasCardio = format === 'emom' && movements.some((m) => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
+  // Strength work on a clock (weighted lifts run as EMOM/intervals, e.g. "Every 1:30: 2 Push
+  // Press build up", or a sequential Push Press Into Push Jerk complex): the hero is the PEAK
+  // LOGGED WEIGHT with the lift's name as subtitle — never a rep tally (a rep total is meaningless
+  // as the headline for strength). Uses the SAME predicate as the poster page routing
+  // (isWeightedStrengthWork) so hero and page can never disagree, and runs BEFORE the EMOM reps
+  // branch so a cadenced strength piece is never rep-heroed. PR still outranks this (handled above).
+  // A cardio/bodyweight EMOM is not strength work, so it falls through to the reps/calories heroes.
+  const strengthWorkEx = format !== 'amrap_intervals'
+    ? exercises.find(isWeightedStrengthWork)
+    : undefined;
+  if (strengthWorkEx) {
+    // Peak across the per-movement logged weights — for a sequential complex the per-block
+    // start->peak lives in the breakdown (weightProgression), so the subtitle names the RIGHT lift
+    // (the 80 belongs to Push Jerk, not Push Press). Falls back to logged set weights.
+    let peakWeight = 0;
+    let peakMovement = '';
+    for (const m of movements) {
+      const mPeak = m.weightProgression && m.weightProgression.length > 0
+        ? Math.max(...m.weightProgression)
+        : (m.weight ?? 0);
+      if (mPeak > peakWeight) {
+        peakWeight = mPeak;
+        peakMovement = m.name;
+      }
+    }
+    if (peakWeight <= 0) {
+      const setPeak = Math.max(0, ...strengthWorkEx.sets.filter((s) => s.completed).map((s) => s.weight ?? 0));
+      if (setPeak > 0) {
+        peakWeight = setPeak;
+        peakMovement = strengthWorkEx.movements?.[0]?.name ?? strengthWorkEx.name;
+      }
+    }
+    if (peakWeight > 0) {
+      const unit = movements.find((m) => m.unit === 'lb') ? 'LB' : 'KG';
+      return {
+        value: `${peakWeight}`,
+        unit,
+        ...(peakMovement ? { subtitle: peakMovement.toUpperCase() } : {}),
+        formatLine,
+        storyLine,
+        storyMovements: buildStory(singleExerciseRounds),
+        accentClass: 'accentGold',
+      };
+    }
+  }
+
+  // Whether this piece runs on a fixed clock (EMOM or a cadenced "every X:XX x N" interval) —
+  // the same set of formats the rep/rounds branch below handles.
+  const isCadencedPiece = format === 'emom' || (format === 'intervals' && !!prescribedCadenceRounds);
+  // Does the work actually CONTAIN cardio (distance or calories)? This must be about the
+  // movements, not the format label: gating it on `format === 'emom'` meant a cadenced
+  // *intervals* piece with a bike/row leg looked cardio-free, so the rep hero fired and buried
+  // the cardio. Evaluated for whichever formats the cadenced branch handles.
+  const hasCardioWork = movements.some((m) => (m.totalCalories || 0) > 0 || (m.totalDistance || 0) > 0);
+  const emomHasCardio = isCadencedPiece && hasCardioWork;
 
   // Fixed-cadence EMOM/intervals: the score is never a finish time — and the rounds are
   // prescribed, not earned (everyone who finishes an EMOM 15 did its rounds). The athlete's
@@ -2888,10 +3092,24 @@ export function computeHeroResult(
 
   const totalCaloriesAcrossMovements = movements.reduce((sum, m) => sum + (m.totalCalories || 0), 0);
   const topCalorieMovement = [...movements].filter((m) => (m.totalCalories || 0) > 0).sort((a, b) => (b.totalCalories || 0) - (a.totalCalories || 0))[0];
-  // For cardio-based EMOMs, any logged calories are the meaningful result — no minimum threshold
-  if ((totalCaloriesAcrossMovements >= 50 || (format === 'emom' && emomHasCardio && totalCaloriesAcrossMovements > 0)) && topCalorieMovement) {
+  // For cardio-based cadenced pieces, any logged calories are the meaningful result — no minimum
+  // threshold (emomHasCardio now covers cadenced intervals too, not just EMOM).
+  if ((totalCaloriesAcrossMovements >= 50 || (emomHasCardio && totalCaloriesAcrossMovements > 0)) && topCalorieMovement) {
     const storyWithoutCalTotal = buildStory(singleExerciseRounds)?.map((line) => (line.total?.endsWith('cal total') ? { ...line, total: '' } : line));
     return { value: `${totalCaloriesAcrossMovements}`, unit: 'CAL', subtitle: topCalorieMovement.name.toUpperCase(), formatLine, storyLine, storyMovements: storyWithoutCalTotal, accentClass: 'accentMagenta' };
+  }
+
+  // Distance cardio is counted work exactly like calories are — it just uses metres instead of
+  // cals, so it gets the SAME rule (meaningful total, or any distance on a cardio-carrying
+  // cadenced piece) and the same slot in the order: after PR / rounds / finish-time / peak-weight,
+  // but BEFORE the generic rep fallback. Without this a piece like "Every 3:15 x 10: 1000m bike +
+  // 20 KB swings" heroed its rep tally, which OMITS the bike entirely (the dominant work).
+  const totalDistanceAcrossMovements = movements.reduce((sum, m) => sum + (m.totalDistance || 0), 0);
+  const topDistanceMovement = [...movements].filter((m) => (m.totalDistance || 0) > 0).sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0))[0];
+  if ((totalDistanceAcrossMovements >= 1000 || (emomHasCardio && totalDistanceAcrossMovements > 0)) && topDistanceMovement) {
+    const { num, unit } = formatDistanceSplit(totalDistanceAcrossMovements);
+    const storyWithoutDistTotal = buildStory(singleExerciseRounds)?.map((line) => (line.total?.endsWith('total') && /km|m$/i.test(line.total ?? '') ? { ...line, total: '' } : line));
+    return { value: num, unit: unit.toUpperCase(), subtitle: topDistanceMovement.name.toUpperCase(), formatLine, storyLine, storyMovements: storyWithoutDistTotal, accentClass: 'accentMagenta' };
   }
 
   // Countable work beats app currency: "+78 EP" means nothing to anyone outside wodi, while

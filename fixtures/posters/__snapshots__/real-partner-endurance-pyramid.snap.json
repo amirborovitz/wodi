@@ -8,7 +8,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "A",
+      "title": "",
       "rows": [
         {
           "primary": "900 M Echo Bike (together)",
@@ -31,7 +31,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "B",
+      "title": "",
       "rows": [
         {
           "primary": "900 M Echo Bike (together)",
@@ -54,7 +54,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "C",
+      "title": "",
       "rows": [
         {
           "primary": "900 M Echo Bike (together)",
@@ -77,7 +77,7 @@
       "partnerDisplayMode": "sections"
     },
     {
-      "title": "D",
+      "title": "",
       "rows": [
         {
           "primary": "900 M Echo Bike (together)",
@@ -112,7 +112,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "A",
+        "title": "",
         "rows": [
           {
             "primary": "900 M Echo Bike (together)",
@@ -135,7 +135,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "B",
+        "title": "",
         "rows": [
           {
             "primary": "900 M Echo Bike (together)",
@@ -158,7 +158,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "C",
+        "title": "",
         "rows": [
           {
             "primary": "900 M Echo Bike (together)",
@@ -181,7 +181,7 @@
         "partnerDisplayMode": "sections"
       },
       {
-        "title": "D",
+        "title": "",
         "rows": [
           {
             "primary": "900 M Echo Bike (together)",
@@ -328,11 +328,6 @@
         "cap": ""
       },
       {
-        "kind": "block",
-        "label": "A",
-        "cap": ""
-      },
-      {
         "kind": "line",
         "rx": "900 M Echo Bike (together)",
         "load": "",
@@ -345,11 +340,6 @@
         "load": "",
         "mine": "40kg",
         "team": "50"
-      },
-      {
-        "kind": "block",
-        "label": "B",
-        "cap": ""
       },
       {
         "kind": "line",
@@ -366,11 +356,6 @@
         "team": "40"
       },
       {
-        "kind": "block",
-        "label": "C",
-        "cap": ""
-      },
-      {
         "kind": "line",
         "rx": "900 M Echo Bike (together)",
         "load": "",
@@ -383,11 +368,6 @@
         "load": "",
         "mine": "40kg",
         "team": "30"
-      },
-      {
-        "kind": "block",
-        "label": "D",
-        "cap": ""
       },
       {
         "kind": "line",
@@ -413,11 +393,6 @@
           "cap": ""
         },
         {
-          "kind": "block",
-          "label": "A",
-          "cap": ""
-        },
-        {
           "kind": "line",
           "rx": "900 M Echo Bike (together)",
           "load": "",
@@ -430,11 +405,6 @@
           "load": "",
           "mine": "40kg",
           "team": "50"
-        },
-        {
-          "kind": "block",
-          "label": "B",
-          "cap": ""
         },
         {
           "kind": "line",
@@ -451,11 +421,6 @@
           "team": "40"
         },
         {
-          "kind": "block",
-          "label": "C",
-          "cap": ""
-        },
-        {
           "kind": "line",
           "rx": "900 M Echo Bike (together)",
           "load": "",
@@ -468,11 +433,6 @@
           "load": "",
           "mine": "40kg",
           "team": "30"
-        },
-        {
-          "kind": "block",
-          "label": "D",
-          "cap": ""
         },
         {
           "kind": "line",

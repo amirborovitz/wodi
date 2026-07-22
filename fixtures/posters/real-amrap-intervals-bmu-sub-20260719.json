@@ -1,0 +1,129 @@
+{
+  "name": "real-amrap-intervals-bmu-sub-20260719",
+  "description": "REAL saved doc: [3:00 AMRAP, 1:00 REST] x 4 with BMU->C2B progression substitution; guards interval blueprint line + substituted movement rendering",
+  "workout": {
+    "status": "completed",
+    "date": "2026-07-19T08:38:03.806Z",
+    "rawText": "STRENGTH (squat)\nBack Squat\n4 sets x 3 reps @85+%\n6 max height squat jumps after each set\n\nMETCON (Medium)\n[03:00 min AMRAP, 01:00 min REST] x 4 rounds:\n4 Bar Muscle-up / 8 Chest to Bar Pull-up / Pull-up\n8 Box Jumps\n16 Alt Dumbbell Snatches @15/22.5kg\n* Continue from where you stopped",
+    "type": "amrap",
+    "title": "WOD",
+    "partnerFactor": 1,
+    "partnerWorkout": false,
+    "format": "amrap_intervals",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Squat",
+        "type": "strength",
+        "loggingMode": "strength",
+        "aiPartName": "RIFT",
+        "isSecondary": false,
+        "rawText": "Back Squat\n4 sets x 3 reps @85+%",
+        "prescription": "4 sets x 3 reps @85+%",
+        "movements": [
+          {
+            "name": "Back Squat",
+            "inputType": "weight",
+            "reps": 3,
+            "equipment": "barbell",
+            "countingMode": "per_round"
+          }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "targetReps": 3, "actualReps": 3, "completed": true, "weight": 80 },
+          { "id": "set-1", "setNumber": 2, "targetReps": 3, "actualReps": 3, "completed": true },
+          { "id": "set-2", "setNumber": 3, "targetReps": 3, "actualReps": 3, "completed": true },
+          { "id": "set-3", "setNumber": 4, "targetReps": 3, "actualReps": 3, "completed": true, "weight": 100 }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Max Height Squat Jumps",
+        "type": "skill",
+        "loggingMode": "bodyweight",
+        "aiPartName": "KILN",
+        "isSecondary": true,
+        "rawText": "6 max height squat jumps after each set",
+        "prescription": "6 max height squat jumps after each set",
+        "movements": [
+          {
+            "name": "Max Height Squat Jump",
+            "reps": 6,
+            "inputType": "none",
+            "scoreEntryMode": "per_round",
+            "countingMode": "per_round"
+          }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "targetReps": 6, "actualReps": 6, "completed": true },
+          { "id": "set-1", "setNumber": 2, "targetReps": 6, "actualReps": 6, "completed": true },
+          { "id": "set-2", "setNumber": 3, "targetReps": 6, "actualReps": 6, "completed": true },
+          { "id": "set-3", "setNumber": 4, "targetReps": 6, "actualReps": 6, "completed": true }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "name": "03:00 min AMRAP x 4",
+        "type": "wod",
+        "loggingMode": "amrap_intervals",
+        "aiPartName": "GRIND",
+        "isSecondary": false,
+        "rounds": 4,
+        "workDuration": 720,
+        "restDuration": 240,
+        "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" },
+        "rawText": "[03:00 min AMRAP, 01:00 min REST] x 4 rounds:\n4 Bar Muscle-up / 8 Chest to Bar Pull-up / Pull-up\n8 Box Jumps\n16 Alt Dumbbell Snatches @15/22.5kg\n* Continue from where you stopped",
+        "prescription": "4 Bar Muscle-up / 8 Chest to Bar Pull-up / Pull-up, 8 Box Jumps, 16 Alt Dumbbell Snatches @15/22.5kg",
+        "movements": [
+          {
+            "name": "Chest-to-Bar Pull-ups",
+            "reps": 8,
+            "distance": 0,
+            "inputType": "none",
+            "alternative": { "name": "Chest to Bar Pull-up", "reps": 8 },
+            "scoreEntryMode": "per_round",
+            "countingMode": "per_round"
+          },
+          {
+            "name": "Box Jump",
+            "reps": 8,
+            "inputType": "none",
+            "scoreEntryMode": "per_round",
+            "countingMode": "per_round"
+          },
+          {
+            "name": "Alt DB Snatch",
+            "reps": 16,
+            "inputType": "weight",
+            "implementCount": 1,
+            "rxWeights": { "male": 22.5, "female": 22.5, "unit": "kg" },
+            "scoreEntryMode": "per_round",
+            "countingMode": "per_round"
+          }
+        ],
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "weight": 22.5, "completed": true, "actualReps": 128 }
+        ]
+      }
+    ],
+    "difficultyLevel": 6,
+    "duration": 16,
+    "timeCap": 960,
+    "durationSeconds": 960,
+    "notes": null,
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Alt DB Snatch", "totalReps": 64, "weight": 22.5, "unit": "kg", "color": "yellow" },
+        { "name": "Chest-to-Bar Pull-ups", "totalReps": 32, "wasSubstituted": true, "originalMovement": "Bar Muscle-up", "substitutionType": "easier", "color": "magenta" },
+        { "name": "Box Jump", "totalReps": 32, "color": "magenta" },
+        { "name": "Max Height Squat Jump", "totalReps": 24, "color": "yellow" },
+        { "name": "Back Squat", "totalReps": 12, "weight": 90, "weightProgression": [80, 100], "unit": "kg", "color": "yellow" }
+      ],
+      "grandTotalVolume": 2520,
+      "grandTotalReps": 164
+    },
+    "heroAchievement": { "type": "generic", "title": "Beast Mode!", "subtitle": "You showed up today", "icon": "star" },
+    "achievements": [],
+    "isPR": false
+  }
+}

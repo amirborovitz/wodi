@@ -1,0 +1,71 @@
+{
+  "name": "interval-compound-name-recovery",
+  "description": "AI truncated 'Hang Clean to Jerk' to 'Hang Clean'; poster recovers the full compound name from rawText. Guards the space between name and suffix (was 'Hang Cleanto Jerks').",
+  "workout": {
+    "date": "2026-08-08T14:37:00.000Z",
+    "title": "EMOM",
+    "format": "intervals",
+    "rawText": "METCON (Intervals)\nEvery 02:30 minutes x 5 sets:\n200m run\n7 Hang Clean to Jerks (unbroken)\n*Choose a challenging yet manageable weight",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Interval Metcon",
+        "type": "wod",
+        "loggingMode": "intervals",
+        "prescription": "Every 2:30 x 5 sets: 200m run, 7 Hang Clean to Jerks (unbroken)",
+        "rawText": "METCON (Intervals)\nEvery 02:30 minutes x 5 sets:\n200m run\n7 Hang Clean to Jerks (unbroken)\n*Choose a challenging yet manageable weight",
+        "rounds": 5,
+        "intervalDuration": 150,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true },
+          { "id": "set-1", "setNumber": 2, "completed": true },
+          { "id": "set-2", "setNumber": 3, "completed": true },
+          { "id": "set-3", "setNumber": 4, "completed": true },
+          { "id": "set-4", "setNumber": 5, "completed": true }
+        ],
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Hang Clean",
+            "reps": 7,
+            "inputType": "weight",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Echo Bike",
+          "totalDistance": 4000,
+          "unit": "m",
+          "wasSubstituted": true,
+          "originalMovement": "Run",
+          "substitutionType": "equivalent",
+          "distancePerRep": 800,
+          "color": "magenta"
+        },
+        {
+          "name": "Hang Clean",
+          "totalReps": 35,
+          "weight": 40,
+          "unit": "kg",
+          "color": "yellow"
+        }
+      ],
+      "grandTotalReps": 35,
+      "grandTotalVolume": 1400,
+      "grandTotalDistance": 4000
+    },
+    "timeCap": 750
+  }
+}

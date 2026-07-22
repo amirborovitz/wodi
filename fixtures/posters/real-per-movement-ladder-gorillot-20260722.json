@@ -1,0 +1,39 @@
+{
+  "name": "real-per-movement-ladder-gorillot-20260722",
+  "description": "GORILLOT part-C metcon: a round-interleaved descending ladder where each movement has its OWN scheme (Air Squat 50-40-30, twin-DB Push Press 30-20-10, Box Jump flat 15 every round). Stored as sections-per-round (pyramid). The poster must show each round with all 3 movements at their own count that round — never a single collapsed 50-40-30, never per-movement blocks. Push Press is twin DBs (equipment dumbbell), shown at 20kg (per-DB), not 40.",
+  "workout": {
+    "title": "For Time",
+    "format": "for_time",
+    "rawText": "METCON (Short)\nFor time:\n[50-40-30] air squats\n[30-20-10] twin Dumbbells / Kettlebells push press\n* 15 box jumps after each set\n< 12 minutes T.C. | WEIGHT: 12/20kg",
+    "exercises": [
+      {
+        "id": "ex-metcon",
+        "name": "For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "[50-40-30] Air Squats, [30-20-10] Twin Dumbbell Push Press, 15 Box Jumps after each set",
+        "rawText": "METCON (Short)\nFor time:\n[50-40-30] air squats\n[30-20-10] twin Dumbbells / Kettlebells push press\n* 15 box jumps after each set\n< 12 minutes T.C. | WEIGHT: 12/20kg",
+        "rounds": 3,
+        "suggestedRepsPerSet": [50, 40, 30],
+        "sets": [{ "id": "t", "setNumber": 1, "time": 640, "completed": true }],
+        "movements": [
+          { "name": "Air Squat", "reps": 50, "inputType": "none" },
+          { "name": "Dumbbell Push Press", "reps": 30, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } },
+          { "name": "Box Jump", "reps": 15, "inputType": "none" }
+        ],
+        "sections": [
+          { "sectionType": "rounds", "rounds": 1, "movements": [ { "name": "Air Squat", "reps": 50, "inputType": "none" }, { "name": "Dumbbell Push Press", "reps": 30, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } }, { "name": "Box Jump", "reps": 15, "inputType": "none" } ] },
+          { "sectionType": "rounds", "rounds": 1, "movements": [ { "name": "Air Squat", "reps": 40, "inputType": "none" }, { "name": "Dumbbell Push Press", "reps": 20, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } }, { "name": "Box Jump", "reps": 15, "inputType": "none" } ] },
+          { "sectionType": "rounds", "rounds": 1, "movements": [ { "name": "Air Squat", "reps": 30, "inputType": "none" }, { "name": "Dumbbell Push Press", "reps": 10, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } }, { "name": "Box Jump", "reps": 15, "inputType": "none" } ] }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Air Squat", "totalReps": 120, "color": "magenta" },
+        { "name": "Dumbbell Push Press", "totalReps": 60, "weight": 40, "unit": "kg", "implementCount": 2, "color": "yellow" },
+        { "name": "Box Jump", "totalReps": 45, "color": "magenta" }
+      ]
+    }
+  }
+}

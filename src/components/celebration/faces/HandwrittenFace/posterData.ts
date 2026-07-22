@@ -139,9 +139,27 @@ function isGenericTitle(title: string): boolean {
     || CADENCE_TITLE_PATTERNS.some((p) => p.test(t));
 }
 
-// Suppress section headers that are just describing the workout format
+// Suppress section headers that are just describing the workout format — but NOT round/section
+// counts like "3 ROUNDS" or "6 SECTIONS FOR TIME": those are structural labels a per-section
+// block header exists to show, not a redundant restatement of the page's format badge. Listed
+// explicitly (not spread from GENERIC_TITLE_PATTERNS) so the two lists can't drift back together.
 const FORMAT_HEADER_PATTERNS = [
-  ...GENERIC_TITLE_PATTERNS,
+  /^today'?s\s+workout$/i,
+  /^workout$/i,
+  /^wod$/i,
+  /^my\s+workout$/i,
+  /^for\s+time$/i,
+  /^amrap$/i,
+  /^strength$/i,
+  /^metcon$/i,
+  /^emom$/i,
+  /^tabata$/i,
+  /^intervals?$/i,
+  /^\d+[-\s]min\s+amrap$/i,
+  /^amrap\s+\d+(\s*min)?$/i,
+  /^pairs?\s+amrap(\s+\d+)?(\s*min)?$/i,
+  /^\d+[-\s]min\s+emom$/i,
+  /^\d+\s*min\s+cap$/i,
   ...CADENCE_TITLE_PATTERNS,
   /^the\s+wod$/i,
   /^the\s+workout$/i,

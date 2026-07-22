@@ -74,7 +74,29 @@
         "isPartnerConfirmed": false
       }
     ],
-    []
+    [
+      {
+        "title": "2 sets:",
+        "rows": [
+          {
+            "primary": "",
+            "name": "2 sets:",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "30-45 sec Passive Hang",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "~01:00 min/side Pigeon Stretch",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
   ],
   "hero": {
     "value": "13½",
@@ -197,7 +219,34 @@
           "total": "203 total"
         }
       ],
-      []
+      [
+        {
+          "kind": "block",
+          "label": "2 SETS:",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "2 sets:",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "30-45 sec Passive Hang",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "~01:00 min/side Pigeon Stretch",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
     ]
   },
   "partnerSubs": {

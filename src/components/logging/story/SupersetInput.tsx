@@ -31,9 +31,34 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     return { isComplex: indices.length >= 1 && hasMutiSets, weightedIndices: indices };
   }, [movements, result.setsTotal]);
 
+  // Sequential blocks: the movements come from DISTINCT 'rounds' sections — one lift per block,
+  // each with its own set count (e.g. "4 sets Push Press, Into: 4 sets Push Jerk"). These are
+  // done one after another at INDEPENDENT weights, so each block is logged on its OWN
+  // ProgressiveWeightRow (its own start->peak), never a single shared bar. Distinct from a
+  // simultaneous "+"-joined complex (no sections → the shared-weight path below is correct).
+  const isSequentialBlocks = useMemo(() => {
+    const sectionIdxs = movements
+      .filter((mr) => mr.sectionType === 'rounds' && mr.sectionIndex != null)
+      .map((mr) => mr.sectionIndex);
+    return new Set(sectionIdxs).size > 1;
+  }, [movements]);
+
   const updateMovement = useCallback((index: number, patch: Partial<MovementResult>) => {
     const next = [...(result.movementResults ?? [])];
     next[index] = { ...next[index], ...patch };
+    onChange({ movementResults: next });
+  }, [result.movementResults, onChange]);
+
+  // Per-block weight progression (sequential complex): writes to THIS movement's own
+  // weight/weightEnd, so each block keeps an independent start->peak.
+  const handleBlockProgressive = useCallback((index: number, start: number | undefined, peak: number | undefined) => {
+    const next = [...(result.movementResults ?? [])];
+    next[index] = {
+      ...next[index],
+      weight: start,
+      weightEnd: peak,
+      loadMode: peak != null && start != null && peak !== start ? 'range' : 'same',
+    };
     onChange({ movementResults: next });
   }, [result.movementResults, onChange]);
 
@@ -118,6 +143,56 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     updateMovement(idx, patch);
     setSwapOpenKey(null);
   }, [swapMr, movements, updateMovement]);
+
+  // Sequential complex: one independent block per section. Each weighted block gets its own
+  // ProgressiveWeightRow (own start->peak); any non-weighted movement in a block keeps its row.
+  if (isSequentialBlocks) {
+    return (
+      <>
+        <div className={styles.container}>
+          {movements.map((mr, i) => (
+            mr.kind === 'load' ? (
+              <ProgressiveWeightRow
+                key={mr.movementKey}
+                weight={mr.weight}
+                peakWeight={mr.weightEnd}
+                placeholder={mr.movement.rxWeights?.male}
+                setsTotal={mr.sectionRounds ?? result.setsTotal}
+                repsPerSet={mr.movement.reps ?? result.exercise.suggestedReps}
+                step={getWeightStep(mr.movement.name, mr.movement.equipment)}
+                onChange={(start, peak) => handleBlockProgressive(i, start, peak)}
+                label={mr.movement.name}
+              />
+            ) : (
+              <MovementRow
+                key={mr.movementKey}
+                mr={mr}
+                index={i}
+                onUpdate={(patch) => updateMovement(i, patch)}
+                onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
+                  ? () => setSwapOpenKey(mr.movementKey)
+                  : undefined}
+              />
+            )
+          ))}
+        </div>
+
+        {swapMr && (
+          <SubstitutionSheet
+            open={swapOpenKey != null}
+            originalName={swapMr.movement.name}
+            originalReps={swapMr.movement.reps}
+            originalDistance={swapMr.movement.distance}
+            originalCalories={swapMr.movement.calories}
+            currentSubstitution={swapMr.substitution}
+            aiAlternative={swapMr.movement.alternative}
+            onSelect={handleSubstitution}
+            onClose={() => setSwapOpenKey(null)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -262,7 +337,7 @@ function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Part
     <StepperInput
       value={mr.weight}
       onChange={(v) => onUpdate({ weight: v != null ? Math.max(0, v) : undefined })}
-      step={getWeightStep(mr.movement.name, mr.implementCount)}
+      step={getWeightStep(mr.movement.name, mr.movement.equipment)}
       min={0}
       max={500}
       placeholder={placeholder}

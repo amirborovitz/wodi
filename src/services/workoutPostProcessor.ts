@@ -310,8 +310,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill loggingMode on exercises that the AI missed
   const withLoggingModes = backfillLoggingModes(withPartnerSplit);
 
+  // Persist the interval count of interval AMRAPs as a structured field
+  const withIntervalCounts = backfillIntervalCount(withLoggingModes);
+
   // Backfill inputType on any movements that the AI missed
-  const withInputTypes = backfillInputTypes(withLoggingModes);
+  const withInputTypes = backfillInputTypes(withIntervalCounts);
 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
   const withSharedWeight = backfillSharedWeightHints(withInputTypes);
@@ -342,8 +345,18 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     );
   }
 
+  // Normalize a per-tier cardio buy-in (run/row/bike before each descending round tier) into
+  // explicit buy_in sections — the AI is non-deterministic about placing it (folds it per-round,
+  // or leaves it top-level-only where sections shadow it), which drops/over-counts it otherwise.
+  const withPerTierBuyIns = normalizePerTierBuyIns(withCorrectedIntervals);
+
+  // Deterministically rebuild per-round sections for a per-movement independent rep ladder
+  // ("[50-40-30] air squats / [30-20-10] push press / 15 box jumps each") when the AI collapsed it
+  // to one shared scheme — so the poster shows each movement's own scheme, not a false 50-40-30.
+  const withPerMovementLadder = normalizePerMovementLadder(withPerTierBuyIns);
+
   // Normalize explicit movement semantics so downstream math can trust structure
-  return backfillMovementSemantics(withCorrectedIntervals);
+  return backfillMovementSemantics(withPerMovementLadder);
 }
 
 function isScoredLoggingMode(loggingMode?: ExerciseLoggingMode): boolean {
@@ -687,6 +700,169 @@ function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
   return changed ? { ...workout, exercises } : workout;
 }
 
+type ParsedSection = NonNullable<ParsedExercise['sections']>[number];
+
+/**
+ * Reconstruct per-round `sections` for a PER-MOVEMENT INDEPENDENT REP LADDER — a for-time piece
+ * where the SAME movements recur every round but EACH carries its OWN rep sequence
+ * ("[50-40-30] air squats / [30-20-10] push press / 15 box jumps after each set"). The AI is
+ * non-deterministic here: it may emit correct per-round sections, or COLLAPSE to one exercise-level
+ * `suggestedRepsPerSet` + a single reps per movement — which then renders as ONE shared 50-40-30
+ * for every movement (false). This deterministically normalizes the collapsed shape to the
+ * canonical per-round sections the renderer consumes, and is idempotent on the already-correct one.
+ *
+ * Detection is STRUCTURAL, not by wording: >=2 movements each carry their OWN bracketed rep
+ * sequence in the exercise's text and those sequences DIFFER. A movement written without a bracket
+ * ("15 box jumps after each set") repeats its single reps flat. Guarded so it never touches a
+ * single-scheme ladder (all movements share one scheme), a building/palindrome chipper (already
+ * sectioned), or a per-tier buy-in ladder. General: any round count, movement set, or mix of
+ * descending/ascending/flat sequences.
+ */
+function parseRepSequence(line: string): number[] | undefined {
+  // Bracketed sequence "[50-40-30]" / "[50/40/30]" is the strong, unambiguous signal.
+  const bracket = line.match(/\[\s*(\d+(?:\s*[-–/]\s*\d+)+)\s*\]/);
+  const bare = bracket ? null : line.match(/\b(\d+(?:-\d+)+)\b(?!\s*\/?\s*\d*\s*(?:kg|lb|cm|m\b|"))/i);
+  const raw = bracket?.[1] ?? bare?.[1];
+  if (!raw) return undefined;
+  const seq = raw.split(/[-–/]/).map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isFinite(n) && n > 0);
+  return seq.length >= 2 ? seq : undefined;
+}
+
+function normalizePerMovementLadder(workout: ParsedWorkout): ParsedWorkout {
+  const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  let changed = false;
+  const exercises = workout.exercises.map((ex) => {
+    if (ex.loggingMode !== 'for_time') return ex;
+    const movements = ex.movements;
+    if (!movements || movements.length < 2) return ex;
+    // Idempotent + guard: any exercise already carrying sections (correct per-round pyramid, a
+    // building chipper, a palindrome, or a per-tier buy-in ladder) is left untouched — we only
+    // build from the FLAT collapsed shape.
+    if ((ex.sections ?? []).length > 0) return ex;
+
+    const text = getExerciseScopedText(workout, ex);
+    const lines = text.split(/\r?\n/);
+    // Each movement's OWN bracketed sequence, parsed from the line that names it.
+    const ownSeqByIndex = movements.map((mov) => {
+      const words = norm(mov.name).split(' ').map((w) => w.replace(/s$/, '')).filter((w) => w.length > 2);
+      if (words.length === 0) return undefined;
+      for (const line of lines) {
+        const low = norm(line);
+        if (!words.every((w) => low.includes(w))) continue;
+        const seq = parseRepSequence(line);
+        if (seq) return seq;
+      }
+      return undefined;
+    });
+
+    const withOwnBracket = ownSeqByIndex.filter((s): s is number[] => !!s);
+    // Signal: >=2 movements each have their OWN bracket AND they are not all identical.
+    if (withOwnBracket.length < 2) return ex;
+    const distinctOwn = new Set(withOwnBracket.map((s) => s.join('-'))).size;
+    if (distinctOwn < 2) return ex; // a single shared scheme (e.g. "21-15-9 thrusters, pull-ups")
+
+    // Ladder length = the longest sequence anyone wrote (or the exercise scheme).
+    const N = Math.max(
+      ...withOwnBracket.map((s) => s.length),
+      ex.suggestedRepsPerSet?.length ?? 0,
+    );
+    if (N < 2) return ex;
+    const at = (seq: number[] | undefined, r: number, flat: number): number =>
+      (seq ? (seq[r] ?? seq[seq.length - 1]) : flat);
+
+    // Per-movement sequence: own bracket, else the exercise scheme if this is the movement the AI
+    // captured it from (its round-1 reps match), else a flat repeat of its single quantity.
+    const qtyField = (mov: ParsedMovement): 'reps' | 'calories' | 'distance' =>
+      mov.reps != null ? 'reps' : (mov.calories ?? 0) > 0 ? 'calories' : (mov.distance ?? 0) > 0 ? 'distance' : 'reps';
+    const seqByIndex = movements.map((mov, i) => {
+      if (ownSeqByIndex[i]) return ownSeqByIndex[i]!;
+      const flat = mov.reps ?? mov.calories ?? mov.distance ?? 0;
+      const scheme = ex.suggestedRepsPerSet;
+      if (scheme && scheme.length === N && scheme[0] === flat) return scheme;
+      return undefined; // flat handled per-round
+    });
+
+    const sections: ParsedSection[] = Array.from({ length: N }, (_, r) => ({
+      sectionType: 'rounds' as const,
+      rounds: 1,
+      movements: movements.map((mov, i) => {
+        const flat = mov.reps ?? mov.calories ?? mov.distance ?? 0;
+        return { ...mov, [qtyField(mov)]: at(seqByIndex[i], r, flat) };
+      }),
+    }));
+    changed = true;
+    return { ...ex, sections };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
+}
+
+/**
+ * Normalize a per-tier cardio BUY-IN (e.g. "300m run" before EACH descending round tier) into
+ * explicit buy_in sections. The AI is demonstrably non-deterministic about this shape — it either
+ * (a) FOLDS the movement in as the first movement of every rounds section (which then over-counts
+ * it once per round, e.g. 3+2+1 = 6 runs), or (b) leaves it ONLY in top-level movements[] (which
+ * drops it from both the sections-based workload total AND the poster, because sections shadow
+ * top-level movements[]). Both are wrong; normalize to ONE buy_in section per tier so the movement
+ * counts once per tier and renders as its own "BUY-IN" block.
+ *
+ * This is structural normalization, not overriding AI judgment: the AI agrees the movement exists
+ * and is a lead-in — it just can't reliably place it. Guarded to a CARDIO-METRIC lead-in
+ * (distance or calories, no reps) inside a MULTI-TIER for-time ladder (>=2 rounds sections), so it
+ * never touches reps-based per-round work or a single-tier RFT. General: any distance/calorie
+ * buy-in movement, any tier count, any rounds-section count.
+ */
+function normalizePerTierBuyIns(workout: ParsedWorkout): ParsedWorkout {
+  let changed = false;
+  const exercises = workout.exercises.map(ex => {
+    if (ex.loggingMode !== 'for_time') return ex;
+    const sections = ex.sections;
+    if (!sections || sections.length === 0) return ex;
+    // Already has an explicit buy-in/cash-out section — trust it.
+    if (sections.some(s => s.sectionType !== 'rounds')) return ex;
+    const roundSections = sections.filter(s => s.sectionType === 'rounds');
+    if (roundSections.length < 2) return ex; // need a multi-tier ladder to disambiguate
+
+    const isCardioBuyIn = (m?: ParsedMovement): m is ParsedMovement =>
+      !!m && ((m.distance ?? 0) > 0 || (m.calories ?? 0) > 0) && !(m.reps && m.reps > 0);
+
+    // Case (a) FOLDED: the SAME cardio movement leads every rounds section.
+    const firstMovs = roundSections.map(s => s.movements?.[0]);
+    const leadName = firstMovs[0]?.name;
+    const foldedLead = leadName && firstMovs.every(m => isCardioBuyIn(m) && m.name === leadName)
+      ? firstMovs[0]
+      : undefined;
+
+    // Case (b) TOP-LEVEL ONLY: a cardio movement in movements[] but present in NO section.
+    const sectionMovNames = new Set(
+      sections.flatMap(s => (s.movements ?? []).map(m => m.name.toLowerCase())),
+    );
+    const topOnlyLead = !foldedLead
+      ? (ex.movements ?? []).find(m => isCardioBuyIn(m) && !sectionMovNames.has(m.name.toLowerCase()))
+      : undefined;
+
+    const lead = foldedLead ?? topOnlyLead;
+    if (!lead) return ex;
+
+    // Rebuild: a buy_in section (clean movement name — the section type carries the "once"
+    // semantics) before each rounds tier. For the folded case, strip the lead from each round
+    // block so it isn't double-counted per round.
+    const rebuilt: ParsedSection[] = [];
+    for (const s of sections) {
+      if (s.sectionType === 'rounds') {
+        rebuilt.push({ sectionType: 'buy_in', rounds: 1, movements: [{ ...lead }] });
+        rebuilt.push(foldedLead ? { ...s, movements: (s.movements ?? []).slice(1) } : s);
+      } else {
+        rebuilt.push(s);
+      }
+    }
+    changed = true;
+    return { ...ex, sections: rebuilt };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
+}
+
 /**
  * The text an exercise actually owns: prefer the AI's per-exercise rawText (scoped to just this
  * block). The shared workout.rawText describes the WHOLE photo/workout, so for a multi-exercise
@@ -697,6 +873,24 @@ function detectMisplacedBuyIns(workout: ParsedWorkout): ParsedWorkout {
 function getExerciseScopedText(workout: ParsedWorkout, ex: ParsedExercise): string {
   if (ex.rawText && ex.rawText.trim()) return ex.rawText;
   return workout.exercises.length === 1 ? (workout.rawText || '') : '';
+}
+
+/**
+ * The AI carries an interval AMRAP's interval count in suggestedSets ("Every 4:00 x 3 AMRAP"
+ * → suggestedSets: 3) but only stamps intervalCount on station rotations — and only
+ * intervalCount survives onto the saved workout doc. Copy it over so downstream consumers
+ * (poster structure lines, workload math) read a structured field instead of re-parsing the
+ * coach's text. AI-provided intervalCount is never overridden.
+ */
+function backfillIntervalCount(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((ex) => (
+      ex.loggingMode === 'amrap_intervals' && ex.intervalCount == null && (ex.suggestedSets ?? 0) > 1
+        ? { ...ex, intervalCount: ex.suggestedSets }
+        : ex
+    )),
+  };
 }
 
 /**
@@ -2196,17 +2390,43 @@ function backfillLoggingModes(workout: ParsedWorkout): ParsedWorkout {
 }
 
 function backfillInputTypes(workout: ParsedWorkout): ParsedWorkout {
+  const fill = (mov: ParsedMovement): ParsedMovement => {
+    const implementCount = mov.implementCount || inferImplementCount(mov);
+    return {
+      ...mov,
+      inputType: mov.inputType || inferInputType(mov),
+      ...(implementCount ? { implementCount } : {}),
+      ...(inferEquipment(mov, implementCount) ? { equipment: inferEquipment(mov, implementCount) } : {}),
+    };
+  };
   return {
     ...workout,
     exercises: workout.exercises.map(ex => ({
       ...ex,
-      movements: ex.movements?.map(mov => ({
-        ...mov,
-        inputType: mov.inputType || inferInputType(mov),
-        implementCount: mov.implementCount || inferImplementCount(mov),
-      })),
+      movements: ex.movements?.map(fill),
+      sections: ex.sections?.map(section => ({ ...section, movements: section.movements.map(fill) })),
     })),
   };
+}
+
+/**
+ * Infer the load implement when the AI omitted it. THE key rule: a DOUBLE implement
+ * (implementCount 2 — twin/double DBs or KBs) is NEVER a barbell, so it must resolve to
+ * dumbbell/kettlebell rather than falling through to the "Barbell" label default downstream.
+ * Trusts an AI-provided equipment value; leaves genuinely ambiguous single-load movements unset
+ * (so a real barbell lift still defaults correctly). General — not keyed to any movement name.
+ */
+function inferEquipment(mov: ParsedMovement, implementCount?: number): ParsedMovement['equipment'] {
+  if (mov.equipment) return mov.equipment;
+  if (mov.inputType !== 'weight') return undefined;
+  const name = mov.name.toLowerCase();
+  const saysKb = /\bkettlebell\b|\bkb\b/.test(name);
+  const saysDb = /\bdumbbell\b|\bdb\b/.test(name);
+  // Two implements can only be DBs or KBs — never a barbell.
+  if (implementCount === 2) return saysKb ? 'kettlebell' : 'dumbbell';
+  if (saysKb) return 'kettlebell';
+  if (saysDb) return 'dumbbell';
+  return undefined;
 }
 
 /**

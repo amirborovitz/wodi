@@ -1,0 +1,18 @@
+{
+  "name": "per-movement-ladder-flat-collapse",
+  "rawText": "METCON (Short)\nFor time:\n[50-40-30] air squats\n[30-20-10] twin Dumbbells / Kettlebells push press\n* 15 box jumps after each set\n< 12 minutes T.C. | WEIGHT: 12/20kg",
+  "aiResponse": "{\"title\":\"GORILLOT Metcon\",\"type\":\"for_time\",\"format\":\"for_time\",\"scoreType\":\"time\",\"timeCap\":720,\"sets\":3,\"rawText\":\"METCON (Short)\\nFor time:\\n[50-40-30] air squats\\n[30-20-10] twin Dumbbells / Kettlebells push press\\n* 15 box jumps after each set\\n< 12 minutes T.C. | WEIGHT: 12/20kg\",\"exercises\":[{\"name\":\"For Time\",\"type\":\"wod\",\"loggingMode\":\"for_time\",\"prescription\":\"[50-40-30] Air Squats, [30-20-10] Twin DB/KB Push Press, 15 Box Jumps after each set\",\"rawText\":\"METCON (Short)\\nFor time:\\n[50-40-30] air squats\\n[30-20-10] twin Dumbbells / Kettlebells push press\\n* 15 box jumps after each set\\n< 12 minutes T.C. | WEIGHT: 12/20kg\",\"suggestedSets\":3,\"suggestedRepsPerSet\":[50,40,30],\"movements\":[{\"name\":\"Air Squat\",\"reps\":50,\"inputType\":\"none\"},{\"name\":\"Push Press\",\"reps\":30,\"implementCount\":2,\"inputType\":\"weight\",\"rxWeights\":{\"male\":20,\"female\":12,\"unit\":\"kg\"}},{\"name\":\"Box Jump\",\"reps\":15,\"inputType\":\"none\"}]}]}",
+  "expect": {
+    "format": "for_time",
+    "parsed.exercises.0.sections.0.sectionType": "rounds",
+    "parsed.exercises.0.sections.0.movements.0.reps": "50",
+    "parsed.exercises.0.sections.0.movements.1.reps": "30",
+    "parsed.exercises.0.sections.0.movements.1.equipment": "dumbbell",
+    "parsed.exercises.0.sections.0.movements.2.reps": "15",
+    "parsed.exercises.0.sections.1.movements.0.reps": "40",
+    "parsed.exercises.0.sections.1.movements.1.reps": "20",
+    "parsed.exercises.0.sections.2.movements.0.reps": "30",
+    "parsed.exercises.0.sections.2.movements.1.reps": "10",
+    "parsed.exercises.0.sections.2.movements.2.reps": "15"
+  }
+}

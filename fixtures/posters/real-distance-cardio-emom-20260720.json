@@ -1,0 +1,45 @@
+{
+  "name": "real-distance-cardio-emom-20260720",
+  "description": "Real saved doc (xFlaKYyapTDH8K2wmrN2, 'Endurance Circuit'): cadenced cardio EMOM — Every 3:15 x 10 of 1000m Echo Bike + 20 Russian KB Swings + 15 Goblet Squats. The hero MUST be the distance total (10.0 KM / ECHO BIKE), never the rep tally: reps (200+150=350) exclude the Echo Bike entirely, which is the dominant work. Guards the distance hero + the format-agnostic cardio guard.",
+  "workout": {
+    "title": "Endurance Circuit",
+    "format": "emom",
+    "timeCap": 1950,
+    "rawText": "Every 3:15 min x 10:\n1000 meters echo bike\n20 Russian kettlebell swing\n15 goblet squats",
+    "exercises": [
+      {
+        "id": "ex-circuit",
+        "name": "Every 3:15 min x 10",
+        "type": "wod",
+        "loggingMode": "emom",
+        "prescription": "1000 meters Echo Bike, 20 Russian Kettlebell Swings, 15 Goblet Squats",
+        "rawText": "Every 3:15 min x 10:\n1000 meters echo bike\n20 Russian kettlebell swing\n15 goblet squats",
+        "rounds": 10,
+        "sets": [
+          { "id": "s1", "setNumber": 1, "weight": 20, "completed": true },
+          { "id": "s2", "setNumber": 2, "weight": 20, "completed": true },
+          { "id": "s3", "setNumber": 3, "weight": 20, "completed": true },
+          { "id": "s4", "setNumber": 4, "weight": 20, "completed": true },
+          { "id": "s5", "setNumber": 5, "weight": 20, "completed": true },
+          { "id": "s6", "setNumber": 6, "weight": 20, "completed": true },
+          { "id": "s7", "setNumber": 7, "weight": 20, "completed": true },
+          { "id": "s8", "setNumber": 8, "weight": 20, "completed": true },
+          { "id": "s9", "setNumber": 9, "weight": 20, "completed": true },
+          { "id": "s10", "setNumber": 10, "weight": 20, "completed": true }
+        ],
+        "movements": [
+          { "name": "Echo Bike", "distance": 1000, "unit": "m", "inputType": "none" },
+          { "name": "Russian Kettlebell Swing", "reps": 20, "inputType": "weight" },
+          { "name": "Goblet Squat", "reps": 15, "inputType": "weight" }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Russian Kettlebell Swing", "totalReps": 200, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Goblet Squat", "totalReps": 150, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Echo Bike", "totalDistance": 10000, "unit": "m", "color": "magenta", "distancePerRep": 1000 }
+      ]
+    }
+  }
+}

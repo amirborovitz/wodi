@@ -1,0 +1,151 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Interval Metcon",
+      "blueprint": "EVERY 2:30 · 5 rounds",
+      "rows": [
+        {
+          "primary": "800m",
+          "name": "Echo Bike",
+          "subNote": "4.00 km total",
+          "totalNote": "4.00 km total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 5
+        },
+        {
+          "primary": "7",
+          "name": "Hang Clean to Jerks",
+          "nameWithLoad": "Hang Clean to Jerks @ 40kg",
+          "loadNote": "40kg",
+          "subNote": "35 total",
+          "totalNote": "35 total",
+          "mineKey": "Hang Clean",
+          "accent": "yellow",
+          "repeatCount": 5
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Interval Metcon",
+        "blueprint": "EVERY 2:30 · 5 rounds",
+        "rows": [
+          {
+            "primary": "800m",
+            "name": "Echo Bike",
+            "subNote": "4.00 km total",
+            "totalNote": "4.00 km total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 5
+          },
+          {
+            "primary": "7",
+            "name": "Hang Clean to Jerks",
+            "nameWithLoad": "Hang Clean to Jerks @ 40kg",
+            "loadNote": "40kg",
+            "subNote": "35 total",
+            "totalNote": "35 total",
+            "mineKey": "Hang Clean",
+            "accent": "yellow",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "4.0",
+    "unit": "KM",
+    "subtitle": "ECHO BIKE",
+    "formatLine": "5 × every 2:30",
+    "storyLine": "4.0km echo bike · 35 hang clean",
+    "storyMovements": [
+      {
+        "perRound": "800m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "800m"
+      },
+      {
+        "perRound": "7",
+        "name": "Hang Clean",
+        "total": "35 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "EVERY 2:30 · 5 rounds"
+      },
+      {
+        "kind": "line",
+        "rx": "800m Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "4.00 km total"
+      },
+      {
+        "kind": "line",
+        "rx": "7 Hang Clean to Jerks",
+        "load": "",
+        "mine": "40kg",
+        "team": "",
+        "total": "35 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "EVERY 2:30 · 5 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "800m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "4.00 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "7 Hang Clean to Jerks",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "35 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

@@ -166,6 +166,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             duration: data.duration,
             notes: data.notes,
             rawText: data.rawText || undefined,
+            corrections: Array.isArray(data.corrections) ? (data.corrections as string[]) : undefined,
             timeCap: data.timeCap,
             format: data.format,
             difficultyLevel: typeof data.difficultyLevel === 'number' ? data.difficultyLevel : undefined,

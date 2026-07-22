@@ -1,0 +1,68 @@
+{
+  "name": "real-sequential-and-ladder-20260720",
+  "description": "Real saved doc (Ibc4aWdk9uAnaguxSIWl, post-deploy): Weightlifting sequential complex (Push Press 4 sets Into Push Jerk 4 sets, logged 50->65 / 65->80) + descending-round metcon (300m run before each 3/2/1 tier). Guards: strength header must convey 8 total sets across the two blocks (not '4'); metcon 1-round tier must keep its title + totals; the per-tier run must appear (bug 3).",
+  "workout": {
+    "title": "Hi Amir!",
+    "format": "for_time",
+    "rawText": "WEIGHTLIFTING\n4 sets, Every 01:30 minutes:\n2 Push Press\nInto:\n4 sets, Every 01:30 minutes:\n2 Push Jerks\n\nMETCON (Medium-Long)\nFor time:\n300m run\n3 rounds:\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n300m run\n2 rounds:\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n300m run\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n< 20 minutes T.C.",
+    "exercises": [
+      {
+        "id": "ex-weightlifting",
+        "name": "Weightlifting",
+        "type": "strength",
+        "loggingMode": "emom",
+        "prescription": "4 sets Every 1:30: 2 Push Press, then 4 sets Every 1:30: 2 Push Jerk — start ~65% and build up",
+        "rawText": "WEIGHTLIFTING\n4 sets, Every 01:30 minutes:\n2 Push Press\nInto:\n4 sets, Every 01:30 minutes:\n2 Push Jerks",
+        "rounds": 4,
+        "sets": [
+          { "id": "s1", "setNumber": 1, "weight": 50, "completed": true },
+          { "id": "s2", "setNumber": 2, "weight": 50, "completed": true },
+          { "id": "s3", "setNumber": 3, "weight": 50, "completed": true },
+          { "id": "s4", "setNumber": 4, "weight": 50, "completed": true }
+        ],
+        "movements": [
+          { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" },
+          { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" }
+        ],
+        "sections": [
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] },
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" } ] }
+        ]
+      },
+      {
+        "id": "ex-metcon",
+        "name": "METCON Medium-Long For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "300m Run, 3 rounds of 20 Russian KB Swings, 15 Goblet Squats, 10 TTB, then 300m Run, 2 rounds, then 300m Run, 1 round",
+        "rawText": "METCON (Medium-Long)\nFor time:\n300m run\n3 rounds:\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n300m run\n2 rounds:\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n300m run\n20 Russian Kettlebell Swings\n15 Goblet Squats\n10 Toes to Bar\n< 20 minutes T.C.",
+        "suggestedSets": 6,
+        "sets": [ { "id": "m0", "setNumber": 1, "time": 1110, "completed": true } ],
+        "movements": [
+          { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" },
+          { "name": "Russian Kettlebell Swing", "reps": 20, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+          { "name": "Goblet Squat", "reps": 15, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+          { "name": "Toes to Bar", "reps": 10, "inputType": "none" }
+        ],
+        "sections": [
+          { "sectionType": "buy_in", "rounds": 1, "movements": [ { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" } ] },
+          { "sectionType": "rounds", "rounds": 3, "movements": [ { "name": "Russian Kettlebell Swing", "reps": 20, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Goblet Squat", "reps": 15, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Toes to Bar", "reps": 10, "inputType": "none" } ] },
+          { "sectionType": "buy_in", "rounds": 1, "movements": [ { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" } ] },
+          { "sectionType": "rounds", "rounds": 2, "movements": [ { "name": "Russian Kettlebell Swing", "reps": 20, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Goblet Squat", "reps": 15, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Toes to Bar", "reps": 10, "inputType": "none" } ] },
+          { "sectionType": "buy_in", "rounds": 1, "movements": [ { "name": "Run", "distance": 300, "unit": "m", "inputType": "none" } ] },
+          { "sectionType": "rounds", "rounds": 1, "movements": [ { "name": "Russian Kettlebell Swing", "reps": 20, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Goblet Squat", "reps": 15, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }, { "name": "Toes to Bar", "reps": 10, "inputType": "none" } ] }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Push Press", "totalReps": 8, "weight": 50, "weightProgression": [50, 65], "unit": "kg", "color": "yellow" },
+        { "name": "Push Jerk", "totalReps": 8, "weight": 65, "weightProgression": [65, 80], "unit": "kg", "color": "yellow" },
+        { "name": "Run", "totalReps": 0, "totalDistance": 900, "unit": "m", "color": "magenta", "distancePerRep": 300 },
+        { "name": "Russian Kettlebell Swing", "totalReps": 120, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Goblet Squat", "totalReps": 90, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Toes to Bar", "totalReps": 60, "color": "cyan" }
+      ]
+    }
+  }
+}

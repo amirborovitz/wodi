@@ -7,7 +7,7 @@
       "isPartnerConfirmed": false
     },
     {
-      "title": "A · 5 ROUNDS",
+      "title": "5 ROUNDS",
       "rows": [
         {
           "primary": "10 CAL Echo Bike",
@@ -36,7 +36,7 @@
       "isPartnerConfirmed": false
     },
     {
-      "title": "B · 5 ROUNDS",
+      "title": "5 ROUNDS",
       "rows": [
         {
           "primary": "10 Dips / Push Ups",
@@ -74,7 +74,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "A · 5 ROUNDS",
+        "title": "5 ROUNDS",
         "rows": [
           {
             "primary": "10 CAL Echo Bike",
@@ -103,7 +103,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "B · 5 ROUNDS",
+        "title": "5 ROUNDS",
         "rows": [
           {
             "primary": "10 Dips / Push Ups",
@@ -212,7 +212,7 @@
       },
       {
         "kind": "block",
-        "label": "A · 5 ROUNDS",
+        "label": "5 ROUNDS",
         "cap": ""
       },
       {
@@ -241,7 +241,7 @@
       },
       {
         "kind": "block",
-        "label": "B · 5 ROUNDS",
+        "label": "5 ROUNDS",
         "cap": ""
       },
       {
@@ -278,7 +278,7 @@
         },
         {
           "kind": "block",
-          "label": "A · 5 ROUNDS",
+          "label": "5 ROUNDS",
           "cap": ""
         },
         {
@@ -307,7 +307,7 @@
         },
         {
           "kind": "block",
-          "label": "B · 5 ROUNDS",
+          "label": "5 ROUNDS",
           "cap": ""
         },
         {

@@ -7,7 +7,7 @@
       "isPartnerConfirmed": false
     },
     {
-      "title": "A · 2 ROUNDS",
+      "title": "2 ROUNDS",
       "rows": [
         {
           "primary": "1.80 KM Echo Bike",
@@ -35,7 +35,7 @@
       "isPartnerConfirmed": false
     },
     {
-      "title": "B · 2 ROUNDS",
+      "title": "2 ROUNDS",
       "rows": [
         {
           "primary": "1.80 KM Echo Bike",
@@ -65,7 +65,7 @@
       "isPartnerConfirmed": false
     },
     {
-      "title": "C · 2 ROUNDS",
+      "title": "2 ROUNDS",
       "rows": [
         {
           "primary": "20 Burpees",
@@ -103,7 +103,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "A · 2 ROUNDS",
+        "title": "2 ROUNDS",
         "rows": [
           {
             "primary": "1.80 KM Echo Bike",
@@ -131,7 +131,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "B · 2 ROUNDS",
+        "title": "2 ROUNDS",
         "rows": [
           {
             "primary": "1.80 KM Echo Bike",
@@ -161,7 +161,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "C · 2 ROUNDS",
+        "title": "2 ROUNDS",
         "rows": [
           {
             "primary": "20 Burpees",
@@ -305,7 +305,7 @@
       },
       {
         "kind": "block",
-        "label": "A · 2 ROUNDS",
+        "label": "2 ROUNDS",
         "cap": ""
       },
       {
@@ -334,7 +334,7 @@
       },
       {
         "kind": "block",
-        "label": "B · 2 ROUNDS",
+        "label": "2 ROUNDS",
         "cap": ""
       },
       {
@@ -363,7 +363,7 @@
       },
       {
         "kind": "block",
-        "label": "C · 2 ROUNDS",
+        "label": "2 ROUNDS",
         "cap": ""
       },
       {
@@ -400,7 +400,7 @@
         },
         {
           "kind": "block",
-          "label": "A · 2 ROUNDS",
+          "label": "2 ROUNDS",
           "cap": ""
         },
         {
@@ -429,7 +429,7 @@
         },
         {
           "kind": "block",
-          "label": "B · 2 ROUNDS",
+          "label": "2 ROUNDS",
           "cap": ""
         },
         {
@@ -458,7 +458,7 @@
         },
         {
           "kind": "block",
-          "label": "C · 2 ROUNDS",
+          "label": "2 ROUNDS",
           "cap": ""
         },
         {

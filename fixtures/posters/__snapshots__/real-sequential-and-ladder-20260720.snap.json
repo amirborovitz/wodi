@@ -1,0 +1,412 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Weightlifting",
+        "blueprint": "8 sets",
+        "rows": [
+          {
+            "primary": "50->65KG",
+            "name": "Push Press",
+            "subNote": "8 total",
+            "totalNote": "8 total",
+            "mineKey": "Push Press",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "65->80KG",
+            "name": "Push Jerk",
+            "subNote": "8 total",
+            "totalNote": "8 total",
+            "mineKey": "Push Jerk",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "3 sections for time",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "BUY-IN",
+        "rows": [
+          {
+            "primary": "300 M Run",
+            "name": "",
+            "totalNote": "300m total",
+            "mineKey": "Run",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "3 ROUNDS",
+        "rows": [
+          {
+            "primary": "20 Russian KB Swings @ 24/16kg",
+            "name": "",
+            "totalNote": "60 total",
+            "mineKey": "Russian Kettlebell Swing",
+            "accent": "yellow"
+          },
+          {
+            "primary": "15 Goblet Squats @ 24/16kg",
+            "name": "",
+            "totalNote": "45 total",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow"
+          },
+          {
+            "primary": "10 T2B",
+            "name": "",
+            "totalNote": "30 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "BUY-IN",
+        "rows": [
+          {
+            "primary": "300 M Run",
+            "name": "",
+            "totalNote": "300m total",
+            "mineKey": "Run",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "2 ROUNDS",
+        "rows": [
+          {
+            "primary": "20 Russian KB Swings @ 24/16kg",
+            "name": "",
+            "totalNote": "40 total",
+            "mineKey": "Russian Kettlebell Swing",
+            "accent": "yellow"
+          },
+          {
+            "primary": "15 Goblet Squats @ 24/16kg",
+            "name": "",
+            "totalNote": "30 total",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow"
+          },
+          {
+            "primary": "10 T2B",
+            "name": "",
+            "totalNote": "20 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "BUY-IN",
+        "rows": [
+          {
+            "primary": "300 M Run",
+            "name": "",
+            "totalNote": "300m total",
+            "mineKey": "Run",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "1 ROUND",
+        "rows": [
+          {
+            "primary": "20 Russian KB Swings @ 24/16kg",
+            "name": "",
+            "totalNote": "20 total",
+            "mineKey": "Russian Kettlebell Swing",
+            "accent": "yellow"
+          },
+          {
+            "primary": "15 Goblet Squats @ 24/16kg",
+            "name": "",
+            "totalNote": "15 total",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow"
+          },
+          {
+            "primary": "10 T2B",
+            "name": "",
+            "totalNote": "10 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "18:30",
+    "unit": "MIN",
+    "formatLine": "EMOM + 3 RFT",
+    "storyLine": "8 push press · 8 push jerk · 900m run · 120 russian kettlebell swing · 90 goblet squat · 60 ttb",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "EMOM × 4",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "Push Press",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          50,
+          65
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "Push Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          65,
+          80
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "METCON MEDIUM-LONG FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "300m",
+        "name": "Run",
+        "total": "900m total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "20",
+        "name": "Russian Kettlebell Swing",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg"
+      },
+      {
+        "perRound": "15",
+        "name": "Goblet Squat",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Toes to Bar",
+        "total": "",
+        "color": "cyan",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "8 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "50->65KG Push Press",
+          "load": "",
+          "mine": "50-65kg",
+          "team": "",
+          "total": "8 total"
+        },
+        {
+          "kind": "line",
+          "rx": "65->80KG Push Jerk",
+          "load": "",
+          "mine": "65-80kg",
+          "team": "",
+          "total": "8 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "3 SECTIONS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "300 M Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "300m total"
+        },
+        {
+          "kind": "block",
+          "label": "3 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "20 Russian KB Swings @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Goblet Squats @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "45 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        },
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "300 M Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "300m total"
+        },
+        {
+          "kind": "block",
+          "label": "2 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "20 Russian KB Swings @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Goblet Squats @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "30 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "20 total"
+        },
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "300 M Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "300m total"
+        },
+        {
+          "kind": "block",
+          "label": "1 ROUND",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "20 Russian KB Swings @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "20 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Goblet Squats @ 24/16kg",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "15 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "10 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  }
+}
