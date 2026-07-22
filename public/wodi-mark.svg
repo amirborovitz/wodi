@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">wodi mark</title>
+  <desc id="desc">A yellow Wodi sticker mark with a heavy W and underline.</desc>
+  <rect width="128" height="128" rx="28" fill="#0c0d0f"/>
+  <rect x="18" y="18" width="92" height="92" rx="20" fill="#f5c200"/>
+  <path d="M41 45l10 36 13-30 13 30 10-36" fill="none" stroke="#0c0d0f" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M43 89h42" fill="none" stroke="#0c0d0f" stroke-width="8" stroke-linecap="round"/>
+</svg>

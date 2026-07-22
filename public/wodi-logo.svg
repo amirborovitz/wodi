@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 160" role="img" aria-labelledby="title desc">
+  <title id="title">wodi logo</title>
+  <desc id="desc">Wodi wordmark in warm white with a yellow reward dot and compact sticker mark.</desc>
+  <g transform="translate(34 34)">
+    <rect x="0" y="0" width="92" height="92" rx="18" fill="#f5c200"/>
+    <path d="M23 30l12 35 11-28 11 28 12-35" fill="none" stroke="#0c0d0f" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M25 71h42" fill="none" stroke="#0c0d0f" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <text x="148" y="105"
+        fill="#f2f0eb"
+        font-family="'Barlow Condensed', 'Arial Narrow', Impact, sans-serif"
+        font-size="94"
+        font-weight="900"
+        letter-spacing="-1">wodi</text>
+  <circle cx="338" cy="96" r="9" fill="#f5c200"/>
+  <text x="374" y="100"
+        fill="#f2f0eb"
+        opacity="0.38"
+        font-family="'DM Mono', monospace"
+        font-size="13"
+        font-weight="500"
+        letter-spacing="3">LOG THE WIN</text>
+</svg>

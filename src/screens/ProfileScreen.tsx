@@ -2,10 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
-import { useWeeklyStats } from '../hooks/useWeeklyStats';
 import { usePRCount } from '../hooks/usePRCount';
 import { useRecapData } from '../hooks/useRecapData';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
+import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
+import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './ProfileScreen.module.css';
 
@@ -62,10 +63,24 @@ function useTickerNumber(target: number, duration = 420): number {
   return display;
 }
 
+function calculateProfileEP(workouts: WorkoutWithStats[], bodyweight: number): number {
+  return workouts.reduce((sum, workout) => {
+    const ep = calculateWorkoutEP(
+      workout.totalVolume ?? 0,
+      getTimeCapMinutes(workout),
+      bodyweight,
+      Boolean(workout.isPR),
+      workout.workloadBreakdown?.movements,
+      undefined,
+      workout.difficultyLevel
+    );
+    return sum + ep.total;
+  }, 0);
+}
+
 export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onOpenRecap }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
-  const { workouts } = useWorkouts();
-  const weeklyStats = useWeeklyStats();
+  const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
   const { recaps, newRecapIds } = useRecapData(workouts);
 
@@ -99,20 +114,26 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
       (sum, w) => sum + (w.workloadBreakdown?.grandTotalDistance || 0),
       0
     );
+    const ep = calculateProfileEP(filteredWorkouts, user?.weight ?? DEFAULT_BW);
     return {
       moveMinutes,
       workoutsCount,
       distanceMeters,
+      ep,
     };
-  }, [filteredWorkouts]);
+  }, [filteredWorkouts, user?.weight]);
 
-  const totalWorkouts = user?.stats.totalWorkouts || workouts.length;
-  const totalEP = weeklyStats.weeklyEP + totalWorkouts * 10;
+  const totalWorkouts = workouts.length;
+  const totalEP = useMemo(
+    () => calculateProfileEP(workouts, user?.weight ?? DEFAULT_BW),
+    [workouts, user?.weight]
+  );
   const handle = user?.email ? `@${user.email.split('@')[0]}` : '';
 
   const displayMoveMinutes = useTickerNumber(stats.moveMinutes);
   const displayWorkouts = useTickerNumber(stats.workoutsCount);
   const displayDistanceMeters = useTickerNumber(stats.distanceMeters);
+  const displayEP = useTickerNumber(stats.ep);
 
   const periodIndex = PERIODS.indexOf(timePeriod);
   const sliderStyle = {
@@ -249,7 +270,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
         ))}
       </div>
 
-      {/* Bento Grid: 3 Equal Cards */}
+      {/* Bento Grid */}
       <div className={styles.bentoGrid}>
         <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
           <span className={styles.cardLabel}>MOVE TIME</span>
@@ -277,6 +298,11 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
           ) : (
             <span className={`${styles.metricValue} ${styles.metricEmpty}`}>{'\u2014'}</span>
           )}
+        </motion.div>
+
+        <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
+          <span className={styles.cardLabel}>EP</span>
+          <span className={styles.metricValue}>{Math.round(displayEP).toLocaleString()}</span>
         </motion.div>
       </div>
 

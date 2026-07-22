@@ -60,10 +60,7 @@ export function LoginScreen() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.06, ease: 'easeOut' }}
         >
-          <h1 className={styles.wordmark}>
-            <span>wod</span>
-            <span className={styles.iAccent}>i</span>
-          </h1>
+          <img className={styles.wordmarkLogo} src="/wodi-logo.svg" alt="wodi" />
           <p className={styles.tagline}>Track. Lift. Show Up.</p>
         </motion.div>
 

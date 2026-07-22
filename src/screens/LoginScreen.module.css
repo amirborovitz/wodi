@@ -10,8 +10,8 @@
   padding-top: max(clamp(20px, 5vw, 40px), var(--safe-top));
   padding-bottom: max(clamp(20px, 5vw, 40px), var(--safe-bottom));
   background:
-    linear-gradient(180deg, #101010 0%, #000000 52%, #000000 100%),
-    #000000;
+    linear-gradient(180deg, #101113 0%, var(--wodi-bg) 52%, #050608 100%),
+    var(--wodi-bg);
 }
 
 .logoGlow {
@@ -23,7 +23,7 @@
   transform: translateX(-50%);
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(0, 255, 255, 0.05) 0%, rgba(0, 255, 255, 0) 72%);
+  background: radial-gradient(circle, rgba(245, 194, 0, 0.08) 0%, rgba(245, 194, 0, 0) 72%);
   filter: blur(28px);
 }
 
@@ -42,26 +42,15 @@
   margin-bottom: clamp(42px, 7vh, 64px);
 }
 
-.wordmark {
-  margin: 0;
-  color: #ffffff;
-  font-family: 'Montserrat', 'Arial Black', 'Helvetica Neue', sans-serif;
-  font-size: clamp(52px, 14vw, 72px);
-  font-weight: 900;
-  font-style: italic;
-  text-transform: lowercase;
-  letter-spacing: -0.035em;
-  line-height: 0.92;
-}
-
-.iAccent {
-  color: #00ffff;
-  text-shadow: 0 0 14px rgba(0, 255, 255, 0.55);
+.wordmarkLogo {
+  width: min(78vw, 336px);
+  height: auto;
+  display: block;
 }
 
 .tagline {
   margin: 10px 0 0;
-  color: #8f9299;
+  color: var(--wodi-dim);
   font-size: clamp(13px, 3vw, 14px);
   letter-spacing: 0.035em;
 }

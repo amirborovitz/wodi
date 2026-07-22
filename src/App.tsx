@@ -76,6 +76,7 @@ function AppContent() {
           animate={{ opacity: 1, scale: 1 }}
           className="loading-content"
         >
+          <img className="loading-logo" src="/wodi-mark.svg" alt="wodi" />
         </motion.div>
       </div>
     );
