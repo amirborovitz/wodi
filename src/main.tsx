@@ -16,6 +16,7 @@ console.log('APP LOADED', { build: WODI_BUILD_ID, loadedAt: new Date().toISOStri
 
 if (typeof window !== 'undefined') {
   window.__WODI_BUILD_ID__ = WODI_BUILD_ID
+  document.title = 'wodi'
 }
 
 createRoot(document.getElementById('root')!).render(
