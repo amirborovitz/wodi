@@ -12,10 +12,12 @@ export function DescendingSetTrack({ repsPerSet, setsCompleted, onChange }: Desc
   const completed = setsCompleted ?? total;
   const isInteractive = !!onChange;
 
+  // Tap = "this is how far I got": mark this rung and everything before it as completed. NOT a
+  // toggle — tapping your last-completed rung again keeps it selected (idempotent), it must never
+  // read as a deselect / score wipe. To log fewer, tap an earlier rung.
   const handleTap = (setIdx: number) => {
     if (!onChange) return;
-    const newCompleted = completed === setIdx + 1 ? setIdx : setIdx + 1;
-    onChange(newCompleted < 0 ? 0 : newCompleted);
+    onChange(setIdx + 1);
   };
 
   const totalRepsCompleted = repsPerSet.slice(0, completed).reduce((s, n) => s + n, 0);

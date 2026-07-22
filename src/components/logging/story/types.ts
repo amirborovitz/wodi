@@ -6,6 +6,7 @@ import type {
   ParsedSectionType,
   MeasurementUnit,
 } from '../../../types';
+import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
 // Universal classification: every exercise maps to exactly ONE kind.
@@ -615,7 +616,19 @@ export function createBlankResult(
   const hasSections = exercise.sections && exercise.sections.length > 0;
   const movementSource: Array<{ mov: ParsedMovement; sectionType?: ParsedSectionType; sectionRounds?: number; sectionIndex?: number }> = [];
 
-  if (hasSections) {
+  // A per-movement rep LADDER (the same movements every round, only reps change) is logged like the
+  // flat for-time shape — ONE input per distinct movement plus the round set-selector — NOT
+  // per-section. Flattening its identical sections would enumerate each movement once per round
+  // (e.g. "DB Push Press · DB Push Press · DB Push Press" with "1 ROUND" dividers). Only GENUINELY
+  // sequential DISTINCT blocks (Push Press THEN Push Jerk) flatten per section.
+  const isPerMovementLadder = hasSections && hasSameMovementsEveryRound(exercise);
+
+  if (isPerMovementLadder) {
+    // Build from the distinct movements (top-level list, else the first round's movements).
+    const roundMovs = exercise.sections!.find(s => s.sectionType === 'rounds')?.movements ?? [];
+    const distinct = (exercise.movements && exercise.movements.length > 0) ? exercise.movements : roundMovs;
+    for (const mov of distinct) movementSource.push({ mov });
+  } else if (hasSections) {
     exercise.sections!.forEach((section, sIdx) => {
       for (const mov of section.movements) {
         movementSource.push({

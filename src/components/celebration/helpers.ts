@@ -31,6 +31,7 @@ import {
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
 import { findMovementTotal, createSubstitutionResolver } from './movementResolution';
+import { hasSameMovementsEveryRound } from '../../utils/sectionShape';
 
 // Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
 // downstream consumers (useCelebrationData, WorkoutScreen) import all helpers from this module.
@@ -1379,21 +1380,6 @@ function buildProgressiveChipperRows(
     }
   }
   return rows;
-}
-
-// Whether the SAME movement sits at every position across all round sections — i.e. the same
-// movements recur each round, only their reps change (e.g. air squats/push press/box jumps every
-// round). This is the "per-movement independent scheme" board, distinct from a palindrome pyramid
-// whose movements themselves differ round to round (600m run → 400m run, KB SDHP → C2B).
-function hasSameMovementsEveryRound(exercise: Exercise): boolean {
-  const roundSections = (exercise.sections ?? []).filter((s) => s.sectionType === 'rounds');
-  if (roundSections.length < 2) return false;
-  const first = roundSections[0].movements ?? [];
-  if (first.length === 0) return false;
-  return roundSections.every((s) =>
-    (s.movements ?? []).length === first.length
-    && (s.movements ?? []).every((m, j) => m.name.toLowerCase() === first[j].name.toLowerCase()),
-  );
 }
 
 // Board-faithful render for a ladder where the same movements recur each round with their OWN rep

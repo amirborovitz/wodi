@@ -6,6 +6,7 @@ import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
 import type { MovementSubstitution } from '../../../types';
+import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
 import styles from './SupersetInput.module.css';
 
 interface SupersetInputProps {
@@ -35,13 +36,16 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
   // each with its own set count (e.g. "4 sets Push Press, Into: 4 sets Push Jerk"). These are
   // done one after another at INDEPENDENT weights, so each block is logged on its OWN
   // ProgressiveWeightRow (its own start->peak), never a single shared bar. Distinct from a
-  // simultaneous "+"-joined complex (no sections → the shared-weight path below is correct).
+  // simultaneous "+"-joined complex (no sections → the shared-weight path below is correct) AND
+  // from a per-movement rep LADDER (the SAME movements every round → not sequential blocks; it
+  // logs one input per distinct movement). Same predicate the poster's ladder branch uses.
   const isSequentialBlocks = useMemo(() => {
+    if (hasSameMovementsEveryRound(result.exercise)) return false;
     const sectionIdxs = movements
       .filter((mr) => mr.sectionType === 'rounds' && mr.sectionIndex != null)
       .map((mr) => mr.sectionIndex);
     return new Set(sectionIdxs).size > 1;
-  }, [movements]);
+  }, [movements, result.exercise]);
 
   const updateMovement = useCallback((index: number, patch: Partial<MovementResult>) => {
     const next = [...(result.movementResults ?? [])];
