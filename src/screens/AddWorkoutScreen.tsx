@@ -2821,6 +2821,28 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
             } : {}),
           };
         });
+        // Sections get the same logged-value bake as the top-level movements: consumers read
+        // section movements when sections exist, so leaving them on the coach's Rx makes every
+        // downstream fallback show Rx instead of the athlete's entry. Logged maps are keyed by
+        // the section movement's own name (createBlankResult builds ladder inputs from sections).
+        const sectionsForSave = result.exercise.sections?.map((sec) => ({
+          ...sec,
+          movements: sec.movements.map((mov) => {
+            const selectedName = result.movementAlternatives?.[mov.name] ?? mov.name;
+            const selectedWeight = result.movementWeights?.[mov.name];
+            return {
+              ...mov,
+              name: selectedName,
+              ...(selectedWeight && selectedWeight > 0 ? {
+                rxWeights: {
+                  male: selectedWeight,
+                  female: selectedWeight,
+                  unit: mov.rxWeights?.unit || 'kg',
+                },
+              } : {}),
+            };
+          }),
+        }));
         let repsFromMovements = 0;
 
         // Calculate volume from per-movement weights if available
@@ -2960,7 +2982,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           sets,
           rxWeights: result.exercise.rxWeights,
           ...(movementsForSave && movementsForSave.length > 0 && { movements: movementsForSave }),
-          ...(result.exercise.sections && result.exercise.sections.length > 0 && { sections: result.exercise.sections }),
+          ...(sectionsForSave && sectionsForSave.length > 0 && { sections: sectionsForSave }),
           ...(result.exercise.suggestedRepsPerSet && result.exercise.suggestedRepsPerSet.length > 0 && { suggestedRepsPerSet: result.exercise.suggestedRepsPerSet }),
           ...(rounds > 1 && { rounds }),
           ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),

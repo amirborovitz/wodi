@@ -624,9 +624,13 @@ export function createBlankResult(
   const isPerMovementLadder = hasSections && hasSameMovementsEveryRound(exercise);
 
   if (isPerMovementLadder) {
-    // Build from the distinct movements (top-level list, else the first round's movements).
+    // Build from the SECTION movements (first round), not the top-level list: when sections
+    // exist every downstream consumer (breakdown, poster) reads section movement names, and the
+    // AI's top-level names can drift ("Push Press" vs section "Dumbbell Push Press"). Keying the
+    // logged weights by the top-level name made the breakdown lookup miss and silently fall back
+    // to Rx — the poster then showed Rx instead of the athlete's entered weight.
     const roundMovs = exercise.sections!.find(s => s.sectionType === 'rounds')?.movements ?? [];
-    const distinct = (exercise.movements && exercise.movements.length > 0) ? exercise.movements : roundMovs;
+    const distinct = roundMovs.length > 0 ? roundMovs : (exercise.movements ?? []);
     for (const mov of distinct) movementSource.push({ mov });
   } else if (hasSections) {
     exercise.sections!.forEach((section, sIdx) => {
