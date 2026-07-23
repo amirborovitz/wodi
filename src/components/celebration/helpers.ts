@@ -1419,7 +1419,7 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     return {
       primary: schemeStr,
       name: formatRepMovementNameForPoster(m0.name, Math.max(...seq)),
-      ...(hasWeight ? { subNote: `${perImplementW}${unit}${implementCount > 1 ? ' ea' : ''}` } : {}),
+      ...(hasWeight ? { subNote: implementCount > 1 ? `${implementCount}×${perImplementW}${unit}` : `${perImplementW}${unit}` } : {}),
       totalNote: total > 0 ? `${total}${totalUnitLabel} total` : undefined,
       mineKey: m0.name,
       accent: hasWeight ? 'yellow' : (bd?.color ?? 'magenta'),

@@ -15,7 +15,7 @@
         {
           "primary": "30-20-10",
           "name": "DB Push Presses",
-          "subNote": "15KG ea",
+          "subNote": "2×15KG",
           "totalNote": "60 total",
           "mineKey": "Dumbbell Push Press",
           "accent": "yellow"
@@ -47,7 +47,7 @@
           {
             "primary": "30-20-10",
             "name": "DB Push Presses",
-            "subNote": "15KG ea",
+            "subNote": "2×15KG",
             "totalNote": "60 total",
             "mineKey": "Dumbbell Push Press",
             "accent": "yellow"
@@ -182,7 +182,7 @@
       {
         "kind": "line",
         "rx": "30-20-10 DB Push Presses",
-        "load": "15KG ea",
+        "load": "2×15KG",
         "mine": "30kg",
         "team": "",
         "total": "60 total"
@@ -214,7 +214,7 @@
         {
           "kind": "line",
           "rx": "30-20-10 DB Push Presses",
-          "load": "15KG ea",
+          "load": "2×15KG",
           "mine": "30kg",
           "team": "",
           "total": "60 total"

@@ -650,9 +650,14 @@ export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<strin
     if (m.weight && m.weight > 0) {
       const unit = m.unit === 'lb' ? 'lb' : 'kg';
       const prog = m.weightProgression;
+      // Breakdown weight is the effective total (per-implement × implementCount, for volume).
+      // Display must stay per-implement — "2×15kg" for twin DBs, never the summed "30kg" the
+      // athlete didn't lift on one implement. Progressions are stored per-implement already.
+      const impl = (m.implementCount ?? 1) > 1 ? m.implementCount! : 1;
+      const perImpl = impl > 1 ? Math.round((m.weight / impl) * 10) / 10 : m.weight;
       value = prog && prog.length > 1
         ? (() => { const uniq = [...new Set(prog)]; return uniq.length > 1 ? `${uniq.join('-')}${unit}` : `${uniq[0]}${unit}`; })()
-        : `${m.weight}${unit}`;
+        : impl > 1 ? `${impl}×${perImpl}${unit}` : `${m.weight}${unit}`;
     } else if ((m.totalDistance ?? 0) > 0) {
       const dist = m.totalDistance!;
       value = dist >= 1000 ? `${(dist / 1000).toFixed(2)}km` : `${Math.round(dist)}m`;
