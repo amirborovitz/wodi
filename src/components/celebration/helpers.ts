@@ -1403,13 +1403,16 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     const schemeStr = allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`;
     const total = seq.reduce((sum, v) => sum + v, 0);
     const bd = breakdown.find((b) => b.name.toLowerCase() === m0.name.toLowerCase());
-    // Show the per-implement load (un-double a twin DB/KB total) so a twin-DB press reads "20kg",
-    // never the doubled "40kg". Prefer the coach's Rx; fall back to the logged breakdown weight.
+    // Load tag = the athlete's LOGGED weight when one exists (breakdown = movementWeights truth),
+    // Rx only as fallback (poster-truth standard). Shown per-implement — un-double a twin DB/KB
+    // breakdown total so a twin-DB press logged at 15 reads "15kg ea", never the doubled "30kg"
+    // and never the Rx "20kg" the athlete didn't enter.
     const implementCount = m0.implementCount ?? bd?.implementCount ?? 1;
     const rxW = m0.rxWeights?.male ?? m0.rxWeights?.female;
-    const perImplementW = rxW && rxW > 0
-      ? rxW
-      : (bd?.weight ? Math.round((bd.weight / (implementCount > 1 ? implementCount : 1)) * 10) / 10 : undefined);
+    const loggedPerImplement = bd?.weight && bd.weight > 0
+      ? Math.round((bd.weight / (implementCount > 1 ? implementCount : 1)) * 10) / 10
+      : undefined;
+    const perImplementW = loggedPerImplement ?? (rxW && rxW > 0 ? rxW : undefined);
     const unit = (m0.rxWeights?.unit ?? bd?.unit ?? 'kg').toUpperCase();
     const hasWeight = (perImplementW ?? 0) > 0;
     const totalUnitLabel = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';

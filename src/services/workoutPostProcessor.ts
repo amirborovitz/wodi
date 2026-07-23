@@ -5,6 +5,7 @@
 
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSectionType, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
+import { hasSameMovementsEveryRound } from '../utils/sectionShape';
 
 /**
  * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg"
@@ -735,10 +736,18 @@ function normalizePerMovementLadder(workout: ParsedWorkout): ParsedWorkout {
     if (ex.loggingMode !== 'for_time') return ex;
     const movements = ex.movements;
     if (!movements || movements.length < 2) return ex;
-    // Idempotent + guard: any exercise already carrying sections (correct per-round pyramid, a
-    // building chipper, a palindrome, or a per-tier buy-in ladder) is left untouched — we only
-    // build from the FLAT collapsed shape.
-    if ((ex.sections ?? []).length > 0) return ex;
+    // Already sectioned: a building chipper / palindrome / per-tier buy-in is left untouched, but a
+    // same-movements-every-round ladder (whether the AI emitted it, or we did) must NOT also carry
+    // an exercise-level `suggestedRepsPerSet` — the per-round sections already hold each round's
+    // reps, and the leftover scheme gets DOUBLE-applied to the movement it matches (air squats 190
+    // instead of 120), inflating rep totals and bodyweight EP. Drop the redundant scheme.
+    if ((ex.sections ?? []).length > 0) {
+      if (ex.suggestedRepsPerSet && hasSameMovementsEveryRound(ex)) {
+        changed = true;
+        return { ...ex, suggestedRepsPerSet: undefined };
+      }
+      return ex;
+    }
 
     const text = getExerciseScopedText(workout, ex);
     const lines = text.split(/\r?\n/);
@@ -791,7 +800,9 @@ function normalizePerMovementLadder(workout: ParsedWorkout): ParsedWorkout {
       }),
     }));
     changed = true;
-    return { ...ex, sections };
+    // Drop the now-redundant exercise-level scheme: the sections hold each round's reps. Leaving it
+    // would double-count the matching movement's reps (and its bodyweight EP) downstream.
+    return { ...ex, sections, suggestedRepsPerSet: undefined };
   });
 
   return changed ? { ...workout, exercises } : workout;

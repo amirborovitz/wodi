@@ -1,6 +1,6 @@
 {
   "name": "real-per-movement-ladder-gorillot-20260722",
-  "description": "GORILLOT part-C metcon: a round-interleaved descending ladder where each movement has its OWN scheme (Air Squat 50-40-30, twin-DB Push Press 30-20-10, Box Jump flat 15 every round). Stored as sections-per-round (pyramid). The poster must show each round with all 3 movements at their own count that round — never a single collapsed 50-40-30, never per-movement blocks. Push Press is twin DBs (equipment dumbbell), shown at 20kg (per-DB), not 40.",
+  "description": "GORILLOT part-C metcon: a round-interleaved descending ladder where each movement has its OWN scheme (Air Squat 50-40-30, twin-DB Push Press 30-20-10, Box Jump flat 15 every round). Stored as sections-per-round (pyramid). The poster must show each round with all 3 movements at their own count that round — never a single collapsed 50-40-30, never per-movement blocks. Push Press is twin DBs (equipment dumbbell) — the load tag must show the LOGGED per-DB weight (15kg ea, breakdown 30 = 2x15), NOT the Rx (20kg from rxWeights) and NOT the doubled 30.",
   "workout": {
     "title": "For Time",
     "format": "for_time",
@@ -31,7 +31,7 @@
     "workloadBreakdown": {
       "movements": [
         { "name": "Air Squat", "totalReps": 120, "color": "magenta" },
-        { "name": "Dumbbell Push Press", "totalReps": 60, "weight": 40, "unit": "kg", "implementCount": 2, "color": "yellow" },
+        { "name": "Dumbbell Push Press", "totalReps": 60, "weight": 30, "unit": "kg", "implementCount": 2, "color": "yellow" },
         { "name": "Box Jump", "totalReps": 45, "color": "magenta" }
       ]
     }
