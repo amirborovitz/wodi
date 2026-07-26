@@ -143,12 +143,15 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   const headerContext = {
     title: sectionExercises[0]?.name?.toUpperCase() ?? null,
     type: (displayFormat ?? 'wod').replace('_', ' ').toUpperCase(),
-    format: '',
+    // Mirror the poster's format badge (buildFormatLine's dominant path is heroResult.formatLine)
+    // so the format-badge dedup — e.g. suppressing a redundant "8 ROUNDS FOR TIME" block header
+    // under an "8 ROUNDS" badge — is actually exercised here instead of stubbed away.
+    format: hero.formatLine ? hero.formatLine.toUpperCase() : '',
     sub: '',
   };
   const posterRows = {
-    reward: reward ? sectionsToRows(reward, mineMap, headerContext, teamSize) : null,
-    pages: pages.map((sections) => sectionsToRows(sections, mineMap, headerContext, teamSize)),
+    reward: reward ? sectionsToRows(reward, mineMap, headerContext) : null,
+    pages: pages.map((sections) => sectionsToRows(sections, mineMap, headerContext)),
   };
 
   // Poster header sub-line for sectioned partner artifacts ("you & your partner - N blocks") —

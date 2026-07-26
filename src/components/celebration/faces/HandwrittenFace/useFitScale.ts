@@ -18,7 +18,11 @@ export function useFitScale<C extends HTMLElement, T extends HTMLElement>(
     if (!container || !content) return;
 
     const measure = (): void => {
-      const containerHeight = container.clientHeight;
+      const containerStyle = window.getComputedStyle(container);
+      const verticalPadding =
+        Number.parseFloat(containerStyle.paddingTop) +
+        Number.parseFloat(containerStyle.paddingBottom);
+      const containerHeight = Math.max(0, container.clientHeight - verticalPadding);
       const previousTransform = content.style.transform;
       content.style.transform = 'none';
       const rectHeight = content.getBoundingClientRect().height;

@@ -1,0 +1,70 @@
+{
+  "name": "real-partner-igug-together-metcon-20260726",
+  "description": "IGUG 'however' partner metcon; flat top-level movements[] with a (together) Echo Bike (substituted from run). Regression guard: together movements must NOT be halved into a per-partner share; splittable rep movements still show the per-partner share.",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "teamSize": 2,
+    "partnerWorkout": true,
+    "timeCap": 2100,
+    "rawText": "23/07/26\nMETCON (Long)\nIn pairs, I go you go (however):\nFor time:\n400m run (together)\n100 Alternating Kettlebell Swings @16/24kg\n400m run (together)\n100 Push-ups\n400m run (together)\n100 Toes to Bar\n400m run (together)\n100 Goblet Lunges @16/24kg\n400 Double Unders / 800 Singles\n< 35 minutes T.C. >\n* You can change the order as you wish\n\nCash out - Core\n2 sets:\n30/30 sec side plank hold\n50 Russian Twists (plate / Kettlebell)",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Dynamic Duo For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "aiPartName": "RIFT",
+        "partnerWorkout": true,
+        "partnerSplit": "reps",
+        "prescription": "400m run (together), 100 Alt KB Swings 16/24kg, 400m run (together), 100 Push-ups, 400m run (together), 100 TTB, 400m run (together), 100 Goblet Lunges 16/24kg, 400 DU/800 SU",
+        "rawText": "23/07/26\nMETCON (Long)\nIn pairs, I go you go (however):\nFor time:\n400m run (together)\n100 Alternating Kettlebell Swings @16/24kg\n400m run (together)\n100 Push-ups\n400m run (together)\n100 Toes to Bar\n400m run (together)\n100 Goblet Lunges @16/24kg\n400 Double Unders / 800 Singles\n< 35 minutes T.C. >\n* You can change the order as you wish",
+        "rxWeights": { "male": 24, "female": 16, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "weight": 20, "actualReps": 800, "time": 1920 }
+        ],
+        "movements": [
+          { "name": "Echo Bike", "distance": 1200, "unit": "m", "together": true, "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "none" },
+          { "name": "Alt American Kettlebell Swing", "reps": 100, "implementCount": 1, "equipment": "kettlebell", "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" } },
+          { "name": "Push-up", "reps": 100, "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "none" },
+          { "name": "Toes to Bar", "reps": 100, "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "none" },
+          { "name": "Goblet Lunge", "reps": 100, "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" } },
+          { "name": "Double Under", "reps": 400, "countingMode": "per_round", "scoreEntryMode": "per_round", "inputType": "none", "alternative": { "name": "Single Under", "reps": 800 } }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Core Cash Out",
+        "type": "wod",
+        "loggingMode": "sets",
+        "aiPartName": "FORGE",
+        "isSecondary": true,
+        "rounds": 2,
+        "prescription": "2 sets: 30/30 sec side plank hold, 50 Russian Twists (plate / Kettlebell)",
+        "rawText": "2 sets:\n30/30 sec side plank hold\n50 Russian Twists (plate / Kettlebell)",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 30, "actualReps": 30 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 30, "actualReps": 30 }
+        ],
+        "movements": [
+          { "name": "Side Plank Hold", "countingMode": "per_round", "inputType": "none" },
+          { "name": "Russian Twist", "reps": 50, "equipment": "other", "countingMode": "per_round", "inputType": "weight", "alternative": { "name": "Russian Twist with Kettlebell", "reps": 50 } }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "grandTotalReps": 900,
+      "grandTotalVolume": 2000,
+      "grandTotalDistance": 1200,
+      "movements": [
+        { "name": "Double Under", "totalReps": 400, "color": "magenta" },
+        { "name": "Alt American Kettlebell Swing", "totalReps": 100, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Push-up", "totalReps": 100, "color": "magenta" },
+        { "name": "Toes to Bar", "totalReps": 100, "color": "cyan" },
+        { "name": "Goblet Lunge", "totalReps": 100, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Russian Twist", "totalReps": 100, "color": "magenta" },
+        { "name": "Echo Bike", "totalDistance": 1200, "unit": "m", "distancePerRep": 1200, "wasSubstituted": true, "originalMovement": "Run", "substitutionType": "equivalent", "together": true, "color": "magenta" }
+      ]
+    }
+  }
+}

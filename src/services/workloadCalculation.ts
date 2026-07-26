@@ -173,7 +173,12 @@ function getStationTotalIntervals(
   if (exercise.intervalCount && exercise.intervalCount > 0) return exercise.intervalCount;
   if (suggestedSets > stationCount && suggestedSets % stationCount === 0) return suggestedSets;
   if (workoutSets > stationCount && workoutSets % stationCount === 0) return workoutSets;
-  if (hasAlternatingStationText(workout, exercise) && workoutSets > 1) return workoutSets;
+  // "Alternating stations" AMRAPs merge stations into one exercise and put the TOTAL interval
+  // count on workout.sets (suggestedSets unset/1) — so workout.sets IS the interval total there.
+  // A minute-EMOM ("12 min, 4 rounds" of 3 stations) instead carries its CYCLE count on
+  // suggestedSets (4); its sets are cycles, and totalIntervals = cycles × stationCount (12).
+  // Only treat workout.sets as the interval total when the exercise has no cycle count of its own.
+  if (hasAlternatingStationText(workout, exercise) && workoutSets > 1 && suggestedSets <= 1) return workoutSets;
 
   return cycles * stationCount;
 }
@@ -438,6 +443,7 @@ export function calculateWorkloadBreakdown(
         const reps = schemeReps ?? ((movement.reps || 0) * movMultiplier);
         const distance = (movement.distance || 0) * movMultiplier;
         const calories = (movement.calories || 0) * movMultiplier;
+        const time = (movement.time || 0) * movMultiplier;
 
         // Get per-implement weight from movementWeights override or rxWeights
         const perImplementWeight = movementWeights?.[movement.name]
@@ -473,6 +479,7 @@ export function calculateWorkloadBreakdown(
             totalReps: (existing.totalReps || 0) + reps,
             totalDistance: (existing.totalDistance || 0) + distance,
             totalCalories: (existing.totalCalories || 0) + calories,
+            totalTime: (existing.totalTime || 0) + time,
             // Keep the first weight encountered
             weight: existing.weight || weight,
             implementCount: existing.implementCount || (implementCount > 1 ? implementCount : undefined),
@@ -484,6 +491,7 @@ export function calculateWorkloadBreakdown(
             totalReps: reps > 0 ? reps : undefined,
             totalDistance: distance > 0 ? distance : undefined,
             totalCalories: calories > 0 ? calories : undefined,
+            totalTime: time > 0 ? time : undefined,
             weight,
             unit,
             color,
@@ -552,6 +560,7 @@ export function calculateWorkloadBreakdown(
     .filter(m => (m.totalReps && m.totalReps > 0)
       || (m.totalDistance && m.totalDistance > 0)
       || (m.totalCalories && m.totalCalories > 0)
+      || (m.totalTime && m.totalTime > 0)
       || (m.weight && m.weight > 0))
     .sort((a, b) => {
       const colorDiff = (colorOrder[a.color || 'magenta'] || 1) - (colorOrder[b.color || 'magenta'] || 1);

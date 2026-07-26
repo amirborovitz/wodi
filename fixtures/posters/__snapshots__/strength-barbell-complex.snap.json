@@ -1,0 +1,103 @@
+{
+  "reward": [
+    {
+      "eyebrow": "POWER CLEAN + HANG POWER CLEAN",
+      "title": "Complex",
+      "blueprint": "10× 50KG → 65KG",
+      "watermark": "COMPLEX",
+      "rows": [
+        {
+          "primary": "50KG→65KG",
+          "name": "× 10 COMPLEX",
+          "subNote": "1 REP EA. · PC+PC",
+          "accent": "yellow"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Weightlifting",
+        "blueprint": "10 sets",
+        "rows": [
+          {
+            "primary": "50->65KG",
+            "name": "1 Power Clean + 1 Hang Power Clean",
+            "subNote": "10 total",
+            "mineKey": "Power Clean",
+            "accent": "yellow",
+            "repeatCount": 10
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "65",
+    "unit": "KG",
+    "subtitle": "POWER CLEAN",
+    "formatLine": "10 × every 01:15",
+    "storyLine": "10 power clean · 10 hang power clean",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "POWER CLEAN + HANG POWER CLEAN",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "1 COMPLEX",
+        "name": "",
+        "total": "10 ROUNDS",
+        "color": "yellow",
+        "weight": 50,
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentGold"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "COMPLEX",
+        "cap": "10× 50KG → 65KG"
+      },
+      {
+        "kind": "line",
+        "rx": "50KG→65KG × 10 COMPLEX",
+        "load": "1 REP EA. · PC+PC",
+        "mine": "",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "10 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "50->65KG 1 Power Clean + 1 Hang Power Clean",
+          "load": "",
+          "mine": "50-52.5-55-57.5-60-62.5-65kg",
+          "team": "",
+          "total": "10 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

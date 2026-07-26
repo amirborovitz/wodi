@@ -117,7 +117,7 @@ const GENERIC_TITLE_PATTERNS = [
   /^emom$/i,
   /^tabata$/i,
   /^intervals?$/i,
-  /^\d+\s*rounds?\s+for\s+time$/i,   // "5 Rounds For Time"
+  /^\d+\s*(?:rounds?|times?)\s+for\s+time$/i,   // "5 Rounds For Time", "8 Times For Time"
   /^\d+\s*rounds?$/i,                 // "5 Rounds"
   /^\d+\s*sections?\s+for\s+time(?:\s*[•·-]\s*.*)?$/i,
   /^\d+[-\s]min\s+amrap$/i,           // "12-Min AMRAP"
@@ -191,6 +191,25 @@ function isDuplicatePosterHeader(value: string | null | undefined, context: Post
 
   return [context.title, context.type, context.format, context.sub]
     .some((candidate) => normalizePosterHeaderText(candidate) === normalized);
+}
+
+// A "N rounds/times/sections for time" header — whether it arrives as a section title or as its
+// blueprint cap — is fully restated by the poster's FOR TIME type tag plus the "N ROUNDS" format
+// badge. Rendered again as a block header it just duplicates the badge (and, when both the label
+// AND the cap are this phrase, duplicates itself — e.g. "8 TIMES FOR TIME" over "8 ROUNDS FOR
+// TIME"). Recognise that equivalence so the redundant header is dropped even when the poster
+// title is a distinct real WOD name (which stops isDuplicatePosterHeader from catching it).
+function isRoundCountForTimeCoveredByFormat(
+  value: string | null | undefined,
+  context: PosterHeaderContext,
+): boolean {
+  const match = normalizePosterHeaderText(value).match(
+    /^(\d+) (?:rounds?|times?|sections?) for time$/,
+  );
+  if (!match) return false;
+  const typeIsForTime = normalizePosterHeaderText(context.type).includes('for time');
+  const formatMatch = normalizePosterHeaderText(context.format).match(/^(\d+) rounds?$/);
+  return typeIsForTime && !!formatMatch && formatMatch[1] === match[1];
 }
 
 function mapFormatToType(format: string | undefined): string {
@@ -442,13 +461,10 @@ function buildResultLabel(format: string | undefined, isPartner: boolean, heroUn
 }
 
 function buildResultValue(hero: HeroResult | null | undefined): string {
-  if (!hero) return '--';
-  // A ladder AMRAP's unit IS part of the score ("6" + "+10" = rounds + partial reps), not a
-  // redundant label restating the unit ("ROUNDS") the result label already states — so it must
-  // always render. For every other format, skip it: the result label provides that context, and
-  // appending it again risks multi-line wrapping at the hero's large font size.
-  if (hero.ladderIntoRound != null && hero.unit) return `${hero.value} ${hero.unit}`;
-  return hero.value ?? '--';
+  // The result LABEL carries the unit ("TOTAL REPS", "MY TIME"), so the big value is just the
+  // number — appending the unit again reads "TOTAL REPS · 108 REPS" and risks multi-line wrapping
+  // at the hero's large font size.
+  return hero?.value ?? '--';
 }
 
 function formatPosterWeightValue(weight: number, unit = 'kg'): string {
@@ -546,13 +562,13 @@ export function sectionsToRows(
   sections: ArtifactSection[],
   mineMap?: Map<string, string>,
   headerContext: PosterHeaderContext = {},
-  teamSize?: number,
 ): PosterRow[] {
   const rows: PosterRow[] = [];
 
   for (const section of sections) {
     const isDuplicateTitle =
-      isDuplicatePosterHeader(section.title, { title: headerContext.title });
+      isDuplicatePosterHeader(section.title, { title: headerContext.title })
+      || isRoundCountForTimeCoveredByFormat(section.title, headerContext);
     // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and the
     // per-station ST. header blocks — a section-level block on top would restate both.
     const hasStationHeaderRows = section.rows.some((row) => row.stationRow && row.roundLabel);
@@ -570,7 +586,8 @@ export function sectionsToRows(
     // athlete reads. The structure cap ("EMOM 15 MIN · 5 ROUNDS") IS the header: promote it
     // into the label slot so the prescription line gets the header's visual weight.
     const isGenericTitle = /^blueprint$/i.test(section.title?.trim() ?? '');
-    const capDuplicatesPosterHeader = isDuplicatePosterHeader(cap, headerContext);
+    const capDuplicatesPosterHeader = isDuplicatePosterHeader(cap, headerContext)
+      || isRoundCountForTimeCoveredByFormat(cap, headerContext);
 
     if (hasHeader) {
       // Suppress the label when it's just repeating the poster title, but
@@ -608,7 +625,7 @@ export function sectionsToRows(
       // station row's primary already embeds the movement name ("200M RUN") and must not
       // append the name again ("200M RUN RUN"). The chip itself is still suppressed on the
       // emitted line: the ST. header block above already carries the station label.
-      const line = artifactRowToPosterLine(row, mineMap, teamSize);
+      const line = artifactRowToPosterLine(row, mineMap);
       rows.push(row.stationRow ? { ...line, roundLabel: undefined } : line);
     }
   }
@@ -690,36 +707,6 @@ function isRxLoad(subNote: string): boolean {
   return !/\btotal\b/i.test(subNote);
 }
 
-// Splits an AI-prescribed ONE-SHOT team total in `primary` into a per-partner share —
-// e.g. "100" → "50", "1800m" → "900m", "80 CAL" → "40 cal" (teamSize=2). Only valid for a
-// single shared target (e.g. "100 wall balls, split however"). Never call this for a
-// per-round/per-turn value (row.repeatCount > 1) — IGUG-style partner rounds alternate whole
-// rounds between partners, so the reps/distance/calories *within* one round are never split
-// further; dividing them again double-discounts the work.
-// Returns '' for shapes that aren't a shareable team total (weights, relay legs "5×").
-function computeTeamShare(primary: string, teamSize: number): string {
-  const p = primary.trim();
-
-  const cal = p.match(/^(\d+(?:\.\d+)?)\s*cal$/i);
-  if (cal) {
-    return `${Math.round(parseFloat(cal[1]) / teamSize)} cal`;
-  }
-
-  const dist = p.match(/^(\d+(?:\.\d+)?)\s*(km|m)$/i);
-  if (dist) {
-    const meters = dist[2].toLowerCase() === 'km' ? parseFloat(dist[1]) * 1000 : parseFloat(dist[1]);
-    const share = meters / teamSize;
-    return share >= 1000 ? `${(share / 1000).toFixed(2)}km` : `${Math.round(share)}m`;
-  }
-
-  const reps = p.match(/^(\d+(?:\.\d+)?)$/);
-  if (reps) {
-    return `${Math.round(parseFloat(reps[1]) / teamSize)}`;
-  }
-
-  return '';
-}
-
 // "ME" is only meaningful for partner rows when it's a personal weight —
 // distance/rep/calorie "mine" values come from the same prescribed total as
 // the TEAM share and would just duplicate it.
@@ -789,7 +776,7 @@ function extractLoadSuffix(nameWithLoad: string | undefined): string {
   return match ? match[1].trim() : '';
 }
 
-function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>, teamSize?: number): PosterLine {
+function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>): PosterLine {
   // Round-trade partner row (IGUG): whoever's up does the WHOLE round, so there's no personal
   // "share" of this movement to compute — primary/relay/team-share logic below doesn't apply.
   // Full prescription, full-width, weight inline via nameWithLoad (e.g. "Clean & Jerk @ 45kg").
@@ -857,27 +844,15 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   const total = row.totalNote || (row.subNote && /\btotal\b/i.test(row.subNote) ? row.subNote : undefined);
   const loadSuffix = row.loadNote || extractLoadSuffix(row.nameWithLoad);
 
-  const isPerRoundValue = !!(row.repeatCount && row.repeatCount > 1);
-
   let team = '';
   let mine = row.suppressMine ? '' : loadSuffix || mineRaw;
   const mineBeforeWipe = mine;
-  // Gate on this ROW's own confirmed split (set only when this block's own text confirmed
-  // partner language — see partnerSplit.ts), never on the raw teamSize alone. teamSize is a
-  // session-level field the AI stamps once for the whole multi-part workout (so EP/volume math
-  // scales correctly everywhere) — it does not mean every block in the session is partnered.
-  // Using it unguarded here would divide an unconfirmed solo block's values by teamSize purely
-  // because a SIBLING block in the same session happens to be partnered.
+  // Per-partner flat share is resolved ONCE upstream (computeMovementTeamShare in helpers.ts)
+  // and carried on row.teamShare — computed from movement data, so it honors (together) work and
+  // per-round values that a display-string regex here never could. This layer only reads it.
   if (row.teamShare) {
-    // Share computed from the movement data at row-build time — authoritative over the
-    // display-line regex below, which can't parse a full-sentence primary.
     team = row.teamShare;
     mine = loadSuffix || (isWeightValue(mineRaw) ? mineRaw : '');
-  } else if (row.partnerSplit === 'reps' && teamSize && teamSize > 1 && !isPerRoundValue) {
-    team = computeTeamShare(row.primary ?? '', teamSize);
-    if (team) {
-      mine = loadSuffix || (isWeightValue(mineRaw) ? mineRaw : '');
-    }
   } else if (total && !isWeightValue(mine)) {
     mine = '';
   }
@@ -1029,7 +1004,7 @@ export function buildPosterWodFromPage(
   const teamSize = data.teamSize ?? 1;
   const totalsEstimated = !!data.activeBreakdown?.estimated;
   const builtRows: PosterRow[] = sections.length > 0
-    ? sectionsToRows(sections, mineMap, { title, type, format, sub }, teamSize)
+    ? sectionsToRows(sections, mineMap, { title, type, format, sub })
     : [];
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
   const strengthTopSet = page.isStrength ? getTopSetValue(page.exercise, page.movements) : null;
@@ -1170,7 +1145,7 @@ export function buildPosterWod(
   // repeats the type pill verbatim ("EMOM" pill + "EMOM" sub-line), drop it. Unnamed posters
   // keep it: there the format IS the headline.
   const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
-  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub }, teamSize);
+  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub });
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
 
   const wod: PosterWodInternal = {

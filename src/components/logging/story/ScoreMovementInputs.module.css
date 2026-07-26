@@ -146,6 +146,17 @@
   align-items: center;
   gap: 2px;
   text-align: center;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  padding: 4px 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.heroWeightCenterActive {
+  border-color: var(--wodi-yellow);
+  background: rgba(245, 194, 0, 0.08);
 }
 
 .heroWeightValue {
@@ -155,6 +166,14 @@
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: 0;
+}
+
+.heroWeightMultiplier {
+  color: var(--wodi-yellow);
+  font-size: 0.5em;
+  font-weight: 900;
+  margin-right: 5px;
+  vertical-align: 0.12em;
 }
 
 .heroWeightUnit {

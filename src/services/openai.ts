@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
+import { resolveSourceDate } from './sourceDateResolution';
 
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
 
@@ -252,13 +253,20 @@ Cardio machines are NEVER measured in "reps". They use calories or distance:
 - When only one calorie value is given (e.g., "7 cal Echo Bike"), set calories to that value and estimate rxCalories (male=given, female≈70-80% of male, rounded)
 - NEVER put calorie or distance values in the "reps" field for cardio machines
 
+## TIMED HOLDS / STATIC POSITIONS
+Isometric holds are measured in TIME, not reps. When a movement prescribes a duration (plank, wall sit, hollow hold, L-sit, dead hang, handstand hold, superman hold, ring support hold, etc.), set "time" to the duration in SECONDS and "inputType": "none". NEVER put the hold duration in the "reps" field, and NEVER leave a hold with no time — losing the duration erases the whole movement.
+- "45 sec plank hold" → { "name": "Plank Hold", "time": 45, "inputType": "none" }
+- "1 min plank" → { "name": "Plank", "time": 60, "inputType": "none" }
+- "30s hollow hold" → { "name": "Hollow Hold", "time": 30, "inputType": "none" }
+- "wall sit 1:00" → { "name": "Wall Sit", "time": 60, "inputType": "none" }
+
 ## MOVEMENT INPUT CLASSIFICATION
 Every movement MUST include "inputType":
 - "weight": barbell/KB/DB movements needing weight logged per set (deadlift, squat, press, clean, snatch, thruster, swing, lunge, wall ball, goblet, row with weight, shoulder to overhead, clean and jerk, etc.)
 - "calories": cardio machines when the user must LOG calories (standalone cardio — "max cal", open-ended calorie target)
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
-- CRITICAL: a missing written weight does NOT make a loaded movement "none". A push press, thruster, or "weighted X" with no weight on the board is still inputType "weight" — that is exactly when the athlete must be asked what they lifted.
+- CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate/vest (e.g. any squat, lunge, split squat, step-up, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature.
 
 ## MOVEMENT EQUIPMENT
 Every movement performed with an external load MUST also include "equipment" — the implement the load is on (include it even when the board writes no weight):
@@ -490,7 +498,7 @@ Output:
   "exercises": [{
     "name": "Barbell Complex", "type": "strength", "loggingMode": "emom",
     "prescription": "Every 2:00 x 5: 1 Power Clean + 1 Hang Clean + 1 Push Jerk",
-    "suggestedSets": 5,
+    "suggestedSets": 5, "complex": true,
     "movements": [
       { "name": "Power Clean", "reps": 1, "inputType": "weight", "equipment": "barbell" },
       { "name": "Hang Clean", "reps": 1, "inputType": "weight", "equipment": "barbell" },
@@ -498,7 +506,8 @@ Output:
     ]
   }]
 }
-Why NO sections: the three lifts are ONE unbroken set on ONE bar at ONE weight, all done every round (a "+"-joined complex). A single flat "movements[]" is correct — one shared weight. Contrast 4b, where "Into:" separates blocks each with its own set count and its own building weight.`;
+Why NO sections: the three lifts are ONE unbroken set on ONE bar at ONE weight, all done every round (a "+"-joined complex). A single flat "movements[]" is correct — one shared weight. Contrast 4b, where "Into:" separates blocks each with its own set count and its own building weight.
+ALWAYS set "complex": true on a "+"-joined same-bar complex exercise (like this one). It tells the app the sub-lifts are one combined set — the poster renders them as a single line ("1 Power Clean + 1 Hang Clean + 1 Push Jerk") instead of separate movements, and volume counts the shared bar once. Do NOT set "complex" on 4b's "Into:" blocks (separate sets), nor on ordinary multi-movement metcons.`;
 
 const EXAMPLES_METCON_ADVANCED = `### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"
@@ -1012,7 +1021,16 @@ export async function parseWorkoutText(
   const rawJson = jsonStr.trim();
   const data = JSON.parse(rawJson);
   const validated = validateParsedWorkout(data);
-  const postProcessed = postProcessParsedWorkout(validated);
+  // Seed rawText from the parse input so post-processing has the board text to work from (the
+  // merge sets the definitive rawText later). Without it, text-driven repairs that fall back to
+  // workout.rawText — e.g. normalizeInterleavedMovements rebuilding a collapsed chipper — have no
+  // text to read at this stage. Never clobber a per-exercise rawText the AI already emitted.
+  const withRawText = validated.rawText ? validated : { ...validated, rawText: text };
+  const withResolvedDate = {
+    ...withRawText,
+    sourceDate: resolveSourceDate(withRawText.sourceDate, text, new Date()),
+  };
+  const postProcessed = postProcessParsedWorkout(withResolvedDate);
 
   logAiWorkoutSummary(`${sourceLabel} PARSE AI`, data);
   logAiWorkoutSummary(`${sourceLabel} PARSE POST`, postProcessed);
@@ -1273,7 +1291,7 @@ function mergeSegmentedParses(
     partnerWorkout: partParses.some((parse) => parse.partnerWorkout === true)
       ? true
       : firstDefined('partnerWorkout'),
-    sourceDate: firstDefined('sourceDate'),
+    sourceDate: resolveSourceDate(firstDefined('sourceDate'), originalText, new Date()),
   };
 }
 
@@ -1503,9 +1521,11 @@ function validateMovement(data: unknown): ParsedMovement | null {
 
 export function validateParsedWorkout(data: unknown): ParsedWorkout {
   const raw = data as Record<string, unknown>;
-  const sourceDate = typeof raw.sourceDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.sourceDate)
-    ? raw.sourceDate
-    : undefined;
+  const sourceDate = resolveSourceDate(
+    typeof raw.sourceDate === 'string' ? raw.sourceDate : undefined,
+    typeof raw.rawText === 'string' ? raw.rawText : undefined,
+    new Date(),
+  );
 
   // Validate workout type
   const validTypes: WorkoutType[] = ['strength', 'metcon', 'emom', 'amrap', 'for_time', 'mixed'];
@@ -1713,6 +1733,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),
         ...(typeof exercise.partnerWorkout === 'boolean' && { partnerWorkout: exercise.partnerWorkout }),
         ...((exercise.partnerSplit === 'reps' || exercise.partnerSplit === 'rounds') && { partnerSplit: exercise.partnerSplit }),
+        ...(exercise.complex === true && { complex: true }),
       });
     }
   }

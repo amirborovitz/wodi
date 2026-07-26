@@ -744,7 +744,9 @@ function buildWorkloadBreakdownFromResults(
 
   // Partner factor already applied per-exercise above (only to team exercises)
   const movements = Array.from(movementMap.values())
-    .filter(m => (m.totalReps && m.totalReps > 0) || (m.totalDistance && m.totalDistance > 0) || (m.totalCalories && m.totalCalories > 0))
+    // A prescribed timed hold (plank, wall sit, hollow hold) carries only totalTime — no reps,
+    // distance, or calories. It's still part of the workout and must reach the poster.
+    .filter(m => (m.totalReps && m.totalReps > 0) || (m.totalDistance && m.totalDistance > 0) || (m.totalCalories && m.totalCalories > 0) || (m.totalTime && m.totalTime > 0))
     .sort((a, b) => (b.totalReps || 0) - (a.totalReps || 0));
 
   // Derive grandTotalVolume from the final movements so it always matches
@@ -2994,6 +2996,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           // Persist this part's own logging mode — detail-mode rendering must never fall back
           // to the session-level format (parts are standalone practices).
           ...(result.exercise.loggingMode && { loggingMode: result.exercise.loggingMode }),
+          // Barbell complex: sub-lifts render as one combined poster line in reward + detail mode.
+          ...(result.exercise.complex === true && { complex: true }),
           ...(typeof result.exercise.isSecondary === 'boolean' && { isSecondary: result.exercise.isSecondary }),
           ...(typeof result.exercise.partnerWorkout === 'boolean' && { partnerWorkout: result.exercise.partnerWorkout }),
           ...(result.exercise.partnerSplit && { partnerSplit: result.exercise.partnerSplit }),

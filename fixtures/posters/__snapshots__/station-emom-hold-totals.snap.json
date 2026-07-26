@@ -1,0 +1,213 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "EMOM 12",
+      "blueprint": "EMOM 12 MIN · 4 rounds",
+      "rows": [
+        {
+          "primary": "8-10 Thruster @ 40kg",
+          "name": "Thruster",
+          "totalNote": "36 total",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 1",
+          "stationHeaderCap": "4 rds · 1:00"
+        },
+        {
+          "primary": "8-10 Burpee",
+          "name": "Burpee",
+          "totalNote": "36 total",
+          "accent": "magenta",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 2",
+          "stationHeaderCap": "4 rds · 1:00"
+        },
+        {
+          "primary": "45s Plank Hold",
+          "name": "Plank Hold",
+          "totalNote": "3 min total",
+          "accent": "cyan",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 3",
+          "stationHeaderCap": "4 rds · 1:00"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "EMOM 12",
+        "blueprint": "EMOM 12 MIN · 4 rounds",
+        "rows": [
+          {
+            "primary": "8-10 Thruster @ 40kg",
+            "name": "Thruster",
+            "totalNote": "36 total",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 1",
+            "stationHeaderCap": "4 rds · 1:00"
+          },
+          {
+            "primary": "8-10 Burpee",
+            "name": "Burpee",
+            "totalNote": "36 total",
+            "accent": "magenta",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 2",
+            "stationHeaderCap": "4 rds · 1:00"
+          },
+          {
+            "primary": "45s Plank Hold",
+            "name": "Plank Hold",
+            "totalNote": "3 min total",
+            "accent": "cyan",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 3",
+            "stationHeaderCap": "4 rds · 1:00"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "72",
+    "unit": "REPS",
+    "storyLine": "36 thruster · 36 burpee",
+    "storyMovements": [
+      {
+        "perRound": "9",
+        "name": "Thruster",
+        "total": "36 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "9",
+        "name": "Burpee",
+        "total": "36 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "EMOM 12 MIN · 4 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "MIN 1",
+        "cap": "4 rds · 1:00"
+      },
+      {
+        "kind": "line",
+        "rx": "8-10 Thruster @ 40kg",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "36 total"
+      },
+      {
+        "kind": "block",
+        "label": "MIN 2",
+        "cap": "4 rds · 1:00"
+      },
+      {
+        "kind": "line",
+        "rx": "8-10 Burpee",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "36 total"
+      },
+      {
+        "kind": "block",
+        "label": "MIN 3",
+        "cap": "4 rds · 1:00"
+      },
+      {
+        "kind": "line",
+        "rx": "45s Plank Hold",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "3 min total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "EMOM 12 MIN · 4 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "MIN 1",
+          "cap": "4 rds · 1:00"
+        },
+        {
+          "kind": "line",
+          "rx": "8-10 Thruster @ 40kg",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        },
+        {
+          "kind": "block",
+          "label": "MIN 2",
+          "cap": "4 rds · 1:00"
+        },
+        {
+          "kind": "line",
+          "rx": "8-10 Burpee",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        },
+        {
+          "kind": "block",
+          "label": "MIN 3",
+          "cap": "4 rds · 1:00"
+        },
+        {
+          "kind": "line",
+          "rx": "45s Plank Hold",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "3 min total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

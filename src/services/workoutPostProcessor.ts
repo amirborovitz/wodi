@@ -320,9 +320,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
   const withSharedWeight = backfillSharedWeightHints(withInputTypes);
 
+  // Backfill the `complex` flag on "+"-joined same-bar complexes the AI didn't tag
+  const withComplex = backfillComplexFlag(withSharedWeight);
+
   // Backfill Min 1 / Min 2 / ... labels on rotating EMOM stations when the AI
   // parsed the movements but missed the station metadata.
-  const withEmomMinuteStations = backfillEmomMinuteStations(withSharedWeight);
+  const withEmomMinuteStations = backfillEmomMinuteStations(withComplex);
 
   // Detect rotating interval "station" workouts (A/B/C/D repeated across outer rounds)
   const withStationRotation = detectStationRotation(withEmomMinuteStations);
@@ -356,8 +359,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // to one shared scheme — so the poster shows each movement's own scheme, not a false 50-40-30.
   const withPerMovementLadder = normalizePerMovementLadder(withPerTierBuyIns);
 
+  // Restore interleaved repeats a flat for-time chipper collapsed at parse (e.g. a run written
+  // before each station that the AI deduplicated to one) — rebuilt deterministically from board text.
+  const withInterleaved = normalizeInterleavedMovements(withPerMovementLadder);
+
   // Normalize explicit movement semantics so downstream math can trust structure
-  return backfillMovementSemantics(withPerMovementLadder);
+  return backfillMovementSemantics(withInterleaved);
 }
 
 function isScoredLoggingMode(loggingMode?: ExerciseLoggingMode): boolean {
@@ -884,6 +891,91 @@ function normalizePerTierBuyIns(workout: ParsedWorkout): ParsedWorkout {
 function getExerciseScopedText(workout: ParsedWorkout, ex: ParsedExercise): string {
   if (ex.rawText && ex.rawText.trim()) return ex.rawText;
   return workout.exercises.length === 1 ? (workout.rawText || '') : '';
+}
+
+// Words that describe workout STRUCTURE, not a movement's identity — dropped before matching a
+// board line to a movement so generic scaffolding ("for time", "each round") never cross-matches.
+const STRUCTURE_TOKENS = new Set([
+  'the', 'and', 'with', 'for', 'time', 'rounds', 'round', 'each', 'every', 'min', 'mins', 'minute',
+  'minutes', 'cap', 'reps', 'rep', 'cal', 'cals', 'calorie', 'calories', 'sets', 'set', 'into',
+  'then', 'together', 'however', 'pairs', 'pair', 'you', 'your', 'can', 'change', 'order', 'wish',
+  'metcon', 'long', 'from',
+]);
+
+// Identity tokens of a movement name / board line: alphabetic words >2 chars, minus structure
+// words, crudely singularized so "swings"↔"swing" and "lunges"↔"lunge" match. Pure numbers and
+// loads ("400m", "24kg", "16") are dropped — they identify quantity, not the movement.
+function movementIdentityTokens(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !/\d/.test(w) && !STRUCTURE_TOKENS.has(w))
+      .map((w) => (w.endsWith('s') && w.length > 3 ? w.slice(0, -1) : w)),
+  );
+}
+
+/**
+ * A flat for-time chipper often writes some movements more than once, interleaved between others —
+ * classically a run/bike before each station ("400m run, 100 swings, 400m run, 100 push-ups, …").
+ * The AI is non-deterministic about this and frequently DEDUPLICATES movements[] down to the unique
+ * set (one run), collapsing the real ordered sequence — especially when the board says the order is
+ * flexible. That erases the repeated work from logging, workload, and the poster (the run shows once
+ * at the start instead of between every station).
+ *
+ * This rebuilds movements[] from the exercise's OWN board text (which faithfully preserves every
+ * line), using the parsed movements[] purely as the canonical-name lexicon. It is deterministic and
+ * deliberately conservative: a line maps to a movement by identity-token OVERLAP (so the AI renaming
+ * "Alternating"→"American" still matches on "kettlebell swing"), and the rebuild happens ONLY when
+ *   - the reconstructed sequence is strictly LONGER than movements[] (a real, text-backed repeat), and
+ *   - every parsed movement is accounted for at least once (never silently drop one), and
+ *   - no board line is ambiguous (matches two movements equally well).
+ * Any ambiguity aborts and leaves movements[] untouched — a wrong reorder is worse than the collapse.
+ * Sectioned / round-structured exercises are out of scope: their repeats live in sections, and the
+ * per-tier cardio buy-in case is owned by normalizePerTierBuyIns.
+ */
+function normalizeInterleavedMovements(workout: ParsedWorkout): ParsedWorkout {
+  let changed = false;
+  const exercises = workout.exercises.map((ex) => {
+    if (ex.loggingMode !== 'for_time') return ex;
+    if (ex.sections && ex.sections.length > 0) return ex;
+    const movements = ex.movements;
+    if (!movements || movements.length < 2) return ex;
+    const text = getExerciseScopedText(workout, ex);
+    if (!text.trim()) return ex;
+
+    const movementTokens = movements.map((m) => movementIdentityTokens(m.name));
+
+    // Walk the board lines in order; map each to the single best-overlapping movement.
+    const sequence: ParsedMovement[] = [];
+    for (const line of text.split(/[\n,]/).map((l) => l.trim()).filter(Boolean)) {
+      const lineTokens = movementIdentityTokens(line);
+      if (lineTokens.size === 0) continue;
+      let best = -1;
+      let bestScore = 0;
+      let tie = false;
+      movementTokens.forEach((tokens, i) => {
+        let score = 0;
+        tokens.forEach((t) => { if (lineTokens.has(t)) score += 1; });
+        if (score > bestScore) { bestScore = score; best = i; tie = false; }
+        else if (score === bestScore && score > 0) { tie = true; }
+      });
+      if (bestScore === 0) continue;   // a header/note line — not a movement
+      if (tie) return ex;              // two movements fit equally — too risky to reorder
+      sequence.push(movements[best]);
+    }
+
+    // Only act on a genuine collapse, and never drop a movement the text didn't line up.
+    if (sequence.length <= movements.length) return ex;
+    const covered = new Set(sequence.map((m) => m.name.toLowerCase()));
+    if (!movements.every((m) => covered.has(m.name.toLowerCase()))) return ex;
+
+    changed = true;
+    // Clone each occurrence so duplicated entries never share a mutable reference downstream.
+    return { ...ex, movements: sequence.map((m) => ({ ...m })) };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
 }
 
 /**
@@ -2500,6 +2592,35 @@ function backfillSharedWeightHints(workout: ParsedWorkout): ParsedWorkout {
           sharedWeightMovements: weighted.map(m => m.name),
         },
       };
+    }),
+  };
+}
+
+/**
+ * Backfill the `complex` flag on a "+"-joined same-bar barbell complex when the AI missed it.
+ *
+ * A complex ("1 Power Clean + 1 Hang Power Clean") is one unbroken set on one bar — the sub-lifts
+ * must render as a single poster line, not as separate standalone movements. The board joins them
+ * with "+", which is the notation that distinguishes a complex from a line-per-movement metcon
+ * couplet. Conservative on purpose: only flat (no-sections) exercises whose movements are ALL on a
+ * bar, where the scoped text actually contains a lift-joining "+". The "+" must sit between letters
+ * (optionally with a rep count) so it never fires on intensity cues like "@80+%".
+ */
+function backfillComplexFlag(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => {
+      if (ex.complex) return ex;                  // AI already told us — trust it
+      if (ex.sections?.length) return ex;         // 4b "Into:" blocks are separate sets, not a complex
+      const movements = ex.movements;
+      if (!movements || movements.length < 2) return ex;
+      // Every movement is on the same bar — a "+"-joined complex is one weight, one bar.
+      if (!movements.every(m => m.inputType === 'weight')) return ex;
+      const scoped = `${ex.name} ${ex.prescription} ${getExerciseScopedText(workout, ex)}`;
+      // "clean + 1 hang" / "Press + Jerk" — a letter, then "+", then an optional count, then a
+      // letter. Excludes "@80+%" (digit before the "+") and "60/90kg" (no "+").
+      if (!/[a-z]\s*\+\s*\d*\s*[a-z]/i.test(scoped)) return ex;
+      return { ...ex, complex: true };
     }),
   };
 }

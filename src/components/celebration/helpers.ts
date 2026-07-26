@@ -351,6 +351,22 @@ export function getLadderRungValue(reps: number[], idx: number): number {
   return reps[reps.length - 1] + step * (idx - reps.length + 1);
 }
 
+// Total reps across the laddered movements — the same figure the logging screen leads with
+// (Σ completed rungs (+ partial) × scaling-movement count). Prefers the logged combined total
+// stamped on sets[0].actualReps; recomputes from the rungs only as a fallback.
+function ladderTotalReps(exercise: Exercise): number {
+  const logged = exercise.sets?.[0]?.actualReps;
+  if (logged && logged > 0) return logged;
+  const reps = exercise.ladderReps ?? [];
+  const step = exercise.ladderStep ?? 0;
+  if (reps.length === 0 || step <= 0) return 0;
+  const partial = exercise.ladderPartial ?? 0;
+  const scalingCount = splitLadderMovements(exercise).scaling.length || 1;
+  let sum = 0;
+  for (let j = 0; j < step; j++) sum += getLadderRungValue(reps, j);
+  return (sum + partial) * scalingCount;
+}
+
 /**
  * Per-implement weight to display for a ladder movement — prefers what was actually logged
  * over the prescribed Rx, since this is the "what I did" layer. MovementTotal.weight for a
@@ -390,7 +406,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
 
   let weight: number | undefined;
   let unit = 'kg';
-  let weightSuffix = '';
+  let implementCount = 1;
   for (const mov of scalingMovements) {
     const actual = findMovementTotal(movements, mov.name);
     const prescribedWeight = mov.rxWeights?.male || mov.rxWeights?.female;
@@ -398,10 +414,15 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
     if (w != null) {
       weight = w;
       unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit ?? 'kg');
-      weightSuffix = mov.implementCount === 2 ? ' each' : '';
+      implementCount = mov.implementCount ?? 1;
       break;
     }
   }
+  // Twin implement → "2×16kg" (the app-wide convention), never the softer "16kg each" that
+  // doesn't read clearly as a double, and never the doubled total.
+  const loadNote = weight != null
+    ? (implementCount > 1 ? `${implementCount}×${weight}${unit}` : `${weight}${unit}`)
+    : undefined;
 
   const step = exercise.ladderStep ?? 0;
   const partial = exercise.ladderPartial ?? 0;
@@ -425,7 +446,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
   const trackRow: ArtifactRow = {
     primary: '',
     name: scalingMovements.map((m) => formatRepMovementNameForPoster(m.name, m.reps ?? ladderReps[0])).join(' + '),
-    loadNote: weight != null ? `${weight}${unit}${weightSuffix}` : undefined,
+    loadNote,
     accent: 'yellow',
     ladderTrack: { reps: ladderReps, step, partial: partial > 0 ? partial : undefined, cadence: cadenceLabel },
   };
@@ -1095,9 +1116,42 @@ function getMovementDisplayNameFromContext(
   return `${prefix} ${name}`;
 }
 
+/**
+ * The single source of truth for a flat-share ('reps') partner poster: each partner's share of
+ * one movement's team total, computed from the MOVEMENT DATA (per-round reps/distance/calories),
+ * never by re-parsing a rendered display string. Both the sectioned partner builder
+ * (`buildMultiSectionForTimeSections`) and the standard/sequential builders
+ * (`buildCelebrationMovementRow`) route through here, so the split rule can't drift between paths.
+ *
+ * Two shapes are NEVER split:
+ * - `together` movements — both athletes do the full amount side by side (e.g. "600m run
+ *   (together)"). Dividing them would erase work each partner actually did.
+ * - per-round values (`isPerRoundValue`, i.e. a row that repeats over rounds>1) — the number is
+ *   already what one athlete does in one round; splitting again double-discounts it.
+ */
+function computeMovementTeamShare(params: {
+  perRoundReps?: number;
+  perRoundDistance?: number;
+  perRoundCalories?: number;
+  teamSize?: number;
+  together?: boolean;
+  isPerRoundValue?: boolean;
+}): string | undefined {
+  const { perRoundReps, perRoundDistance, perRoundCalories, teamSize, together, isPerRoundValue } = params;
+  if (!teamSize || teamSize <= 1) return undefined;
+  if (together || isPerRoundValue) return undefined;
+  if (perRoundReps && perRoundReps > 0) return `${Math.round(perRoundReps / teamSize)}`;
+  if (perRoundCalories && perRoundCalories > 0) return `${Math.round(perRoundCalories / teamSize)} cal`;
+  if (perRoundDistance && perRoundDistance > 0) {
+    const share = perRoundDistance / teamSize;
+    return share >= 1000 ? `${(share / 1000).toFixed(2)}km` : `${Math.round(share)}m`;
+  }
+  return undefined;
+}
+
 function buildCelebrationMovementRow(params: {
   movementName: string;
-  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean };
+  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; time?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean };
   actual?: MovementTotal;
   repeatCount?: number;
   isLadder?: boolean;
@@ -1105,8 +1159,10 @@ function buildCelebrationMovementRow(params: {
   suppressCalorieTotal?: boolean;
   suppressDistanceTotal?: boolean;
   partnerSplit?: 'reps' | 'rounds';
+  teamSize?: number;
+  together?: boolean;
 }): ArtifactRow {
-  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit } = params;
+  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit, teamSize, together } = params;
   const weight = prescribed?.implementCount === 2 && prescribed.weight
     ? prescribed.weight
     : actual?.weight ?? prescribed?.weight;
@@ -1178,6 +1234,15 @@ function buildCelebrationMovementRow(params: {
       subNoteParts.push(totalLabel(totalCalories, 'cal'));
     }
     accent = 'magenta';
+  } else if ((prescribed?.time ?? actual?.totalTime ?? 0) > 0) {
+    // Prescribed timed hold (plank, wall sit, hollow hold): the per-round duration IS the
+    // quantity — never reps. Cyan, matching the skill/core Trinity color.
+    const perRoundTime = prescribed?.time
+      ?? (actual?.totalTime && repeatCount && repeatCount > 1 && actual.totalTime % repeatCount === 0
+        ? actual.totalTime / repeatCount
+        : actual?.totalTime);
+    primary = formatHoldDuration(perRoundTime as number);
+    accent = 'cyan';
   } else if (isStrength && hasWeight) {
     if (actual?.weightProgression && actual.weightProgression.length > 1) {
       const min = Math.min(...actual.weightProgression);
@@ -1203,9 +1268,13 @@ function buildCelebrationMovementRow(params: {
   }
 
   const baseDisplayName = actual?.wasSubstituted && actual.name ? actual.name : movementName;
-  const displayName = perRoundReps && perRoundReps !== 1 && !isStrength
+  const pluralName = perRoundReps && perRoundReps !== 1 && !isStrength
     ? pluralizeMovementLabel(baseDisplayName)
     : baseDisplayName;
+  // "together" movements (both partners do the full amount) carry the note inline so the reader
+  // sees WHY there's no per-partner split — matching the sectioned builder's "(together)" suffix.
+  const isTogether = !!together;
+  const displayName = isTogether ? `${pluralName} (together)` : pluralName;
   const hasLoggedWeight = (actual?.weight || 0) > 0;
   const hasPrescribedDistForRelay = (prescribed?.distance ?? 0) > 0 && (perRoundDistance ?? 0) > 0;
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
@@ -1239,6 +1308,21 @@ function buildCelebrationMovementRow(params: {
     accent,
     repeatCount,
     partnerSplit,
+    // Flat-share partner split resolved from movement data (never a display-string regex). Skipped
+    // for (together) work and per-round values by computeMovementTeamShare's own guards.
+    teamShare: partnerSplit === 'reps'
+      ? computeMovementTeamShare({
+          perRoundReps,
+          perRoundDistance,
+          perRoundCalories,
+          teamSize,
+          together: isTogether,
+          isPerRoundValue: (repeatCount ?? 0) > 1,
+        })
+      : undefined,
+    // A (together) movement's full amount already shows in the value column via `primary`; a
+    // second, identical "mine" readout is redundant noise. Weighted work keeps mine (the load).
+    ...(isTogether && !hasWeight ? { suppressMine: true } : {}),
     // Pair-paced pacer rows get a SWAP chip: the run/bike is the swap task between AMRAP
     // turns, not a movement inside the round — the chip keeps the story readable.
     ...(prescribed?.relay ? { roundLabel: 'SWAP' } : {}),
@@ -1518,6 +1602,7 @@ function buildSequentialMovementRows(
     isStrength?: boolean;
     descLadderScheme?: number[];
     partnerSplit?: 'reps' | 'rounds';
+    teamSize?: number;
   } = {},
 ): ArtifactRow[] {
   return prescribedMovements.map((movement): ArtifactRow => {
@@ -1540,6 +1625,8 @@ function buildSequentialMovementRows(
       isStrength: options.isStrength,
       isLadder: !!options.descLadderScheme,
       partnerSplit: options.partnerSplit,
+      teamSize: options.teamSize,
+      together: movement.together ?? actual?.together,
     });
   });
 }
@@ -1629,21 +1716,20 @@ function buildMultiSectionForTimeSections(
           : hasMultiRoundTier
             ? '1 ROUND'
             : '';
-    // Flat-share ('reps') split: per-partner share of each movement's team total, computed from
-    // the movement data itself — the display line carries a full sentence, so the poster layer
-    // can't re-derive the quantity from it. (together) movements are done side by side, never
-    // split; multi-round sections prescribe per-round values, which must not be halved either.
-    const teamShareFor = (movement: ParsedMovement): string | undefined => {
-      if (splitInfo?.split !== 'reps' || !teamSize || teamSize <= 1) return undefined;
-      if (movement.together || rounds > 1) return undefined;
-      if (movement.reps && movement.reps > 0) return `${Math.round(movement.reps / teamSize)}`;
-      if (movement.calories && movement.calories > 0) return `${Math.round(movement.calories / teamSize)} cal`;
-      if (movement.distance && movement.distance > 0) {
-        const share = movement.distance / teamSize;
-        return share >= 1000 ? `${(share / 1000).toFixed(2)}km` : `${Math.round(share)}m`;
-      }
-      return undefined;
-    };
+    // Flat-share ('reps') split: per-partner share of each movement's team total, from the movement
+    // data itself (never a display-string regex) via the one shared rule computeMovementTeamShare —
+    // which skips (together) work and per-round (rounds>1) values.
+    const teamShareFor = (movement: ParsedMovement): string | undefined =>
+      splitInfo?.split !== 'reps'
+        ? undefined
+        : computeMovementTeamShare({
+            perRoundReps: movement.reps,
+            perRoundDistance: movement.distance,
+            perRoundCalories: movement.calories,
+            teamSize,
+            together: movement.together,
+            isPerRoundValue: rounds > 1,
+          });
     const rows = moveEntries.map(({ movement, logged, part }): ArtifactRow => {
       const rowPartnerMine = personalRoundsForSection > 0
         ? formatSectionMovementPart(exercise, movement, personalRoundsForSection).text
@@ -1817,6 +1903,14 @@ function formatIntervalDuration(seconds: number): string {
   return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
 }
 
+// A prescribed isometric-hold duration as the athlete reads it: "45s", "1 min", "1:30".
+function formatHoldDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
+}
+
 // Coach-written interval repeat ("[3:00 AMRAP, 1:00 REST] x 4 rounds") — the only rounds
 // figure allowed on a structure line. An exercise's `rounds`/repeatCount is the EARNED
 // score for AMRAPs and must never masquerade as prescription.
@@ -1890,6 +1984,7 @@ export function buildPageArtifactSections(
   const prescribedRepsDisplayMap: Record<string, string> = {};
   const prescribedCalsMap: Record<string, number> = {};
   const prescribedDistMap: Record<string, number> = {};
+  const prescribedTimeMap: Record<string, number> = {};
   const prescribedWeightMap: Record<string, number> = {};
   const prescribedImplementMap: Record<string, 1 | 2> = {};
   const prescribedMaxMap: Record<string, boolean> = {};
@@ -1916,6 +2011,7 @@ export function buildPageArtifactSections(
     if (m.repsDisplay) prescribedRepsDisplayMap[key] = m.repsDisplay;
     if (m.calories) prescribedCalsMap[key] = m.calories;
     if (m.distance) prescribedDistMap[key] = m.distance;
+    if (m.time) prescribedTimeMap[key] = m.time;
     if (m.rxWeights?.male || m.rxWeights?.female) {
       prescribedWeightMap[key] = m.rxWeights.male || m.rxWeights.female || 0;
       const rxUnit = m.rxWeights.unit === 'lb' ? 'lb' : 'kg';
@@ -2228,6 +2324,7 @@ export function buildPageArtifactSections(
         isStrength,
         descLadderScheme: descSchemeGlobal,
         partnerSplit: splitInfo?.split,
+        teamSize,
       })
     : orderedMovements.map((movement): ArtifactRow => {
         const key = movement.name.toLowerCase();
@@ -2237,17 +2334,21 @@ export function buildPageArtifactSections(
           const prescReps = prescribedRepsMap[key];
           const prescCals = prescribedCalsMap[key];
           const prescDist = prescribedDistMap[key];
+          const prescTime = prescribedTimeMap[key];
           // isMaxReps is stamped by the post-processor on save (logging writes the athlete's
           // per-round reps into movement.reps, so "no prescribed value" alone stops being a
           // reliable signal after save). The absence check remains for docs saved before the
-          // stamp existed.
-          const isMaxMovement = Boolean(prescribedMaxMap[key])
-            || (!(prescDist && prescDist > 0) && !(prescCals && prescCals > 0) && !(prescReps && prescReps > 0));
+          // stamp existed. A prescribed timed hold ("45s Plank") is a fixed prescription, never
+          // a max-effort movement.
+          const isMaxMovement = !(prescTime && prescTime > 0)
+            && (Boolean(prescribedMaxMap[key])
+              || (!(prescDist && prescDist > 0) && !(prescCals && prescCals > 0) && !(prescReps && prescReps > 0)));
           const wUnit = movement.unit === 'lb' ? 'lb' : 'kg';
           const displayName = movement.name.replace(/\bDbs?\b/g, (token) => token.toUpperCase());
           const totalR = movement.totalReps || 0;
           const totalC = movement.totalCalories || 0;
           const totalD = movement.totalDistance || 0;
+          const totalT = movement.totalTime || 0;
 
           let fullLine: string;
           let rxLoadTag: string | undefined;
@@ -2265,15 +2366,22 @@ export function buildPageArtifactSections(
               : undefined;
           } else {
             // Fixed prescription: one line as the athlete would read it off the whiteboard
-            // ("200m Run", "50 Double Under / 80 Singles"). The per-station round count in the
-            // ST. header already says how many times it ran — no derived totals.
-            const qty = prescDist && prescDist > 0 ? formatStationDistance(prescDist)
+            // ("200m Run", "50 Double Under / 80 Singles"). The ST. header shows how many times
+            // it ran; the total across all visits rides alongside when it adds information beyond
+            // the per-round quantity (i.e. the station was done more than once).
+            const qty = prescTime && prescTime > 0 ? formatHoldDuration(prescTime)
+              : prescDist && prescDist > 0 ? formatStationDistance(prescDist)
               : prescCals && prescCals > 0 ? `${prescCals} cal`
               : prescribedRepsDisplayMap[key] ?? `${prescReps}`;
             const altSuffix = prescribedAltMap[key] ? ` / ${prescribedAltMap[key]}` : '';
             const loadSuffix = (movement.weight || 0) > 0 ? ` @ ${movement.weight}${wUnit}`
               : prescribedRxLabelMap[key] ? ` @ ${prescribedRxLabelMap[key]}` : '';
             fullLine = `${qty} ${displayName}${altSuffix}${loadSuffix}`;
+            totalNote = totalR > (prescReps || 0) ? `${totalR} total`
+              : totalC > (prescCals || 0) ? `${totalC} cal total`
+              : totalD > (prescDist || 0) ? `${formatStationDistance(totalD)} total`
+              : totalT > (prescTime || 0) ? `${formatHoldDuration(totalT)} total`
+              : undefined;
           }
 
           // Station rows always carry the COMPLETE display line in primary (the poster line
@@ -2307,6 +2415,7 @@ export function buildPageArtifactSections(
           repsDisplay: prescribedRepsDisplayMap[key],
           distance: prescribedDistMap[key],
           calories: prescribedCalsMap[key],
+          time: prescribedTimeMap[key],
           weight: prescribedWeightMap[key],
           implementCount: prescribedImplementMap[key],
           relay: parsedMovement?.relay,
@@ -2321,6 +2430,8 @@ export function buildPageArtifactSections(
           repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
           isStrength,
           partnerSplit: splitInfo?.split,
+          teamSize,
+          together: movement.together ?? parsedMovement?.together,
         });
 
         if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {
@@ -2364,12 +2475,30 @@ export function buildPageArtifactSections(
     ? [...rows.filter((r) => r.roundLabel !== 'SWAP'), ...rows.filter((r) => r.roundLabel === 'SWAP')]
     : rows;
 
+  // Barbell complex ("1 Power Clean + 1 Hang Power Clean"): the sub-lifts are ONE unbroken set on
+  // one bar, so collapse their rows into a single line that mirrors the board's "+"-joined
+  // notation. Keep the first row's shape (shared weight, mineKey) — only the name changes — so the
+  // skin renders it exactly like any strength movement row.
+  const complexCollapsed = (exercise.complex && swapLast.length >= 2 && swapLast.every((r) => !r.stationRow && r.roundLabel == null))
+    ? [{
+        ...swapLast[0],
+        name: prescribedMovements
+          .map((m) => {
+            const rep = m.reps ?? prescribedRepsMap[m.name.toLowerCase()];
+            const nm = getMovementDisplayNameFromContext(m, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`);
+            return [rep != null ? `${rep}` : null, nm].filter(Boolean).join(' ');
+          })
+          .join(' + '),
+        totalNote: undefined,
+      }]
+    : swapLast;
+
   return [{
     eyebrow: sectionEyebrow,
     title: exercise.name,
     blueprint,
     structureNote,
-    rows: swapLast,
+    rows: complexCollapsed,
     hiddenCount: 0,
     ...((descSchemeGlobal || strengthBubbleScheme) && {
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
@@ -2892,23 +3021,27 @@ export function computeHeroResult(
   if (amrapExercise) {
     const isLadder = amrapExercise.ladderReps && amrapExercise.ladderReps.length > 0 && amrapExercise.ladderStep != null;
     if (isLadder) {
-      // An AMRAP ladder score IS rounds + partial reps — lead with that ("6 +10"), not a raw
-      // rep count nobody watching can verify. amrapExercise.sets[0].actualReps is the scaling
-      // movements' combined total (per-movement reps × movement count, used for the workload
-      // breakdown) — it is NOT "total reps for the workout" and must never be shown as the hero.
+      // A ladder AMRAP leads with TOTAL REPS, not rounds: each round is a different rep count, so
+      // "9 rounds" undersells the work (2-3-…-10 = 54/movement → 108 reps here). This mirrors the
+      // logging screen's headline. The rung climb itself is still shown by the poster's ladder
+      // track, so "which round" context isn't lost. ladderTotalReps prefers the logged combined
+      // total (sets[0].actualReps, already includes partial reps).
       const step = amrapExercise.ladderStep || 0;
       if (step > 0) {
-        const partial = amrapExercise.ladderPartial || 0;
-        return {
-          value: `${step}`,
-          unit: partial > 0 ? `+${partial}` : undefined,
-          formatLine, storyLine,
-          storyMovements: buildStory(step),
-          accentClass: 'accentMagenta',
-          // The poster never carries a rep total for a ladder score (no way to verify it at a
-          // glance) — just which round the partial is logged into, beside the rounds+partial hero.
-          ladderIntoRound: partial > 0 ? step + 1 : undefined,
-        };
+        const totalReps = ladderTotalReps(amrapExercise);
+        if (totalReps > 0) {
+          const partial = amrapExercise.ladderPartial || 0;
+          return {
+            value: `${totalReps}`,
+            unit: 'REPS',
+            formatLine, storyLine,
+            storyMovements: buildStory(step),
+            accentClass: 'accentMagenta',
+            // Partial reps into the next rung → a "into round N" meta note beside the total (the
+            // total already counts them; this just says where the athlete stopped climbing).
+            ladderIntoRound: partial > 0 ? step + 1 : undefined,
+          };
+        }
       }
     }
     // Alternating-station interval AMRAP: exercise.rounds is the prescribed interval count

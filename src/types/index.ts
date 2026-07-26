@@ -199,6 +199,10 @@ export interface Exercise {
   // the whole photo. Carried through from ParsedExercise.rawText so poster-time text matching
   // (e.g. parseDescLadderScheme) stays scoped per part in multi-exercise workouts.
   rawText?: string;
+  // True when this exercise's movements are performed as ONE barbell complex per set — an unbroken
+  // sequence on a single bar ("1 Power Clean + 1 Hang Power Clean"). Carried from ParsedExercise so
+  // the poster renders the sub-movements as one combined line in both reward and detail mode.
+  complex?: boolean;
   // This part's own logging mode, persisted so detail-mode rendering never falls back to the
   // session-level format (parts are standalone practices). 'free' routes the poster to
   // verbatim-prescription rendering with the entered score as hero.
@@ -401,6 +405,11 @@ export interface ParsedExercise {
   // suggestedSets (existing "(N each)" convention) — no separate field needed pre-save.
   partnerWorkout?: boolean;
   partnerSplit?: 'reps' | 'rounds';
+  // True when this exercise's movements are performed as ONE barbell complex per set — an
+  // unbroken sequence on a single bar ("1 Power Clean + 1 Hang Power Clean", "3 Snatch + 2 OHS").
+  // The movements[] keep each sub-lift; the poster renders them as one combined line, and volume
+  // counts the shared bar once. AI-set at parse time; backfilled from "+"-joined board text.
+  complex?: boolean;
 }
 
 // Movement substitution tracking during logging
@@ -529,6 +538,7 @@ export interface EPBreakdown {
   volume: number;      // (totalVolume / bodyweight) × EP_VOLUME_RATE
   bodyweight: number;  // Bodyweight movement credit (burpees, pull-ups, etc.)
   distance: number;    // distance_meters × EP_DISTANCE_RATE (× carry multiplier)
+  calories: number;    // machine_calories × EP_CALORIE_RATE (Echo Bike, Row, Ski…)
   intensity: number;   // Bonus for beating the time cap (timeCap / actualTime ratio)
   pr: number;          // EP_PR_BONUS per PR
   difficulty: number;  // Difficulty multiplier bonus/penalty (0 when no difficultyLevel)

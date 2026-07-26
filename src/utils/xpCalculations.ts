@@ -8,6 +8,12 @@ export const EP_BASE = 10;           // Every completed workout
 export const EP_METCON_RATE = 3;     // Per minute of time cap (not actual time)
 export const EP_VOLUME_RATE = 0.5;   // Per (totalVolume / bodyweight) unit
 export const EP_DISTANCE_RATE = 0.01; // Per meter of distance
+export const EP_CALORIE_RATE = 0.3;  // Per calorie — AIR-BIKE anchor (Echo/Assault). Other
+                                     // machines scale down via calorieRateForMovement().
+                                     // Anchored to TIME, not distance: ~20 air-bike cal ≈ 2 min
+                                     // ≈ 6 EP of time, so a cardio minute counts ~double (its
+                                     // time + a roughly equal calorie bonus) without overtaking
+                                     // time as the primary effort signal.
 export const EP_CARRY_MULTIPLIER = 2.5; // Weighted carry multiplier
 export const EP_PR_BONUS = 25;       // Per PR achieved
 export const EP_BODYWEIGHT_RATE = 0.5;  // Same as volume rate, for bodyweight movements
@@ -33,8 +39,26 @@ export function isWeightedCarry(movementName: string): boolean {
 }
 
 /**
+ * Distance-EP weighting per machine. Air bikes report hugely inflated distance for the work done
+ * (2 km echo in ~3:30 is little real travel), so raw-meter EP over-pays them and a distance-logged
+ * bike out-scores the SAME ride logged by calories. Each machine's meters are discounted to match
+ * its (time-anchored) calorie value: 2 km echo ≈ 40 cal ≈ 12 EP either way. Run/Row/SkiErg report
+ * honest distance and keep the full rate.
+ */
+export function machineDistanceMultiplier(name: string): number {
+  const n = name.toLowerCase();
+  // Air bikes (Echo / Assault / generic "air bike") — most inflated distance.
+  if (/echo|assault/.test(n) || (/\bair\b/.test(n) && /bike/.test(n))) return 0.6;
+  // Concept2 BikeErg — also covers far more distance than the effort warrants.
+  if (/erg/.test(n) && /bike/.test(n)) return 0.4;
+  // Run, Row, SkiErg, and everything else: honest distance.
+  return 1.0;
+}
+
+/**
  * Calculate distance EP from workout movement breakdown.
- * Weighted carries get a 2.5x multiplier vs standard cardio at 1.0x.
+ * Weighted carries get a 2.5x multiplier; cardio machines with inflated distance readouts
+ * (air bikes, bike-ergs) get discounted via machineDistanceMultiplier; everything else is 1.0x.
  */
 export function calculateDistanceEP(
   movements: Array<{ name: string; totalDistance?: number; weight?: number }>
@@ -44,10 +68,51 @@ export function calculateDistanceEP(
     if (!mov.totalDistance || mov.totalDistance <= 0) continue;
     const baseEP = mov.totalDistance * EP_DISTANCE_RATE;
     const isWeighted = isWeightedCarry(mov.name) || (mov.weight != null && mov.weight > 0);
-    const multiplier = isWeighted ? EP_CARRY_MULTIPLIER : 1.0;
+    const multiplier = isWeighted ? EP_CARRY_MULTIPLIER : machineDistanceMultiplier(mov.name);
     distanceEP += baseEP * multiplier;
   }
   return Math.floor(distanceEP);
+}
+
+/**
+ * EP earned per calorie, by machine. A calorie is NOT equal across ergs: an air-bike calorie is
+ * the hardest to earn, a bike-erg calorie the easiest, so a flat rate would over-pay the easy
+ * machines. Each rate is anchored to the TIME that many calories takes (~2 min of hard work → a
+ * calorie bonus ≈ that time's EP), so calories stay a modifier under the time backbone rather
+ * than overtaking it. Mirrors the machine distance-equivalence table in exerciseDefinitions.ts.
+ */
+export function calorieRateForMovement(name: string): number {
+  const n = name.toLowerCase();
+  // Air bikes (Echo / Assault / generic "air bike") — stingiest calories, the anchor rate.
+  if (/echo|assault/.test(n) || (/\bair\b/.test(n) && /bike/.test(n))) return EP_CALORIE_RATE;
+  // Concept2 BikeErg — calories come fastest, so a calorie is worth the least effort.
+  if (/erg/.test(n) && /bike/.test(n)) return 0.15;
+  // Rower / SkiErg — cheaper than an air bike, harder than a bike-erg.
+  if (/\brow|\bski/.test(n)) return 0.2;
+  // Unknown cardio machine: treat like a rower, never assume the air-bike anchor.
+  return 0.2;
+}
+
+/**
+ * Calculate calorie EP from cardio-machine movements (Echo Bike, Row, Ski, etc.).
+ * Machine calories are a direct measure of work output that the formula previously ignored
+ * entirely — a 400-cal Echo Bike piece earned zero EP. Calories are the better cardio metric
+ * because they track PACE where distance can't: the same 1 km burns ~20 cal at a hard pull
+ * (1:39) but ~17 cal easy (1:55), so a faster effort rightly earns more.
+ *
+ * Each machine's rate comes from calorieRateForMovement (air bike is the anchor; rower/ski/bike-
+ * erg calories are cheaper and scale down) so the same displayed calorie count isn't over-paid
+ * on the machines that hand out calories easily.
+ */
+export function calculateCalorieEP(
+  movements: Array<{ name?: string; totalCalories?: number }>
+): number {
+  let calorieEP = 0;
+  for (const mov of movements) {
+    if (!mov.totalCalories || mov.totalCalories <= 0) continue;
+    calorieEP += mov.totalCalories * calorieRateForMovement(mov.name ?? '');
+  }
+  return Math.floor(calorieEP);
 }
 
 // ============================================
@@ -128,7 +193,7 @@ export function calculateWorkoutEP(
   timeCapMinutes: number,
   bodyweight: number,
   isPR: boolean = false,
-  movements?: Array<{ name: string; totalReps?: number; totalDistance?: number; weight?: number }>,
+  movements?: Array<{ name: string; totalReps?: number; totalDistance?: number; totalCalories?: number; weight?: number }>,
   actualTimeMinutes?: number,
   difficultyLevel?: number
 ): EPBreakdown {
@@ -139,6 +204,7 @@ export function calculateWorkoutEP(
     : 0;
   const bwEP = movements ? calculateBodyweightEP(movements) : 0;
   const distance = movements ? calculateDistanceEP(movements) : 0;
+  const calories = movements ? calculateCalorieEP(movements) : 0;
 
   // Intensity bonus: reward faster completions relative to time cap.
   // Each 10% faster = +EP_INTENSITY_RATE, capped at 50% faster (5 tiers).
@@ -153,7 +219,7 @@ export function calculateWorkoutEP(
 
   // Difficulty multiplier: 1.0 at level 5, ±4% per level away from 5.
   // Range: level 1 → 0.84×, level 5 → 1.00×, level 8 → 1.12×, level 10 → 1.20×
-  const subtotal = EP_BASE + time + volume + bwEP + distance + intensity + pr;
+  const subtotal = EP_BASE + time + volume + bwEP + distance + calories + intensity + pr;
   let difficulty = 0;
   if (difficultyLevel && difficultyLevel >= 1 && difficultyLevel <= 10) {
     const multiplier = 1.0 + (difficultyLevel - 5) * 0.04;
@@ -166,6 +232,7 @@ export function calculateWorkoutEP(
     volume,
     bodyweight: bwEP,
     distance,
+    calories,
     intensity,
     pr,
     difficulty,
@@ -246,6 +313,7 @@ export function calculateWorkoutXP(
     volume,
     bodyweight: 0,
     distance: 0,
+    calories: 0,
     intensity: 0,
     pr,
     difficulty: 0,

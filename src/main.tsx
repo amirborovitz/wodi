@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-const WODI_BUILD_ID = '2026-05-29-poster-whiteboard-v9'
+// __BUILD_TIME__ / __APP_VERSION__ are injected at build time by vite.config.ts.
+const WODI_BUILD_ID = `v${__APP_VERSION__} · built ${__BUILD_TIME__}`
 
 declare global {
   interface Window {
@@ -11,8 +12,7 @@ declare global {
   }
 }
 
-console.warn(`[WODI BUILD] ${WODI_BUILD_ID}`)
-console.log('APP LOADED', { build: WODI_BUILD_ID, loadedAt: new Date().toISOString() })
+console.warn(`%c[WODI BUILD] ${WODI_BUILD_ID}`, 'font-weight:bold;color:#f5c200')
 
 if (typeof window !== 'undefined') {
   window.__WODI_BUILD_ID__ = WODI_BUILD_ID

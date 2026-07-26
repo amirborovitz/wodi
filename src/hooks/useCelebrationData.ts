@@ -44,6 +44,7 @@ import {
   type CelebrationStickerConfig,
 } from '../services/celebrationStickerConfig';
 import { hasStructuralCorrection } from '../components/celebration/corrections';
+import { resolveSourceDate } from '../services/sourceDateResolution';
 import {
   // Pure computation functions
   computeHeroResult,
@@ -207,48 +208,6 @@ export interface CelebrationData {
   hasStationEmom: boolean;
 }
 
-function toIsoCalendarDate(year: number, month: number, day: number): string | undefined {
-  if (month < 1 || month > 12 || day < 1 || day > 31) return undefined;
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year
-    || date.getMonth() !== month - 1
-    || date.getDate() !== day
-  ) {
-    return undefined;
-  }
-  return [
-    String(year).padStart(4, '0'),
-    String(month).padStart(2, '0'),
-    String(day).padStart(2, '0'),
-  ].join('-');
-}
-
-function normalizeSourceDate(value: string | undefined, fallbackYear: number): string | undefined {
-  if (!value) return undefined;
-  const iso = value.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) {
-    return toIsoCalendarDate(parseInt(iso[1], 10), parseInt(iso[2], 10), parseInt(iso[3], 10));
-  }
-  const slash = value.match(/\b(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2}|\d{4}))?\b/);
-  if (!slash) return undefined;
-  const day = parseInt(slash[1], 10);
-  const month = parseInt(slash[2], 10);
-  const rawYear = slash[3] ? parseInt(slash[3], 10) : fallbackYear;
-  const year = rawYear < 100 ? 2000 + rawYear : rawYear;
-  return toIsoCalendarDate(year, month, day);
-}
-
-function extractSourceDateFromRawText(rawText: string | undefined, fallbackYear: number): string | undefined {
-  if (!rawText) return undefined;
-  for (const line of rawText.split('\n').map((item) => item.trim())) {
-    if (!/\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})?)\b/.test(line)) continue;
-    const normalized = normalizeSourceDate(line, fallbackYear);
-    if (normalized) return normalized;
-  }
-  return undefined;
-}
-
 // ─── Internal pure helpers (not in WorkoutScreen) ─────────────────────────────
 
 function inferPosterDifficultyLevel(params: {
@@ -375,10 +334,11 @@ export function useCelebrationData(
   // The workout's actual date — never "now at render time". Reward mode carries it on
   // rewardData (set at save time); detail mode reads the persisted Firestore field.
   const workoutDate: Date = (isReward ? rewardData?.date : workout?.date) ?? new Date();
-  const sourceDate = normalizeSourceDate(
+  const sourceDate = resolveSourceDate(
     isReward ? rewardData?.sourceDate : workout?.sourceDate,
-    workoutDate.getFullYear(),
-  ) ?? extractSourceDateFromRawText(rawText, workoutDate.getFullYear());
+    rawText,
+    workoutDate,
+  );
 
   // ── Poster customization (persisted to Firestore) ──────────────────────────
 

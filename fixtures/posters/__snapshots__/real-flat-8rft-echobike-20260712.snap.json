@@ -151,11 +151,6 @@
   "posterRows": {
     "reward": [
       {
-        "kind": "block",
-        "label": "",
-        "cap": "8 rounds for time"
-      },
-      {
         "kind": "line",
         "rx": "2000m Echo Bike",
         "load": "",
@@ -190,11 +185,6 @@
     ],
     "pages": [
       [
-        {
-          "kind": "block",
-          "label": "",
-          "cap": "8 rounds for time"
-        },
         {
           "kind": "line",
           "rx": "2000m Echo Bike",

@@ -1,0 +1,40 @@
+{
+  "name": "station-emom-hold-totals",
+  "description": "Minute-station EMOM (Gorillot 'EMOM 12 min, 4 rounds' of 3 stations: thrusters / burpees / 45s plank hold). Guards three fixes: (1) a timed hold renders as '45s Plank Hold' instead of being dropped, (2) per-station-visit counting yields 4 visits each (Thruster/Burpee 36 reps, plank 180s) — NOT the [2,1,1] the 'alt stations' shortcut used to give (27 reps), (3) each station row shows its across-all-visits total ('36 total', '3 min total') when the station ran more than once.",
+  "workout": {
+    "title": "Metcon",
+    "format": "emom",
+    "rawText": "EMOM for 12 minutes (4 rounds):\nmin 1 : 8-10 thrusters @35/50kg\nmin 2 : 8-10 burpee box step up\nmin 3 : 45 sec plank hold",
+    "exercises": [
+      {
+        "id": "ex-emom",
+        "name": "EMOM 12",
+        "type": "wod",
+        "loggingMode": "emom",
+        "prescription": "8-10 Thrusters, 8-10 Burpees, 45 sec Plank Hold",
+        "rawText": "EMOM for 12 minutes (4 rounds):\nmin 1 : 8-10 thrusters @35/50kg\nmin 2 : 8-10 burpee box step up\nmin 3 : 45 sec plank hold",
+        "rounds": 4,
+        "intervalCount": 12,
+        "workDuration": 720,
+        "sets": [
+          { "id": "s1", "setNumber": 1, "weight": 40, "completed": true },
+          { "id": "s2", "setNumber": 2, "weight": 40, "completed": true },
+          { "id": "s3", "setNumber": 3, "weight": 40, "completed": true },
+          { "id": "s4", "setNumber": 4, "weight": 40, "completed": true }
+        ],
+        "movements": [
+          { "name": "Thruster", "reps": 9, "repsDisplay": "8-10", "inputType": "weight", "equipment": "barbell", "rxWeights": { "male": 50, "female": 35, "unit": "kg" }, "stationLabel": "Min 1", "countingMode": "per_station_visit" },
+          { "name": "Burpee", "reps": 9, "repsDisplay": "8-10", "inputType": "none", "stationLabel": "Min 2", "countingMode": "per_station_visit" },
+          { "name": "Plank Hold", "time": 45, "inputType": "none", "stationLabel": "Min 3", "countingMode": "per_station_visit" }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Thruster", "totalReps": 36, "weight": 40, "unit": "kg", "color": "yellow" },
+        { "name": "Burpee", "totalReps": 36, "color": "magenta" },
+        { "name": "Plank Hold", "totalTime": 180, "color": "cyan" }
+      ]
+    }
+  }
+}

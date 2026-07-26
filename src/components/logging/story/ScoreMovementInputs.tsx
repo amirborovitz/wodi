@@ -801,6 +801,16 @@ export function ScoreMovementInputs({
     const tile = editableTiles.find((entry) => entry.tileId === tileId);
     if (!tile) return;
 
+    // A typed weight on a shared-hero tile propagates to the whole equipment group, exactly like
+    // the +/- buttons do — otherwise typing would silently desync the group's shared weight.
+    const commitWeight = (val: number | undefined) => {
+      if (tile.mr.kind === 'load' && sharedWeightKeys.has(tile.mr.movementKey)) {
+        handleSharedWeightChange(getMovementEquipment(tile.mr) as 'barbell' | 'kb' | 'db', val);
+      } else {
+        handleWeightChange(tile.globalIndex, tile.mr, val);
+      }
+    };
+
     const sanitized = tile.config.inputMode === 'decimal'
       ? rawValue.replace(/[^0-9.]/g, '')
       : rawValue.replace(/\D/g, '');
@@ -812,7 +822,7 @@ export function ScoreMovementInputs({
       setNumpadValue('');
       switch (tile.config.field) {
         case 'weight':
-          handleWeightChange(tile.globalIndex, tile.mr, undefined);
+          commitWeight(undefined);
           return;
         case 'distance':
           onChange(tile.globalIndex, { distance: undefined });
@@ -836,7 +846,7 @@ export function ScoreMovementInputs({
 
     switch (tile.config.field) {
       case 'weight':
-        handleWeightChange(tile.globalIndex, tile.mr, clamped);
+        commitWeight(clamped);
         return;
       case 'distance':
         onChange(tile.globalIndex, { distance: clamped });
@@ -848,7 +858,7 @@ export function ScoreMovementInputs({
         onChange(tile.globalIndex, { reps: clamped });
         return;
     }
-  }, [editableTiles, handleWeightChange, onChange]);
+  }, [editableTiles, handleWeightChange, handleSharedWeightChange, getMovementEquipment, sharedWeightKeys, onChange]);
 
   const handleNumpadDigit = useCallback((digit: string) => {
     if (!activeTileId) return;
@@ -1013,6 +1023,10 @@ export function ScoreMovementInputs({
     const step = getLegalWeightStep(base);
     const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' - ');
     const groupLabel = getEquipmentLabel(focusedLoadGroup.type);
+    // Twin implement (two DBs/KBs held at once): the athlete logs the per-implement weight, so the
+    // hero must read "2× 16 kg each" — not a bare "16" that hides the double.
+    const isTwin = focusedLoadGroup.movements.some(mr => mr.implementCount === 2);
+    const heroActive = activeTileId === base?.movementKey;
 
     const setSharedValue = (next: number) => {
       handleSharedWeightChange(focusedLoadGroup.type, roundToLegalWeight(next, base));
@@ -1047,7 +1061,7 @@ export function ScoreMovementInputs({
                     </button>
                     <span className={styles.separateWeightValue}>
                       {value}
-                      <span>kg</span>
+                      <span>{mr.implementCount === 2 ? 'kg each' : 'kg'}</span>
                     </span>
                     <button
                       type="button"
@@ -1101,15 +1115,23 @@ export function ScoreMovementInputs({
           >
             -
           </button>
-          <div className={styles.heroWeightCenter}>
-            <span className={styles.heroWeightValue}>{currentWeight}</span>
-            <span className={styles.heroWeightUnit}>kg</span>
+          <button
+            type="button"
+            className={`${styles.heroWeightCenter} ${heroActive ? styles.heroWeightCenterActive : ''}`}
+            onClick={() => base && openTile(base.movementKey)}
+            aria-label={`Type ${groupLabel} weight`}
+          >
+            <span className={styles.heroWeightValue}>
+              {isTwin && <span className={styles.heroWeightMultiplier}>2×</span>}
+              {currentWeight}
+            </span>
+            <span className={styles.heroWeightUnit}>{isTwin ? 'kg each' : 'kg'}</span>
             {rx != null && (
               <span className={`${styles.rxHint} ${isRx ? styles.rxHit : ''}`}>
                 {isRx ? 'Rx ✓' : `Rx is ${rx}kg`}
               </span>
             )}
-          </div>
+          </button>
           <button
             type="button"
             className={styles.heroWeightButton}
