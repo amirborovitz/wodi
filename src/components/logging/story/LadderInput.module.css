@@ -104,86 +104,9 @@
   text-shadow: 0 0 12px rgba(245, 194, 0, 0.5);
 }
 
-/* ── Partial trigger pill ── */
-.partialTrigger {
-  background: transparent;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-full);
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: var(--font-semibold);
-  padding: 10px 20px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: all var(--duration-fast) var(--ease-out);
-}
-
-.partialTrigger:active {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-/* ── Partial reps row ── */
-.partialRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  width: 100%;
-  max-width: 320px;
-}
-
-.partialLabel {
-  font-size: 13px;
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-}
-
-.partialControls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.partialBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--color-text-secondary);
-  font-size: 18px;
-  font-weight: var(--font-bold);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: all var(--duration-fast) var(--ease-out);
-}
-
-.partialBtn:active {
-  background: rgba(255, 255, 255, 0.08);
-  transform: scale(0.93);
-}
-
-.partialCount {
-  font-size: 16px;
-  font-weight: var(--font-bold);
-  color: var(--wodi-yellow);
-  min-width: 24px;
-  text-align: center;
-}
-
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .stepBtn,
-  .partialBtn,
-  .partialTrigger {
+  .stepBtn {
     transition: none;
-  }
-  .partialBtn:active {
-    transform: none;
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "wodboard",
   "private": true,
-  "version": "0.1.18",
+  "version": "0.1.19",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,6 +12,8 @@
     "corpus:add": "tsx scripts/wod-corpus.ts --add",
     "posters": "tsx scripts/poster-corpus.ts",
     "posters:update": "tsx scripts/poster-corpus.ts --update",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -38,6 +40,7 @@
     "tsx": "^4.22.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^4.1.10"
   }
 }

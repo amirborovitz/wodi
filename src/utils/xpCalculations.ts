@@ -240,11 +240,51 @@ export function calculateWorkoutEP(
   };
 }
 
+// The workout fields EP derivation reads. EP is NOT persisted — it is recomputed from the
+// stored breakdown every time it's shown. Keeping the input shape narrow lets stats/tests build
+// a workout stub without a full Firestore doc.
+export type EPWorkout = Pick<
+  Workout,
+  'type' | 'timeCap' | 'duration' | 'format' | 'difficultyLevel' | 'workloadBreakdown'
+> & { isPR?: boolean };
+
+/**
+ * THE single source of truth for a persisted workout's EP.
+ *
+ * Every consumer — recap poster, weekly stats, career totals — must call this so the number is
+ * identical everywhere. Because EP is recomputed (never stored), the old bug was three separate
+ * call sites passing different inputs: Profile/weekly dropped the PR, intensity and difficulty
+ * terms, so career EP silently under-counted the sum of what each workout actually earned.
+ *
+ * `intensity` needs the actual completion time, which only exists at log time; pass it via
+ * `actualTimeMinutes` there. Aggregating history without it simply yields no intensity bonus
+ * (correct — most formats never earn one anyway).
+ */
+export function computeWorkoutEP(
+  workout: EPWorkout,
+  opts: { bodyweight?: number; actualTimeMinutes?: number } = {},
+): EPBreakdown {
+  const totalVolume = workout.workloadBreakdown?.grandTotalVolume ?? 0;
+  const timeCapMinutes = getTimeCapMinutes(workout);
+  const movements = workout.workloadBreakdown?.movements;
+  // Difficulty multiplier applies to metcon-style work only, never pure strength (mirrors save).
+  const difficultyLevel = workout.format === 'strength' ? undefined : workout.difficultyLevel;
+  return calculateWorkoutEP(
+    totalVolume,
+    timeCapMinutes,
+    opts.bodyweight ?? DEFAULT_BW,
+    workout.isPR ?? false,
+    movements,
+    opts.actualTimeMinutes,
+    difficultyLevel,
+  );
+}
+
 /**
  * Get time-cap minutes for EP calculation.
  * Uses persisted timeCap when available, otherwise falls back to duration.
  */
-export function getTimeCapMinutes(workout: Workout): number {
+export function getTimeCapMinutes(workout: Pick<Workout, 'type' | 'timeCap' | 'duration'>): number {
   const { type, timeCap, duration } = workout;
 
   // Explicit timeCap always wins — even strength-typed workouts may have a metcon component

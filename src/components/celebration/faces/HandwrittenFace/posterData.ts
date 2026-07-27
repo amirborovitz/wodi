@@ -14,6 +14,7 @@ import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 // Value import from helpers directly (not the useCelebrationData re-export): the hook module
 // transitively initializes Firebase, which the Node poster-corpus harness must never load.
 import { shouldLogCelebrationDebug } from '../../helpers';
+import { timeCapLabelFromText } from '../../../../utils/timeCap';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export interface PosterLine {
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
   // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
   // render the normal rx/load/mine row AND additionally render this chart right below it.
-  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
+  ladderTrack?: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
 }
 
 export type PosterRow = PosterBlock | PosterLine;
@@ -405,8 +406,7 @@ function dedupeAmrapFormat(
 
 function explicitTimeCapSub(exercise: CelebrationData['exercises'][number] | undefined, rawText?: string): string {
   const source = `${exercise?.name ?? ''} ${exercise?.prescription ?? ''} ${rawText ?? ''}`;
-  const match = source.match(/\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i);
-  return match ? `${parseInt(match[1], 10)} MIN CAP` : '';
+  return timeCapLabelFromText(source) ?? '';
 }
 
 // Totals shown in the brand strip: REPS · EFFORT · KM/CAL
@@ -548,8 +548,8 @@ function buildAmrapResultMeta(
   heroResult: HeroResult | null | undefined,
 ): { meta?: string } {
   if (!isAmrap) return {};
-  if (heroResult?.ladderIntoRound != null) {
-    return { meta: `into round ${heroResult.ladderIntoRound}` };
+  if (heroResult?.ladderIntoRungReps != null) {
+    return { meta: `into the ${heroResult.ladderIntoRungReps}s` };
   }
   return {};
 }

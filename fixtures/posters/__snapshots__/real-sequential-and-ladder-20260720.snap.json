@@ -33,7 +33,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "3 sections for time",
+        "blueprint": "3 sections for time (20 MIN CAP)",
         "rows": [],
         "isPartnerConfirmed": false
       },
@@ -270,7 +270,7 @@
       [
         {
           "kind": "block",
-          "label": "3 SECTIONS FOR TIME",
+          "label": "3 SECTIONS FOR TIME (20 MIN CAP)",
           "cap": ""
         },
         {

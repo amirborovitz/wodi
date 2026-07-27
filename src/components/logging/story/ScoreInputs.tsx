@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import type { CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult, MovementResult } from './types';
+import { PartialRoundChecklist, type PartialRow } from './PartialRoundChecklist';
 import styles from './ScoreInputs.module.css';
 
 function selectAllInput(target: HTMLInputElement) {
@@ -152,13 +152,9 @@ function formatRoundsDisplay(rounds: number): string {
 // movements they finished in the incomplete round — in any order.
 // partialMovements (names, in round order) is what the save pipeline
 // consumes (+1 effective round per checked movement); partialReps is
-// the derived rep count shown on pills and stored on the set.
-
-interface PartialRow {
-  name: string;
-  quantityLabel: string;
-  reps: number; // rep-equivalent for the "+N reps" summary (reps or calories)
-}
+// the derived rep count shown on pills and stored on the set. The pill +
+// checklist UI is the shared PartialRoundChecklist; this file just builds
+// the rows from the AMRAP's per-round movements.
 
 // Only per-round work is checkable: buy-in/cash-out sections and
 // once/per-interval/per-station movements don't repeat with the round,
@@ -190,18 +186,11 @@ function buildPartialRows(movementResults: MovementResult[] | undefined): Partia
 }
 
 function PartialRoundControl({ result, onChange }: ScoreRoundsInputProps) {
-  const [open, setOpen] = useState(false);
   const rows = useMemo(() => buildPartialRows(result.movementResults), [result.movementResults]);
-
-  const checkedNames = useMemo(
-    () => new Set(result.partialMovements ?? []),
-    [result.partialMovements],
-  );
-  const checkedRows = rows.filter(row => checkedNames.has(row.name));
-  const partialReps = checkedRows.reduce((sum, row) => sum + row.reps, 0);
+  const checkedNames = result.partialMovements ?? [];
 
   const toggleMovement = useCallback((name: string) => {
-    const next = new Set(checkedNames);
+    const next = new Set(result.partialMovements ?? []);
     if (next.has(name)) next.delete(name);
     else next.add(name);
     const nextRows = rows.filter(row => next.has(row.name));
@@ -209,116 +198,18 @@ function PartialRoundControl({ result, onChange }: ScoreRoundsInputProps) {
       partialMovements: nextRows.length > 0 ? nextRows.map(row => row.name) : undefined,
       partialReps: nextRows.length > 0 ? nextRows.reduce((sum, row) => sum + row.reps, 0) : undefined,
     });
-  }, [checkedNames, rows, onChange]);
+  }, [result.partialMovements, rows, onChange]);
 
-  if (rows.length === 0) return null;
-
-  const count = checkedRows.length;
   // Restored legacy results carry partialReps without movement names — still show as set.
-  const legacyReps = count === 0 ? (result.partialReps ?? 0) : 0;
-  const hasPartial = count > 0 || legacyReps > 0;
-  const pct = Math.round((count / rows.length) * 100);
-
-  let pillLabel: string;
-  if (count > 0) {
-    pillLabel = open
-      ? `${count} of ${rows.length} moves`
-      : `${count} of ${rows.length} · +${partialReps} reps`;
-  } else if (legacyReps > 0) {
-    pillLabel = `+${legacyReps} reps`;
-  } else {
-    pillLabel = '+ partial round';
-  }
+  const legacyReps = checkedNames.length === 0 ? (result.partialReps ?? 0) : 0;
 
   return (
-    <div className={styles.partialWrap}>
-      <button
-        type="button"
-        className={`${styles.partialPill} ${hasPartial ? styles.partialPillActive : ''}`}
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-      >
-        <span
-          className={styles.partialRing}
-          style={{ '--pct': pct } as CSSProperties}
-        />
-        <span>{pillLabel}</span>
-        <svg
-          className={`${styles.partialChev} ${open ? styles.partialChevOpen : ''}`}
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            className={styles.partialCard}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <div className={styles.partialBody}>
-              <div className={styles.partialTitle}>Which moves did you finish?</div>
-              <div>
-                {rows.map(row => {
-                  const isDone = checkedNames.has(row.name);
-                  return (
-                    <motion.button
-                      key={row.name}
-                      type="button"
-                      className={`${styles.mvRow} ${isDone ? styles.mvRowDone : ''}`}
-                      onClick={() => toggleMovement(row.name)}
-                      whileTap={{ scale: 0.97 }}
-                      aria-pressed={isDone}
-                    >
-                      <span className={styles.mvCheck}>
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#0a0a08"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </span>
-                      <span className={styles.mvName}>{row.name}</span>
-                      {row.quantityLabel && <span className={styles.mvReps}>{row.quantityLabel}</span>}
-                    </motion.button>
-                  );
-                })}
-              </div>
-              <div className={styles.partialSummary}>
-                <span className={styles.partialFrac}>
-                  {count} <span>of {rows.length}</span>
-                </span>
-                <span className={styles.partialRepsNote}>+{partialReps} reps</span>
-              </div>
-              <button
-                type="button"
-                className={styles.partialDoneBtn}
-                onClick={() => setOpen(false)}
-              >
-                Done
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <PartialRoundChecklist
+      rows={rows}
+      checkedNames={checkedNames}
+      onToggle={toggleMovement}
+      legacyReps={legacyReps}
+    />
   );
 }
 

@@ -6,6 +6,7 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSectionType, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
 import { hasSameMovementsEveryRound } from '../utils/sectionShape';
+import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 
 /**
  * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg"
@@ -1322,34 +1323,10 @@ function extractTimeCap(workout: ParsedWorkout): number | undefined {
     ...workout.exercises.map(e => `${e.name} ${e.prescription}`),
   ].filter(Boolean).join(' ').toLowerCase();
 
-  // Patterns for time cap extraction
-  const patterns = [
-    // Explicit time cap patterns
-    /(\d+)\s*min(?:ute)?s?\s*(?:tc|t\.c\.|time\s*cap)/i,
-    /(?:tc|t\.c\.|time\s*cap)\s*:?\s*(\d+)\s*min/i,
-    /(?:tc|t\.c\.|time\s*cap)\s*:?\s*(\d+)/i,
-    /\*\s*(\d+)\s*min/i,  // "*42min TC" format
-    /cap\s*:?\s*(\d+)\s*min/i,
-    /(\d+)\s*min\s*t\.?c\.?/i,  // "16 min T.C." or "16 min tc"
-    // AMRAP patterns: "25min AMRAP", "25 min AMRAP", "AMRAP 25"
-    /(\d+)\s*min(?:ute)?s?\s*amrap/i,
-    /amrap\s*(\d+)\s*min/i,
-    /amrap\s*(\d+)/i,
-    // EMOM patterns: "20min EMOM", "EMOM 20"
-    /(\d+)\s*min(?:ute)?s?\s*e(?:2)?mom/i,
-    /e(?:2)?mom\s*(\d+)\s*min/i,
-    /e(?:2)?mom\s*(\d+)/i,
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) {
-      const minutes = parseInt(match[1]);
-      return minutes * 60; // Convert to seconds
-    }
-  }
-
-  return undefined;
+  // One parser owns every cap/window notation (utils/timeCap.ts). The dozen bespoke patterns
+  // that used to live here disagreed with the four other copies elsewhere in the app — most
+  // visibly, none of them could read marker-first "T.C - 34 MIN", so those caps were dropped.
+  return parsePrescribedCeilingSeconds(text);
 }
 
 /**
@@ -1911,7 +1888,7 @@ function normalizeSingleMovementName(name: string): string {
   return titleCaseMovementName(name);
 }
 
-function normalizeMovementName(name: string): string {
+export function normalizeMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
 
   // 1. Check for exact match first (highest priority)
@@ -1966,8 +1943,21 @@ function normalizeMovementName(name: string): string {
   for (const [alias, canonical] of sortedAliases) {
     // Use word boundary regex instead of includes()
     const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
-    if (regex.test(strippedLower)) {
-      return prefix + canonical;
+    const match = strippedLower.match(regex);
+    if (match) {
+      // Rewrite ONLY the matched span. Returning the bare canonical discarded every word the
+      // alias table doesn't happen to know — "Sync Dual DB Thruster" collapsed to "DB Thruster"
+      // while a sibling movement with no alias hit kept its full name, so one board rendered
+      // under two naming conventions. The board's own qualifiers are part of the workout.
+      const at = match.index ?? 0;
+      const before = strippedLower.slice(0, at).trim();
+      const after = strippedLower.slice(at + match[0].length).trim();
+      if (!before && !after) return prefix + canonical;
+      return prefix + [
+        before && titleCaseMovementName(before),
+        canonical,
+        after && titleCaseMovementName(after),
+      ].filter(Boolean).join(' ');
     }
   }
 

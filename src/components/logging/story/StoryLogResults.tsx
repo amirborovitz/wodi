@@ -49,7 +49,6 @@ export interface LegacyExerciseResult {
   partialReps?: number;
   partialMovements?: string[];
   ladderStep?: number;
-  ladderPartial?: number;
   metconName?: string;
 }
 
@@ -252,13 +251,20 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     }
     const lr = r.exercise.ladderReps;
     if (lr && lr.length > 0 && r.ladderStep != null) {
-      const step = r.ladderStep, partial = r.ladderPartial ?? 0;
+      const step = r.ladderStep;
       const mc2 = (r.exercise.movements ?? []).filter(m => m.perRound !== false).length || 1;
-      let rpm = 0;
-      for (let j = 0; j < step; j++) rpm += getLadderRungValue(lr, j);
-      rpm += partial;
-      sets.push({ id: 'set-0', setNumber: 1, actualReps: rpm * mc2, completed: true });
-      return { exercise: r.exercise, sets, rounds: step, notes: r.notes, ladderStep: step, ...(partial > 0 && { ladderPartial: partial }), ...buildMaps() };
+      let fullPerMovement = 0;
+      for (let j = 0; j < step; j++) fullPerMovement += getLadderRungValue(lr, j);
+      // partialReps is the already-summed partial-round total (Σ finished movements
+      // × next rung), stamped by the checklist — never a per-movement uniform figure.
+      const partialTotal = r.partialReps ?? 0;
+      sets.push({ id: 'set-0', setNumber: 1, actualReps: fullPerMovement * mc2 + partialTotal, completed: true });
+      return {
+        exercise: r.exercise, sets, rounds: step, notes: r.notes, ladderStep: step,
+        ...(r.partialMovements?.length ? { partialMovements: r.partialMovements } : {}),
+        ...(partialTotal > 0 ? { partialReps: partialTotal } : {}),
+        ...buildMaps(),
+      };
     }
     sets.push({ id: 'set-0', setNumber: 1, completed: true });
     return {

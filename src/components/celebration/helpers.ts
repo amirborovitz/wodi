@@ -9,6 +9,7 @@
 import type {
   Exercise,
   MovementTotal,
+  SharedWorkLabel,
   WorkloadBreakdown,
   WorkoutFormat,
   ParsedSection,
@@ -32,114 +33,26 @@ import {
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
 import { findMovementTotal, createSubstitutionResolver } from './movementResolution';
 import { hasSameMovementsEveryRound } from '../../utils/sectionShape';
+import { timeCapLabelFromText } from '../../utils/timeCap';
 
 // Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
 // downstream consumers (useCelebrationData, WorkoutScreen) import all helpers from this module.
 export { findMovementTotal } from './movementResolution';
 
 // ─── Formatting helpers ───────────────────────────────────────────────────────
-
-export function formatDurationFromSeconds(totalSeconds: number): { num: string; unit: string } {
-  if (totalSeconds === 0) return { num: '--', unit: '' };
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = Math.round(totalSeconds % 60);
-  if (mins >= 60) {
-    const hrs = Math.floor(mins / 60);
-    const remainingMins = mins % 60;
-    return { num: `${hrs}:${remainingMins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`, unit: '' };
-  }
-  if (secs > 0) return { num: `${mins}:${secs.toString().padStart(2, '0')}`, unit: '' };
-  return { num: `${mins}`, unit: 'min' };
-}
-
-export function formatDistanceSplit(meters: number): { num: string; unit: string } {
-  if (meters >= 1000) return { num: `${(meters / 1000).toFixed(1)}`, unit: 'km' };
-  return { num: `${Math.round(meters)}`, unit: 'm' };
-}
-
-export function formatDistanceValue(meters: number): string {
-  if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`;
-  return `${Math.round(meters)} m`;
-}
-
-export function normalizeIntervalNotation(raw: string): string {
-  return raw.replace(
-    /every\s+(\d+(?:\.\d+)?)\s*(minutes?|mins?)\b/gi,
-    (_match, value: string) => {
-      if (!value.includes('.')) return `every ${value} min`;
-      const totalSeconds = Math.round(parseFloat(value) * 60);
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
-      return `every ${mins}:${secs.toString().padStart(2, '0')}`;
-    },
-  );
-}
-
-export function formatAmrapRounds(rounds: number): string {
-  const intPart = Math.floor(rounds);
-  if (rounds % 1 !== 0) return intPart === 0 ? '½' : `${intPart}½`;
-  return `${intPart}`;
-}
-
-export function fmtTimeSocial(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    return `${h}:${(m % 60).toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  }
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-export function formatStickerMovementName(name: string): string {
-  return name
-    .replace(/\bDumbbell\b/gi, 'DB')
-    .replace(/\bKettlebell\b/gi, 'KB')
-    .replace(/\bAmerican\b/gi, 'AM')
-    .replace(/\bRussian\b/gi, 'RU')
-    .replace(/\bHandstand Push[- ]?Ups?\b/gi, 'HSPU')
-    .replace(/\bToes[- ]to[- ]Bar\b/gi, 'TTB')
-    .replace(/\bChest[- ]to[- ]Bar\b/gi, 'C2B')
-    .replace(/\bDouble[- ]Unders?\b/gi, 'DU')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
-}
-
-export function formatStampLoad(weight: number, unit?: string): string {
-  const rounded = Number.isInteger(weight) ? `${weight}` : weight.toFixed(1);
-  return `${rounded}${unit === 'lb' ? 'LB' : 'KG'}`;
-}
-
-export function stableRotation(seed: string, index: number): number {
-  let hash = index * 97;
-  for (let i = 0; i < seed.length; i += 1) {
-    hash = (hash * 31 + seed.charCodeAt(i)) % 600;
-  }
-  return parseFloat((-3 + hash / 100).toFixed(1));
-}
-
-export function normalizeBlueprint(text: string): string {
-  return text
-    .replace(/\bR\.P\.E\.?\b/gi, 'RPE')
-    .replace(/\bR\.I\.R\.?\b/gi, 'RIR')
-    .replace(/\bE\.M\.O\.M\.?\b/gi, 'EMOM');
-}
-
-export function extractEveryXCadence(text: string): string | undefined {
-  // "EMOM 15" / "EMOM for 15 minutes" — the board's own label beats a generic "every 1 min"
-  const emom = text.match(/\bemom\s*(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?\b/i);
-  if (emom) return `EMOM ${emom[1]} MIN`;
-  const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?(?:\s*[x×]|(?=\s|$))/i);
-  if (mmss) {
-    const mins = parseInt(mmss[1]);
-    const secs = parseInt(mmss[2]);
-    return secs === 0 ? `EVERY ${mins} MIN` : `EVERY ${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-  const simple = text.match(/every\s+(\d+(?:\.\d+)?)\s*min(?:utes?)?\b/i);
-  if (simple) return `EVERY ${simple[1]} MIN`;
-  return undefined;
-}
+// Pure formatters live in ./posterFormatters; re-exported here so existing consumers that
+// import them from './helpers' keep working, and imported below for internal use.
+export * from './posterFormatters';
+import {
+  formatDistanceSplit,
+  formatDistanceValue,
+  normalizeIntervalNotation,
+  formatAmrapRounds,
+  fmtTimeSocial,
+  formatStampLoad,
+  normalizeBlueprint,
+  extractEveryXCadence,
+} from './posterFormatters';
 
 // ─── Debug ───────────────────────────────────────────────────────────────────
 
@@ -360,11 +273,13 @@ function ladderTotalReps(exercise: Exercise): number {
   const reps = exercise.ladderReps ?? [];
   const step = exercise.ladderStep ?? 0;
   if (reps.length === 0 || step <= 0) return 0;
-  const partial = exercise.ladderPartial ?? 0;
   const scalingCount = splitLadderMovements(exercise).scaling.length || 1;
   let sum = 0;
   for (let j = 0; j < step; j++) sum += getLadderRungValue(reps, j);
-  return (sum + partial) * scalingCount;
+  // Partial climb into the next rung. New docs stamp the already-summed
+  // partialReps; legacy docs stored a per-movement uniform ladderPartial.
+  const partialTotal = exercise.partialReps ?? ((exercise.ladderPartial ?? 0) * scalingCount);
+  return sum * scalingCount + partialTotal;
 }
 
 /**
@@ -425,7 +340,10 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
     : undefined;
 
   const step = exercise.ladderStep ?? 0;
-  const partial = exercise.ladderPartial ?? 0;
+  // Partial climb into the next rung: new docs list which movements were finished
+  // (a truthful "done/total" ghost label); legacy docs kept a per-movement rep count.
+  const partialDone = exercise.partialMovements?.length ?? 0;
+  const legacyPartial = exercise.ladderPartial ?? 0;
 
   // Per-round increment — stated explicitly so the climb rule is read, not guessed.
   const cadence = ladderReps.length >= 2 ? ladderReps[1] - ladderReps[0] : undefined;
@@ -448,7 +366,16 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
     name: scalingMovements.map((m) => formatRepMovementNameForPoster(m.name, m.reps ?? ladderReps[0])).join(' + '),
     loadNote,
     accent: 'yellow',
-    ladderTrack: { reps: ladderReps, step, partial: partial > 0 ? partial : undefined, cadence: cadenceLabel },
+    ladderTrack: {
+      reps: ladderReps,
+      step,
+      cadence: cadenceLabel,
+      ...(partialDone > 0
+        ? { partialMoves: { done: partialDone, total: scalingMovements.length } }
+        : legacyPartial > 0
+          ? { partial: legacyPartial }
+          : {}),
+    },
   };
 
   return [trackRow, ...fixedRows];
@@ -1149,6 +1076,15 @@ function computeMovementTeamShare(params: {
   return undefined;
 }
 
+/**
+ * The parenthetical a no-split partner movement carries on the poster. Defaults to "(together)"
+ * for docs saved before sharedLabel existed, so nothing regresses — but when the board named the
+ * arrangement we print ITS word, per the poster-mirrors-original-notation rule.
+ */
+function sharedWorkSuffix(label: SharedWorkLabel | undefined): string {
+  return `(${label ?? 'together'})`;
+}
+
 function buildCelebrationMovementRow(params: {
   movementName: string;
   prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; time?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean };
@@ -1161,8 +1097,9 @@ function buildCelebrationMovementRow(params: {
   partnerSplit?: 'reps' | 'rounds';
   teamSize?: number;
   together?: boolean;
+  sharedLabel?: SharedWorkLabel;
 }): ArtifactRow {
-  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit, teamSize, together } = params;
+  const { movementName, prescribed, actual, repeatCount, isStrength, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit, teamSize, together, sharedLabel } = params;
   const weight = prescribed?.implementCount === 2 && prescribed.weight
     ? prescribed.weight
     : actual?.weight ?? prescribed?.weight;
@@ -1271,10 +1208,11 @@ function buildCelebrationMovementRow(params: {
   const pluralName = perRoundReps && perRoundReps !== 1 && !isStrength
     ? pluralizeMovementLabel(baseDisplayName)
     : baseDisplayName;
-  // "together" movements (both partners do the full amount) carry the note inline so the reader
-  // sees WHY there's no per-partner split — matching the sectioned builder's "(together)" suffix.
+  // No-split movements (every athlete does the full amount) carry the note inline so the reader
+  // sees WHY there's no per-partner split — matching the sectioned builder's suffix. The word
+  // is the board's own ("(each)" / "(sync)" / "(together)"), never a house rewrite.
   const isTogether = !!together;
-  const displayName = isTogether ? `${pluralName} (together)` : pluralName;
+  const displayName = isTogether ? `${pluralName} ${sharedWorkSuffix(sharedLabel)}` : pluralName;
   const hasLoggedWeight = (actual?.weight || 0) > 0;
   const hasPrescribedDistForRelay = (prescribed?.distance ?? 0) > 0 && (perRoundDistance ?? 0) > 0;
   const relayCountForName = hasPrescribedDistForRelay && totalDistance && perRoundDistance && totalDistance > perRoundDistance
@@ -1385,6 +1323,8 @@ function abbreviateMovementForPoster(name: string): string {
     .replace(/\bAmerican Kettlebell Swing\b/gi, 'AKS');
 }
 
+const MAX_FULL_POSTER_MOVEMENT_NAME_LENGTH = 24;
+
 function pluralizeMovementLabel(name: string): string {
   const cleaned = name.replace(/\s+/g, ' ').trim();
   if (!cleaned) return cleaned;
@@ -1402,6 +1342,9 @@ function pluralizeMovementLabel(name: string): string {
 }
 
 function formatRepMovementNameForPoster(name: string, reps?: number): string {
+  const fullName = reps != null && reps !== 1 ? pluralizeMovementLabel(name) : name;
+  if (fullName.length <= MAX_FULL_POSTER_MOVEMENT_NAME_LENGTH) return fullName;
+
   const abbreviated = abbreviateMovementForPoster(name);
   return reps != null && reps !== 1 ? pluralizeMovementLabel(abbreviated) : abbreviated;
 }
@@ -1569,7 +1512,7 @@ function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement,
         ? formatDistanceValue(movement.distance * multiplier).toUpperCase()
         : '';
   const load = formatSectionRxLoad(exercise, movement);
-  const together = movement.together ? ' (together)' : '';
+  const together = movement.together ? ` ${sharedWorkSuffix(movement.sharedLabel)}` : '';
   // "OR" option from the board ("10 dips / push ups") — same convention as station rows.
   // The alt quantity is omitted when it matches the main movement's, as boards write it.
   const alt = movement.alternative;
@@ -1627,6 +1570,7 @@ function buildSequentialMovementRows(
       partnerSplit: options.partnerSplit,
       teamSize: options.teamSize,
       together: movement.together ?? actual?.together,
+      sharedLabel: movement.sharedLabel ?? actual?.sharedLabel,
     });
   });
 }
@@ -2108,21 +2052,34 @@ export function buildPageArtifactSections(
     : undefined;
   const isTeamIGUG = splitInfo?.split === 'rounds';
   const personalRepeatCount = isTeamIGUG ? splitInfo!.personalRounds : repeatCount;
-  const roundLedger = isTeamIGUG
+  // buildRoundLedger returns undefined when nothing actually alternated (personalRounds covers
+  // every round), so the whole ledger drops out rather than asserting a split that never
+  // happened — see the note on buildRoundLedger.
+  const ledgerRounds = isTeamIGUG
+    ? buildRoundLedger(
+        splitInfo!.totalRounds!,
+        inferPartnerRoundLedgerCompletedRounds(splitInfo!.totalRounds!, exercise, movements),
+        splitInfo!.personalRounds!,
+        teamSize,
+      )
+    : undefined;
+  const roundLedger = ledgerRounds
     ? {
         totalRounds: splitInfo!.totalRounds!,
         personalRounds: splitInfo!.personalRounds!,
-        rounds: buildRoundLedger(
-          splitInfo!.totalRounds!,
-          inferPartnerRoundLedgerCompletedRounds(splitInfo!.totalRounds!, exercise, movements),
-          teamSize,
-        ),
+        rounds: ledgerRounds,
       }
     : undefined;
-  const capMatch = exerciseOnlyText.match(
-    /\b(\d+)\s*(?:min(?:ute)?s?|minutes?)\s*(?:t\.?c\.?|time\s*cap|cap)\b/i,
+  // The cap can be written before or after the number ("T.C - 34 MIN" / "20 min cap"); one
+  // parser in utils/timeCap.ts owns every notation so this label can never disagree with the
+  // cap the save path stored or the wizard prefilled.
+  //
+  // Scoped to THIS block's own text (name + prescription + its slice of the board), never the
+  // whole session: on a multi-part board the coach writes the cap inside the part it governs,
+  // and hoisting a sibling's cap onto this part would invent a constraint it never had.
+  const timeCapLabel = timeCapLabelFromText(
+    `${exerciseOnlyText} ${exercise.rawText || ''}`,
   );
-  const timeCapLabel = capMatch ? `${parseInt(capMatch[1], 10)} MIN CAP` : undefined;
   const isExerciseForTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
   const descSchemeGlobal = !isStrength && isExerciseForTime
     ? parseForTimeRepScheme(exercise, rawText)
@@ -3030,16 +2987,18 @@ export function computeHeroResult(
       if (step > 0) {
         const totalReps = ladderTotalReps(amrapExercise);
         if (totalReps > 0) {
-          const partial = amrapExercise.ladderPartial || 0;
+          const hasPartial = (amrapExercise.partialMovements?.length ?? 0) > 0
+            || (amrapExercise.ladderPartial ?? 0) > 0;
           return {
             value: `${totalReps}`,
             unit: 'REPS',
             formatLine, storyLine,
             storyMovements: buildStory(step),
             accentClass: 'accentMagenta',
-            // Partial reps into the next rung → a "into round N" meta note beside the total (the
-            // total already counts them; this just says where the athlete stopped climbing).
-            ladderIntoRound: partial > 0 ? step + 1 : undefined,
+            // A partial climb into the next rung → an "into the Ns" meta note beside the total (the
+            // total already counts it; this just says where the athlete stopped climbing). Stated
+            // as the rung's rep value to match the ladder track's bar labels + the logging screen.
+            ladderIntoRungReps: hasPartial ? getLadderRungValue(amrapExercise.ladderReps!, step) : undefined,
           };
         }
       }

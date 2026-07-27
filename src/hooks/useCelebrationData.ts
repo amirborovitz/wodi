@@ -173,7 +173,7 @@ export interface CelebrationData {
 
   // Achievements & ladder
   activeAchievements: Achievement[] | undefined;
-  ladderData: { ladderReps: number[]; ladderStep: number; ladderPartial?: number } | null;
+  ladderData: { ladderReps: number[]; ladderStep: number } | null;
   ladderSecondSticker: HighlightStampData | null;
 
   // Workload
@@ -548,12 +548,31 @@ export function useCelebrationData(
 
   const totalEP = isReward ? (rewardEP?.total ?? 0) : (detailEP?.total ?? 0);
 
+  if (shouldLogCelebrationDebug()) {
+    // Itemised so any zero is explainable, not a mystery: EP shows which term is 0 (volume 0 =
+    // nothing weighted, calories 0 = no machine work), workload shows the grand totals and the
+    // per-movement rows that feed them (and whether they were estimated/guesswork).
+    console.log('[CelebrationDebug] EP + workload breakdown', {
+      ep: rewardEP ?? detailEP,
+      workload: {
+        grandTotalReps: activeBreakdown?.grandTotalReps ?? 0,
+        grandTotalVolume: activeBreakdown?.grandTotalVolume ?? 0,
+        grandTotalDistance: activeBreakdown?.grandTotalDistance ?? 0,
+        grandTotalCalories: activeBreakdown?.grandTotalCalories ?? 0,
+        estimated: activeBreakdown?.estimated ?? false,
+      },
+      movements: (activeBreakdown?.movements ?? []).map((m) => ({
+        name: m.name, reps: m.totalReps, weight: m.weight,
+        distance: m.totalDistance, calories: m.totalCalories,
+      })),
+    });
+  }
+
   // ── Ladder ────────────────────────────────────────────────────────────────
 
   const ladderData = useMemo((): {
     ladderReps: number[];
     ladderStep: number;
-    ladderPartial?: number;
   } | null => {
     if (verbatimMode) return null;
     const amrapEx = exercises.find((ex) => ex.ladderReps && ex.ladderReps.length > 0);
@@ -576,7 +595,7 @@ export function useCelebrationData(
     }
 
     if (!step) return null;
-    return { ladderReps: reps, ladderStep: step, ladderPartial: amrapEx.ladderPartial };
+    return { ladderReps: reps, ladderStep: step };
   }, [verbatimMode, exercises, activeBreakdown?.movements]);
 
   // ── Chipper ───────────────────────────────────────────────────────────────

@@ -178,7 +178,7 @@ function ladderRungValue(reps: number[], idx: number): number {
 }
 
 export interface LadderTrackChartProps {
-  track: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
+  track: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
   /** Filled bar / lit rung color (the skin's accent — yellow on dark skins, ink on the
    * all-yellow Flare skin, gold on Foil, etc). Used ONLY for completed rounds. */
   barColor?: string;
@@ -237,7 +237,11 @@ export function LadderTrackChart({
   const usingDefaultFill = mutedFill === undefined;
   const resolvedMutedFill = mutedFill ?? barColor;
   const ghostLabelColor = usingDefaultFill ? BRAND.ink : resolvedMutedAccent;
-  const { reps, step, partial = 0, cadence, complete = false } = track;
+  const { reps, step, partial = 0, partialMoves, cadence, complete = false } = track;
+  // A partial climb into the next rung shows a ghost fill. New docs label it with the
+  // truthful "finished / total" movement fraction; legacy docs show the old "+N" rep count.
+  const hasPartial = (partialMoves?.done ?? 0) > 0 || partial > 0;
+  const partialLabel = partialMoves ? `${partialMoves.done}/${partialMoves.total}` : `+${partial}`;
   // Bars slim down as the climb grows so the whole ladder stays on the poster; the
   // sliding window (··· trimming the earliest rungs) only kicks in past MAX_BARS.
   const MAX_BARS = 11;
@@ -261,7 +265,7 @@ export function LadderTrackChart({
         {startIdx > 0 && <span style={{ fontFamily: fB, fontSize: 11, color: emptyColor, alignSelf: 'center' }}>···</span>}
         {bars.map(({ idx, value, completed, isNext }) => {
           const barH = Math.max(6, Math.round((value / maxVal) * MAX_H));
-          const fillH = isNext && partial > 0 ? Math.round(barH * GHOST_FILL_RATIO) : 0;
+          const fillH = isNext && hasPartial ? Math.round(barH * GHOST_FILL_RATIO) : 0;
           return (
             <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{
@@ -282,7 +286,7 @@ export function LadderTrackChart({
                       position: 'absolute', left: 0, right: 0, bottom: Math.max(0, fillH - 13),
                       textAlign: 'center', fontFamily: fD, fontSize: 8.5, fontWeight: 900, color: ghostLabelColor,
                     }}>
-                      +{partial}
+                      {partialLabel}
                     </span>
                   </>
                 )}
@@ -291,7 +295,7 @@ export function LadderTrackChart({
                 fontFamily: fD, fontSize: 9, fontWeight: 900,
                 color: isNext ? resolvedMutedAccent : completed ? textColor : emptyColor,
               }}>
-                {isNext ? `R${idx + 1}` : value}
+                {value}
               </span>
             </div>
           );

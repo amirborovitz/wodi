@@ -188,8 +188,8 @@ export interface Exercise {
   workDuration?: number;   // AI-parsed programmed work time in seconds (e.g. 120 for "2:00 AMRAP")
   restDuration?: number;   // AI-parsed programmed rest time in seconds between rounds/intervals
   ladderStep?: number;     // How many rungs completed (continuous across intervals)
-  ladderPartial?: number;  // Partial reps into next incomplete rung
-  partialReps?: number;        // Extra reps into the incomplete AMRAP round (derived from partialMovements)
+  ladderPartial?: number;  // LEGACY: per-movement uniform reps into next rung (pre-checklist docs only; new docs use partialMovements/partialReps)
+  partialReps?: number;        // Extra reps into the incomplete round — AMRAP or ladder (derived from partialMovements)
   partialMovements?: string[]; // Movement names finished in the incomplete AMRAP round
   intensity?: IntensityRating | null; // user-entered metcon block intensity
   aiPartName?: string;     // Generated poster wordmark for this workout part
@@ -274,6 +274,21 @@ export interface ParsedWorkout {
 }
 
 // Workload breakdown types
+/**
+ * How a partner board said that a movement is NOT split between athletes. All three mean the
+ * same arithmetic — every athlete does the full prescribed amount — so `together: boolean` stays
+ * the single field the math reads. This one exists purely so the poster can mirror the board's
+ * own word instead of rewriting every notation as "(together)":
+ *
+ *   'each'      — "6 HSPU (EACH)": you do yours, I do mine, in turn
+ *   'sync'      — "12 SYNC DUAL DB THRUSTERS": performed simultaneously, reps matched
+ *   'together'  — "600m run (together)": side by side
+ *
+ * Boards overwhelmingly write "(each)" or "SYNC"; treating only "(together)" as the no-split
+ * signal is what made an every-athlete-does-everything WOD look like a round trade.
+ */
+export type SharedWorkLabel = 'each' | 'sync' | 'together';
+
 export interface MovementTotal {
   name: string;
   exerciseIndex?: number;      // Optional exercise scope for mixed/sectioned workouts
@@ -292,6 +307,7 @@ export interface MovementTotal {
   implementCount?: number;  // 1=single, 2=pair (KB/DB)
   distancePerRep?: number;  // Single-round distance before multiplying by rounds
   together?: boolean;       // Partner workout: both athletes do full amount (no split)
+  sharedLabel?: SharedWorkLabel;  // The board's own word for that no-split arrangement
 }
 
 export interface WorkloadBreakdown {
@@ -339,6 +355,7 @@ export interface ParsedMovement {
   perRound?: boolean;           // If false, movement is done once (buy-in/cash-out), not multiplied by rounds. Default true.
   role?: 'buy_in' | 'cash_out'; // AI-assigned role: buy-in (done once before rounds) or cash-out (done once after rounds).
   together?: boolean;           // Partner workouts: true if all partners do this movement together (not split). E.g., "600m run (together)".
+  sharedLabel?: SharedWorkLabel; // How the BOARD said it — see SharedWorkLabel. Display only; `together` carries the math.
   relay?: boolean;              // Pair-paced pacer movement ("P1 runs 200m while P2 AMRAPs, swap"): the athlete's trip
                                 // count is independent of the AMRAP round count. Logged distance is a TOTAL (trips ×
                                 // per-trip), never multiplied by rounds. NOT a partner-workout signal — pair-paced

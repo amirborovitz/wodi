@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
+import { PartialRoundChecklist, type PartialRow } from './PartialRoundChecklist';
 import styles from './LadderInput.module.css';
 
 interface LadderInputProps {
@@ -22,58 +23,75 @@ function getRungValue(ladderReps: number[], rungIdx: number): number {
 
 /**
  * LadderInput — single continuous ladder.
- * Athlete taps the last rung they completed. The ladder extends beyond
- * the prescribed values for athletes who go further.
+ * Athlete taps the last rung they *fully* completed. The ladder extends beyond
+ * the prescribed values for athletes who go further. A partial climb into the
+ * next rung is captured with the shared "which moves did you finish?" checklist
+ * (each per-round movement did that rung's rep count) — never a raw rep number
+ * assumed uniform across every movement.
  */
 export function LadderInput({ result, onChange }: LadderInputProps) {
   const ladderReps = result.exercise.ladderReps!;
   const step = result.ladderStep ?? 0;
-  const partial = result.ladderPartial ?? 0;
-  const movementCount = (result.exercise.movements ?? []).filter(m => m.perRound !== false).length || 1;
 
-  // Show extra rungs beyond prescribed if athlete is fast
+  // Only the laddered (per-round) movements climb; fixed "after each round"
+  // work (e.g. burpees, double-unders marked perRound: false) is counted by
+  // round elsewhere and isn't part of the ladder total or the partial checklist.
+  const laddered = useMemo(
+    () => (result.exercise.movements ?? []).filter(m => m.perRound !== false),
+    [result.exercise.movements],
+  );
+  const movementCount = laddered.length || 1;
+
+  // The rung the athlete is currently climbing into (next incomplete one).
+  const nextRungVal = getRungValue(ladderReps, step);
+
+  // Show extra rungs beyond prescribed if athlete is fast.
   const EXTRA_RUNGS = 3;
   const visibleRungs = Math.max(ladderReps.length, step + 1) + EXTRA_RUNGS;
 
-  // Track whether partial drawer is open
-  const [showPartial, setShowPartial] = useState(partial > 0);
+  // One row per laddered movement; finishing it adds this rung's rep count.
+  const partialRows = useMemo<PartialRow[]>(
+    () => laddered.map(m => ({
+      name: m.name,
+      quantityLabel: `${nextRungVal} reps`,
+      reps: nextRungVal,
+    })),
+    [laddered, nextRungVal],
+  );
 
-  // Total reps (per movement × movements)
-  const totalReps = useMemo(() => {
+  const checkedNames = result.partialMovements ?? [];
+  const checkedCount = partialRows.filter(r => checkedNames.includes(r.name)).length;
+  // Live partial total: each checked movement did the next rung's reps. Restored
+  // legacy docs carry partialReps without names — fall back to that.
+  const partialTotal = checkedCount > 0 ? checkedCount * nextRungVal : (result.partialReps ?? 0);
+
+  // Full rungs completed, summed per movement then across the laddered movements.
+  const fullPerMovement = useMemo(() => {
     let sum = 0;
     for (let j = 0; j < step; j++) sum += getRungValue(ladderReps, j);
-    return (sum + partial) * movementCount;
-  }, [ladderReps, step, partial, movementCount]);
-
-  // Reps per movement (without multiplying by movementCount)
-  const repsPerMovement = useMemo(() => {
-    let sum = 0;
-    for (let j = 0; j < step; j++) sum += getRungValue(ladderReps, j);
-    return sum + partial;
-  }, [ladderReps, step, partial]);
+    return sum;
+  }, [ladderReps, step]);
+  const totalReps = fullPerMovement * movementCount + partialTotal;
 
   const handleStepTap = useCallback((rungIdx: number) => {
-    let newStep: number;
-    // Tapping the current top rung deselects it
-    if (step === rungIdx + 1) {
-      newStep = rungIdx;
-    } else {
-      newStep = rungIdx + 1;
-    }
-    // Clear partial if it exceeds the next rung
-    const nextRungVal = getRungValue(ladderReps, newStep);
-    const newPartial = partial >= nextRungVal ? 0 : partial;
-    onChange({ ladderStep: newStep, ladderPartial: newPartial });
-  }, [step, partial, ladderReps, onChange]);
+    // Tapping the current top rung deselects it. Moving the rung invalidates any
+    // partial marks (they were "into" the old next rung), so clear them.
+    const newStep = step === rungIdx + 1 ? rungIdx : rungIdx + 1;
+    onChange({ ladderStep: newStep, partialMovements: undefined, partialReps: undefined });
+  }, [step, onChange]);
 
-  const handlePartialChange = useCallback((delta: number) => {
-    const nextRungVal = getRungValue(ladderReps, step);
-    const newVal = Math.max(0, Math.min(nextRungVal - 1, partial + delta));
-    onChange({ ladderPartial: newVal });
-  }, [step, partial, ladderReps, onChange]);
+  const togglePartial = useCallback((name: string) => {
+    const next = new Set(result.partialMovements ?? []);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    const names = laddered.filter(m => next.has(m.name)).map(m => m.name);
+    onChange({
+      partialMovements: names.length > 0 ? names : undefined,
+      partialReps: names.length > 0 ? names.length * nextRungVal : undefined,
+    });
+  }, [result.partialMovements, laddered, nextRungVal, onChange]);
 
-  // The rung the athlete is currently working on (next incomplete one)
-  const nextRungVal = getRungValue(ladderReps, step);
+  const legacyReps = checkedCount === 0 ? (result.partialReps ?? 0) : 0;
 
   return (
     <div className={styles.container}>
@@ -94,7 +112,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
         <span className={styles.totalLabel}>total reps</span>
       </div>
 
-      {/* Headline: "Got to the 10s" */}
+      {/* Headline: "Completed through the 10s · into the 12s" */}
       {step > 0 && (
         <motion.div
           className={styles.headline}
@@ -102,8 +120,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
           animate={{ opacity: 1 }}
         >
           Completed through the {getRungValue(ladderReps, step - 1)}s
-          {partial > 0 && ` + ${partial} into the ${nextRungVal}s`}
-          {' '}&middot; {repsPerMovement} reps/movement
+          {(checkedCount > 0 || legacyReps > 0) && ` · into the ${nextRungVal}s`}
         </motion.div>
       )}
 
@@ -129,40 +146,14 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
         })}
       </div>
 
-      {/* Partial reps */}
-      {!showPartial ? (
-        <motion.button
-          type="button"
-          className={styles.partialTrigger}
-          onClick={() => setShowPartial(true)}
-          whileTap={{ scale: 0.97 }}
-        >
-          + Add partial reps
-        </motion.button>
-      ) : (
-        <div className={styles.partialRow}>
-          <span className={styles.partialLabel}>
-            +{partial} into the {nextRungVal}s
-          </span>
-          <div className={styles.partialControls}>
-            <button
-              type="button"
-              className={styles.partialBtn}
-              onClick={() => handlePartialChange(-1)}
-            >
-              -
-            </button>
-            <span className={styles.partialCount}>{partial}</span>
-            <button
-              type="button"
-              className={styles.partialBtn}
-              onClick={() => handlePartialChange(1)}
-            >
-              +
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Partial climb into the next rung — same checklist as AMRAP rounds */}
+      <PartialRoundChecklist
+        rows={partialRows}
+        checkedNames={checkedNames}
+        onToggle={togglePartial}
+        legacyReps={legacyReps}
+        title={`Into the ${nextRungVal}s — which moves did you finish?`}
+      />
     </div>
   );
 }

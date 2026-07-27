@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, SharedWorkLabel } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 import { resolveSourceDate } from './sourceDateResolution';
 
@@ -9,6 +9,45 @@ const openai = new OpenAI({
   apiKey: env?.VITE_OPENAI_API_KEY ?? process.env.VITE_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: true // Required for client-side usage
 });
+
+/**
+ * The parse hit OpenAI's rate limit (429), not a workout the parser couldn't read.
+ * Thrown so the UI can say "wait a couple of minutes" instead of blaming the board —
+ * a rate limit clears on its own, so re-shooting or rewording the WOD does nothing.
+ */
+export class ParseRateLimitError extends Error {
+  constructor(cause?: unknown) {
+    super('OpenAI rate limit reached while parsing the workout.');
+    this.name = 'ParseRateLimitError';
+    this.cause = cause;
+  }
+}
+
+function errorFields(error: unknown): { status?: unknown; statusCode?: unknown; code?: unknown; message: string } {
+  const candidate = (error && typeof error === 'object' ? error : {}) as {
+    status?: unknown; statusCode?: unknown; code?: unknown; message?: unknown;
+  };
+  return { ...candidate, message: typeof candidate.message === 'string' ? candidate.message : '' };
+}
+
+/**
+ * The API key is out of credit. OpenAI returns this as a 429 too, but unlike a rate limit it
+ * never clears on its own — so it must never be reported as "try again in a few minutes".
+ */
+export function isQuotaExhaustedError(error: unknown): boolean {
+  const { code, message } = errorFields(error);
+  return code === 'insufficient_quota' || /insufficient[_ ]quota|exceeded your current quota/i.test(message);
+}
+
+/** True for OpenAI 429s, however they surface (SDK APIError, fetch Response, or bare message). */
+export function isRateLimitError(error: unknown): boolean {
+  if (error instanceof ParseRateLimitError) return true;
+  if (!error || typeof error !== 'object') return false;
+  const { status, statusCode, code, message } = errorFields(error);
+  if (status === 429 || statusCode === 429) return true;
+  if (code === 'rate_limit_exceeded') return true;
+  return /\b429\b|rate limit/i.test(message);
+}
 
 // Shared by the segmentation and structuring prompts — canonical-name normalization must be
 // identical at both stages or the second stage re-interprets the first stage's output.
@@ -393,10 +432,11 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - A board TITLED or headed "Partner WOD" / "Partner Metcon" is a partner workout even when no other partner phrasing appears in the body → partnerWorkout: true, teamSize: 2 (unless a different team size is stated). Keep that heading line in rawText — it is part of the board.
 - "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
-- "together" movements: when a movement says "(together)" or "run together", set "together": true on that movement. This means ALL partners do the full amount (not split). Example: "600m run (together)" → distance: 600, together: true.
+- NO-SPLIT movements: a movement is not divided between partners whenever the board marks it "(together)", "(each)"/"(ea)", or "sync"/"synchro"/"in sync". All three mean every athlete performs the full written amount. Set "together": true AND "sharedLabel" to which word the board used ("together" | "each" | "sync") so the poster can echo the board's own notation. Examples: "600m run (together)" → distance: 600, together: true, sharedLabel: "together". "6 HSPU (EACH)" → reps: 6, together: true, sharedLabel: "each". "12 Sync Dual DB Thrusters" → reps: 12, together: true, sharedLabel: "sync".
+- "(each)" ATTACHED TO A MOVEMENT is a no-split marker (above). "(N each)" attached to a ROUND COUNT ("6 rounds (3 each)") is a per-person round count. Same word, opposite meaning — read what the "(each)" is attached to.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
 - CRITICAL PARTNER SPLIT DISTINCTION: There are two partner workout shapes. Use partnerSplit: "rounds" only when partners explicitly trade/own complete rounds, e.g. "6 rounds (3 each)", "alternate full rounds", or a single total round target completed round-by-round. For sectioned for-time partner workouts ("In pairs: 3 rounds ... then 3 rounds ... then buy-out/cash-out"), use partnerSplit: "reps" even if the instructions say "I go you go" or "split however"; each exercise inside the section is shared/split unless that movement is marked together. Keep section.rounds as the prescribed section repeat count.
-- PER-EXERCISE partnerWorkout/partnerSplit (on EACH exercise object, separate from and in addition to the top-level fields above): the top-level fields describe the whole SESSION (for EP/volume math); they do NOT mean every exercise is partnered. On EACH exercise, set its OWN partnerWorkout/partnerSplit: a strength or skill block is partnerWorkout: false even when a sibling metcon block in the same session is partnered — set this explicitly, don't omit it. For the exercise that IS partnered: partnerSplit: "rounds" when partners trade whole rounds (IGUG/"I go you go"/"(N each)"), or partnerSplit: "reps" when partners share one flat/continuous total with no round structure (e.g. "100 wall balls between you, split however"). The per-person round count for "rounds" continues to be suggestedSets, per the "(N each)" rule above — do not add a separate count field.
+- PER-EXERCISE partnerWorkout/partnerSplit (on EACH exercise object, separate from and in addition to the top-level fields above): the top-level fields describe the whole SESSION (for EP/volume math); they do NOT mean every exercise is partnered. On EACH exercise, set its OWN partnerWorkout/partnerSplit: a strength or skill block is partnerWorkout: false even when a sibling metcon block in the same session is partnered — set this explicitly, don't omit it. For the exercise that IS partnered: partnerSplit: "rounds" when partners trade whole rounds (IGUG/"I go you go"/"(N each)" on the round count), or partnerSplit: "reps" when partners share one flat/continuous total with no round structure (e.g. "100 wall balls between you, split however"). DECISIVE EXCEPTION: when every movement in the block is marked no-split ("(each)"/"sync"/"together"), the athletes are NOT trading work at all — each completes every round. "I go you go" there describes taking turns WITHIN a round, not owning alternate rounds. Set personalRounds equal to the full prescribed round count, never a divided share. The per-person round count for "rounds" continues to be suggestedSets, per the "(N each)" rule above — do not add a separate count field.
 - ROTATING STATION HEADCOUNT: "5 groups starting at different stations (7 people max)" / "max 6 per station" are logistics notes, NOT team designations. Do NOT set partnerWorkout or teamSize from headcount-per-station language. Only set teamSize when athletes are explicitly working together as one unit (IGUG, In Pairs, Team of N completing a shared target).
 
 ### PAIR-PACED AMRAP (pairs as the clock — NOT a partner workout)
@@ -1349,7 +1389,9 @@ async function structureSegments(
 
   // Parallel: kind-scoped prompts (see buildParsePrompt) keep a multi-part burst inside the
   // per-minute token limit that used to force this loop sequential, and structurePart's retry
-  // ladder absorbs any 429 stragglers.
+  // ladder absorbs 429 stragglers. A 429 that outlives the ladder rejects this Promise.all
+  // rather than degrading — losing a part's structure silently is worse than asking the
+  // athlete to re-shoot the same board in a couple of minutes.
   const startedAt = performance.now();
   const partParses = await Promise.all(
     segmented.parts.map((part) => structurePart(part, sourceLabel, athleteNote)),
@@ -1359,7 +1401,8 @@ async function structureSegments(
 }
 
 // Structures one segmented part, retrying failures before demoting to 'free' (a parseable
-// part must never end up as a bare score screen because of a transient error). The second
+// part must never end up as a bare score screen because of a transient error). Rate limits
+// are the exception: they never demote, they throw — see the catch below. The second
 // delay is long on purpose: multi-part sessions fire several full-prompt calls back to back,
 // and OpenAI's tokens-per-MINUTE limit doesn't clear in 2 seconds — a short retry lands in
 // the same window and fails identically. An empty parse (possible stochastic refusal) gets
@@ -1379,6 +1422,13 @@ async function structurePart(part: WorkoutPartSegment, sourceLabel: 'TEXT' | 'IM
       console.warn(`[SEGMENT] part ${label} structured empty — retrying once`);
     } catch (error) {
       if (attempt >= STRUCTURE_RETRY_DELAYS_MS.length) {
+        // A rate limit is not an unreadable board — degrading here would hand the athlete a
+        // bare score screen and silently lose the part's structure forever. Surface it so the
+        // UI can tell them to wait it out and re-parse the same photo.
+        if (isRateLimitError(error)) {
+          console.warn(`[SEGMENT] part ${label} rate-limited after ${attempt + 1} attempts — failing the parse:`, error);
+          throw new ParseRateLimitError(error);
+        }
         console.warn(`[SEGMENT] part ${label} failed to structure after ${attempt + 1} attempts — keeping it as a free part:`, error);
         return buildFreePartFallback(part);
       }
@@ -1431,6 +1481,10 @@ function validateMeasurementUnit(value: unknown): MeasurementUnit | undefined {
     return value as MeasurementUnit;
   }
   return undefined;
+}
+
+function isSharedWorkLabel(value: unknown): value is SharedWorkLabel {
+  return value === 'each' || value === 'sync' || value === 'together';
 }
 
 function validateMovement(data: unknown): ParsedMovement | null {
@@ -1511,7 +1565,10 @@ function validateMovement(data: unknown): ParsedMovement | null {
     scoreEntryMode,
     stationLabel: typeof raw.stationLabel === 'string' ? raw.stationLabel : undefined,
     stationIndex: typeof raw.stationIndex === 'number' ? raw.stationIndex : undefined,
-    together: raw.together === true ? true : undefined,
+    // A board that named the arrangement is stating there's no split, so the label implies
+    // together — the two can never disagree downstream.
+    together: raw.together === true || isSharedWorkLabel(raw.sharedLabel) ? true : undefined,
+    sharedLabel: isSharedWorkLabel(raw.sharedLabel) ? raw.sharedLabel : undefined,
     relay: raw.relay === true ? true : undefined,
     alternative,
     // Preserve role so downstream code can distinguish buy-in from cash-out

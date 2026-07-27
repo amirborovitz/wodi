@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
-import { parseWorkoutImage, parseWorkoutSession } from '../services/openai';
+import { parseWorkoutImage, parseWorkoutSession, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
 import { assignMovementColors, getStationVisitCountsForExercise } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
@@ -84,7 +84,6 @@ interface ExerciseResult {
   partialReps?: number; // Partial reps in next cycle (for restore)
   partialMovements?: string[]; // Movement names completed in AMRAP partial round
   ladderStep?: number;
-  ladderPartial?: number;
   metconName?: string;
 }
 
@@ -118,6 +117,21 @@ function getSavedStrengthRepScheme(sets: ExerciseSet[]): number[] | undefined {
 
 const ADMIN_EMAIL = 'aborovitz@gmail.com';
 const SAVED_WORKOUTS_EMAIL = 'aborovitz@gmail.com';
+
+// A rate limit says nothing about the board, so the copy must not send the athlete off
+// re-shooting the photo or rewriting the WOD — it clears on its own. Every parse catch site
+// routes through this so there is one place the wait-it-out wording lives. Quota exhaustion
+// arrives as a 429 too but never clears, so it gets its own line — telling someone to wait
+// for a dead API key is worse than saying nothing.
+function parseFailureMessage(error: unknown, fallback: string): string {
+  if (isQuotaExhaustedError(error)) {
+    return "Wodi's AI credit has run out — this won't fix itself. Save the WOD and check billing.";
+  }
+  if (isRateLimitError(error)) {
+    return 'Too many WODs at once — Wodi hit its AI limit. Nothing wrong with your board: wait 2–3 minutes, then try the same photo again.';
+  }
+  return fallback;
+}
 
 const CINDY_MOVEMENTS = ['pull-up', 'pullup', 'push-up', 'pushup', 'air squat'];
 const DT_MOVEMENTS = ['deadlift', 'hang clean', 'hang power clean', 'shoulder to overhead', 'push jerk'];
@@ -579,6 +593,7 @@ function buildWorkloadBreakdownFromResults(
           substitutionType: existing.substitutionType || substitutionType,
           implementCount: existing.implementCount || implementCount,
           together: existing.together && isTogether, // only if ALL merged entries are together
+          sharedLabel: existing.sharedLabel ?? mov.sharedLabel,
         });
       } else {
         movementMap.set(key, {
@@ -596,6 +611,7 @@ function buildWorkloadBreakdownFromResults(
           implementCount: implementCount > 1 ? implementCount : undefined,
           distancePerRep: userDistancePerRep ?? (mov.distance && mov.distance > 0 ? mov.distance : undefined),
           together: isTogether || undefined,
+          sharedLabel: mov.sharedLabel,
         });
       }
 
@@ -1547,7 +1563,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         setStep('preview');
       } catch (err) {
         console.error('Error parsing workout:', err);
-        setError('Failed to parse workout. Please try again or enter manually.');
+        setError(parseFailureMessage(err, 'Failed to parse workout. Please try again or enter manually.'));
         setStep('capture');
       }
     };
@@ -1679,19 +1695,28 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         }
         case 'score_rounds': {
           if (savedEx.rounds != null) result.rounds = savedEx.rounds;
-          // Explicit partial-round fields (movement checklist) win over the legacy
-          // sets[0].actualReps carrier, which newer saves use for a derived rep total.
+          const isLadder = savedEx.ladderReps != null && savedEx.ladderReps.length > 0;
+          // Both ladder and AMRAP partials use the same checklist fields
+          // (partialMovements + summed partialReps). They differ only in the
+          // legacy fallback: a ladder's sets[0].actualReps is the FULL total, so
+          // it must never be read as partial reps.
           if (savedEx.partialMovements != null && savedEx.partialMovements.length > 0) {
             result.partialMovements = savedEx.partialMovements;
           }
           if (savedEx.partialReps != null) {
             result.partialReps = savedEx.partialReps;
+          } else if (isLadder) {
+            // Legacy ladder docs stored a per-movement uniform partial — convert
+            // to the summed partial-round total the checklist now expects.
+            if (savedEx.ladderPartial != null && savedEx.ladderPartial > 0) {
+              const mc = (savedEx.movements ?? []).filter(m => m.perRound !== false).length || 1;
+              result.partialReps = savedEx.ladderPartial * mc;
+            }
           } else if (savedEx.partialMovements == null) {
             const partialReps = savedEx.sets[0]?.actualReps;
             if (partialReps != null) result.partialReps = partialReps;
           }
           if (savedEx.ladderStep != null) result.ladderStep = savedEx.ladderStep;
-          if (savedEx.ladderPartial != null) result.ladderPartial = savedEx.ladderPartial;
           break;
         }
         case 'intervals': {
@@ -1778,7 +1803,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         }
       } catch (err) {
         if (cancelled) return;
-        if (stored) {
+        // A rate limit means the healing reparse never got a verdict — replaying the degraded
+        // parse here would bake the bare score screen in for a reason that clears on its own.
+        if (stored && !isRateLimitError(err)) {
           // Reparse failed — the degraded parse still logs a score; better than blocking.
           console.warn('[SavedWod] reparse of degraded saved parse failed — using stored parse:', err);
           setParsedWorkout(stored);
@@ -1786,7 +1813,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           return;
         }
         console.error('[SavedWod] Failed to parse raw saved WOD:', err);
-        setError('Could not parse this saved WOD. Try adding it again.');
+        setError(parseFailureMessage(err, 'Could not parse this saved WOD. Try adding it again.'));
         setStep('capture');
       }
     };
@@ -2019,7 +2046,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
       setStep('preview');
     } catch (err) {
       console.error('Error parsing workout:', err);
-      setError('Failed to parse workout. Please try again or enter manually.');
+      setError(parseFailureMessage(err, 'Failed to parse workout. Please try again or enter manually.'));
       setStep('capture');
     }
   };
@@ -2035,7 +2062,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
       setStep('preview');
     } catch (err) {
       console.error('Error parsing voice workout:', err);
-      setError('Could not parse workout. Try editing the text and trying again.');
+      setError(parseFailureMessage(err, 'Could not parse workout. Try editing the text and trying again.'));
       setStep('voice');
     }
   };
@@ -2066,7 +2093,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
       setTellWodiOpen(false);
     } catch (err) {
       console.error('Tell Wodi re-parse failed:', err);
-      setTellWodiError("Couldn't update the workout — try again.");
+      setTellWodiError(parseFailureMessage(err, "Couldn't update the workout — try again."));
     } finally {
       setTellWodiBusy(false);
     }
@@ -2989,7 +3016,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           ...(rounds > 1 && { rounds }),
           ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),
           ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
-          ...(result.ladderPartial != null && result.ladderPartial > 0 && { ladderPartial: result.ladderPartial }),
           ...(result.partialReps != null && result.partialReps > 0 && { partialReps: result.partialReps }),
           ...(result.partialMovements && result.partialMovements.length > 0 && { partialMovements: result.partialMovements }),
           ...(result.exercise.rawText && { rawText: result.exercise.rawText }),
@@ -3111,7 +3137,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         notes: null,
         rawText: parsedWorkout.rawText?.trim() || null,
         ...(parsedWorkout.userContext && { userContext: parsedWorkout.userContext }),
-        timeCap: effectiveDuration > 0 ? effectiveDuration : (parsedWorkout.timeCap || null),
+        // The cap is PRESCRIPTION — what the coach wrote. It must never be overwritten with
+        // effectiveDuration (what the athlete actually took): that is already persisted as
+        // duration/durationSeconds directly above, and stamping it here destroyed the board's
+        // own number — a "T.C - 34 MIN" board saved a 45-minute "cap" equal to the logged time,
+        // leaving nothing downstream able to tell a cap from a result.
+        timeCap: parsedWorkout.timeCap || null,
         format: parsedWorkout.format || null,
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         updatedAt: serverTimestamp(),

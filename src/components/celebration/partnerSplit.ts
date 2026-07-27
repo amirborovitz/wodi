@@ -70,17 +70,32 @@ export function detectPartnerSplit(params: {
 
 export type RoundLedgerEntry = 'me' | 'partner' | 'pending';
 
-// Completed rounds cycle through the team starting with 'me' (the athlete logging the workout
-// is "I" in "I go, you go"): in a pair every other round is mine; in a team of 3 every third
-// round is. Rounds beyond what was actually completed are 'pending' — a flat symbolic state,
-// never a computed partial (mirrors the ladderTrack ghost-rung convention: a round is several
-// movements, so "how far into round 7" can't be rendered as a fraction).
+// The ledger renders WHICH rounds were mine — so it must be derived from the recorded
+// personalRounds, never synthesized from teamSize arithmetic alone. Deriving it from teamSize
+// was a guess presented as fact: a board reading "I GO U GO" whose every movement is marked
+// (EACH)/SYNC has both athletes completing all 5 rounds, yet the cycle handed rounds 2 and 4 to
+// the partner and the poster told the athlete they'd done 3 of 5.
+//
+// Returns undefined when nothing alternated (personalRounds covers every round) — there is no
+// ledger to draw, and drawing one would invent a split the workout never had. Callers omit the
+// ledger entirely rather than rendering an all-'me' strip.
+//
+// Rounds beyond what was actually completed are 'pending' — a flat symbolic state, never a
+// computed partial (mirrors the ladderTrack ghost-rung convention: a round is several movements,
+// so "how far into round 7" can't be rendered as a fraction).
 export function buildRoundLedger(
   totalRounds: number,
   completedRounds: number,
+  personalRounds: number,
   teamSize = 2,
-): RoundLedgerEntry[] {
+): RoundLedgerEntry[] | undefined {
+  if (!(totalRounds > 0) || !(personalRounds > 0)) return undefined;
+  if (personalRounds >= totalRounds) return undefined;
+
   const cycle = Math.max(2, teamSize);
+  // Whoever holds the larger (or equal) share leads off, so the alternation lands on exactly
+  // personalRounds rounds: 3-of-5 → mine are 1,3,5; 2-of-5 → mine are 2,4.
+  const myOffset = personalRounds * cycle >= totalRounds ? 0 : 1;
   return Array.from({ length: totalRounds }, (_, i) =>
-    i >= completedRounds ? 'pending' : (i % cycle === 0 ? 'me' : 'partner'));
+    i >= completedRounds ? 'pending' : (i % cycle === myOffset ? 'me' : 'partner'));
 }

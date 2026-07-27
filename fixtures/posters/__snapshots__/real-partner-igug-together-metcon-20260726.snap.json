@@ -3,7 +3,7 @@
     {
       "eyebrow": "PARTNER AMRAP",
       "title": "Dynamic Duo For Time",
-      "blueprint": "For time",
+      "blueprint": "For time (35 MIN CAP)",
       "rows": [
         {
           "primary": "1200m",
@@ -77,7 +77,7 @@
       {
         "eyebrow": "WOD",
         "title": "Dynamic Duo For Time",
-        "blueprint": "For time",
+        "blueprint": "For time (35 MIN CAP)",
         "rows": [
           {
             "primary": "1200m",
@@ -235,6 +235,11 @@
   "posterRows": {
     "reward": [
       {
+        "kind": "block",
+        "label": "",
+        "cap": "For time (35 MIN CAP)"
+      },
+      {
         "kind": "line",
         "rx": "1200m Echo Bike (together)",
         "load": "",
@@ -281,6 +286,11 @@
     ],
     "pages": [
       [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "For time (35 MIN CAP)"
+        },
         {
           "kind": "line",
           "rx": "1200m Echo Bike (together)",

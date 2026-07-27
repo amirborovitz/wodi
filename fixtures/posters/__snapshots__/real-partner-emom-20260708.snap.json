@@ -5,7 +5,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "4-round pyramid for time",
+        "blueprint": "4-round pyramid for time (28 MIN CAP)",
         "rows": [],
         "isPartnerConfirmed": true,
         "partnerDisplayMode": "sections"
@@ -171,7 +171,7 @@
       [
         {
           "kind": "block",
-          "label": "4-ROUND PYRAMID FOR TIME",
+          "label": "4-ROUND PYRAMID FOR TIME (28 MIN CAP)",
           "cap": ""
         },
         {

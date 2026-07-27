@@ -5,8 +5,8 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import { usePRCount } from '../hooks/usePRCount';
 import { useRecapData } from '../hooks/useRecapData';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
-import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
-import type { WorkoutWithStats } from '../hooks/useWorkouts';
+import { DEFAULT_BW } from '../utils/xpCalculations';
+import { aggregateStats } from '../utils/statsAggregation';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './ProfileScreen.module.css';
 
@@ -63,21 +63,6 @@ function useTickerNumber(target: number, duration = 420): number {
   return display;
 }
 
-function calculateProfileEP(workouts: WorkoutWithStats[], bodyweight: number): number {
-  return workouts.reduce((sum, workout) => {
-    const ep = calculateWorkoutEP(
-      workout.totalVolume ?? 0,
-      getTimeCapMinutes(workout),
-      bodyweight,
-      Boolean(workout.isPR),
-      workout.workloadBreakdown?.movements,
-      undefined,
-      workout.difficultyLevel
-    );
-    return sum + ep.total;
-  }, 0);
-}
-
 export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onOpenRecap }: ProfileScreenProps) {
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
@@ -114,7 +99,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
       (sum, w) => sum + (w.workloadBreakdown?.grandTotalDistance || 0),
       0
     );
-    const ep = calculateProfileEP(filteredWorkouts, user?.weight ?? DEFAULT_BW);
+    const ep = aggregateStats(filteredWorkouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP;
     return {
       moveMinutes,
       workoutsCount,
@@ -125,7 +110,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
 
   const totalWorkouts = workouts.length;
   const totalEP = useMemo(
-    () => calculateProfileEP(workouts, user?.weight ?? DEFAULT_BW),
+    () => aggregateStats(workouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP,
     [workouts, user?.weight]
   );
   const handle = user?.email ? `@${user.email.split('@')[0]}` : '';

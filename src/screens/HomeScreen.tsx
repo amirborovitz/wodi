@@ -6,7 +6,8 @@ import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
-import { calculateWorkoutEP, DEFAULT_BW, getTimeCapMinutes } from '../utils/xpCalculations';
+import { DEFAULT_BW } from '../utils/xpCalculations';
+import { aggregateStats } from '../utils/statsAggregation';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
@@ -133,21 +134,13 @@ export function HomeScreen({
     [workouts, weekStart],
   );
 
-  const monthlyEP = useMemo(() => {
-    const bw = user?.weight ?? DEFAULT_BW;
-    return workouts
-      .filter(w => w.date >= monthStart)
-      .reduce((sum, w) => {
-        const ep = calculateWorkoutEP(
-          w.totalVolume ?? 0,
-          getTimeCapMinutes(w),
-          bw,
-          Boolean(w.isPR),
-          w.workloadBreakdown?.movements,
-        );
-        return sum + ep.total;
-      }, 0);
-  }, [workouts, monthStart, user?.weight]);
+  const monthlyEP = useMemo(
+    () => aggregateStats(
+      workouts.filter(w => w.date >= monthStart),
+      { bodyweight: user?.weight ?? DEFAULT_BW },
+    ).totalEP,
+    [workouts, monthStart, user?.weight],
+  );
 
   const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
   const savedSummary = useMemo(() => {

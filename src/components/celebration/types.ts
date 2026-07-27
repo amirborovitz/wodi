@@ -6,11 +6,12 @@ export interface HeroResult {
   storyLine?: string;
   storyMovements?: StoryMovementLine[];
   accentClass: string;
-  // Ladder AMRAP only — the round the partial reps are logged into ("into round 7"), shown
-  // beside the rounds+partial hero. No rep-total field: the poster never carries a checkable
-  // total for a ladder score (a round is often several movements, so it can't be verified at a
-  // glance) — that reconciliation belongs in the log/edit view, never on the shared poster.
-  ladderIntoRound?: number;
+  // Ladder AMRAP only — the rep value of the rung the athlete climbed into ("into the 12s"),
+  // shown beside the hero total. Stated as the rung's rep value (not a round number) to match
+  // the ladder track's bar labels and the logging screen. No per-movement rep-total field: the
+  // poster never carries a checkable total for a ladder score (a round is often several
+  // movements) — that reconciliation belongs in the log/edit view, never on the shared poster.
+  ladderIntoRungReps?: number;
   amrapNarrative?: string;
 }
 
@@ -86,7 +87,10 @@ export interface ArtifactRow {
   // them). `reps` is the prescribed rung sequence, `step` is rungs completed, `partial` is reps
   // into the next rung, `cadence` states the per-round increment explicitly ("+2 REPS EVERY
   // ROUND") so the climb rule is read, not guessed.
-  ladderTrack?: { reps: number[]; step: number; partial?: number; cadence?: string; complete?: boolean };
+  // `partialMoves` (new docs) is the truthful ghost-rung label: how many of the next
+  // rung's movements were finished, out of the total. `partial` is the legacy per-movement
+  // rep count kept only for old docs saved before the checklist.
+  ladderTrack?: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
 }
 
 export interface ArtifactSection {

@@ -3,7 +3,7 @@
     {
       "eyebrow": "FOR TIME",
       "title": "Blueprint",
-      "blueprint": "3 rounds for time",
+      "blueprint": "3 rounds for time · 12 MIN CAP",
       "rows": [
         {
           "primary": "50-40-30",
@@ -35,7 +35,7 @@
       {
         "eyebrow": "FOR TIME",
         "title": "Blueprint",
-        "blueprint": "3 rounds for time",
+        "blueprint": "3 rounds for time · 12 MIN CAP",
         "rows": [
           {
             "primary": "50-40-30",
@@ -168,7 +168,7 @@
     "reward": [
       {
         "kind": "block",
-        "label": "3 ROUNDS FOR TIME",
+        "label": "3 ROUNDS FOR TIME · 12 MIN CAP",
         "cap": ""
       },
       {
@@ -200,7 +200,7 @@
       [
         {
           "kind": "block",
-          "label": "3 ROUNDS FOR TIME",
+          "label": "3 ROUNDS FOR TIME · 12 MIN CAP",
           "cap": ""
         },
         {

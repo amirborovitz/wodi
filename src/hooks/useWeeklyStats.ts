@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useWorkouts } from './useWorkouts';
 import type { WorkoutWithStats } from './useWorkouts';
 import { useAuth } from '../context/AuthContext';
-import { calculateWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
+import { computeWorkoutEP, getTimeCapMinutes, DEFAULT_BW } from '../utils/xpCalculations';
 import { DEFAULT_USER_GOALS } from '../types';
 import type { UserGoals, EPBreakdown } from '../types';
 
@@ -61,7 +61,9 @@ export function useWeeklyStats(): WeeklyStatsResult {
     // Calculate stats for each workout
     const workoutsWithStats = thisWeekWorkouts.map((workout) => {
       const metconMinutes = getTimeCapMinutes(workout);
-      const ep = calculateWorkoutEP(workout.totalVolume, metconMinutes, bodyweight, false, workout.workloadBreakdown?.movements);
+      // Single EP source of truth — includes the PR + difficulty terms the poster/save use,
+      // so weekly EP can no longer diverge from what each workout earned.
+      const ep = computeWorkoutEP(workout, { bodyweight });
       return {
         ...workout,
         metconMinutes,

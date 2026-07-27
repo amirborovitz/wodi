@@ -7,6 +7,7 @@ import type {
   MeasurementUnit,
 } from '../../../types';
 import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
+import { parseTimeCapSeconds } from '../../../utils/timeCap';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
 // Universal classification: every exercise maps to exactly ONE kind.
@@ -78,9 +79,10 @@ export interface StoryExerciseResult {
   partialMovements?: string[];        // movement names completed in partial round (social-ready)
 
   // ladder AMRAP (score_rounds + ladderReps on exercise)
-  // Single continuous ladder — you pick up where you left off across intervals
+  // Single continuous ladder — you pick up where you left off across intervals.
+  // A partial climb into the next rung uses the shared partialMovements/partialReps
+  // fields above (the same "which moves did you finish?" checklist as AMRAP rounds).
   ladderStep?: number;                // how many rungs completed (e.g., 3 = completed through rung index 2)
-  ladderPartial?: number;             // partial reps into the next incomplete rung
 
   // intervals
   intervalsCompleted?: number;        // how many intervals done
@@ -453,9 +455,9 @@ export function getRowState(result: StoryExerciseResult): RowState {
       return 'empty';
 
     case 'score_rounds':
-      // Ladder AMRAP: filled if any interval has progress
+      // Ladder AMRAP: filled once any full rung is done; a partial climb into the
+      // next rung (partialReps/partialMovements, below) counts as 'partial'.
       if (result.ladderStep != null && result.ladderStep > 0) return 'filled';
-      if (result.ladderPartial != null && result.ladderPartial > 0) return 'partial';
       if (result.rounds != null && result.rounds > 0) return 'filled';
       if (result.partialReps != null && result.partialReps > 0) return 'partial';
       if (result.partialMovements != null && result.partialMovements.length > 0) return 'partial';
@@ -600,10 +602,9 @@ export function createBlankResult(
     });
   }
 
-  // Ladder AMRAP: initialize to zero
+  // Ladder AMRAP: start at the bottom of the ladder
   if (exercise.ladderReps && exercise.ladderReps.length > 0 && kind === 'score_rounds') {
     base.ladderStep = 0;
-    base.ladderPartial = 0;
   }
 
   // Always initialize per-movement results when movements exist.
@@ -770,11 +771,12 @@ export function createBlankResult(
       break;
 
     case 'score_time': {
-      // For Time: prefill with time cap if available in prescription
-      const rx = exercise.prescription?.toLowerCase() ?? '';
-      const capMatch = rx.match(/(\d+)\s*(?:min(?:ute)?s?)\s*(?:cap|time\s*cap)/i);
-      if (capMatch) {
-        base.timeSeconds = parseInt(capMatch[1], 10) * 60;
+      // For Time: prefill with the time cap the coach wrote, whichever notation they used
+      // ("20 min cap" / "T.C - 34 MIN") — utils/timeCap.ts owns every form so this prefill
+      // can't silently miss a cap the poster later displays.
+      const capSeconds = parseTimeCapSeconds(exercise.prescription);
+      if (capSeconds) {
+        base.timeSeconds = capSeconds;
       }
       break;
     }
