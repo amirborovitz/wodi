@@ -1,4 +1,5 @@
 import type {
+  BlockResult,
   ExerciseLoggingMode,
   MovementEquipment,
   ParsedExercise,
@@ -7,6 +8,7 @@ import type {
   MeasurementUnit,
 } from '../../../types';
 import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
+import { matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
@@ -93,6 +95,12 @@ export interface StoryExerciseResult {
   // The value itself lands in the matching field above (timeSeconds / rounds / repsTotal / weight).
   freeScoreType?: 'time' | 'rounds' | 'reps' | 'load';
 
+  // Per-block scores, indexed by section index — set only on a piece whose blocks are scored
+  // separately (exercise.sections[i].scoreType present). The wizard gives each such block its
+  // own page and writes its score here; save copies each entry into sections[i].result.
+  // Sparse on purpose: an index is undefined until the athlete logs that block.
+  blockScores?: (BlockResult | undefined)[];
+
   // Superset / multi-movement support
   movementResults?: MovementResult[]; // per-movement overrides for supersets
 
@@ -166,7 +174,7 @@ const DISTANCE_CARDIO_PATTERNS = [
 
 function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_machine' | 'distance_cardio' | 'unknown' {
   const n = name.toLowerCase();
-  if (CARDIO_MACHINE_PATTERNS.some(p => n.includes(p))) return 'cardio_machine';
+  if (matchesNamePattern(n, CARDIO_MACHINE_PATTERNS)) return 'cardio_machine';
   // Standalone "Row" = Concept2 rower (cardio machine). Weighted rows (Renegade Row,
   // Bent-over Row, DB Row, etc.) are distinguished by their qualifier words.
   if (/\brow\b/.test(n) && !/renegade|bent[-\s]over|pendlay|dumbbell|\bdb\b|kettlebell|\bkb\b|barbell/.test(n)) {
@@ -179,10 +187,10 @@ function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_m
   // (e.g., "weighted box step up", "weighted pull-up", "weighted vest lunges").
   if (/\bweighted\b/i.test(n)) return 'weight';
   // Check bodyweight BEFORE weighted (e.g., "chest to bar" shouldn't match "bar")
-  if (BODYWEIGHT_NAME_PATTERNS.some(p => n.includes(p))) return 'bodyweight';
+  if (matchesNamePattern(n, BODYWEIGHT_NAME_PATTERNS)) return 'bodyweight';
   if (/\bbanded?\b|band\b|rotation|hold\b/i.test(n)) return 'bodyweight';
-  if (DISTANCE_CARDIO_PATTERNS.some(p => n.includes(p))) return 'distance_cardio';
-  if (WEIGHTED_NAME_PATTERNS.some(p => n.includes(p))) return 'weight';
+  if (matchesNamePattern(n, DISTANCE_CARDIO_PATTERNS)) return 'distance_cardio';
+  if (matchesNamePattern(n, WEIGHTED_NAME_PATTERNS)) return 'weight';
   return 'unknown';
 }
 
@@ -210,12 +218,18 @@ export function movementToKind(mov: ParsedMovement): ExerciseKind {
   if (mov.inputType === 'calories') return 'distance';
   if (mov.inputType === 'distance') return 'distance';
 
-  // AI said 'none' or isBodyweight — trust it. Only rxWeights (also AI data) can
-  // rescue to 'load'; name patterns must not override an explicit AI classification.
+  // AI said 'none' or isBodyweight — trust it. Only AI DATA (rxWeights, time, a
+  // prescribed distance/calorie quantity) may refine the kind; a name pattern must never
+  // override an explicit AI classification. "30 Bicycle Crunches" comes back as
+  // { reps: 30, inputType: 'none' } — that is a counted movement, whatever its name
+  // happens to look like to a regex.
   if (mov.inputType === 'none' || mov.isBodyweight) {
     if (mov.rxWeights) return 'load';
     if (mov.time && mov.time > 0) return 'duration';
-    if (nameClass === 'distance_cardio') return 'distance';
+    if ((mov.distance ?? 0) > 0 || (mov.calories ?? 0) > 0) return 'distance';
+    // Nothing prescribed at all (bare "Run" / "Max Row"): no AI quantity to trust, so the
+    // name is the only signal left — fallback, not override.
+    if (!mov.reps && nameClass === 'distance_cardio') return 'distance';
     return 'reps';
   }
 
@@ -261,6 +275,23 @@ export function loggingModeToKind(mode: ExerciseLoggingMode): ExerciseKind {
 function isFixedCadenceInterval(exercise: ParsedExercise): boolean {
   const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/\s+/g, ' ');
   return /\b(?:emom|e\d+mom|every\s+\d+(?::\d{2})?\s*(?:min(?:ute)?s?)?)\b/i.test(text);
+}
+
+const BUILDING_LOAD_CUE =
+  /\bbuild(?:s|ing)?\b|\bwork(?:ing)?\s+up\b|\bascend(?:ing)?\b|\badd(?:ing)?\s+(?:weight|load)\b|\bincreas(?:e|ing)\s+(?:the\s+)?(?:weight|load)\b|\bclimb(?:ing)?\b|\bheaviest\b/i;
+
+/**
+ * True when the board tells the athlete to move UP in weight across the block's sets
+ * ("start at ~65% and build up weight", "add weight each set", "work up to a heavy single").
+ * Such a block has TWO numbers worth logging — where it started and where it topped out — so it
+ * gets the Start/Peak progression input instead of a single weight confirm.
+ *
+ * Read straight from AI output: the parse prompt preserves written loading cues verbatim in
+ * `prescription`, and `rawText` is this exercise's own slice of the board (never a sibling's).
+ */
+export function prescribesBuildingLoad(exercise: ParsedExercise): boolean {
+  const text = `${exercise.name || ''} ${exercise.prescription || ''} ${exercise.rawText || ''}`;
+  return BUILDING_LOAD_CUE.test(text);
 }
 
 const DURATION_HOLD_PATTERNS = [

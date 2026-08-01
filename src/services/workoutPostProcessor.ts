@@ -6,6 +6,7 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSectionType, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
 import { hasSameMovementsEveryRound } from '../utils/sectionShape';
+import { matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 
 /**
@@ -36,7 +37,8 @@ const FIXED_MOVEMENT_STOPWORDS = new Set([
  */
 const CARDIO_MACHINES = [
   'bike', 'echo bike', 'assault bike', 'air bike', 'airbike', 'airdyne',
-  'row', 'rower', 'rowing', 'ski erg', 'skierg', 'ski-erg',
+  'bike erg', 'bikeerg',
+  'row', 'rower', 'rowing', 'row erg', 'rowerg', 'ski erg', 'skierg',
   'run', 'running', 'treadmill', 'airrunner',
 ];
 
@@ -360,9 +362,16 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // to one shared scheme — so the poster shows each movement's own scheme, not a false 50-40-30.
   const withPerMovementLadder = normalizePerMovementLadder(withPerTierBuyIns);
 
+  // Collapse a lone single-pass `rounds` section into flat movements[] — ONE representation for
+  // a plain chipper, so downstream never has to branch on which shape the AI happened to emit.
+  // After the section-BUILDING normalizers above (a ladder/per-tier shape they just created has
+  // >= 2 sections and is left alone) and before the interleaved repair, which skips sectioned
+  // exercises.
+  const withSinglePassCollapsed = normalizeSinglePassSections(withPerMovementLadder);
+
   // Restore interleaved repeats a flat for-time chipper collapsed at parse (e.g. a run written
   // before each station that the AI deduplicated to one) — rebuilt deterministically from board text.
-  const withInterleaved = normalizeInterleavedMovements(withPerMovementLadder);
+  const withInterleaved = normalizeInterleavedMovements(withSinglePassCollapsed);
 
   // Normalize explicit movement semantics so downstream math can trust structure
   return backfillMovementSemantics(withInterleaved);
@@ -935,6 +944,47 @@ function movementIdentityTokens(text: string): Set<string> {
  * Sectioned / round-structured exercises are out of scope: their repeats live in sections, and the
  * per-tier cardio buy-in case is owned by normalizePerTierBuyIns.
  */
+/**
+ * Collapse a LONE single-pass `rounds` section into the flat `movements[]` it already is.
+ *
+ * A plain chipper has two representations in the AI's output — flat `movements[]`, or one
+ * `rounds` section (rounds: 1) holding the same lines — and which one it emits is
+ * non-deterministic for the same board. That ambiguity is the bug: ~50 places downstream branch
+ * on `exercise.sections?.length`, so the two shapes take different code paths and tell different
+ * stories. Worse, the AI writes the section's list in full board order while deduplicating the
+ * flat list, leaving one exercise carrying TWO disagreeing movement lists (a palindrome chipper's
+ * 7 lines in `sections[0]`, 4 unique names in `movements[]`) under names that drift apart
+ * ("Twin Kettlebells Clean and Jerk" vs "Clean + Jerk").
+ *
+ * One section run once says nothing a flat list can't: this makes the flat list the single
+ * representation, and the section's order — the board's order — wins, because it's the one the
+ * AI kept complete. A section that carries real structure is left alone: a repeat count
+ * (rounds > 1), a board-written label, a block score, or a buy_in/cash_out role.
+ *
+ * Runs BEFORE normalizeInterleavedMovements, which bails on any sectioned exercise — so a
+ * single-pass section that the AI ALSO deduplicated now reaches that text-driven repair instead
+ * of escaping it.
+ */
+function normalizeSinglePassSections(workout: ParsedWorkout): ParsedWorkout {
+  let changed = false;
+  const exercises = workout.exercises.map((ex) => {
+    const sections = ex.sections;
+    if (!sections || sections.length !== 1) return ex;
+    const [only] = sections;
+    if (only.sectionType !== 'rounds') return ex;
+    if ((only.rounds ?? 1) > 1) return ex;
+    if (only.label || only.scoreType || only.result) return ex;
+    if (!only.movements || only.movements.length === 0) return ex;
+
+    changed = true;
+    // Clone each movement so the collapsed list never shares a mutable reference with the
+    // section object callers may still hold.
+    return { ...ex, movements: only.movements.map((m) => ({ ...m })), sections: undefined };
+  });
+
+  return changed ? { ...workout, exercises } : workout;
+}
+
 function normalizeInterleavedMovements(workout: ParsedWorkout): ParsedWorkout {
   let changed = false;
   const exercises = workout.exercises.map((ex) => {
@@ -959,10 +1009,15 @@ function normalizeInterleavedMovements(workout: ParsedWorkout): ParsedWorkout {
         let score = 0;
         tokens.forEach((t) => { if (lineTokens.has(t)) score += 1; });
         if (score > bestScore) { bestScore = score; best = i; tie = false; }
-        else if (score === bestScore && score > 0) { tie = true; }
+        // A tie is only ambiguous between DIFFERENT movements. Two entries of the SAME movement
+        // score alike by definition — the AI often half-repairs a chipper, duplicating the run
+        // but not the other repeats — and treating that as ambiguity aborted the rebuild on
+        // exactly the lists that most needed it, leaving the collapse in place.
+        else if (score === bestScore && score > 0
+          && movements[i].name.toLowerCase() !== movements[best].name.toLowerCase()) { tie = true; }
       });
       if (bestScore === 0) continue;   // a header/note line — not a movement
-      if (tie) return ex;              // two movements fit equally — too risky to reorder
+      if (tie) return ex;              // two DIFFERENT movements fit equally — too risky to reorder
       sequence.push(movements[best]);
     }
 
@@ -2136,7 +2191,7 @@ function extractDistanceFromText(
  */
 function isCardioMachine(name: string): boolean {
   const lower = name.toLowerCase();
-  return CARDIO_MACHINES.some(machine => lower.includes(machine));
+  return matchesNamePattern(lower, CARDIO_MACHINES);
 }
 
 /**
@@ -2410,10 +2465,10 @@ const BACKFILL_BODYWEIGHT = [
 function inferInputType(mov: ParsedMovement): ParsedMovement['inputType'] {
   const name = mov.name.toLowerCase();
 
-  if (BACKFILL_CARDIO_MACHINES.some(p => name.includes(p))) return 'calories';
+  if (matchesNamePattern(name, BACKFILL_CARDIO_MACHINES)) return 'calories';
   if (/cal\b|calorie/i.test(name)) return 'calories';
-  if (BACKFILL_DISTANCE_CARDIO.some(p => name.includes(p))) return mov.distance ? 'none' : 'distance';
-  if (BACKFILL_BODYWEIGHT.some(p => name.includes(p))) return 'none';
+  if (matchesNamePattern(name, BACKFILL_DISTANCE_CARDIO)) return mov.distance ? 'none' : 'distance';
+  if (matchesNamePattern(name, BACKFILL_BODYWEIGHT)) return 'none';
   if (/\bbanded?\b|band\b|rotation|hold\b|plank/i.test(name)) return 'none';
 
   const weightedPatterns = [
@@ -2421,7 +2476,7 @@ function inferInputType(mov: ParsedMovement): ParsedMovement['inputType'] {
     'press', 'deadlift', 'clean', 'snatch', 'thruster', 'front rack', 'overhead',
     'squat', 'lunge', 'curl', 'row', 'swing', 'wall ball', 'jerk',
   ];
-  if (weightedPatterns.some(p => name.includes(p))) return 'weight';
+  if (matchesNamePattern(name, weightedPatterns)) return 'weight';
 
   return 'none';
 }

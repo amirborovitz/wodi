@@ -1,0 +1,158 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Weightlifting",
+      "blueprint": "EVERY 1:30",
+      "rows": [
+        {
+          "primary": "4 × 2",
+          "name": "Clean and Jerk",
+          "totalNote": "8 total",
+          "subNote": "8 total",
+          "mineKey": "Clean and Jerk",
+          "mineOverride": "40-50kg",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "4 × 1",
+          "name": "Clean and Jerk",
+          "totalNote": "4 total",
+          "subNote": "4 total",
+          "mineKey": "Clean and Jerk",
+          "mineOverride": "50-65kg",
+          "accent": "yellow",
+          "repeatCount": 4
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Weightlifting",
+        "blueprint": "EVERY 1:30",
+        "rows": [
+          {
+            "primary": "4 × 2",
+            "name": "Clean and Jerk",
+            "totalNote": "8 total",
+            "subNote": "8 total",
+            "mineKey": "Clean and Jerk",
+            "mineOverride": "40-50kg",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "4 × 1",
+            "name": "Clean and Jerk",
+            "totalNote": "4 total",
+            "subNote": "4 total",
+            "mineKey": "Clean and Jerk",
+            "mineOverride": "50-65kg",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "65",
+    "unit": "KG",
+    "subtitle": "CLEAN AND JERK",
+    "formatLine": "8 × every 1:30",
+    "storyLine": "12 clean and jerk",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×4 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Clean and Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×4 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Clean and Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentGold"
+  },
+  "resultLabel": "TOP SET",
+  "resultValue": "65kg",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "4 × 2 Clean and Jerk",
+        "load": "",
+        "mine": "40-50kg",
+        "team": "",
+        "total": "8 total"
+      },
+      {
+        "kind": "line",
+        "rx": "4 × 1 Clean and Jerk",
+        "load": "",
+        "mine": "50-65kg",
+        "team": "",
+        "total": "4 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "4 × 2 Clean and Jerk",
+          "load": "",
+          "mine": "40-50kg",
+          "team": "",
+          "total": "8 total"
+        },
+        {
+          "kind": "line",
+          "rx": "4 × 1 Clean and Jerk",
+          "load": "",
+          "mine": "50-65kg",
+          "team": "",
+          "total": "4 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

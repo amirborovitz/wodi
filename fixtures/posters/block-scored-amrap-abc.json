@@ -1,0 +1,89 @@
+{
+  "name": "block-scored-amrap-abc",
+  "description": "Block-scored interval AMRAP: ONE piece ([10:00 AMRAP / 2:00 REST] x 3) whose A/B/C blocks each carry their own rounds score (5/5/6). Pins the model that replaced splitting each block into its own exercise (and its own poster). Real board, logged 2026-07-29.",
+  "workout": {
+    "title": "Endurance Circuit",
+    "format": "amrap_intervals",
+    "timeCap": 2160,
+    "rawText": "METCON (Long)\n[10:00 min AMRAP, 02:00 min REST] x 3 rounds:\n\nAMRAP - A:\n5/7 calories echo bike\n10 alt' single Dumbbell Devil Press @15/22.5kg\n30 bicycle crunches\n\nAMRAP - B:\n50 Double Under / 100 singles\n10 alt' weighted box step up\n10 Toes to Bar\n\nAMRAP - C:\n15 Russian Kettlebell Swings @20/28kg\n12 goblet squats\n9 push ups",
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Echo Bike", "totalCalories": 35, "unit": "cal", "color": "magenta" },
+        { "name": "Alt Single Dumbbell Devil Press", "totalReps": 50, "weight": 22.5, "unit": "kg", "color": "yellow" },
+        { "name": "Bicycle Crunch", "totalReps": 150, "color": "magenta" },
+        { "name": "Double Under", "totalReps": 250, "color": "magenta" },
+        { "name": "Alt Weighted Box Step Up", "totalReps": 50, "weight": 15, "unit": "kg", "color": "yellow" },
+        { "name": "Toes to Bar", "totalReps": 50, "color": "cyan" },
+        { "name": "Russian Kettlebell Swing", "totalReps": 105, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Goblet Squat", "totalReps": 84, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Push-up", "totalReps": 54, "color": "magenta" }
+      ]
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "10:00 AMRAP x 3",
+        "type": "wod",
+        "loggingMode": "amrap_intervals",
+        "prescription": "[10:00 AMRAP / 2:00 REST] x 3: AMRAP-A 5/7 cal Echo Bike + 10 Alt Single DB Devil Press + 30 Bicycle Crunches, AMRAP-B 50 Double Unders + 10 Alt Weighted Box Step Ups + 10 Toes to Bar, AMRAP-C 15 Russian KB Swings + 12 Goblet Squats + 9 Push-ups",
+        "aiPartName": "TANK",
+        "intervalCount": 3,
+        "workDuration": 1800,
+        "restDuration": 360,
+        "rounds": 16,
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 1016 }
+        ],
+        "movements": [
+          { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" },
+          { "name": "Alt Single Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
+          { "name": "Bicycle Crunch", "reps": 30, "inputType": "none" },
+          { "name": "Double Under", "reps": 50, "inputType": "none", "alternative": { "name": "Single Under", "reps": 100 } },
+          { "name": "Alt Weighted Box Step Up", "reps": 10, "inputType": "weight", "rxWeights": { "male": 15, "female": 15, "unit": "kg" }, "implementCount": 1 },
+          { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
+          { "name": "Russian Kettlebell Swing", "reps": 15, "inputType": "weight", "rxWeights": { "male": 28, "female": 20, "unit": "kg" }, "implementCount": 1 },
+          { "name": "Goblet Squat", "reps": 12, "inputType": "weight", "rxWeights": { "male": 28, "female": 20, "unit": "kg" }, "implementCount": 1 },
+          { "name": "Push-up", "reps": 9, "inputType": "none" }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "label": "A",
+            "scoreType": "rounds",
+            "result": { "value": 5 },
+            "movements": [
+              { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" },
+              { "name": "Alt Single Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
+              { "name": "Bicycle Crunch", "reps": 30, "inputType": "none" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "label": "B",
+            "scoreType": "rounds",
+            "result": { "value": 5 },
+            "movements": [
+              { "name": "Double Under", "reps": 50, "inputType": "none", "alternative": { "name": "Single Under", "reps": 100 } },
+              { "name": "Alt Weighted Box Step Up", "reps": 10, "inputType": "weight", "rxWeights": { "male": 15, "female": 15, "unit": "kg" }, "implementCount": 1 },
+              { "name": "Toes to Bar", "reps": 10, "inputType": "none" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "label": "C",
+            "scoreType": "rounds",
+            "result": { "value": 6, "partialReps": 12, "partialMovements": ["Russian Kettlebell Swing", "Goblet Squat"] },
+            "movements": [
+              { "name": "Russian Kettlebell Swing", "reps": 15, "inputType": "weight", "rxWeights": { "male": 28, "female": 20, "unit": "kg" }, "implementCount": 1 },
+              { "name": "Goblet Squat", "reps": 12, "inputType": "weight", "rxWeights": { "male": 28, "female": 20, "unit": "kg" }, "implementCount": 1 },
+              { "name": "Push-up", "reps": 9, "inputType": "none" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

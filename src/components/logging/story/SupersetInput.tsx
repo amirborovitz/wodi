@@ -148,6 +148,20 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     setSwapOpenKey(null);
   }, [swapMr, movements, updateMovement]);
 
+  // Sequential blocks can repeat the same lift ("4 sets: 2 Clean & Jerk / Into: 4 sets: 1 Clean
+  // & Jerk"). Two identically-titled cards read as a duplicate bug, so a repeated name carries
+  // its own block's scheme (CLEAN & JERK · 4×2) to say which block it is.
+  const blockLabel = useCallback((mr: MovementResult): string => {
+    const isRepeatedName = movements.filter(
+      (m) => m.movement.name.toLowerCase() === mr.movement.name.toLowerCase(),
+    ).length > 1;
+    const sets = mr.sectionRounds ?? result.setsTotal;
+    const reps = mr.movement.reps;
+    return isRepeatedName && sets > 1 && reps
+      ? `${mr.movement.name} · ${sets}×${reps}`
+      : mr.movement.name;
+  }, [movements, result.setsTotal]);
+
   // Sequential complex: one independent block per section. Each weighted block gets its own
   // ProgressiveWeightRow (own start->peak); any non-weighted movement in a block keeps its row.
   if (isSequentialBlocks) {
@@ -165,7 +179,7 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
                 repsPerSet={mr.movement.reps ?? result.exercise.suggestedReps}
                 step={getWeightStep(mr.movement.name, mr.movement.equipment)}
                 onChange={(start, peak) => handleBlockProgressive(i, start, peak)}
-                label={mr.movement.name}
+                label={blockLabel(mr)}
               />
             ) : (
               <MovementRow

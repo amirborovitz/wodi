@@ -106,8 +106,8 @@
     ]
   ],
   "hero": {
-    "value": "35",
-    "unit": "KG",
+    "value": "240",
+    "unit": "REPS",
     "formatLine": "8 min EMOM + For Time · In Pairs",
     "storyLine": "100 power clean · 80 shoulder to overhead · 60 thruster · 4.4km echo bike · 300m farmer carry",
     "storyMovements": [
@@ -162,8 +162,10 @@
         "color": "magenta"
       }
     ],
-    "accentClass": "accentGold"
+    "accentClass": "accentMagenta"
   },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "240",
   "posterRows": {
     "reward": null,
     "pages": [

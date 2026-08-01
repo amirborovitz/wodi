@@ -1,0 +1,379 @@
+{
+  "reward": [
+    {
+      "eyebrow": "PARTNER AMRAP",
+      "title": "METCON Long For Time",
+      "blueprint": "For time (30 MIN CAP)",
+      "rows": [
+        {
+          "primary": "600m",
+          "name": "Run (together)",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "suppressMine": true
+        },
+        {
+          "primary": "80",
+          "name": "Twin Kettlebells Clean and Jerks",
+          "nameWithLoad": "Twin Kettlebells Clean and Jerks @ 20kg each",
+          "loadNote": "20kg each",
+          "mineKey": "Twin Kettlebells Clean and Jerk",
+          "accent": "yellow",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "40"
+        },
+        {
+          "primary": "60",
+          "name": "Box Jump Overs",
+          "mineKey": "Box Jump Over",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "30"
+        },
+        {
+          "primary": "40",
+          "name": "Bar Muscle-ups",
+          "mineKey": "Bar Muscle-up",
+          "accent": "cyan",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "20"
+        },
+        {
+          "primary": "60",
+          "name": "Box Jump Overs",
+          "mineKey": "Box Jump Over",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "30"
+        },
+        {
+          "primary": "80",
+          "name": "Twin Kettlebells Clean and Jerks",
+          "nameWithLoad": "Twin Kettlebells Clean and Jerks @ 20kg each",
+          "loadNote": "20kg each",
+          "mineKey": "Twin Kettlebells Clean and Jerk",
+          "accent": "yellow",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "40"
+        },
+        {
+          "primary": "600m",
+          "name": "Run (together)",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "suppressMine": true
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": true
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Core",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "30",
+            "name": "Russian Twist",
+            "subNote": "90 total",
+            "totalNote": "90 total",
+            "mineKey": "Russian Twist",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "50m",
+            "name": "Twin Kettlebells Front Rack Carry",
+            "subNote": "75 m total",
+            "totalNote": "75 m total",
+            "mineKey": "Twin Kettlebells Front Rack Carry",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "METCON Long For Time",
+        "blueprint": "For time (30 MIN CAP)",
+        "rows": [
+          {
+            "primary": "600m",
+            "name": "Run (together)",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "suppressMine": true
+          },
+          {
+            "primary": "80",
+            "name": "Twin Kettlebells Clean and Jerks",
+            "nameWithLoad": "Twin Kettlebells Clean and Jerks @ 20kg each",
+            "loadNote": "20kg each",
+            "mineKey": "Twin Kettlebells Clean and Jerk",
+            "accent": "yellow",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "40"
+          },
+          {
+            "primary": "60",
+            "name": "Box Jump Overs",
+            "mineKey": "Box Jump Over",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "30"
+          },
+          {
+            "primary": "40",
+            "name": "Bar Muscle-ups",
+            "mineKey": "Bar Muscle-up",
+            "accent": "cyan",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "20"
+          },
+          {
+            "primary": "60",
+            "name": "Box Jump Overs",
+            "mineKey": "Box Jump Over",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "30"
+          },
+          {
+            "primary": "80",
+            "name": "Twin Kettlebells Clean and Jerks",
+            "nameWithLoad": "Twin Kettlebells Clean and Jerks @ 20kg each",
+            "loadNote": "20kg each",
+            "mineKey": "Twin Kettlebells Clean and Jerk",
+            "accent": "yellow",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "40"
+          },
+          {
+            "primary": "600m",
+            "name": "Run (together)",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "suppressMine": true
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": true
+      }
+    ]
+  ],
+  "hero": {
+    "value": "32:20",
+    "unit": "MIN",
+    "storyLine": "160 twin kettlebells clean and jerk · 120 box jump over · 40 bar mu · 1.2km run",
+    "storyMovements": [
+      {
+        "perRound": "1.2km",
+        "name": "Run",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "320",
+        "name": "Twin Kettlebells Clean and Jerk",
+        "total": "",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 160",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "240",
+        "name": "Box Jump Over",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "partnerNote": "your part 120",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "80",
+        "name": "Bar Muscle-up",
+        "total": "",
+        "color": "cyan",
+        "partnerNote": "your part 40",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "OUR TIME",
+  "resultValue": "32:20",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "For time (30 MIN CAP)"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Run (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "80 Twin Kettlebells Clean and Jerks",
+        "load": "",
+        "mine": "20kg each",
+        "team": "40"
+      },
+      {
+        "kind": "line",
+        "rx": "60 Box Jump Overs",
+        "load": "",
+        "mine": "",
+        "team": "30"
+      },
+      {
+        "kind": "line",
+        "rx": "40 Bar Muscle-ups",
+        "load": "",
+        "mine": "",
+        "team": "20"
+      },
+      {
+        "kind": "line",
+        "rx": "60 Box Jump Overs",
+        "load": "",
+        "mine": "",
+        "team": "30"
+      },
+      {
+        "kind": "line",
+        "rx": "80 Twin Kettlebells Clean and Jerks",
+        "load": "",
+        "mine": "20kg each",
+        "team": "40"
+      },
+      {
+        "kind": "line",
+        "rx": "600m Run (together)",
+        "load": "",
+        "mine": "",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "CORE",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "30 Russian Twist",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "50m Twin Kettlebells Front Rack Carry",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "75 m total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "For time (30 MIN CAP)"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Run (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "80 Twin Kettlebells Clean and Jerks",
+          "load": "",
+          "mine": "20kg each",
+          "team": "40"
+        },
+        {
+          "kind": "line",
+          "rx": "60 Box Jump Overs",
+          "load": "",
+          "mine": "",
+          "team": "30"
+        },
+        {
+          "kind": "line",
+          "rx": "40 Bar Muscle-ups",
+          "load": "",
+          "mine": "",
+          "team": "20"
+        },
+        {
+          "kind": "line",
+          "rx": "60 Box Jump Overs",
+          "load": "",
+          "mine": "",
+          "team": "30"
+        },
+        {
+          "kind": "line",
+          "rx": "80 Twin Kettlebells Clean and Jerks",
+          "load": "",
+          "mine": "20kg each",
+          "team": "40"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Run (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  }
+}

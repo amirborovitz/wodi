@@ -44,6 +44,10 @@ import {
   type CelebrationStickerConfig,
 } from '../services/celebrationStickerConfig';
 import { hasStructuralCorrection } from '../components/celebration/corrections';
+import {
+  prescribedMovementNames,
+  movementsMatchingNames,
+} from '../components/celebration/movementResolution';
 import { resolveSourceDate } from '../services/sourceDateResolution';
 import {
   // Pure computation functions
@@ -244,18 +248,7 @@ function isMainPart(ex: Exercise): boolean {
  * practices: a poster section rendering one part must never receive a sibling part's movements.
  */
 function movementsForExercises(target: Exercise[], all: MovementTotal[]): MovementTotal[] {
-  const names = new Set<string>();
-  for (const ex of target) {
-    names.add(ex.name.toLowerCase());
-    const prescribed = ex.sections?.length
-      ? ex.sections.flatMap((section) => section.movements ?? [])
-      : (ex.movements ?? []);
-    for (const m of prescribed) names.add(m.name.toLowerCase());
-  }
-  const scoped = all.filter((m) =>
-    names.has(m.name.toLowerCase())
-    || (m.originalMovement != null && names.has(m.originalMovement.toLowerCase())),
-  );
+  const scoped = movementsMatchingNames(all, prescribedMovementNames(target));
   // Name-matching failed entirely (aliases, renames) — a wrongly-empty poster is worse than
   // the unscoped list, so fall back rather than render nothing.
   return scoped.length > 0 ? scoped : all;
@@ -773,14 +766,7 @@ export function useCelebrationData(
 
     return posterMainExercises.map((ex): CarouselPage => {
       const isStrength = isStrengthPagePart(ex);
-      const exNameLower = ex.name.toLowerCase();
-      const subNames = new Set((ex.movements ?? []).map((m) => m.name.toLowerCase()));
-
-      const fromBreakdown = allMovements.filter((m) => {
-        const mn = m.name.toLowerCase();
-        const orig = m.originalMovement?.toLowerCase();
-        return mn === exNameLower || subNames.has(mn) || (orig != null && subNames.has(orig));
-      });
+      const fromBreakdown = movementsMatchingNames(allMovements, prescribedMovementNames([ex]));
 
       if (fromBreakdown.length > 0) return { exercise: ex, movements: fromBreakdown, isStrength };
 
@@ -809,8 +795,9 @@ export function useCelebrationData(
         return { exercise: ex, movements: [derived], isStrength };
       }
 
-      const metconMovements = allMovements.filter((m) => subNames.has(m.name.toLowerCase()));
-      return { exercise: ex, movements: metconMovements, isStrength };
+      // Nothing in the breakdown belongs to this part and it logged no weighted sets — the page
+      // renders from its prescription alone rather than borrowing a sibling's numbers.
+      return { exercise: ex, movements: [], isStrength };
     });
   }, [posterLayout, posterMainExercises, activeBreakdown?.movements]);
 

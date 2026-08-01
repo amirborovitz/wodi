@@ -14,6 +14,8 @@ import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 // Value import from helpers directly (not the useCelebrationData re-export): the hook module
 // transitively initializes Firebase, which the Node poster-corpus harness must never load.
 import { shouldLogCelebrationDebug } from '../../helpers';
+import { formatLoggedLoad } from '../../posterFormatters';
+import { getExercisePeakLoad } from '../../movementResolution';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -211,6 +213,19 @@ function isRoundCountForTimeCoveredByFormat(
   const typeIsForTime = normalizePosterHeaderText(context.type).includes('for time');
   const formatMatch = normalizePosterHeaderText(context.format).match(/^(\d+) rounds?$/);
   return typeIsForTime && !!formatMatch && formatMatch[1] === match[1];
+}
+
+// A bare cadence header ("EVERY 1:30") next to a format line that already states that cadence
+// WITH its count ("8 × EVERY 1:30") is the same sentence twice, minus the useful half. Recognise
+// the containment so the block header drops out and the count-bearing line speaks alone.
+function isCadenceCoveredByFormat(
+  value: string | null | undefined,
+  context: PosterHeaderContext,
+): boolean {
+  const normalized = normalizePosterHeaderText(value);
+  if (!normalized.startsWith('every ') && !normalized.startsWith('emom ')) return false;
+  const format = normalizePosterHeaderText(context.format);
+  return format !== normalized && format.endsWith(normalized);
 }
 
 function mapFormatToType(format: string | undefined): string {
@@ -442,13 +457,20 @@ function buildTotals(data: CelebrationData, heroValue: string): PosterTotal[] {
 // per-movement readout above it does). Strength stays individual even in a team session.
 // isPartner must come from isPartnerConfirmed (this card's own content), never raw teamSize —
 // a session-level teamSize doesn't mean this specific card's block is the partnered one.
-function buildResultLabel(format: string | undefined, isPartner: boolean, heroUnit?: string): string {
+export function buildResultLabel(format: string | undefined, isPartner: boolean, heroUnit?: string): string {
   // The label follows the hero's unit before falling back to the format — a fallback hero
   // (EP when no time was logged, calories on a cardio EMOM) must never sit under "MY TIME".
   if (heroUnit === 'REPS') return isPartner ? 'OUR REPS' : 'TOTAL REPS';
   // "EP" alone doesn't survive a screenshot — a stranger needs to read it as a score.
   if (heroUnit === 'EP') return 'EFFORT';
   if (heroUnit === 'CAL') return 'CALORIES';
+  // Distance heroes were missing here, so a cardio EMOM's "3.0" (km) sat under the format's
+  // "ROUNDS" — a label that contradicted the poster's own "3.00 KM TOTAL" row beside it and
+  // read as a wrong round count. Any unit the hero can produce must be handled BEFORE the
+  // format switch, which knows the workout's shape but not what was actually measured.
+  if (heroUnit === 'KM' || heroUnit === 'M') return 'DISTANCE';
+  if (heroUnit === 'KG') return 'TOP SET';
+  if (heroUnit === 'KG PR') return 'PR';
   switch (format) {
     case 'for_time':        return isPartner ? 'OUR TIME' : 'MY TIME';
     case 'amrap':
@@ -460,11 +482,40 @@ function buildResultLabel(format: string | undefined, isPartner: boolean, heroUn
   }
 }
 
-function buildResultValue(hero: HeroResult | null | undefined): string {
-  // The result LABEL carries the unit ("TOTAL REPS", "MY TIME"), so the big value is just the
-  // number — appending the unit again reads "TOTAL REPS · 108 REPS" and risks multi-line wrapping
-  // at the hero's large font size.
-  return hero?.value ?? '--';
+/**
+ * The hero number, always carrying its unit somewhere the reader can see.
+ *
+ * Most labels state the unit themselves ("TOTAL REPS", "CALORIES"), and repeating it reads
+ * "TOTAL REPS · 108 REPS" while risking a wrap at the hero's font size. But some don't —
+ * "DISTANCE" over a bare "1.0" leaves the single most important question on the poster
+ * unanswered, and a screenshot of it is unreadable to anyone. So: append the unit only when the
+ * label doesn't already say it. ResultValue renders a trailing unit small beside the number.
+ */
+export function buildResultValue(hero: HeroResult | null | undefined, label: string): string {
+  const value = hero?.value ?? '--';
+  if (value === '--') return value;
+  // A clock states its own unit ("12:34" is not 12.34 of anything) — "12:34min" reads as noise.
+  if (value.includes(':')) return value;
+  // The measure only ("KG PR" is the PR badge's business; the number is in kilos).
+  const unit = hero?.unit?.trim().split(/\s+/)[0];
+  if (!unit) return value;
+  // A value that already ends in its unit (weights arrive as "65kg") must not gain a second one.
+  if (new RegExp(`${unit}$`, 'i').test(value)) return value;
+  return label.toUpperCase().includes(unit.toUpperCase()) ? value : `${value}${unit.toLowerCase()}`;
+}
+
+/**
+ * WHAT the aerobic hero was done on ("ECHO BIKE", "RUN"). A cardio number is meaningless without
+ * its machine — "50 CAL" could be a bike, a rower or a ski, and each is a different workout. The
+ * hero already resolved which movement it belongs to; this surfaces it beside the number.
+ *
+ * Cardio only. A strength hero's lift is already named by the movement row above it, so repeating
+ * it under the number is noise.
+ */
+export function aerobicHeroSubject(hero: HeroResult | null | undefined): string | undefined {
+  const unit = hero?.unit?.toUpperCase();
+  const isAerobic = unit === 'CAL' || unit === 'KM' || unit === 'M';
+  return isAerobic ? hero?.subtitle : undefined;
 }
 
 function formatPosterWeightValue(weight: number, unit = 'kg'): string {
@@ -497,43 +548,28 @@ export function achievementMatchesMovementList(
   });
 }
 
-function getTopSetValue(exercise: Exercise, movements: MovementTotal[] = []): string | null {
-  const setWeights = exercise.sets
-    .filter((set) => set.completed && (set.weight ?? 0) > 0)
-    .map((set) => set.weight ?? 0);
-  const movementWeights = movements.flatMap((movement) => {
-    if (movement.weightProgression?.length) return movement.weightProgression;
-    return (movement.weight ?? 0) > 0 ? [movement.weight ?? 0] : [];
-  });
-  const unit = movements.find((movement) =>
+function loadUnitOf(movements: MovementTotal[]): 'kg' | 'lb' {
+  return movements.find((movement) =>
     (movement.weightProgression?.length ?? 0) > 0 || (movement.weight ?? 0) > 0,
   )?.unit === 'lb' ? 'lb' : 'kg';
-  const peak = Math.max(...setWeights, ...movementWeights, 0);
-  return peak > 0 ? formatPosterWeightValue(peak, unit) : null;
+}
+
+// THE top set: the heaviest load anywhere in the exercise, over every place one is recorded.
+// Never derived from the breakdown alone — see collectExerciseLoadWeights for why a repeated
+// lift's peak is invisible there.
+function getTopSetValue(exercise: Exercise, movements: MovementTotal[] = []): string | null {
+  const peak = getExercisePeakLoad(exercise, movements);
+  return peak ? formatPosterWeightValue(peak.weight, loadUnitOf(movements)) : null;
 }
 
 function getSingleStrengthTopSetValue(data: CelebrationData): string | null {
   if (data.workoutFormat !== 'strength') return null;
-  const exercisePeak = Math.max(
-    ...data.exercises.flatMap((exercise) =>
-      exercise.sets
-        .filter((set) => set.completed && (set.weight ?? 0) > 0)
-        .map((set) => set.weight ?? 0),
-    ),
+  const movements = data.activeBreakdown?.movements ?? [];
+  const peak = Math.max(
+    ...data.exercises.map((exercise) => getExercisePeakLoad(exercise, movements)?.weight ?? 0),
     0,
   );
-  const movementPeak = Math.max(
-    ...(data.activeBreakdown?.movements ?? []).flatMap((movement) => {
-      if (movement.weightProgression?.length) return movement.weightProgression;
-      return (movement.weight ?? 0) > 0 ? [movement.weight ?? 0] : [];
-    }),
-    0,
-  );
-  const unit = (data.activeBreakdown?.movements ?? []).find((movement) =>
-    (movement.weightProgression?.length ?? 0) > 0 || (movement.weight ?? 0) > 0,
-  )?.unit === 'lb' ? 'lb' : 'kg';
-  const peak = Math.max(exercisePeak, movementPeak);
-  return peak > 0 ? formatPosterWeightValue(peak, unit) : null;
+  return peak > 0 ? formatPosterWeightValue(peak, loadUnitOf(movements)) : null;
 }
 
 /**
@@ -587,9 +623,21 @@ export function sectionsToRows(
     // into the label slot so the prescription line gets the header's visual weight.
     const isGenericTitle = /^blueprint$/i.test(section.title?.trim() ?? '');
     const capDuplicatesPosterHeader = isDuplicatePosterHeader(cap, headerContext)
-      || isRoundCountForTimeCoveredByFormat(cap, headerContext);
+      || isRoundCountForTimeCoveredByFormat(cap, headerContext)
+      || isCadenceCoveredByFormat(cap, headerContext);
 
-    if (hasHeader) {
+    // A separately-scored block (an A/B/C interval AMRAP) always gets its header row: the
+    // label identifies the block and the score is the athlete's result for it. This is the
+    // producer for PosterBlock.score — the slot every skin renders and nothing used to fill.
+    if (section.blockScore) {
+      rows.push({
+        kind: 'block',
+        label: section.title.toUpperCase(),
+        cap: capDuplicatesPosterHeader ? '' : cap,
+        score: section.blockScore.value,
+        scoreSub: section.blockScore.unit,
+      } satisfies PosterBlock);
+    } else if (hasHeader) {
       // Suppress the label when it's just repeating the poster title, but
       // keep the cap (e.g. "8 sets") so the prescription story is visible.
       const label = isDuplicateTitle || (isGenericTitle && capDuplicatesPosterHeader)
@@ -646,13 +694,12 @@ export function buildMineMapFromStory(storyMovements: StoryMovementLine[]): Map<
   const map = new Map<string, string>();
   for (const sm of storyMovements) {
     const key = sm.name.toLowerCase().trim();
-    const unit = sm.unit ?? 'kg';
-    if (sm.weightProgression && sm.weightProgression.length > 1) {
-      const uniq = [...new Set(sm.weightProgression)];
-      map.set(key, uniq.length > 1 ? `${uniq.join('-')}${unit}` : `${uniq[0]}${unit}`);
-    } else if (sm.weight && sm.weight > 0) {
-      map.set(key, `${sm.weight}${unit}`);
-    }
+    const unit = sm.unit === 'lb' ? 'lb' : 'kg';
+    const value = formatLoggedLoad(
+      sm.weightProgression?.length ? sm.weightProgression : sm.weight ? [sm.weight] : [],
+      unit,
+    );
+    if (value) map.set(key, value);
   }
   return map;
 }
@@ -666,15 +713,12 @@ export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<strin
 
     if (m.weight && m.weight > 0) {
       const unit = m.unit === 'lb' ? 'lb' : 'kg';
-      const prog = m.weightProgression;
       // Breakdown weight is the effective total (per-implement × implementCount, for volume).
       // Display must stay per-implement — "2×15kg" for twin DBs, never the summed "30kg" the
       // athlete didn't lift on one implement. Progressions are stored per-implement already.
       const impl = (m.implementCount ?? 1) > 1 ? m.implementCount! : 1;
       const perImpl = impl > 1 ? Math.round((m.weight / impl) * 10) / 10 : m.weight;
-      value = prog && prog.length > 1
-        ? (() => { const uniq = [...new Set(prog)]; return uniq.length > 1 ? `${uniq.join('-')}${unit}` : `${uniq[0]}${unit}`; })()
-        : impl > 1 ? `${impl}×${perImpl}${unit}` : `${m.weight}${unit}`;
+      value = formatLoggedLoad(m.weightProgression?.length ? m.weightProgression : [perImpl], unit, impl);
     } else if ((m.totalDistance ?? 0) > 0) {
       const dist = m.totalDistance!;
       value = dist >= 1000 ? `${(dist / 1000).toFixed(2)}km` : `${Math.round(dist)}m`;
@@ -839,8 +883,9 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   // keyless rows (whiteboard-verbatim lines, legacy chipper/ladder rows), where the row text
   // is the only handle on the movement.
   const mineRaw = row.suppressMine ? ''
-    : row.mineKey ? (mineMap?.get(row.mineKey.toLowerCase().trim()) ?? '')
-    : lookupMineValue(mineMap, row.name || rxLabel, rxLabel);
+    : row.mineOverride ?? (row.mineKey
+      ? (mineMap?.get(row.mineKey.toLowerCase().trim()) ?? '')
+      : lookupMineValue(mineMap, row.name || rxLabel, rxLabel));
   const total = row.totalNote || (row.subNote && /\btotal\b/i.test(row.subNote) ? row.subNote : undefined);
   const loadSuffix = row.loadNote || extractLoadSuffix(row.nameWithLoad);
 
@@ -1016,6 +1061,11 @@ export function buildPosterWodFromPage(
     if (heroResult?.unit === 'REPS') return isPartnerPage ? 'OUR REPS' : 'TOTAL REPS';
     if (heroResult?.unit === 'EP') return 'EP';
     if (heroResult?.unit === 'CAL') return 'CALORIES';
+    // Same gap as buildResultLabel: without these, a distance or weight hero inherits the
+    // format's label and contradicts its own number.
+    if (heroResult?.unit === 'KM' || heroResult?.unit === 'M') return 'DISTANCE';
+    if (heroResult?.unit === 'KG') return 'TOP SET';
+    if (heroResult?.unit === 'KG PR') return 'PR';
     // Free part: the label follows whichever score type the athlete picked.
     if (exFmt === 'free') {
       switch (heroResult?.unit) {
@@ -1033,13 +1083,12 @@ export function buildPosterWodFromPage(
       default: return isPartnerPage ? 'OUR RESULT' : 'RESULT';
     }
   })();
-  // Same unit-suppression rule as the main poster (see buildResultValue): the result label
-  // already says "ROUNDS"/"MY TIME", so appending the unit again reads "ROUNDS · 6 ROUNDS".
-  const resultValue = strengthTopSet ?? buildResultValue(heroResult);
+  const resultValue = strengthTopSet ?? buildResultValue(heroResult, resultLabel);
   // Station pages: the interval clock in the title already states the cap — no meta line.
-  const { meta: resultMeta } = stationClock
+  const { meta: amrapMeta } = stationClock
     ? { meta: undefined }
     : buildAmrapResultMeta(isAmrap, heroResult);
+  const resultMeta = amrapMeta ?? aerobicHeroSubject(heroResult);
 
   // Page-scoped, not session-scoped: a PR in one part (e.g. the deadlift) must never badge a
   // sibling part (e.g. the metcon) just because they share a session-level isPR flag.
@@ -1126,8 +1175,9 @@ export function buildPosterWod(
   // Result
   const strengthTopSet = getSingleStrengthTopSetValue(data);
   const resultLabel = strengthTopSet ? 'TOP SET' : buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit);
-  const resultValue = strengthTopSet ?? buildResultValue(data.heroResult);
-  const { meta: resultMeta } = buildAmrapResultMeta(isAmrap, data.heroResult);
+  const resultValue = strengthTopSet ?? buildResultValue(data.heroResult, resultLabel);
+  const { meta: amrapMeta } = buildAmrapResultMeta(isAmrap, data.heroResult);
+  const resultMeta = amrapMeta ?? aerobicHeroSubject(data.heroResult);
 
   // RX badge
   const rx: string | null = data.isPR ? 'PR' : null;

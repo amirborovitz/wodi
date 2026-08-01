@@ -14,7 +14,7 @@
         },
         {
           "primary": "30-20-10",
-          "name": "DB Push Presses",
+          "name": "Dumbbell Push Presses",
           "subNote": "2×15KG",
           "totalNote": "60 total",
           "mineKey": "Dumbbell Push Press",
@@ -46,7 +46,7 @@
           },
           {
             "primary": "30-20-10",
-            "name": "DB Push Presses",
+            "name": "Dumbbell Push Presses",
             "subNote": "2×15KG",
             "totalNote": "60 total",
             "mineKey": "Dumbbell Push Press",
@@ -164,6 +164,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "MY TIME",
+  "resultValue": "10:40",
   "posterRows": {
     "reward": [
       {
@@ -181,7 +183,7 @@
       },
       {
         "kind": "line",
-        "rx": "30-20-10 DB Push Presses",
+        "rx": "30-20-10 Dumbbell Push Presses",
         "load": "2×15KG",
         "mine": "30kg",
         "team": "",
@@ -213,7 +215,7 @@
         },
         {
           "kind": "line",
-          "rx": "30-20-10 DB Push Presses",
+          "rx": "30-20-10 Dumbbell Push Presses",
           "load": "2×15KG",
           "mine": "30kg",
           "team": "",

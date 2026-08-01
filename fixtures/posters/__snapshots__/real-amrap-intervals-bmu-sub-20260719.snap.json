@@ -138,6 +138,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "4",
   "posterRows": {
     "reward": null,
     "pages": [

@@ -1,4 +1,5 @@
 import type { StoryExerciseResult, MovementResult } from './types';
+import { prescribesBuildingLoad } from './types';
 import { LoadInput } from './LoadInput';
 import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
@@ -185,8 +186,16 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
   // still go to ScoreMovementInputs. But an all-weighted complex (e.g. Power Clean +
   // Squat Clean + Push Jerk EMOM) gets SupersetInput for shared barbell weight.
   // (kind 'intervals' is EMOM-only now — "X sets for time" maps to 'score_time' above.)
-  const isWeightedComplex = kind === 'intervals' && movements.every(mr => mr.kind === 'load');
-  if (movements.length > 1 && (kind !== 'intervals' || isWeightedComplex)) {
+  const isWeightedComplex = kind === 'intervals' && movements.length > 0
+    && movements.every(mr => mr.kind === 'load');
+  // A single-lift EMOM the board tells you to BUILD across ("4 sets, Every 1:30: 2 Clean & Jerk
+  // — start at ~65% and build up") is a weight progression, same as a strength block: it needs
+  // Start/Peak, not the one weight tile ScoreMovementInputs would give it. SupersetInput's
+  // progressive path handles one weighted movement as happily as several.
+  const isBuildingLift = isWeightedComplex
+    && result.setsTotal > 1
+    && prescribesBuildingLoad(result.exercise);
+  if ((movements.length > 1 || isBuildingLift) && (kind !== 'intervals' || isWeightedComplex)) {
     return <SupersetInput result={result} onChange={onChange} />;
   }
 

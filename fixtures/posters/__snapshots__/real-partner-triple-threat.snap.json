@@ -18,7 +18,7 @@
           "accent": "yellow"
         },
         {
-          "primary": "100 DU",
+          "primary": "100 Double Unders",
           "name": "",
           "totalNote": "300 total",
           "mineKey": "Double Under",
@@ -93,7 +93,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "100 DU",
+            "primary": "100 Double Unders",
             "name": "",
             "totalNote": "300 total",
             "mineKey": "Double Under",
@@ -222,6 +222,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "OUR TIME",
+  "resultValue": "40:00",
   "posterRows": {
     "reward": [
       {
@@ -244,7 +246,7 @@
       },
       {
         "kind": "line",
-        "rx": "100 DU",
+        "rx": "100 Double Unders",
         "load": "",
         "mine": "",
         "team": "",
@@ -315,7 +317,7 @@
         },
         {
           "kind": "line",
-          "rx": "100 DU",
+          "rx": "100 Double Unders",
           "load": "",
           "mine": "",
           "team": "",

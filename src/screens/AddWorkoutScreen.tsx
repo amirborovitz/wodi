@@ -34,6 +34,7 @@ import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
+import { matchesNamePattern } from '../utils/movementNameMatch';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
@@ -149,7 +150,7 @@ function parseCindyDtRounds(text?: string): { cindyRounds: number; dtRounds: num
 /** Check if a movement is a weighted carry (farmer carry, yoke, etc.) */
 function isWeightedCarry(name: string): boolean {
   const lower = name.toLowerCase();
-  return WEIGHTED_CARRY_PATTERNS.some(p => lower.includes(p));
+  return matchesNamePattern(lower, WEIGHTED_CARRY_PATTERNS);
 }
 
 function getStationVisitCount(totalIntervals: number, stationCount: number, stationIndex: number): number {
@@ -853,7 +854,7 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
     'pull-up', 'pullup', 'push-up', 'pushup', 'air squat', 'pistol',
     'burpee', 'ring row', 'jump squat', 'squat jump', 'squat thrust',
   ];
-  if (bodyweightPatterns.some(p => name.includes(p))) return false;
+  if (matchesNamePattern(name, bodyweightPatterns)) return false;
 
   const weightedPatterns = [
     'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press', 'thruster',
@@ -868,7 +869,7 @@ function isWeightedMovement(movement: ParsedMovement): boolean {
   }
   if (/\b(bike|echo|assault|ski\s?erg|air\s?runner|rower)\b/.test(name)) return false;
 
-  return weightedPatterns.some(p => name.includes(p));
+  return matchesNamePattern(name, weightedPatterns);
 }
 
 function buildImplementCountsFromPerMovement(
@@ -1046,7 +1047,7 @@ function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification
   }
 
   // 2. Check for cardio machines - need to infer metric
-  const isCardioMachine = CARDIO_MACHINE_PATTERNS.some(p => text.includes(p));
+  const isCardioMachine = matchesNamePattern(text, CARDIO_MACHINE_PATTERNS);
   if (isCardioMachine) {
     // Default to calories for machines if no explicit metric
     return {
@@ -1058,7 +1059,7 @@ function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification
   }
 
   // 3. Check for distance exercises (run, swim, etc.)
-  const isDistanceExercise = DISTANCE_CARDIO_PATTERNS.some(p => text.includes(p));
+  const isDistanceExercise = matchesNamePattern(text, DISTANCE_CARDIO_PATTERNS);
   if (isDistanceExercise) {
     return {
       inputType: 'cardio_distance',
@@ -1079,7 +1080,7 @@ function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification
   }
 
   // 5. Check for bodyweight exercises
-  const isBodyweight = BODYWEIGHT_PATTERNS.some(p => text.includes(p));
+  const isBodyweight = matchesNamePattern(text, BODYWEIGHT_PATTERNS);
   const hasWeight = exercise.rxWeights ||
                     /\d+\s*(kg|lb|pound)/i.test(text) ||
                     text.includes('weighted');
@@ -1088,7 +1089,7 @@ function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification
     'press', 'deadlift', 'clean', 'snatch', 'thruster', 'front rack', 'overhead',
     'back squat', 'front squat', 'squat'
   ];
-  const hasWeightedImplement = weightedImplementPatterns.some(p => text.includes(p));
+  const hasWeightedImplement = matchesNamePattern(text, weightedImplementPatterns);
 
   if (!hasWeight && hasWeightedImplement && !isBodyweight) {
     return {
@@ -2827,12 +2828,21 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         const rounds = result.rounds || 1;
         const baseMovements = result.exercise.movements;
         const fsKeys = getMovementKeys(baseMovements || []);
+        // The athlete's own load for one movement occurrence, as the list they moved through.
+        // Both movement lists bake it, so no consumer has to know which list it is reading.
+        const loggedLoadFor = (mk: string, plainName: string): number[] | undefined => {
+          const progression = movementLookup(result.movementWeightProgressions || {}, mk, plainName);
+          if (progression && progression.length > 0) return progression;
+          const single = movementLookup(result.movementWeights || {}, mk, plainName);
+          return single && single > 0 ? [single] : undefined;
+        };
         const movementsForSave = baseMovements?.map((mov, mi) => {
           const mk = fsKeys[mi];
           const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
           const selectedReps = movementLookup(result.movementReps || {}, mk, mov.name);
           const selectedDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
           const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
+          const loggedWeights = loggedLoadFor(mk, mov.name);
           return {
             ...mov,
             name: selectedName,
@@ -2841,6 +2851,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
             // (already in the breakdown), and detail mode needs the per-trip prescription to
             // reconstruct the "N×" trip count.
             ...(selectedDistance !== undefined && mov.relay !== true ? { distance: selectedDistance } : {}),
+            ...(loggedWeights ? { loggedWeights } : {}),
             ...(selectedWeight && selectedWeight > 0 ? {
               rxWeights: {
                 male: selectedWeight,
@@ -2852,16 +2863,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         });
         // Sections get the same logged-value bake as the top-level movements: consumers read
         // section movements when sections exist, so leaving them on the coach's Rx makes every
-        // downstream fallback show Rx instead of the athlete's entry. Logged maps are keyed by
-        // the section movement's own name (createBlankResult builds ladder inputs from sections).
-        const sectionsForSave = result.exercise.sections?.map((sec) => ({
+        // downstream fallback show Rx instead of the athlete's entry.
+        //
+        // Keyed by the SAME ::index sequence createBlankResult assigns when it flattens the
+        // sections into one input per block — a bare-name lookup gave every block of a repeated
+        // lift ("4 sets: 2 Clean & Jerk, Into: 4 sets: 1 Clean & Jerk") the FIRST block's weight,
+        // silently erasing what the athlete built to in every block after it.
+        const sectionKeys = getMovementKeys(result.exercise.sections?.flatMap((sec) => sec.movements) ?? []);
+        const sectionKeyOffsets: number[] = [];
+        result.exercise.sections?.reduce((offset, sec) => {
+          sectionKeyOffsets.push(offset);
+          return offset + sec.movements.length;
+        }, 0);
+        const sectionsForSave = result.exercise.sections?.map((sec, secIdx) => ({
           ...sec,
-          movements: sec.movements.map((mov) => {
-            const selectedName = result.movementAlternatives?.[mov.name] ?? mov.name;
-            const selectedWeight = result.movementWeights?.[mov.name];
+          movements: sec.movements.map((mov, movIdx) => {
+            const mk = sectionKeys[sectionKeyOffsets[secIdx] + movIdx] ?? mov.name;
+            const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
+            const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
+            const loggedWeights = loggedLoadFor(mk, mov.name);
             return {
               ...mov,
               name: selectedName,
+              ...(loggedWeights ? { loggedWeights } : {}),
               ...(selectedWeight && selectedWeight > 0 ? {
                 rxWeights: {
                   male: selectedWeight,

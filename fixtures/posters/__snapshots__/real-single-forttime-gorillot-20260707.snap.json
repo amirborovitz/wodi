@@ -18,7 +18,7 @@
           "accent": "magenta"
         },
         {
-          "primary": "20 Alt DB Snatches @ 22.5/15kg",
+          "primary": "20 Alt Dumbbell Snatches @ 22.5/15kg",
           "name": "",
           "totalNote": "40 total",
           "mineKey": "Alt Dumbbell Snatch",
@@ -54,7 +54,7 @@
           "accent": "magenta"
         },
         {
-          "primary": "20 T2B",
+          "primary": "20 Toes to Bars",
           "name": "",
           "totalNote": "40 total",
           "mineKey": "Toes to Bar",
@@ -83,7 +83,7 @@
           "accent": "yellow"
         },
         {
-          "primary": "40 DU / 80 Single Unders",
+          "primary": "40 Double Unders / 80 Single Unders",
           "name": "",
           "totalNote": "80 total",
           "mineKey": "Double Under",
@@ -114,7 +114,7 @@
             "accent": "magenta"
           },
           {
-            "primary": "20 Alt DB Snatches @ 22.5/15kg",
+            "primary": "20 Alt Dumbbell Snatches @ 22.5/15kg",
             "name": "",
             "totalNote": "40 total",
             "mineKey": "Alt Dumbbell Snatch",
@@ -150,7 +150,7 @@
             "accent": "magenta"
           },
           {
-            "primary": "20 T2B",
+            "primary": "20 Toes to Bars",
             "name": "",
             "totalNote": "40 total",
             "mineKey": "Toes to Bar",
@@ -179,7 +179,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "40 DU / 80 Single Unders",
+            "primary": "40 Double Unders / 80 Single Unders",
             "name": "",
             "totalNote": "80 total",
             "mineKey": "Double Under",
@@ -296,6 +296,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "MY TIME",
+  "resultValue": "33:00",
   "posterRows": {
     "reward": [
       {
@@ -318,7 +320,7 @@
       },
       {
         "kind": "line",
-        "rx": "20 Alt DB Snatches @ 22.5/15kg",
+        "rx": "20 Alt Dumbbell Snatches @ 22.5/15kg",
         "load": "",
         "mine": "17.5kg",
         "team": "",
@@ -355,7 +357,7 @@
       },
       {
         "kind": "line",
-        "rx": "20 T2B",
+        "rx": "20 Toes to Bars",
         "load": "",
         "mine": "",
         "team": "",
@@ -384,7 +386,7 @@
       },
       {
         "kind": "line",
-        "rx": "40 DU / 80 Single Unders",
+        "rx": "40 Double Unders / 80 Single Unders",
         "load": "",
         "mine": "",
         "team": "",
@@ -413,7 +415,7 @@
         },
         {
           "kind": "line",
-          "rx": "20 Alt DB Snatches @ 22.5/15kg",
+          "rx": "20 Alt Dumbbell Snatches @ 22.5/15kg",
           "load": "",
           "mine": "17.5kg",
           "team": "",
@@ -450,7 +452,7 @@
         },
         {
           "kind": "line",
-          "rx": "20 T2B",
+          "rx": "20 Toes to Bars",
           "load": "",
           "mine": "",
           "team": "",
@@ -479,7 +481,7 @@
         },
         {
           "kind": "line",
-          "rx": "40 DU / 80 Single Unders",
+          "rx": "40 Double Unders / 80 Single Unders",
           "load": "",
           "mine": "",
           "team": "",

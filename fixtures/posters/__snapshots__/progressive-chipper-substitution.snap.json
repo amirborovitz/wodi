@@ -138,6 +138,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "MY TIME",
+  "resultValue": "17:00",
   "posterRows": {
     "reward": [
       {

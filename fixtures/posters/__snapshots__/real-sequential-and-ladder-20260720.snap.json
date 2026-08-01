@@ -5,23 +5,25 @@
       {
         "eyebrow": "WOD",
         "title": "Weightlifting",
-        "blueprint": "8 sets",
+        "blueprint": "EVERY 1:30",
         "rows": [
           {
-            "primary": "50->65KG",
+            "primary": "4 × 2",
             "name": "Push Press",
-            "subNote": "8 total",
             "totalNote": "8 total",
+            "subNote": "8 total",
             "mineKey": "Push Press",
+            "mineOverride": "50-65kg",
             "accent": "yellow",
             "repeatCount": 4
           },
           {
-            "primary": "65->80KG",
+            "primary": "4 × 2",
             "name": "Push Jerk",
-            "subNote": "8 total",
             "totalNote": "8 total",
+            "subNote": "8 total",
             "mineKey": "Push Jerk",
+            "mineOverride": "65-80kg",
             "accent": "yellow",
             "repeatCount": 4
           }
@@ -69,7 +71,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "10 T2B",
+            "primary": "10 Toes to Bars",
             "name": "",
             "totalNote": "30 total",
             "mineKey": "Toes to Bar",
@@ -111,7 +113,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "10 T2B",
+            "primary": "10 Toes to Bars",
             "name": "",
             "totalNote": "20 total",
             "mineKey": "Toes to Bar",
@@ -153,7 +155,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "10 T2B",
+            "primary": "10 Toes to Bars",
             "name": "",
             "totalNote": "10 total",
             "mineKey": "Toes to Bar",
@@ -241,6 +243,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "MY TIME",
+  "resultValue": "18:30",
   "posterRows": {
     "reward": null,
     "pages": [
@@ -248,11 +252,11 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "8 sets"
+          "cap": "EVERY 1:30"
         },
         {
           "kind": "line",
-          "rx": "50->65KG Push Press",
+          "rx": "4 × 2 Push Press",
           "load": "",
           "mine": "50-65kg",
           "team": "",
@@ -260,7 +264,7 @@
         },
         {
           "kind": "line",
-          "rx": "65->80KG Push Jerk",
+          "rx": "4 × 2 Push Jerk",
           "load": "",
           "mine": "65-80kg",
           "team": "",
@@ -309,7 +313,7 @@
         },
         {
           "kind": "line",
-          "rx": "10 T2B",
+          "rx": "10 Toes to Bars",
           "load": "",
           "mine": "",
           "team": "",
@@ -351,7 +355,7 @@
         },
         {
           "kind": "line",
-          "rx": "10 T2B",
+          "rx": "10 Toes to Bars",
           "load": "",
           "mine": "",
           "team": "",
@@ -393,7 +397,7 @@
         },
         {
           "kind": "line",
-          "rx": "10 T2B",
+          "rx": "10 Toes to Bars",
           "load": "",
           "mine": "",
           "team": "",

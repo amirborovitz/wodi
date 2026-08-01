@@ -1,0 +1,41 @@
+{
+  "name": "real-cadenced-metcon-short-run-20260730",
+  "description": "REAL saved doc (JqbuaciOE8rrWaNLFa7O, metcon part). Cadenced intervals whose rounds each open with a SHORT run: 5 x (200m run + 8 power cleans + 8 box jumps) = 1 km of running beside 80 reps of barbell and box. The hero must be the 80 REPS. Any cardio at all used to hand the hero to the cardio leg, printing 'DISTANCE / 1.0' — a bare number with no unit anywhere on the card, naming neither the machine nor the work that actually filled the intervals. A run only outranks reps once it reaches 2 km (a bike, 5 km); below that it is a leg inside the workout, not its result.",
+  "workout": {
+    "title": "Today Workout",
+    "format": "intervals",
+    "rawText": "METCON (Intervals)\nEvery 03:00 minutes x 5 sets:\n200m run\n8 Power Cleans (Touch-and-Go) @40/60kg\n8 Box Jumps\n* Choose a challenging yet manageable weight",
+    "exercises": [
+      {
+        "id": "exercise-1",
+        "name": "Every 3:00 min x 5",
+        "type": "wod",
+        "loggingMode": "intervals",
+        "rounds": 5,
+        "intervalCount": 5,
+        "prescription": "200m Run, 8 Power Cleans (Touch-and-Go) @40/60kg, 8 Box Jumps",
+        "rawText": "Every 03:00 minutes x 5 sets:\n200m run\n8 Power Cleans (Touch-and-Go) @40/60kg\n8 Box Jumps",
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "movements": [
+          { "name": "Run", "distance": 200, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Touch-and-go Power Clean", "reps": 8, "rxWeights": { "male": 60, "female": 60, "unit": "kg" }, "inputType": "weight", "equipment": "barbell", "countingMode": "per_round", "scoreEntryMode": "per_round", "loggedWeights": [60] },
+          { "name": "Box Jump", "reps": 8, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 40, "weight": 60 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 40, "weight": 60 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 40, "weight": 60 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 40, "weight": 60 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 40, "weight": 60 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Touch-and-go Power Clean", "totalReps": 40, "weight": 60, "unit": "kg", "color": "yellow" },
+        { "name": "Box Jump", "totalReps": 40, "color": "magenta" },
+        { "name": "Run", "totalDistance": 1000, "distancePerRep": 200, "unit": "m", "color": "magenta" }
+      ]
+    }
+  }
+}

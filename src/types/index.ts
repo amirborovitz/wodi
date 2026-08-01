@@ -347,6 +347,17 @@ export interface ParsedMovement {
   calories?: number;            // Calorie target
   rxCalories?: RxCalories;      // Rx calories for cardio machines (male/female)
   rxWeights?: RxWeights;        // Rx weights (male/female)
+  // What the ATHLETE loaded on THIS movement occurrence, in the order they moved through it
+  // (start → peak). One entry when they held one weight, the whole build when they climbed.
+  // Written at save time under the same ::index key the logging used, so two blocks of the same
+  // lift ("4 sets: 2 C&J, Into: 4 sets: 1 C&J") each keep their own.
+  //
+  // Neither of the two places this used to be read from can answer it. `rxWeights` is the
+  // COACH's prescription — one pair of numbers, so a logged build flattens into it and takes the
+  // board's own Rx with it. The workload breakdown is a TOTALS table keyed by movement NAME, so a
+  // repeated lift merges into one entry carrying one smeared progression. Per-occurrence truth
+  // belongs on the occurrence.
+  loggedWeights?: number[];
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
   inputType?: 'weight' | 'calories' | 'distance' | 'none';  // AI-classified input type
@@ -374,10 +385,39 @@ export interface ParsedMovement {
 
 export type ParsedSectionType = 'buy_in' | 'rounds' | 'cash_out';
 
+// How ONE block of a piece is scored. Mirrors StoryExerciseResult['freeScoreType'] so a single
+// tagged value covers "5 rounds", "3:42" and "top set @60kg" without a field per shape.
+export type BlockScoreType = 'time' | 'rounds' | 'reps' | 'load';
+
+// What the athlete actually put up on ONE block. Written at LOGGING time (the prescription
+// knows the block is scored; only the athlete knows the number).
+export interface BlockResult {
+  value: number;                   // seconds / rounds / reps / kg, per the section's scoreType
+  partialReps?: number;            // extra reps into an incomplete round (scoreType 'rounds')
+  partialMovements?: string[];     // movement names finished in that incomplete round
+}
+
 export interface ParsedSection {
   sectionType: ParsedSectionType;  // buy-in, working rounds block, or cash-out
   rounds?: number;                 // how many times this block is repeated (default 1 for buy_in/cash_out)
   movements: ParsedMovement[];     // movements in this block (per round for "rounds" sections)
+  // Board-written label for this block ("A", "B", "AMRAP - C", "Min 1"). Display only —
+  // never parsed for structure. Drives the poster's block header.
+  label?: string;
+  // ── The two halves of block scoring — set at different times, never together ──
+  //
+  // PARSE time (AI): presence means "this block carries its own score, of this type". Set only
+  // when the board scores each block separately (an A/B/C interval AMRAP: one rounds count per
+  // block). Absent = the block is just structure and the exercise-level score stands, which is
+  // every pre-existing workout — so this field is purely additive.
+  //
+  // This pair is what lets A/B/C stay ONE exercise (one piece, one poster). Before it existed a
+  // score could only live on an exercise, so the parser was told to split each block into its own
+  // exercise purely to give the score somewhere to live — costing the piece its identity and
+  // producing one poster per block.
+  scoreType?: BlockScoreType;
+  // LOGGING time (athlete): the number they hit on this block. Only ever set when scoreType is.
+  result?: BlockResult;
 }
 
 export interface ParsedExercise {

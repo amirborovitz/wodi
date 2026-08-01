@@ -7,14 +7,27 @@ import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
 import { getPrescribedSetCount } from './types';
+import type { ScoredBlock } from './blockScoping';
+import { applyBlockScoresToSections, getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from './blockScoping';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useAuth } from '../../../context/AuthContext';
 
 // ─── Public type for WizardOverview ─────────────────────────────
 
+/**
+ * One page of the wizard. Ordinarily an exercise IS a page. A piece whose blocks are scored
+ * separately (an A/B/C interval AMRAP) contributes one page PER block instead — the athlete
+ * scores each block on its own screen, rather than scrolling one screen carrying all of them.
+ */
+export interface WizardPage {
+  exerciseIndex: number;
+  /** Set only for a block page — which of the exercise's sections this page scores. */
+  block?: ScoredBlock;
+}
+
 export interface WizardBlock {
   groupLabel: string | null;
-  exerciseIndices: number[];
+  pages: WizardPage[];
   isMetcon: boolean;
   typeLabel: string;
   displayName: string;
@@ -156,7 +169,17 @@ function computeWizardBlocks(
       ? `Part ${g.label}`
       : (firstEx?.name && firstEx.name.length <= 22 ? firstEx.name : typeLabel);
 
-    return { groupLabel: g.label, exerciseIndices: g.indices, isMetcon, typeLabel, displayName };
+    // An exercise is one page — unless its blocks are separately scored, in which case each
+    // block gets its own page so the athlete logs one score per screen.
+    const pages: WizardPage[] = g.indices.flatMap((exerciseIndex) => {
+      const exercise = workout.exercises[exerciseIndex];
+      const blocks = exercise ? getScoredBlocks(exercise) : [];
+      return blocks.length > 1
+        ? blocks.map((block) => ({ exerciseIndex, block }))
+        : [{ exerciseIndex }];
+    });
+
+    return { groupLabel: g.label, pages, isMetcon, typeLabel, displayName };
   });
 }
 
@@ -187,7 +210,30 @@ function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
 
 // ─── Convert story result → legacy ExerciseResult ───────────────
 
+/**
+ * A block-scored piece carries its per-block scores on its own sections, so everything
+ * downstream (workload, poster) reads each block's result next to the block it belongs to.
+ * The piece-level `rounds` becomes the total across blocks — the one honest whole-piece
+ * number for a workout the athlete scored three times.
+ */
 function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
+  const legacy = buildLegacyResult(r);
+  const scores = r.blockScores;
+  if (!scores?.length) return legacy;
+
+  const sections = applyBlockScoresToSections(legacy.exercise, scores);
+  const roundsTotal = (legacy.exercise.sections ?? []).reduce(
+    (sum, section, i) => (section.scoreType === 'rounds' ? sum + (scores[i]?.value ?? 0) : sum),
+    0,
+  );
+  return {
+    ...legacy,
+    exercise: { ...legacy.exercise, sections },
+    ...(roundsTotal > 0 ? { rounds: roundsTotal } : {}),
+  };
+}
+
+function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const sets: ExerciseSet[] = [];
   const prescribedCount = getPrescribedSetCount(r.exercise, r.kind);
   const effectiveSetsTotal = Math.max(r.setsTotal || 1, prescribedCount ?? 0);
@@ -395,7 +441,7 @@ export function StoryLogResults({
   );
   const [blockOrder, setBlockOrder] = useState<number[]>(() => wizardBlocks.map((_, i) => i));
   const [currentStep, setCurrentStep] = useState(0);
-  // Which exercise within the current block we're logging
+  // Which page within the current block we're logging (an exercise, or one scored block of one)
   const [blockExerciseStep, setBlockExerciseStep] = useState(0);
   const [isSubstitutionOpen, setIsSubstitutionOpen] = useState(false);
 
@@ -406,16 +452,29 @@ export function StoryLogResults({
   const currentBlock = wizardBlocks[currentBlockIdx];
   const isLastBlock = currentStep >= blockOrder.length - 1;
 
-  const currentGlobalIdx = currentBlock?.exerciseIndices[blockExerciseStep] ?? 0;
-  const currentResult = results[currentGlobalIdx] ?? null;
-  const isLastExercise = blockExerciseStep >= (currentBlock?.exerciseIndices.length ?? 1) - 1;
+  const currentPage = currentBlock?.pages[blockExerciseStep];
+  const currentGlobalIdx = currentPage?.exerciseIndex ?? 0;
+  const currentScoredBlock = currentPage?.block;
+  const fullResult = results[currentGlobalIdx] ?? null;
+  const isLastExercise = blockExerciseStep >= (currentBlock?.pages.length ?? 1) - 1;
 
-  // ── Result change for current exercise ──
+  // On a block page the inputs see ONLY that block — its movements, its score — so every
+  // existing input component works on it unchanged. See blockScoping.ts.
+  const currentResult = useMemo(
+    () => (fullResult && currentScoredBlock ? scopeResultToBlock(fullResult, currentScoredBlock) : fullResult),
+    [fullResult, currentScoredBlock],
+  );
+
+  // ── Result change for current page ──
   const handleInputChange = useCallback((patch: Partial<StoryExerciseResult>) => {
-    setResults(prev => prev.map((r, i) =>
-      i === currentGlobalIdx ? { ...r, ...patch, skipped: undefined } : r,
-    ));
-  }, [currentGlobalIdx]);
+    setResults(prev => prev.map((r, i) => {
+      if (i !== currentGlobalIdx) return r;
+      // A block page's patch is scoped to that block — fold it back onto the whole exercise
+      // rather than letting one block's score overwrite the piece's.
+      const applied = currentScoredBlock ? mergeBlockPatch(r, currentScoredBlock, patch) : patch;
+      return { ...r, ...applied, skipped: undefined };
+    }));
+  }, [currentGlobalIdx, currentScoredBlock]);
 
   // ── Save pipeline ──
   const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
@@ -501,7 +560,7 @@ export function StoryLogResults({
     } else if (currentStep > 0) {
       setCurrentStep(s => s - 1);
       const prevBlock = wizardBlocks[blockOrder[currentStep - 1]];
-      setBlockExerciseStep((prevBlock?.exerciseIndices.length ?? 1) - 1);
+      setBlockExerciseStep((prevBlock?.pages.length ?? 1) - 1);
       setWizardPhase('logging');
     } else if (wizardBlocks.length > 1) {
       setWizardPhase('overview');
@@ -546,11 +605,13 @@ export function StoryLogResults({
             key={`exercise-${currentStep}-${blockExerciseStep}`}
             result={currentResult}
             exerciseIndex={blockExerciseStep + 1}
-            exerciseTotal={currentBlock?.exerciseIndices.length ?? 1}
+            exerciseTotal={currentBlock?.pages.length ?? 1}
             blockIndex={currentStep}
             blockTotal={wizardBlocks.length}
             blockType={currentBlock?.typeLabel ?? 'WORKOUT'}
-            blockName={currentBlock?.displayName ?? currentResult.exercise.name}
+            // On a block page the header names the BLOCK ("BLOCK A"), not the whole piece —
+            // three identically-titled screens in a row is the thing that reads as a bug.
+            blockName={currentScoredBlock?.displayName ?? currentBlock?.displayName ?? currentResult.exercise.name}
             isLastExercise={isLastExercise}
             isLastBlock={isLastBlock}
             hideFooter={isSubstitutionOpen}

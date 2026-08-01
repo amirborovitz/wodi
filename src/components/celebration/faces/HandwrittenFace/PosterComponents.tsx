@@ -31,8 +31,12 @@ export interface MovementValueParts {
   loadTag?: string | null;
 }
 
+// Any unit buildResultValue appended — not just weights. Naming kg/lb explicitly left "2.4km"
+// and "50cal" as one opaque string, which Stadium's numeric dot-matrix cannot render at all
+// (the letters came out blank, so a distance hero read as a bare "2.4"). The split is the
+// number and whatever trailing letters it carries, whichever measure it is.
 export function splitResultValue(value: string): { primary: string; unit: string } {
-  const match = value.match(/^(-?\d+(?:\.\d+)?)(kg|lb)$/i);
+  const match = value.match(/^(-?\d+(?:\.\d+)?)\s*([a-z]+)$/i);
   if (!match) return { primary: value, unit: '' };
   return { primary: match[1], unit: match[2].toLowerCase() };
 }

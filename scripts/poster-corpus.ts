@@ -36,8 +36,15 @@ import {
   buildMineMapFromBreakdown,
   buildMineMapFromStory,
   partnerBlocksSub,
+  buildResultLabel,
+  buildResultValue,
+  aerobicHeroSubject,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
+import {
+  prescribedMovementNames,
+  movementsMatchingNames,
+} from '../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
 
 interface PosterFixture {
@@ -59,15 +66,18 @@ const FIXTURE_DIR = path.resolve(process.cwd(), 'fixtures', 'posters');
 const SNAPSHOT_DIR = path.join(FIXTURE_DIR, '__snapshots__');
 
 // Mirrors useCelebrationData.carouselPageData: a page's movements are the breakdown entries
-// whose name (or pre-substitution original) belongs to this exercise.
+// whose name (or pre-substitution original) belongs to this exercise. Scoped off the SAME
+// name set the hook uses (sections + flat list) — a mirror that reads fewer names than
+// production drops rows the real poster shows, and the harness stops being evidence.
 function scopePageMovements(exercise: Exercise, allMovements: MovementTotal[]): MovementTotal[] {
-  const exNameLower = exercise.name.toLowerCase();
-  const subNames = new Set((exercise.movements ?? []).map((m) => m.name.toLowerCase()));
-  return allMovements.filter((m) => {
-    const mn = m.name.toLowerCase();
-    const orig = m.originalMovement?.toLowerCase();
-    return mn === exNameLower || subNames.has(mn) || (orig != null && subNames.has(orig));
-  });
+  return movementsMatchingNames(allMovements, prescribedMovementNames([exercise]));
+}
+
+// Mirrors useCelebrationData.artifactSections: same scoping, but an empty match falls back to
+// the unscoped list rather than rendering nothing.
+function scopeRewardMovements(exercises: Exercise[], allMovements: MovementTotal[]): MovementTotal[] {
+  const scoped = movementsMatchingNames(allMovements, prescribedMovementNames(exercises));
+  return scoped.length > 0 ? scoped : allMovements;
 }
 
 function buildSnapshot(fixture: PosterFixture): unknown {
@@ -103,7 +113,7 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   const reward = sectionExercises.length === 1
     ? buildRewardArtifactSections(
         sectionExercises,
-        exercises.length > 1 ? scopePageMovements(sectionExercises[0], movements) : movements,
+        exercises.length > sectionExercises.length ? scopeRewardMovements(sectionExercises, movements) : movements,
         rawText,
         teamSize,
         title,
@@ -163,7 +173,19 @@ function buildSnapshot(fixture: PosterFixture): unknown {
     ),
   };
 
-  return { reward, pages, hero, posterRows, partnerSubs };
+  // The hero's LABEL, not just its number. Snapshotting the value alone left a blind spot the
+  // harness could never catch: a cardio EMOM heroed "10.0" (km) while the label was picked from
+  // the workout FORMAT and read "ROUNDS" — a number and a caption that contradicted each other,
+  // and contradicted the poster's own "10.00 KM TOTAL" row. Both halves must be pinned.
+  const resultLabel = buildResultLabel(displayFormat, reward?.[0]?.isPartnerConfirmed === true, hero.unit);
+
+  // The hero exactly as the skin prints it: the number WITH its unit, plus the machine an
+  // aerobic score was set on. Snapshotting hero.value alone left a poster reading
+  // "DISTANCE / 1.0" — a number with no unit anywhere on the card, and no clue which machine.
+  const resultValue = buildResultValue(hero, resultLabel);
+  const resultMeta = aerobicHeroSubject(hero);
+
+  return { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs };
 }
 
 // ─── Diffing ───────────────────────────────────────────────────────────────

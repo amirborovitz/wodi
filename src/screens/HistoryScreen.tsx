@@ -19,14 +19,11 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
   const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
 
-  const sortedWorkouts = useMemo(
-    () => [...workouts].sort((a, b) => b.date.getTime() - a.date.getTime()),
-    [workouts]
-  );
-
+  // `useWorkouts` already returns newest-trained first — the gallery must not
+  // re-sort, or it silently reverts to logged-date order.
   const shownWorkouts = useMemo(
-    () => (filter === 'pr' ? sortedWorkouts.filter((w) => w.isPR) : sortedWorkouts),
-    [sortedWorkouts, filter]
+    () => (filter === 'pr' ? workouts.filter((w) => w.isPR) : workouts),
+    [workouts, filter]
   );
 
   const actionSheetWorkout = actionSheetWorkoutId
@@ -35,7 +32,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
 
   const handleSelect = (workout: WorkoutWithStats) => {
     if (consumeLongPress()) return;
-    onSelectWorkout?.(workout, sortedWorkouts);
+    onSelectWorkout?.(workout, workouts);
   };
 
   const handleDelete = async () => {

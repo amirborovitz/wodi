@@ -1,0 +1,216 @@
+{
+  "name": "real-partner-palindrome-chipper-20260731",
+  "description": "Real saved doc. Partner IGUG for-time chipper written as a palindrome (600m run / 80 C&J / 60 BJO / 40 BMU / 60 BJO / 80 C&J / 600m run). The AI kept every occurrence in ONE single-pass rounds section; top-level movements[] is the deduped 4. Regression guard: the poster must print all 7 occurrences in board order, never collapse to 4 rows carrying whole-piece totals (1.20 KM / 160 / 120).",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "teamSize": 2,
+    "partnerWorkout": true,
+    "timeCap": 1800,
+    "rawText": "31/07/26\nCore\n3 sets:\n30 Russian twists\n~50m twin Kettlebells Front Rack Carry\n\nMETCON (Long)\nIn pairs, I go you go (however):\nFor time:\n600m run (together)\n80 twin Kettlebells Clean and Jerk\n60 Box Jumps Over\n40 Bar Muscle-up / 60 Chest to Bar Pull-ups / Pull-ups\n60 Box Jumps Over\n80 twin Kettlebells Clean and Jerk\n600m run (together)\nWEIGHT: 12/20kg (x2) | Advanced: 16/24kg (x2)\n30 minutes T.C.",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Core",
+        "type": "skill",
+        "prescription": "3 sets: 30 Russian twists, ~50m twin Kettlebells Front Rack Carry",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 90 }
+        ],
+        "movements": [
+          { "name": "Russian Twist", "reps": 30, "inputType": "none", "countingMode": "per_round" },
+          {
+            "name": "Twin Kettlebells Front Rack Carry",
+            "distance": 25,
+            "unit": "m",
+            "inputType": "none",
+            "equipment": "kettlebell",
+            "implementCount": 2,
+            "countingMode": "per_round"
+          }
+        ],
+        "rounds": 3,
+        "rawText": "3 sets:\n30 Russian twists\n~50m twin Kettlebells Front Rack Carry",
+        "loggingMode": "sets",
+        "isSecondary": true,
+        "aiPartName": "SLAB"
+      },
+      {
+        "id": "exercise-1",
+        "name": "METCON Long For Time",
+        "type": "wod",
+        "prescription": "600m run (together), 80 twin Kettlebells Clean and Jerk, 60 Box Jumps Over, 40 Bar Muscle-up / 60 Chest to Bar Pull-ups / Pull-ups, 60 Box Jumps Over, 80 twin Kettlebells Clean and Jerk, 600m run (together)",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 180, "weight": 20, "time": 1940 }
+        ],
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 600,
+            "unit": "m",
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "together": true,
+            "sharedLabel": "together"
+          },
+          {
+            "name": "Clean + Jerk",
+            "reps": 80,
+            "rxWeights": { "male": 20, "female": 12, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Box Jump Over",
+            "reps": 60,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Bar Muscle-up",
+            "reps": 40,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "alternative": { "name": "Chest to Bar Pull-up", "reps": 60 }
+          }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              {
+                "name": "Run",
+                "distance": 600,
+                "unit": "m",
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "together": true,
+                "sharedLabel": "together"
+              },
+              {
+                "name": "Twin Kettlebells Clean and Jerk",
+                "reps": 80,
+                "rxWeights": { "male": 20, "female": 20, "unit": "kg" },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 2,
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "loggedWeights": [20]
+              },
+              {
+                "name": "Box Jump Over",
+                "reps": 60,
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round"
+              },
+              {
+                "name": "Bar Muscle-up",
+                "reps": 40,
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "alternative": { "name": "Chest to Bar Pull-up", "reps": 60 }
+              },
+              {
+                "name": "Box Jump Over",
+                "reps": 60,
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round"
+              },
+              {
+                "name": "Twin Kettlebells Clean and Jerk",
+                "reps": 80,
+                "rxWeights": { "male": 20, "female": 20, "unit": "kg" },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 2,
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "loggedWeights": [20]
+              },
+              {
+                "name": "Run",
+                "distance": 600,
+                "unit": "m",
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "together": true,
+                "sharedLabel": "together"
+              }
+            ]
+          }
+        ],
+        "rawText": "METCON (Long)\nIn pairs, I go you go (however):\nFor time:\n600m run (together)\n80 twin Kettlebells Clean and Jerk\n60 Box Jumps Over\n40 Bar Muscle-up / 60 Chest to Bar Pull-ups / Pull-ups\n60 Box Jumps Over\n80 twin Kettlebells Clean and Jerk\n600m run (together)\nWEIGHT: 12/20kg (x2) | Advanced: 16/24kg (x2)\n30 minutes T.C.",
+        "loggingMode": "for_time",
+        "partnerWorkout": true,
+        "partnerSplit": "reps",
+        "aiPartName": "FORGE"
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Twin Kettlebells Clean and Jerk",
+          "totalReps": 160,
+          "totalDistance": 0,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "weight": 40,
+          "unit": "kg",
+          "wasSubstituted": false,
+          "implementCount": 2,
+          "color": "yellow"
+        },
+        {
+          "name": "Box Jump Over",
+          "totalReps": 120,
+          "totalDistance": 0,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "wasSubstituted": false,
+          "implementCount": 1,
+          "color": "magenta"
+        },
+        { "name": "Russian Twist", "totalReps": 90, "color": "magenta" },
+        { "name": "Bar Muscle-up", "totalReps": 40, "color": "cyan" },
+        {
+          "name": "Twin Kettlebells Front Rack Carry",
+          "totalDistance": 75,
+          "unit": "m",
+          "implementCount": 2,
+          "distancePerRep": 50,
+          "color": "yellow"
+        },
+        {
+          "name": "Run",
+          "totalReps": 0,
+          "totalDistance": 1200,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "unit": "m",
+          "wasSubstituted": false,
+          "implementCount": 1,
+          "distancePerRep": 600,
+          "together": true,
+          "sharedLabel": "together",
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 410,
+      "grandTotalVolume": 6400,
+      "grandTotalDistance": 1275
+    }
+  }
+}

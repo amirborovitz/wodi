@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { BRAND, VIBE, fD, fB, fM, fH } from '../celebration/faces/HandwrittenFace/brand';
 import { Wordmark, FormatTag } from '../celebration/faces/HandwrittenFace/PosterComponents';
 import { elementToCanvas, canvasToBlob, shareImage, downloadBlob } from '../../utils/shareUtils';
-import type { RecapData, RecapFeltStat } from '../../hooks/useRecapData';
+import type { RecapData, RecapFeltStat, RecapCardioStat } from '../../hooks/useRecapData';
 import type { VibeKey } from '../celebration/faces/HandwrittenFace/brand';
 import styles from './WrappedStoryScreen.module.css';
 
@@ -59,6 +59,44 @@ function SMark({ color = SWHITE, dot = BRAND.yellow }: { color?: string; dot?: s
   );
 }
 
+// ── Cardio formatting ─────────────────────────────────────────────────────────
+// Cal and metres are never converted into each other or added together — they
+// cover different sessions. Each is rendered in the unit it was measured in.
+
+function formatDistance(metres: number): string {
+  return metres >= 1000
+    ? `${(metres / 1000).toFixed(metres >= 10000 ? 0 : 1)} km`
+    : `${Math.round(metres).toLocaleString()} m`;
+}
+
+interface CardioHeadline {
+  value: string;
+  unit: string;
+  /** The other unit's total, when the period was measured both ways. */
+  footnote: string | null;
+}
+
+function cardioHeadline(stat: RecapCardioStat): CardioHeadline {
+  const leadsWithCalories = stat.primary === 'calories';
+  const hasBoth = stat.calories > 0 && stat.distance > 0;
+  const otherSessions = leadsWithCalories ? stat.distanceSessions : stat.calorieSessions;
+  const otherTotal = leadsWithCalories
+    ? formatDistance(stat.distance)
+    : `${Math.round(stat.calories).toLocaleString()} cal`;
+
+  return {
+    value: leadsWithCalories
+      ? Math.round(stat.calories).toLocaleString()
+      : formatDistance(stat.distance).split(' ')[0],
+    unit: leadsWithCalories ? 'CAL' : formatDistance(stat.distance).split(' ')[1].toUpperCase(),
+    // Spelled out as a separate count of sessions so the two totals can never read
+    // as halves of one number — they're different days, not a split.
+    footnote: hasBoth
+      ? `+ ${otherTotal} across ${otherSessions} ${otherSessions === 1 ? 'session' : 'sessions'} you measured the other way`
+      : null,
+  };
+}
+
 function FeltBar({ felt }: { felt: RecapFeltStat[] }): React.JSX.Element {
   return (
     <div style={{ display: 'flex', height: 12, borderRadius: 999, overflow: 'hidden' }}>
@@ -82,6 +120,15 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
   const persona = pickPersona(data.felt);
   const top = data.moves[0] ?? { name: '—', reps: 0 };
   const YEL = BRAND.yellow;
+
+  // Busiest machine headlines the engine card; up to two more sit under it.
+  const engine = data.cardio.length > 0
+    ? {
+        stat: data.cardio[0],
+        head: cardioHeadline(data.cardio[0]),
+        rest: data.cardio.slice(1, 3).map(stat => ({ stat, head: cardioHeadline(stat) })),
+      }
+    : null;
 
   const cardBase: React.CSSProperties = {
     position: 'absolute',
@@ -165,7 +212,46 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 4 · PERSONA — full-bleed dominant vibe color
+    // 4 · THE ENGINE — cardio, in its own units. Skipped entirely when the period
+    // had no cardio: an empty engine card is dead space in a 7-card story.
+    ...(engine ? [{
+      key: 'engine',
+      bg: SINK,
+      node: (
+        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
+          <SEyebrow>Your engine ran</SEyebrow>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: fD, fontSize: 58, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.01em', color: SWHITE, textTransform: 'uppercase' }}>
+              {engine.stat.name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, marginTop: 8 }}>
+              <span style={{ fontFamily: fD, fontSize: 86, fontWeight: 900, lineHeight: 0.8, letterSpacing: '-0.03em', color: YEL }}>{engine.head.value}</span>
+              <span style={{ fontFamily: fD, fontSize: 32, fontWeight: 900, color: YEL }}>{engine.head.unit}</span>
+            </div>
+            {engine.head.footnote && (
+              <div style={{ fontFamily: fB, fontSize: 13, fontWeight: 700, color: SDIM, marginTop: 10, lineHeight: 1.35 }}>
+                {engine.head.footnote}
+              </div>
+            )}
+          </div>
+          {engine.rest.length > 0 && (
+            <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {engine.rest.map(({ stat, head }) => (
+                <div key={stat.name} style={{ display: 'flex', alignItems: 'baseline', gap: 11, borderTop: '1px solid rgba(243,241,234,0.12)', paddingTop: 11 }}>
+                  <span style={{ fontFamily: fB, fontSize: 17, fontWeight: 800, color: SWHITE }}>{stat.name}</span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontFamily: fD, fontSize: 21, fontWeight: 900, color: SWHITE }}>{head.value}</span>
+                  <span style={{ fontFamily: fM, fontSize: 12, color: SDIM }}>{head.unit.toLowerCase()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <SMark />
+        </div>
+      ),
+    }] : []),
+
+    // 5 · PERSONA — full-bleed dominant vibe color
     {
       key: 'persona',
       bg: persona.color,
@@ -190,7 +276,7 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 5 · TONNAGE
+    // 6 · TONNAGE
     {
       key: 'tonnage',
       bg: SINK,
@@ -210,7 +296,7 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 6 · BIGGEST LIFT — PR as celebration
+    // 7 · BIGGEST LIFT — PR as celebration
     {
       key: 'pr',
       bg: SINK,
@@ -235,7 +321,7 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 7 · FINALE — the shareable card
+    // 8 · FINALE — the shareable card
     {
       key: 'finale',
       bg: SINK,

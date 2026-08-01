@@ -5,24 +5,30 @@ import {
   getPath,
   loadDotEnv,
   parseExpectation,
-  runLivePipeline,
-  runOfflinePipeline,
+  runSessionPipeline,
   stringifyValue,
   type CliOptions,
   type Expectation,
   type PipelineResult,
 } from './check-wod';
+import { installRecorder, installReplay, restoreOpenAI, type RecordedResponses } from './aiReplay';
 
 interface WodFixture {
   name: string;
+  description?: string;
   rawText: string;
-  aiResponse: string;
+  /**
+   * Every AI answer the real pipeline needs for this board, keyed by call input (see aiReplay).
+   * A segmented parse makes one segmentation call plus one per part, so a fixture holds several.
+   */
+  aiResponses: RecordedResponses;
   expect: Record<string, string>;
 }
 
 interface CorpusOptions {
   live: boolean;
   add: boolean;
+  record: boolean;
   fixture?: string;
   file?: string;
   name?: string;
@@ -61,11 +67,12 @@ Usage:
   npm run corpus -- --live
   npm run corpus -- --live --fixture plain-for-time-control
   npm run corpus:add -- --file wod.txt --name my-wod
+  npm run corpus:record -- --fixture plain-for-time-control   (re-capture cached AI answers)
 `);
 }
 
 function parseArgs(argv: string[]): CorpusOptions {
-  const options: CorpusOptions = { live: false, add: false };
+  const options: CorpusOptions = { live: false, add: false, record: false };
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -78,6 +85,7 @@ function parseArgs(argv: string[]): CorpusOptions {
 
     if (arg === '--live') options.live = true;
     else if (arg === '--add') options.add = true;
+    else if (arg === '--record') options.record = true;
     else if (arg === '--fixture') options.fixture = next();
     else if (arg === '--file') options.file = next();
     else if (arg === '--name') options.name = next();
@@ -92,6 +100,7 @@ function parseArgs(argv: string[]): CorpusOptions {
   }
 
   options.live = options.live || process.env.npm_config_live === 'true';
+  options.record = options.record || process.env.npm_config_record === 'true';
   options.fixture = options.fixture ?? npmConfigValue('fixture');
   options.file = options.file ?? npmConfigValue('file');
   options.name = options.name ?? npmConfigValue('name');
@@ -112,19 +121,20 @@ function readFixture(filePath: string): WodFixture {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error(`${filePath} is not a JSON object.`);
   }
-  const fixture = parsed as Partial<WodFixture>;
-  if (!fixture.name || !fixture.rawText || !fixture.aiResponse || !fixture.expect) {
-    throw new Error(`${filePath} must include name, rawText, aiResponse, and expect.`);
+  const fixture = parsed as Partial<WodFixture> & { aiResponse?: string };
+  if (!fixture.name || !fixture.rawText || !fixture.expect) {
+    throw new Error(`${filePath} must include name, rawText, and expect.`);
   }
   return {
     name: fixture.name,
+    ...(fixture.description ? { description: fixture.description } : {}),
     rawText: fixture.rawText,
-    aiResponse: fixture.aiResponse,
+    aiResponses: fixture.aiResponses ?? {},
     expect: fixture.expect,
   };
 }
 
-function loadFixtures(filterName?: string): WodFixture[] {
+function loadFixtures(filterName?: string, allowLegacy = false): WodFixture[] {
   if (!fs.existsSync(FIXTURE_DIR)) return [];
   const fixtures = fs.readdirSync(FIXTURE_DIR)
     .filter((name) => name.endsWith('.json'))
@@ -132,6 +142,21 @@ function loadFixtures(filterName?: string): WodFixture[] {
     .filter((fixture) => !filterName || fixture.name === filterName);
   if (filterName && fixtures.length === 0) {
     throw new Error(`No fixture named "${filterName}" found in ${FIXTURE_DIR}.`);
+  }
+  // Checked AFTER filtering so one un-migrated fixture can't block a run of the others — and so
+  // `--record` (which exists to migrate them) can load them at all.
+  if (!allowLegacy) {
+    // Pre-segmentation fixtures cached ONE response for a single whole-board call. The real
+    // pipeline makes several, so there is nothing to translate — the answers have to be
+    // re-captured against the actual call sequence.
+    const legacy = fixtures.filter((fixture) => Object.keys(fixture.aiResponses).length === 0);
+    if (legacy.length > 0) {
+      throw new Error(
+        `${legacy.length} fixture(s) still have the old single-call "aiResponse" shape: `
+        + `${legacy.map((f) => f.name).join(', ')}\n`
+        + '  Re-record them: npm run corpus:record',
+      );
+    }
   }
   return fixtures;
 }
@@ -163,11 +188,21 @@ function formatDiffForFailedPaths(
   });
 }
 
+/** Replay the fixture's cached answers through the real pipeline. */
+async function runCached(fixture: WodFixture): Promise<PipelineResult> {
+  installReplay(fixture.aiResponses ?? {});
+  try {
+    return await runSessionPipeline(fixture.rawText);
+  } finally {
+    restoreOpenAI();
+  }
+}
+
 async function runFixture(fixture: WodFixture, live: boolean): Promise<FixtureRunResult> {
   try {
-    const cachedPipeline = await runOfflinePipeline(fixture.aiResponse, fixture.rawText);
+    const cachedPipeline = await runCached(fixture);
     const pipeline = live
-      ? await runLivePipeline(fixture.rawText)
+      ? await runSessionPipeline(fixture.rawText)
       : cachedPipeline;
     return {
       fixture,
@@ -184,6 +219,17 @@ async function runFixture(fixture: WodFixture, live: boolean): Promise<FixtureRu
       error: (error as Error).message,
     };
   }
+}
+
+/** Re-capture every AI answer for a fixture against the CURRENT prompt, keeping its expectations. */
+async function recordFixture(fixture: WodFixture): Promise<WodFixture> {
+  const store = installRecorder();
+  try {
+    await runSessionPipeline(fixture.rawText);
+  } finally {
+    restoreOpenAI();
+  }
+  return { ...fixture, aiResponses: store };
 }
 
 function printRunResult(result: FixtureRunResult): void {
@@ -232,18 +278,40 @@ async function addFixture(options: CorpusOptions): Promise<void> {
   }
   loadDotEnv();
   const rawText = fs.readFileSync(path.resolve(options.file), 'utf8');
-  const result = await runLivePipeline(rawText);
+  const store = installRecorder();
+  let result: PipelineResult;
+  try {
+    result = await runSessionPipeline(rawText);
+  } finally {
+    restoreOpenAI();
+  }
   fs.mkdirSync(FIXTURE_DIR, { recursive: true });
   const fixturePath = path.join(FIXTURE_DIR, fixtureFileName(options.name));
   const fixture: WodFixture = {
     name: options.name,
     rawText,
-    aiResponse: result.raw,
+    aiResponses: store,
     expect: starterExpect(result.context),
   };
   fs.writeFileSync(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`, 'utf8');
-  console.log(`Wrote ${fixturePath}`);
+  console.log(`Wrote ${fixturePath} (${Object.keys(store).length} cached AI calls)`);
   console.log('Review and trim the starter expectations before committing.');
+}
+
+/**
+ * Re-capture cached AI answers for existing fixtures against the current prompt. Expectations are
+ * kept as-is on purpose: re-recording refreshes what the AI SAID, never what we require of it.
+ */
+async function recordCorpus(options: CorpusOptions): Promise<void> {
+  loadDotEnv();
+  const fixtures = loadFixtures(options.fixture, true);
+  if (fixtures.length === 0) throw new Error(`No fixtures found in ${FIXTURE_DIR}.`);
+  for (const fixture of fixtures) {
+    const updated = await recordFixture(fixture);
+    const fixturePath = path.join(FIXTURE_DIR, fixtureFileName(fixture.name));
+    fs.writeFileSync(fixturePath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+    console.log(`recorded ${fixture.name} (${Object.keys(updated.aiResponses).length} AI calls)`);
+  }
 }
 
 async function runCorpus(options: CorpusOptions): Promise<void> {
@@ -268,7 +336,9 @@ async function main(): Promise<void> {
   const scriptName = path.basename(process.env.npm_lifecycle_event ?? '');
   const options = parseArgs(process.argv.slice(2));
   if (scriptName === 'corpus:add') options.add = true;
+  if (scriptName === 'corpus:record') options.record = true;
   if (options.add) await addFixture(options);
+  else if (options.record) await recordCorpus(options);
   else await runCorpus(options);
 }
 

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, SharedWorkLabel } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 import { resolveSourceDate } from './sourceDateResolution';
 
@@ -136,6 +136,16 @@ Return ONLY valid JSON:
         {
           "sectionType": "buy_in" | "rounds" | "cash_out",
           "rounds": 1,
+          // label: the board's own name for this block ("A", "B", "AMRAP - C", "Min 1").
+          // Copy it verbatim when the board labels its blocks; omit when it doesn't.
+          "label": "A",
+          // scoreType: set ONLY when THIS block is scored SEPARATELY from its siblings — the
+          // athlete walks away with one number per block, not one number for the piece.
+          // The classic case is an interval AMRAP whose blocks hold different movements
+          // ("[10:00 AMRAP, 2:00 REST] x 3 rounds: A... B... C..."): each block gets its own
+          // rounds score. Omit on blocks that merely structure ONE score (a for-time piece
+          // with A/B/C sections finishing on one clock — that's a single total time).
+          "scoreType": "time" | "rounds" | "reps" | "load",
           "movements": [
             { "name": "Movement Name", "reps": 10, "inputType": "none" }
           ]
@@ -195,19 +205,30 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
   - "buyIn": movements that happen once at the start (not per round),
   - "cashOut": movements that happen once at the end (not per round),
   - "movements": the per-round block of movements for that section.
-- Do NOT duplicate the same movements multiple times in the JSON to simulate rounds.
-  Instead, keep them once with "suggestedSets" / "sets" encoding the number of rounds.
-- LETTERED SUB-BLOCKS UNDER ONE SCORE: a single for-time piece may label its sequential blocks
-  A./B./C. under ONE "For time" header and ONE time cap (e.g. "For time: A. 10 rounds: [block]
-  B. 10 rounds: [block] C. 10 rounds: [block], 40 min T.C."). These are round sections of ONE
-  exercise — one "sections" entry per block with that block's "rounds" count — NOT separate
-  exercises. The athlete logs one total time for the whole piece.
-- CRITICAL DISTINCTION: The previous rule only means "do not copy the whole round block N
-  times." It does NOT mean dedupe repeated movements that appear multiple times inside the
-  round block itself. If the per-round prescription says "200m run, 10 deadlift, 200m run,
-  10 power clean", the movements[] array MUST contain Run, Deadlift, Run, Power Clean in
-  that order. Those repeated Run entries are real work inside each round, not simulated
-  rounds.
+- WHAT "movements[]" IS depends on whether you also emit "sections", and you always know which:
+  - NO "sections" (the common case — a flat metcon or chipper): movements[] IS THE WORK ITSELF.
+    Transcribe the board LITERALLY — every movement line, in board order, INCLUDING a movement
+    written more than once. Never compress it to the unique set. If the board writes
+    "600m run / 80 KB C&J / 60 box jump over / 40 bar muscle-up / 60 box jump over / 80 KB C&J /
+    600m run", movements[] has SEVEN entries in exactly that order — two runs, two C&J, two box
+    jump overs. Dropping a repeated line DELETES WORK THE ATHLETE DID.
+  - WITH "sections": the sections are the source of truth for the work and its order; movements[]
+    is only a reference list of the distinct movements involved.
+- Do NOT duplicate the same movements multiple times in the JSON to simulate ROUNDS. Repeating a
+  whole round block N times is wrong — "suggestedSets" / "sets" encodes the number of rounds.
+  That is about ROUNDS ONLY. It never licenses dropping a repeated line from within ONE pass.
+- LETTERED / NUMBERED SUB-BLOCKS ARE SECTIONS, NEVER SEPARATE EXERCISES. A piece may label its
+  blocks A./B./C. or 1./2./3. under ONE governing header. Either way it is ONE exercise with one
+  "sections" entry per block, carrying that block's "label" and "rounds". What differs is only
+  WHERE THE SCORE LIVES:
+  - ONE score for the whole piece — a for-time piece under one "For time" header and one time cap
+    ("For time: A. 10 rounds: [block] B. 10 rounds: [block] C. 10 rounds: [block], 40 min T.C.").
+    The athlete logs one total time. Sections OMIT "scoreType".
+  - ONE score PER BLOCK — an interval AMRAP whose blocks hold different movements
+    ("[10:00 min AMRAP, 02:00 min REST] x 3 rounds:" over blocks A/B/C). The athlete walks away
+    with a separate rounds count for each block. Each section sets "scoreType": "rounds".
+  In BOTH cases it stays one exercise. Needing a score per block is NOT a reason to split into
+  exercises — that is what the section's own "scoreType" exists for. See examples 11 and 14.
 - CRITICAL — PROGRESSIVE / BUILDING ROUNDS RULE: When each round is structurally different
   (a new movement is added or removed each round), DO NOT collapse into one "rounds: N" section.
   Instead emit one sections entry per round, each with "rounds": 1, listing that round's exact movements.
@@ -219,7 +240,7 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
       { sectionType: "rounds", rounds: 1, movements: [BOB×10, Thruster×20, Row×10] },
       { sectionType: "rounds", rounds: 1, movements: [BOB×10, PC×30, Thruster×20, Row×10] }
     ]
-  The top-level movements[] should still list the UNIQUE set of movements (deduplicated) for reference.
+  The sections are the source of truth here; top-level movements[] is just the distinct movements involved.
 - CRITICAL — PYRAMID / PALINDROME CHIPPER RULE: When a for-time workout has multiple distinct sections
   where the SAME movement names appear but with DIFFERENT reps, distances, or calories per section
   (e.g., descending/ascending patterns like "600m / 400m / 200m / 400m / 600m", pyramid structures),
@@ -389,7 +410,7 @@ ${MOVEMENT_ALIASES_SECTION}
 - NEVER return "Today's Workout", a format label ("For Time"), a description ("8 Round Barbell Metcon"), or any sentence.
 
 ## KEY GUIDELINES
-1. Only split into multiple exercises for truly separate blocks (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise — UNLESS the workout alternates between different movement blocks (A.1/A.2, odd/even minutes with different movements). Alternating blocks need separate exercises for separate round scores. SEQUENTIAL LIFTS UNDER ONE HEADING = ONE exercise with SECTIONS (not separate exercises, not one flat block): when a strength piece flows one movement "Into:"/"then" another under a single heading and EACH block has its OWN set count — e.g. "4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" — emit ONE exercise whose "sections" has one "rounds" section PER block, each with that block's own "rounds" (set count) and its own movement(s). Also list each movement once in top-level "movements[]" for reference. These blocks are done SEQUENTIALLY at INDEPENDENT weights (Push Press across its 4 sets, THEN Push Jerk across its 4 sets), so they must NOT be flattened into one shared block. This differs from a SIMULTANEOUS "+"-joined complex done together each set on one bar (e.g. "1 Power Clean + 1 Push Jerk"), which stays a single flat "movements[]" list with NO sections (one shared weight). See examples 4b (sequential → sections) and 4c (simultaneous → flat).
+1. Only split into multiple exercises for truly separate PRACTICES (e.g., Strength + Metcon, Skill + WOD). A single WOD = one exercise, ALWAYS. A piece made of several movement blocks under ONE governing clock/header — "[10:00 AMRAP, 2:00 REST] x 3 rounds:" over blocks A/B/C, "A.1/A.2", odd/even minutes with different movements, numbered lists 1./2./3. — is STILL ONE exercise: emit one "sections" entry per block, each with its own "label" and its own "scoreType" so each block keeps its OWN score. NEVER split those blocks into separate exercises. A separate exercise means a separate piece of training with its own poster; blocks are parts of one piece and must share one. SEQUENTIAL LIFTS UNDER ONE HEADING = ONE exercise with SECTIONS (not separate exercises, not one flat block): when a strength piece flows one movement "Into:"/"then" another under a single heading and EACH block has its OWN set count — e.g. "4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" — emit ONE exercise whose "sections" has one "rounds" section PER block, each with that block's own "rounds" (set count) and its own movement(s). Also list each movement once in top-level "movements[]" for reference. These blocks are done SEQUENTIALLY at INDEPENDENT weights (Push Press across its 4 sets, THEN Push Jerk across its 4 sets), so they must NOT be flattened into one shared block. This differs from a SIMULTANEOUS "+"-joined complex done together each set on one bar (e.g. "1 Power Clean + 1 Push Jerk"), which stays a single flat "movements[]" list with NO sections (one shared weight). See examples 4b (sequential → sections) and 4c (simultaneous → flat).
 2. Exercise names MUST include set count/timing (e.g., "8 Rounds For Time", "5 sets every 2:30"). "AxB" = A sets of B reps.
 3. Movement alternatives ("40 DU / 60 singles"): use "alternative" field, easier movement as primary. Do NOT create two separate movements.
 4. ALWAYS include "difficultyLevel" (1–10) at the top level. Rate the programmed difficulty, not athlete fitness. Use the full range: 1=active recovery, 3=easy, 5=moderate benchmark pace, 7=hard, 8=very hard, 10=brutal. Consider load relative to body weight, total volume, time cap, and movement complexity. Example: "50 cal Echo Bike + 50 Thrusters @30kg × 3 rounds" = 8.
@@ -415,7 +436,7 @@ Example: "For time: [50-40-30] air squats / [30-20-10] twin DB/KB push press / 1
     { sectionType: "rounds", rounds: 1, movements: [Air Squat 40, DB Push Press 20 (implementCount 2), Box Jump 15] },
     { sectionType: "rounds", rounds: 1, movements: [Air Squat 30, DB Push Press 10 (implementCount 2), Box Jump 15] }
   ]
-  (top-level movements[] lists each unique movement once, with its round-1 reps, for reference.)`;
+  (sections are the source of truth here; top-level movements[] is just the distinct movements involved.)`;
 
 const RULES_LADDERS_PARTNERS = `## ASCENDING LADDER REP SCHEMES
 When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to the sequence.
@@ -517,7 +538,7 @@ Output:
   "exercises": [{
     "name": "Weightlifting", "type": "strength", "loggingMode": "emom",
     "prescription": "4 sets Every 1:30: 2 Push Press, then 4 sets Every 1:30: 2 Push Jerk — start ~65% and build up, from the floor",
-    "suggestedSets": 8,
+    "suggestedSets": 8, "intervalCount": 8, "workDuration": 720,
     "movements": [
       { "name": "Push Press", "reps": 2, "inputType": "weight", "equipment": "barbell" },
       { "name": "Push Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell" }
@@ -528,7 +549,9 @@ Output:
     ]
   }]
 }
-Why sections: each lift is its OWN block at its OWN building weight — the athlete logs Push Press across its 4 sets, THEN Push Jerk across its 4 sets. One "rounds" section per block keeps the two progressions independent for logging and the poster. Generalizes to N blocks (3+ lifts chained by "Into:"/"then") and any per-block set count.
+Why sections: each lift is its OWN block at its OWN building weight — the athlete logs Push Press across its 4 sets, THEN Push Jerk across its 4 sets. One "rounds" section per block keeps the two progressions independent for logging and the poster. Generalizes to N blocks (3+ lifts chained by "Into:"/"then") and any per-block set count. This holds when the blocks repeat the SAME lift at a different rep count ("4 sets: 2 Clean & Jerk / Into: / 4 sets: 1 Clean & Jerk") — still TWO blocks, one section each, each with its own movement entry; never merge them into one.
+Why intervalCount + workDuration: the cadence is STRUCTURE, and the app must never have to re-read it off the board — boards write the same clock a dozen ways ("Every 01:30 minutes:", "E1:30", "every 90 sec", "EMOM x 8"). "intervalCount" is the TOTAL intervals across all blocks (4 + 4 = 8) and "workDuration" is CUMULATIVE seconds (8 x 90 = 720), so the per-interval cadence is workDuration / intervalCount. Always emit both when the board states a cadence, whatever notation it used.
+NEVER set "stationRotation" on these blocks. They run one after another (all of block 1, THEN all of block 2) — nothing alternates. "stationRotation" means the blocks take turns under ONE clock, which would halve every block's set count.
 
 ### 4c. SIMULTANEOUS barbell complex ("+"-joined, done together each set) — ONE flat block, NO sections
 Input: "Every 2:00 x 5: 1 Power Clean + 1 Hang Clean + 1 Push Jerk (same bar)"
@@ -635,6 +658,24 @@ Output:
     ] }]
 }
 
+### 9b. Chipper that WRITES A MOVEMENT MORE THAN ONCE (flat — no sections)
+Input: "For time (30 min TC): 600m run, 80 twin KB clean & jerk 20/12kg, 60 box jumps over, 40 bar muscle-ups, 60 box jumps over, 80 twin KB clean & jerk, 600m run"
+Output:
+{
+  "type": "for_time", "format": "for_time", "scoreType": "time", "timeCap": 1800,
+  "exercises": [{ "name": "Chipper For Time", "type": "wod", "loggingMode": "for_time", "prescription": "600m Run, 80 Twin KB Clean and Jerk, 60 Box Jump Over, 40 Bar Muscle-up, 60 Box Jump Over, 80 Twin KB Clean and Jerk, 600m Run", "suggestedSets": 1,
+    "movements": [
+      { "name": "Run", "distance": 600, "unit": "m", "inputType": "none" },
+      { "name": "Twin Kettlebell Clean and Jerk", "reps": 80, "inputType": "weight", "equipment": "kettlebell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } },
+      { "name": "Box Jump Over", "reps": 60, "inputType": "none" },
+      { "name": "Bar Muscle-up", "reps": 40, "inputType": "none" },
+      { "name": "Box Jump Over", "reps": 60, "inputType": "none" },
+      { "name": "Twin Kettlebell Clean and Jerk", "reps": 80, "inputType": "weight", "equipment": "kettlebell", "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } },
+      { "name": "Run", "distance": 600, "unit": "m", "inputType": "none" }
+    ] }]
+}
+NOTE: SEVEN entries for seven written lines — the second run, the second C&J and the second box-jump-over are each their OWN entry, in board order. This is ONE pass (suggestedSets: 1), so no round-simulation rule applies. Emitting the four distinct movements instead would delete half the work. NO "sections" here: a single pass through a flat list needs none — sections are for work that is GROUPED and REPEATED (see 16, 17).
+
 ### 10. Barbell Complex
 Input: "EMOM 12: 1 Power Clean + 1 Squat Clean @ 80kg"
 Output:
@@ -648,39 +689,42 @@ Output:
     ] }]
 }
 
-### 11. Alternating AMRAPs (different blocks)
+### 11. Alternating AMRAPs (different blocks) — ONE exercise, one scored section per block
 Input: "[6:00 min AMRAP, 2:00 min REST] x 4 (alt): A.1: 200m Run, 10 Alt DB Devil Press, 10 Box Jumps. A.2: 6 Pull-ups, 8 Burpees over DB, 10 (5+5) DB Thrusters. DB 15/22.5kg"
 Output:
 {
   "title": "Lion's Roar", "type": "amrap", "format": "amrap_intervals", "scoreType": "rounds_reps", "timeCap": 1920,
   "exercises": [
-    { "name": "A.1 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1, "workDuration": 360, "restDuration": 120,
+    {
+      "name": "6:00 AMRAP x 4 (alt)", "type": "wod", "loggingMode": "amrap_intervals",
+      "prescription": "[6:00 AMRAP / 2:00 REST] x 4 (alt): A.1 200m Run + 10 Alt DB Devil Press + 10 Box Jumps, A.2 6 Pull-ups + 8 Burpees over DB + 10 DB Thrusters (5+5)",
+      "suggestedSets": 4, "intervalCount": 4, "workDuration": 1440, "restDuration": 480,
       "movements": [
         { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
         { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
-        { "name": "Box Jump", "reps": 10, "inputType": "none" }
-      ] },
-    { "name": "A.2 AMRAP 6:00 (Round 1)", "type": "wod", "loggingMode": "amrap", "prescription": "6 Pull-ups, 8 Burpees over DB, 10 DB Thrusters (5+5)", "suggestedSets": 1,
-      "movements": [
+        { "name": "Box Jump", "reps": 10, "inputType": "none" },
         { "name": "Pull-up", "reps": 6, "inputType": "none" },
         { "name": "Burpee over Dumbbell", "reps": 8, "inputType": "none" },
         { "name": "Dumbbell Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
-      ] },
-    { "name": "A.1 AMRAP 6:00 (Round 2)", "type": "wod", "loggingMode": "amrap", "prescription": "200m Run, 10 Alt DB Devil Press, 10 Box Jumps", "suggestedSets": 1,
-      "movements": [
-        { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
-        { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
-        { "name": "Box Jump", "reps": 10, "inputType": "none" }
-      ] },
-    { "name": "A.2 AMRAP 6:00 (Round 2)", "type": "wod", "loggingMode": "amrap", "prescription": "6 Pull-ups, 8 Burpees over DB, 10 DB Thrusters (5+5)", "suggestedSets": 1,
-      "movements": [
-        { "name": "Pull-up", "reps": 6, "inputType": "none" },
-        { "name": "Burpee over Dumbbell", "reps": 8, "inputType": "none" },
-        { "name": "Dumbbell Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
-      ] }
+      ],
+      "sections": [
+        { "sectionType": "rounds", "rounds": 2, "label": "A.1", "scoreType": "rounds",
+          "movements": [
+            { "name": "Run", "distance": 200, "unit": "m", "inputType": "none" },
+            { "name": "Alt Dumbbell Devil Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 },
+            { "name": "Box Jump", "reps": 10, "inputType": "none" }
+          ] },
+        { "sectionType": "rounds", "rounds": 2, "label": "A.2", "scoreType": "rounds",
+          "movements": [
+            { "name": "Pull-up", "reps": 6, "inputType": "none" },
+            { "name": "Burpee over Dumbbell", "reps": 8, "inputType": "none" },
+            { "name": "Dumbbell Thruster", "reps": 10, "inputType": "weight", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }, "implementCount": 1 }
+          ] }
+      ]
+    }
   ]
 }
-NOTE: When AMRAPs alternate between DIFFERENT movement blocks (A.1/A.2 or odd/even), split into separate exercises — one per block per attempt. Each exercise gets its own round score. Do NOT merge different blocks into one exercise.
+NOTE: This is ONE piece of training on ONE clock — so ONE exercise, never one exercise per block and never one per attempt. Each block becomes a "sections" entry carrying its own "label", its own "scoreType": "rounds" (the athlete scores A.1 and A.2 separately), and its "rounds" = how many times that block comes up (4 intervals alternating over 2 blocks = 2 visits each). workDuration/restDuration are CUMULATIVE across all 4 intervals (1440 / 480).
 
 ### 12. Every X:XX with buy-in + AMRAP (interval AMRAP)
 Input: "Every 04:00 min x 3 rounds: 200m run, Into AMRAP: 4 B.M.U / 6 chest to bar pull ups, 8 boxjumps, 10 KB swings @24/32kg"
@@ -824,15 +868,15 @@ Output:
   ]
 }
 
-## AMRAP INTERVALS — NUMBERED BLOCKS
+## AMRAP INTERVALS — NUMBERED / LETTERED BLOCKS
 
-When an AMRAP intervals workout has numbered sections (1. / 2. / 3. or labeled A / B / C) with DIFFERENT movement blocks, each numbered section is a SEPARATE exercise with loggingMode: "amrap". Do NOT merge them into one exercise.
+When an AMRAP intervals workout has numbered or lettered blocks (1. / 2. / 3., or A / B / C, or "AMRAP - A" / "AMRAP - B") holding DIFFERENT movements, it is ONE exercise with loggingMode: "amrap_intervals" and one "sections" entry per block. Each section carries the board's own "label" and "scoreType": "rounds", because the athlete scores each block separately. Do NOT emit one exercise per block — needing a score per block is exactly what the section's "scoreType" is for. See example 14.
 
 CRITICAL — BUY-IN RULE: In AMRAP intervals, the first movement of a numbered block is NEVER automatically a buy-in. A buy-in is ONLY movements explicitly introduced by "buy-in", "into AMRAP", or "then AMRAP" phrasing. If the workout lists numbered movement blocks without any "into AMRAP" language, every movement in every block is a regular per-round AMRAP movement.
 
 Exception for alternating stations: when the text says "(alt)", "alternate", "alternating stations", or "two groups starting at different stations" and labels blocks like B.1 / B.2 under one repeated interval clock, keep ONE metcon exercise with stationRotation: true, loggingMode: "amrap_intervals", intervalCount set to the total interval count, and stationLabel/stationIndex/countingMode: "per_station_visit" on the first movement of each station. The total interval count is distributed across stations. Example: "[02:00 AMRAP / 01:00 REST] x 6 (alt): B.1 200m Run + Max DB Devil Press, B.2 50 DU + Max Sit-ups" means 6 total intervals, 2 stations, 3 visits per station.
 
-### 14. Numbered sequential AMRAP intervals (different blocks)
+### 14. Numbered/lettered AMRAP intervals (different blocks) — ONE exercise, one scored section per block
 Input: "[12:00 min AMRAP / 01:00 min REST] x 3 :
 1. 8/10 calories bike, 10 DB's burpee to deadlift, 10 DB's push press
 2. 5 pull up, 10 push ups, 15 air squats
@@ -843,38 +887,45 @@ Output:
   "timeCap": 2340, "intervalTime": 720, "sets": 3,
   "exercises": [
     {
-      "name": "AMRAP 1 — 12 Min", "type": "wod", "loggingMode": "amrap",
-      "prescription": "8/10 cal Bike, 10 DB Burpee to Deadlift, 10 DB Push Press",
-      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
+      "name": "12:00 AMRAP x 3", "type": "wod", "loggingMode": "amrap_intervals",
+      "prescription": "[12:00 AMRAP / 1:00 REST] x 3: 1. 8/10 cal Bike + 10 DB Burpee to Deadlift + 10 DB Push Press, 2. 5 Pull-ups + 10 Push-ups + 15 Air Squats, 3. 10 American KB Swings + 10 Toes to Bar + 10 Box Jumps",
+      "suggestedSets": 3, "intervalCount": 3, "workDuration": 2160, "restDuration": 180,
       "movements": [
         { "name": "Bike", "calories": 10, "rxCalories": { "male": 10, "female": 8 }, "inputType": "none" },
         { "name": "Dumbbell Burpee to Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 },
-        { "name": "Dumbbell Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 }
-      ]
-    },
-    {
-      "name": "AMRAP 2 — 12 Min", "type": "wod", "loggingMode": "amrap",
-      "prescription": "5 Pull-ups, 10 Push-ups, 15 Air Squats",
-      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
-      "movements": [
+        { "name": "Dumbbell Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 },
         { "name": "Pull-up", "reps": 5, "inputType": "none" },
         { "name": "Push-up", "reps": 10, "inputType": "none" },
-        { "name": "Air Squat", "reps": 15, "inputType": "none" }
-      ]
-    },
-    {
-      "name": "AMRAP 3 — 12 Min", "type": "wod", "loggingMode": "amrap",
-      "prescription": "10 American KB Swings, 10 Toes to Bar, 10 Box Jumps",
-      "suggestedSets": 1, "workDuration": 720, "restDuration": 60,
-      "movements": [
+        { "name": "Air Squat", "reps": 15, "inputType": "none" },
         { "name": "American Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" }, "implementCount": 1 },
         { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
         { "name": "Box Jump", "reps": 10, "inputType": "none" }
+      ],
+      "sections": [
+        { "sectionType": "rounds", "rounds": 1, "label": "1", "scoreType": "rounds",
+          "movements": [
+            { "name": "Bike", "calories": 10, "rxCalories": { "male": 10, "female": 8 }, "inputType": "none" },
+            { "name": "Dumbbell Burpee to Deadlift", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 },
+            { "name": "Dumbbell Push Press", "reps": 10, "inputType": "weight", "rxWeights": { "male": 10, "female": 10, "unit": "kg" }, "implementCount": 2 }
+          ] },
+        { "sectionType": "rounds", "rounds": 1, "label": "2", "scoreType": "rounds",
+          "movements": [
+            { "name": "Pull-up", "reps": 5, "inputType": "none" },
+            { "name": "Push-up", "reps": 10, "inputType": "none" },
+            { "name": "Air Squat", "reps": 15, "inputType": "none" }
+          ] },
+        { "sectionType": "rounds", "rounds": 1, "label": "3", "scoreType": "rounds",
+          "movements": [
+            { "name": "American Kettlebell Swing", "reps": 10, "inputType": "weight", "rxWeights": { "male": 24, "female": 16, "unit": "kg" }, "implementCount": 1 },
+            { "name": "Toes to Bar", "reps": 10, "inputType": "none" },
+            { "name": "Box Jump", "reps": 10, "inputType": "none" }
+          ] }
       ]
     }
   ]
 }
-NOTE: "8/10 calories bike" → Bike, calories: 10, rxCalories: { male: 10, female: 8 }. The Bike is movement #1 in AMRAP 1 — it is NOT a buy-in. No buy-in is present in this workout. Each numbered section becomes its own exercise.
+NOTE: "8/10 calories bike" → Bike, calories: 10, rxCalories: { male: 10, female: 8 }. The Bike is movement #1 in block 1 — it is NOT a buy-in. No buy-in is present in this workout.
+CRITICAL: this is ONE piece of training, so ONE exercise. Each numbered block becomes a "sections" entry, NOT its own exercise. The athlete scores each block separately, which is exactly what "scoreType": "rounds" on the section is for — that is no longer a reason to split into exercises. Lettered blocks ("AMRAP - A / AMRAP - B / AMRAP - C") are the SAME shape as numbered ones and parse identically; put the board's own label ("A", "B", "C") in each section's "label". Top-level "movements[]" lists every block's movements in board order, for reference. workDuration/restDuration are CUMULATIVE across all 3 intervals (2160 / 180).
 
 ### 14b. ALTERNATING stations under one clock — ONE exercise, never separate exercises
 Input: "[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):
@@ -961,7 +1012,7 @@ Output:
     ]
   }]
 }
-NOTE: Each round is a separate sections entry with rounds: 1. DO NOT collapse into one "rounds: 5" section when each round's movement list is different. The movements[] at the top lists unique movements for reference only.
+NOTE: Each round is a separate sections entry with rounds: 1. DO NOT collapse into one "rounds: 5" section when each round's movement list is different. The sections are the source of truth here, so the movements[] at the top is just the distinct movements involved.
 
 ### 17. Pyramid / palindrome chipper (same movement count per section, different reps/distances)
 Input: "For time: 600m Run, 60 KB SDHP, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 200m Run, 20 Chest-to-Bar Pull-up, 10 Burpee / 400m Run, 40 KB Swing, 10 Burpee / 600m Run, 60 KB SDHP, 10 Burpee (30 min TC)"
@@ -987,7 +1038,7 @@ Output:
     ]
   }]
 }
-NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The movements[] at top lists unique movements (deduplicated) for reference. DO NOT flatten all sections into one movement list — the pyramid structure must be preserved.`;
+NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The sections are the source of truth here, so the movements[] at top is just the distinct movements involved. DO NOT drop the sections in favour of that flat list — the pyramid structure must be preserved.`;
 
 const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not parse workout from text"}';
 
@@ -1690,11 +1741,26 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
             }
           }
 
+          // The board's own name for this block ("A", "AMRAP - C", "Min 1"). Display only.
+          const label =
+            typeof rawSec.label === 'string' && rawSec.label.trim() ? rawSec.label.trim() : undefined;
+
+          // Set only when the AI marked THIS block as separately scored (see BlockResult).
+          // Anything outside the four known score shapes is dropped rather than guessed —
+          // a wrong score shape would put the athlete in the wrong logging input.
+          const rawScoreType = rawSec.scoreType;
+          const scoreType: BlockScoreType | undefined =
+            rawScoreType === 'time' || rawScoreType === 'rounds' || rawScoreType === 'reps' || rawScoreType === 'load'
+              ? rawScoreType
+              : undefined;
+
           if (sectionMovements.length > 0) {
             parsedSections.push({
               sectionType,
               rounds,
               movements: sectionMovements,
+              ...(label ? { label } : {}),
+              ...(scoreType ? { scoreType } : {}),
             });
           }
         }

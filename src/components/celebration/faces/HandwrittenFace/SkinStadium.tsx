@@ -43,13 +43,31 @@ const DOT_PATTERNS: Record<string, string[]> = {
   '8': ['01110','10001','10001','01110','10001','10001','01110'],
   '9': ['01110','10001','10001','01111','00001','00010','01100'],
   ':': ['0','0','1','0','1','0','0'],
+  '.': ['0','0','0','0','0','0','1'],
   '-': ['0','0','0','1','0','0','0'],
   '+': ['00000','00100','00100','11111','00100','00100','00000'],
   ' ': ['00000','00000','00000','00000','00000','00000','00000'],
 };
 
+const ROWS = 7;
+const MATRIX_HEIGHT = ROWS * DOT + (ROWS - 1) * GAP;
+
 function DotChar({ char }: { char: string }): React.JSX.Element {
-  const pattern = DOT_PATTERNS[char] ?? DOT_PATTERNS[' '];
+  const pattern = DOT_PATTERNS[char];
+  // A glyph with no pattern (½, a stray letter) used to fall back to blank space, which silently
+  // deleted part of the score. Light it as text at the matrix's own height instead.
+  if (!pattern) {
+    return (
+      <div style={{
+        height: MATRIX_HEIGHT, display: 'flex', alignItems: 'center', flexShrink: 0,
+        fontFamily: fD, fontSize: MATRIX_HEIGHT * 0.72, fontWeight: 900, lineHeight: 1,
+        color: BRAND.yellow,
+        textShadow: `0 0 6px ${BRAND.yellow}, 0 0 18px ${BRAND.yellow}cc, 0 0 36px ${BRAND.yellow}66`,
+      }}>
+        {char}
+      </div>
+    );
+  }
   const cols = pattern[0].length;
   const rows = pattern.length;
 

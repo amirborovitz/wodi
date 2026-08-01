@@ -1,5 +1,6 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
+import { hasSequentialBlocks } from '../utils/sectionShape';
 
 /**
  * Bodyweight movements that should not show a weight annotation in the UI
@@ -183,11 +184,22 @@ function getStationTotalIntervals(
   return cycles * stationCount;
 }
 
+/** True when this exercise's blocks were each scored separately AND actually logged. */
+function hasLoggedBlockScores(exercise: ParsedExercise): boolean {
+  return (exercise.sections ?? []).some((section) => section.scoreType && section.result != null);
+}
+
 export function getStationVisitCountsForExercise(
   workout: ParsedWorkout,
   exercise: ParsedExercise,
   _exerciseIndex: number
 ): number[] | null {
+  // A block-scored piece needs no station-visit ESTIMATE: how many times each block was done
+  // is the athlete's logged score. This estimate divides the interval count across blocks
+  // (3 intervals ÷ 3 blocks = 1 visit each) and, being a per-movement override, would win over
+  // the real per-block rounds — silently reducing a 5-round block to a single round.
+  if (hasLoggedBlockScores(exercise)) return null;
+
   // Allow exercises with stationLabel on movements to bypass the stationRotation flag —
   // EMOM minute-station workouts use stationLabel without setting stationRotation.
   const hasMovementStationLabels = exercise.movements?.some(m => m.stationLabel);
@@ -199,6 +211,18 @@ export function getStationVisitCountsForExercise(
     || exercise.loggingMode === 'amrap_intervals'
   );
   if (!(workout.stationRotation || exercise.stationRotation || hasMovementStationLabels || hasSectionStationStructure)) return null;
+
+  // Sequential blocks are not stations. "4 sets: 2 Clean & Jerk, Into: 4 sets: 1 Clean & Jerk"
+  // runs block A to completion, THEN block B — each section's own `rounds` is how many times it
+  // ran, and the piece's total is their SUM (8 sets, 12 reps). Dividing an interval count across
+  // them as if they alternated halved every block (2 visits each → 6 reps). The AI stamps
+  // stationRotation on these boards often enough that the flag can't be trusted here; the section
+  // shape can. Resolved before the interval math below, which has no meaning for this shape.
+  if (!hasMovementStationLabels && hasSequentialBlocks(exercise)) {
+    return (exercise.sections ?? []).flatMap((section) =>
+      section.movements.map(() => (section.sectionType === 'rounds' ? (section.rounds ?? 1) : 1)),
+    );
+  }
 
   // For exercises with movement-level station labels (EMOM stations):
   // Compute totalIntervals = cycles × stationCount so each station gets (cycles) visits.
@@ -404,10 +428,26 @@ export function calculateWorkloadBreakdown(
     // rounds sections use their explicit section round count.
     const movementEntries = exercise.sections && exercise.sections.length > 0
       ? exercise.sections.flatMap((section) => {
-          const sectionMultiplier = section.sectionType === 'rounds' ? (section.rounds ?? 1) : 1;
+          // A separately-scored block (an A/B/C interval AMRAP) repeats as many times as the
+          // athlete MANAGED, not as many as the board prescribed — its `rounds` is how often
+          // the block comes up in the piece (usually 1), while the AMRAP rounds they actually
+          // completed is the logged score. Using `rounds` here would count one round of each
+          // block and undercount the whole piece.
+          const loggedRounds =
+            section.scoreType === 'rounds' && section.result?.value != null
+              ? section.result.value
+              : undefined;
+          const sectionMultiplier = section.sectionType === 'rounds'
+            ? (loggedRounds ?? section.rounds ?? 1)
+            : 1;
+          // Partial round, same rule as a whole-exercise AMRAP (see AddWorkoutScreen): a
+          // movement the athlete finished before the buzzer counts one MORE time than the full
+          // rounds — that work was really done. Scoped per block, since each block stops at its
+          // own point in its own round.
+          const partialNames = new Set(section.result?.partialMovements ?? []);
           return section.movements.map((movement) => ({
             movement,
-            fallbackMultiplier: sectionMultiplier,
+            fallbackMultiplier: sectionMultiplier + (partialNames.has(movement.name) ? 1 : 0),
             forceOnce: section.sectionType !== 'rounds',
           }));
         })

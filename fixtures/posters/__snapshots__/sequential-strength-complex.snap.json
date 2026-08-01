@@ -3,23 +3,25 @@
     {
       "eyebrow": "WOD",
       "title": "Weightlifting",
-      "blueprint": "8 sets",
+      "blueprint": "EVERY 1:30",
       "rows": [
         {
-          "primary": "45->55KG",
+          "primary": "4 × 2",
           "name": "Push Press",
-          "subNote": "8 total",
           "totalNote": "8 total",
+          "subNote": "8 total",
           "mineKey": "Push Press",
+          "mineOverride": "45-55kg",
           "accent": "yellow",
           "repeatCount": 4
         },
         {
-          "primary": "60->70KG",
+          "primary": "4 × 2",
           "name": "Push Jerk",
-          "subNote": "8 total",
           "totalNote": "8 total",
+          "subNote": "8 total",
           "mineKey": "Push Jerk",
+          "mineOverride": "60-70kg",
           "accent": "yellow",
           "repeatCount": 4
         }
@@ -33,23 +35,25 @@
       {
         "eyebrow": "WOD",
         "title": "Weightlifting",
-        "blueprint": "8 sets",
+        "blueprint": "EVERY 1:30",
         "rows": [
           {
-            "primary": "45->55KG",
+            "primary": "4 × 2",
             "name": "Push Press",
-            "subNote": "8 total",
             "totalNote": "8 total",
+            "subNote": "8 total",
             "mineKey": "Push Press",
+            "mineOverride": "45-55kg",
             "accent": "yellow",
             "repeatCount": 4
           },
           {
-            "primary": "60->70KG",
+            "primary": "4 × 2",
             "name": "Push Jerk",
-            "subNote": "8 total",
             "totalNote": "8 total",
+            "subNote": "8 total",
             "mineKey": "Push Jerk",
+            "mineOverride": "60-70kg",
             "accent": "yellow",
             "repeatCount": 4
           }
@@ -63,7 +67,7 @@
     "value": "70",
     "unit": "KG",
     "subtitle": "PUSH JERK",
-    "formatLine": "2 × every 1:30",
+    "formatLine": "8 × every 1:30",
     "storyLine": "8 push press · 8 push jerk",
     "storyMovements": [
       {
@@ -103,16 +107,13 @@
     ],
     "accentClass": "accentGold"
   },
+  "resultLabel": "TOP SET",
+  "resultValue": "70kg",
   "posterRows": {
     "reward": [
       {
-        "kind": "block",
-        "label": "",
-        "cap": "8 sets"
-      },
-      {
         "kind": "line",
-        "rx": "45->55KG Push Press",
+        "rx": "4 × 2 Push Press",
         "load": "",
         "mine": "45-55kg",
         "team": "",
@@ -120,7 +121,7 @@
       },
       {
         "kind": "line",
-        "rx": "60->70KG Push Jerk",
+        "rx": "4 × 2 Push Jerk",
         "load": "",
         "mine": "60-70kg",
         "team": "",
@@ -130,13 +131,8 @@
     "pages": [
       [
         {
-          "kind": "block",
-          "label": "",
-          "cap": "8 sets"
-        },
-        {
           "kind": "line",
-          "rx": "45->55KG Push Press",
+          "rx": "4 × 2 Push Press",
           "load": "",
           "mine": "45-55kg",
           "team": "",
@@ -144,7 +140,7 @@
         },
         {
           "kind": "line",
-          "rx": "60->70KG Push Jerk",
+          "rx": "4 × 2 Push Jerk",
           "load": "",
           "mine": "60-70kg",
           "team": "",

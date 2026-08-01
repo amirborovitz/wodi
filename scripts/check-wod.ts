@@ -263,39 +263,20 @@ export function buildContext(parsed: ParsedWorkout, workload: WorkloadBreakdown,
   };
 }
 
-export async function runOfflinePipeline(aiResponse: string, rawText: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
-  const { validateParsedWorkout } = await import('../src/services/openai');
-  const { postProcessParsedWorkout } = await import('../src/services/workoutPostProcessor');
+/**
+ * THE production parse path: segment the board, structure each part in its own call, merge.
+ * `parseWorkoutText` (one call over the whole board) is a FALLBACK production only reaches when
+ * segmentation fails — testing against it reads a board in a way the app never does, which
+ * produced phantom failures and hid real ones. Everything downstream of the parse is shared with
+ * runOfflinePipeline so the two differ only in where the AI answers come from.
+ */
+export async function runSessionPipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
+  const { parseWorkoutSession } = await import('../src/services/openai');
   const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
   const { computeHeroResult } = await import('../src/components/celebration/helpers');
 
-  const validated = validateParsedWorkout(parseAiJson(aiResponse));
-  const parsed = postProcessParsedWorkout(validated);
-  const workload = calculateWorkloadBreakdown(parsed);
-  const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, result));
-  const hero = computeHeroResult(
-    exercises,
-    parsed.format,
-    workload.grandTotalVolume,
-    0,
-    Math.round((parsed.timeCap ?? 0) / 60),
-    false,
-    workload.movements,
-    parsed.timeCap,
-    undefined,
-    undefined,
-    parsed.teamSize,
-    parsed.rawText ?? rawText,
-  );
-  return { raw: aiResponse, parsed, workload, hero, context: buildContext(parsed, workload, hero) };
-}
-
-export async function runLivePipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
-  const { parseWorkoutText } = await import('../src/services/openai');
-  const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
-  const { computeHeroResult } = await import('../src/components/celebration/helpers');
-
-  const { raw, parsed } = await parseWorkoutText(text);
+  const parsed = await parseWorkoutSession(text);
+  const raw = JSON.stringify(parsed, null, 2);
   const workload = calculateWorkloadBreakdown(parsed);
   const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, result));
   const hero = computeHeroResult(
@@ -324,7 +305,7 @@ async function main(): Promise<void> {
     throw new Error('Provide --text or --file.');
   }
 
-  const result = await runLivePipeline(text, options.result);
+  const result = await runSessionPipeline(text, options.result);
 
   const failures = options.expects
     .map((expectation) => checkExpectation(result.context, expectation))

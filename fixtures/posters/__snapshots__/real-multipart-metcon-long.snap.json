@@ -65,7 +65,7 @@
             "accent": "yellow"
           },
           {
-            "primary": "10 T2B",
+            "primary": "10 Toes to Bars",
             "name": "",
             "totalNote": "50 total",
             "mineKey": "Toes to Bar",
@@ -192,6 +192,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "MY TIME",
+  "resultValue": "24:00",
   "posterRows": {
     "reward": null,
     "pages": [
@@ -255,7 +257,7 @@
         },
         {
           "kind": "line",
-          "rx": "10 T2B",
+          "rx": "10 Toes to Bars",
           "load": "",
           "mine": "",
           "team": "",

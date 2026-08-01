@@ -75,6 +75,30 @@ export function formatStampLoad(weight: number, unit?: string): string {
   return `${rounded}${unit === 'lb' ? 'LB' : 'KG'}`;
 }
 
+/**
+ * THE way a logged load reads on a poster. One weight prints as itself ("50kg"); a build prints
+ * every rung the athlete actually stood on, in the order they climbed ("50-52.5-55-57.5-60kg").
+ * Same function for a lone lift and for one block of a sequential piece, so a build never renders
+ * as a single number just because of where the row came from.
+ *
+ * Every rung, not just the endpoints: the climb IS the story of a build-up day, and a poster that
+ * says "50-65kg" hides whether that took three jumps or seven.
+ *
+ * Weights arrive PER IMPLEMENT. The "2×" prefix marks a pair the athlete held one in each hand,
+ * and only fits a single figure — a pair that also climbed reads as its rungs alone, since
+ * "2×45-55kg" parses as arithmetic rather than as a range.
+ */
+export function formatLoggedLoad(
+  weights: readonly number[] | undefined,
+  unit: 'kg' | 'lb' = 'kg',
+  implementCount = 1,
+): string {
+  const distinct = [...new Set((weights ?? []).filter((w) => w > 0))];
+  if (distinct.length === 0) return '';
+  if (distinct.length > 1) return `${distinct.join('-')}${unit}`;
+  return implementCount > 1 ? `${implementCount}×${distinct[0]}${unit}` : `${distinct[0]}${unit}`;
+}
+
 export function stableRotation(seed: string, index: number): number {
   let hash = index * 97;
   for (let i = 0; i < seed.length; i += 1) {
@@ -94,7 +118,9 @@ export function extractEveryXCadence(text: string): string | undefined {
   // "EMOM 15" / "EMOM for 15 minutes" — the board's own label beats a generic "every 1 min"
   const emom = text.match(/\bemom\s*(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?\b/i);
   if (emom) return `EMOM ${emom[1]} MIN`;
-  const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?(?:\s*[x×]|(?=\s|$))/i);
+  // Boards write the cadence with a trailing colon ("Every 01:30 minutes:") as often as bare, so
+  // the terminator allows punctuation — requiring whitespace/end dropped the cadence entirely.
+  const mmss = text.match(/every\s+0?(\d+):(\d{2})\s*(?:min(?:utes?)?)?(?:\s*[x×]|(?=[\s:,.]|$))/i);
   if (mmss) {
     const mins = parseInt(mmss[1]);
     const secs = parseInt(mmss[2]);

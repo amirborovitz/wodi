@@ -10,6 +10,33 @@ import type { Exercise, ParsedMovement, MovementTotal } from '../../types';
 // didn't do. See memory: feedback_poster_movement_data_source.
 
 /**
+ * Every movement name a part prescribes, from BOTH sections and the flat list — either may
+ * carry a name the other renamed (a section's "Twin Kettlebells Clean and Jerk" against the
+ * flat list's "Clean + Jerk"). Scoping has to recognise both spellings or the breakdown entry
+ * matches neither and the movement silently drops off that part's poster.
+ */
+export function prescribedMovementNames(target: Exercise[]): Set<string> {
+  const names = new Set<string>();
+  for (const ex of target) {
+    names.add(ex.name.toLowerCase());
+    const prescribed = [
+      ...(ex.sections?.flatMap((section) => section.movements ?? []) ?? []),
+      ...(ex.movements ?? []),
+    ];
+    for (const m of prescribed) names.add(m.name.toLowerCase());
+  }
+  return names;
+}
+
+/** Breakdown entries whose name (or pre-substitution original) is one of `names`. */
+export function movementsMatchingNames(all: MovementTotal[], names: Set<string>): MovementTotal[] {
+  return all.filter((m) =>
+    names.has(m.name.toLowerCase())
+    || (m.originalMovement != null && names.has(m.originalMovement.toLowerCase())),
+  );
+}
+
+/**
  * THE canonical prescription→breakdown join: matches a prescribed movement name against
  * a logged entry's current name OR its pre-substitution original. Optionally scoped to
  * one exercise of a multi-part workout first, falling back to a global match for docs
@@ -31,6 +58,119 @@ export function findMovementTotal(
   return movements.find(
     (m) => m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower,
   );
+}
+
+/**
+ * What the athlete loaded on ONE movement occurrence, as the list of weights they moved through.
+ *
+ * The poster has always shown builds ("45-55kg") by reading `MovementTotal.weightProgression` —
+ * but the breakdown is a TOTALS table keyed by movement NAME, so a piece that repeats a lift
+ * ("4 sets: 2 C&J, Into: 4 sets: 1 C&J") holds one merged entry for both blocks and no
+ * per-occurrence answer can be recovered from it. This resolves the occurrence instead, and is
+ * the ONLY place that decides which source may speak:
+ *
+ *  1. `loggedWeights` — written per occurrence at save under the logging's own ::index key.
+ *     Always right when present, whether the athlete held one weight or climbed.
+ *  2. `twin` — the SAME occurrence as recorded on the exercise's other movement list. An exercise
+ *     carries its movements twice (flat `movements[]` and inside `sections[]`), and older saves
+ *     keyed the section list by bare name — giving every block of a repeated lift the first
+ *     block's weight while the flat list held each block's own. Reading the twin recovers those
+ *     docs. Callers pair by position and must confirm the pairing (same name, same reps) first;
+ *     an unconfirmed twin is not passed.
+ *  3. the breakdown entry, but ONLY when this movement occurs once in the piece — then its
+ *     totals are wholly this occurrence's, so its progression IS this occurrence's build. This
+ *     is the path that made single-lift and distinct-name blocks work before `loggedWeights`,
+ *     and it keeps docs saved before it rendering exactly as they did.
+ *  4. `rxWeights` — a single figure, and only because saves before (1) baked the logged weight
+ *     into it. Never a build; a lone number is all this source can honestly carry.
+ */
+export function resolveOccurrenceLoad(
+  movement: ParsedMovement,
+  breakdown: MovementTotal[],
+  occurrencesInPiece: number,
+  twin?: ParsedMovement,
+): { weights: number[]; unit: 'kg' | 'lb'; implementCount: number } | undefined {
+  const logged = findMovementTotal(breakdown, movement.name);
+  const unit: 'kg' | 'lb' = logged?.unit === 'lb' || movement.rxWeights?.unit === 'lb' ? 'lb' : 'kg';
+  const implementCount = movement.implementCount && movement.implementCount > 1 ? movement.implementCount : 1;
+
+  if (movement.loggedWeights?.length) {
+    return { weights: movement.loggedWeights, unit, implementCount };
+  }
+
+  if (twin?.loggedWeights?.length) {
+    return { weights: twin.loggedWeights, unit, implementCount };
+  }
+
+  if (occurrencesInPiece > 1) {
+    // A repeated lift: the breakdown holds one merged entry for every block of it, so only a
+    // per-occurrence record may answer. The twin's Rx slot is one such record on older docs.
+    const twinRx = twin?.rxWeights?.male || twin?.rxWeights?.female;
+    if (twinRx) return { weights: [twinRx], unit, implementCount };
+  }
+
+  if (occurrencesInPiece === 1 && logged) {
+    // Breakdown weight is the effective load (per-implement × implementCount, for volume) while
+    // progressions are stored per-implement already — so only the single-weight branch divides.
+    if (logged.weightProgression?.length) return { weights: logged.weightProgression, unit, implementCount };
+    if ((logged.weight ?? 0) > 0) {
+      const perImplement = implementCount > 1
+        ? Math.round((logged.weight! / implementCount) * 10) / 10
+        : logged.weight!;
+      return { weights: [perImplement], unit, implementCount };
+    }
+  }
+
+  const rx = movement.rxWeights?.male || movement.rxWeights?.female;
+  return rx ? { weights: [rx], unit, implementCount } : undefined;
+}
+
+/**
+ * THE top set: the heaviest load an exercise put on the bar, and which lift it belonged to.
+ * One definition, so the hero number and the rows beneath it cannot disagree.
+ *
+ * Reads all three places a load can be recorded — the breakdown entries, the athlete's
+ * per-occurrence `loggedWeights`, and the completed sets. The occurrence pass is what makes a
+ * repeated lift honest: a piece whose blocks share a name ("4 sets: 2 C&J, Into: 4 sets: 1 C&J")
+ * has ONE merged breakdown entry holding just one block's build, and its completed sets stop
+ * there too — so a peak taken without the occurrences reports 50 under a row that reads
+ * "50-65kg". Ties keep the earliest source's lift name, so a piece whose blocks are distinct
+ * still names the lift the peak actually belongs to.
+ */
+export function getExercisePeakLoad(
+  exercise: Pick<Exercise, 'sets' | 'sections' | 'movements' | 'name'>,
+  breakdown: MovementTotal[],
+): { weight: number; movementName?: string } | null {
+  const occurrenceMovements = exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements ?? [])
+    : (exercise.movements ?? []);
+  const occurrences = new Map<string, number>();
+  for (const mov of occurrenceMovements) {
+    const key = mov.name.toLowerCase();
+    occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
+  }
+
+  const candidates: Array<{ weight: number; movementName?: string }> = [
+    ...breakdown.flatMap((movement) =>
+      (movement.weightProgression?.length
+        ? movement.weightProgression
+        : (movement.weight ?? 0) > 0 ? [movement.weight ?? 0] : []
+      ).map((weight) => ({ weight, movementName: movement.name })),
+    ),
+    ...occurrenceMovements.flatMap((mov) =>
+      (resolveOccurrenceLoad(mov, breakdown, occurrences.get(mov.name.toLowerCase()) ?? 1)?.weights ?? [])
+        .map((weight) => ({ weight, movementName: mov.name })),
+    ),
+    ...(exercise.sets ?? [])
+      .filter((set) => set.completed && (set.weight ?? 0) > 0)
+      .map((set) => ({ weight: set.weight ?? 0, movementName: undefined })),
+  ];
+
+  let best: { weight: number; movementName?: string } | null = null;
+  for (const candidate of candidates) {
+    if (candidate.weight > 0 && candidate.weight > (best?.weight ?? 0)) best = candidate;
+  }
+  return best;
 }
 
 export interface ResolvedPrescribedMovement {

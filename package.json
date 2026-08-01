@@ -1,7 +1,7 @@
 {
   "name": "wodboard",
   "private": true,
-  "version": "0.1.19",
+  "version": "0.1.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,8 @@
     "posters:update": "tsx scripts/poster-corpus.ts --update",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "corpus:record": "tsx scripts/wod-corpus.ts --record"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.16",

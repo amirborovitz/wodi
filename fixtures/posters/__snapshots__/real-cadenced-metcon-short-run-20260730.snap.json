@@ -1,0 +1,190 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Every 3:00 min x 5",
+      "blueprint": "EVERY 3 MIN · 5 rounds",
+      "rows": [
+        {
+          "primary": "200m",
+          "name": "Run",
+          "subNote": "1.00 km total",
+          "totalNote": "1.00 km total",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 5
+        },
+        {
+          "primary": "8",
+          "name": "Touch-and-go Power Cleans",
+          "nameWithLoad": "Touch-and-go Power Cleans @ 60kg",
+          "loadNote": "60kg",
+          "subNote": "40 total",
+          "totalNote": "40 total",
+          "mineKey": "Touch-and-go Power Clean",
+          "accent": "yellow",
+          "repeatCount": 5
+        },
+        {
+          "primary": "8",
+          "name": "Box Jumps",
+          "subNote": "40 total",
+          "totalNote": "40 total",
+          "mineKey": "Box Jump",
+          "accent": "magenta",
+          "repeatCount": 5
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Every 3:00 min x 5",
+        "blueprint": "EVERY 3 MIN · 5 rounds",
+        "rows": [
+          {
+            "primary": "200m",
+            "name": "Run",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 5
+          },
+          {
+            "primary": "8",
+            "name": "Touch-and-go Power Cleans",
+            "nameWithLoad": "Touch-and-go Power Cleans @ 60kg",
+            "loadNote": "60kg",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Touch-and-go Power Clean",
+            "accent": "yellow",
+            "repeatCount": 5
+          },
+          {
+            "primary": "8",
+            "name": "Box Jumps",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Box Jump",
+            "accent": "magenta",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "80",
+    "unit": "REPS",
+    "storyLine": "40 touch-and-go power clean · 40 box jump · 1.0km run",
+    "storyMovements": [
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.0km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Touch-and-go Power Clean",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 60,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Box Jump",
+        "total": "40 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "80",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "EVERY 3 MIN · 5 rounds"
+      },
+      {
+        "kind": "line",
+        "rx": "200m Run",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "1.00 km total"
+      },
+      {
+        "kind": "line",
+        "rx": "8 Touch-and-go Power Cleans",
+        "load": "",
+        "mine": "60kg",
+        "team": "",
+        "total": "40 total"
+      },
+      {
+        "kind": "line",
+        "rx": "8 Box Jumps",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "40 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "EVERY 3 MIN · 5 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Touch-and-go Power Cleans",
+          "load": "",
+          "mine": "60kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

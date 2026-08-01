@@ -94,6 +94,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "176",
   "posterRows": {
     "reward": [
       {

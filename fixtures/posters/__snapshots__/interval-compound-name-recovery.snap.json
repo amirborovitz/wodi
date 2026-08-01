@@ -92,6 +92,9 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "DISTANCE",
+  "resultValue": "4.0km",
+  "resultMeta": "ECHO BIKE",
   "posterRows": {
     "reward": [
       {

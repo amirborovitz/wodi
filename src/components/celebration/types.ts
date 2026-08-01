@@ -56,6 +56,11 @@ export interface ArtifactRow {
   // value with an EXACT map lookup on this key — never fuzzy word matching. Rows without it
   // (whiteboard-verbatim lines) fall back to word matching by design.
   mineKey?: string;
+  // This row's athlete value, resolved at row-build time and used INSTEAD of the mineKey lookup.
+  // Only for rows the name-keyed mine map cannot answer: sequential strength blocks that repeat
+  // one lift ("4×2 Clean & Jerk, then 4×1") share a single merged breakdown entry, so the map
+  // holds one value for the whole piece while each block has its own load.
+  mineOverride?: string;
   accent: 'yellow' | 'magenta' | 'cyan';
   missing?: boolean;
   stationRow?: boolean;
@@ -97,6 +102,11 @@ export interface ArtifactSection {
   title: string;
   eyebrow?: string;
   blueprint?: string;
+  // Set only on a separately-scored block of a piece (an A/B/C interval AMRAP) — the athlete's
+  // result for THIS block, rendered on the block's own header row ("BLOCK A … 5 ROUNDS").
+  // This is what keeps such a piece on ONE poster: each block shows its own score in place,
+  // instead of the piece being split into a page (and a wordmark) per block.
+  blockScore?: { value: string; unit?: string };
   // Pair-paced structure sub-line ("in pairs · swap each 200m run") — rendered as the poster
   // page's sub so an outside viewer understands the swap format. Built from the relay-flagged
   // pacer movement, never from AI prose.

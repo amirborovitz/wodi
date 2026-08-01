@@ -1,0 +1,42 @@
+{
+  "name": "real-sequential-strength-same-movement-20260729",
+  "description": "REAL saved doc (LvwftFAdQITQtyhMZmh8), verbatim — including the pre-fix section weights (both blocks stamped 40 by the old bare-name bake) alongside the correct per-block weights on movements[] (40 / 50). Sequential weightlifting build where BOTH blocks are the SAME movement at different rep counts ('4 sets E1:30: 2 Clean and Jerks, Into: 4 sets E1:30: 1 Clean and Jerk'). Each block must keep its own row — its own set count, its own rep count, its own logged load, recovered from movements[] by position for docs saved before the section fix. Collapsing them to one 'Clean and Jerk 40-50kg' row erases the whole story of the piece; the name-keyed breakdown entry (merged across both blocks) must never supply either block's load.",
+  "workout": {
+    "title": "Today Workout",
+    "format": "emom",
+    "rawText": "WEIGHTLIFTING\n4 sets, Every 01:30 minutes:\n2 Clean and Jerks\nInto:\n4 sets, Every 01:30 minutes:\n1 Clean and Jerk\n* Start at ~65% and build up weight",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Weightlifting",
+        "type": "strength",
+        "loggingMode": "emom",
+        "rounds": 4,
+        "stationRotation": true,
+        "aiPartName": "GRIND",
+        "isSecondary": false,
+        "prescription": "4 sets Every 1:30: 2 Clean and Jerks, then 4 sets Every 1:30: 1 Clean and Jerk — start at ~65% and build up weight",
+        "rawText": "4 sets, Every 01:30 minutes:\n2 Clean and Jerks\nInto:\n4 sets, Every 01:30 minutes:\n1 Clean and Jerk\n* Start at ~65% and build up weight",
+        "movements": [
+          { "name": "Clean and Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "rxWeights": { "male": 40, "female": 40, "unit": "kg" } },
+          { "name": "Clean and Jerk", "reps": 1, "inputType": "weight", "equipment": "barbell", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "rxWeights": { "male": 50, "female": 50, "unit": "kg" } }
+        ],
+        "sections": [
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Clean and Jerk", "reps": 2, "inputType": "weight", "equipment": "barbell", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "rxWeights": { "male": 40, "female": 40, "unit": "kg" } } ] },
+          { "sectionType": "rounds", "rounds": 4, "movements": [ { "name": "Clean and Jerk", "reps": 1, "inputType": "weight", "equipment": "barbell", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "rxWeights": { "male": 40, "female": 40, "unit": "kg" } } ] }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "weight": 40 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "weight": 40 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "weight": 40 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "weight": 40 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Clean and Jerk", "totalReps": 6, "weight": 40, "weightProgression": [40, 50], "unit": "kg", "color": "yellow", "implementCount": 1, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "wasSubstituted": false }
+      ]
+    }
+  }
+}

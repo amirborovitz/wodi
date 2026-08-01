@@ -14,6 +14,9 @@ import {
   POSTER_CUSTOMIZATION_EVENT,
   type PosterCustomizationEventDetail,
 } from './usePosterCustomization';
+// THE one ordering for the workout list — every consumer (gallery, home rail,
+// recaps) reads this order. Don't re-sort downstream.
+import { byNewestTrained } from '../utils/workoutDate';
 import type { Achievement, PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset, Workout, WorkoutType } from '../types';
 
 export interface WorkoutWithStats extends Workout {
@@ -184,9 +187,10 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
           const stats = calculateWorkoutStats(workout);
           return { ...workout, ...stats, isPR };
         })
-        // Filter completed workouts and sort by date (newest first)
+        // Keep the most recently TRAINED workouts — the cap has to be applied after
+        // the real-date sort, or a late-logged old board would displace a newer one.
         .filter((w) => w.status === 'completed')
-        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .sort(byNewestTrained)
         .slice(0, maxCount);
 
       console.log('Processed workouts:', fetchedWorkouts.length);
@@ -210,17 +214,22 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
       const customEvent = event as CustomEvent<PosterCustomizationEventDetail>;
       const { workoutId, update } = customEvent.detail;
 
-      setWorkouts((prev) => prev.map((workout) => {
-        if (workout.id !== workoutId) return workout;
-        return {
-          ...workout,
-          ...(update.posterSkin !== undefined ? { posterSkin: update.posterSkin } : {}),
-          ...(update.posterVibe !== undefined ? { posterVibe: update.posterVibe ?? undefined } : {}),
-          ...(update.sourceDate !== undefined ? { sourceDate: update.sourceDate } : {}),
-          ...(update.posterSticker !== undefined ? { posterSticker: update.posterSticker ?? undefined } : {}),
-          ...(update.posterVibeOffset !== undefined ? { posterVibeOffset: update.posterVibeOffset ?? undefined } : {}),
-        };
-      }));
+      setWorkouts((prev) => {
+        const next = prev.map((workout) => {
+          if (workout.id !== workoutId) return workout;
+          return {
+            ...workout,
+            ...(update.posterSkin !== undefined ? { posterSkin: update.posterSkin } : {}),
+            ...(update.posterVibe !== undefined ? { posterVibe: update.posterVibe ?? undefined } : {}),
+            ...(update.sourceDate !== undefined ? { sourceDate: update.sourceDate } : {}),
+            ...(update.posterSticker !== undefined ? { posterSticker: update.posterSticker ?? undefined } : {}),
+            ...(update.posterVibeOffset !== undefined ? { posterVibeOffset: update.posterVibeOffset ?? undefined } : {}),
+          };
+        });
+        // Correcting the date on the poster now moves the workout in the gallery, so
+        // the list has to re-order here — skin/vibe/sticker edits never affect order.
+        return update.sourceDate !== undefined ? next.sort(byNewestTrained) : next;
+      });
     };
 
     window.addEventListener(POSTER_CUSTOMIZATION_EVENT, handlePosterCustomization);

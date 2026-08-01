@@ -157,6 +157,8 @@
     ],
     "accentClass": "accentMagenta"
   },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "8",
   "posterRows": {
     "reward": null,
     "pages": [
