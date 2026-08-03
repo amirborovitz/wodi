@@ -17,6 +17,7 @@ import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { CorrectionSheet } from '../../CorrectionSheet';
 import { TextSticker } from './TextSticker';
 import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
+import { PRLift } from '../../PRLift';
 import type { PosterSticker, PosterVibeOffset } from '../../../../types';
 import { shareWorkoutCard } from '../../../../utils/shareUtils';
 import styles from './index.module.css';
@@ -154,6 +155,17 @@ export function HandwrittenFace({
       : null,
     [data, isCarousel, primaryCarouselPage, singleWod],
   );
+
+  // Slide that holds the PR's part. `pageWods` puts the summary (= the primary page) at
+  // slide 0 and drops that page from the tail, so the tail index has to skip it.
+  const prSlideIndex = useMemo((): number | null => {
+    const pageIndex = data.prCelebration?.pageIndex;
+    if (pageIndex == null || !isCarousel) return null;
+    if (pageIndex === primaryCarouselPage) return 0;
+    let slide = 1;
+    for (let i = 0; i < pageIndex; i++) if (i !== primaryCarouselPage) slide++;
+    return slide;
+  }, [data.prCelebration?.pageIndex, isCarousel, primaryCarouselPage]);
 
   const Skin = SKINS[skinIdx].Comp;
   const currentFelt = VIBE[vibe];
@@ -579,6 +591,17 @@ export function HandwrittenFace({
 
         {bottomBar}
 
+        {data.prCelebration && (
+          <PRLift
+            pr={data.prCelebration}
+            onNavigate={
+              prSlideIndex != null && prSlideIndex !== carouselPage
+                ? () => snapToPage(prSlideIndex)
+                : undefined
+            }
+          />
+        )}
+
         <DeleteActionSheet
           title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
           deleteLabel="Remove"
@@ -639,6 +662,8 @@ export function HandwrittenFace({
       </div>
 
       {bottomBar}
+
+      {data.prCelebration && <PRLift pr={data.prCelebration} />}
 
       <DeleteActionSheet
         title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}

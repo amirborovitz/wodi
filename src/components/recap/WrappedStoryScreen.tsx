@@ -2,7 +2,9 @@ import React, { useState, useRef } from 'react';
 import { BRAND, VIBE, fD, fB, fM, fH } from '../celebration/faces/HandwrittenFace/brand';
 import { Wordmark, FormatTag } from '../celebration/faces/HandwrittenFace/PosterComponents';
 import { elementToCanvas, canvasToBlob, shareImage, downloadBlob } from '../../utils/shareUtils';
-import type { RecapData, RecapFeltStat, RecapCardioStat } from '../../hooks/useRecapData';
+import type {
+  RecapData, RecapFeltStat, RecapMoveStat, RecapMoveVariant,
+} from '../../hooks/useRecapData';
 import type { VibeKey } from '../celebration/faces/HandwrittenFace/brand';
 import styles from './WrappedStoryScreen.module.css';
 
@@ -32,6 +34,163 @@ const PERSONA_MAP: Record<VibeKey, { name: string; sub: string }> = {
   chill:   { name: 'THE CRUISER',      sub: 'smooth is fast' },
 };
 
+/**
+ * The variant split under a family — "Russian 260 ████", "American 140 ██".
+ *
+ * Bars are scaled to the BIGGEST VARIANT, not to the family total. The question a
+ * split answers is "which flavour dominated", and against the total every bar in a
+ * five-way split is a stub that answers nothing.
+ *
+ * `maxRows` is lower on a card that carries three families than on one that
+ * carries a single family alone — the cap is about the card, not the movement.
+ */
+function VariantBars({ variants, color, ink = SWHITE, maxRows = 4 }: {
+  variants: RecapMoveVariant[];
+  color: string;
+  ink?: string;
+  maxRows?: number;
+}): React.JSX.Element {
+  const rows = variants.slice(0, maxRows);
+  const max = Math.max(...rows.map(v => v.reps));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {rows.map(v => (
+        <div key={v.name} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: ink, width: 92, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {v.name}
+          </span>
+          <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 900, color: ink, width: 46, textAlign: 'right' }}>
+            {v.reps.toLocaleString()}
+          </span>
+          <span style={{ flex: 1, height: 8, background: 'rgba(243,241,234,0.09)', borderRadius: 999, overflow: 'hidden' }}>
+            <span style={{ display: 'block', height: '100%', width: `${Math.max(4, (v.reps / max) * 100)}%`, background: color, borderRadius: 999 }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** "Used in 6 workouts" — the frequency axis, stated next to every family total. */
+function workoutsLine(workoutCount: number): string {
+  return `used in ${workoutCount} workout${workoutCount === 1 ? '' : 's'}`;
+}
+
+/**
+ * Families on ONE card. Three is the cap, not a target.
+ *
+ * A story card carries one idea. Five families each with their own sub-rows is
+ * thirteen numeric lines at one size — a ledger, and the thing that has to
+ * overflow or scroll to fit. Past three, it's another card.
+ */
+const MAX_FAMILIES_PER_CARD = 3;
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Yellow is the product's only accent, so it marks work that COUNTS. Grey is not
+ * the default here, it is the demotion — Core alone gets it, so a 605-rep Core row
+ * can't LOOK like the headline while ranking last.
+ */
+function familyInk(move: RecapMoveStat): { ink: string; accent: string } {
+  return move.category === 'core'
+    ? { ink: SDIM, accent: 'rgba(243,241,234,0.32)' }
+    : { ink: SWHITE, accent: BRAND.yellow };
+}
+
+/**
+ * Everything between the eyebrow and the wordmark, centered in the height that's
+ * left over.
+ *
+ * Cards used to stack content from the top and let `margin-top: auto` shove the
+ * wordmark down, which on a tall phone screen left 60% of the card as dead black
+ * below the last row. Centering the group is what makes a short card read as a
+ * considered layout instead of a list that ran out.
+ */
+function CardBody({ children, gap = 18 }: { children: React.ReactNode; gap?: number }): React.JSX.Element {
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * One family on a board card: name, total, and its variant split.
+ *
+ * Every family on a card gets THIS, identically. An earlier build gave the
+ * biggest one hero scale and demoted the rest to a different compact row style —
+ * which put two card designs on one screen with a void between them. Contrast
+ * lives inside the block (a 30px total against 11px sub-lines), not between
+ * blocks; Core's dimming is the only difference allowed, because that one carries
+ * meaning.
+ */
+function FamilyBlock({ move, first, maxRows }: {
+  move: RecapMoveStat;
+  first: boolean;
+  maxRows: number;
+}): React.JSX.Element {
+  const { ink, accent } = familyInk(move);
+
+  return (
+    <div style={{ borderTop: first ? 'none' : '1px solid rgba(243,241,234,0.12)', paddingTop: first ? 0 : 14 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ fontFamily: fB, fontSize: 16, fontWeight: 800, color: ink }}>{move.name}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontFamily: fD, fontSize: 30, fontWeight: 900, lineHeight: 0.9, color: accent }}>
+          {move.reps.toLocaleString()}
+        </span>
+        <span style={{ fontFamily: fM, fontSize: 10.5, color: SDIM }}>reps</span>
+      </div>
+      <div style={{ fontFamily: fM, fontSize: 10.5, color: 'rgba(243,241,234,0.4)', marginTop: 3 }}>
+        {workoutsLine(move.workoutCount)}
+      </div>
+      {move.variants.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <VariantBars variants={move.variants} color={accent} ink={ink} maxRows={maxRows} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The body of any family card — board pages and conditioning alike, so there is
+ * one board layout rather than one per section.
+ */
+function BoardBody({ eyebrow, moves, note }: {
+  eyebrow: string;
+  moves: RecapMoveStat[];
+  /** A closing line of context. Fills the bottom of a short card on purpose. */
+  note?: string | null;
+}): React.JSX.Element {
+  // Three families each showing four splits is twelve bar rows — the ledger
+  // again. A family alone on a card can afford all four; sharing, it can't.
+  const maxRows = moves.length > 2 ? 2 : moves.length > 1 ? 3 : 4;
+
+  return (
+    <>
+      <SEyebrow>{eyebrow}</SEyebrow>
+      <CardBody gap={16}>
+        {moves.map((m, i) => (
+          <FamilyBlock key={m.name} move={m} first={i === 0} maxRows={maxRows} />
+        ))}
+      </CardBody>
+      {note && (
+        <div style={{ fontFamily: fD, fontSize: 24, fontWeight: 900, color: SWHITE, lineHeight: 1, paddingTop: 8 }}>
+          {note}
+        </div>
+      )}
+      <SMarkFlush />
+    </>
+  );
+}
+
 function pickPersona(felt: RecapFeltStat[]): Persona {
   if (felt.length === 0) {
     return { name: 'YOU SHOWED UP', sub: "that's all that matters", vibe: 'solid', color: VIBE.solid.color, count: 0 };
@@ -59,42 +218,17 @@ function SMark({ color = SWHITE, dot = BRAND.yellow }: { color?: string; dot?: s
   );
 }
 
-// ── Cardio formatting ─────────────────────────────────────────────────────────
-// Cal and metres are never converted into each other or added together — they
-// cover different sessions. Each is rendered in the unit it was measured in.
-
-function formatDistance(metres: number): string {
-  return metres >= 1000
-    ? `${(metres / 1000).toFixed(metres >= 10000 ? 0 : 1)} km`
-    : `${Math.round(metres).toLocaleString()} m`;
-}
-
-interface CardioHeadline {
-  value: string;
-  unit: string;
-  /** The other unit's total, when the period was measured both ways. */
-  footnote: string | null;
-}
-
-function cardioHeadline(stat: RecapCardioStat): CardioHeadline {
-  const leadsWithCalories = stat.primary === 'calories';
-  const hasBoth = stat.calories > 0 && stat.distance > 0;
-  const otherSessions = leadsWithCalories ? stat.distanceSessions : stat.calorieSessions;
-  const otherTotal = leadsWithCalories
-    ? formatDistance(stat.distance)
-    : `${Math.round(stat.calories).toLocaleString()} cal`;
-
-  return {
-    value: leadsWithCalories
-      ? Math.round(stat.calories).toLocaleString()
-      : formatDistance(stat.distance).split(' ')[0],
-    unit: leadsWithCalories ? 'CAL' : formatDistance(stat.distance).split(' ')[1].toUpperCase(),
-    // Spelled out as a separate count of sessions so the two totals can never read
-    // as halves of one number — they're different days, not a split.
-    footnote: hasBoth
-      ? `+ ${otherTotal} across ${otherSessions} ${otherSessions === 1 ? 'session' : 'sessions'} you measured the other way`
-      : null,
-  };
+/**
+ * The sign-off for cards that already push their own content apart with a flex
+ * spacer. `SMark`'s `margin-top: auto` would swallow the free space before any
+ * spacer could grow, collapsing the layout it was placed to create.
+ */
+function SMarkFlush({ color = SWHITE, dot = BRAND.yellow }: { color?: string; dot?: string }): React.JSX.Element {
+  return (
+    <div style={{ paddingTop: 18 }}>
+      <Wordmark color={color} dot={dot} size={20} />
+    </div>
+  );
 }
 
 function FeltBar({ felt }: { felt: RecapFeltStat[] }): React.JSX.Element {
@@ -108,7 +242,7 @@ function FeltBar({ felt }: { felt: RecapFeltStat[] }): React.JSX.Element {
   );
 }
 
-// ── The 7 cards ───────────────────────────────────────────────────────────────
+// ── The cards ───────────────────────────────────────────────────────────────
 
 interface CardDef {
   key: string;
@@ -118,17 +252,17 @@ interface CardDef {
 
 function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement | null>): CardDef[] {
   const persona = pickPersona(data.felt);
-  const top = data.moves[0] ?? { name: '—', reps: 0 };
+  const top = data.topMove;
   const YEL = BRAND.yellow;
 
-  // Busiest machine headlines the engine card; up to two more sit under it.
-  const engine = data.cardio.length > 0
-    ? {
-        stat: data.cardio[0],
-        head: cardioHeadline(data.cardio[0]),
-        rest: data.cardio.slice(1, 3).map(stat => ({ stat, head: cardioHeadline(stat) })),
-      }
-    : null;
+  // The board carries the families the headline didn't — three to a page, so a
+  // long month becomes two cards rather than one that overflows.
+  const boardPages = chunk(data.families.filter(m => m !== top), MAX_FAMILIES_PER_CARD);
+  const conditioning = data.conditioning.slice(0, MAX_FAMILIES_PER_CARD);
+  const aerobic = data.aerobic;
+  // Three facts is both the floor and the ceiling for a card of facts: below it
+  // there's nothing on screen, above it there's a spreadsheet.
+  const highlights = data.highlights.length >= 3 ? data.highlights.slice(0, 3) : [];
 
   const cardBase: React.CSSProperties = {
     position: 'absolute',
@@ -166,84 +300,34 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 2 · REPS — full yellow
-    {
-      key: 'reps',
-      bg: YEL,
-      node: (
-        <div style={{ ...cardBase, background: YEL, color: SINK }}>
-          <SEyebrow color="rgba(0,0,0,0.6)">You knocked out</SEyebrow>
-          <div style={{ marginTop: 'auto' }}>
-            <div style={{ fontFamily: fD, fontSize: 104, fontWeight: 900, lineHeight: 0.78, letterSpacing: '-0.04em', color: SINK }}>{data.reps.toLocaleString()}</div>
-            <div style={{ fontFamily: fD, fontSize: 40, fontWeight: 900, letterSpacing: '0.02em', color: SINK, marginTop: 2 }}>REPS</div>
-          </div>
-          <div style={{ fontFamily: fB, fontSize: 17, fontWeight: 800, color: 'rgba(0,0,0,0.72)', marginTop: 18, lineHeight: 1.35 }}>{data.repsSub}</div>
-          <SMark color={SINK} dot={SINK} />
-        </div>
-      ),
-    },
-
-    // 3 · TOP MOVE
-    {
-      key: 'topmove',
-      bg: SINK,
-      node: (
-        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
-          <SEyebrow>Your #1 move was</SEyebrow>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontFamily: fD, fontSize: 58, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.01em', color: YEL, textTransform: 'uppercase' }}>{top.name}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
-              <span style={{ fontFamily: fD, fontSize: 40, fontWeight: 900, color: SWHITE }}>{top.reps.toLocaleString()}</span>
-              <span style={{ fontFamily: fB, fontSize: 15, fontWeight: 800, color: SDIM }}>reps · that's your thing</span>
-            </div>
-          </div>
-          <div style={{ marginTop: 26, display: 'flex', flexDirection: 'column', gap: 13 }}>
-            {data.moves.slice(1, 4).map((m, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 11, borderTop: '1px solid rgba(243,241,234,0.12)', paddingTop: 12 }}>
-                <span style={{ fontFamily: fM, fontSize: 13, color: 'rgba(243,241,234,0.35)' }}>{i + 2}</span>
-                <span style={{ fontFamily: fB, fontSize: 18, fontWeight: 800, color: SWHITE }}>{m.name}</span>
-                <span style={{ flex: 1 }} />
-                <span style={{ fontFamily: fD, fontSize: 22, fontWeight: 900, color: SWHITE }}>{m.reps.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-          <SMark />
-        </div>
-      ),
-    },
-
-    // 4 · THE ENGINE — cardio, in its own units. Skipped entirely when the period
-    // had no cardio: an empty engine card is dead space in a 7-card story.
-    ...(engine ? [{
+    // 2 · ENGINE MODE — the aerobic hero, at the same scale as tonnage and early
+    // in the deck. This number used to be an 11px footnote under the conditioning
+    // card; for a lot of months it's the biggest thing that happened.
+    ...(aerobic ? [{
       key: 'engine',
       bg: SINK,
       node: (
         <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
-          <SEyebrow>Your engine ran</SEyebrow>
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontFamily: fD, fontSize: 58, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.01em', color: SWHITE, textTransform: 'uppercase' }}>
-              {engine.stat.name}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 9, marginTop: 8 }}>
-              <span style={{ fontFamily: fD, fontSize: 86, fontWeight: 900, lineHeight: 0.8, letterSpacing: '-0.03em', color: YEL }}>{engine.head.value}</span>
-              <span style={{ fontFamily: fD, fontSize: 32, fontWeight: 900, color: YEL }}>{engine.head.unit}</span>
-            </div>
-            {engine.head.footnote && (
-              <div style={{ fontFamily: fB, fontSize: 13, fontWeight: 700, color: SDIM, marginTop: 10, lineHeight: 1.35 }}>
-                {engine.head.footnote}
+          <SEyebrow color={YEL}>Engine mode</SEyebrow>
+          <div style={{ marginTop: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <div style={{ fontFamily: fD, fontSize: 96, fontWeight: 900, lineHeight: 0.78, letterSpacing: '-0.03em', color: YEL, textShadow: `0 0 30px ${YEL}33` }}>
+                {aerobic.value}
               </div>
-            )}
+              <div style={{ fontFamily: fD, fontSize: 32, fontWeight: 900, color: YEL }}>{aerobic.unit}</div>
+            </div>
+            <div style={{ fontFamily: fB, fontSize: 15, fontWeight: 800, color: SWHITE, marginTop: 4 }}>
+              on the {aerobic.machine} alone
+            </div>
           </div>
-          {engine.rest.length > 0 && (
-            <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {engine.rest.map(({ stat, head }) => (
-                <div key={stat.name} style={{ display: 'flex', alignItems: 'baseline', gap: 11, borderTop: '1px solid rgba(243,241,234,0.12)', paddingTop: 11 }}>
-                  <span style={{ fontFamily: fB, fontSize: 17, fontWeight: 800, color: SWHITE }}>{stat.name}</span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ fontFamily: fD, fontSize: 21, fontWeight: 900, color: SWHITE }}>{head.value}</span>
-                  <span style={{ fontFamily: fM, fontSize: 12, color: SDIM }}>{head.unit.toLowerCase()}</span>
-                </div>
-              ))}
+          <div style={{ fontFamily: fD, fontSize: 26, fontWeight: 900, color: SWHITE, marginTop: 18, lineHeight: 1 }}>
+            {aerobic.compare}
+          </div>
+          {/* Every other aerobic number, each in the unit it was measured in —
+              never summed into the hero, never converted into it. */}
+          {aerobic.rest && (
+            <div style={{ fontFamily: fB, fontSize: 13.5, fontWeight: 700, color: SDIM, marginTop: 10 }}>
+              {aerobic.rest}
             </div>
           )}
           <SMark />
@@ -251,7 +335,56 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     }] : []),
 
-    // 5 · PERSONA — full-bleed dominant vibe color
+    // 3 · THE HEADLINE FAMILY — never a conditioning movement, by construction.
+    // Skipped when nothing in the period resolved to a family we know: an empty
+    // "your #1 move was —" is worse than one card fewer.
+    ...(top ? [{
+      key: 'topmove',
+      bg: SINK,
+      node: (
+        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
+          <SEyebrow>Your #1 move was</SEyebrow>
+          {/* Name, count and breakdown center as ONE group. Stacked from the top
+              they crammed into the first third and left the rest of the card black. */}
+          <CardBody gap={22}>
+            <div>
+              <div style={{ fontFamily: fD, fontSize: 58, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.01em', color: YEL, textTransform: 'uppercase' }}>{top.name}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+                <span style={{ fontFamily: fD, fontSize: 40, fontWeight: 900, color: SWHITE }}>{top.reps.toLocaleString()}</span>
+                <span style={{ fontFamily: fB, fontSize: 15, fontWeight: 800, color: SDIM }}>reps · {workoutsLine(top.workoutCount)}</span>
+              </div>
+            </div>
+            {top.variants.length > 0 && (
+              <div>
+                <SEyebrow>How you did them</SEyebrow>
+                <div style={{ marginTop: 11 }}>
+                  <VariantBars variants={top.variants} color={YEL} />
+                </div>
+              </div>
+            )}
+          </CardBody>
+          <SMarkFlush />
+        </div>
+      ),
+    }] : []),
+
+    // 4 · THE FAMILY BOARD, PAGE 1 — at most three families, the biggest of them
+    // at hero scale. Never a scrolling list: page 2 exists for exactly this reason.
+    ...(boardPages[0] ? [{
+      key: 'families-1',
+      bg: SINK,
+      node: (
+        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
+          <BoardBody eyebrow="What else defined it" moves={boardPages[0]} />
+        </div>
+      ),
+    }] : []),
+
+    // 5 · PERSONA — full-bleed dominant vibe color.
+    //
+    // Positioned HERE on purpose: it is the colour break between the two board
+    // pages, so the deck never runs two list cards back to back. Move it and the
+    // middle of the story goes flat.
     {
       key: 'persona',
       bg: persona.color,
@@ -276,28 +409,58 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
       ),
     },
 
-    // 6 · TONNAGE
-    {
-      key: 'tonnage',
+    // 6 · THE FAMILY BOARD, PAGE 2 — the families page 1 couldn't hold, same shape.
+    // Core lands here when it's on the board at all: last page, last row, dimmed.
+    ...(boardPages[1] ? [{
+      key: 'families-2',
       bg: SINK,
       node: (
         <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
-          <SEyebrow>All in, you moved</SEyebrow>
+          <BoardBody eyebrow="…and defined it" moves={boardPages[1]} />
+        </div>
+      ),
+    }] : []),
+
+    // 7 · TONNAGE — the deck's full-bleed yellow card. Black → colour → black is
+    // the rhythm; without it every screen after the cover is white-on-black and
+    // the whole thing reads as one long document.
+    {
+      key: 'tonnage',
+      bg: YEL,
+      node: (
+        <div style={{ ...cardBase, background: YEL, color: SINK, backgroundImage: 'radial-gradient(130% 80% at 50% -10%, rgba(255,255,255,0.28), transparent 55%)' }}>
+          <SEyebrow color="rgba(0,0,0,0.6)">All in, you moved</SEyebrow>
           <div style={{ marginTop: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <div style={{ fontFamily: fD, fontSize: 86, fontWeight: 900, lineHeight: 0.8, letterSpacing: '-0.03em', color: YEL }}>{data.tonnage.toLocaleString()}</div>
-              <div style={{ fontFamily: fD, fontSize: 34, fontWeight: 900, color: YEL }}>KG</div>
+              <div style={{ fontFamily: fD, fontSize: 100, fontWeight: 900, lineHeight: 0.78, letterSpacing: '-0.04em', color: SINK }}>{data.tonnage.toLocaleString()}</div>
+              <div style={{ fontFamily: fD, fontSize: 38, fontWeight: 900, color: SINK }}>KG</div>
             </div>
           </div>
-          <div style={{ fontFamily: fD, fontSize: 30, fontWeight: 900, color: SWHITE, marginTop: 18, lineHeight: 0.95 }}>{data.tonnageComp}</div>
-          <div style={{ fontFamily: fB, fontSize: 15, fontWeight: 700, color: SDIM, marginTop: 10 }}>one rep at a time.</div>
-          <SMark />
+          <div style={{ fontFamily: fD, fontSize: 30, fontWeight: 900, color: 'rgba(0,0,0,0.8)', marginTop: 18, lineHeight: 0.95 }}>{data.tonnageComp}</div>
+          <div style={{ fontFamily: fB, fontSize: 15, fontWeight: 800, color: 'rgba(0,0,0,0.6)', marginTop: 10 }}>one rep at a time.</div>
+          <SMark color={SINK} dot={SINK} />
         </div>
       ),
     },
 
-    // 7 · BIGGEST LIFT — PR as celebration
-    {
+    // 8 · CONDITIONING VOLUME — the rep counts that are naturally an order of
+    // magnitude bigger, on their own card so the scale means something. Cardio is
+    // NOT here: it has the engine card, in its own units. Skipped when empty.
+    ...(conditioning.length > 0 ? [{
+      key: 'conditioning',
+      bg: SINK,
+      node: (
+        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
+          <BoardBody eyebrow="Conditioning volume" moves={conditioning} note={data.conditioningNote} />
+        </div>
+      ),
+    }] : []),
+
+    // 9 · BIGGEST LIFT — PR as celebration. The delta is what makes it one: a bare
+    // "50kg" next to a five-figure tonnage card reads smaller than it was, and
+    // "up from 45kg" is the same fact told so a stranger can see the jump.
+    // Skipped when there was no PR — an empty card with a dash in it is not one.
+    ...(data.heaviest ? [{
       key: 'pr',
       bg: SINK,
       node: (
@@ -305,23 +468,52 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
           <SEyebrow color={R_GREEN}>New personal best</SEyebrow>
           <div style={{ marginTop: 'auto' }}>
             <div style={{ fontFamily: fD, fontSize: 52, fontWeight: 900, lineHeight: 0.86, color: SWHITE, textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
-              {data.heaviest?.move ?? 'Strength PR'}
+              {data.heaviest.move}
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
               <span style={{ fontFamily: fD, fontSize: 72, fontWeight: 900, color: R_GREEN, lineHeight: 0.8 }}>
-                {data.heaviest?.value ?? '—'}
+                {data.heaviest.value}
               </span>
             </div>
           </div>
           <div style={{ fontFamily: fD, fontSize: 26, fontWeight: 900, color: SWHITE, marginTop: 18, lineHeight: 0.98 }}>
-            heavier than you've ever pulled.
+            {data.prDelta ?? "heavier than you've ever pulled."}
           </div>
           <SMark />
         </div>
       ),
-    },
+    }] : []),
 
-    // 8 · FINALE — the shareable card
+    // 10 · THIS MONTH — facts on different axes, each stating its own measure so no
+    // two lines read as one ranking. Capped at three, with the first at hero scale:
+    // five equal label/value pairs in a black void is the emptiest slide there is.
+    ...(highlights.length > 0 ? [{
+      key: 'highlights',
+      bg: SINK,
+      node: (
+        <div style={{ ...cardBase, background: SINK, color: SWHITE }}>
+          <SEyebrow color={YEL}>This {data.scope}</SEyebrow>
+          {/* Three facts, one treatment, centered as a group — same rule as the
+              board cards. Contrast is inside a fact, never between facts. */}
+          <CardBody gap={26}>
+            {highlights.map(h => (
+              <div key={h.kind}>
+                <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.11em', textTransform: 'uppercase', color: SDIM }}>
+                  {h.label}
+                </div>
+                <div style={{ fontFamily: fD, fontSize: 38, fontWeight: 900, lineHeight: 0.9, letterSpacing: '-0.01em', color: SWHITE, marginTop: 4 }}>
+                  {h.subject}
+                </div>
+                <div style={{ fontFamily: fM, fontSize: 12.5, color: YEL, marginTop: 3 }}>{h.detail}</div>
+              </div>
+            ))}
+          </CardBody>
+          <SMarkFlush />
+        </div>
+      ),
+    }] : []),
+
+    // 10 · FINALE — the shareable card
     {
       key: 'finale',
       bg: SINK,
@@ -340,22 +532,43 @@ function buildCards(data: RecapData, finaleRef: React.RefObject<HTMLDivElement |
             {persona.name.toLowerCase()}
           </div>
 
-          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM }}>TOTAL REPS</div>
-              <div style={{ fontFamily: fD, fontSize: 44, fontWeight: 900, color: YEL, lineHeight: 0.85 }}>{data.reps.toLocaleString()}</div>
+          <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 13 }}>
+            {top && (
+              <div>
+                <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM }}>TOP MOVE</div>
+                <div style={{ fontFamily: fD, fontSize: 30, fontWeight: 900, color: SWHITE, lineHeight: 0.9, marginTop: 3 }}>{top.name}</div>
+                <div style={{ fontFamily: fD, fontSize: 40, fontWeight: 900, color: YEL, lineHeight: 0.85, marginTop: 2 }}>{top.reps.toLocaleString()}</div>
+              </div>
+            )}
+            {/* The same families as the board pages, in the same order — the cards
+                must agree, so both read off `data.families` rather than re-picking. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 16, rowGap: 8 }}>
+              {boardPages.flat().slice(0, 4).map(m => (
+                <div key={m.name}>
+                  <div style={{ fontFamily: fM, fontSize: 10.5, color: SDIM, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</div>
+                  <div style={{ fontFamily: fD, fontSize: 19, fontWeight: 900, color: SWHITE, lineHeight: 0.95 }}>{m.reps.toLocaleString()}</div>
+                </div>
+              ))}
             </div>
             <div style={{ display: 'flex', gap: 20 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM }}>TOP MOVE</div>
-                <div style={{ fontFamily: fD, fontSize: 24, fontWeight: 900, color: SWHITE, lineHeight: 0.9, marginTop: 2 }}>{top.name}</div>
-                <div style={{ fontFamily: fM, fontSize: 12, color: SDIM, marginTop: 2 }}>{top.reps.toLocaleString()} reps</div>
-              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM }}>MOVED</div>
                 <div style={{ fontFamily: fD, fontSize: 24, fontWeight: 900, color: SWHITE, lineHeight: 0.9, marginTop: 2 }}>{data.tonnage.toLocaleString()} kg</div>
                 <div style={{ fontFamily: fM, fontSize: 12, color: SDIM, marginTop: 2 }}>{data.workouts} workouts</div>
               </div>
+              {/* The engine number is a headline flex, so it stands beside tonnage
+                  here rather than being left off the one card that leaves the app. */}
+              {data.aerobic && (
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM }}>ENGINE</div>
+                  <div style={{ fontFamily: fD, fontSize: 24, fontWeight: 900, color: SWHITE, lineHeight: 0.9, marginTop: 2 }}>
+                    {data.aerobic.value} {data.aerobic.unit.toLowerCase()}
+                  </div>
+                  <div style={{ fontFamily: fM, fontSize: 12, color: SDIM, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {data.aerobic.machine}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <div style={{ fontFamily: fB, fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', color: SDIM, marginBottom: 8 }}>HOW IT FELT</div>

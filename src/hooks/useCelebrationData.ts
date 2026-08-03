@@ -128,6 +128,23 @@ export interface CarouselPage {
   isStrength: boolean;
 }
 
+/**
+ * The transient post-save PR moment. Non-null ONLY in reward mode — re-opening a
+ * workout from history must not replay the celebration. Resolved here rather than in
+ * the face so `isReward` never becomes a rendering condition downstream.
+ *
+ * `pageIndex` indexes `carouselPageData` (the part the PR belongs to), not the poster's
+ * slide order — the face owns that mapping.
+ */
+export interface PRCelebration {
+  movement: string;
+  value: number;
+  previousBest?: number;
+  isFirstEver: boolean;
+  extraCount: number;
+  pageIndex: number | null;
+}
+
 export interface CelebrationData {
   // Raw inputs normalised from both modes
   exercises: Exercise[];
@@ -177,6 +194,7 @@ export interface CelebrationData {
 
   // Achievements & ladder
   activeAchievements: Achievement[] | undefined;
+  prCelebration: PRCelebration | null;
   ladderData: { ladderReps: number[]; ladderStep: number } | null;
   ladderSecondSticker: HighlightStampData | null;
 
@@ -1116,6 +1134,36 @@ export function useCelebrationData(
     rawText,
   ]);
 
+  // ── PR celebration (transient, reward mode only) ──────────────────────────
+  // The landing slide is deliberately the metcon (getPrimaryCarouselPageIndex), and the
+  // poster's PR badge is page-scoped, so a strength PR is otherwise unreachable in the
+  // moment it happens. This drives a session-level overlay above the poster.
+
+  const prCelebration = useMemo((): PRCelebration | null => {
+    if (!isReward) return null;
+
+    const prs = (activeAchievements ?? []).filter(
+      (a) => a.type === 'pr' && a.movement && typeof a.value === 'number',
+    );
+    if (prs.length === 0) return null;
+
+    // Biggest lift leads. Ties keep detection order so the hero stays stable across renders.
+    const best = prs.reduce((top, a) => ((a.value ?? 0) > (top.value ?? 0) ? a : top), prs[0]);
+
+    const pageIndex = carouselPageData?.findIndex((page) =>
+      achievementMatchesMovementList(best, page.movements),
+    );
+
+    return {
+      movement: best.movement!,
+      value: best.value!,
+      previousBest: best.previousBest,
+      isFirstEver: best.previousBest == null,
+      extraCount: prs.length - 1,
+      pageIndex: pageIndex != null && pageIndex >= 0 ? pageIndex : null,
+    };
+  }, [isReward, activeAchievements, carouselPageData]);
+
   // ── Footer stats ──────────────────────────────────────────────────────────
 
   const recordedCompletionSeconds =
@@ -1192,6 +1240,7 @@ export function useCelebrationData(
     repsSplit,
     showTime,
     activeAchievements,
+    prCelebration,
     ladderData,
     ladderSecondSticker,
     activeBreakdown,

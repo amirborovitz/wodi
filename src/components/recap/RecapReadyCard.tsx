@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BRAND, VIBE, fD, fB } from '../celebration/faces/HandwrittenFace/brand';
 import { RecapPeek } from './RecapPeek';
+import { getTopMoveLine } from '../../hooks/useRecapData';
 import type { RecapData } from '../../hooks/useRecapData';
 import styles from './RecapReadyCard.module.css';
 
@@ -16,8 +17,8 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
   const isSeason = data.scope === 'season';
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   const metaLine = data.felt.length > 0
-    ? `${data.reps.toLocaleString()} reps - mostly ${VIBE[data.felt[0].vibe].label.toLowerCase()}`
-    : `${data.reps.toLocaleString()} reps - ${data.workouts} workouts`;
+    ? `${getTopMoveLine(data)} - mostly ${VIBE[data.felt[0].vibe].label.toLowerCase()}`
+    : `${getTopMoveLine(data)} - ${data.workouts} workouts`;
 
   const handleDismissClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();

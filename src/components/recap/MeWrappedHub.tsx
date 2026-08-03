@@ -1,7 +1,7 @@
 import React from 'react';
 import { BRAND, fD, fB, fM } from '../celebration/faces/HandwrittenFace/brand';
 import { RecapPeek } from './RecapPeek';
-import { getPersonaName } from '../../hooks/useRecapData';
+import { getPersonaName, getTopMoveLine } from '../../hooks/useRecapData';
 import type { RecapData } from '../../hooks/useRecapData';
 import styles from './MeWrappedHub.module.css';
 
@@ -35,7 +35,7 @@ function FeaturedTile({ data, isNew, onOpen }: TileProps): React.JSX.Element {
           </span>
           <div className={styles.featuredPeriod} style={{ fontFamily: fD }}>{data.period}</div>
           <div className={styles.featuredMeta} style={{ fontFamily: fB }}>
-            {data.reps.toLocaleString()} reps · {getPersonaName(data)}
+            {getTopMoveLine(data)} · {getPersonaName(data)}
           </div>
           <span className={styles.featuredCta} style={{ fontFamily: fB }}>
             Open recap
@@ -62,7 +62,7 @@ function GridTile({ data, isNew, onOpen }: TileProps): React.JSX.Element {
       <div className={styles.gridCaption}>
         <div className={styles.gridPeriod} style={{ fontFamily: fD }}>{data.period}</div>
         <div className={styles.gridMeta} style={{ fontFamily: fB }}>
-          {data.reps.toLocaleString()} reps · {getPersonaName(data)}
+          {getTopMoveLine(data)} · {getPersonaName(data)}
         </div>
       </div>
     </button>

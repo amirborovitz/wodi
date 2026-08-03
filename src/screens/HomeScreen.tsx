@@ -66,7 +66,7 @@ export function HomeScreen({
   const { user } = useAuth();
   const { workouts, loading, refresh, deleteWorkout } = useWorkouts(100);
   const { planned } = usePlannedWorkouts();
-  const { monthRecap, seasonRecap } = useRecapData(workouts);
+  const { monthRecap, seasonRecap } = useRecapData(workouts, user?.id);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // Show season recap if this is a quarter-start month (Jan/Apr/Jul/Oct) + day ≤ 7; else month recap.

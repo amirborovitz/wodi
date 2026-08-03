@@ -1,6 +1,70 @@
 import { describe, it, expect } from 'vitest';
-import { calculateWorkloadBreakdown } from './workloadCalculation';
+import { calculateWorkloadBreakdown, isTeamPrescribedExercise } from './workloadCalculation';
 import type { ParsedWorkout } from '../types';
+
+describe('isTeamPrescribedExercise', () => {
+  const team = (name: string, prescription: string, sole = false) =>
+    isTeamPrescribedExercise({ name, prescription } as never, 0.5, sole);
+
+  it('trusts the per-exercise partnerWorkout the AI set, over any text', () => {
+    // The AI is prompted for this per block and the post-processor backfills it.
+    // An explicit false on a solo block must win even when the text screams partner.
+    expect(isTeamPrescribedExercise(
+      { name: 'Partner 14 RFT (7 each)', prescription: 'in pairs, I go you go', partnerWorkout: false } as never,
+      0.5, false,
+    )).toBe(false);
+    // ...and an explicit true wins even when the text carries no keyword at all.
+    expect(isTeamPrescribedExercise(
+      { name: 'Metcon', prescription: '8 rounds: 5 Power Clean', partnerWorkout: true } as never,
+      0.5, false,
+    )).toBe(true);
+    // A sole exercise does not override an explicit false either.
+    expect(isTeamPrescribedExercise(
+      { name: 'Metcon', prescription: '21-15-9', partnerWorkout: false } as never,
+      0.5, true,
+    )).toBe(false);
+  });
+
+  it('reads the partner marker out of the NAME when the AI field is absent', () => {
+    // Both are real boards whose reps were stored as the PAIR's total. The parser
+    // puts "Partner ... (N each)" in the name and emits a per-person prescription
+    // with no keyword, so a prescription-only test saw solo work.
+    expect(team('Partner 16 RFT (8 each)', '8 rounds each: 5 twin KB Power Clean, 5 twin KB Front Squats')).toBe(true);
+    expect(team('Partner 14 RFT (7 each)', '14 RFT (7 each): 5 Deadlift, 5 Power Clean')).toBe(true);
+  });
+
+  it('still detects the keyword when it IS in the prescription', () => {
+    expect(team('Metcon', 'In pairs, I go you go: 80 twin Kettlebell Clean and Jerk')).toBe(true);
+    expect(team('WOD', 'Teams of 2: 100 wall balls')).toBe(true);
+    expect(team('WOD', 'IGUG for time')).toBe(true);
+  });
+
+  it('leaves solo blocks inside a partner session alone', () => {
+    // Halving these would undercount work the athlete did in full — every one of
+    // these sat in a session whose metcon WAS shared.
+    expect(team('Double Unders', 'EMOM for 8 minutes: "X" Double Under')).toBe(false);
+    expect(team('Barbell Good Morning', '4 sets: (@R.P.E 7-8) 8 Barbell Good Morning')).toBe(false);
+    expect(team('Dips (rings / parallettes)', '4 sets: (@R.P.E 7-8) 8 Dips')).toBe(false);
+    expect(team('Skill Practice', '4 sets: 1 legless rope climb / 7 strict pull ups')).toBe(false);
+    expect(team('Core Tabata', 'Core TABATA: 1. Flutter kicks 2. Hollow rocks')).toBe(false);
+  });
+
+  it('treats a lone exercise as team work, since nothing else carries the signal', () => {
+    expect(team('Metcon', '21-15-9 thrusters and pull-ups', true)).toBe(true);
+  });
+
+  it('never splits anything in a solo session', () => {
+    expect(isTeamPrescribedExercise(
+      { name: 'Partner 16 RFT (8 each)', prescription: 'in pairs' } as never, 1, false,
+    )).toBe(false);
+  });
+
+  it('does not mistake a per-side rep scheme for a partner split', () => {
+    // "10 each side" is one athlete's own work, not a pair's total.
+    expect(team('Lunge', '3 sets of 10 each side')).toBe(false);
+    expect(team('Single Arm Press', '8 reps each arm')).toBe(false);
+  });
+});
 
 // A deliberately simple, fully-predictable workout: 3 rounds (containerRounds) of two weighted
 // movements, no sections/stations. This pins the core rep × round and twin-implement volume math

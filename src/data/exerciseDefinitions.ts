@@ -454,9 +454,45 @@ const BENCHMARK_NAMES = [
   'fran', 'murph', 'grace', 'diane', 'helen', 'elizabeth',
   'isabel', 'jackie', 'karen', 'linda', 'nancy', 'annie',
   'dt', 'cindy', 'mary', 'amanda', 'barbara', 'chelsea',
-  'eva', 'filthy fifty', 'fight gone bad', 'kelly',
+  'eva', 'filthy fifty', 'fight gone bad', 'kelly', 'lynne',
   'king kong', 'the chief', 'nate', 'randy',
 ];
+
+// The benchmarks whose RECORD is a clock — a faster time beats a slower one. The rest are
+// scored in rounds (Cindy, Mary, Nate, The Chief) or reps (Fight Gone Bad, Lynne), so a
+// duration on those docs is elapsed session time, not a result, and must never rank them.
+const FOR_TIME_BENCHMARKS = new Set([
+  'fran', 'grace', 'diane', 'helen', 'elizabeth', 'isabel', 'jackie', 'karen',
+  'linda', 'nancy', 'annie', 'dt', 'amanda', 'barbara', 'eva', 'kelly',
+  'filthy fifty', 'murph', 'randy', 'king kong',
+]);
+
+// Names whose title case isn't just capitalised words.
+const BENCHMARK_DISPLAY_OVERRIDES: Record<string, string> = { dt: 'DT' };
+
+// Longest first, so a multi-word name ("fight gone bad") is tested before any single
+// word inside it could claim the title.
+const SORTED_BENCHMARK_NAMES = [...BENCHMARK_NAMES].sort((a, b) => b.length - a.length);
+
+/**
+ * The benchmark WOD a workout title names, or null. Matched on word boundaries so
+ * "Fran (scaled)" and "Benchmark: DT" both resolve while "Wednesday" never yields "DT".
+ * Returns the display-cased name ("Fran", "DT", "Fight Gone Bad").
+ */
+export function matchBenchmarkName(title: string): string | null {
+  const lower = title.toLowerCase().trim();
+  for (const name of SORTED_BENCHMARK_NAMES) {
+    if (new RegExp(`\\b${escapeRegex(name)}\\b`, 'i').test(lower)) {
+      return BENCHMARK_DISPLAY_OVERRIDES[name] ?? toTitleCase(name);
+    }
+  }
+  return null;
+}
+
+/** True when this benchmark is scored by total time (a faster clock is the better record). */
+export function isForTimeBenchmark(name: string): boolean {
+  return FOR_TIME_BENCHMARKS.has(name.toLowerCase().trim());
+}
 
 export function getMovementCategory(name: string): MovementCategory {
   const lower = name.toLowerCase().trim();
@@ -560,154 +596,4 @@ export function getCanonicalLiftName(name: string): string {
   }
 
   return toTitleCase(normalized);
-}
-
-// ============================================
-// MOVEMENT FAMILIES (for recaps)
-//
-// A recap answers "what did I do a LOT of this month", not "which exact
-// variant on which day". Push Press, Push Jerk, Split Jerk and Strict Press
-// are all Shoulder to Overhead; Power / Squat / Hang Clean and the Clean &
-// Jerk are all Clean; Back / Front / Overhead / Air Squat are all Squat.
-// Split across five rows nobody's #1 move ever looks like their #1 move.
-//
-// This is deliberately COARSER than getCanonicalLiftName (which keeps the
-// variants apart, because a Power Clean PR is not a Squat Clean PR).
-// ============================================
-
-interface MovementFamily {
-  /** Display name shown on the recap card. */
-  name: string;
-  /** Matched as whole words against the separator-normalized movement name. */
-  aliases?: string[];
-  /**
-   * Names that only read as this family when they are the ENTIRE name. "Row" on
-   * its own is the erg; "Bent Over Row", "DB Row", "Ring Row" are barbell work.
-   * No word-boundary alias can tell those apart, so the erg matches exactly.
-   */
-  exact?: string[];
-}
-
-// ORDER IS THE RULE: first family whose alias matches wins, so a family must
-// sit above any family that would also swallow its names. "Squat Clean" has to
-// meet Clean before Squat; "Burpee Box Jump Over" has to meet Burpee before Box
-// Jump; "Handstand Push-up" has to meet HSPU before Push-up.
-const MOVEMENT_FAMILIES: MovementFamily[] = [
-  // Compound/branded movements first — they contain words other families claim.
-  { name: 'Devil Press', aliases: ['devil press'] },
-  { name: 'Man Maker', aliases: ['man maker', 'manmaker'] },
-  { name: 'Wall Walk', aliases: ['wall walk'] },
-  { name: 'Handstand Push-up', aliases: ['handstand push up', 'handstand pushup', 'hspu'] },
-  { name: 'Handstand Walk', aliases: ['handstand walk', 'handstand hold', 'handstand'] },
-  { name: 'Muscle-up', aliases: ['muscle up', 'muscleup', 'bmu', 'rmu'] },
-
-  // Barbell lifts. Bare roots ('clean', 'snatch') intentionally catch every
-  // grip/height/implement variant: hang, power, squat, muscle, DB, KB.
-  { name: 'Clean', aliases: ['clean', 'c&j', 'cnj'] },
-  { name: 'Snatch', aliases: ['snatch'] },
-  { name: 'Thruster', aliases: ['thruster'] },
-  {
-    name: 'Shoulder to Overhead',
-    // No bare 'press' — that would swallow Bench / Floor / Leg / Devil Press.
-    aliases: [
-      'shoulder to overhead', 'shoulder 2 overhead', 's2o', 'sto',
-      'jerk',
-      'push press', 'strict press', 'shoulder press', 'military press',
-      'overhead press', 'ohp', 'z press', 'seated press',
-      'behind the neck press', 'press behind the neck',
-      'db press', 'dumbbell press', 'kb press', 'kettlebell press',
-    ],
-  },
-  { name: 'Pistol', aliases: ['pistol', 'single leg squat'] },
-  { name: 'Squat', aliases: ['squat', 'ohs'] },
-  { name: 'Deadlift', aliases: ['deadlift', 'dead lift', 'dl', 'rdl', 'sdhp'] },
-  { name: 'Bench Press', aliases: ['bench press', 'bench'] },
-
-  // Gymnastics / bodyweight.
-  { name: 'Pull-up', aliases: ['pull up', 'pullup', 'chest to bar', 'c2b', 'ctb'] },
-  { name: 'Toes to Bar', aliases: ['toes to bar', 'toes 2 bar', 't2b', 'ttb'] },
-  { name: 'Push-up', aliases: ['push up', 'pushup', 'hrpu'] },
-  { name: 'Dip', aliases: ['dip'] },
-  { name: 'Burpee', aliases: ['burpee'] },
-  { name: 'Box Jump', aliases: ['box jump', 'bjo'] },
-  { name: 'Step-up', aliases: ['step up', 'stepup'] },
-  { name: 'Rope Climb', aliases: ['rope climb'] },
-  { name: 'Sit-up', aliases: ['sit up', 'situp'] },
-  { name: 'Double Under', aliases: ['double under', 'du', 'dubs'] },
-  { name: 'Single Under', aliases: ['single under', 'su'] },
-  { name: 'Ring Row', aliases: ['ring row'] },
-
-  // Loaded accessories.
-  { name: 'Wall Ball', aliases: ['wall ball', 'wallball'] },
-  {
-    name: 'Kettlebell Swing',
-    // DB Swing keeps its own name — calling it a kettlebell swing would be a lie.
-    aliases: [
-      'kettlebell swing', 'kb swing', 'american swing', 'russian swing',
-      'aks', 'akbs', 'rks', 'rkbs',
-    ],
-  },
-  { name: 'Lunge', aliases: ['lunge'] },
-  { name: 'Curl', aliases: ['curl'] },
-  { name: 'Turkish Get-up', aliases: ['turkish get up', 'tgu'] },
-
-  // Cardio machines. Every bike is one Bike; the recap measures these in their
-  // own units (cal / distance), never in reps, so they never reach the top-move
-  // card — but they DO need rolling up for the engine card.
-  { name: 'Bike', aliases: ['bike', 'bikeerg', 'echo', 'assault', 'airdyne'] },
-  { name: 'Ski', aliases: ['ski', 'skierg'] },
-  { name: 'Run', aliases: ['run', 'running', 'sprint', 'jog', 'air runner', 'airrunner', 'treadmill'] },
-  { name: 'Swim', aliases: ['swim'] },
-  { name: 'Row', exact: ['row', 'rows', 'rowing', 'rower', 'row erg', 'rowerg', 'erg', 'concept 2', 'concept2', 'c2'] },
-];
-
-/** Lowercase and flatten every separator so "Pull-up", "pull up" and "Pull/Up" all match one alias. */
-function normalizeForFamily(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[-_/+&]/g, match => (match === '&' ? ' & ' : ' '))
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Boards pluralize freely ("21 Thrusters", "Pullups", "50 Squats"), so every
-// alias matches its own plural too — a bare `\bsquat\b` misses "Squats" entirely.
-const COMPILED_FAMILIES: { name: string; patterns: RegExp[]; exact: Set<string> }[] =
-  MOVEMENT_FAMILIES.map(family => ({
-    name: family.name,
-    patterns: (family.aliases ?? []).map(
-      alias => new RegExp(`\\b${escapeRegex(normalizeForFamily(alias))}(?:e?s)?\\b`, 'i')
-    ),
-    exact: new Set((family.exact ?? []).map(normalizeForFamily)),
-  }));
-
-/**
- * Roll a movement name up to its recap FAMILY — the headline movement an athlete
- * would name out loud ("Shoulder to Overhead", "Clean", "Squat"), merging every
- * grip/height/implement variant into it.
- *
- * Unknown movements fall through to their own name unchanged: the stored names
- * already went through `normalizeMovementName` at save time, so an unmatched
- * movement is still a clean display label — and inventing a family for it would
- * be a guess. Use `getCanonicalLiftName` instead wherever variants must stay
- * apart (PRs, records).
- */
-export function getMovementFamily(name: string): string {
-  const normalized = normalizeForFamily(name);
-  if (!normalized) return name.trim();
-
-  for (const family of COMPILED_FAMILIES) {
-    if (family.exact.has(normalized)) return family.name;
-    if (family.patterns.some(pattern => pattern.test(normalized))) return family.name;
-  }
-
-  return name.trim();
-}
-
-/** Cardio families, which the recap measures in distance/calories rather than reps. */
-const CARDIO_FAMILIES = new Set(['Bike', 'Row', 'Ski', 'Run', 'Swim']);
-
-/** True when a movement's story is told in metres or calories, not reps. */
-export function isCardioFamily(family: string): boolean {
-  return CARDIO_FAMILIES.has(family);
 }

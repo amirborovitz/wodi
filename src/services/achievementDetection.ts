@@ -1,4 +1,4 @@
-import type { Achievement, Exercise, PersonalRecord, Workout } from '../types';
+import type { Achievement, Exercise, MovementEquipment, PersonalRecord, Workout } from '../types';
 import { getCanonicalLiftName } from '../data/exerciseDefinitions';
 
 interface AchievementContext {
@@ -75,8 +75,7 @@ export async function detectBestAchievement(
 
 /**
  * PR-eligible movement patterns — only barbell/major lifts.
- * Accessory movements (step-ups, lunges with plate, weighted runs) get
- * weight inputs for logging but are NOT PR-worthy.
+ * Used when the AI gave us no implement classification (legacy docs).
  */
 const PR_ELIGIBLE_PATTERNS = [
   'deadlift', 'clean', 'jerk', 'snatch', 'squat', 'press',
@@ -84,13 +83,26 @@ const PR_ELIGIBLE_PATTERNS = [
   'bench', 'curl',
 ];
 
-const PR_EXCLUDED_PATTERNS = [
-  'step-up', 'step up', 'stepup', 'box step',
-  'lunge', 'walking',
+/**
+ * Never a lift PR, however it is loaded — monostructural work, carries and
+ * gymnastics. A loaded carry or a weighted-vest run is not a lift.
+ */
+const NEVER_PR_PATTERNS = [
   'run', 'carry', 'farmer', 'sled', 'suitcase', 'yoke', 'ruck',
-  'shuttle', 'bike', 'ski', 'swim',
+  'shuttle', 'bike', 'ski', 'swim', 'row erg', 'erg',
   'push-up', 'pushup', 'pull-up', 'pullup', 'sit-up', 'situp',
   'burpee', 'double under', 'single under',
+];
+
+/**
+ * Accessory movements — NOT PR-worthy when loaded with a plate, DB or KB
+ * (walking lunge holding a plate, weighted step-up), but ARE PR-worthy when
+ * the load is on a barbell (back rack reverse lunge is a barbell lift).
+ * The AI's `equipment` classification decides which case we are in.
+ */
+const ACCESSORY_UNLESS_BARBELL_PATTERNS = [
+  'step-up', 'step up', 'stepup', 'box step',
+  'lunge', 'walking',
   'kb', 'kettlebell',
 ];
 
@@ -109,7 +121,7 @@ function isPureStrengthExercise(exercise: Exercise): boolean {
   if (exercise.type === 'strength') return true;
   // Barbell complex: all movements are PR-eligible weighted lifts
   if (exercise.movements && exercise.movements.length > 0) {
-    const allPREligible = exercise.movements.every(m => isPREligible(m.name));
+    const allPREligible = exercise.movements.every(m => isPREligible(m.name, m.equipment));
     const hasSetsWithWeight = exercise.sets.some(set => (set.weight || 0) > 0);
     if (allPREligible && hasSetsWithWeight) return true;
   }
@@ -117,9 +129,17 @@ function isPureStrengthExercise(exercise: Exercise): boolean {
     && exercise.sets.some(set => (set.weight || 0) > 0);
 }
 
-function isPREligible(movementName: string): boolean {
+/**
+ * A movement earns PRs when the load sits on a barbell, or — for legacy docs
+ * with no AI implement classification — when its name matches a known lift.
+ * Trusting the AI's `equipment` here means new barbell lifts (Zercher squat,
+ * good morning, back rack lunge) are PR-worthy without extending a name list.
+ */
+function isPREligible(movementName: string, equipment?: MovementEquipment): boolean {
   const lower = movementName.toLowerCase();
-  if (PR_EXCLUDED_PATTERNS.some(p => lower.includes(p))) return false;
+  if (NEVER_PR_PATTERNS.some(p => lower.includes(p))) return false;
+  if (equipment === 'barbell') return true;
+  if (ACCESSORY_UNLESS_BARBELL_PATTERNS.some(p => lower.includes(p))) return false;
   return PR_ELIGIBLE_PATTERNS.some(p => lower.includes(p));
 }
 
@@ -149,7 +169,7 @@ function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight:
       const rxW = m.rxWeights?.male ?? m.rxWeights?.female ?? 0;
       // Prefer peak actual weight over prescribed Rx weight
       const w = maxSetWeight > 0 ? maxSetWeight : rxW;
-      if (w > 0 && isPREligible(m.name)) {
+      if (w > 0 && isPREligible(m.name, m.equipment)) {
         candidates.push({ name: m.name, weight: w });
       }
     }

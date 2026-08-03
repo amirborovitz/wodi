@@ -1,0 +1,176 @@
+/* The PR Lift — transient celebration layer above the poster.
+   Gold only: the design system assigns gold to PRs, and a component uses exactly one
+   Trinity color. The glow is heavier than a standard social shadow because this IS the
+   hero element for the ~3s it exists. */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 12%; /* sits over the poster's hero band, not dead centre */
+  z-index: 40;
+  pointer-events: none;
+}
+
+.layer[role='button'] {
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bloom {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  max-width: 120vw;
+  max-height: 120vw;
+  border-radius: var(--radius-full);
+  background: radial-gradient(
+    circle,
+    rgba(255, 214, 0, 0.20) 0%,
+    rgba(255, 138, 0, 0.10) 38%,
+    rgba(255, 214, 0, 0) 70%
+  );
+  opacity: 0;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-5) 28px;
+  background: #161616;
+  border: 1px solid rgba(255, 214, 0, 0.22);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 8px 40px rgba(255, 214, 0, 0.18);
+  transform: translateY(24px) scale(0.86);
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+
+/* ── Type: L3 kicker → L1 hook → L3 metadata ─────────────────────────────── */
+
+.kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-volume);
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.value {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1;
+  color: var(--color-volume);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 214, 0, 0.7);
+}
+
+.movement {
+  max-width: 240px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: #a0a0a0;
+}
+
+.gain {
+  margin-top: var(--space-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--neon-lime);
+  font-variant-numeric: tabular-nums;
+}
+
+.extra {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #555555;
+}
+
+/* ── Phases ──────────────────────────────────────────────────────────────── */
+
+.rise .card {
+  transition:
+    transform 420ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+}
+
+.hold .bloom { opacity: 1; }
+
+.hold .card {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition:
+    transform 420ms var(--ease-out),
+    opacity 420ms var(--ease-out);
+  animation: prFloat 1.8s var(--ease-in-out) 420ms infinite;
+}
+
+.lift .bloom {
+  opacity: 0;
+  transition: opacity 800ms var(--ease-out);
+}
+
+.lift .card {
+  transform: translateY(-40px) scale(1.04);
+  opacity: 0;
+  filter: blur(4px);
+  transition:
+    transform 800ms var(--ease-out),
+    opacity 800ms var(--ease-out),
+    filter 800ms var(--ease-out);
+}
+
+@keyframes prFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-3px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .bloom {
+    transition: opacity 200ms linear;
+    animation: none;
+  }
+
+  .rise .card { transform: none; opacity: 0; }
+
+  .hold .card,
+  .hold .bloom {
+    transform: none;
+    opacity: 1;
+    animation: none;
+  }
+
+  .lift .card,
+  .lift .bloom {
+    transform: none;
+    opacity: 0;
+    filter: none;
+  }
+}

@@ -2,6 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { loadMovementRegistry } from './services/movementRegistryService'
+
+// Warm the movement registry at boot. Importing the service already installs the
+// bundled seed synchronously, so this only upgrades it to the Firestore copy —
+// nothing waits on it, and a failure leaves the seed in place.
+void loadMovementRegistry()
 
 // __BUILD_TIME__ / __APP_VERSION__ are injected at build time by vite.config.ts.
 const WODI_BUILD_ID = `v${__APP_VERSION__} · built ${__BUILD_TIME__}`

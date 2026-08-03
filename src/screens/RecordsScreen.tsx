@@ -1,75 +1,166 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePRs } from '../hooks/usePRs';
-import { getCanonicalLiftName } from '../data/exerciseDefinitions';
-import type { PersonalRecord } from '../types';
+import { useRecords, type RecordEntry } from '../hooks/useRecords';
 import styles from './RecordsScreen.module.css';
 
 interface RecordsScreenProps {
   onBack: () => void;
 }
 
-interface PRGroup {
-  movement: string;
-  best: PersonalRecord;
-  history: PersonalRecord[]; // sorted newest first
-}
+/** A record set inside this window still reads as news. */
+const FRESH_PR_DAYS = 30;
 
-function formatPRValue(pr: PersonalRecord): string {
-  return `${pr.weight}kg`;
-}
-
-function formatDate(date: Date): string {
+function formatMonth(date: Date): string {
   return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 }
 
-function groupPRs(prs: PersonalRecord[]): PRGroup[] {
-  const groups = new Map<string, PersonalRecord[]>();
-  for (const pr of prs) {
-    const key = getCanonicalLiftName(pr.movement).toLowerCase();
-    const list = groups.get(key) ?? [];
-    list.push(pr);
-    groups.set(key, list);
-  }
-
-  const result: PRGroup[] = [];
-  for (const [, list] of groups) {
-    // Sort by date desc (newest first)
-    const sorted = [...list].sort((a, b) => b.date.getTime() - a.date.getTime());
-    // Best = highest weight
-    const best = [...list].sort((a, b) => b.weight - a.weight)[0];
-    result.push({ movement: getCanonicalLiftName(best.movement), best, history: sorted });
-  }
-
-  // Sort groups: most recent PR first
-  return result.sort((a, b) => b.best.date.getTime() - a.best.date.getTime());
+function isFresh(date: Date): boolean {
+  return Date.now() - date.getTime() < FRESH_PR_DAYS * 24 * 60 * 60 * 1000;
 }
 
-function BackIcon(): React.ReactElement {
+function ChevronLeftIcon(): React.ReactElement {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className={styles.backIconSvg}>
-      <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 18l-6-6 6-6" />
     </svg>
   );
 }
 
-function PRCard({ group, onTap }: { group: PRGroup; onTap: () => void }): React.ReactElement {
+function StarIcon(): React.ReactElement {
   return (
-    <button type="button" className={styles.prCard} onClick={onTap}>
-      <span className={styles.prMovement}>{group.movement}</span>
-      <span className={styles.prBest}>{formatPRValue(group.best)}</span>
-      <span className={styles.prDate}>{formatDate(group.best.date)}</span>
+    <svg viewBox="0 0 24 24" fill="currentColor" className={styles.starIcon}>
+      <path d="M12 2l2.9 6.6 7.1.7-5.4 4.7 1.7 7-6.3-3.8-6.3 3.8 1.7-7L2 9.3l7.1-.7z" />
+    </svg>
+  );
+}
+
+/**
+ * The progression line. Plotted on its own min/max so the shape of THIS record's climb
+ * fills the box — the axis is deliberately unlabelled, it reads as movement, not as a
+ * number to measure off. A benchmark's series descends (a faster clock), which draws the
+ * same "up and to the right" improvement once the y-axis is flipped for it.
+ */
+function Sparkline({
+  trend,
+  higherIsBetter,
+  width,
+  height,
+  className,
+}: {
+  trend: number[];
+  higherIsBetter: boolean;
+  width: number;
+  height: number;
+  className?: string;
+}): React.ReactElement | null {
+  if (trend.length < 2) return null;
+
+  const min = Math.min(...trend);
+  const max = Math.max(...trend);
+  const span = max - min || 1;
+  const pad = 2;
+  const usable = height - pad * 2;
+
+  const points = trend.map((value, i) => {
+    const ratio = (value - min) / span;
+    const level = higherIsBetter ? ratio : 1 - ratio;
+    return [(i / (trend.length - 1)) * width, pad + (1 - level) * usable] as const;
+  });
+  const path = points
+    .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(' ');
+  const [lastX, lastY] = points[points.length - 1];
+
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      width={width}
+      height={height}
+      className={className}
+      aria-hidden="true"
+    >
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lastX} cy={lastY} r="2.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HeroCard({ entry, onTap }: { entry: RecordEntry; onTap: () => void }): React.ReactElement {
+  return (
+    <button type="button" className={styles.heroCard} onClick={onTap}>
+      <span className={styles.heroGlow} aria-hidden="true" />
+      <span className={styles.heroBadge}>
+        <StarIcon />
+        {isFresh(entry.achievedAt) ? 'New PR' : 'Latest PR'}
+      </span>
+      {entry.kind === 'benchmark' && <span className={styles.heroEyebrow}>Benchmark</span>}
+      <span className={styles.heroMovement}>{entry.movement}</span>
+      <span className={styles.heroValueRow}>
+        <span className={styles.heroValue}>{entry.value}</span>
+        <Sparkline
+          trend={entry.trend}
+          higherIsBetter={entry.higherIsBetter}
+          width={90}
+          height={34}
+          className={styles.heroSpark}
+        />
+      </span>
+      <span className={styles.heroMonth}>{formatMonth(entry.achievedAt)}</span>
     </button>
   );
 }
 
-function DetailSheet({
-  group,
-  onClose,
+function RecordCard({ entry, onTap }: { entry: RecordEntry; onTap: () => void }): React.ReactElement {
+  return (
+    <button type="button" className={styles.recordCard} onClick={onTap}>
+      {entry.kind === 'benchmark' && <span className={styles.cardEyebrow}>Benchmark</span>}
+      <span className={styles.cardMovement}>{entry.movement}</span>
+      <span className={styles.cardValueRow}>
+        <span className={styles.cardValue}>{entry.value}</span>
+        <Sparkline
+          trend={entry.trend}
+          higherIsBetter={entry.higherIsBetter}
+          width={46}
+          height={18}
+          className={styles.cardSpark}
+        />
+      </span>
+      <span className={styles.cardMonth}>{formatMonth(entry.achievedAt)}</span>
+    </button>
+  );
+}
+
+function RecordSection({
+  label,
+  entries,
+  onSelect,
 }: {
-  group: PRGroup;
-  onClose: () => void;
-}): React.ReactElement {
+  label: string;
+  entries: RecordEntry[];
+  onSelect: (entry: RecordEntry) => void;
+}): React.ReactElement | null {
+  if (entries.length === 0) return null;
+
+  return (
+    <>
+      <h2 className={styles.sectionLabel}>{label}</h2>
+      <div className={styles.grid}>
+        {entries.map((entry, i) => (
+          <motion.div
+            key={entry.id}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(0.03 * i, 0.24), duration: 0.24 }}
+          >
+            <RecordCard entry={entry} onTap={() => onSelect(entry)} />
+          </motion.div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function DetailSheet({ entry, onClose }: { entry: RecordEntry; onClose: () => void }): React.ReactElement {
   return (
     <>
       <motion.button
@@ -91,8 +182,10 @@ function DetailSheet({
         <div className={styles.sheetHandle} />
         <div className={styles.sheetHeader}>
           <div>
-            <p className={styles.sheetEyebrow}>PERSONAL RECORD</p>
-            <h2 className={styles.sheetTitle}>{group.movement}</h2>
+            <p className={styles.sheetEyebrow}>
+              {entry.kind === 'benchmark' ? 'BENCHMARK' : 'PERSONAL RECORD'}
+            </p>
+            <h2 className={styles.sheetTitle}>{entry.movement}</h2>
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -103,21 +196,28 @@ function DetailSheet({
 
         <div className={styles.sheetBest}>
           <span className={styles.sheetBestLabel}>CURRENT BEST</span>
-          <span className={styles.sheetBestValue}>{formatPRValue(group.best)}</span>
-          <span className={styles.sheetBestDate}>{formatDate(group.best.date)}</span>
+          <div className={styles.sheetBestRow}>
+            <span className={styles.sheetBestValue}>{entry.value}</span>
+            <Sparkline
+              trend={entry.trend}
+              higherIsBetter={entry.higherIsBetter}
+              width={110}
+              height={40}
+              className={styles.sheetSpark}
+            />
+          </div>
+          <span className={styles.sheetBestDate}>{formatMonth(entry.achievedAt)}</span>
         </div>
 
-        {group.history.length > 1 && (
+        {entry.history.length > 1 && (
           <>
             <p className={styles.sheetHistoryLabel}>HISTORY</p>
             <div className={styles.sheetHistoryList}>
-              {group.history.map((pr) => (
-                <div key={pr.id} className={styles.historyRow}>
-                  <span className={styles.historyWeight}>{formatPRValue(pr)}</span>
-                  <span className={styles.historyDate}>{formatDate(pr.date)}</span>
-                  {pr.id === group.best.id && (
-                    <span className={styles.historyBestChip}>BEST</span>
-                  )}
+              {entry.history.map((attempt) => (
+                <div key={attempt.id} className={styles.historyRow}>
+                  <span className={styles.historyValue}>{attempt.value}</span>
+                  <span className={styles.historyDate}>{formatMonth(attempt.date)}</span>
+                  {attempt.isBest && <span className={styles.historyBestChip}>BEST</span>}
                 </div>
               ))}
             </div>
@@ -129,14 +229,11 @@ function DetailSheet({
 }
 
 export function RecordsScreen({ onBack }: RecordsScreenProps): React.ReactElement {
-  const { prs, loading } = usePRs();
-  const [selectedGroup, setSelectedGroup] = useState<PRGroup | null>(null);
-
-  const groups = useMemo(() => groupPRs(prs), [prs]);
+  const { hero, lifts, benchmarks, total, loading } = useRecords();
+  const [selected, setSelected] = useState<RecordEntry | null>(null);
 
   return (
     <div className={styles.screen}>
-      {/* Header */}
       <motion.div
         className={styles.header}
         initial={{ opacity: 0, y: -10 }}
@@ -144,56 +241,53 @@ export function RecordsScreen({ onBack }: RecordsScreenProps): React.ReactElemen
         transition={{ duration: 0.22 }}
       >
         <button type="button" className={styles.backBtn} onClick={onBack} aria-label="Go back">
-          <BackIcon />
+          <ChevronLeftIcon />
         </button>
-        <h1 className={styles.pageTitle}>Records</h1>
+        <div>
+          <h1 className={styles.pageTitle}>RECORDS</h1>
+          <p className={styles.pageSubtitle}>
+            {loading ? 'Loading…' : `${total} personal best${total === 1 ? '' : 's'}`}
+          </p>
+        </div>
       </motion.div>
 
-      {/* Content */}
-      <div className={styles.content}>
-        {loading ? (
-          <div className={styles.skeletonGrid}>
-            {[0, 1, 2, 3].map(i => (
+      {loading ? (
+        <div className={styles.content}>
+          <div className={styles.heroSkeleton} />
+          <div className={styles.grid}>
+            {[0, 1, 2, 3].map((i) => (
               <div key={i} className={styles.skeleton} />
             ))}
           </div>
-        ) : groups.length === 0 ? (
+        </div>
+      ) : !hero ? (
+        <motion.div
+          className={styles.emptyState}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+        >
+          <span className={styles.emptyIcon}>★</span>
+          <p className={styles.emptyText}>
+            Your records will appear here after your first PR. Keep grinding.
+          </p>
+        </motion.div>
+      ) : (
+        <div className={styles.content}>
           <motion.div
-            className={styles.emptyState}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.1 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28 }}
           >
-            <span className={styles.emptyIcon}>★</span>
-            <p className={styles.emptyText}>
-              Your records will appear here after your first PR. Keep grinding.
-            </p>
+            <HeroCard entry={hero} onTap={() => setSelected(hero)} />
           </motion.div>
-        ) : (
-          <motion.div
-            className={styles.grid}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.08, duration: 0.3 }}
-          >
-            {groups.map((group, i) => (
-              <motion.div
-                key={group.movement}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.04 * i, duration: 0.24 }}
-              >
-                <PRCard group={group} onTap={() => setSelectedGroup(group)} />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </div>
+          <RecordSection label="Lifts" entries={lifts} onSelect={setSelected} />
+          <RecordSection label="Benchmarks" entries={benchmarks} onSelect={setSelected} />
+        </div>
+      )}
 
       <AnimatePresence>
-        {selectedGroup && (
-          <DetailSheet group={selectedGroup} onClose={() => setSelectedGroup(null)} />
-        )}
+        {selected && <DetailSheet entry={selected} onClose={() => setSelected(null)} />}
       </AnimatePresence>
     </div>
   );

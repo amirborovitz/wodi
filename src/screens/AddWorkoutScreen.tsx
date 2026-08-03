@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors, getStationVisitCountsForExercise } from '../services/workloadCalculation';
+import { assignMovementColors, getStationVisitCountsForExercise, isTeamPrescribedExercise } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -289,16 +289,11 @@ function buildWorkloadBreakdownFromResults(
     parsedWorkout?.rawText || results.map((result) => result.exercise.prescription).join(' ')
   );
 
-  // Detect which exercises are team/partner exercises by checking prescription text
-  const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
-
   results.forEach((result, resultIndex) => {
-    // Check if this exercise is a team/partner exercise.
-    // For single-exercise workouts (common with sectioned WODs), trust the workout-level
-    // partnerFactor since the exercise prescription may not repeat the "in pairs" keyword.
-    const isSingleExercise = results.length === 1;
-    const isTeamExercise = partnerFactor < 1 && (
-      isSingleExercise || TEAM_KEYWORDS.test(result.exercise.prescription || '')
+    const isTeamExercise = isTeamPrescribedExercise(
+      result.exercise,
+      partnerFactor,
+      results.length === 1,
     );
     const exerciseFactor = isTeamExercise ? partnerFactor : 1;
     const movements = result.exercise.movements;

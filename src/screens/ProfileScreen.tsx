@@ -67,7 +67,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
   const { user, updateUserPhoto } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
-  const { recaps, newRecapIds } = useRecapData(workouts);
+  const { recaps, newRecapIds } = useRecapData(workouts, user?.id);
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
   const [photoUploading, setPhotoUploading] = useState(false);

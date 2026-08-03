@@ -3,6 +3,49 @@ import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks } from '../utils/sectionShape';
 
 /**
+ * Whether an exercise inside a partner session was prescribed as a TEAM total —
+ * a number the pair produces together, of which this athlete did a share — rather
+ * than solo work each athlete completes in full.
+ *
+ * A partner WOD routinely mixes both: the metcon is shared, the strength and skill
+ * blocks before it are not. Applying the partner factor to everything would halve
+ * real work; applying it to nothing files the pair's output as one athlete's.
+ *
+ * `ParsedExercise.partnerWorkout` IS the answer. The AI is prompted for it per
+ * block ("set partnerWorkout: false, not omitted, on a solo strength/skill block
+ * even when the session overall is partnered"), and workoutPostProcessor's
+ * `backfillPartnerSplit` fills it from exercise-scoped text when the AI omits it.
+ * Trust it, including an explicit `false` — see [[feedback-trust-ai-over-regex]].
+ *
+ * The text scan below is ONLY for saved data predating that field. It reads the
+ * NAME as well as the prescription: the parser writes the partner marker into the
+ * name it generates ("Partner 16 RFT (8 each)") while the prescription it emits is
+ * the already-per-person body ("8 rounds each: 5 twin KB Power Clean"), carrying no
+ * keyword at all. Scanning the prescription alone missed every multi-part partner
+ * WOD — one real board stored 16 rounds of a pair's work as one athlete's 592 reps.
+ */
+const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
+/** The board's explicit split notation: "16 RFT (8 each)", "14 RFT (7 each)". */
+const EACH_SPLIT = /\(\s*\d+\s*each\s*\)/i;
+
+export function isTeamPrescribedExercise(
+  exercise: Pick<ParsedExercise, 'name' | 'prescription' | 'partnerWorkout'>,
+  partnerFactor: number,
+  isSoleExercise: boolean,
+): boolean {
+  if (partnerFactor >= 1) return false;
+  if (typeof exercise.partnerWorkout === 'boolean') return exercise.partnerWorkout;
+
+  // ── Legacy data only, from here down ──
+  // A sectioned WOD often collapses to one exercise whose prescription never
+  // repeats "in pairs" — with nothing else in the session, the workout-level
+  // partner factor is the only signal there is, and it applies.
+  if (isSoleExercise) return true;
+  const text = `${exercise.name ?? ''} ${exercise.prescription ?? ''}`;
+  return TEAM_KEYWORDS.test(text) || EACH_SPLIT.test(text);
+}
+
+/**
  * Bodyweight movements that should not show a weight annotation in the UI
  * (pull-ups, dips, muscle-ups, rope climbs). These never use athlete bodyweight
  * for volume calculations — only an explicitly logged weight counts.

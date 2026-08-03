@@ -145,7 +145,8 @@ export interface Workout {
   status: WorkoutStatus;
   exercises: Exercise[];
   scores?: WorkoutScores;
-  duration?: number;       // minutes
+  duration?: number;       // minutes, rounded — display only
+  durationSeconds?: number; // the athlete's actual elapsed time, to the second (what `duration` rounds)
   notes?: string;
   rawText?: string;
   userContext?: string;    // Athlete-supplied context/correction used when parsing (kept for reproducible re-parses)
