@@ -129,9 +129,12 @@
   padding-top: 24px;
 }
 
+/* Applied when useFitScale had to shrink the card. It may only change alignment:
+   this class is toggled BY the measurement, so changing the padding would change
+   the height it measures against and oscillate the card between the two states.
+   Mirrors .carouselSlideFitTop, which is alignment-only for the same reason. */
 .cardAreaFitTop {
   align-items: flex-start;
-  padding-top: 10px;
 }
 
 .cardWrapper {
@@ -354,7 +357,8 @@
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
   font-family: 'DM Mono', monospace;
-  font-size: 13px;
+  /* 16px minimum — anything smaller makes iOS Safari zoom the poster off-screen. */
+  font-size: 16px;
   padding: 0 12px;
   color-scheme: dark;
 }
@@ -397,7 +401,8 @@
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
   font-family: 'Barlow', sans-serif;
-  font-size: 13.5px;
+  /* 16px minimum — anything smaller makes iOS Safari zoom the poster off-screen. */
+  font-size: 16px;
   padding: 0 12px;
 }
 

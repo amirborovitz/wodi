@@ -45,7 +45,6 @@
           {
             "primary": "300 M Run",
             "name": "",
-            "totalNote": "300m total",
             "mineKey": "Run",
             "suppressMine": true,
             "accent": "magenta"
@@ -54,7 +53,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "3 ROUNDS",
+        "title": "THEN 3 ROUNDS OF",
         "rows": [
           {
             "primary": "20 Russian KB Swings @ 24/16kg",
@@ -87,7 +86,6 @@
           {
             "primary": "300 M Run",
             "name": "",
-            "totalNote": "300m total",
             "mineKey": "Run",
             "suppressMine": true,
             "accent": "magenta"
@@ -96,7 +94,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "2 ROUNDS",
+        "title": "THEN 2 ROUNDS OF",
         "rows": [
           {
             "primary": "20 Russian KB Swings @ 24/16kg",
@@ -129,7 +127,6 @@
           {
             "primary": "300 M Run",
             "name": "",
-            "totalNote": "300m total",
             "mineKey": "Run",
             "suppressMine": true,
             "accent": "magenta"
@@ -138,7 +135,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "1 ROUND",
+        "title": "THEN 1 ROUND",
         "rows": [
           {
             "primary": "20 Russian KB Swings @ 24/16kg",
@@ -287,12 +284,11 @@
           "rx": "300 M Run",
           "load": "",
           "mine": "",
-          "team": "",
-          "total": "300m total"
+          "team": ""
         },
         {
           "kind": "block",
-          "label": "3 ROUNDS",
+          "label": "THEN 3 ROUNDS OF",
           "cap": ""
         },
         {
@@ -329,12 +325,11 @@
           "rx": "300 M Run",
           "load": "",
           "mine": "",
-          "team": "",
-          "total": "300m total"
+          "team": ""
         },
         {
           "kind": "block",
-          "label": "2 ROUNDS",
+          "label": "THEN 2 ROUNDS OF",
           "cap": ""
         },
         {
@@ -371,12 +366,11 @@
           "rx": "300 M Run",
           "load": "",
           "mine": "",
-          "team": "",
-          "total": "300m total"
+          "team": ""
         },
         {
           "kind": "block",
-          "label": "1 ROUND",
+          "label": "THEN 1 ROUND",
           "cap": ""
         },
         {

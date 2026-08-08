@@ -55,6 +55,16 @@ function parseEntry(raw: Record<string, unknown>): MovementRegistryEntry | null 
 
 let loaded = false;
 
+// Flag writes share the Firestore SDK's single FIFO mutation queue with real
+// user writes — a workout delete can only be acknowledged once everything queued
+// ahead of it resolves. A burst of flag writes (one per unknown movement, fired
+// on every Home render) therefore stalls the next thing the athlete taps, and a
+// burst that the rules reject stalls it for seconds and can take it down with
+// the failing write stream. So the channel is throttled to one write in flight,
+// and trips off for the session the first time one fails.
+let flagChain: Promise<void> = Promise.resolve();
+let flaggingDisabled = false;
+
 /**
  * Pull the registry from Firestore and swap it in. Safe to call more than once;
  * only the first call does work.
@@ -89,15 +99,27 @@ export async function loadMovementRegistry(): Promise<void> {
  * `phrase` matches are flagged too — they resolved, but only by fuzzy fallback,
  * so they're the candidates for being promoted into a real alias.
  */
-export async function flagMovement(
+export function flagMovement(
   rawName: string,
   resolved: ResolvedMovement,
   context: { userId: string; workoutId?: string; reps?: number },
 ): Promise<void> {
-  if (resolved.match === 'exact') return;
+  if (resolved.match === 'exact') return Promise.resolve();
 
   const key = normalizeMovementKey(rawName);
-  if (!key) return;
+  if (!key) return Promise.resolve();
+
+  flagChain = flagChain.then(() => writeFlag(key, rawName, resolved, context));
+  return flagChain;
+}
+
+async function writeFlag(
+  key: string,
+  rawName: string,
+  resolved: ResolvedMovement,
+  context: { userId: string; workoutId?: string; reps?: number },
+): Promise<void> {
+  if (flaggingDisabled) return;
 
   try {
     await setDoc(
@@ -122,7 +144,10 @@ export async function flagMovement(
       { merge: true },
     );
   } catch (error) {
-    // Telemetry must never break a recap.
-    console.warn('[movementRegistry] could not flag movement', rawName, error);
+    // Telemetry must never break a recap — nor keep retrying and holding the
+    // athlete's own writes behind it. One failure means the channel is closed
+    // (rules, offline, quota); stop until the next reload.
+    flaggingDisabled = true;
+    console.warn('[movementRegistry] flagging disabled after failure on', rawName, error);
   }
 }

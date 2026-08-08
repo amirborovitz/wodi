@@ -1,12 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import type { ParsedWorkout, ExerciseLoggingMode, ExerciseSet } from '../../../types';
+import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet } from '../../../types';
+import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
 import { initStoryResults } from './WodStoryScreen';
 import { InputRouter } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
-import { getPrescribedSetCount } from './types';
+import { getPrescribedSetCount, getMaxRepsMovement } from './types';
 import type { ScoredBlock } from './blockScoping';
 import { applyBlockScoresToSections, getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from './blockScoping';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -79,18 +80,31 @@ function getModeForExercise(
   return workout.exercises[index]?.loggingMode ?? loggingModes[index];
 }
 
-function isPrimaryExercise(
+/**
+ * Does this exercise need a screen in the logging wizard?
+ *
+ * Main parts always do. A SECONDARY part normally does not — a warm-up, a cash-out tabata, a
+ * mobility block has nothing the athlete must supply, so it lands in the saved workout as
+ * prescribed/completed via its auto-built result and never interrupts the flow.
+ *
+ * The exception is a secondary block that earns a number the board doesn't prescribe: a practice
+ * whose max the AI flagged (`isMaxReps`). Being secondary says the block isn't the session's main
+ * effort — it does NOT say the max the athlete just tested is worth throwing away. Without this,
+ * "test your max unbroken toes to bar" was classified secondary, skipped here, and the max input
+ * built for it could never render because its screen was never created.
+ */
+function needsLoggingStep(
   workout: ParsedWorkout,
   loggingModes: ExerciseLoggingMode[],
   index: number,
 ): boolean {
   const ex = workout.exercises[index];
   if (!ex) return false;
-  // The AI's own main/secondary verdict is authoritative — the SAME gate the poster uses
-  // (posterMainExercises): a part the poster gives no page to (cash-out tabata, warm-up,
-  // skill practice) must not demand a logging step either. It still lands in the saved
-  // workout as prescribed/completed via its auto-built result. The text/type checks below
-  // are the fallback for legacy parses without the flag.
+  // Something obvious to track outranks "secondary" — that IS the reason to stop and ask.
+  if (getMaxRepsMovement(ex)) return true;
+  // Otherwise the AI's own main/secondary verdict is authoritative — the same verdict the poster
+  // reads (posterMainExercises). The text/type checks below are the fallback for legacy parses
+  // without the flag.
   if (ex.isSecondary != null) return !ex.isSecondary;
   const text = `${ex.name || ''} ${ex.prescription || ''}`.toLowerCase();
   if (NON_PRIMARY_PATTERN.test(text)) return false;
@@ -120,7 +134,7 @@ function computeWizardBlocks(
   let currentIndices: number[] = [];
 
   workout.exercises.forEach((ex, i) => {
-    if (!isPrimaryExercise(workout, loggingModes, i)) return;
+    if (!needsLoggingStep(workout, loggingModes, i)) return;
 
     const match = ex.name.match(PART_PATTERN);
     const label = match ? match[1].toUpperCase() : null;
@@ -196,6 +210,8 @@ interface StoryLogResultsProps {
   onBack: () => void;
   isSaving?: boolean;
   initialResults?: StoryExerciseResult[];
+  /** Most recent logged max per movement (lowercased name) — seeds the max-effort stepper. */
+  lastMaxReps?: Record<string, number>;
 }
 
 // ─── Ladder helper ───────────────────────────────────────────────
@@ -360,9 +376,18 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, isMax: true, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount && r.implementCount > 1 ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
     }
-    case 'reps':
+    case 'reps': {
       for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: r.exercise.suggestedReps, actualReps: r.repsPerSet ?? r.repsTotal ?? r.exercise.suggestedReps, completed: true });
+      // The max-effort test is ONE of the practice's prescribed sets ("test your max, then 4
+      // more sets"), never an extra one — writing it into the first set records the athlete's
+      // real rep count without inventing a set the board didn't call for. Boards that put the
+      // test last land the same totals; only the set's position differs, and a practice block's
+      // set order carries no meaning downstream.
+      if (r.maxReps != null && r.maxReps > 0 && sets.length > 0) {
+        sets[0] = { ...sets[0], actualReps: r.maxReps, isMax: true };
+      }
       return { exercise: r.exercise, sets, notes: r.notes };
+    }
     case 'duration':
       for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, time: r.durationSeconds, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes };
@@ -420,9 +445,21 @@ export function StoryLogResults({
   onBack,
   isSaving: _isSaving = false,
   initialResults,
+  lastMaxReps,
 }: StoryLogResultsProps) {
   const { user } = useAuth();
   const teamSize = parsedWorkout.partnerWorkout ? (parsedWorkout.teamSize ?? 2) : undefined;
+
+  // The session team size only applies to the blocks that were actually shared. Handing the
+  // whole session's team size to every input made a solo strength block inside a partner
+  // session render "60kg total - your part 30" — a number no one on the board ever prescribed.
+  const teamSizeFor = useCallback(
+    (exercise: ParsedExercise): number | undefined =>
+      teamSize && isTeamPrescribedExercise(exercise, 1 / teamSize, parsedWorkout.exercises.length === 1)
+        ? teamSize
+        : undefined,
+    [teamSize, parsedWorkout.exercises.length],
+  );
 
   const [results, setResults] = useState<StoryExerciseResult[]>(() =>
     initialResults && initialResults.length > 0
@@ -623,8 +660,9 @@ export function StoryLogResults({
             <InputRouter
               result={currentResult}
               onChange={handleInputChange}
-              teamSize={teamSize}
+              teamSize={teamSizeFor(currentResult.exercise)}
               onSubstitutionOpenChange={setIsSubstitutionOpen}
+              lastMaxReps={lastMaxReps}
             />
           </WizardExerciseScreen>
         )}

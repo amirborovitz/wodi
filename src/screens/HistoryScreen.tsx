@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useWorkouts } from '../hooks/useWorkouts';
+import { useAuth } from '../context/AuthContext';
+import { isAdminEmail } from '../utils/admin';
 import { useLongPress } from '../hooks/useLongPress';
+import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
@@ -14,10 +17,14 @@ interface HistoryScreenProps {
 type GalleryFilter = 'all' | 'pr';
 
 export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
-  const { workouts, loading, deleteWorkout } = useWorkouts();
+  // The Gallery is the only surface that opts in to test workouts: hiding them everywhere would
+  // leave them unreachable to delete, and re-opening one is how a poster change gets checked.
+  const { workouts, loading, deleteWorkout, setWorkoutTest } = useWorkouts(50, { includeTests: true });
+  const { user } = useAuth();
+  const isAdmin = isAdminEmail(user?.email);
   const [filter, setFilter] = useState<GalleryFilter>('all');
-  const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
-  const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
+  const deleteSheet = useDeleteSheet(deleteWorkout);
+  const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(deleteSheet.open);
 
   // `useWorkouts` already returns newest-trained first — the gallery must not
   // re-sort, or it silently reverts to logged-date order.
@@ -26,20 +33,13 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
     [workouts, filter]
   );
 
-  const actionSheetWorkout = actionSheetWorkoutId
-    ? workouts.find((w) => w.id === actionSheetWorkoutId) ?? null
+  const actionSheetWorkout = deleteSheet.targetId
+    ? workouts.find((w) => w.id === deleteSheet.targetId) ?? null
     : null;
 
   const handleSelect = (workout: WorkoutWithStats) => {
     if (consumeLongPress()) return;
     onSelectWorkout?.(workout, workouts);
-  };
-
-  const handleDelete = async () => {
-    if (actionSheetWorkoutId) {
-      await deleteWorkout(actionSheetWorkoutId);
-      setActionSheetWorkoutId(null);
-    }
   };
 
   return (
@@ -76,7 +76,10 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
         <>
           <div className={styles.header}>
             <h1 className={styles.title}>Gallery</h1>
-            <p className={styles.subtitle}>{workouts.length} posters made · keep building</p>
+            {/* Listing test workouts must not mean counting them — this is still a real tally. */}
+            <p className={styles.subtitle}>
+              {workouts.filter((w) => !w.isTest).length} posters made · keep building
+            </p>
           </div>
 
           <div className={styles.filters}>
@@ -109,7 +112,9 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.03, duration: 0.25 }}
                   {...longPressHandlers(workout.id)}
+                  className={workout.isTest ? styles.testCard : undefined}
                 >
+                  {workout.isTest && <span className={styles.testBadge}>TEST</span>}
                   <PosterThumbnail workout={workout} fullWidth onClick={() => handleSelect(workout)} />
                 </motion.div>
               ))}
@@ -120,8 +125,18 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
 
       <DeleteActionSheet
         title={actionSheetWorkout?.title ?? null}
-        onDelete={handleDelete}
-        onCancel={() => setActionSheetWorkoutId(null)}
+        onDelete={deleteSheet.confirm}
+        onCancel={deleteSheet.close}
+        busy={deleteSheet.busy}
+        error={deleteSheet.error}
+        tag={actionSheetWorkout?.isTest ? 'TEST' : null}
+        secondaryAction={isAdmin && actionSheetWorkout ? {
+          label: actionSheetWorkout.isTest ? 'Unmark as test' : 'Mark as test',
+          onClick: () => {
+            void setWorkoutTest(actionSheetWorkout.id, !actionSheetWorkout.isTest);
+            deleteSheet.close();
+          },
+        } : null}
       />
     </div>
   );

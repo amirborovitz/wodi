@@ -180,6 +180,11 @@ export interface ResolvedPrescribedMovement {
   /** Logged breakdown entry backing a substitution, ONLY when its totals belong wholly to
    * the section being rendered (safe to display as this row's exact total). */
   logged?: MovementTotal;
+  /** Whether a swap was applied — read this, never a before/after name comparison. The saved
+   * prescription may ALREADY carry the substituted name (the logging sheet writes the swap
+   * back into `sections[]`), so comparing names reports "no swap" on exactly the docs that
+   * were substituted, and the quantity the resolver returned then goes unscaled. */
+  substituted: boolean;
 }
 
 /**
@@ -212,7 +217,7 @@ export function createSubstitutionResolver(
 
   return (prescribed: ParsedMovement, sectionRounds: number): ResolvedPrescribedMovement => {
     const actual = findMovementTotal(breakdown, prescribed.name);
-    if (!actual?.wasSubstituted) return { movement: prescribed };
+    if (!actual?.wasSubstituted) return { movement: prescribed, substituted: false };
 
     const rounds = Math.max(sectionRounds, 1);
     const ownsAllRounds = (repeatsByName.get(prescribed.name.toLowerCase()) ?? rounds) === rounds;
@@ -226,6 +231,7 @@ export function createSubstitutionResolver(
     };
 
     return {
+      substituted: true,
       logged: ownsAllRounds ? actual : undefined,
       movement: {
         ...prescribed,

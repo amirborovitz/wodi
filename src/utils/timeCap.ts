@@ -60,7 +60,13 @@ function firstMatch(text: string, patterns: RegExp[]): number | undefined {
  */
 export function parseTimeCapSeconds(text: string | null | undefined): number | undefined {
   if (!text) return undefined;
-  return firstMatch(text, [CAP_MARKER_FIRST, CAP_MARKER_LAST]);
+  // MARKER-LAST is tried first because it is the more specific pattern: it requires the minute
+  // unit to sit BETWEEN the number and the marker ("35 min cap"), so it can only match a number
+  // that is actually the cap. MARKER-FIRST accepts an optional unit, which lets it read whatever
+  // number follows the marker — in "35 min cap: 800m run" that is the run's 800, and the poster
+  // printed "800 MIN CAP". Most specific wins; the looser pattern only answers what it alone can
+  // ("T.C - 34 MIN", "TC: 16min", "cap 12'").
+  return firstMatch(text, [CAP_MARKER_LAST, CAP_MARKER_FIRST]);
 }
 
 /** AMRAP/EMOM window length in seconds ("25 min AMRAP", "EMOM 20"). */

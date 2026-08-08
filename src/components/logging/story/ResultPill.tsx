@@ -1,5 +1,6 @@
 import type { StoryExerciseResult } from './types';
 import { getRowState, kindToTrinityColor } from './types';
+import { exerciseLoadUnit, type LoadUnit } from '../../../utils/loadUnits';
 import styles from './ResultPill.module.css';
 
 interface ResultPillProps {
@@ -15,10 +16,10 @@ function formatTime(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function formatWeight(kg: number, implement?: 1 | 2): string {
+function formatWeight(weight: number, unit: LoadUnit, implement?: 1 | 2): string {
   const prefix = implement === 2 ? '2x' : '';
-  const display = kg % 1 === 0 ? String(kg) : kg.toFixed(1);
-  return `${prefix}${display}kg`;
+  const display = weight % 1 === 0 ? String(weight) : weight.toFixed(1);
+  return `${prefix}${display}${unit}`;
 }
 
 function formatDistance(value: number, unit?: string): string {
@@ -38,6 +39,7 @@ interface FormattedPill {
 }
 
 function formatResult(r: StoryExerciseResult): FormattedPill {
+  const loadUnit = exerciseLoadUnit(r.exercise);
   // Scored exercises always show time/rounds — even with multiple movements.
   if (r.kind === 'score_time') {
     if (r.timeSeconds == null) {
@@ -70,7 +72,7 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
     if ((r.timeSeconds ?? 0) > 0) return { text: formatTime(r.timeSeconds!) };
     if ((r.rounds ?? 0) > 0) return { text: `${r.rounds} rds` };
     if ((r.repsTotal ?? 0) > 0) return { text: `${r.repsTotal} reps` };
-    if ((r.weight ?? 0) > 0) return { text: formatWeight(r.weight!, r.implementCount) };
+    if ((r.weight ?? 0) > 0) return { text: formatWeight(r.weight!, loadUnit, r.implementCount) };
     if (r.notes && r.notes.trim()) return { text: 'Noted' };
     return { text: 'Add score' };
   }
@@ -96,9 +98,9 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
     case 'load': {
       if (r.loadMode === 'bodyweight') return { text: 'BW' };
       if (r.weight == null) return { text: 'Add weight' };
-      const start = formatWeight(r.weight, r.implementCount);
+      const start = formatWeight(r.weight, loadUnit, r.implementCount);
       if (r.loadMode === 'range' && r.weightEnd != null && r.weightEnd !== r.weight) {
-        return { text: start, secondary: formatWeight(r.weightEnd, r.implementCount) };
+        return { text: start, secondary: formatWeight(r.weightEnd, loadUnit, r.implementCount) };
       }
       return { text: start };
     }

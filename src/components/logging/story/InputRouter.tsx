@@ -9,12 +9,15 @@ import { ScoreMovementInputs } from './ScoreMovementInputs';
 import { LadderInput } from './LadderInput';
 import { DescendingSetTrack } from './DescendingSetTrack';
 import { FreeScoreInput } from './FreeScoreInput';
+import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
 
 interface InputRouterProps {
   result: StoryExerciseResult;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
   teamSize?: number;
   onSubstitutionOpenChange?: (open: boolean) => void;
+  /** Most recent logged max per movement (lowercased name) — seeds the max-effort stepper. */
+  lastMaxReps?: Record<string, number>;
 }
 
 /**
@@ -25,7 +28,7 @@ interface InputRouterProps {
  * If a movement says inputType: "weight", we show a weight input —
  * regardless of whether the exercise is scored, single, or superset.
  */
-export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange }: InputRouterProps) {
+export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange, lastMaxReps }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
   if (kind === 'score_time' || kind === 'score_rounds') {
@@ -79,7 +82,14 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     // only scored movement the ROUNDS counter is redundant — the relay stepper IS the score
     // input: we hide ScoreRoundsInput and sync the relay count back into result.rounds.
     // For a plain solo AMRAP the ROUNDS counter already counts every trip, so prescribed-distance
-    // movements render display-only instead (distanceDerivedFromRounds).
+    // movements take no input instead (distancePrescribedByStructure).
+    //
+    // A for-time per-movement ladder is the other shape where the board already states every
+    // metre: its tiers prescribe 800/600/400m, and a single input box can only hold one of them —
+    // it showed 800 and would have logged that as the whole run. Its prescribed reps (40-30-20
+    // thrusters, 20-30-40 burpees) already take no input for exactly this reason; the distance
+    // is no different. The athlete's unknowns here are the TIME and the weight they chose.
+    const isPerMovementLadder = kind === 'score_time' && hasSameMovementsEveryRound(result.exercise);
     const relayMr = inputMovements.find(
       mr => mr.kind === 'distance' &&
         (mr.movement.distance ?? 0) > 0 &&
@@ -130,7 +140,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
             movements={displayMovements}
             inputMovements={inputMovements}
             isRelayContext={hasRelay && kind === 'score_rounds'}
-            distanceDerivedFromRounds={kind === 'score_rounds' && !hasRelay}
+            distancePrescribedByStructure={(kind === 'score_rounds' || isPerMovementLadder) && !hasRelay}
             teamSize={teamSize}
             onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {
@@ -208,7 +218,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     case 'load':
       return <LoadInput result={result} onChange={onChange} showImplement={hasImplement} />;
     case 'reps':
-      return <RepsSetsInput result={result} onChange={onChange} />;
+      return <RepsSetsInput result={result} onChange={onChange} lastMaxReps={lastMaxReps} />;
     case 'duration':
       return <DurationInput result={result} onChange={onChange} />;
     case 'distance':

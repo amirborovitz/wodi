@@ -1,7 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MovementResult } from './types';
-import type { ParsedMovement, ParsedSectionType } from '../../../types';
-import { getWeightStep } from './types';
+import type { ParsedSectionType } from '../../../types';
+import { getWeightStep, getWeightMax } from './types';
+import { movementLoadUnit, type LoadUnit } from '../../../utils/loadUnits';
+import {
+  getMovementEquipmentType,
+  resolveLoadGroups,
+  resolveMovementEquipment,
+  type LoadEquipment,
+  type SharedEquipment,
+} from './loadGroups';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { CustomNumpadSheet } from './CustomNumpadSheet';
@@ -24,71 +32,23 @@ interface ScoreMovementInputsProps {
   /** True only in partner/relay AMRAPs where a prescribed distance movement represents
    *  a relay trip count (how many times the athlete ran X meters), not a total distance. */
   isRelayContext?: boolean;
-  /** True in solo rounds-scored workouts: a prescribed-distance movement (e.g. 300m run
-   *  per round) is fully counted by the ROUNDS input, so it renders display-only. */
-  distanceDerivedFromRounds?: boolean;
+  /** True when the board already prescribes every metre of a distance movement, so the athlete
+   *  has nothing to enter for it — exactly like a prescribed rep count, which takes no input
+   *  either (getTileConfig returns null for it). Two shapes qualify: a solo rounds-scored WOD
+   *  (the ROUNDS input counts every trip of a 300m-per-round run) and a for-time per-movement
+   *  ladder (the tiers state 800/600/400m; ONE box cannot hold that scheme and would silently
+   *  log the first tier as the whole run). */
+  distancePrescribedByStructure?: boolean;
 }
 
-// Classify a movement by equipment type for weight propagation grouping.
-// Barbell movements only propagate to other barbell movements, not KB or DB.
-// Weight-input grouping bucket: same-bucket load movements share ONE weight input (the
-// shared hero screen). 'other' movements never share — each renders its own WeightField.
-type SharedEquipment = 'barbell' | 'kb' | 'db';
-type LoadEquipment = SharedEquipment | 'other';
-
-// AI-stamped ParsedMovement.equipment → grouping bucket. The AI is the authority for the
-// implement; the name regexes below are the fallback for docs parsed before the field existed.
-// 'none' on a load-kind movement means the athlete added a load of their own choosing.
-function equipmentFromAi(mov: ParsedMovement): LoadEquipment | null {
-  switch (mov.equipment) {
-    case 'barbell': return 'barbell';
-    case 'dumbbell': return 'db';
-    case 'kettlebell': return 'kb';
-    case 'other':
-    case 'none': return 'other';
-    default: return null;
-  }
-}
-
-function getEquipmentType(name: string): LoadEquipment {
-  const lower = name.toLowerCase();
-  if (/\bdb\b|dumbbell/.test(lower)) return 'db';
-  if (/\bkb\b|kettlebell|\bsuitcase\b|\bfarmer'?s?\b|\bcarry\b/.test(lower)) return 'kb';
-  if (isImplicitHeldLoad(lower)) return 'other';
-  return 'barbell';
-}
-
-// Name-based classification, but a DOUBLE implement (twin/double DBs or KBs) can NEVER be a
-// barbell — you can't hold two barbells — so it must resolve to DB/KB, not the barbell default.
-// Defense for docs whose equipment field the AI/post-processor didn't stamp. General.
-function getMovementEquipmentType(mov: ParsedMovement): LoadEquipment {
-  const named = getEquipmentType(mov.name);
-  if (mov.implementCount === 2 && named === 'barbell') return 'db';
-  return named;
-}
-
-// "Weighted X" with no stated implement (weighted box step-up, weighted pull-up, weighted
-// sit-up) is a held load the athlete picks — DBs/KBs/plate — never the session's barbell.
-function isImplicitHeldLoad(name: string): boolean {
-  return /\bweighted\b/i.test(name) && getExplicitEquipmentType(name) === null;
-}
-
-function getExplicitEquipmentType(name: string): 'barbell' | 'kb' | 'db' | null {
-  const lower = name.toLowerCase();
-  if (/\bdb\b|dumbbell/.test(lower)) return 'db';
-  if (/\bkb\b|kettlebell/.test(lower)) return 'kb';
-  if (/\bbarbell\b/.test(lower)) return 'barbell';
-  return null;
-}
-
-function getEquipmentLabel(type: 'barbell' | 'kb' | 'db'): string {
+function getEquipmentLabel(type: SharedEquipment): string {
   if (type === 'kb') return 'KB';
   if (type === 'db') return 'DB';
   return 'Barbell';
 }
 
 function getLegalWeightStep(mr: MovementResult): number {
-  return getWeightStep(mr.movement.name, mr.movement.equipment);
+  return getWeightStep(mr.movement.name, mr.movement.equipment, movementLoadUnit(mr.movement));
 }
 
 function roundToLegalWeight(value: number, mr: MovementResult): number {
@@ -109,11 +69,14 @@ function getDefaultMetconWeight(mr: MovementResult): number | undefined {
   return roundToLegalWeight(rx * 0.8, mr);
 }
 
-function getFallbackWeight(type: LoadEquipment): number | undefined {
-  if (type === 'kb') return 16;
+// The number the stepper opens on when the coach wrote no load at all. Stated in the unit the
+// rest of the board is written in — the common gym KB / the common training bar, not a kg
+// figure relabelled "lb".
+function getFallbackWeight(type: LoadEquipment, unit: LoadUnit = 'kg'): number | undefined {
   // No default prior for DBs or odd implements — the athlete states the load.
   if (type === 'db' || type === 'other') return undefined;
-  return 40;
+  if (type === 'kb') return unit === 'lb' ? 35 : 16;
+  return unit === 'lb' ? 95 : 40;
 }
 
 function getMovementCaptionName(mr: MovementResult): string {
@@ -136,8 +99,26 @@ function movementAlternateKey(mr: MovementResult): string {
     .trim();
 }
 
-function movementHasInput(mr: MovementResult, distanceDerivedFromRounds: boolean): boolean {
-  return getTileConfig(mr, distanceDerivedFromRounds) != null;
+function movementHasInput(mr: MovementResult, distancePrescribedByStructure: boolean): boolean {
+  return getTileConfig(mr, distancePrescribedByStructure) != null;
+}
+
+/**
+ * A ladder row's prescribed scheme, exactly as the coach wrote it: "800-600-400m", "40-30-20",
+ * "15" when the movement holds a constant count every tier. Undefined when this isn't a ladder
+ * row — nothing to narrate.
+ *
+ * Mirrors the poster's ladder row (helpers.buildPerMovementLadderRows) on purpose: the athlete
+ * should read the same scheme while logging that the finished poster prints.
+ */
+function prescribedSchemeLabel(mr: MovementResult): string | undefined {
+  const seq = mr.prescribedScheme;
+  if (!seq || seq.length === 0) return undefined;
+  const unit = mr.kind === 'distance'
+    ? (isCalorieBased(mr) ? ' cal' : (mr.movement.unit ?? 'm'))
+    : '';
+  const allSame = seq.every((v) => v === seq[0]);
+  return `${allSame ? seq[0] : seq.join('-')}${unit}`;
 }
 
 // A distance-kind movement measured in calories rather than meters (prescribed cals,
@@ -332,7 +313,7 @@ interface TileConfig {
 const LOAD_TILE_COLOR = '#f5c200';
 const METRIC_TILE_COLOR = '#f5c200';
 
-function getTileConfig(mr: MovementResult, distanceDerivedFromRounds = false): TileConfig | null {
+function getTileConfig(mr: MovementResult, distancePrescribedByStructure = false): TileConfig | null {
   const isMaxBodyweight =
     mr.kind === 'reps' &&
     mr.movement.reps == null &&
@@ -340,15 +321,16 @@ function getTileConfig(mr: MovementResult, distanceDerivedFromRounds = false): T
     mr.movement.calories == null;
 
   if (mr.kind === 'load') {
+    const loadUnit = movementLoadUnit(mr.movement);
     return {
       field: 'weight',
       value: mr.weight,
       placeholder: mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0',
-      unit: mr.implementCount === 2 ? '2x kg' : 'kg',
+      unit: mr.implementCount === 2 ? `2x ${loadUnit}` : loadUnit,
       color: LOAD_TILE_COLOR,
-      step: getWeightStep(mr.movement.name, mr.movement.equipment),
+      step: getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit),
       min: 0,
-      max: 500,
+      max: getWeightMax(loadUnit),
       inputMode: 'decimal',
     };
   }
@@ -357,7 +339,7 @@ function getTileConfig(mr: MovementResult, distanceDerivedFromRounds = false): T
     const isCal = isCalorieBased(mr);
     // Solo rounds-scored workout: the ROUNDS counter already counts every trip of a
     // prescribed-distance movement, so it takes no input of its own.
-    if (distanceDerivedFromRounds && getPrescribedTripDistance(mr) > 0) return null;
+    if (distancePrescribedByStructure && getPrescribedTripDistance(mr) > 0) return null;
     const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
     return {
       field: isCal ? 'calories' : 'distance',
@@ -449,7 +431,7 @@ export function ScoreMovementInputs({
   onSubstitutionOpenChange,
   teamSize,
   isRelayContext = false,
-  distanceDerivedFromRounds = false,
+  distancePrescribedByStructure = false,
 }: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
@@ -459,51 +441,16 @@ export function ScoreMovementInputs({
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
 
-  const equipmentByKey = useMemo(() => {
-    const explicitTypes = new Set<SharedEquipment>();
-    movements.forEach((mr) => {
-      if (mr.kind !== 'load') return;
-      const explicit = getExplicitEquipmentType(mr.movement.name);
-      if (explicit) explicitTypes.add(explicit);
-    });
-
-    const sharedExplicitType = explicitTypes.size === 1 ? [...explicitTypes][0] : null;
-    const byKey = new Map<string, LoadEquipment>();
-    movements.forEach((mr) => {
-      if (mr.kind !== 'load') return;
-      // AI-stamped equipment outranks every name heuristic. Below it, implicit held loads
-      // must not adopt a sibling's explicit equipment either — a "Weighted Pull-up" next
-      // to a "Barbell Bench" is not done with the barbell.
-      byKey.set(
-        mr.movementKey,
-        equipmentFromAi(mr.movement)
-          ?? getExplicitEquipmentType(mr.movement.name)
-          ?? (isImplicitHeldLoad(mr.movement.name) ? 'other' : null)
-          ?? sharedExplicitType
-          ?? getMovementEquipmentType(mr.movement),
-      );
-    });
-    return byKey;
-  }, [movements]);
+  const equipmentByKey = useMemo(() => resolveMovementEquipment(movements), [movements]);
 
   const getMovementEquipment = useCallback((mr: MovementResult) => (
     equipmentByKey.get(mr.movementKey) ?? getMovementEquipmentType(mr.movement)
   ), [equipmentByKey]);
 
-  const loadGroups = useMemo(() => {
-    const groups = new Map<SharedEquipment, { type: SharedEquipment; movements: MovementResult[] }>();
-    movements.forEach((mr) => {
-      if (mr.kind !== 'load') return;
-      const type = getMovementEquipment(mr);
-      // 'other' implements never share a weight input — they stay out of every group and
-      // render as individual WeightField tiles.
-      if (type === 'other') return;
-      const group = groups.get(type) ?? { type, movements: [] };
-      group.movements.push(mr);
-      groups.set(type, group);
-    });
-    return [...groups.values()];
-  }, [movements, getMovementEquipment]);
+  const loadGroups = useMemo(
+    () => resolveLoadGroups(movements, getMovementEquipment),
+    [movements, getMovementEquipment],
+  );
 
   // Only the first (focused) load group uses the hero shared-weight screen.
   // Secondary groups (different equipment type) are rendered as individual tiles.
@@ -512,6 +459,17 @@ export function ScoreMovementInputs({
     const focusedGroup = loadGroups[0];
     if (!focusedGroup || separateWeightGroups.has(focusedGroup.type)) return keys;
     focusedGroup.movements.forEach((mr) => keys.add(mr.movementKey));
+    return keys;
+  }, [loadGroups, separateWeightGroups]);
+
+  // Movements in a group the athlete split apart. Their weights are theirs alone — no
+  // first-edit propagation in or out, or "different weights" would immediately re-sync them.
+  const separatedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    loadGroups.forEach((group) => {
+      if (!separateWeightGroups.has(group.type)) return;
+      group.movements.forEach((mr) => keys.add(mr.movementKey));
+    });
     return keys;
   }, [loadGroups, separateWeightGroups]);
 
@@ -544,12 +502,14 @@ export function ScoreMovementInputs({
     // On the first manual weight edit, propagate atomically to all same-equipment
     // load movements that haven't been manually edited yet (barbell -> barbell, KB -> KB,
     // DB -> DB). 'other' implements are each their own thing — never propagate between them.
-    if (w != null && manuallyEditedRef.current.size === 1 && onBatch && getMovementEquipment(mr) !== 'other') {
+    const canPropagate = getMovementEquipment(mr) !== 'other' && !separatedKeys.has(mr.movementKey);
+    if (w != null && manuallyEditedRef.current.size === 1 && onBatch && canPropagate) {
       const srcEquip = getMovementEquipment(mr);
       const next = movements.map((other, otherIdx) => {
         if (otherIdx === globalIndex) return { ...other, weight: w };
         if (other.kind !== 'load') return other;
         if (manuallyEditedRef.current.has(other.movementKey)) return other;
+        if (separatedKeys.has(other.movementKey)) return other;
         if (getMovementEquipment(other) !== srcEquip) return other;
         return { ...other, weight: w };
       });
@@ -557,13 +517,16 @@ export function ScoreMovementInputs({
     } else {
       onChange(globalIndex, { weight: w });
     }
-  }, [movements, onChange, onBatch, getMovementEquipment]);
+  }, [movements, onChange, onBatch, getMovementEquipment, separatedKeys]);
 
-  const handleSharedWeightChange = useCallback((equipmentType: 'barbell' | 'kb' | 'db', weight: number | undefined) => {
+  // Every movement on the shared hero screen takes the one weight. Keyed on the group's
+  // movement keys, not on equipment: an unstated held load ('other') joins the implement
+  // group without ever classifying as that implement.
+  const handleSharedWeightChange = useCallback((weight: number | undefined) => {
     const w = weight != null ? Math.max(0, weight) : undefined;
     const next = movements.map((mr) => {
       if (mr.kind !== 'load') return mr;
-      if (getMovementEquipment(mr) !== equipmentType) return mr;
+      if (!sharedWeightKeys.has(mr.movementKey)) return mr;
       return { ...mr, weight: w };
     });
     if (onBatch) {
@@ -573,7 +536,7 @@ export function ScoreMovementInputs({
     next.forEach((mr, index) => {
       if (mr !== movements[index]) onChange(index, { weight: mr.weight });
     });
-  }, [movements, onBatch, onChange, getMovementEquipment]);
+  }, [movements, onBatch, onChange, sharedWeightKeys]);
 
   const clearLongPress = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -601,13 +564,31 @@ export function ScoreMovementInputs({
 
   useEffect(() => {
     if (seededDefaultsRef.current) return;
+    // What the hero screen opens on for the shared group. Members with no prescription of their
+    // own (an unstated held load that joined the implement) must be seeded with it, or the
+    // stored weight would be empty while the screen visibly reads "used for" that movement.
+    const heroGroup = loadGroups[0] ?? null;
+    const heroBase = heroGroup && (
+      heroGroup.movements.find(mr => mr.weight != null)
+      ?? heroGroup.movements.find(mr => getRxWeight(mr) != null)
+      ?? heroGroup.movements[0]
+    );
+    const heroWeight = heroGroup && heroBase
+      ? (heroBase.weight
+        ?? getDefaultMetconWeight(heroBase)
+        ?? getFallbackWeight(heroGroup.type, movementLoadUnit(heroBase.movement)))
+      : undefined;
+    const heroKeys = new Set(heroGroup?.movements.map(mr => mr.movementKey) ?? []);
+
     const next = movements.map((mr) => {
       if (mr.kind !== 'load' || mr.weight != null) return mr;
       // Seed from Rx weight (80% of prescribed) when available, otherwise fall back to
       // the equipment default (barbell=40, KB=16). This keeps the persisted value consistent
       // with what the hero weight screen visually displays; without seeding, the screen
       // shows a fallback weight that is lost if the user never taps +/-.
-      const defaultWeight = getDefaultMetconWeight(mr) ?? getFallbackWeight(getMovementEquipment(mr));
+      const defaultWeight = getDefaultMetconWeight(mr)
+        ?? (heroKeys.has(mr.movementKey) ? heroWeight : undefined)
+        ?? getFallbackWeight(getMovementEquipment(mr), movementLoadUnit(mr.movement));
       return defaultWeight != null ? { ...mr, weight: defaultWeight } : mr;
     });
     const changed = next.some((mr, i) => mr !== movements[i]);
@@ -623,7 +604,7 @@ export function ScoreMovementInputs({
     next.forEach((mr, index) => {
       if (mr !== movements[index]) onChange(index, { weight: mr.weight });
     });
-  }, [movements, onBatch, onChange, getMovementEquipment]);
+  }, [movements, onBatch, onChange, getMovementEquipment, loadGroups]);
 
   // Which movement key has the substitution sheet open
   const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
@@ -747,7 +728,7 @@ export function ScoreMovementInputs({
 
   const editableTiles = useMemo(() => (
     movements.flatMap((mr, globalIndex) => {
-      const config = getTileConfig(mr, distanceDerivedFromRounds);
+      const config = getTileConfig(mr, distancePrescribedByStructure);
       if (!config) return [];
       const sub = getSubState(mr);
       const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
@@ -760,7 +741,7 @@ export function ScoreMovementInputs({
         config,
       }];
     })
-  ), [movements, distanceDerivedFromRounds]);
+  ), [movements, distancePrescribedByStructure]);
 
   const tileRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
@@ -805,7 +786,7 @@ export function ScoreMovementInputs({
     // the +/- buttons do — otherwise typing would silently desync the group's shared weight.
     const commitWeight = (val: number | undefined) => {
       if (tile.mr.kind === 'load' && sharedWeightKeys.has(tile.mr.movementKey)) {
-        handleSharedWeightChange(getMovementEquipment(tile.mr) as 'barbell' | 'kb' | 'db', val);
+        handleSharedWeightChange(val);
       } else {
         handleWeightChange(tile.globalIndex, tile.mr, val);
       }
@@ -858,7 +839,7 @@ export function ScoreMovementInputs({
         onChange(tile.globalIndex, { reps: clamped });
         return;
     }
-  }, [editableTiles, handleWeightChange, handleSharedWeightChange, getMovementEquipment, sharedWeightKeys, onChange]);
+  }, [editableTiles, handleWeightChange, handleSharedWeightChange, sharedWeightKeys, onChange]);
 
   const handleNumpadDigit = useCallback((digit: string) => {
     if (!activeTileId) return;
@@ -921,8 +902,9 @@ export function ScoreMovementInputs({
     ).toUpperCase();
 
     const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
+    const schemeLabel = prescribedSchemeLabel(mr);
     const isSharedWeight = sharedWeightKeys.has(mr.movementKey);
-    const tileField = getTileConfig(mr, distanceDerivedFromRounds)?.field;
+    const tileField = getTileConfig(mr, distancePrescribedByStructure)?.field;
 
     return (
       <React.Fragment key={mr.movementKey}>
@@ -969,6 +951,13 @@ export function ScoreMovementInputs({
               </span>
             )}
           </div>
+
+          {/* The board's own scheme for this movement ("800-600-400m") — a ladder collapses to
+              one row per movement, so without this the row states nothing about the three
+              descending trips it stands for. */}
+          {schemeLabel && (
+            <span className={styles.prescribedScheme}>{schemeLabel}</span>
+          )}
 
           {/* Partner annotation */}
           {partnerNote && (
@@ -1018,7 +1007,12 @@ export function ScoreMovementInputs({
     const firstWithValue = focusedLoadGroup.movements.find(mr => mr.weight != null);
     const firstRx = focusedLoadGroup.movements.find(mr => getRxWeight(mr) != null);
     const base = firstWithValue ?? firstRx ?? focusedLoadGroup.movements[0];
-    const currentWeight = base?.weight ?? getDefaultMetconWeight(base) ?? getFallbackWeight(focusedLoadGroup.type) ?? 0;
+    // One shared bar, one unit: the movement whose Rx the hero is anchored on states it.
+    const groupUnit = movementLoadUnit(base?.movement);
+    const currentWeight = base?.weight
+      ?? getDefaultMetconWeight(base)
+      ?? getFallbackWeight(focusedLoadGroup.type, groupUnit)
+      ?? 0;
     const rx = getRxWeight(base);
     const step = getLegalWeightStep(base);
     const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' - ');
@@ -1029,7 +1023,7 @@ export function ScoreMovementInputs({
     const heroActive = activeTileId === base?.movementKey;
 
     const setSharedValue = (next: number) => {
-      handleSharedWeightChange(focusedLoadGroup.type, roundToLegalWeight(next, base));
+      handleSharedWeightChange(roundToLegalWeight(next, base));
     };
     const nudgeShared = (direction: -1 | 1, multiplier = 1) => {
       setSharedValue(currentWeight + direction * step * multiplier);
@@ -1045,7 +1039,11 @@ export function ScoreMovementInputs({
           <div className={styles.separateWeightList}>
             {focusedLoadGroup.movements.map((mr) => {
               const globalIndex = movements.indexOf(mr);
-              const value = mr.weight ?? getDefaultMetconWeight(mr) ?? getFallbackWeight(focusedLoadGroup.type) ?? 0;
+              const movementUnit = movementLoadUnit(mr.movement);
+              const value = mr.weight
+                ?? getDefaultMetconWeight(mr)
+                ?? getFallbackWeight(focusedLoadGroup.type, movementUnit)
+                ?? 0;
               const movementStep = getLegalWeightStep(mr);
               return (
                 <div key={mr.movementKey} className={styles.separateWeightRow}>
@@ -1061,7 +1059,7 @@ export function ScoreMovementInputs({
                     </button>
                     <span className={styles.separateWeightValue}>
                       {value}
-                      <span>{mr.implementCount === 2 ? 'kg each' : 'kg'}</span>
+                      <span>{mr.implementCount === 2 ? `${movementUnit} each` : movementUnit}</span>
                     </span>
                     <button
                       type="button"
@@ -1125,10 +1123,10 @@ export function ScoreMovementInputs({
               {isTwin && <span className={styles.heroWeightMultiplier}>2×</span>}
               {currentWeight}
             </span>
-            <span className={styles.heroWeightUnit}>{isTwin ? 'kg each' : 'kg'}</span>
+            <span className={styles.heroWeightUnit}>{isTwin ? `${groupUnit} each` : groupUnit}</span>
             {rx != null && (
               <span className={`${styles.rxHint} ${isRx ? styles.rxHit : ''}`}>
-                {isRx ? 'Rx ✓' : `Rx is ${rx}kg`}
+                {isRx ? 'Rx ✓' : `Rx is ${rx}${groupUnit}`}
               </span>
             )}
           </button>
@@ -1196,7 +1194,13 @@ export function ScoreMovementInputs({
 
   // Only stop on movements where the athlete can actually change something.
   // Plain bodyweight movements with no alternate are omitted from this input step.
-  const visibleMovements = movements.filter(mr => movementHasInput(mr, distanceDerivedFromRounds) || canOpenAlternate(mr));
+  // A ladder row earns its place even with nothing to enter: it carries the scheme (800-600-400m,
+  // 40-30-20) that tells the athlete what the tier structure actually is. Dropping the no-input
+  // rows told the story of a workout with one run in it.
+  const visibleMovements = movements.filter(mr =>
+    movementHasInput(mr, distancePrescribedByStructure)
+    || canOpenAlternate(mr)
+    || prescribedSchemeLabel(mr) != null);
   const visibleSectionGroups = groupBySections(visibleMovements);
   const focusedLoadStep = renderFocusedLoadStep();
   const focusedLoadFirstKey = focusedLoadGroup?.movements[0]?.movementKey ?? null;
@@ -1267,8 +1271,9 @@ function WeightField({
   active: boolean;
 }) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
-  const unitLabel = mr.implementCount === 2 ? '2x kg' : 'kg';
-  const step = getWeightStep(mr.movement.name, mr.movement.equipment);
+  const loadUnit = movementLoadUnit(mr.movement);
+  const unitLabel = mr.implementCount === 2 ? `2x ${loadUnit}` : loadUnit;
+  const step = getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit);
 
   return (
     <StepperInput
@@ -1276,7 +1281,7 @@ function WeightField({
       onChange={(v) => onChange({ weight: v != null ? Math.max(0, v) : undefined })}
       step={step}
       min={0}
-      max={500}
+      max={getWeightMax(loadUnit)}
       placeholder={placeholder}
       unit={unitLabel}
       color={LOAD_TILE_COLOR}

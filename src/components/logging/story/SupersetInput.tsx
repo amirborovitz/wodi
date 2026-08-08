@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { StoryExerciseResult, MovementResult } from './types';
-import { kindToTrinityColor, getWeightStep } from './types';
+import { kindToTrinityColor, getWeightStep, getWeightMax } from './types';
+import { movementLoadUnit } from '../../../utils/loadUnits';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
@@ -177,7 +178,8 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
                 placeholder={mr.movement.rxWeights?.male}
                 setsTotal={mr.sectionRounds ?? result.setsTotal}
                 repsPerSet={mr.movement.reps ?? result.exercise.suggestedReps}
-                step={getWeightStep(mr.movement.name, mr.movement.equipment)}
+                step={getWeightStep(mr.movement.name, mr.movement.equipment, movementLoadUnit(mr.movement))}
+                unit={movementLoadUnit(mr.movement)}
                 onChange={(start, peak) => handleBlockProgressive(i, start, peak)}
                 label={blockLabel(mr)}
               />
@@ -348,16 +350,17 @@ function SwapIcon() {
 // ─── Inline inputs ──────────────────────────────────────────────
 
 function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Partial<MovementResult>) => void }) {
-  const unitLabel = mr.implementCount === 2 ? '2× kg' : 'kg';
+  const loadUnit = movementLoadUnit(mr.movement);
+  const unitLabel = mr.implementCount === 2 ? `2× ${loadUnit}` : loadUnit;
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
 
   return (
     <StepperInput
       value={mr.weight}
       onChange={(v) => onUpdate({ weight: v != null ? Math.max(0, v) : undefined })}
-      step={getWeightStep(mr.movement.name, mr.movement.equipment)}
+      step={getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit)}
       min={0}
-      max={500}
+      max={getWeightMax(loadUnit)}
       placeholder={placeholder}
       unit={unitLabel}
       color={kindToTrinityColor('load')}

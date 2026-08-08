@@ -1,7 +1,8 @@
 import { useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
-import { getWeightStep } from './types';
+import { getWeightStep, getWeightMax } from './types';
+import { exerciseLoadUnit } from '../../../utils/loadUnits';
 import { StepperInput } from './StepperInput';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import styles from './LoadInput.module.css';
@@ -36,7 +37,10 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   const topTouched = useRef(false);
   const firstMovement = result.exercise?.movements?.[0];
   const movName = firstMovement?.name ?? result.exercise?.name ?? '';
-  const weightStep = getWeightStep(movName, firstMovement?.equipment);
+  // The board's unit, not the app's: an lb board is logged in lb, start to finish.
+  const unit = exerciseLoadUnit(result.exercise);
+  const weightStep = getWeightStep(movName, firstMovement?.equipment, unit);
+  const weightMax = getWeightMax(unit);
   const showBodyweightToggle = mode === 'bodyweight' || canUseBodyweightMode(movName);
 
   // Detect max set pattern (e.g., [8-6-4-2-max] → repsPerSet has 4 items, setsTotal=5)
@@ -138,6 +142,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               setsTotal={result.setsTotal}
               repsPerSet={result.exercise.suggestedReps}
               step={weightStep}
+              unit={unit}
               onChange={handleProgressiveChange}
               label={movName || result.exercise.name}
               footer={hasMaxSet ? (
@@ -158,9 +163,9 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
                     onChange={(v) => onChange({ maxRepsWeight: v != null ? Math.max(0, v) : undefined })}
                     step={weightStep}
                     min={0}
-                    max={500}
+                    max={weightMax}
                     placeholder={topVal ? String(Math.round(topVal * 0.6 / weightStep) * weightStep) : '0'}
-                    unit="kg"
+                    unit={unit}
                     color="var(--color-volume)"
                     inputMode="decimal"
                   />
@@ -183,6 +188,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               placeholder={getDefaultWeight(result)}
               setsTotal={result.setsTotal}
               step={weightStep}
+              unit={unit}
               onChange={handleSingleChange}
             />
           </motion.div>
@@ -201,9 +207,9 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               onChange={handleStartChange}
               step={weightStep}
               min={0}
-              max={500}
+              max={weightMax}
               placeholder="0"
-              unit="kg"
+              unit={unit}
               label="Start"
               color="var(--color-volume)"
               inputMode="decimal"
@@ -229,9 +235,9 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               onChange={(v) => { handleTopFocus(); handleTopChange(v); }}
               step={weightStep}
               min={0}
-              max={500}
+              max={weightMax}
               placeholder="0"
-              unit="kg"
+              unit={unit}
               label="Top"
               color="var(--color-volume)"
               inputMode="decimal"

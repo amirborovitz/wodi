@@ -1,0 +1,89 @@
+{
+  "name": "real-bike-sub-per-tier-20260805",
+  "description": "REAL saved doc (workouts/VdzdiGZ2V2EMVX4TZWEK, 2026-08-05). Same 800/600/400m run ladder as its sibling, but the run was substituted to an Echo Bike (x3) in the logging sheet. What the save path actually wrote: sections[] keep the ORIGINAL per-tier distances (800/600/400) under the SUBSTITUTED name 'Echo Bike', while top-level movements[] carry the tier-1 converted figure 2400 on all three tiers. Poster must read 2400-1800-1200m Echo Bikes, 5400m total (matching the stored workloadBreakdown) - not a flat 2400m / 7200m total.",
+  "workout": {
+    "title": "Metcon",
+    "type": "for_time",
+    "format": "for_time",
+    "status": "completed",
+    "timeCap": 2100,
+    "duration": 35,
+    "durationSeconds": 2100,
+    "isPR": false,
+    "partnerWorkout": false,
+    "partnerFactor": 1,
+    "difficultyLevel": 7,
+    "rawText": "For time:\n800m run\n40 Thrusters @15/20kg (empty Barbell)\n40 box jumps\n20 burpees over the bar\n600m run\n30 Thrusters @15/20kg (empty Barbell)\n30 box jumps\n30 burpees over the bar\n400m run\n20 Thrusters @15/20kg (empty Barbell)\n20 box jumps\n40 burpees over the bar\n< 35 minutes T.C.",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Pyramid For Time",
+        "aiPartName": "GRIND",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "Pyramid for time with a 35 min time cap",
+        "rounds": 3,
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "time": 1660, "weight": 20, "actualReps": 810 }
+        ],
+        "movements": [
+          { "name": "Echo Bike", "distance": 2400, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Thruster", "reps": 40, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Box Jump", "reps": 40, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Burpees Over Bar", "reps": 20, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Echo Bike", "distance": 2400, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Thruster", "reps": 30, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Box Jump", "reps": 30, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Burpees Over Bar", "reps": 30, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Echo Bike", "distance": 2400, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Thruster", "reps": 20, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Box Jump", "reps": 20, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Burpees Over Bar", "reps": 40, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Echo Bike", "distance": 800, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Thruster", "reps": 40, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Box Jump", "reps": 40, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Burpees Over Bar", "reps": 20, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Echo Bike", "distance": 600, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Thruster", "reps": 30, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Box Jump", "reps": 30, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Burpees Over Bar", "reps": 30, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              { "name": "Echo Bike", "distance": 400, "unit": "m", "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Thruster", "reps": 20, "loggedWeights": [20], "equipment": "barbell", "inputType": "weight", "rxWeights": { "male": 20, "female": 20, "unit": "kg" }, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Box Jump", "reps": 20, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+              { "name": "Burpees Over Bar", "reps": 40, "inputType": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+            ]
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "grandTotalReps": 270,
+      "grandTotalVolume": 1800,
+      "grandTotalDistance": 5400,
+      "movements": [
+        { "name": "Thruster", "totalReps": 90, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "weight": 20, "unit": "kg", "color": "yellow", "implementCount": 1, "wasSubstituted": false },
+        { "name": "Box Jump", "totalReps": 90, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "color": "magenta", "implementCount": 1, "wasSubstituted": false },
+        { "name": "Burpees Over Bar", "totalReps": 90, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "color": "magenta", "implementCount": 1, "wasSubstituted": false },
+        { "name": "Echo Bike", "totalReps": 0, "totalDistance": 5400, "totalCalories": 0, "totalTime": 0, "unit": "m", "color": "magenta", "implementCount": 1, "distancePerRep": 2400, "originalMovement": "Run", "substitutionType": "equivalent", "wasSubstituted": true }
+      ]
+    }
+  }
+}

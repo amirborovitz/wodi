@@ -4,6 +4,11 @@ import { useLayoutEffect, useRef, useState } from 'react';
  * Scales content down (never up) so it fits entirely within its container's
  * height — used so the poster card never gets clipped when a workout has
  * many movement rows.
+ *
+ * Anything the caller renders off the returned scale (a "needs fit" class, say)
+ * must NOT change the container's padding/height or the content's box: the
+ * ResizeObserver below would re-measure against the new geometry, flip the scale
+ * back, and leave the card flickering between the two states.
  */
 export function useFitScale<C extends HTMLElement, T extends HTMLElement>(
   deps: unknown[],

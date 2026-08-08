@@ -6,6 +6,11 @@ interface TellWodiSheetProps {
   open: boolean;
   /** Seed text when the sheet opens (e.g. from tapping a preview chip). */
   prefill: string;
+  /**
+   * The part being corrected, named so the athlete can see the scope they're about to change.
+   * The whole promise of this channel is "just this part" — an unnamed sheet can't make it.
+   */
+  partName: string | null;
   busy: boolean;
   error: string | null;
   onSubmit: (note: string) => void;
@@ -21,11 +26,14 @@ const QUICK_NOTES: { label: string; text: string }[] = [
 ];
 
 /**
- * Bottom sheet where the athlete adds context the whiteboard doesn't have
- * ("partner wod, teams of 2", "the cap was 12 min"). The note is fed back
- * into the AI parse as authoritative context and the preview updates.
+ * Bottom sheet where the athlete says, in their own words, what the parse got wrong about ONE
+ * part ("this isn't an AMRAP — each 2-min window is a run, 8 thrusters, then max burpees").
+ * The note is fed back into the AI as authoritative context and only that part is re-read.
+ *
+ * Free text on purpose: a fixed set of reason chips can only describe mistakes we anticipated,
+ * and the whole reason this channel exists is the ones we didn't.
  */
-export function TellWodiSheet({ open, prefill, busy, error, onSubmit, onClose }: TellWodiSheetProps) {
+export function TellWodiSheet({ open, prefill, partName, busy, error, onSubmit, onClose }: TellWodiSheetProps) {
   const [note, setNote] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -59,9 +67,10 @@ export function TellWodiSheet({ open, prefill, busy, error, onSubmit, onClose }:
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 420, damping: 38 }}
           >
-            <div className={styles.header}>Tell Wodi</div>
+            <div className={styles.header}>What did wodi miss?</div>
+            {partName && <div className={styles.scope}>{partName}</div>}
             <p className={styles.hint}>
-              Anything the board doesn&apos;t say — partner setup, time cap, a movement it got wrong.
+              Tell it in your own words. It&apos;ll re-read just this part.
             </p>
             <div className={styles.quickChips}>
               {QUICK_NOTES.map((quick) => (
@@ -84,7 +93,7 @@ export function TellWodiSheet({ open, prefill, busy, error, onSubmit, onClose }:
               className={styles.textarea}
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="e.g. partner wod, teams of 2, I go you go"
+              placeholder="e.g. it's not an amrap — each 2 min is a run, 8 thrusters, then max burpees"
               rows={3}
               disabled={busy}
             />
@@ -95,7 +104,7 @@ export function TellWodiSheet({ open, prefill, busy, error, onSubmit, onClose }:
               disabled={!canSubmit}
               onClick={() => onSubmit(note.trim())}
             >
-              {busy ? 'Re-reading the board…' : 'Update workout'}
+              {busy ? 'Re-reading…' : 'Re-read this part'}
             </button>
           </motion.div>
         </>

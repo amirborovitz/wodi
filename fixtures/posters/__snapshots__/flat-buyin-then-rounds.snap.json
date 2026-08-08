@@ -1,0 +1,211 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "5 rounds for time",
+      "rows": [],
+      "isPartnerConfirmed": false
+    },
+    {
+      "title": "BUY-IN",
+      "rows": [
+        {
+          "primary": "1000 M Row",
+          "name": "",
+          "mineKey": "Row",
+          "suppressMine": true,
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": false
+    },
+    {
+      "title": "THEN 5 ROUNDS OF",
+      "rows": [
+        {
+          "primary": "25 Pull-ups",
+          "name": "",
+          "totalNote": "125 total",
+          "mineKey": "Pull-up",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "primary": "7 Push Jerks @ 135lb",
+          "name": "",
+          "totalNote": "35 total",
+          "mineKey": "Push Jerk",
+          "accent": "yellow"
+        }
+      ],
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "5 rounds for time",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "BUY-IN",
+        "rows": [
+          {
+            "primary": "1000 M Row",
+            "name": "",
+            "mineKey": "Row",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "THEN 5 ROUNDS OF",
+        "rows": [
+          {
+            "primary": "25 Pull-ups",
+            "name": "",
+            "totalNote": "125 total",
+            "mineKey": "Pull-up",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "7 Push Jerks @ 135lb",
+            "name": "",
+            "totalNote": "35 total",
+            "mineKey": "Push Jerk",
+            "accent": "yellow"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "22:00",
+    "unit": "MIN",
+    "storyLine": "35 push jerk · 125 pull-up · 1.0km buy-in: row",
+    "storyMovements": [
+      {
+        "perRound": "1.0km",
+        "name": "Buy-In: Row",
+        "total": "1.0km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "25",
+        "name": "Pull-up",
+        "total": "125 total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "7",
+        "name": "Push Jerk",
+        "total": "35 total",
+        "color": "yellow",
+        "weight": 135,
+        "unit": "lb",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "22:00",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "5 ROUNDS FOR TIME",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "BUY-IN",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "1000 M Row",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "block",
+        "label": "THEN 5 ROUNDS OF",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "25 Pull-ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "125 total"
+      },
+      {
+        "kind": "line",
+        "rx": "7 Push Jerks @ 135lb",
+        "load": "",
+        "mine": "135lb",
+        "team": "",
+        "total": "35 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "5 ROUNDS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "1000 M Row",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "block",
+          "label": "THEN 5 ROUNDS OF",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "25 Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "125 total"
+        },
+        {
+          "kind": "line",
+          "rx": "7 Push Jerks @ 135lb",
+          "load": "",
+          "mine": "135lb",
+          "team": "",
+          "total": "35 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

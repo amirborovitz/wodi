@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 import { resolveSourceDate } from './sourceDateResolution';
 
@@ -184,8 +184,12 @@ const RULES_BLOCKS = `## BLOCKS — isSecondary
 You usually receive ONE part of a session (a strength piece OR a metcon OR accessory work) —
 the session was already split upstream. Parse what you're given; never force extra blocks.
 - "isSecondary": true for support work (warm-up, "body armor", mobility/prehab, activation,
-  "in between sets" accessories, cool-down); false for the piece the athlete trains for
+  "in between sets" accessories, cool-down) and for skill/technique practice ("practice",
+  "movement focus", "for quality", "quality sets"); false for the piece the athlete trains for
   (the main lift or the metcon). At most 2 non-secondary exercises.
+  A skill/practice block is ALWAYS "isSecondary": true — it is drilling, not a scored effort, so
+  it never becomes the main piece just because it is the only block in the text you were handed.
+  Judge the block on what it IS, never on what else happens to be in this call.
 - CRITICAL — EVERY BLOCK IS A STANDALONE PRACTICE. All structure fields ("loggingMode",
   "stationRotation", "intervalCount", "workDuration", "restDuration", and movement-level
   "stationLabel"/"stationIndex"/"countingMode") describe ONE exercise only — set them on the
@@ -292,6 +296,13 @@ const RULES_QUANTITIES = `## WEIGHT PARSING
 - "40/60 kg" → rxWeights: { female: 40, male: 60, unit: "kg" } (higher = male)
 - "@60kg" → rxWeights: { male: 60, female: 60, unit: "kg" }
 - "twin kb 16kg" or "2 kb 24kg" → rxWeights: 16 (per implement), implementCount: 2
+- POUNDS: report the number the coach wrote and tag the unit — NEVER convert to kg.
+  - "135 lb" / "135lbs" / "135#" → rxWeights: { male: 135, female: 135, unit: "lb" }
+  - "95/65 lb" → rxWeights: { female: 65, male: 95, unit: "lb" } (higher = male)
+  - "2x50lb DB" → rxWeights: { male: 50, female: 50, unit: "lb" }, implementCount: 2
+- The "#" suffix ALWAYS means pounds ("225#" = 225 lb), never a rep count or a rack position.
+- Set "unit" from what the board actually says. Only default to "kg" when no unit is written
+  anywhere on the board — never re-express one gym's numbers in the other gym's unit.
 
 ## DISTANCE PARSING
 - "~50m" or "approx 50m" → distance: 50 (use the numeric value as-is, ignore ~ / approx)
@@ -449,7 +460,8 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 ## PARTNER / TEAM WORKOUTS
 - A partner workout means the WORK IS SHARED OR SPLIT between athletes: a team total divided up, whole rounds traded (IGUG), or one shared score built by both. Pair language alone is NOT enough — see PAIR-PACED below for pairs that only time each other.
 - "IGUG", "I go you go", "in pairs", "with a partner" WITH shared/split work → partnerWorkout: true, teamSize: 2
-- "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N
+- "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N — but ONLY when that team shares ONE target or score. If the work written on the board is a per-person prescription that every athlete completes in full, the team wording is a logistics grouping (who rotates onto which machine, how many share a rig) → partnerWorkout: false, NO teamSize.
+- A TEAM SIZE MUST BE EXACT TO BE REAL: a range or approximate headcount ("teams of 4-5", "groups of 3-4", "~6 per team", "max 5 per team") can never describe a shared total — a team target cannot be divided by an indeterminate number. Treat it as a logistics grouping: partnerWorkout: false, NO teamSize. Same when the team note only explains equipment sharing or turn-taking ("work in teams of 4, 30 sec segments on the bike", "share a bar", "2 per rower") — the reps on the board are still each athlete's own work.
 - A board TITLED or headed "Partner WOD" / "Partner Metcon" is a partner workout even when no other partner phrasing appears in the body → partnerWorkout: true, teamSize: 2 (unless a different team size is stated). Keep that heading line in rawText — it is part of the board.
 - "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
@@ -473,6 +485,17 @@ Only treat such a piece as a true partner workout when the board explicitly make
 const RULES_SKILL_TIMECAP = `## SKILL / PRACTICE BLOCKS
 "Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
 Example: "A. 3 sets, for quality: 10 ring rows, 15 prone T-raises" → exercise type: "skill", suggestedSets: 3.
+type: "skill" says WHY the block exists, never HOW it is logged — pick loggingMode from the WORK, exactly as for any other block: bodyweight reps → "bodyweight", loaded sets → "strength", a timed piece → its timed mode. A practice block is a normal shape, so it must NOT fall back to "free" just because it is skill work or carries coaching cues ("focus on kipping", "max unbroken test, then 4 sets at 40-60%") — those cues belong in prescription, they do not change the mode.
+Example: "A. Movement focus: Toes to Bar, 8 minutes practice. Advanced: test max unbroken reps, then 4 more sets of 40-60%" → type: "skill", loggingMode: "bodyweight", suggestedSets: 5.
+
+A practice block is secondary, so it is logged as "did the sets" — UNLESS the athlete EARNS a number
+in it that the board does not prescribe. You decide whether it does: stamp "isMaxReps": true on the
+movement that carries that number, and stamp nothing when the block has none. Do not stamp a
+movement whose count the coach already wrote — that is prescription, and asking the athlete to
+re-enter it logs the board back to itself.
+- "test your max unbroken Toes to Bar, then 4 sets at 40-60%" → the Toes to Bar movement gets "isMaxReps": true
+- "8 minutes practice: work on your kipping rhythm" → nothing stamped (a cue, not a result)
+- "3 sets, for quality: 10 ring rows, 15 prone T-raises" → nothing stamped (both counts prescribed)
 
 ## TIME CAP
 "T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.`;
@@ -1120,6 +1143,10 @@ export async function parseWorkoutText(
   const withResolvedDate = {
     ...withRawText,
     sourceDate: resolveSourceDate(withRawText.sourceDate, text, new Date()),
+    // Stamped BEFORE post-processing, not after: the post-processor's text-driven inference
+    // reads the board's own wording, and an athlete correction exists precisely because that
+    // wording is misleading. It has to know a correction is in play to stand down.
+    ...(athleteNote ? { userContext: athleteNote } : {}),
   };
   const postProcessed = postProcessParsedWorkout(withResolvedDate);
 
@@ -1210,7 +1237,7 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
 
 export interface WorkoutPartSegment {
   label?: string;
-  kind: 'strength' | 'metcon' | 'accessory';
+  kind: WorkoutPartKind;
   text: string;
 }
 
@@ -1238,7 +1265,7 @@ SEGMENTATION:
 - The unit of a part is the SCORE, never the label. Before splitting on A./B./C. labels, check what governs the labeled blocks: a format/scoring header written ONCE above them ("For time:", "AMRAP 25", "Chipper") and/or a single time cap written once below covering all of them means the blocks run on ONE clock toward ONE score — they are ONE part, with the internal labels kept inside its text. The same holds for blocks joined by connectors ("Into:", "then", "A+B+C for time") and for a partner piece with one finish time. Example: "For time: / A. 10 rounds: [...] / B. 10 rounds: [...] / C. 10 rounds: [...] / 40 min T.C." is ONE metcon part.
 - Labels split into separate parts only when each labeled block is SEPARATELY LETTERED (its own A./B./C.) AND scored on its own — it carries its own format/scoring line ("A. Every 1:30 x 8: ...", "B. 16 min AMRAP: ..."), its own clock or time cap, or is a different kind of training. Blocks scored independently are separate parts even when unlabeled.
 - A per-block cadence/scheme line alone does NOT promote a sub-block to its own part. What binds sub-blocks into ONE part is a SHARED GOVERNING SCOPE: they sit under a single top-level label (one "A."), or under one scoring header / one time cap. Sub-bullets or lines within that scope stay ONE part even when each repeats its own cadence/scheme line — and whether or not a connector ("Into:", "then", "immediately into") joins them. The connector is a hint, not the trigger; the trigger is the shared scope. Contrast: "A. 4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" is ONE strength part (both bullets share the single label A.) — do NOT split it into Push Press and Push Jerk parts; whereas "A. Every 1:30 x 8: [...] / B. 16 min AMRAP: [...]" is TWO parts (two separate top-level letters, each with its own scoring).
-- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", unrelated skill practice.
+- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", and skill/technique practice ("movement focus of the day", "8 minutes practice", "for quality", "quality sets"). A practice block is "accessory" even when it opens the session, headlines a movement, or drills something the metcon later uses — practising a movement is not the same as being scored on it.
 - A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
 - A date written on the board goes into the FIRST part's text (a later step reads it from there).
 - Single-part boards return one part. Never invent parts that are not on the board.
@@ -1363,6 +1390,9 @@ function mergeSegmentedParses(
     return parse.exercises.map((exercise) => ({
       ...exercise,
       rawText: exercise.rawText || part.text,
+      // Kept so this part can later be re-parsed ALONE under the same prompt scope it was
+      // first read with — the athlete's "Fix this part" never re-reads its siblings.
+      partKind: part.kind,
       ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
     }));
   });
@@ -1415,6 +1445,34 @@ function withUserContext(parsed: ParsedWorkout, athleteNote?: string): ParsedWor
   return athleteNote ? { ...parsed, userContext: athleteNote } : parsed;
 }
 
+/**
+ * Re-read ONE part of a board with the athlete's correction, leaving every other part untouched.
+ *
+ * This is the whole correction channel. It deliberately does NOT go through
+ * `parseWorkoutSession`: segmenting again would re-read the entire board, and the parse is
+ * non-deterministic — so a note about the metcon could silently reshape a strength part the
+ * athlete never complained about, discarding numbers they already logged correctly. Re-parsing
+ * one part is also one call on the cheaper kind-scoped prompt instead of segment + N.
+ *
+ * `partText` is the exercise's own `rawText` (its slice of the board, preserved through the
+ * merge) and `kind` is its `partKind` — both persisted on the saved workout for exactly this.
+ * Callers splice the result back with `applyPartReparse`.
+ */
+export async function reparseWorkoutPart(
+  partText: string,
+  kind: WorkoutPartKind | undefined,
+  athleteNote: string,
+): Promise<ParsedWorkout> {
+  const { parsed } = await parseWorkoutText(partText, 'TEXT', kind, athleteNote);
+  return withUserContext(
+    // The re-parse sees only this part's text, so its exercises come back without the scope
+    // stamp the merge would normally apply. Restore it, or a second correction on the same
+    // part would have nothing to re-parse with.
+    { ...parsed, exercises: parsed.exercises.map((exercise) => ({ ...exercise, partKind: kind })) },
+    athleteNote,
+  );
+}
+
 async function structureSegments(
   originalText: string,
   segmented: SegmentedWorkout,
@@ -1434,6 +1492,9 @@ async function structureSegments(
     return applyTitlePartnerOverride({
       ...parsed,
       rawText: originalText,
+      // Single-part boards get the same stamp as merged ones — a one-part session must be
+      // just as re-parseable as one part of a three-part session.
+      exercises: parsed.exercises.map((exercise) => ({ ...exercise, partKind: part.kind })),
       ...(segmented.title ? { title: segmented.title } : {}),
     });
   }
@@ -1508,6 +1569,9 @@ function buildFreePartFallback(part: WorkoutPartSegment): ParsedWorkout {
       suggestedSets: 1,
       loggingMode: 'free',
       rawText: part.text,
+      // A part that fell back to 'free' is the one MOST likely to be corrected — it must carry
+      // its scope so "Fix this part" can retry the structuring it just failed.
+      partKind: part.kind,
       ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
     }],
   };

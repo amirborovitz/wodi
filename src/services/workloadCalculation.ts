@@ -1,6 +1,7 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks } from '../utils/sectionShape';
+import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 
 /**
  * Whether an exercise inside a partner session was prescribed as a TEAM total —
@@ -29,7 +30,9 @@ const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
 const EACH_SPLIT = /\(\s*\d+\s*each\s*\)/i;
 
 export function isTeamPrescribedExercise(
-  exercise: Pick<ParsedExercise, 'name' | 'prescription' | 'partnerWorkout'>,
+  // Structural, not Pick<ParsedExercise>: the saved Firestore Exercise reaching this from
+  // detail mode carries the same three fields but leaves prescription optional.
+  exercise: { name?: string; prescription?: string; partnerWorkout?: boolean },
   partnerFactor: number,
   isSoleExercise: boolean,
 ): boolean {
@@ -652,10 +655,12 @@ export function calculateWorkloadBreakdown(
       return (b.totalReps || 0) - (a.totalReps || 0);
     });
 
-  // Derive volume from final movements for consistency with display
+  // Derive volume from final movements for consistency with display.
+  // Rows keep the unit the coach wrote; grandTotalVolume is kg by definition (EP divides it
+  // by the athlete's bodyweight in kg), so an lb load converts here and only here.
   const derivedVolume = movements.reduce((sum, m) => {
     if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-      return sum + m.weight * m.totalReps;
+      return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
     }
     return sum;
   }, 0);
@@ -680,6 +685,12 @@ export function calculateWorkloadBreakdown(
 export function calculateWorkloadFromExercises(
   exercises: Array<{
     name: string;
+    prescription?: string;
+    partnerWorkout?: boolean;
+    // Sets store a bare number; the unit lives on the prescription the athlete typed into.
+    // Structural so a saved `Exercise` satisfies it as-is.
+    rxWeights?: { unit?: 'kg' | 'lb' };
+    movements?: ReadonlyArray<{ rxWeights?: { unit?: 'kg' | 'lb' } }>;
     sets: Array<{
       actualReps?: number;
       weight?: number;
@@ -694,7 +705,6 @@ export function calculateWorkloadFromExercises(
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
   let grandTotalDistance = 0;
-  let grandTotalRunDistance = 0; // Run distance exempt from partner division
   let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
@@ -718,6 +728,21 @@ export function calculateWorkloadFromExercises(
       if (set.calories) {
         exerciseCalories += set.calories;
       }
+    }
+
+    // The partner factor divides only what a COACH prescribed as a team total, and only for
+    // the blocks that were actually shared — the same gate the save path applies in
+    // buildWorkloadBreakdownFromResults. Applying it to every movement in the session (as
+    // this function used to, at the end of the pipeline) quietly divided the solo strength
+    // block of a partner session too, and divided runs on the way to the grand total even
+    // though each athlete runs the full distance.
+    const isTeamExercise = isTeamPrescribedExercise(exercise, partnerFactor, exercises.length === 1);
+    const isRun = /\b(run|running|sprint)\b/i.test(exercise.name);
+    const factor = isTeamExercise && !isRun ? partnerFactor || 1 : 1;
+    if (factor !== 1) {
+      exerciseReps = Math.round(exerciseReps * factor);
+      exerciseDistance = Math.round(exerciseDistance * factor);
+      exerciseCalories = Math.round(exerciseCalories * factor);
     }
 
     // Only the real (first/last set) weights are ever stored, so the average of the
@@ -749,7 +774,7 @@ export function calculateWorkloadFromExercises(
         : exerciseCalories > 0
           ? 'cal'
           : exerciseWeight
-            ? 'kg'
+            ? exerciseLoadUnit(exercise)
             : undefined;
       movementMap.set(key, {
         name: exercise.name,
@@ -769,9 +794,6 @@ export function calculateWorkloadFromExercises(
     }
     if (exerciseDistance > 0) {
       grandTotalDistance += exerciseDistance;
-      if (/\b(run|running|sprint)\b/i.test(exercise.name)) {
-        grandTotalRunDistance += exerciseDistance;
-      }
       if ((exerciseWeight && exerciseWeight > 0) || isWeightedCarry(exercise.name)) {
         grandTotalWeightedDistance += exerciseDistance;
       }
@@ -782,7 +804,6 @@ export function calculateWorkloadFromExercises(
   }
 
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
-  const factor = partnerFactor || 1;
   const movements = Array.from(movementMap.values())
     // Keep movements with any meaningful metric: reps, calories, distance — or a logged
     // weight (a rep-less coach line like an alternating pair still happened and must
@@ -791,17 +812,6 @@ export function calculateWorkloadFromExercises(
       || (m.totalCalories && m.totalCalories > 0)
       || (m.totalDistance && m.totalDistance > 0)
       || (m.weight && m.weight > 0))
-    .map((movement) => {
-      // Runs are never divided — each person runs the full distance
-      const isRun = /\b(run|running|sprint)\b/i.test(movement.name);
-      const f = isRun ? 1 : factor;
-      return {
-        ...movement,
-        totalReps: movement.totalReps ? Math.round(movement.totalReps * f) : movement.totalReps,
-        totalCalories: movement.totalCalories ? Math.round(movement.totalCalories * f) : movement.totalCalories,
-        totalDistance: movement.totalDistance ? Math.round(movement.totalDistance * f) : movement.totalDistance,
-      };
-    })
     .sort((a, b) => {
       const colorDiff = (colorOrder[a.color || 'magenta'] || 1) - (colorOrder[b.color || 'magenta'] || 1);
       if (colorDiff !== 0) return colorDiff;
@@ -811,23 +821,23 @@ export function calculateWorkloadFromExercises(
       return bVal - aVal;
     });
 
-  // Derive volume from final movements for consistency with display
+  // Derive volume from final movements for consistency with display.
+  // grandTotalVolume is kg by definition — see the note in calculateWorkloadBreakdown.
   const derivedVolume = movements.reduce((sum, m) => {
     if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-      return sum + m.weight * m.totalReps;
+      return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
     }
     return sum;
   }, 0);
 
   return {
     movements,
-    grandTotalReps: Math.round(grandTotalReps * factor),
+    // Already per-exercise factored above — never scale a second time here.
+    grandTotalReps: Math.round(grandTotalReps),
     grandTotalVolume: Math.round(derivedVolume),
-    grandTotalDistance: grandTotalDistance > 0
-      ? Math.round((grandTotalDistance - grandTotalRunDistance) * factor + grandTotalRunDistance)
-      : undefined,
-    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance * factor) : undefined,
-    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories * factor) : undefined,
+    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
+    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
+    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds,
   };
 }

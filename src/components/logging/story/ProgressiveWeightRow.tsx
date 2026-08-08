@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { LoadUnit } from '../../../utils/loadUnits';
 import styles from './ProgressiveWeightRow.module.css';
 
 function selectAllInput(target: HTMLInputElement | null) {
@@ -44,8 +45,11 @@ interface ProgressiveWeightRowProps {
   placeholder?: number;
   setsTotal: number;
   repsPerSet?: number;
-  /** Chevron/drag increment in kg (2 for KBs, 2.5 for plates). Typed values ignore it. */
+  /** Chevron/drag increment in the prescribed unit (2 for KBs, 2.5 for plates, 5 in lb).
+   *  Typed values ignore it. */
   step?: number;
+  /** The unit the board prescribed this load in — what the athlete is typing. */
+  unit?: LoadUnit;
   onChange: (start: number | undefined, peak: number | undefined) => void;
   label?: string;
   footer?: ReactNode;
@@ -67,12 +71,14 @@ export function ProgressiveWeightRow({
   setsTotal,
   repsPerSet,
   step = 2.5,
+  unit = 'kg',
   onChange,
   label = 'Barbell',
   footer,
   singleColumn = false,
   columnLabel = 'Weight',
 }: ProgressiveWeightRowProps) {
+  const unitLabel = unit.toUpperCase();
   const peakTouched = useRef(false);
   const peakRef = useRef<number | undefined>(peakWeight);
   const weightRef = useRef<number | undefined>(weight);
@@ -292,10 +298,10 @@ export function ProgressiveWeightRow({
               onPointerDown={(e) => e.stopPropagation()}
               onChange={(e) => setStartDraft(e.target.value)}
               onBlur={singleColumn ? commitSingleDraft : commitStartDraft}
-              aria-label={singleColumn ? `${columnLabel} in kg` : 'Start weight in kg'}
+              aria-label={singleColumn ? `${columnLabel} in ${unit}` : `Start weight in ${unit}`}
             />
           </div>
-          <span className={styles.unit}>KG</span>
+          <span className={styles.unit}>{unitLabel}</span>
 
           <button className={styles.chevron}
             onPointerDown={() => startHold(() => (singleColumn ? stepSingle(-step) : stepStart(-step)))}
@@ -338,10 +344,10 @@ export function ProgressiveWeightRow({
                 onPointerDown={(e) => e.stopPropagation()}
                 onChange={(e) => setPeakDraft(e.target.value)}
                 onBlur={commitPeakDraft}
-                aria-label="Peak weight in kg"
+                aria-label={`Peak weight in ${unit}`}
               />
             </div>
-            <span className={styles.unit}>KG</span>
+            <span className={styles.unit}>{unitLabel}</span>
 
             <button className={styles.chevron}
               onPointerDown={() => startHold(() => stepPeak(-step))}

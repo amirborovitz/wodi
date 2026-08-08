@@ -6,6 +6,9 @@ import {
   getDocs,
   deleteDoc,
   doc,
+  setDoc,
+  updateDoc,
+  increment,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -31,6 +34,8 @@ interface UseWorkoutsResult {
   error: Error | null;
   refresh: () => Promise<void>;
   deleteWorkout: (workoutId: string) => Promise<boolean>;
+  /** Flag/unflag a saved workout as a throwaway test. Resolves false if the write failed. */
+  setWorkoutTest: (workoutId: string, isTest: boolean) => Promise<boolean>;
   stats: {
     thisWeek: number;
     thisMonth: number;
@@ -83,7 +88,18 @@ function calculateWorkoutStats(workout: Workout): { totalReps: number; totalVolu
   return { totalReps, totalVolume };
 }
 
-export function useWorkouts(maxCount = 50): UseWorkoutsResult {
+interface UseWorkoutsOptions {
+  /**
+   * Include throwaway test workouts. Default false: every count, total, recap and record reads
+   * through this hook, so ONE filter here keeps them all clean rather than asking each consumer
+   * to remember. Only a surface whose job is managing the workouts themselves (the Gallery, so
+   * they can be found and deleted) should opt in.
+   */
+  includeTests?: boolean;
+}
+
+export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): UseWorkoutsResult {
+  const { includeTests = false } = options;
   const { user } = useAuth();
   const [workouts, setWorkouts] = useState<WorkoutWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +197,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
             heroAchievement,
             achievements,
             isPR,
+            isTest: data.isTest === true,
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
           };
@@ -191,6 +208,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
         // Keep the most recently TRAINED workouts — the cap has to be applied after
         // the real-date sort, or a late-logged old board would displace a newer one.
         .filter((w) => w.status === 'completed')
+        .filter((w) => includeTests || !w.isTest)
         .sort(byNewestTrained)
         .slice(0, maxCount);
 
@@ -251,6 +269,42 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
     }
   };
 
+  const setWorkoutTest = async (workoutId: string, isTest: boolean): Promise<boolean> => {
+    if (!user) return false;
+    const target = workouts.find((w) => w.id === workoutId);
+
+    try {
+      await updateDoc(doc(db, 'workouts', workoutId), { isTest });
+
+      // The save already bumped the user-doc counters for this workout, and those are the one
+      // thing the read filter can't reach — so flagging has to walk them back, and unflagging has
+      // to put them back. Without this the totals drift by a workout every time the flag is used.
+      if (target) {
+        const sign = isTest ? -1 : 1;
+        await setDoc(doc(db, 'users', user.id), {
+          stats: {
+            totalWorkouts: increment(sign),
+            totalVolume: increment(sign * (target.totalVolume || 0)),
+          },
+        }, { merge: true });
+      }
+
+      // Honour this consumer's own filter, or the change leaves no trace: on Home (which excludes
+      // tests) the poster used to sit in the rail exactly as before, so nothing told the athlete
+      // the flag had taken. Dropping it there IS the feedback; the Gallery opted in, so it keeps
+      // the row and re-renders it badged.
+      setWorkouts((prev) => (
+        !includeTests && isTest
+          ? prev.filter((w) => w.id !== workoutId)
+          : prev.map((w) => (w.id === workoutId ? { ...w, isTest } : w))
+      ));
+      return true;
+    } catch (err) {
+      console.error('Error updating test flag:', err);
+      return false;
+    }
+  };
+
   // Calculate summary stats
   const startOfWeek = getStartOfWeek();
   const startOfMonth = getStartOfMonth();
@@ -267,6 +321,7 @@ export function useWorkouts(maxCount = 50): UseWorkoutsResult {
     error,
     refresh: fetchWorkouts,
     deleteWorkout,
+    setWorkoutTest,
     stats,
   };
 }

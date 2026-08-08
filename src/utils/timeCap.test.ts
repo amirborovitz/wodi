@@ -32,6 +32,16 @@ describe('parseTimeCapSeconds', () => {
     expect(parseTimeCapSeconds('TC 7:30')).toBe(7 * 60 + 30);
   });
 
+  it('reads the cap, not the first number that happens to follow the marker', () => {
+    // The AI writes a prescription as "35 min cap: 800m run, 40 Thrusters, ...". Marker-first
+    // matched "cap: 800" and, being tried first, won — the poster printed "800 MIN CAP". The
+    // marker-LAST reading is the specific one here and must take precedence.
+    expect(parseTimeCapSeconds('35 min cap: 800m run, 40 Thrusters')).toBe(35 * 60);
+    expect(parseTimeCapSeconds('20 min cap: 100 burpees')).toBe(20 * 60);
+    // Marker-first still owns the notations only it can read.
+    expect(parseTimeCapSeconds('T.C - 34 MIN: 400m run')).toBe(34 * 60);
+  });
+
   it('does not invent a cap where none was written', () => {
     expect(parseTimeCapSeconds('5 rounds for time')).toBeUndefined();
     expect(parseTimeCapSeconds('')).toBeUndefined();

@@ -279,6 +279,24 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Hero lays the unit beside the number on its baseline, not stacked under it — "12 reps" reads
+   as one figure the way the poster prints it. */
+.arcadeCenterHero {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/* Hero value — the screen exists to capture this one number, so it carries the display face and
+   the accent, per the design system's hierarchy rule ("the achievement is the hero"). */
+.arcadeValueHero {
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--stepper-color, var(--wodi-yellow));
+}
+
 .arcadeUnit {
   font-size: 11px;
   font-weight: 600;

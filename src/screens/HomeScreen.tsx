@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
+import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { DEFAULT_BW } from '../utils/xpCalculations';
@@ -12,7 +12,7 @@ import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
-import { db } from '../services/firebase';
+import { isAdminEmail } from '../utils/admin';
 import type { PlannedWorkout } from '../types';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
@@ -64,8 +64,8 @@ export function HomeScreen({
   onOpenRecap,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
-  const { workouts, loading, refresh, deleteWorkout } = useWorkouts(100);
-  const { planned } = usePlannedWorkouts();
+  const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(100);
+  const { planned, deleteSavedWod } = usePlannedWorkouts();
   const { monthRecap, seasonRecap } = useRecapData(workouts, user?.id);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
@@ -91,8 +91,9 @@ export function HomeScreen({
     setRecapHandled(true);
     if (recapForToday) onOpenRecap?.(recapForToday);
   };
-  const [actionSheetWorkoutId, setActionSheetWorkoutId] = useState<string | null>(null);
-  const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(setActionSheetWorkoutId);
+  const deleteSheet = useDeleteSheet(deleteWorkout);
+  const savedDeleteSheet = useDeleteSheet(deleteSavedWod);
+  const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(deleteSheet.open);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recapSlotRef = useRef<HTMLDivElement>(null);
@@ -148,8 +149,14 @@ export function HomeScreen({
     return planned.slice(0, 3).map(getSavedTitle).join(', ');
   }, [planned]);
 
-  const actionSheetWorkout = actionSheetWorkoutId
-    ? workouts.find((w) => w.id === actionSheetWorkoutId) ?? null
+  const actionSheetWorkout = deleteSheet.targetId
+    ? workouts.find((w) => w.id === deleteSheet.targetId) ?? null
+    : null;
+
+  // Null closes the sheet, which is what should happen if the row vanished under us
+  // (deleted on another device) — there is nothing left to confirm.
+  const savedActionSheet = savedDeleteSheet.targetId
+    ? planned.find((p) => p.id === savedDeleteSheet.targetId) ?? null
     : null;
 
   const handleSelectWorkout = (workout: WorkoutWithStats) => {
@@ -157,16 +164,16 @@ export function HomeScreen({
     onSelectWorkout?.(workout, workouts);
   };
 
-  const handleDeleteWorkout = async () => {
-    if (actionSheetWorkoutId) {
-      await deleteWorkout(actionSheetWorkoutId);
-      setActionSheetWorkoutId(null);
-    }
+  const handleDeleteSavedWod = (saved: PlannedWorkout) => {
+    savedDeleteSheet.open(saved.id);
   };
 
-  const handleDeleteSavedWod = async (saved: PlannedWorkout) => {
-    await deleteDoc(doc(db, 'savedWods', saved.id));
-    if (planned.length <= 1) setSavedSheetOpen(false);
+  const handleConfirmDeleteSavedWod = async () => {
+    const deleted = await savedDeleteSheet.confirm();
+    // Only on success — a failed delete keeps its own sheet up with the error, and closing
+    // For Later underneath it would read as though the WOD had gone. `planned` is this
+    // render's snapshot and still holds the deleted row, so 1 means "that was the last one".
+    if (deleted && planned.length <= 1) setSavedSheetOpen(false);
   };
 
   const handleLogSavedWod = (saved: PlannedWorkout) => {
@@ -424,8 +431,32 @@ export function HomeScreen({
 
       <DeleteActionSheet
         title={actionSheetWorkout?.title ?? null}
-        onDelete={handleDeleteWorkout}
-        onCancel={() => setActionSheetWorkoutId(null)}
+        onDelete={deleteSheet.confirm}
+        onCancel={deleteSheet.close}
+        busy={deleteSheet.busy}
+        error={deleteSheet.error}
+        tag={actionSheetWorkout?.isTest ? 'TEST' : null}
+        // Marking drops the workout from the rail (Home excludes tests), so in practice this only
+        // ever reads "Mark as test" here — but the label still follows the state rather than
+        // asserting it, so a workout left over from a stale fetch can't offer the wrong action.
+        secondaryAction={isAdminEmail(user?.email) && actionSheetWorkout ? {
+          label: actionSheetWorkout.isTest ? 'Unmark as test' : 'Mark as test',
+          onClick: () => {
+            void setWorkoutTest(actionSheetWorkout.id, !actionSheetWorkout.isTest);
+            deleteSheet.close();
+          },
+        } : null}
+      />
+
+      {/* Saved WODs get their own confirm. It renders above the For Later sheet it is raised
+          from (see the z-index note in DeleteActionSheet.module.css). */}
+      <DeleteActionSheet
+        title={savedActionSheet ? getSavedTitle(savedActionSheet) : null}
+        deleteLabel="Delete Saved WOD"
+        onDelete={handleConfirmDeleteSavedWod}
+        onCancel={savedDeleteSheet.close}
+        busy={savedDeleteSheet.busy}
+        error={savedDeleteSheet.error}
       />
 
       <AnimatePresence>
@@ -479,7 +510,6 @@ export function HomeScreen({
                       key={p.id}
                       planned={p}
                       onLog={handleLogSavedWod}
-                      onOpen={handleLogSavedWod}
                       onDelete={handleDeleteSavedWod}
                     />
                   ))

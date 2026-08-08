@@ -24,26 +24,6 @@
     [
       {
         "eyebrow": "WOD",
-        "title": "Max Height Squat Jumps",
-        "blueprint": "4 sets",
-        "rows": [
-          {
-            "primary": "6",
-            "name": "Max Height Squat Jump",
-            "subNote": "24 total",
-            "totalNote": "24 total",
-            "mineKey": "Max Height Squat Jump",
-            "accent": "yellow",
-            "repeatCount": 4
-          }
-        ],
-        "hiddenCount": 0,
-        "isPartnerConfirmed": false
-      }
-    ],
-    [
-      {
-        "eyebrow": "WOD",
         "title": "03:00 min AMRAP x 4",
         "blueprint": "3 min AMRAP · 1 min rest · 4 rounds",
         "rows": [
@@ -161,21 +141,6 @@
       [
         {
           "kind": "block",
-          "label": "MAX HEIGHT SQUAT JUMPS",
-          "cap": "4 sets"
-        },
-        {
-          "kind": "line",
-          "rx": "6 Max Height Squat Jump",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "24 total"
-        }
-      ],
-      [
-        {
-          "kind": "block",
           "label": "03:00 MIN AMRAP X 4",
           "cap": "3 min AMRAP · 1 min rest · 4 rounds"
         },
@@ -209,7 +174,6 @@
   "partnerSubs": {
     "reward": null,
     "pages": [
-      null,
       null,
       null
     ]

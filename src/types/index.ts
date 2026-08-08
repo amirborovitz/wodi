@@ -162,6 +162,15 @@ export interface Workout {
   heroAchievement?: Achievement;
   achievements?: Achievement[];
   isPR?: boolean;
+  /**
+   * A throwaway workout logged to exercise the app, not to record training.
+   *
+   * It is excluded from every count, total, recap and record — see the single filter in
+   * `useWorkouts`, which is what all of those read through. It also suppresses the save-time
+   * side effects that a later filter could never undo: the user-doc counters and PR writes.
+   * The Gallery still lists it (badged) so it can be found and deleted.
+   */
+  isTest?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -171,6 +180,14 @@ export interface WorkoutScores {
   cardio: number;        // 0-100
   effort: number;        // 0-100
 }
+
+/**
+ * Which kind-scoped parse prompt a board part was structured with. Persisted per exercise so a
+ * single part can be RE-PARSED on its own later (the athlete's "Fix this part" correction) —
+ * without it the re-parse would have to guess the prompt scope, or fall back to re-reading the
+ * whole board and disturbing parts the athlete never complained about.
+ */
+export type WorkoutPartKind = 'strength' | 'metcon' | 'accessory';
 
 export interface Exercise {
   id: string;
@@ -198,8 +215,12 @@ export interface Exercise {
   mvpNote?: string;         // Individual standout note for team workouts (e.g. "NIMROD CRUSHED IT!")
   // This exercise's OWN slice of the whiteboard/source text — scoped to just this block, not
   // the whole photo. Carried through from ParsedExercise.rawText so poster-time text matching
-  // (e.g. parseDescLadderScheme) stays scoped per part in multi-exercise workouts.
+  // (e.g. parseDescLadderScheme) stays scoped per part in multi-exercise workouts. Also the
+  // INPUT to a per-part re-parse — see WorkoutPartKind.
   rawText?: string;
+  // The parse scope this part was structured with, carried from ParsedExercise so a saved
+  // workout can re-parse this one part on its own. See WorkoutPartKind.
+  partKind?: WorkoutPartKind;
   // True when this exercise's movements are performed as ONE barbell complex per set — an unbroken
   // sequence on a single bar ("1 Power Clean + 1 Hang Power Clean"). Carried from ParsedExercise so
   // the poster renders the sub-movements as one combined line in both reward and detail mode.
@@ -448,8 +469,12 @@ export interface ParsedExercise {
   // This exercise's OWN slice of the whiteboard/source text — scoped to just this block,
   // not the whole photo. Use this (not the workout-level rawText) for any per-exercise text
   // matching (ladder detection, "after each round" phrasing, etc.) in a multi-exercise workout,
-  // so one block's wording can never leak into a sibling block's detection.
+  // so one block's wording can never leak into a sibling block's detection. Also the INPUT to a
+  // per-part re-parse — see WorkoutPartKind.
   rawText?: string;
+  // The parse scope this part was structured with (set by mergeSegmentedParses from the
+  // segmentation's own kind), so this one part can be re-parsed alone. See WorkoutPartKind.
+  partKind?: WorkoutPartKind;
   // True if this is an auxiliary/accessory block (warm-up, body armor, mobility, skill practice)
   // rather than one of the session's main parts. A session has AT MOST 2 main parts — typically
   // a strength piece and a metcon/WOD — every other exercise must be isSecondary: true.

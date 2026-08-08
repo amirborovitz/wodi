@@ -1,0 +1,76 @@
+{
+  "name": "flat-buyin-then-rounds",
+  "description": "2007 Hopper: a 1000m row buy-in, THEN 5 rounds. The AI expresses this shape with NO sections[] — openai.ts flattens buyIn[] into movements[] carrying role:'buy_in', perRound:false and a 'Buy-In: ' name prefix. The poster used to render all three movements as peers under one '5 ROUNDS' format line, printing the prefix as part of the name ('1000m Buy-In: Row') so the once-only row read as if it repeated five times. Must render BUY-IN / THEN 5 ROUNDS OF headers with the prefix stripped. Also pins lb loads surviving to the poster.",
+  "workout": {
+    "title": "Workout 1",
+    "format": "for_time",
+    "rawText": "2007 Hopper — For time:\n1000m Row (buy-in)\nThen 5 rounds of:\n25 Pull-ups\n7 Push Jerks 135lb",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "2007 Hopper For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "1000m Row buy-in, then 5 rounds of: 25 Pull-ups, 7 Push Jerks 135lb",
+        "rounds": 5,
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 160,
+            "weight": 135,
+            "time": 1320
+          }
+        ],
+        "movements": [
+          {
+            "name": "Buy-In: Row",
+            "distance": 1000,
+            "unit": "m",
+            "inputType": "none",
+            "role": "buy_in",
+            "perRound": false
+          },
+          {
+            "name": "Pull-up",
+            "reps": 25,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Push Jerk",
+            "reps": 7,
+            "rxWeights": { "male": 135, "female": 135, "unit": "lb" },
+            "inputType": "weight",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Push Jerk",
+          "totalReps": 35,
+          "weight": 135,
+          "unit": "lb",
+          "color": "yellow"
+        },
+        {
+          "name": "Pull-up",
+          "totalReps": 125,
+          "color": "magenta"
+        },
+        {
+          "name": "Buy-In: Row",
+          "totalDistance": 1000,
+          "distancePerRep": 1000,
+          "color": "magenta"
+        }
+      ]
+    }
+  }
+}

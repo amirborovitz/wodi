@@ -285,7 +285,8 @@
   border-bottom: 1px solid rgba(242, 240, 235, 0.14);
   color: var(--wodi-white);
   font-family: var(--font-barlow);
-  font-size: 14px;
+  /* 16px minimum — anything smaller makes iOS Safari zoom the screen in on focus. */
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.02em;
   padding: 6px 0 8px;

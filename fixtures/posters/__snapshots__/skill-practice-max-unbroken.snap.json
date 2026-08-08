@@ -1,0 +1,179 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Toes to Bar Practice",
+        "blueprint": "5 sets",
+        "rows": [
+          {
+            "primary": "Max",
+            "name": "Toes to Bar",
+            "subNote": "18 total",
+            "totalNote": "18 total",
+            "mineKey": "Toes to Bar",
+            "accent": "cyan",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "6 Rounds For Time",
+        "blueprint": "6 rounds for time",
+        "rows": [
+          {
+            "primary": "300m",
+            "name": "Run",
+            "subNote": "1.80 km total",
+            "totalNote": "1.80 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 6
+          },
+          {
+            "primary": "10",
+            "name": "Alt Single Dumbbell Devil Presses",
+            "nameWithLoad": "Alt Single Dumbbell Devil Presses @ 22.5kg",
+            "loadNote": "22.5kg",
+            "subNote": "60 total",
+            "totalNote": "60 total",
+            "mineKey": "Alt Single Dumbbell Devil Press",
+            "accent": "yellow",
+            "repeatCount": 6
+          },
+          {
+            "primary": "10",
+            "name": "Alt Weighted Box Step Ups",
+            "nameWithLoad": "Alt Weighted Box Step Ups @ 22.5kg",
+            "loadNote": "22.5kg",
+            "subNote": "60 total",
+            "totalNote": "60 total",
+            "mineKey": "Alt Weighted Box Step Up",
+            "accent": "yellow",
+            "repeatCount": 6
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "21:24",
+    "unit": "MIN",
+    "formatLine": "For Time + 6 RFT",
+    "storyLine": "18 ttb · 1.8km run · 60 alt single dumbbell devil press · 60 alt weighted box step up",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "TOES TO BAR PRACTICE",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "4",
+        "name": "Toes to Bar",
+        "total": "18 total",
+        "color": "cyan",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "6 ROUNDS FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "300m",
+        "name": "Run",
+        "total": "1.8km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Alt Single Dumbbell Devil Press",
+        "total": "60 total",
+        "color": "yellow",
+        "weight": 22.5,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Alt Weighted Box Step Up",
+        "total": "60 total",
+        "color": "yellow",
+        "weight": 22.5,
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "21:24",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Toes to Bar",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "18 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "6 ROUNDS FOR TIME",
+          "cap": "6 rounds for time"
+        },
+        {
+          "kind": "line",
+          "rx": "300m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.80 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Alt Single Dumbbell Devil Presses",
+          "load": "",
+          "mine": "22.5kg",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Alt Weighted Box Step Ups",
+          "load": "",
+          "mine": "22.5kg",
+          "team": "",
+          "total": "60 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  }
+}

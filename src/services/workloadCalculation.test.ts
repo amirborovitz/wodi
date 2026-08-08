@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { calculateWorkloadBreakdown, isTeamPrescribedExercise } from './workloadCalculation';
+import {
+  calculateWorkloadBreakdown,
+  calculateWorkloadFromExercises,
+  isTeamPrescribedExercise,
+} from './workloadCalculation';
 import type { ParsedWorkout } from '../types';
 
 describe('isTeamPrescribedExercise', () => {
@@ -66,6 +70,42 @@ describe('isTeamPrescribedExercise', () => {
   });
 });
 
+// The detail-mode fallback (legacy docs with no stored workloadBreakdown). It used to apply
+// the session partner factor to EVERY movement at the end of the pipeline, with no per-exercise
+// gate — so a partner session's solo strength block came back halved.
+describe('calculateWorkloadFromExercises — partner factor gating', () => {
+  const partnerSession = [
+    // Solo strength block sitting in a partner session.
+    { name: 'Back Squat', prescription: '4 sets x 5 reps', partnerWorkout: false,
+      sets: [{ actualReps: 20, weight: 100 }] },
+    // The block that actually IS shared.
+    { name: 'Metcon', prescription: 'In pairs: 100 wall balls', partnerWorkout: true,
+      sets: [{ actualReps: 100 }] },
+    // Runs are never divided — each athlete runs the full distance.
+    { name: 'Run', prescription: 'In pairs: 800m run', partnerWorkout: true,
+      sets: [{ distance: 800 }] },
+  ];
+
+  it('divides only the shared block, never the solo one', () => {
+    const b = calculateWorkloadFromExercises(partnerSession, undefined, 0.5);
+    const byName = (n: string) => b.movements.find(m => m.name === n);
+
+    expect(byName('Back Squat')?.totalReps).toBe(20);   // full — not 10
+    expect(byName('Metcon')?.totalReps).toBe(50);       // the athlete's share of 100
+    expect(byName('Run')?.totalDistance).toBe(800);     // full — runs are exempt
+
+    expect(b.grandTotalReps).toBe(70);                  // 20 + 50, not 60
+    expect(b.grandTotalVolume).toBe(2000);              // 100kg × 20 undivided reps
+    expect(b.grandTotalDistance).toBe(800);
+  });
+
+  it('leaves a solo session completely untouched', () => {
+    const b = calculateWorkloadFromExercises(partnerSession, undefined, 1);
+    expect(b.grandTotalReps).toBe(120);
+    expect(b.grandTotalDistance).toBe(800);
+  });
+});
+
 // A deliberately simple, fully-predictable workout: 3 rounds (containerRounds) of two weighted
 // movements, no sections/stations. This pins the core rep × round and twin-implement volume math
 // and, crucially, checks the grand totals actually equal the sum of the movement rows — the
@@ -109,6 +149,40 @@ describe('calculateWorkloadBreakdown', () => {
     expect(wb.grandTotalReps).toBe(45);       // 30 + 15
     expect(wb.grandTotalVolume).toBe(sumVolume);
     expect(wb.grandTotalVolume).toBe(2700);   // 1500 + 1200
+  });
+});
+
+// An American board. The rows must read back in POUNDS (that's what the coach wrote and what
+// the poster prints), while grandTotalVolume — which EP divides by a bodyweight in kg — must
+// be converted. Reading 135 lb as 135 kg ran an lb gym's EP ~2.2x hot.
+const POUND_BOARD: ParsedWorkout = {
+  title: '3 RFT',
+  type: 'for_time',
+  format: 'for_time',
+  scoreType: 'time',
+  containerRounds: 3,
+  exercises: [{
+    name: '3 RFT',
+    type: 'metcon',
+    loggingMode: 'for_time',
+    movements: [
+      { name: 'Thruster', reps: 10, inputType: 'weight', rxWeights: { male: 135, female: 95, unit: 'lb' }, implementCount: 1 },
+    ],
+  }],
+} as unknown as ParsedWorkout;
+
+describe('pound-prescribed boards', () => {
+  it('keeps the row in lb but converts the volume total to kg', () => {
+    const wb = calculateWorkloadBreakdown(POUND_BOARD);
+    const thruster = wb.movements.find(m => m.name === 'Thruster');
+
+    expect(thruster).toMatchObject({ totalReps: 30, weight: 135, unit: 'lb' });
+    // 30 reps × 135 lb = 4050 lb = 1837 kg (not the 4050 a kg-blind sum would return).
+    expect(wb.grandTotalVolume).toBe(1837);
+  });
+
+  it('leaves a kg board untouched', () => {
+    expect(calculateWorkloadBreakdown(THREE_ROUNDER).grandTotalVolume).toBe(2700);
   });
 });
 

@@ -65,7 +65,9 @@ export function useRewardData(): UseRewardDataResult {
       let workoutsThisWeek = 1; // Start at 1 since we just saved a workout
       try {
         const workoutsSnapshot = await getDocs(workoutsQuery);
-        workoutsThisWeek = workoutsSnapshot.size;
+        // This hook reads Firestore directly rather than through `useWorkouts`, so it does not
+        // inherit that hook's test-workout filter and has to apply the rule itself.
+        workoutsThisWeek = workoutsSnapshot.docs.filter((d) => d.data().isTest !== true).length;
       } catch (err) {
         console.warn('Could not fetch weekly workouts, using default:', err);
       }
@@ -96,7 +98,8 @@ export function useRewardData(): UseRewardDataResult {
           limit(50)
         );
         const recentSnapshot = await getDocs(recentQuery);
-        recentWorkouts = recentSnapshot.docs.map(doc => ({
+        // Same rule as above: a throwaway log must not feed benchmark comparison or achievements.
+        recentWorkouts = recentSnapshot.docs.filter((doc) => doc.data().isTest !== true).map(doc => ({
           id: doc.id,
           ...doc.data(),
           date: doc.data().date?.toDate?.() || new Date(),

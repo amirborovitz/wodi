@@ -278,6 +278,16 @@ body {
   background: var(--color-text-tertiary);
 }
 
+/* Text Controls - iOS zoom guard.
+   Safari zooms the whole page in when a focused control renders below 16px, and
+   never zooms back out — the poster/logging screens end up clipped off-screen.
+   Every focusable control must stay at 16px or larger. */
+input,
+textarea,
+select {
+  font-size: var(--text-base);
+}
+
 /* Number Input - Hide Spinners */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

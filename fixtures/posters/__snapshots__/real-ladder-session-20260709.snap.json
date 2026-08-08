@@ -24,26 +24,6 @@
     [
       {
         "eyebrow": "WOD",
-        "title": "Seated Shoulder External Rotations",
-        "blueprint": "3 sets",
-        "rows": [
-          {
-            "primary": "10",
-            "name": "Seated Shoulder External Rotation",
-            "subNote": "30 total",
-            "totalNote": "30 total",
-            "mineKey": "Seated Shoulder External Rotation",
-            "accent": "magenta",
-            "repeatCount": 3
-          }
-        ],
-        "hiddenCount": 0,
-        "isPartnerConfirmed": false
-      }
-    ],
-    [
-      {
-        "eyebrow": "WOD",
         "title": "03:00 min AMRAP x 4",
         "rows": [
           {
@@ -152,21 +132,6 @@
       [
         {
           "kind": "block",
-          "label": "SEATED SHOULDER EXTERNAL ROTATIONS",
-          "cap": "3 sets"
-        },
-        {
-          "kind": "line",
-          "rx": "10 Seated Shoulder External Rotation",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "30 total"
-        }
-      ],
-      [
-        {
-          "kind": "block",
           "label": "03:00 MIN AMRAP X 4",
           "cap": "WOD"
         },
@@ -208,7 +173,6 @@
   "partnerSubs": {
     "reward": null,
     "pages": [
-      null,
       null,
       null
     ]

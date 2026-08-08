@@ -189,3 +189,98 @@ describe('postProcessParsedWorkout — interleaved rebuild', () => {
       .toEqual(['Run', 'Bar Muscle-up', 'Up']);
   });
 });
+
+// The real board that surfaced this (04/08/26): a 3-tier descending ladder, each tier opening
+// with a run of its OWN distance. The AI reads it correctly — three single-pass rounds sections,
+// runs at 800/600/400. Lifting those runs into sibling buy_in sections erased them: the poster's
+// ladder rows and the story-logging inputs both build a tier from `rounds` sections alone, so the
+// run showed up in NEITHER, and cloning tier 1's lead made the distance total 2400m for 1800m run.
+function ladderTier(distance: number, reps: number, burpees: number, rounds = 1): ParsedSection {
+  return {
+    sectionType: 'rounds',
+    rounds,
+    movements: [
+      { name: 'Run', distance, unit: 'm' },
+      { name: 'Thruster', reps, rxWeights: { male: 20, female: 15, unit: 'kg' } },
+      { name: 'Box Jump', reps },
+      { name: 'Burpees Over Bar', reps: burpees },
+    ],
+  } as unknown as ParsedSection;
+}
+
+function descendingLadder(sections: ParsedSection[], movements?: unknown[]): ParsedWorkout {
+  return {
+    title: 'Metcon',
+    type: 'for_time',
+    format: 'for_time',
+    scoreType: 'time',
+    rawText: 'Metcon\n\nA. For time:\n800m run\n40 Thrusters @15/20kg (empty BB)\n40 box jumps\n'
+      + '20 burpees over the bar\n\n600m run\n30 Thrusters @15/20kg (empty BB)\n30 box jumps\n'
+      + '30 burpees over the bar\n\n400m run\n20 Thrusters @15/20kg (empty BB)\n20 box jumps\n'
+      + '40 burpees over the bar\n\n35 minutes T.C.',
+    exercises: [{
+      name: 'Pyramid For Time',
+      type: 'wod',
+      loggingMode: 'for_time',
+      suggestedSets: 3,
+      prescription: '35 min cap, descending reps pyramid',
+      movements: movements ?? [
+        { name: 'Run', distance: 800, unit: 'm' },
+        { name: 'Thruster', reps: 40, rxWeights: { male: 20, female: 15, unit: 'kg' } },
+        { name: 'Box Jump', reps: 40 },
+        { name: 'Burpees Over Bar', reps: 20 },
+      ],
+      sections,
+    }],
+  } as unknown as ParsedWorkout;
+}
+
+describe('postProcessParsedWorkout — section-shadowed lead-in', () => {
+  const SINGLE_PASS = [ladderTier(800, 40, 20), ladderTier(600, 30, 30), ladderTier(400, 20, 40)];
+
+  it('leaves a lead-in the AI placed exactly where the AI placed it', () => {
+    const ex = postProcessParsedWorkout(descendingLadder(SINGLE_PASS)).exercises[0];
+
+    // Untouched: no invented buy_in sections, and every tier keeps its OWN distance. The run the
+    // board opens each tier with is still the tier's first movement — where the poster ladder row
+    // and the logging input builder read it from.
+    expect(ex.sections?.map((s) => s.sectionType)).toEqual(['rounds', 'rounds', 'rounds']);
+    expect(ex.sections?.map((s) => s.movements[0].name)).toEqual(['Run', 'Run', 'Run']);
+    expect(ex.sections?.map((s) => s.movements[0].distance)).toEqual([800, 600, 400]);
+  });
+
+  it('leaves a placed lead-in alone in REPEATING tiers too — placement is the AI\'s call', () => {
+    const repeating = [ladderTier(800, 40, 20, 3), ladderTier(600, 30, 30, 2)];
+    const ex = postProcessParsedWorkout(descendingLadder(repeating)).exercises[0];
+
+    expect(ex.sections?.map((s) => s.sectionType)).toEqual(['rounds', 'rounds']);
+    expect(ex.sections?.map((s) => s.movements[0].distance)).toEqual([800, 600]);
+  });
+
+  it('backfills a lead-in the AI left ONLY in movements[], where sections shadow it', () => {
+    // Sections shadow movements[], so a run the AI left ONLY at top level is invisible without
+    // this repair. Single-pass tiers run it once each, so it belongs inside them.
+    const noRuns = SINGLE_PASS.map((s) => ({ ...s, movements: s.movements.slice(1) })) as ParsedSection[];
+    const ex = postProcessParsedWorkout(descendingLadder(noRuns)).exercises[0];
+
+    expect(ex.sections?.map((s) => s.sectionType)).toEqual(['rounds', 'rounds', 'rounds']);
+    expect(ex.sections?.map((s) => s.movements[0].name)).toEqual(['Run', 'Run', 'Run']);
+    expect(ex.sections?.map((s) => s.movements.length)).toEqual([4, 4, 4]);
+  });
+
+  it('leaves a reps-based lead-in alone — the guard is a cardio metric, not position', () => {
+    const repsLead = SINGLE_PASS.map((s) => ({
+      ...s,
+      movements: [{ name: 'Pull-up', reps: 10 }, ...s.movements.slice(1)],
+    })) as ParsedSection[];
+    const ex = postProcessParsedWorkout(descendingLadder(repsLead, [
+      { name: 'Pull-up', reps: 10 },
+      { name: 'Thruster', reps: 40, rxWeights: { male: 20, female: 15, unit: 'kg' } },
+      { name: 'Box Jump', reps: 40 },
+      { name: 'Burpees Over Bar', reps: 20 },
+    ])).exercises[0];
+
+    expect(ex.sections?.map((s) => s.sectionType)).toEqual(['rounds', 'rounds', 'rounds']);
+    expect(ex.sections?.map((s) => s.movements[0].name)).toEqual(['Pull-up', 'Pull-up', 'Pull-up']);
+  });
+});

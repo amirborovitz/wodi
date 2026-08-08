@@ -1,0 +1,126 @@
+{
+  "name": "skill-practice-max-unbroken",
+  "description": "Skill practice whose board asks for a max-effort test ('Toes to Bar — 8 min practice. Start with a test: max unbroken reps, then 4 more sets at 40-60%'). The AI stamps isMaxReps with NO prescribed rep count, and logging now writes the athlete's max into the first set (isMax). The row must read 'Max Toes to Bar — 18', never '18 Toes to Bars' — the coach prescribed no count, so printing the athlete's own number as a prescription is a lie about the board. Secondary by classification (as the AI marks every practice) — the max must still reach the poster.",
+  "workout": {
+    "title": "Movement focus of the day",
+    "format": "for_time",
+    "rawText": "Movement focus of the day\nToes to Bar\n8 minutes practice\nFocus on kipping & reps cycling\nAdvanced :\nStart with a test : max unbroken reps\nThen, 4 more sets of 40-60% from your max",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Toes to Bar Practice",
+        "type": "skill",
+        "loggingMode": "bodyweight",
+        "prescription": "8 minutes practice. Focus on kipping & reps cycling. Advanced: Start with a test: max unbroken reps, then 4 more sets of 40-60% from your max",
+        "rawText": "Toes to Bar\n8 minutes practice\nFocus on kipping & reps cycling\nAdvanced :\nStart with a test : max unbroken reps\nThen, 4 more sets of 40-60% from your max",
+        "workDuration": 480,
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 18,
+            "isMax": true
+          },
+          {
+            "id": "set-1",
+            "setNumber": 2,
+            "completed": true
+          },
+          {
+            "id": "set-2",
+            "setNumber": 3,
+            "completed": true
+          },
+          {
+            "id": "set-3",
+            "setNumber": 4,
+            "completed": true
+          },
+          {
+            "id": "set-4",
+            "setNumber": 5,
+            "completed": true
+          }
+        ],
+        "movements": [
+          {
+            "name": "Toes to Bar",
+            "inputType": "none",
+            "isMaxReps": true,
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          }
+        ],
+        "isSecondary": true
+      },
+      {
+        "id": "exercise-1",
+        "name": "6 Rounds For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "6 rounds for time: 300m Run, 10 Alt Single DB Devil Press, 10 Alt Weighted Box Step Up",
+        "rawText": "6 Rounds For Time\n300m Run\n10 Alt Single Dumbbell Devil Press\n10 Alt Weighted Box Step Up",
+        "rounds": 6,
+        "isSecondary": false,
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "time": 1284
+          }
+        ],
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 300,
+            "unit": "m",
+            "inputType": "none"
+          },
+          {
+            "name": "Alt Single Dumbbell Devil Press",
+            "reps": 10,
+            "inputType": "weight",
+            "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }
+          },
+          {
+            "name": "Alt Weighted Box Step Up",
+            "reps": 10,
+            "inputType": "weight",
+            "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" }
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Toes to Bar",
+          "totalReps": 18,
+          "color": "cyan"
+        },
+        {
+          "name": "Run",
+          "totalDistance": 1800,
+          "unit": "m",
+          "color": "magenta"
+        },
+        {
+          "name": "Alt Single Dumbbell Devil Press",
+          "totalReps": 60,
+          "weight": 22.5,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Alt Weighted Box Step Up",
+          "totalReps": 60,
+          "weight": 22.5,
+          "unit": "kg",
+          "color": "yellow"
+        }
+      ]
+    }
+  }
+}

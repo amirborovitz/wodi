@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { StoryExerciseResult } from './types';
 import { ScoreTimeInput, ScoreRoundsInput } from './ScoreInputs';
+import { exerciseLoadUnit } from '../../../utils/loadUnits';
 import scoreStyles from './ScoreInputs.module.css';
 import styles from './FreeScoreInput.module.css';
 
@@ -26,6 +27,7 @@ interface FreeScoreInputProps {
  */
 export function FreeScoreInput({ result, onChange }: FreeScoreInputProps) {
   const active = result.freeScoreType ?? null;
+  const loadUnit = exerciseLoadUnit(result.exercise);
 
   const pick = useCallback((type: FreeScoreType) => {
     if (type === result.freeScoreType) return;
@@ -81,7 +83,7 @@ export function FreeScoreInput({ result, onChange }: FreeScoreInputProps) {
               placeholder="0"
               onChange={(e) => handleNumeric(e.target.value)}
             />
-            <span className={scoreStyles.timeDrumLabel}>{active === 'reps' ? 'reps' : 'kg'}</span>
+            <span className={scoreStyles.timeDrumLabel}>{active === 'reps' ? 'reps' : loadUnit}</span>
           </div>
         </div>
       )}

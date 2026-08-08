@@ -33,6 +33,12 @@ interface StepperInputProps {
   inputMode?: 'decimal' | 'numeric';
   /** Compact size for inline use; 'arcade' = full-width horizontal dashboard tile */
   size?: 'sm' | 'md' | 'arcade';
+  /**
+   * 'hero' renders the arcade value as the screen's headline: condensed display face, accent
+   * colour, oversized. For a screen whose whole job is capturing ONE number, the design system's
+   * hierarchy rule applies — "the achievement is the hero". Ignored outside arcade size.
+   */
+  emphasis?: 'default' | 'hero';
   onCenterPress?: () => void;
   active?: boolean;
 }
@@ -67,6 +73,7 @@ export function StepperInput({
   color,
   inputMode = 'numeric',
   size = 'md',
+  emphasis = 'default',
   onCenterPress,
   active = false,
 }: StepperInputProps) {
@@ -226,14 +233,16 @@ export function StepperInput({
         >
           <span className={styles.arcadeIcon} aria-hidden="true">−</span>
         </button>
-        <div className={styles.arcadeCenter}>
+        <div className={`${styles.arcadeCenter} ${emphasis === 'hero' ? styles.arcadeCenterHero : ''}`}>
           <button
             type="button"
             className={`${styles.arcadeValueButton} ${active ? styles.arcadeValueButtonActive : ''}`}
             onClick={onCenterPress}
             aria-label={label ? `Edit ${label}` : 'Edit value'}
           >
-            <span className={styles.arcadeValue}>{displayStr || placeholder}</span>
+            <span className={`${styles.arcadeValue} ${emphasis === 'hero' ? styles.arcadeValueHero : ''}`}>
+              {displayStr || placeholder}
+            </span>
           </button>
           {unit && <span className={styles.arcadeUnit}>{unit}</span>}
         </div>

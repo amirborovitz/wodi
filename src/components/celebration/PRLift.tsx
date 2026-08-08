@@ -66,6 +66,8 @@ export function PRLift({ pr, onNavigate }: PRLiftProps): React.JSX.Element | nul
 
   const gain = pr.previousBest != null ? Math.round((pr.value - pr.previousBest) * 10) / 10 : null;
   const interactive = Boolean(onNavigate);
+  const unitLabel = pr.unit.toUpperCase();
+  const spokenUnit = pr.unit === 'lb' ? 'pounds' : 'kilos';
 
   return (
     <div
@@ -75,8 +77,8 @@ export function PRLift({ pr, onNavigate }: PRLiftProps): React.JSX.Element | nul
       tabIndex={interactive ? 0 : undefined}
       aria-label={
         interactive
-          ? `New personal record, ${pr.value} kilos ${pr.movement}. Open this part.`
-          : `New personal record, ${pr.value} kilos ${pr.movement}`
+          ? `New personal record, ${pr.value} ${spokenUnit} ${pr.movement}. Open this part.`
+          : `New personal record, ${pr.value} ${spokenUnit} ${pr.movement}`
       }
     >
       <div className={styles.bloom} aria-hidden="true" />
@@ -84,10 +86,10 @@ export function PRLift({ pr, onNavigate }: PRLiftProps): React.JSX.Element | nul
         <span className={styles.kicker}>{pr.isFirstEver ? 'First PR' : 'New PR'}</span>
         <div className={styles.valueRow}>
           <span className={styles.value}>{shownValue}</span>
-          <span className={styles.unit}>KG</span>
+          <span className={styles.unit}>{unitLabel}</span>
         </div>
         <span className={styles.movement}>{pr.movement}</span>
-        {gain != null && gain > 0 && <span className={styles.gain}>&#9650; +{gain} KG</span>}
+        {gain != null && gain > 0 && <span className={styles.gain}>&#9650; +{gain} {unitLabel}</span>}
         {pr.extraCount > 0 && (
           <span className={styles.extra}>
             +{pr.extraCount} more PR{pr.extraCount > 1 ? 's' : ''}

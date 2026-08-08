@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
-import { parseWorkoutImage, parseWorkoutSession, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
+import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
 import { assignMovementColors, getStationVisitCountsForExercise, isTeamPrescribedExercise } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
@@ -22,6 +22,9 @@ import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
+import { scaleEnteredToTier } from '../utils/tierScaling';
+import { buildPrescriptionLines } from '../utils/prescriptionLines';
+import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
 import { TellWodiSheet } from '../components/workouts/TellWodiSheet';
 import {
@@ -31,10 +34,13 @@ import {
 } from '../data/exerciseDefinitions';
 import { StoryLogResults } from '../components/logging/story/StoryLogResults';
 import type { StoryExerciseResult } from '../components/logging/story/types';
-import { createBlankResult } from '../components/logging/story/types';
+import { createBlankResult, movementToKind } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
+import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 import { removeUndefined } from '../utils/firestoreUtils';
+import { isAdminEmail } from '../utils/admin';
 import { matchesNamePattern } from '../utils/movementNameMatch';
+import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
@@ -42,6 +48,15 @@ import styles from './AddWorkoutScreen.module.css';
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+// Same mark as the poster's per-page correction row — one affordance, learned once.
+const FlagIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 3v18" />
+    <path d="M5 4h11l-2 4 2 4H5" />
   </svg>
 );
 
@@ -116,8 +131,6 @@ function getSavedStrengthRepScheme(sets: ExerciseSet[]): number[] | undefined {
   return reps.length > 0 ? reps : undefined;
 }
 
-const ADMIN_EMAIL = 'aborovitz@gmail.com';
-const SAVED_WORKOUTS_EMAIL = 'aborovitz@gmail.com';
 
 // A rate limit says nothing about the board, so the copy must not send the athlete off
 // re-shooting the photo or rewriting the WOD — it clears on its own. Every parse catch site
@@ -447,6 +460,10 @@ function buildWorkloadBreakdownFromResults(
     // so duplicate movement names (e.g. two "Run" entries) resolve independently.
     // movementLookup tries the unique key first, falls back to plain name.
     const movKeys = getMovementKeys(iterationMovements);
+    // The prescription each movement's logged value was entered against — its FIRST occurrence,
+    // because a per-movement ladder collapses to one input row built from tier 1. Later tiers
+    // prescribe their own amounts and scale by the ratio that entry implies (see tierScaling).
+    const basePrescribed = new Map<string, ParsedMovement>();
     iterationMovements.forEach((mov, movIdx) => {
       const mk = movKeys[movIdx];
       const lowerName = mov.name.toLowerCase();
@@ -461,12 +478,31 @@ function buildWorkloadBreakdownFromResults(
 
       // User-entered values are already personal — don't apply partner factor.
       // AI-prescribed values are team totals — apply partner factor.
-      const userReps = movementLookup(result.movementReps || {}, mk, mov.name);
-      const userDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
-      const userCalories = movementLookup(result.movementCalories || {}, mk, mov.name);
+      const enteredReps = movementLookup(result.movementReps || {}, mk, mov.name);
+      const enteredDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
+      const enteredCalories = movementLookup(result.movementCalories || {}, mk, mov.name);
       const userDistancePerRep = movementLookup(result.movementDistancesPerRep || {}, mk, mov.name);
 
-      const perRoundReps = userReps ?? mov.reps ?? 0;
+      // One entry answers for the tier it was made against; every other tier scales its own
+      // prescription by the same ratio. Without this a substituted ladder saved tier 1's
+      // converted value on all of them (800/600/400m run -> Echo Bike became 3 x 2400m).
+      const baseKey = mov.name.toLowerCase();
+      if (!basePrescribed.has(baseKey)) basePrescribed.set(baseKey, mov);
+      const base = basePrescribed.get(baseKey);
+      const userReps = scaleEnteredToTier(enteredReps, mov.reps, base?.reps);
+      const userDistance = scaleEnteredToTier(enteredDistance, mov.distance, base?.distance);
+      const userCalories = scaleEnteredToTier(enteredCalories, mov.calories, base?.calories);
+
+      // A max-effort test has NO prescribed count by definition — the number the athlete earned
+      // lives on the max SET, not on the movement. Without this the movement reads as 0
+      // prescribed and 0 entered, gets skipped below, and the early return past the sets-based
+      // fallback means the one thing the athlete actually measured never reaches the breakdown,
+      // the rep total, or the poster.
+      const maxSetReps = mov.isMaxReps && !mov.reps && !mov.distance && !mov.calories
+        ? result.sets.find((s) => s.isMax && (s.actualReps ?? 0) > 0)?.actualReps
+        : undefined;
+
+      const perRoundReps = userReps ?? maxSetReps ?? mov.reps ?? 0;
       const perRoundDistance = userDistance ?? mov.distance ?? 0;
       const perRoundCalories = userCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
@@ -494,7 +530,11 @@ function buildWorkloadBreakdownFromResults(
       // Buy-in/cash-out sections are done once, not per AMRAP/round block.
       const stationVisits = stationVisitCounts?.[movIdx];
       const sectionType = perMovementSectionTypes[movIdx];
-      const effective = sectionType && sectionType !== 'rounds'
+      // A max test happens ONCE, whatever the block's set count says — a 14-rep effort inside a
+      // 5-set practice is 14 reps, not 70.
+      const effective = maxSetReps != null
+        ? { rounds: 1, estimated: false }
+        : sectionType && sectionType !== 'rounds'
         ? { rounds: 1, estimated: false }
         : getMovementEffectiveRounds(
           mov,
@@ -711,7 +751,7 @@ function buildWorkloadBreakdownFromResults(
           totalReps: exerciseReps,
           weight: exerciseWeight,
           weightProgression,
-          unit: exerciseWeight ? 'kg' : undefined,
+          unit: exerciseWeight ? exerciseLoadUnit(result.exercise) : undefined,
         });
       }
 
@@ -767,13 +807,15 @@ function buildWorkloadBreakdownFromResults(
   // or the rounds calculation is off by one.
   // Deduplicate barbell complexes: when multiple movements share the exact same
   // weight AND rep count they are a single-bar complex — count volume once.
+  // Rows keep the coach's unit; grandTotalVolume is kg by definition (EP divides it by
+  // bodyweight in kg), so an lb load converts here and only here.
   const complexKeys = new Set<string>();
   const derivedVolume = movements.reduce((sum, m) => {
     if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
       const key = `${m.weight}:${m.totalReps}`;
       if (complexKeys.has(key)) return sum;
       complexKeys.add(key);
-      return sum + m.weight * m.totalReps;
+      return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
     }
     return sum;
   }, 0);
@@ -1142,19 +1184,38 @@ function shouldForceForTimeMode(exercise: ParsedExercise): boolean {
 // Preview readback: what the logging step will ask for, per mode. Shown under each exercise
 // on the preview so a wrong interpretation ("weight?" on a bodyweight piece) is visible
 // BEFORE logging starts, in the athlete's terms — not as an internal mode name.
-const LOGGING_MODE_HINTS: Record<ExerciseLoggingMode, string> = {
+// 'emom' is absent on purpose — its hint is derived from the movements (see emomLoggingHint).
+const LOGGING_MODE_HINTS: Record<Exclude<ExerciseLoggingMode, 'emom'>, string> = {
   strength: 'weight × sets',
   sets: 'reps × sets',
   for_time: 'your time',
   amrap: 'rounds + reps',
   amrap_intervals: 'total rounds',
   intervals: 'score per interval',
-  emom: 'reps per minute',
   cardio: 'time / calories',
   cardio_distance: 'distance',
   bodyweight: 'reps',
   free: 'your score',
 };
+
+// EMOM / "every X:XX" pieces score nothing per minute: the cadence AND the work are both
+// prescribed, so the logging step (kind 'intervals' → ScoreMovementInputs) only asks the
+// athlete to confirm the numbers they used per movement. The hint has to name that, and it
+// has to name it from the movements — a barbell EMOM, a bike EMOM and a Cindy-style
+// bodyweight EMOM all land here and ask for different things.
+function emomLoggingHint(exercise: ParsedExercise): string {
+  const kinds = (exercise.movements || []).map(movementToKind);
+  const hasLoad = kinds.includes('load');
+  const hasCardio = kinds.includes('distance');
+  if (hasLoad && hasCardio) return 'weights + cardio';
+  if (hasLoad) return 'weights used';
+  if (hasCardio) return 'calories / distance';
+  return 'rounds completed';
+}
+
+function getLoggingModeHint(exercise: ParsedExercise, mode: ExerciseLoggingMode): string {
+  return mode === 'emom' ? emomLoggingHint(exercise) : LOGGING_MODE_HINTS[mode];
+}
 
 function getExerciseLoggingMode(
   exercise: ParsedExercise,
@@ -1429,10 +1490,17 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
 
 export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
-  const isAdmin = user?.email === ADMIN_EMAIL;
-  const canUseSavedWorkouts = user?.email?.toLowerCase() === SAVED_WORKOUTS_EMAIL;
+  const isAdmin = isAdminEmail(user?.email);
+  const canUseSavedWorkouts = isAdminEmail(user?.email);
   const { calculateRewardData } = useRewardData();
   const { workouts: recentWorkouts } = useWorkouts(10);
+  // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
+  // workouts already loaded here — no extra query on the logging path.
+  const lastMaxReps = useMemo(() => buildLastMaxRepsMap(recentWorkouts), [recentWorkouts]);
+  // The flag itself is set from the long-press menu on a saved workout, not here. What this
+  // screen still needs it for is the EDIT path: re-saving a workout already marked as a test must
+  // not feed its volume back into the counters it was taken out of, or rewrite PRs from it.
+  const isTestWorkout = editWorkout?.isTest === true;
   const [step, setStep] = useState<Step>('capture');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
@@ -1507,6 +1575,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
   const [tellWodiPrefill, setTellWodiPrefill] = useState('');
   const [tellWodiBusy, setTellWodiBusy] = useState(false);
   const [tellWodiError, setTellWodiError] = useState<string | null>(null);
+  // Which part the open sheet is correcting, and which one is currently being re-read. Separate
+  // because the sheet closes on submit — the in-flight state lives on the part card so every
+  // OTHER part stays readable and interactive while one is re-parsing.
+  const [tellWodiPartIndex, setTellWodiPartIndex] = useState<number | null>(null);
+  const [reparsingPartIndex, setReparsingPartIndex] = useState<number | null>(null);
   // Track if AI is currently loading guidance
   const [, setIsLoadingGuidance] = useState(false);
 
@@ -2063,35 +2136,52 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
     }
   };
 
-  // Re-parse requires the board's transcription; without it there is nothing to re-read.
-  const canTellWodi = Boolean(parsedWorkout?.rawText?.trim());
+  // Re-parse requires the part's own transcription; without it there is nothing to re-read.
+  const canCorrectPart = (index: number): boolean =>
+    Boolean(parsedWorkout?.exercises[index]?.rawText?.trim() || parsedWorkout?.rawText?.trim());
 
-  const openTellWodi = (prefill: string) => {
+  const openTellWodi = (partIndex: number, prefill: string) => {
+    setTellWodiPartIndex(partIndex);
     setTellWodiPrefill(prefill);
     setTellWodiError(null);
     setTellWodiOpen(true);
   };
 
+  /**
+   * Re-read ONE part with the athlete's note. Never the whole board: the parse is
+   * non-deterministic, so re-segmenting could reshape parts they never complained about — and
+   * on the poster that would throw away numbers they already logged correctly.
+   */
   const handleTellWodiSubmit = async (note: string) => {
-    const raw = parsedWorkout?.rawText?.trim();
-    if (!raw || !note) return;
+    const index = tellWodiPartIndex;
+    const exercise = index != null ? parsedWorkout?.exercises[index] : undefined;
+    if (!parsedWorkout || index == null || !exercise || !note) return;
+
+    // A part missing its own slice falls back to the whole board — better a wider re-read than
+    // no correction channel at all on legacy parses saved before per-part rawText existed.
+    const partText = exercise.rawText?.trim() || parsedWorkout.rawText?.trim();
+    if (!partText) return;
+
     setTellWodiBusy(true);
     setTellWodiError(null);
+    setTellWodiOpen(false);          // the part card carries the in-flight state, not the sheet
+    setReparsingPartIndex(index);
     try {
-      // Corrections accumulate: a second note must not erase what the first one fixed.
-      const combinedNote = [parsedWorkout?.userContext, note].filter(Boolean).join('\n');
-      const reparsed = await parseWorkoutSession(raw, 'TEXT', combinedNote);
-      setParsedWorkout(reparsed);
+      // Notes accumulate so a second fix doesn't erase the first.
+      const combinedNote = [parsedWorkout.userContext, note].filter(Boolean).join('\n');
+      const reparsed = await reparseWorkoutPart(partText, exercise.partKind, combinedNote);
+      setParsedWorkout(applyPartReparse(parsedWorkout, index, reparsed, note));
       // Index-keyed caches from the previous parse no longer line up with the new exercises
       setModeOverrides({});
       setSmartClassifications({});
       setLoggingGuidance({});
-      setTellWodiOpen(false);
     } catch (err) {
       console.error('Tell Wodi re-parse failed:', err);
-      setTellWodiError(parseFailureMessage(err, "Couldn't update the workout — try again."));
+      setTellWodiError(parseFailureMessage(err, "Couldn't re-read that part — try again."));
+      setTellWodiOpen(true);         // reopen with the error rather than failing silently
     } finally {
       setTellWodiBusy(false);
+      setReparsingPartIndex(null);
     }
   };
 
@@ -2831,11 +2921,24 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           const single = movementLookup(result.movementWeights || {}, mk, plainName);
           return single && single > 0 ? [single] : undefined;
         };
+        // The prescription an entry was made against: the movement's FIRST occurrence. A
+        // per-movement ladder collapses to one input row built from tier 1, so baking the raw
+        // entry onto every occurrence saved an 800/600/400m run swapped for a bike as 3 × 2400m.
+        // Later tiers scale their own prescription by the ratio that entry implies (tierScaling) —
+        // the same rule the breakdown above already follows, so both agree on 5400m.
+        const saveBasePrescribed = new Map<string, ParsedMovement>();
         const movementsForSave = baseMovements?.map((mov, mi) => {
           const mk = fsKeys[mi];
+          const baseKey = mov.name.toLowerCase();
+          if (!saveBasePrescribed.has(baseKey)) saveBasePrescribed.set(baseKey, mov);
+          const base = saveBasePrescribed.get(baseKey);
           const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
-          const selectedReps = movementLookup(result.movementReps || {}, mk, mov.name);
-          const selectedDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
+          const selectedReps = scaleEnteredToTier(
+            movementLookup(result.movementReps || {}, mk, mov.name), mov.reps, base?.reps,
+          );
+          const selectedDistance = scaleEnteredToTier(
+            movementLookup(result.movementDistances || {}, mk, mov.name), mov.distance, base?.distance,
+          );
           const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
           const loggedWeights = loggedLoadFor(mk, mov.name);
           return {
@@ -3038,6 +3141,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           ...(result.partialReps != null && result.partialReps > 0 && { partialReps: result.partialReps }),
           ...(result.partialMovements && result.partialMovements.length > 0 && { partialMovements: result.partialMovements }),
           ...(result.exercise.rawText && { rawText: result.exercise.rawText }),
+          // rawText + partKind are the two inputs a per-part re-parse needs. Persisting them
+          // together is what lets the poster's "Fix this part" re-read one block of a saved
+          // workout without disturbing the parts the athlete logged correctly.
+          ...(result.exercise.partKind && { partKind: result.exercise.partKind }),
           // Persist this part's own logging mode — detail-mode rendering must never fall back
           // to the session-level format (parts are standalone practices).
           ...(result.exercise.loggingMode && { loggingMode: result.exercise.loggingMode }),
@@ -3164,6 +3271,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         timeCap: parsedWorkout.timeCap || null,
         format: parsedWorkout.format || null,
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
+        ...(isTestWorkout && { isTest: true }),
         updatedAt: serverTimestamp(),
       };
 
@@ -3178,21 +3286,24 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         const docRef = await addDoc(collection(db, 'workouts'), removeUndefined(workoutCreateData));
         persistedWorkoutId = docRef.id;
 
-        // Update user stats
-        const userRef = doc(db, 'users', user.id);
-        await setDoc(userRef, {
-          stats: {
-            totalWorkouts: increment(1),
-            totalVolume: increment(totalVolume),
-          },
-        }, { merge: true });
+        // Update user stats. These counters are the one thing a read-time filter can never undo:
+        // they are incremented here and never decremented, not even when the workout is deleted.
+        if (!isTestWorkout) {
+          const userRef = doc(db, 'users', user.id);
+          await setDoc(userRef, {
+            stats: {
+              totalWorkouts: increment(1),
+              totalVolume: increment(totalVolume),
+            },
+          }, { merge: true });
+        }
         setSavedWorkoutMeta({ id: docRef.id, totalVolume, date: workoutDate });
       } else if (savedWorkoutMeta?.id) {
         const workoutRef = doc(db, 'workouts', savedWorkoutMeta.id);
         persistedWorkoutId = savedWorkoutMeta.id;
         await setDoc(workoutRef, removeUndefined(workoutBase), { merge: true });
         const volumeDelta = totalVolume - (savedWorkoutMeta.totalVolume || 0);
-        if (volumeDelta !== 0) {
+        if (volumeDelta !== 0 && !isTestWorkout) {
           const userRef = doc(db, 'users', user.id);
           await setDoc(userRef, {
             stats: {
@@ -3255,8 +3366,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         totalWorkoutsForReward
       );
 
-      // Write new PRs to Firestore
-      try {
+      // Write new PRs to Firestore.
+      // A test workout writes none. The PR document id is derived from the movement name, so a
+      // throwaway 200kg deadlift OVERWRITES the real record for that movement — and deleting the
+      // test workout afterwards does not bring it back. This is the guard that makes the flag
+      // safe to use, not just tidy.
+      if (!isTestWorkout) try {
         const workoutId = persistedWorkoutId || 'unsaved';
         const newPRs = extractNewPRs(
           { id: workoutId, title: workoutTitle, exercises, date: workoutDate },
@@ -3618,20 +3733,29 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
                 </span>
               )}
             </div>
+            {/* Partner is a session-level fact the board often doesn't state, but it's carried
+                per exercise — so the chip corrects the PRIMARY part, whose re-parse is the one
+                allowed to restate session fields (see applyPartReparse). */}
             {isPartnerWorkout ? (
               <button
                 type="button"
                 className={styles.previewPartnerChip}
-                disabled={!canTellWodi}
-                onClick={() => openTellWodi('This is NOT a partner workout — I did it alone. ')}
+                disabled={!canCorrectPart(primaryExerciseIndex(parsedWorkout))}
+                onClick={() => openTellWodi(
+                  primaryExerciseIndex(parsedWorkout),
+                  'This is NOT a partner workout — I did it alone. ',
+                )}
               >
                 Partner · Team of {teamSize}
               </button>
-            ) : canTellWodi && (
+            ) : canCorrectPart(primaryExerciseIndex(parsedWorkout)) && (
               <button
                 type="button"
                 className={styles.previewGhostChip}
-                onClick={() => openTellWodi('This is a partner workout, teams of 2. ')}
+                onClick={() => openTellWodi(
+                  primaryExerciseIndex(parsedWorkout),
+                  'This is a partner workout, teams of 2. ',
+                )}
               >
                 + Partner?
               </button>
@@ -3639,7 +3763,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
 
             <div className={styles.exerciseList}>
               {parsedWorkout.exercises.map((exercise, index) => (
-                <div key={index} className={styles.exerciseItem}>
+                <div
+                  key={index}
+                  className={`${styles.exerciseItem} ${reparsingPartIndex === index ? styles.exerciseItemReparsing : ''}`}
+                >
                   <div className={styles.previewExerciseHeader}>
                     <span className={styles.previewExerciseIndex}>{index + 1}</span>
                     <span className={styles.previewExerciseName}>{exercise.name}</span>
@@ -3647,18 +3774,47 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
                   <span className={styles.previewExercisePrescription}>
                     {exercise.prescription}
                   </span>
-                  {exercise.movements?.filter(m => m.name.startsWith('Cash-Out:') || m.name.startsWith('Buy-In:')).map((m, mi) => (
-                    <span key={mi} className={styles.previewExerciseCashOut}>
-                      {m.name}{m.distance ? ` ${m.distance}${m.unit ?? 'm'}` : m.reps ? ` ${m.reps} reps` : ''}
+                  {/* What the parse actually read. This screen asks the athlete to approve the
+                      parse, so it has to SHOW it — a dropped movement is invisible against a
+                      title and a one-line paraphrase, which is how a missing 800m run reached
+                      the poster unnoticed. */}
+                  <ul className={styles.previewMovements}>
+                    {buildPrescriptionLines(exercise).map((line, li) => (
+                      <li key={li} className={styles.previewMovement}>
+                        {line.role && (
+                          <span className={styles.previewMovementRole}>
+                            {line.role === 'buy_in' ? 'BUY-IN' : 'CASH-OUT'}
+                          </span>
+                        )}
+                        {line.qty && <span className={styles.previewMovementQty}>{line.qty}</span>}
+                        <span className={styles.previewMovementName}>{line.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {/* The "you'll log" line is the one most often wrong when a part is
+                      misclassified, so the fix sits at the end of the sentence that's lying. */}
+                  <div className={styles.previewLogRow}>
+                    <span className={styles.previewLogHint}>
+                      {reparsingPartIndex === index ? 'Re-reading this part…' : (
+                        <>You&apos;ll log: {getLoggingModeHint(exercise, getExerciseLoggingMode(exercise, {
+                          format: parsedWorkout.format,
+                          scoreType: parsedWorkout.scoreType,
+                          exerciseCount: parsedWorkout.exercises.length,
+                        }))}</>
+                      )}
                     </span>
-                  ))}
-                  <span className={styles.previewLogHint}>
-                    You&apos;ll log: {LOGGING_MODE_HINTS[getExerciseLoggingMode(exercise, {
-                      format: parsedWorkout.format,
-                      scoreType: parsedWorkout.scoreType,
-                      exerciseCount: parsedWorkout.exercises.length,
-                    })]}
-                  </span>
+                    {canCorrectPart(index) && reparsingPartIndex == null && (
+                      <button
+                        type="button"
+                        className={styles.partFlagBtn}
+                        onClick={() => openTellWodi(index, '')}
+                      >
+                        <FlagIcon />
+                        Fix this part
+                      </button>
+                    )}
+                  </div>
+                  {reparsingPartIndex === index && <div className={styles.partReparseBar} />}
                 </div>
               ))}
             </div>
@@ -3691,23 +3847,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
             Save for later <span aria-hidden="true">-&gt;</span>
           </button>
 
-          {canTellWodi && (
-            <button
-              type="button"
-              className={styles.tellWodiLink}
-              onClick={() => openTellWodi('')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M5 3v18" />
-                <path d="M5 4h11l-2 4 2 4H5" />
-              </svg>
-              Something off? Tell wodi
-            </button>
-          )}
+          {/* No screen-level correction link: corrections are per part now, and a second
+              workout-level path would re-read the whole board — the exact thing this replaces. */}
 
           <TellWodiSheet
             open={tellWodiOpen}
             prefill={tellWodiPrefill}
+            partName={tellWodiPartIndex != null
+              ? parsedWorkout.exercises[tellWodiPartIndex]?.name ?? null
+              : null}
             busy={tellWodiBusy}
             error={tellWodiError}
             onSubmit={handleTellWodiSubmit}
@@ -3736,6 +3884,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           onBack={() => editWorkout ? onBack() : setStep('preview')}
           isSaving={false}
           initialResults={editInitialResults}
+          lastMaxReps={lastMaxReps}
         />
       )}
 

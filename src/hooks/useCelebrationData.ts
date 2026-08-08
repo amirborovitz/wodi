@@ -35,6 +35,7 @@ import {
   getTimeCapMinutes,
   DEFAULT_BW,
 } from '../utils/xpCalculations';
+import { asLoadUnit, exerciseLoadUnit, type LoadUnit } from '../utils/loadUnits';
 import {
   calculateWorkloadFromExercises,
   assignMovementColors,
@@ -86,6 +87,7 @@ import {
   BARBELL_PATTERNS,
 } from '../components/celebration/helpers';
 import { achievementMatchesMovementList } from '../components/celebration/faces/HandwrittenFace/posterData';
+import { isMainPart } from '../components/celebration/mainPart';
 
 // Re-export helpers for callers that need them directly
 export {
@@ -139,6 +141,8 @@ export interface CarouselPage {
 export interface PRCelebration {
   movement: string;
   value: number;
+  /** The unit the lift was logged in — a 315 lb deadlift must never flash up as "315 KG". */
+  unit: LoadUnit;
   previousBest?: number;
   isFirstEver: boolean;
   extraCount: number;
@@ -250,15 +254,6 @@ function inferPosterDifficultyLevel(params: {
   return Math.max(1, Math.min(10, score));
 }
 
-/**
- * Is this exercise one of the session's main parts (vs. a secondary/auxiliary block like a
- * warm-up or body-armor circuit)? Trusts the AI's explicit `isSecondary` when present; for
- * older data that predates the field, falls back to the `type !== 'skill'` proxy.
- */
-function isMainPart(ex: Exercise): boolean {
-  if (typeof ex.isSecondary === 'boolean') return !ex.isSecondary;
-  return ex.type !== 'skill';
-}
 
 /**
  * Movements from the workload breakdown that belong to the given exercises (matched by
@@ -807,7 +802,8 @@ export function useCelebrationData(
           totalReps: wsReps > 0 ? wsReps : undefined,
           weight: avgWeight,
           weightProgression,
-          unit: 'kg',
+          // Sets store a bare number — the unit is the one this part was prescribed in.
+          unit: exerciseLoadUnit(ex),
           color: 'yellow',
         };
         return { exercise: ex, movements: [derived], isStrength };
@@ -1154,9 +1150,16 @@ export function useCelebrationData(
       achievementMatchesMovementList(best, page.movements),
     );
 
+    // The achievement itself carries a bare number; the breakdown row the PR was matched to
+    // is what knows which unit the athlete entered.
+    const prRow = pageIndex != null && pageIndex >= 0
+      ? carouselPageData?.[pageIndex].movements.find((m) => (m.weight ?? 0) > 0)
+      : undefined;
+
     return {
       movement: best.movement!,
       value: best.value!,
+      unit: asLoadUnit(prRow?.unit),
       previousBest: best.previousBest,
       isFirstEver: best.previousBest == null,
       extraCount: prs.length - 1,

@@ -47,7 +47,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "5 ROUNDS",
+        "title": "5 ROUNDS OF",
         "rows": [
           {
             "primary": "600 M Echo Bike",
@@ -76,7 +76,7 @@
         "isPartnerConfirmed": false
       },
       {
-        "title": "5 ROUNDS",
+        "title": "5 ROUNDS OF",
         "rows": [
           {
             "primary": "10 Dips / Push-ups",
@@ -236,7 +236,7 @@
         },
         {
           "kind": "block",
-          "label": "5 ROUNDS",
+          "label": "5 ROUNDS OF",
           "cap": ""
         },
         {
@@ -265,7 +265,7 @@
         },
         {
           "kind": "block",
-          "label": "5 ROUNDS",
+          "label": "5 ROUNDS OF",
           "cap": ""
         },
         {

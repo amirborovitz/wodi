@@ -76,7 +76,8 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #f2f0eb;
   font-family: 'Barlow', sans-serif;
-  font-size: 13.5px;
+  /* 16px minimum — anything smaller makes iOS Safari zoom the poster off-screen. */
+  font-size: 16px;
   padding: 12px;
   resize: none;
   margin-bottom: 14px;

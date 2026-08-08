@@ -7,7 +7,9 @@ import type {
   ParsedSectionType,
   MeasurementUnit,
 } from '../../../types';
-import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
+import type { LoadUnit } from '../../../utils/loadUnits';
+import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
+import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
 import { matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
 
@@ -58,7 +60,10 @@ export interface StoryExerciseResult {
   weightEnd?: number;                 // end weight (range mode only)
   loadMode?: LoadMode;                // how weight was captured
   implementCount?: 1 | 2;            // single or pair (KB/DB)
-  maxReps?: number;                   // reps completed in "max" set (for [8-6-4-2-max] patterns)
+  // Reps completed in a MAX set. Two shapes share this one field: a loaded [8-6-4-2-max]
+  // scheme (with maxRepsWeight), and a skill practice whose board asks for a max-effort test
+  // ("max unbroken toes to bar") — see getMaxRepsMovement.
+  maxReps?: number;
   maxRepsWeight?: number;             // weight used for the "max" set
 
   // reps
@@ -122,6 +127,16 @@ export interface MovementResult {
   calories?: number;
   durationSeconds?: number;
   implementCount?: 1 | 2;
+  /**
+   * This movement's prescribed quantity in EACH tier of a per-movement ladder — [800, 600, 400]
+   * for a run that descends, [40, 30, 20] for thrusters, [15, 15, 15] for a constant add-on.
+   *
+   * A ladder collapses to ONE row per distinct movement (one weight, one swap decision), so
+   * without this the row can only show tier 1's number: a board writing three runs of 800/600/400
+   * rendered as a lone "RUN", which reads as a single run. The row states the whole scheme
+   * instead — the same story the poster's ladder row tells, from the same ladderTiers() source.
+   */
+  prescribedScheme?: number[];
   // Section grouping (populated when exercise has sections)
   sectionType?: ParsedSectionType;  // 'buy_in' | 'rounds' | 'cash_out'
   sectionRounds?: number;           // how many times this section repeats
@@ -292,6 +307,38 @@ const BUILDING_LOAD_CUE =
 export function prescribesBuildingLoad(exercise: ParsedExercise): boolean {
   const text = `${exercise.name || ''} ${exercise.prescription || ''} ${exercise.rawText || ''}`;
   return BUILDING_LOAD_CUE.test(text);
+}
+
+/**
+ * The movement whose score is a MAX-effort test, if this exercise has one.
+ *
+ * A skill practice ("Toes to Bar — 8 min, test your max unbroken reps, then 4 sets at 40-60%")
+ * carries exactly one number the athlete earned: that max. The board prescribes no rep count
+ * for it — that's the whole point — so nothing downstream can derive it, and without an input
+ * the part logs as "5/5 sets" and the poster has nothing to say about those 8 minutes.
+ *
+ * THE AI DECIDES. The parse prompt asks it, for every practice block, whether the athlete earns a
+ * number the board doesn't prescribe, and to stamp `isMaxReps` on the movement that carries it.
+ * This function only reads that answer — it does not re-derive it from the prescribed quantities,
+ * which would put a heuristic above the model on the one judgment we explicitly asked it to make.
+ * `inferIsMaxReps` in the post-processor still backfills the stamp for docs parsed before the
+ * prompt asked (and it defers to the AI whenever the field is present).
+ */
+export function getMaxRepsMovement(
+  // Structural, so the SAME rule answers for a ParsedExercise (logging) and a saved Exercise
+  // (poster). Two gates decide whether a practice block is worth showing — the wizard's
+  // needsLoggingStep and the poster's isMainPart — and they must not drift apart.
+  exercise: { movements?: ParsedMovement[] } | null | undefined,
+): ParsedMovement | undefined {
+  return exercise?.movements?.find((m) => m.isMaxReps === true);
+}
+
+/** True when the board asks for UNBROKEN reps — its word, so the label can echo it. */
+export function prescribesUnbrokenMax(
+  // Structural: the logging screen asks a ParsedExercise, the poster asks the saved Exercise.
+  exercise: { name?: string; prescription?: string; rawText?: string },
+): boolean {
+  return /\bunbroken\b/i.test(`${exercise.name || ''} ${exercise.prescription || ''} ${exercise.rawText || ''}`);
 }
 
 const DURATION_HOLD_PATTERNS = [
@@ -562,12 +609,27 @@ export function kindToTrinityColor(kind: ExerciseKind): string {
 // ─── Weight step size ────────────────────────────────────────────
 // KB movements use 2kg steps (standard jumps: 8,10,12,16,20,24…)
 // Everything else (barbell/DB) uses 2.5kg (plate increments).
+// An lb board steps in 5lb — the smallest pair of change plates in a pound gym, and close
+// enough to the KB jumps there (35→44→53) that a second grid buys nothing.
 // Steps only drive the +/− buttons — typed values are never snapped to this grid.
 
 const KB_PATTERN = /\b(kb|kettlebell)\b/i;
 
-export function getWeightStep(movementName: string, equipment?: MovementEquipment): number {
+export function getWeightStep(
+  movementName: string,
+  equipment?: MovementEquipment,
+  unit: LoadUnit = 'kg',
+): number {
+  if (unit === 'lb') return 5;
   return equipment === 'kettlebell' || KB_PATTERN.test(movementName) ? 2 : 2.5;
+}
+
+// ─── Weight input ceiling ────────────────────────────────────────
+// A stepper bound, not a rule about what a human can lift — it exists so a fat-fingered
+// entry can't store a five-digit load. Scaled per unit so an lb board isn't capped at what
+// is really 227kg.
+export function getWeightMax(unit: LoadUnit): number {
+  return unit === 'lb' ? 1100 : 500;
 }
 
 // ─── Create blank result from parsed exercise ───────────────────
@@ -578,7 +640,17 @@ export function createBlankResult(
   loggingMode: ExerciseLoggingMode,
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
   teamSize?: number,
+  isSoleExercise: boolean = true,
 ): StoryExerciseResult {
+  // The session team size divides ONLY the blocks that were actually shared. A solo strength or
+  // skill block inside a partner session keeps the coach's full numbers — otherwise the athlete
+  // is handed a pre-halved bar weight to log. Same gate the save path uses, so what the stepper
+  // prefills and what the breakdown stores can never disagree.
+  const sharedTeamSize = teamSize
+    && teamSize > 1
+    && isTeamPrescribedExercise(exercise, 1 / teamSize, isSoleExercise)
+    ? teamSize
+    : undefined;
   const baseKind = getDurationOverrideKind(exercise) ?? loggingModeToKind(loggingMode);
   const cadenceKind = loggingMode === 'intervals' && baseKind === 'score_time' && isFixedCadenceInterval(exercise)
     ? 'intervals'
@@ -646,7 +718,7 @@ export function createBlankResult(
   // section grouping metadata (buy-in / rounds blocks / cash-out).
   const isFemale = userSex === 'female';
   const hasSections = exercise.sections && exercise.sections.length > 0;
-  const movementSource: Array<{ mov: ParsedMovement; sectionType?: ParsedSectionType; sectionRounds?: number; sectionIndex?: number }> = [];
+  const movementSource: Array<{ mov: ParsedMovement; sectionType?: ParsedSectionType; sectionRounds?: number; sectionIndex?: number; prescribedScheme?: number[] }> = [];
 
   // A per-movement rep LADDER (the same movements every round, only reps change) is logged like the
   // flat for-time shape — ONE input per distinct movement plus the round set-selector — NOT
@@ -661,9 +733,24 @@ export function createBlankResult(
     // AI's top-level names can drift ("Push Press" vs section "Dumbbell Push Press"). Keying the
     // logged weights by the top-level name made the breakdown lookup miss and silently fall back
     // to Rx — the poster then showed Rx instead of the athlete's entered weight.
-    const roundMovs = exercise.sections!.find(s => s.sectionType === 'rounds')?.movements ?? [];
+    // The first TIER, not the first `rounds` section: a per-tier lead-in (the run opening each
+    // tier) belongs to the tier it leads, and reading round sections alone left it with no input
+    // to log at all. Same ladderTiers() definition the poster's rows use — one shape, one answer.
+    const tiers = ladderTiers(exercise)?.tiers ?? [];
+    const roundMovs = tiers[0] ?? [];
     const distinct = roundMovs.length > 0 ? roundMovs : (exercise.movements ?? []);
-    for (const mov of distinct) movementSource.push({ mov });
+    // Each movement's quantity across every tier, so the collapsed row can state the full scheme
+    // (800-600-400m) instead of just the tier it was built from.
+    const qtyOf = (m?: ParsedMovement): number | undefined => m?.reps ?? m?.calories ?? m?.distance;
+    distinct.forEach((mov, j) => {
+      const scheme = tiers.length > 1
+        ? tiers.map((tier) => qtyOf(tier[j])).filter((q): q is number => q != null)
+        : [];
+      movementSource.push({
+        mov,
+        ...(scheme.length === tiers.length ? { prescribedScheme: scheme } : {}),
+      });
+    });
   } else if (hasSections) {
     exercise.sections!.forEach((section, sIdx) => {
       for (const mov of section.movements) {
@@ -711,7 +798,7 @@ export function createBlankResult(
 
   if (movementSource.length > 0) {
     const seen = new Map<string, number>();
-    base.movementResults = movementSource.map(({ mov, sectionType, sectionRounds, sectionIndex }) => {
+    base.movementResults = movementSource.map(({ mov, sectionType, sectionRounds, sectionIndex, prescribedScheme }) => {
       const count = seen.get(mov.name) ?? 0;
       seen.set(mov.name, count + 1);
       const movementKey = count > 0 ? `${mov.name}::${count}` : mov.name;
@@ -722,6 +809,9 @@ export function createBlankResult(
         movement: mov,
         kind: movKind,
       };
+      if (prescribedScheme) {
+        mr.prescribedScheme = prescribedScheme;
+      }
       // Attach section grouping metadata
       if (sectionType != null) {
         mr.sectionType = sectionType;
@@ -734,10 +824,10 @@ export function createBlankResult(
       // Round-trade partners ('rounds' split, IGUG) never divide — whoever's up for a round does
       // the FULL prescribed amount, not a shared slice of it (see partnerSplit.ts).
       const isRoundsSplit = exercise.partnerWorkout === true && exercise.partnerSplit === 'rounds';
-      const isPartner = teamSize && teamSize > 1 && !isRoundsSplit;
+      const isPartner = sharedTeamSize != null && !isRoundsSplit;
       // Runs are never divided — each person runs the full distance
       const isRun = /\b(run|running|sprint)\b/i.test(mov.name);
-      const shareDivisor = (isPartner && !mov.together && !isRun) ? teamSize : 1;
+      const shareDivisor = (isPartner && !mov.together && !isRun) ? sharedTeamSize : 1;
 
       // Pre-fill from prescription, using user's sex for Rx selection
       if (movKind === 'load') {

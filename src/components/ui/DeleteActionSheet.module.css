@@ -1,8 +1,10 @@
+/* Above every other layer in the app (the For Later sheet sits at 1000/1001): a destructive
+   confirm can be raised from inside another sheet, and it has to be the thing you answer. */
 .actionBackdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  z-index: 300;
+  z-index: 1100;
 }
 
 .actionSheet {
@@ -10,7 +12,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  z-index: 301;
+  z-index: 1101;
   background: #1c1c1e;
   border-top-left-radius: 20px;
   border-top-right-radius: 20px;
@@ -28,6 +30,30 @@
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* Status of the thing being acted on, stated before its name. Yellow is the only accent the
+   design system allows, so the tag borrows it rather than inventing a "debug" colour. */
+.actionSheetTag {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245, 194, 0, 0.9);
+  color: #0c0d0f;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  vertical-align: 1px;
+}
+
+.actionSheetError {
+  padding: 12px 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.08);
 }
 
 .actionSheetBtn {
@@ -48,6 +74,11 @@
 
 .actionSheetBtn:active {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.actionSheetBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .actionSheetBtnDestructive {

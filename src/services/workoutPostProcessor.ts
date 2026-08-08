@@ -10,10 +10,17 @@ import { matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 
 /**
- * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg"
+ * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg", "95/65 lb", "135#"
+ * The "#" suffix is the American board's shorthand for pounds ("225#" = 225 lb).
  */
-const WEIGHT_PATTERN = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(kg|lb)/i;
-const SINGLE_WEIGHT_PATTERN = /@?\s*(\d+(?:\.\d+)?)\s*(kg|lb)/i;
+const WEIGHT_UNIT = '(kg|lb|#)';
+const WEIGHT_PATTERN = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)\\s*${WEIGHT_UNIT}`, 'i');
+const SINGLE_WEIGHT_PATTERN = new RegExp(`@?\\s*(\\d+(?:\\.\\d+)?)\\s*${WEIGHT_UNIT}`, 'i');
+
+/** Board notation → the stored unit. "lb", "lbs" and "#" are all pounds. */
+function normalizeWeightUnit(raw: string): 'kg' | 'lb' {
+  return raw.toLowerCase() === 'kg' ? 'kg' : 'lb';
+}
 
 /**
  * Time-based cardio patterns: "30 sec", "30s", "1 min", "1:30"
@@ -352,10 +359,9 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
     );
   }
 
-  // Normalize a per-tier cardio buy-in (run/row/bike before each descending round tier) into
-  // explicit buy_in sections — the AI is non-deterministic about placing it (folds it per-round,
-  // or leaves it top-level-only where sections shadow it), which drops/over-counts it otherwise.
-  const withPerTierBuyIns = normalizePerTierBuyIns(withCorrectedIntervals);
+  // Restore a lead-in movement the AI left ONLY in movements[], where sections shadow it. Pure
+  // backfill of something otherwise invisible — it never moves or rewrites what the AI placed.
+  const withPerTierBuyIns = backfillSectionShadowedLeadIn(withCorrectedIntervals);
 
   // Deterministically rebuild per-round sections for a per-movement independent rep ladder
   // ("[50-40-30] air squats / [30-20-10] push press / 15 box jumps each") when the AI collapsed it
@@ -826,21 +832,26 @@ function normalizePerMovementLadder(workout: ParsedWorkout): ParsedWorkout {
 }
 
 /**
- * Normalize a per-tier cardio BUY-IN (e.g. "300m run" before EACH descending round tier) into
- * explicit buy_in sections. The AI is demonstrably non-deterministic about this shape — it either
- * (a) FOLDS the movement in as the first movement of every rounds section (which then over-counts
- * it once per round, e.g. 3+2+1 = 6 runs), or (b) leaves it ONLY in top-level movements[] (which
- * drops it from both the sections-based workload total AND the poster, because sections shadow
- * top-level movements[]). Both are wrong; normalize to ONE buy_in section per tier so the movement
- * counts once per tier and renders as its own "BUY-IN" block.
+ * Restore a lead-in movement (e.g. "800m run" opening each descending tier) that the AI left ONLY
+ * in top-level movements[] and put in NO section. Sections shadow movements[] everywhere
+ * downstream, so such a movement is invisible: absent from the workload total, the poster and the
+ * logging flow. Copying it into the tiers is a BACKFILL of something the AI reported but didn't
+ * place — the one repair the trust rules allow.
  *
- * This is structural normalization, not overriding AI judgment: the AI agrees the movement exists
- * and is a lead-in — it just can't reliably place it. Guarded to a CARDIO-METRIC lead-in
- * (distance or calories, no reps) inside a MULTI-TIER for-time ladder (>=2 rounds sections), so it
- * never touches reps-based per-round work or a single-tier RFT. General: any distance/calorie
- * buy-in movement, any tier count, any rounds-section count.
+ * What this deliberately does NOT do — and what the deleted version did, causing the bug that
+ * motivated this rewrite: it never touches a lead-in the AI DID place. When the AI writes the run
+ * as the first movement of each tier, that is its answer to where the movement belongs, and the
+ * parse prompt's own CRITICAL BUY-IN RULE says a buy-in is only what the board explicitly labels
+ * as one. The previous code overrode that, lifting each tier's run into an invented buy_in section
+ * and cloning tier 1's into all of them — an 800/600/400m run became 3× 800m and vanished from
+ * both the poster and the logging flow, because those build a tier from `rounds` sections alone.
+ * A correct parse was rewritten into a wrong one. Heuristics do not get to outvote the model here.
+ *
+ * Guarded to a CARDIO-METRIC lead-in (distance or calories, no reps) in a MULTI-TIER for-time
+ * ladder, so it never touches reps-based per-round work or a single-tier RFT. General: any
+ * distance/calorie movement, any tier count.
  */
-function normalizePerTierBuyIns(workout: ParsedWorkout): ParsedWorkout {
+function backfillSectionShadowedLeadIn(workout: ParsedWorkout): ParsedWorkout {
   let changed = false;
   const exercises = workout.exercises.map(ex => {
     if (ex.loggingMode !== 'for_time') return ex;
@@ -851,41 +862,24 @@ function normalizePerTierBuyIns(workout: ParsedWorkout): ParsedWorkout {
     const roundSections = sections.filter(s => s.sectionType === 'rounds');
     if (roundSections.length < 2) return ex; // need a multi-tier ladder to disambiguate
 
-    const isCardioBuyIn = (m?: ParsedMovement): m is ParsedMovement =>
+    const isCardioLeadIn = (m?: ParsedMovement): m is ParsedMovement =>
       !!m && ((m.distance ?? 0) > 0 || (m.calories ?? 0) > 0) && !(m.reps && m.reps > 0);
 
-    // Case (a) FOLDED: the SAME cardio movement leads every rounds section.
-    const firstMovs = roundSections.map(s => s.movements?.[0]);
-    const leadName = firstMovs[0]?.name;
-    const foldedLead = leadName && firstMovs.every(m => isCardioBuyIn(m) && m.name === leadName)
-      ? firstMovs[0]
-      : undefined;
-
-    // Case (b) TOP-LEVEL ONLY: a cardio movement in movements[] but present in NO section.
     const sectionMovNames = new Set(
       sections.flatMap(s => (s.movements ?? []).map(m => m.name.toLowerCase())),
     );
-    const topOnlyLead = !foldedLead
-      ? (ex.movements ?? []).find(m => isCardioBuyIn(m) && !sectionMovNames.has(m.name.toLowerCase()))
-      : undefined;
+    const shadowed = (ex.movements ?? [])
+      .find(m => isCardioLeadIn(m) && !sectionMovNames.has(m.name.toLowerCase()));
+    if (!shadowed) return ex;
 
-    const lead = foldedLead ?? topOnlyLead;
-    if (!lead) return ex;
-
-    // Rebuild: a buy_in section (clean movement name — the section type carries the "once"
-    // semantics) before each rounds tier. For the folded case, strip the lead from each round
-    // block so it isn't double-counted per round.
-    const rebuilt: ParsedSection[] = [];
-    for (const s of sections) {
-      if (s.sectionType === 'rounds') {
-        rebuilt.push({ sectionType: 'buy_in', rounds: 1, movements: [{ ...lead }] });
-        rebuilt.push(foldedLead ? { ...s, movements: (s.movements ?? []).slice(1) } : s);
-      } else {
-        rebuilt.push(s);
-      }
-    }
+    // The AI wrote it once for the whole ladder and every tier opens with it, so each tier gets
+    // its own copy — as the tier's first movement, which is where movements[] order puts it and
+    // where every consumer that reads a tier will find it.
     changed = true;
-    return { ...ex, sections: rebuilt };
+    return {
+      ...ex,
+      sections: sections.map(s => ({ ...s, movements: [{ ...shadowed }, ...(s.movements ?? [])] })),
+    };
   });
 
   return changed ? { ...workout, exercises } : workout;
@@ -1322,6 +1316,19 @@ function correctWorkoutType(workout: ParsedWorkout, correctedFormat: ParsedWorko
  * AI often returns "strength" for mixed workouts containing AMRAP/EMOM
  */
 function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
+  // An athlete correction OUTRANKS the board's own wording, and this function reads the board.
+  //
+  // Its whole method is inferring the format from words in rawText — so on a board whose coach
+  // wrote the wrong word ("[02:00 AMRAP, 02:00 REST] x 5" for a piece with no rounds to count),
+  // it reinstates that word no matter what the AI concluded. That is exactly the mistake the
+  // athlete used the correction channel to fix: they told us the board is misleading, the model
+  // agreed and returned `intervals`, and this regex put `amrap_intervals` back — which routes
+  // logging to a ROUNDS stepper for a workout that has no rounds.
+  //
+  // Uncorrected parses are untouched, so the legacy rescue this function exists for (the AI
+  // returning "strength" for a mixed board) keeps working everywhere it always did.
+  if (workout.userContext?.trim()) return workout.format;
+
   // prominentText = title + exercise names (high-signal, used for priority checks)
   // fullText = title + rawText + names + prescriptions (broader, used as fallback)
   const prominentText = [
@@ -2044,7 +2051,7 @@ function extractWeightsFromText(text: string): RxWeights | undefined {
     return {
       male: Math.max(val1, val2),
       female: Math.min(val1, val2),
-      unit: unit.toLowerCase() as 'kg' | 'lb',
+      unit: normalizeWeightUnit(unit),
     };
   }
 
@@ -2056,7 +2063,7 @@ function extractWeightsFromText(text: string): RxWeights | undefined {
     return {
       male: val,
       female: val,
-      unit: unit.toLowerCase() as 'kg' | 'lb',
+      unit: normalizeWeightUnit(unit),
     };
   }
 
@@ -2071,8 +2078,8 @@ function findWeightForMovement(movementName: string, text: string): RxWeights | 
   // Use [^,\n\d]*? to stop at clause boundaries (commas, newlines) so we only match
   // weight directly associated with THIS movement mention, not a different one
   const patterns = [
-    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
-    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?@?\\s*(\\d+(?:\\.\\d+)?)\\s*(kg|lb)`, 'i'),
+    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?(\\d+(?:\\.\\d+)?)\\s*/\\s*(\\d+(?:\\.\\d+)?)\\s*${WEIGHT_UNIT}`, 'i'),
+    new RegExp(`${escapeRegex(movementName)}[^,\\n\\d]*?@?\\s*(\\d+(?:\\.\\d+)?)\\s*${WEIGHT_UNIT}`, 'i'),
   ];
 
   for (const pattern of patterns) {
@@ -2085,14 +2092,14 @@ function findWeightForMovement(movementName: string, text: string): RxWeights | 
         return {
           male: Math.max(val1, val2),
           female: Math.min(val1, val2),
-          unit: match[3].toLowerCase() as 'kg' | 'lb',
+          unit: normalizeWeightUnit(match[3]),
         };
       } else if (match[2]) {
         // Single weight pattern
         return {
           male: parseFloat(match[1]),
           female: parseFloat(match[1]),
-          unit: match[2].toLowerCase() as 'kg' | 'lb',
+          unit: normalizeWeightUnit(match[2]),
         };
       }
     }

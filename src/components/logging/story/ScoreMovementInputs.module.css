@@ -505,6 +505,18 @@
   line-height: 1;
 }
 
+/* The coach's rep/distance scheme for a ladder row ("800-600-400m"). Prescription, not input —
+   reads as board text: tabular figures so the tiers line up, one step brighter than the partner
+   note because it IS the movement's quantity, not an aside about it. */
+.prescribedScheme {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Field row: input + unit */
 .fieldRow {
   display: flex;

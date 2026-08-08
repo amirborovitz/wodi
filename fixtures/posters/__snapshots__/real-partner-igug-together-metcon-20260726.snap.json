@@ -145,26 +145,6 @@
         "hiddenCount": 0,
         "isPartnerConfirmed": true
       }
-    ],
-    [
-      {
-        "eyebrow": "WOD",
-        "title": "Core Cash Out",
-        "blueprint": "2 rounds",
-        "rows": [
-          {
-            "primary": "50",
-            "name": "KB Russian Twists",
-            "subNote": "100 total",
-            "totalNote": "100 total",
-            "mineKey": "Russian Twist",
-            "accent": "magenta",
-            "repeatCount": 2
-          }
-        ],
-        "hiddenCount": 0,
-        "isPartnerConfirmed": false
-      }
     ]
   ],
   "hero": {
@@ -337,28 +317,12 @@
           "mine": "",
           "team": "200"
         }
-      ],
-      [
-        {
-          "kind": "block",
-          "label": "CORE CASH OUT",
-          "cap": "2 rounds"
-        },
-        {
-          "kind": "line",
-          "rx": "50 KB Russian Twists",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "100 total"
-        }
       ]
     ]
   },
   "partnerSubs": {
     "reward": null,
     "pages": [
-      null,
       null
     ]
   }

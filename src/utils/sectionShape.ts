@@ -9,15 +9,67 @@ interface MovementLike {
   calories?: number | null;
 }
 
-interface SectionLike {
+interface SectionLike<M extends MovementLike = MovementLike> {
   sectionType?: string;
   rounds?: number | null;
-  movements?: MovementLike[];
+  movements?: M[];
 }
 
 /** The prescribed work for one movement — what changes from ladder rung to ladder rung. */
 function prescribedWork(mov: MovementLike): string {
   return `${mov.reps ?? ''}|${mov.distance ?? ''}|${mov.calories ?? ''}`;
+}
+
+export interface LadderShape<M extends MovementLike> {
+  /** One movement list per tier, with a per-tier lead-in folded into the tier it leads. */
+  tiers: M[][];
+  /**
+   * False when a once-only section could NOT be attributed to a single tier — the tiers are then
+   * just the `rounds` sections, and some prescribed work lives outside them.
+   */
+  foldsCleanly: boolean;
+}
+
+/**
+ * What each tier of a multi-tier ladder actually contains — the ONE definition every ladder
+ * consumer reads, so none of them can silently see a different workout than the others.
+ *
+ * A tier is a `rounds` section plus any once-only section that LEADS it. A per-tier cardio
+ * lead-in ("800m run" before each descending tier) is stored as its own `buy_in` section so a
+ * repeating tier can't multiply it — but the athlete performs it as that tier's first line, and
+ * every consumer that renders or logs a tier has to see it there. Reading `rounds` sections alone
+ * is what made an 800/600/400m run vanish from the poster AND the logging flow while the parse
+ * held it correctly the whole time: three separate consumers each filtered it away independently.
+ *
+ * `foldsCleanly` is false when a once-only section can't be attributed to one tier — a lone
+ * buy-in before ALL tiers belongs to the piece, not to tier 1, and folding it in would print it
+ * as "800-0-0m". Callers that can only render tiers (the per-movement ladder) must decline that
+ * shape and let the sectioned renderer state buy-in/cash-out as their own blocks.
+ *
+ * Returns null when there is no ladder at all (fewer than 2 round sections).
+ */
+export function ladderTiers<M extends MovementLike>(
+  exercise: { sections?: SectionLike<M>[] } | null | undefined,
+): LadderShape<M> | null {
+  const sections = exercise?.sections ?? [];
+  const roundSections = sections.filter((s) => s.sectionType === 'rounds');
+  if (roundSections.length < 2) return null;
+
+  const bare = (): LadderShape<M> => ({ tiers: roundSections.map((s) => s.movements ?? []), foldsCleanly: false });
+
+  // No once-only sections at all: every tier is exactly its own rounds section.
+  if (sections.length === roundSections.length) {
+    return { tiers: roundSections.map((s) => s.movements ?? []), foldsCleanly: true };
+  }
+  // Otherwise the only attributable shape is one lead-in per tier: [lead, tier] × n.
+  if (sections.length !== roundSections.length * 2) return bare();
+  const paired = sections.every((s, i) => (i % 2 === 0 ? s.sectionType !== 'rounds' : s.sectionType === 'rounds'));
+  if (!paired) return bare();
+
+  return {
+    tiers: roundSections.map((s, i) => [...(sections[i * 2].movements ?? []), ...(s.movements ?? [])]),
+    foldsCleanly: true,
+  };
 }
 
 /**
@@ -29,13 +81,14 @@ function prescribedWork(mov: MovementLike): string {
  * blocks (one weight input per block).
  */
 export function hasSameMovementsEveryRound(exercise: { sections?: SectionLike[] } | null | undefined): boolean {
+  const shape = ladderTiers(exercise);
+  if (!shape) return false;
   const roundSections = (exercise?.sections ?? []).filter((s) => s.sectionType === 'rounds');
-  if (roundSections.length < 2) return false;
-  const first = roundSections[0].movements ?? [];
+  const first = shape.tiers[0];
   if (first.length === 0) return false;
-  const sameNames = roundSections.every((s) =>
-    (s.movements ?? []).length === first.length
-    && (s.movements ?? []).every((m, j) => m.name.toLowerCase() === first[j].name.toLowerCase()),
+  const sameNames = shape.tiers.every((tier) =>
+    tier.length === first.length
+    && tier.every((m, j) => m.name.toLowerCase() === first[j].name.toLowerCase()),
   );
   if (!sameNames) return false;
 
@@ -47,8 +100,8 @@ export function hasSameMovementsEveryRound(exercise: { sections?: SectionLike[] 
   // (rounds: 1) whose reps change; a shrinking circuit ([3 rounds][2 rounds][1 round] of the same
   // triplet) repeats identical work. Both of those are still "the same movements every round".
   const everySectionRepeats = roundSections.every((s) => (s.rounds ?? 1) > 1);
-  const sameWorkEverySection = roundSections.every((s) =>
-    (s.movements ?? []).every((m, j) => prescribedWork(m) === prescribedWork(first[j])),
+  const sameWorkEverySection = shape.tiers.every((tier) =>
+    tier.every((m, j) => prescribedWork(m) === prescribedWork(first[j])),
   );
   return !everySectionRepeats || sameWorkEverySection;
 }

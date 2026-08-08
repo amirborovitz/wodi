@@ -2,6 +2,11 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Mirrors ADMIN_EMAIL in the app — the triage owner for shared collections.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'aborovitz@gmail.com';
+    }
+
     // Users can read/write their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -22,6 +27,21 @@ service cloud.firestore {
     match /savedWods/{docId} {
       allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Movement registry — the canonical family/implement table every client
+    // reads at boot. Triage writes it from the console; clients never do.
+    match /movementRegistry/{movementId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Movement flag queue — telemetry for movements the registry couldn't place.
+    // Any signed-in client appends (merge write, keyed by normalized name);
+    // only triage reads the ranked list back or clears it.
+    match /movementFlags/{movementId} {
+      allow create, update: if request.auth != null;
+      allow read, delete: if isAdmin();
     }
 
   }

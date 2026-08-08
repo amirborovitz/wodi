@@ -35,6 +35,13 @@
   background: none;
   border: none;
   padding: 0;
+  /* The <button> UA sheet overrides inherited typography (Arial 13.33px /
+     line-height normal / centered / black). Skins style themselves relative to
+     the page's inherited context, so without this the poster renders with
+     centred rows and the wrong base font here but not on the full-size screen. */
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
 }
 
 .frame:active {

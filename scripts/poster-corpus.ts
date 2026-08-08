@@ -41,6 +41,7 @@ import {
   aerobicHeroSubject,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
+import { isMainPart } from '../src/components/celebration/mainPart';
 import {
   prescribedMovementNames,
   movementsMatchingNames,
@@ -105,7 +106,7 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   // Mirrors useCelebrationData: the whole-workout artifact and every display decision follow
   // the MAIN part(s) — one main part owns the artifact even when secondary siblings exist,
   // and its own format (loggingMode-first) outranks the persisted session format.
-  const mainExercises = exercises.filter((ex) => ex.isSecondary !== true);
+  const mainExercises = exercises.filter(isMainPart);
   const sectionExercises = mainExercises.length > 0 ? mainExercises : exercises;
   const displayFormat = mainExercises.length === 1
     ? inferWorkoutFormatForExercise(mainExercises[0], format)
@@ -119,7 +120,10 @@ function buildSnapshot(fixture: PosterFixture): unknown {
         title,
       )
     : null;
-  const pages = exercises.map((exercise) =>
+  // Mirrors useCelebrationData.carouselPageData, which maps posterMainExercises — NOT every
+  // exercise. Building a page here for a part the app filters away is how a secondary block
+  // could vanish from the real poster while its fixture stayed green.
+  const pages = sectionExercises.map((exercise) =>
     buildPageArtifactSections(
       exercise,
       scopePageMovements(exercise, movements),

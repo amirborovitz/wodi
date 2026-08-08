@@ -493,6 +493,6 @@ export function initStoryResults(
 ): StoryExerciseResult[] {
   return workout.exercises.map((ex, i) => {
     const mode = ex.loggingMode ?? loggingModes[i] ?? 'strength';
-    return createBlankResult(ex, i, mode, userSex, teamSize);
+    return createBlankResult(ex, i, mode, userSex, teamSize, workout.exercises.length === 1);
   });
 }

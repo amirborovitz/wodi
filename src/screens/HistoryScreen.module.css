@@ -147,3 +147,28 @@
   align-items: start;
 }
 
+
+/* ── Test workout (admin) ──
+   Listed so it can be found and deleted, but visibly not part of the record: dimmed, with a
+   corner tag. Yellow is the only accent the system allows, so the tag borrows it at low weight
+   rather than inventing a "debug" colour. */
+.testCard {
+  position: relative;
+  opacity: 0.55;
+}
+
+.testBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 194, 0, 0.9);
+  color: #0c0d0f;
+  font-family: var(--font-family);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+}

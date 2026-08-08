@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ParsedMovement } from '../../types';
 import { getExerciseAlternatives, findExerciseDefinition, getAlternativeType } from '../../data/exerciseDefinitions';
+import { movementLoadUnit } from '../../utils/loadUnits';
 import styles from './InlineMovementEditor.module.css';
 
 /**
@@ -501,7 +502,7 @@ export function InlineMovementEditor({
                   {movement.rxWeights.male}
                 </div>
               ) : null}
-              <span className={styles.unitLabel}>kg</span>
+              <span className={styles.unitLabel}>{movementLoadUnit(movement)}</span>
             </div>
           )}
         </div>

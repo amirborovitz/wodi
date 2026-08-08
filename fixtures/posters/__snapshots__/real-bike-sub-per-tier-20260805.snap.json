@@ -1,0 +1,301 @@
+{
+  "reward": [
+    {
+      "eyebrow": "FOR TIME",
+      "title": "Blueprint",
+      "blueprint": "3 rounds for time · 35 MIN CAP",
+      "rows": [
+        {
+          "primary": "2400-1800-1200m",
+          "name": "Echo Bikes",
+          "totalNote": "5400m total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta"
+        },
+        {
+          "primary": "40-30-20",
+          "name": "Thrusters",
+          "subNote": "20KG",
+          "totalNote": "90 total",
+          "mineKey": "Thruster",
+          "accent": "yellow"
+        },
+        {
+          "primary": "40-30-20",
+          "name": "Box Jumps",
+          "totalNote": "90 total",
+          "mineKey": "Box Jump",
+          "accent": "magenta"
+        },
+        {
+          "primary": "20-30-40",
+          "name": "Burpees Over Bars",
+          "totalNote": "90 total",
+          "mineKey": "Burpees Over Bar",
+          "accent": "magenta"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "FOR TIME",
+        "title": "Blueprint",
+        "blueprint": "3 rounds for time · 35 MIN CAP",
+        "rows": [
+          {
+            "primary": "2400-1800-1200m",
+            "name": "Echo Bikes",
+            "totalNote": "5400m total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta"
+          },
+          {
+            "primary": "40-30-20",
+            "name": "Thrusters",
+            "subNote": "20KG",
+            "totalNote": "90 total",
+            "mineKey": "Thruster",
+            "accent": "yellow"
+          },
+          {
+            "primary": "40-30-20",
+            "name": "Box Jumps",
+            "totalNote": "90 total",
+            "mineKey": "Box Jump",
+            "accent": "magenta"
+          },
+          {
+            "primary": "20-30-40",
+            "name": "Burpees Over Bars",
+            "totalNote": "90 total",
+            "mineKey": "Burpees Over Bar",
+            "accent": "magenta"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "27:40",
+    "unit": "MIN",
+    "storyLine": "90 thruster · 90 box jump · 90 burpees over bar · 5.4km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "800m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "2.4km"
+      },
+      {
+        "perRound": "40",
+        "name": "Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Burpees Over Bar",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "1.8km"
+      },
+      {
+        "perRound": "30",
+        "name": "Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Burpees Over Bar",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "400m",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "1.2km"
+      },
+      {
+        "perRound": "20",
+        "name": "Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "20",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "40",
+        "name": "Burpees Over Bar",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "27:40",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "3 ROUNDS FOR TIME · 35 MIN CAP",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "2400-1800-1200m Echo Bikes",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "5400m total"
+      },
+      {
+        "kind": "line",
+        "rx": "40-30-20 Thrusters",
+        "load": "20KG",
+        "mine": "20kg",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "40-30-20 Box Jumps",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "20-30-40 Burpees Over Bars",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "90 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "3 ROUNDS FOR TIME · 35 MIN CAP",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "2400-1800-1200m Echo Bikes",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "5400m total"
+        },
+        {
+          "kind": "line",
+          "rx": "40-30-20 Thrusters",
+          "load": "20KG",
+          "mine": "20kg",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "40-30-20 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20-30-40 Burpees Over Bars",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "90 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  }
+}

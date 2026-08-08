@@ -17,6 +17,8 @@ import { shouldLogCelebrationDebug } from '../../helpers';
 import { formatLoggedLoad } from '../../posterFormatters';
 import { getExercisePeakLoad } from '../../movementResolution';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
+import { hasLoggedMaxEffort } from '../../mainPart';
+import { prescribesUnbrokenMax } from '../../../logging/story/types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -377,6 +379,8 @@ function buildSubLine(data: CelebrationData): string {
   }
   const fmt = data.workoutFormat;
   const ex0 = data.exercises[0];
+  // A load cue over a practice that never touched a weight.
+  if (data.exercises.length === 1 && ex0 && hasLoggedMaxEffort(ex0)) return '';
   if (fmt === 'strength') {
     return 'build to heavy';
   }
@@ -970,9 +974,17 @@ export function buildPosterWodFromPage(
       : exType === 'strength' ? 'strength'
       : data.workoutFormat ?? 'for_time';
 
+  // A practice scored by a max test is neither a format nor a load story, so neither the
+  // session's format ("FOR TIME", inherited from a sibling metcon) nor "STRENGTH" describes it.
+  // It also must not read "PRACTICE" — the title already says so, and the tag exists to add what
+  // the title can't.
+  const isMaxPractice = hasLoggedMaxEffort(page.exercise);
+
   // Map to display label via the same canonical mapping the summary card uses
   // (mapFormatToType) — 'free' is the one label it doesn't cover.
-  const type = exFmt === 'free' ? 'WOD' : mapFormatToType(exFmt as Parameters<typeof mapFormatToType>[0]);
+  const type = isMaxPractice
+    ? 'SKILL'
+    : exFmt === 'free' ? 'WOD' : mapFormatToType(exFmt as Parameters<typeof mapFormatToType>[0]);
 
   // 'amrap' and 'amrap_intervals' are both displayed as "AMRAP" everywhere else in this function
   // (the type tag above, mapFormatToType, resultLabel below) — duration extraction must treat
@@ -1013,10 +1025,13 @@ export function buildPosterWodFromPage(
     }
     // FormatTag pill already reads "AMRAP" — state the duration only, not the format word again.
     if (isAmrap && amrapMinutes) return `${amrapMinutes} MIN`;
-    if (page.isStrength) {
+    // The strength scheme counts sets that logged reps — on a max practice that is the ONE tested
+    // set, so it printed "1 SETS" directly above the block's own "5 SETS" blueprint.
+    if (page.isStrength && !isMaxPractice) {
       const scheme = formatPosterStrengthScheme(page.exercise);
       if (scheme) return scheme;
     }
+    if (isMaxPractice) return '';
     return mapFormatToType(exFmt);
   })();
 
@@ -1028,7 +1043,11 @@ export function buildPosterWodFromPage(
   if (!title && isPartnerPage) {
     title = section?.partnerDisplayMode === 'sections' ? 'PARTNER WOD' : 'PARTNER METCON';
   }
-  const repsScheme = page.isStrength ? formatPosterStrengthRepsSequence(page.exercise) : undefined;
+  // The per-set reps sequence tells a build-up story ("6-6-5-4-3"). A max test has exactly one
+  // number, so the sequence is just the hero repeated in a quieter font.
+  const repsScheme = page.isStrength && !isMaxPractice
+    ? formatPosterStrengthRepsSequence(page.exercise)
+    : undefined;
 
   const sub = (() => {
     if (section?.partnerDisplayMode === 'sections') return partnerBlocksSub(data.artifactSections);
@@ -1039,6 +1058,8 @@ export function buildPosterWodFromPage(
     // Station pages: the "alt. stations" format line stands alone (the clock title already
     // carries the durations).
     if (stationClock) return '';
+    // "build to heavy" is a load cue — meaningless on a practice that never touched a weight.
+    if (isMaxPractice) return '';
     if (exFmt === 'strength') return 'build to heavy';
     if (isAmrap && amrapMinutes) return '';
     if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
@@ -1052,10 +1073,15 @@ export function buildPosterWodFromPage(
     ? sectionsToRows(sections, mineMap, { title, type, format, sub })
     : [];
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
-  const strengthTopSet = page.isStrength ? getTopSetValue(page.exercise, page.movements) : null;
+  const strengthTopSet = page.isStrength && !isMaxPractice
+    ? getTopSetValue(page.exercise, page.movements)
+    : null;
 
   const resultLabel = (() => {
     if (strengthTopSet) return 'TOP SET';
+    // A max is not a total. "TOTAL REPS" over a single tested set both misstates what the number
+    // is and reads as a second, different fact beside the row that already says "Max Toes to Bar".
+    if (isMaxPractice) return prescribesUnbrokenMax(page.exercise) ? 'MAX UNBROKEN' : 'MAX REPS';
     // The label follows the hero's unit before the format, same rule as buildResultLabel —
     // a fallback hero (EP when no time was logged) must never sit under "MY TIME".
     if (heroResult?.unit === 'REPS') return isPartnerPage ? 'OUR REPS' : 'TOTAL REPS';
@@ -1138,7 +1164,12 @@ export function buildPosterWod(
     ? rawTitle.toUpperCase()
     : null;
 
-  const type = mapFormatToType(data.workoutFormat);
+  // Same rule as the page builder: a practice scored by a max test is not a load story. A
+  // practice logged on its own renders through THIS path, so it needs the identical treatment —
+  // otherwise the wording depends on whether a metcon happened to be logged beside it.
+  const soloMaxPractice = data.exercises.length === 1 && !!data.exercises[0]
+    && hasLoggedMaxEffort(data.exercises[0]);
+  const type = soloMaxPractice ? 'SKILL' : mapFormatToType(data.workoutFormat);
   const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
   const amrapMinutes = isAmrap
     ? (extractAmrapMinutes(data.exercises[0]) ?? (data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined))
@@ -1151,7 +1182,7 @@ export function buildPosterWod(
   const structureNote = data.artifactSections.find((s) => s.structureNote)?.structureNote;
   const sub = structureNote ?? (isAmrap && amrapMinutes ? '' : buildSubLine(data));
   const isStrengthWod = data.workoutFormat === 'strength' || data.exercises[0]?.type === 'strength';
-  const repsScheme = isStrengthWod && data.exercises[0]
+  const repsScheme = isStrengthWod && data.exercises[0] && !soloMaxPractice
     ? formatPosterStrengthRepsSequence(data.exercises[0])
     : undefined;
 
@@ -1173,8 +1204,12 @@ export function buildPosterWod(
   }
 
   // Result
-  const strengthTopSet = getSingleStrengthTopSetValue(data);
-  const resultLabel = strengthTopSet ? 'TOP SET' : buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit);
+  const strengthTopSet = soloMaxPractice ? null : getSingleStrengthTopSetValue(data);
+  const resultLabel = strengthTopSet
+    ? 'TOP SET'
+    : soloMaxPractice
+      ? (prescribesUnbrokenMax(data.exercises[0]) ? 'MAX UNBROKEN' : 'MAX REPS')
+      : buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit);
   const resultValue = strengthTopSet ?? buildResultValue(data.heroResult, resultLabel);
   const { meta: amrapMeta } = buildAmrapResultMeta(isAmrap, data.heroResult);
   const resultMeta = amrapMeta ?? aerobicHeroSubject(data.heroResult);

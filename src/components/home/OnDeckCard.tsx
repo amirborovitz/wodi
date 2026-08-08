@@ -4,7 +4,6 @@ import styles from './OnDeckCard.module.css';
 interface OnDeckCardProps {
   planned: PlannedWorkout;
   onLog: (planned: PlannedWorkout) => void;
-  onOpen?: (planned: PlannedWorkout) => void;
   onDelete?: (planned: PlannedWorkout) => void;
 }
 

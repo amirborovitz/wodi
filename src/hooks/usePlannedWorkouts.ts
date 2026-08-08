@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   query,
   where,
   onSnapshot,
+  deleteDoc,
+  doc,
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -13,6 +15,8 @@ import type { PlannedWorkout } from '../types';
 interface UsePlannedWorkoutsResult {
   planned: PlannedWorkout[];
   loading: boolean;
+  /** Resolves false when the write is rejected, so the caller can keep its confirm sheet up. */
+  deleteSavedWod: (savedWodId: string) => Promise<boolean>;
 }
 
 export function usePlannedWorkouts(): UsePlannedWorkoutsResult {
@@ -64,5 +68,17 @@ export function usePlannedWorkouts(): UsePlannedWorkoutsResult {
     return unsub;
   }, [user?.id]);
 
-  return { planned, loading };
+  // No local state to prune: the onSnapshot listener above drops the row the moment the
+  // delete lands, so reporting success/failure is this function's whole job.
+  const deleteSavedWod = useCallback(async (savedWodId: string): Promise<boolean> => {
+    try {
+      await deleteDoc(doc(db, 'savedWods', savedWodId));
+      return true;
+    } catch (err) {
+      console.error('[usePlannedWorkouts] Failed to delete saved WOD:', err);
+      return false;
+    }
+  }, []);
+
+  return { planned, loading, deleteSavedWod };
 }

@@ -81,35 +81,6 @@
     [
       {
         "eyebrow": "WOD",
-        "title": "Core",
-        "blueprint": "3 sets",
-        "rows": [
-          {
-            "primary": "30",
-            "name": "Russian Twist",
-            "subNote": "90 total",
-            "totalNote": "90 total",
-            "mineKey": "Russian Twist",
-            "accent": "magenta",
-            "repeatCount": 3
-          },
-          {
-            "primary": "50m",
-            "name": "Twin Kettlebells Front Rack Carry",
-            "subNote": "75 m total",
-            "totalNote": "75 m total",
-            "mineKey": "Twin Kettlebells Front Rack Carry",
-            "accent": "magenta",
-            "repeatCount": 3
-          }
-        ],
-        "hiddenCount": 0,
-        "isPartnerConfirmed": false
-      }
-    ],
-    [
-      {
-        "eyebrow": "WOD",
         "title": "METCON Long For Time",
         "blueprint": "For time (30 MIN CAP)",
         "rows": [
@@ -291,29 +262,6 @@
       [
         {
           "kind": "block",
-          "label": "CORE",
-          "cap": "3 sets"
-        },
-        {
-          "kind": "line",
-          "rx": "30 Russian Twist",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "90 total"
-        },
-        {
-          "kind": "line",
-          "rx": "50m Twin Kettlebells Front Rack Carry",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "75 m total"
-        }
-      ],
-      [
-        {
-          "kind": "block",
           "label": "",
           "cap": "For time (30 MIN CAP)"
         },
@@ -372,7 +320,6 @@
   "partnerSubs": {
     "reward": null,
     "pages": [
-      null,
       null
     ]
   }
