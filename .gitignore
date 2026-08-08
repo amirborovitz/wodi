@@ -26,3 +26,6 @@ dist-ssr
 # Claude session state
 .claude-state.md
 .claude/worktrees/
+
+# Firebase deploy cache (regenerated on every deploy)
+.firebase/
