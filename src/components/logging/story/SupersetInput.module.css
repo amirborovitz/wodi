@@ -8,6 +8,151 @@
   gap: 0;
 }
 
+/* ── Load progress: how many weights this piece still owes ──
+   A strength circuit asks one weight per station. The first card is the lift the athlete came
+   for, so without a count the cards under it read as optional detail. Eyebrow + pips + count. */
+.loadProgress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 20px 12px;
+}
+
+.loadProgressLabel {
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.38);
+  flex-shrink: 0;
+}
+
+.loadPips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.loadPip {
+  height: 3px;
+  flex: 1;
+  min-width: 8px;
+  max-width: 28px;
+  border-radius: 999px;
+  background: rgba(242, 240, 235, 0.12);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.loadPipDone {
+  background: var(--wodi-yellow, #f5c200);
+}
+
+.loadProgressCount {
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(242, 240, 235, 0.38);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+
+.loadProgressCount strong {
+  color: var(--wodi-yellow, #f5c200);
+  font-weight: 800;
+}
+
+/* ── Load block: one weight input + its escape hatch ──
+   A strength circuit stacks several of these, so each carries its own bottom spacing — the
+   container runs gap: 0 for the receipt-style movement rows and their hairline separators. */
+.loadBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* "Log these separately →" — takes a merged card apart into one input per movement.
+   Reads as a real control, not a footnote: it is the only way back when the AI's `complex`
+   call is wrong, and a faint link is one nobody finds. */
+.splitLink {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: rgba(242, 240, 235, 0.82);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 9px 16px;
+  margin-top: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+
+.splitLink:active {
+  color: var(--wodi-yellow);
+  border-color: rgba(245, 194, 0, 0.35);
+}
+
+/* ── Footer: what is still missing, named ──
+   Sits last in the block, directly above the wizard's Next button, so the athlete reads it at
+   the exact moment they were about to move on. It never blocks — it just makes the skip a
+   decision instead of an accident. */
+.loadFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 20px;
+  text-align: center;
+}
+
+.loadRemaining {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-family: var(--font-barlow);
+}
+
+.loadRemaining strong {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wodi-yellow, #f5c200);
+}
+
+.loadRemainingNames {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(242, 240, 235, 0.38);
+}
+
+/* Inverse of .splitLink — several stations that turned out to be one pick-up after all. */
+.sameWeightLink {
+  border: 0;
+  background: transparent;
+  color: rgba(242, 240, 235, 0.7);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sameWeightLink:active {
+  color: var(--wodi-yellow);
+}
+
 /* ── Movement row: receipt-style ── */
 /* No card background — these are supporting cast, not hero elements.
    A hairline top separator and left-rail color dot are all the structure
@@ -212,7 +357,9 @@
 @media (prefers-reduced-motion: reduce) {
   .movRow::before,
   .swapBtn,
-  .inlineChip {
+  .inlineChip,
+  .loadPip,
+  .splitLink {
     transition: none;
   }
   .inlineChip:active {

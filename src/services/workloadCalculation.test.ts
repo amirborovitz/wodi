@@ -238,3 +238,80 @@ describe('sequential blocks are not a station rotation', () => {
     expect(wb.grandTotalReps).toBe(12);
   });
 });
+
+// The real Gorillot board of 2026-08-10: "Every 01:30 x 8 sets: 1 squat clean + 1 front squat +
+// push jerk" AND "5 RFT: 200m run / 8 front squat @45kg / 8 C2B". FRONT SQUAT IS IN BOTH PARTS,
+// at two different loads. Keyed on the movement name alone, the two parts merged into one row:
+// 48 reps (40 + 8) priced at whichever weight arrived first — so the metcon poster page printed
+// "48 TOTAL" for a metcon that did 40, and the strength load smeared onto the metcon's volume.
+const SAME_LIFT_IN_TWO_PARTS: ParsedWorkout = {
+  title: 'Weightlifting + Metcon',
+  type: 'for_time',
+  format: 'for_time',
+  scoreType: 'time',
+  exercises: [
+    {
+      name: 'Barbell Complex',
+      type: 'strength',
+      loggingMode: 'emom',
+      complex: true,
+      movements: [
+        { name: 'Squat Clean', reps: 1, inputType: 'weight', rxWeights: { male: 50, female: 50, unit: 'kg' } },
+        { name: 'Front Squat', reps: 1, inputType: 'weight', rxWeights: { male: 50, female: 50, unit: 'kg' } },
+        { name: 'Push Jerk', reps: 1, inputType: 'weight', rxWeights: { male: 50, female: 50, unit: 'kg' } },
+      ],
+    },
+    {
+      name: '5 Rounds For Time',
+      type: 'metcon',
+      loggingMode: 'for_time',
+      movements: [
+        { name: 'Front Squat', reps: 8, inputType: 'weight', rxWeights: { male: 45, female: 45, unit: 'kg' } },
+        { name: 'Chest To Bar Pull-up', reps: 8, inputType: 'none' },
+      ],
+    },
+  ],
+} as unknown as ParsedWorkout;
+
+describe('one movement trained in two parts', () => {
+  it('keeps a per-part row for the same lift, each with its own reps and load', () => {
+    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
+    const frontSquats = wb.movements.filter((m) => m.name === 'Front Squat');
+
+    expect(frontSquats).toHaveLength(2);
+    expect(frontSquats.find((m) => m.exerciseIndex === 0)).toMatchObject({ totalReps: 1, weight: 50 });
+    expect(frontSquats.find((m) => m.exerciseIndex === 1)).toMatchObject({ totalReps: 8, weight: 45 });
+  });
+
+  it('stamps every row with the part it was trained in', () => {
+    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
+    expect(wb.movements.every((m) => m.exerciseIndex != null)).toBe(true);
+    expect(wb.movements.find((m) => m.name === 'Squat Clean')?.exerciseIndex).toBe(0);
+    expect(wb.movements.find((m) => m.name === 'Chest To Bar Pull-up')?.exerciseIndex).toBe(1);
+  });
+
+  it('leaves the session totals unchanged — the split re-buckets, it never re-counts', () => {
+    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
+    const sumReps = wb.movements.reduce((s, m) => s + (m.totalReps ?? 0), 0);
+    expect(wb.grandTotalReps).toBe(sumReps);
+    expect(wb.grandTotalReps).toBe(19); // complex 1+1+1, metcon 8+8 — one round each, no double count
+  });
+
+  it('still merges a movement repeated WITHIN one part', () => {
+    const twiceInOnePart = {
+      ...SAME_LIFT_IN_TWO_PARTS,
+      exercises: [{
+        name: 'Metcon',
+        type: 'metcon',
+        loggingMode: 'for_time',
+        movements: [
+          { name: 'Wall Ball', reps: 10, inputType: 'none' },
+          { name: 'Wall Ball', reps: 5, inputType: 'none' },
+        ],
+      }],
+    } as unknown as ParsedWorkout;
+    const wb = calculateWorkloadBreakdown(twiceInOnePart);
+    expect(wb.movements.filter((m) => m.name === 'Wall Ball')).toHaveLength(1);
+    expect(wb.movements[0]).toMatchObject({ totalReps: 15, exerciseIndex: 0 });
+  });
+});

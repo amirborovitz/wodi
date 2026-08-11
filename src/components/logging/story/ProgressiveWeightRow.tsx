@@ -52,6 +52,9 @@ interface ProgressiveWeightRowProps {
   unit?: LoadUnit;
   onChange: (start: number | undefined, peak: number | undefined) => void;
   label?: string;
+  /** Names every movement this one weight covers. A shared input must say what it buys —
+   *  an unexplained single card is how a merged group hides the movements inside it. */
+  subLabel?: string;
   footer?: ReactNode;
   /** One column only (no Start/Peak split) — for a single attempt with exactly one
    * meaningful number (e.g. "build a heavy Clean & Jerk for the day"). Peak always
@@ -60,6 +63,9 @@ interface ProgressiveWeightRowProps {
   singleColumn?: boolean;
   /** Column label in single-column mode. Defaults to "Weight". */
   columnLabel?: string;
+  /** No number entered yet, in a piece that is asking for several loads at once — the card
+   *  renders as an open slot so it can't be mistaken for one already filled in. */
+  pending?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -74,9 +80,11 @@ export function ProgressiveWeightRow({
   unit = 'kg',
   onChange,
   label = 'Barbell',
+  subLabel,
   footer,
   singleColumn = false,
   columnLabel = 'Weight',
+  pending = false,
 }: ProgressiveWeightRowProps) {
   const unitLabel = unit.toUpperCase();
   const peakTouched = useRef(false);
@@ -259,12 +267,13 @@ export function ProgressiveWeightRow({
     : setsTotal > 0 ? `${setsTotal} SETS` : null;
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${pending ? styles.cardPending : ''}`}>
       {/* Header — omitted in single-column mode; the exercise name above already carries it */}
       {!singleColumn && (
         <div className={styles.header}>
           <span className={styles.label}>{label.toUpperCase()}</span>
           {badge && <span className={styles.totalBadge}>{badge}</span>}
+          {subLabel && <p className={styles.subLabel}>{subLabel}</p>}
         </div>
       )}
 

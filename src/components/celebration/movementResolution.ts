@@ -37,6 +37,34 @@ export function movementsMatchingNames(all: MovementTotal[], names: Set<string>)
 }
 
 /**
+ * THE part→breakdown scope. `indices` are the parts' positions in the saved workout's
+ * `exercises[]`, which is what the breakdown builders stamp as `MovementTotal.exerciseIndex`.
+ *
+ * The index is the only thing that can separate one lift done in two parts — "1 front squat"
+ * inside the strength complex and "8 front squats" in the metcon are the same NAME, so a
+ * name-scoped page pulled in its sibling's reps and printed them as its own ("48 TOTAL" on a
+ * metcon that did 40). Where the index is present it is authoritative and answers alone;
+ * matching the name too would only re-admit the sibling.
+ *
+ * Docs saved before stamping existed carry no index, so those entries still scope by name —
+ * old posters keep rendering exactly as they did, merged totals and all.
+ */
+export function movementsForParts(
+  all: MovementTotal[],
+  parts: Exercise[],
+  indices: readonly number[],
+): MovementTotal[] {
+  const scope = new Set(indices);
+  const names = prescribedMovementNames(parts);
+  return all.filter((m) => (
+    m.exerciseIndex != null
+      ? scope.has(m.exerciseIndex)
+      : names.has(m.name.toLowerCase())
+        || (m.originalMovement != null && names.has(m.originalMovement.toLowerCase()))
+  ));
+}
+
+/**
  * THE canonical prescription→breakdown join: matches a prescribed movement name against
  * a logged entry's current name OR its pre-substitution original. Optionally scoped to
  * one exercise of a multi-part workout first, falling back to a global match for docs

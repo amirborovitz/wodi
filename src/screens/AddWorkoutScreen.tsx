@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors, getStationVisitCountsForExercise, isTeamPrescribedExercise } from '../services/workloadCalculation';
+import { assignMovementColors, getStationVisitCountsForExercise, isTeamPrescribedExercise, movementBucketKey } from '../services/workloadCalculation';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -285,6 +285,18 @@ function getMovementEffectiveRounds(
     : { rounds: stationVisits ?? movementRounds, estimated: false };
 }
 
+/**
+ * Whether a user-entered distance/calorie figure is the whole block's total or one round's work.
+ * `scoreEntryMode` is the field that records entry scope, so it decides whenever the parse set it.
+ * `unprescribedInThisUnit` is only the legacy fallback for parses that predate the field: left in
+ * charge it swallowed every unit-changing SUBSTITUTION, because a board that prescribes reps
+ * (40 double unders) never prescribes calories — so one round's 8 cal on the Echo Bike was stored
+ * as the entire 9-round total.
+ */
+function entersTotalValue(movement: ParsedMovement, unprescribedInThisUnit: boolean): boolean {
+  return movement.scoreEntryMode ? movement.scoreEntryMode === 'total' : unprescribedInThisUnit;
+}
+
 function buildWorkloadBreakdownFromResults(
   results: ExerciseResult[],
   parsedWorkout?: ParsedWorkout,
@@ -347,7 +359,7 @@ function buildWorkloadBreakdownFromResults(
 
         const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
         const movementName = rawMovementName;
-        const key = movementName.toLowerCase();
+        const key = movementBucketKey(movementName, resultIndex);
 
         const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
           ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
@@ -378,6 +390,7 @@ function buildWorkloadBreakdownFromResults(
         } else {
           movementMap.set(key, {
             name: movementName,
+            exerciseIndex: resultIndex,
             totalReps: movReps > 0 ? movReps : undefined,
             totalDistance: movementDistance > 0 ? movementDistance : undefined,
             totalCalories: movementCalories > 0 ? movementCalories : undefined,
@@ -566,8 +579,10 @@ function buildWorkloadBreakdownFromResults(
       // still repeat by rounds; only true total-entry fields should bypass round math.
       // Relay pacer movements log a TOTAL (trip stepper writes trips × per-trip) whose trip
       // count is independent of the AMRAP round count — never multiply it by rounds.
-      const useDistanceAsTotal = userDistance !== undefined && ((mov.distance ?? 0) <= 0 || mov.scoreEntryMode === 'total' || mov.relay === true);
-      const useCaloriesAsTotal = userCalories !== undefined && ((mov.calories ?? 0) <= 0 || mov.scoreEntryMode === 'total');
+      const useDistanceAsTotal = userDistance !== undefined
+        && (mov.relay === true || entersTotalValue(mov, (mov.distance ?? 0) <= 0));
+      const useCaloriesAsTotal = userCalories !== undefined
+        && entersTotalValue(mov, (mov.calories ?? 0) <= 0);
       const movementDistance = Math.round((
         useDistanceAsTotal
           ? perRoundDistance
@@ -585,7 +600,7 @@ function buildWorkloadBreakdownFromResults(
       const wasSubstituted = rawMovementName !== mov.name;
       const substitutionType = wasSubstituted ? (getAlternativeType(mov.name, rawMovementName) ?? undefined) : undefined;
       const originalMovement = wasSubstituted ? mov.name : undefined;
-      const key = movementName.toLowerCase();
+      const key = movementBucketKey(movementName, resultIndex);
 
       // Weight priority: weighted avg from sets (when progressive) > user-entered per-movement > user-entered per-set > parsed Rx
       // When weights vary across sets, use the weighted average so volume = avgWeight × totalReps
@@ -634,6 +649,7 @@ function buildWorkloadBreakdownFromResults(
       } else {
         movementMap.set(key, {
           name: movementName,
+          exerciseIndex: resultIndex,
           totalReps: movementReps > 0 ? movementReps : undefined,
           totalDistance: movementDistance > 0 ? movementDistance : undefined,
           totalCalories: movementCalories > 0 ? movementCalories : undefined,
@@ -675,7 +691,7 @@ function buildWorkloadBreakdownFromResults(
 
     let exerciseReps = 0;
     if (result.totalDistance && result.totalDistance > 0) {
-      const key = result.exercise.name.toLowerCase();
+      const key = movementBucketKey(result.exercise.name, resultIndex);
       const existing = movementMap.get(key);
       const totalDistance = result.totalDistance;
       const unit = result.distanceUnit || 'm';
@@ -689,6 +705,7 @@ function buildWorkloadBreakdownFromResults(
       } else {
         movementMap.set(key, {
           name: result.exercise.name,
+          exerciseIndex: resultIndex,
           totalDistance,
           unit,
         });
@@ -698,7 +715,7 @@ function buildWorkloadBreakdownFromResults(
     }
 
     if (result.totalCalories && result.totalCalories > 0) {
-      const key = result.exercise.name.toLowerCase();
+      const key = movementBucketKey(result.exercise.name, resultIndex);
       const existing = movementMap.get(key);
       const totalCalories = result.totalCalories;
 
@@ -710,6 +727,7 @@ function buildWorkloadBreakdownFromResults(
       } else {
         movementMap.set(key, {
           name: result.exercise.name,
+          exerciseIndex: resultIndex,
           totalCalories,
           unit: 'cal',
         });
@@ -736,7 +754,7 @@ function buildWorkloadBreakdownFromResults(
     const weightProgression = distinctWeights.length > 1 ? distinctWeights : undefined;
 
     if (exerciseReps > 0) {
-      const key = result.exercise.name.toLowerCase();
+      const key = movementBucketKey(result.exercise.name, resultIndex);
       const existing = movementMap.get(key);
       if (existing) {
         movementMap.set(key, {
@@ -748,6 +766,7 @@ function buildWorkloadBreakdownFromResults(
       } else {
         movementMap.set(key, {
           name: result.exercise.name,
+          exerciseIndex: resultIndex,
           totalReps: exerciseReps,
           weight: exerciseWeight,
           weightProgression,
@@ -767,7 +786,7 @@ function buildWorkloadBreakdownFromResults(
   // per-movement loop above because the movement might be added by a different exercise/code
   // path. Fix: iterate results, find exercises with distinct (real, first/last-set) weights,
   // and patch the corresponding movement entry in the map.
-  results.forEach((result) => {
+  results.forEach((result, resultIndex) => {
     const movements = result.exercise.movements;
     if (!movements || movements.length === 0) return;
     const distinctWeights = [...new Set(
@@ -781,7 +800,9 @@ function buildWorkloadBreakdownFromResults(
 
     for (const mov of movements) {
       if (!isWeightedMovement(mov)) continue;
-      const key = mov.name.toLowerCase();
+      // Scoped to THIS part: a sibling part's entry for the same lift keeps its own load, and
+      // must never be patched with this part's set progression.
+      const key = movementBucketKey(mov.name, resultIndex);
       const entry = movementMap.get(key);
       if (!entry) continue;
       if (entry.weightProgression && entry.weightProgression.length > 1) continue; // already set

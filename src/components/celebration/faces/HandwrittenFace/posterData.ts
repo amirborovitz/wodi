@@ -293,11 +293,27 @@ function formatPosterStrengthScheme(exercise: Exercise): string | undefined {
   return `${completed.length} SETS`;
 }
 
+// A set's rep count is a story only when the SET IS ONE MOVEMENT ("6-6-5-4-3" on a deadlift
+// build-up). When the piece puts several movements in one set — a complex ("1 squat clean +
+// 1 front squat + 1 push jerk") or a strength circuit ("5 press / 10/10 DB row / 8/8 SLDL") —
+// actualReps is their SUM (3, 23): a number no coach wrote and no athlete entered, which reads
+// as a rep scheme and isn't one. The row name already spells out each movement's own reps.
+function prescribesSingleMovement(exercise: Exercise): boolean {
+  const names = new Set(
+    [
+      ...(exercise.sections?.flatMap((section) => section.movements ?? []) ?? []),
+      ...(exercise.movements ?? []),
+    ].map((movement) => movement.name.toLowerCase()),
+  );
+  return names.size <= 1;
+}
+
 // Every set's reps spelled out in full ("6-6-5-4-3"), never ellipsized or collapsed — the
 // climbing/descending reps across sets are the whole story of a build-up day. Lives on the
 // movement row as a quiet sub-line, separate from the scheme line above (which only states
 // the set count).
-function formatPosterStrengthRepsSequence(exercise: Exercise): string | undefined {
+export function formatPosterStrengthRepsSequence(exercise: Exercise): string | undefined {
+  if (!prescribesSingleMovement(exercise)) return undefined;
   const completed = getPosterCompletedStrengthSets(exercise);
   const reps = completed
     .map((set) => set.actualReps ?? set.targetReps)

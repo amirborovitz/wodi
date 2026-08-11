@@ -313,7 +313,12 @@ export type SharedWorkLabel = 'each' | 'sync' | 'together';
 
 export interface MovementTotal {
   name: string;
-  exerciseIndex?: number;      // Optional exercise scope for mixed/sectioned workouts
+  // Which PART this total belongs to — its index in the workout's exercises[]. Always stamped
+  // by the breakdown builders; optional only because docs saved before stamping existed have
+  // no value, and those fall back to name-scoping (movementsForParts). The breakdown holds one
+  // entry per movement PER PART, so the same lift in a strength piece and in the metcon stays
+  // two rows at two loads instead of merging into one.
+  exerciseIndex?: number;
   totalReps?: number;
   totalDistance?: number;
   totalCalories?: number;
@@ -501,7 +506,7 @@ export interface MovementSubstitution {
   selectedName: string;           // What user selected instead
   substitutionType: 'easier' | 'harder' | 'equivalent';
   distanceMultiplier?: number;    // e.g., 1.25 for row vs run
-  repMultiplier?: number;         // e.g., 3 for single-unders vs double-unders
+  repMultiplier?: number;         // e.g., 2 for single-unders vs double-unders
   originalValue?: number;         // Original distance/reps
   adjustedValue?: number;         // Adjusted value after multiplier
   /** The unit the adjusted value is measured in (target movement's default unit) */

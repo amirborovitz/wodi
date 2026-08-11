@@ -2216,8 +2216,8 @@ function cleanWeightFromName(name: string): string {
  * Known alternative movement pairs (primary -> alternatives)
  * Primary is the easier/scaled movement; alternatives are harder/Rx
  */
-const KNOWN_ALTERNATIVE_PAIRS: Array<{ primary: string; alternatives: string[]; repMultiplier?: number }> = [
-  { primary: 'Single Under', alternatives: ['Double Under'], repMultiplier: 3 },
+const KNOWN_ALTERNATIVE_PAIRS: Array<{ primary: string; alternatives: string[] }> = [
+  { primary: 'Single Under', alternatives: ['Double Under'] },
   { primary: 'Pull-up', alternatives: ['Chest to Bar Pull-up', 'Muscle-up', 'Bar Muscle-up'] },
   { primary: 'Push-up', alternatives: ['Handstand Push-up'] },
   { primary: 'Air Squat', alternatives: ['Pistol'] },
@@ -2666,8 +2666,18 @@ function backfillComplexFlag(workout: ParsedWorkout): ParsedWorkout {
       if (ex.sections?.length) return ex;         // 4b "Into:" blocks are separate sets, not a complex
       const movements = ex.movements;
       if (!movements || movements.length < 2) return ex;
-      // Every movement is on the same bar — a "+"-joined complex is one weight, one bar.
+      // Every movement is loaded AND on the same implement — a "+"-joined complex is one weight,
+      // one bar. `inputType` alone only proves they are loaded: it passed a barbell press beside
+      // two dumbbell movements, and downstream a complex collapses its members into ONE weight
+      // input, so the extras stop being loggable at all. The AI's per-movement `equipment` is the
+      // authority on whether it really is one implement; unstated equipment still passes.
       if (!movements.every(m => m.inputType === 'weight')) return ex;
+      const statedEquipment = new Set(
+        movements
+          .map(m => m.equipment)
+          .filter(e => e === 'barbell' || e === 'dumbbell' || e === 'kettlebell'),
+      );
+      if (statedEquipment.size > 1) return ex;
       const scoped = `${ex.name} ${ex.prescription} ${getExerciseScopedText(workout, ex)}`;
       // "clean + 1 hang" / "Press + Jerk" — a letter, then "+", then an optional count, then a
       // letter. Excludes "@80+%" (digit before the "+") and "60/90kg" (no "+").

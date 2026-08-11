@@ -1,5 +1,133 @@
 # Changelog
 
+## v0.1.23 — Every load its own number, every part its own row
+
+The release's through-line: **a session is not one bucket.** A strength circuit is several lifts at
+several weights, not one weight repeated. A lift trained in the complex *and* in the metcon is two
+rows at two loads, not one row holding the sum. And a movement swapped for a machine is measured in
+the machine's unit, not in the reps the board wrote for the movement it replaced.
+
+---
+
+### Strength circuits ask for every weight
+
+**New `resolveLoadBlocks()` in `logging/story/loadGroups.ts`** — one entry per weight the athlete
+actually has to state. Two movements share a single input only when the AI flagged the exercise
+`complex`: one implement picked up and carried through consecutive lifts without setting it down,
+where there is physically one load. Everything else is a station at its own intensity — "4 sets:
+5 shoulder press / 10/10 DB row / 8/8 single-leg deadlift" is three lifts, and sharing an equipment
+*class* is not sharing a weight (the row rides at 22.5, the single-leg deadlift at 20). Inferring
+one number from a shared `db` bucket is what stamped a single load across a whole circuit.
+
+Metcon weights are untouched: they still group by implement in play through `resolveLoadGroups`,
+because inside one metcon round a single pair of DBs really does serve every DB movement.
+
+The `sectionIndex` axis splits first, so sequential blocks ("4 sets Push Press, Into: 4 sets Push
+Jerk") keep independent start→peak entries, and a complex that repeats per block merges within its
+own block and never across them.
+
+**`SupersetInput` rebuilt around that list.** The entered load is written to *each covered
+movement*, never to the parent result — that is what lets one block build 40→50 kg while the DB row
+beside it stays at 22.5. The card that covers several movements now says so ("One bar · 3 lifts")
+and names them, an unfilled card renders as an open slot rather than looking already answered, and
+a "Weights to log 2/3" header plus an "*N* weights left" footer names what is still missing — the
+failure mode being fixed is logging the hero lift and walking away from the rest.
+
+Two escape hatches, both one tap, because a merged card must never make a lift impossible to record:
+- **"Log these separately"** splits a merged block into its movements.
+- **"Same weight for all"** copies one number across, offered only when every input is the same
+  implement (copying a bar weight onto a DB row is never the intent).
+
+### `complex` means one implement, never set down
+
+The prompt now states what the flag *means* rather than only where it applies, and names the shape
+it kept swallowing: a strength circuit or superset — several different movements each done for
+their own reps inside a set — must stay `complex: false`. Using the same equipment does not make a
+circuit a complex; the test is whether the implement is put down between movements. When unsure the
+model leaves the flag off, because a missing flag costs an extra weight prompt while a wrong one
+asks for a single weight the athlete never used.
+
+`backfillComplexFlag` was making the same mistake in the post-processor: `inputType === 'weight'`
+only proves the movements are *loaded*, so it passed a barbell press beside two DB movements and
+collapsed all three into one input. It now also requires the AI's per-movement `equipment` to name
+a single implement (unstated equipment still passes).
+
+### A block's `sets[]` records only what the block shares
+
+Each movement's own load travels on `movementResults` → `movementWeights`, which is what the
+breakdown, the poster rows and the peak-load scan read. The exercise-level `sets[]` is a
+whole-block record, and it may now only state what is genuinely shared:
+
+- **weight** — only when every load in the block resolved to the same number. A barbell press at
+  40 kg beside a DB row at 22.5 has no exercise-level weight, and inventing one was read downstream
+  as fact (`hasVaryingSetWeights` averaged it across every movement; the poster quoted it as the
+  top set).
+- **reps** — the block's per-set total across its movements, the same meaning `actualReps` carries
+  everywhere else. One movement's rep count stamped on the whole block is what put "10 reps" on a
+  5-rep shoulder press.
+
+### The breakdown is keyed per part, not per name
+
+**New `movementBucketKey(name, exerciseIndex)`** — the same lift routinely appears twice on one
+board at two intensities: "1 front squat" inside a strength complex and "8 front squats @ 45 kg" in
+the metcon. Keying on the name alone merged them into one row, which summed reps across parts (the
+metcon page then printed the strength block's reps as its own) and kept only the *first* weight, so
+the other part's reps were priced at a load it never touched. Repeats within one part still merge,
+which is exactly what a part's total means.
+
+`MovementTotal.exerciseIndex` is now stamped by every breakdown builder — the live save path in
+`AddWorkoutScreen`, `calculateWorkloadBreakdown` and `calculateWorkloadFromExercises`.
+
+**New `movementsForParts()`** is THE part→breakdown scope, replacing name matching in
+`useCelebrationData`, the hero-result path and the poster harness. Where the index is present it
+answers alone; matching the name as well would only re-admit the sibling. `repairUndercountedBreakdown`
+is keyed the same way — a name-only map kept whichever row arrived last and then repaired it against
+the *other* part's round count, turning a complex's 8 front squats into the metcon's 40.
+
+Docs saved before stamping existed carry no index and still scope by name, so old posters render
+exactly as they did.
+
+### Substitutions that change the unit
+
+A board that prescribes reps (40 double-unders) never prescribes calories, so the legacy
+"unprescribed in this unit ⇒ the entry is a total" fallback swallowed every unit-changing swap: one
+round's 8 cal on the Echo Bike was stored as the entire 9-round total. **New `entersTotalValue()`**
+puts `scoreEntryMode` in charge whenever the parse set it, and keeps the old inference only for
+parses that predate the field.
+
+With that fixed at the source, the poster's matching exemption came out: a substituted row divides
+by the round count like every other row, instead of printing the 9-round total as the per-round
+prescription ("72 CAL Echo Bike"). A relay leg still keeps its own per-trip figure.
+
+A distance- or calorie-measured substitute also no longer inherits the board's reps — those belong
+to the movement that was swapped out. A rep-measured swap (double-unders → singles) keeps them.
+
+**Substitution catalogue**: double-under ↔ single-under corrected from 3× to 2× (three singles per
+double was never the trade), and cardio machines are now offered as calorie equivalents for both.
+
+### Poster
+
+- **The per-set reps sub-line is single-movement only.** "6-6-5-4-3" is a story when the set *is*
+  one movement. When a set holds several — a complex, or a strength circuit — `actualReps` is their
+  sum (3, 23): a number no coach wrote and no athlete entered, which reads as a rep scheme and is
+  not one. The row name already spells out each movement's own reps.
+- **No duplicated sub-lift in a complex line.** Compound-name recovery reads the board's own "a + b"
+  and splices the neighbour onto a truncated name — correct for "Hang Clean" ← "Hang Clean to Jerk",
+  wrong inside a complex whose neighbours the caller is already joining, which printed "1 Squat
+  Clean + 1 Front Squat + Push Jerk + 1 Push Jerk". Recovery now stands down when the caller joins
+  the siblings itself.
+
+### Harness
+
+Three new real-board fixtures — a mixed-implement strength circuit, a barbell complex EMOM beside a
+metcon (the same lift in two parts), and an AMRAP with double-unders swapped for an Echo Bike. The
+snapshot now also captures each strength page's reps sub-line, so the single-movement gate can't
+regress in either direction.
+
+`tsc -b` clean, 238/238 tests, 38/38 poster fixtures.
+
+---
+
 ## v0.1.22 — Units, ladders, max-effort practices, and per-part corrections
 
 The release's through-line: **stop letting a downstream heuristic overwrite something the board,

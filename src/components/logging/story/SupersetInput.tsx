@@ -2,12 +2,18 @@ import { useCallback, useMemo, useState } from 'react';
 import type { StoryExerciseResult, MovementResult } from './types';
 import { kindToTrinityColor, getWeightStep, getWeightMax } from './types';
 import { movementLoadUnit } from '../../../utils/loadUnits';
+import {
+  getMovementEquipmentType,
+  resolveLoadBlocks,
+  resolveMovementEquipment,
+  type LoadBlock,
+  type LoadEquipment,
+} from './loadGroups';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
 import type { MovementSubstitution } from '../../../types';
-import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
 import styles from './SupersetInput.module.css';
 
 interface SupersetInputProps {
@@ -15,38 +21,61 @@ interface SupersetInputProps {
   onChange: (patch: Partial<StoryExerciseResult>) => void;
 }
 
+/** What ONE weight input covers: a load block, or a single movement split out of one. */
+type WeightInput = LoadBlock;
+
+/** What a merged card is claiming to be — the reason it asks for a single number. */
+const ONE_LOAD_NOUN: Record<LoadEquipment, string> = {
+  barbell: 'One bar',
+  db: 'One DB load',
+  kb: 'One KB load',
+  other: 'One load',
+};
+
+/** Board-order render slot: a shared weight input, or one movement's own row. */
+type RenderItem =
+  | { type: 'weight'; input: WeightInput }
+  | { type: 'row'; mr: MovementResult; index: number };
+
 /**
- * Renders compact per-movement input rows for supersets.
- * Detects barbell complexes (2+ weighted movements sharing one bar)
- * and renders a single shared weight input instead of per-movement inputs.
+ * Renders compact per-movement input rows for supersets, complexes and strength circuits.
+ * Every distinct load in the piece gets its own weight input; movements that truly share an
+ * implement share one, with an escape hatch to split them apart.
  */
 export function SupersetInput({ result, onChange }: SupersetInputProps) {
-  const movements = result.movementResults ?? [];
+  // Stable identity: everything below memoises on this list, and a fresh `[]` each render
+  // would re-derive every load block on every keystroke.
+  const movements = useMemo(() => result.movementResults ?? [], [result.movementResults]);
 
-  // Detect barbell complex or single weighted movement needing Start/Top.
-  // Show ProgressiveWeightRow when 1+ weighted movements exist with multiple sets.
-  const { isComplex, weightedIndices } = useMemo(() => {
-    const indices = movements
-      .map((mr, i) => mr.kind === 'load' ? i : -1)
-      .filter(i => i >= 0);
-    const hasMutiSets = result.setsTotal > 1;
-    return { isComplex: indices.length >= 1 && hasMutiSets, weightedIndices: indices };
-  }, [movements, result.setsTotal]);
+  const equipmentByKey = useMemo(() => resolveMovementEquipment(movements), [movements]);
 
-  // Sequential blocks: the movements come from DISTINCT 'rounds' sections — one lift per block,
-  // each with its own set count (e.g. "4 sets Push Press, Into: 4 sets Push Jerk"). These are
-  // done one after another at INDEPENDENT weights, so each block is logged on its OWN
-  // ProgressiveWeightRow (its own start->peak), never a single shared bar. Distinct from a
-  // simultaneous "+"-joined complex (no sections → the shared-weight path below is correct) AND
-  // from a per-movement rep LADDER (the SAME movements every round → not sequential blocks; it
-  // logs one input per distinct movement). Same predicate the poster's ladder branch uses.
-  const isSequentialBlocks = useMemo(() => {
-    if (hasSameMovementsEveryRound(result.exercise)) return false;
-    const sectionIdxs = movements
-      .filter((mr) => mr.sectionType === 'rounds' && mr.sectionIndex != null)
-      .map((mr) => mr.sectionIndex);
-    return new Set(sectionIdxs).size > 1;
-  }, [movements, result.exercise]);
+  const getMovementEquipment = useCallback((mr: MovementResult): LoadEquipment => (
+    equipmentByKey.get(mr.movementKey) ?? getMovementEquipmentType(mr.movement)
+  ), [equipmentByKey]);
+
+  // Every distinct load the athlete has to state. Only a complex — the AI's word for one bar
+  // taken through an unbroken sequence — collapses its movements into a single weight; a
+  // strength circuit asks each station separately. See resolveLoadBlocks.
+  const isComplex = result.exercise.complex === true;
+  const loadBlocks = useMemo<LoadBlock[]>(
+    () => resolveLoadBlocks(movements, getMovementEquipment, isComplex),
+    [movements, getMovementEquipment, isComplex],
+  );
+
+  // Blocks the athlete pulled apart ("use different weights for each"): same rows, own numbers.
+  const [splitBlockKeys, setSplitBlockKeys] = useState<Set<string>>(() => new Set());
+
+  const weightInputs = useMemo<WeightInput[]>(() => loadBlocks.flatMap((block) => (
+    splitBlockKeys.has(block.key) && block.movements.length > 1
+      ? block.movements.map((mr) => ({ key: `${block.key}:${mr.movementKey}`, type: block.type, movements: [mr] }))
+      : [block]
+  )), [loadBlocks, splitBlockKeys]);
+
+  // A start->peak input only means something across multiple sets. The block states its own
+  // count when it has one (sequential blocks each repeat on their own).
+  const inputSetsTotal = useCallback((input: WeightInput): number => (
+    input.movements[0]?.sectionRounds ?? result.setsTotal
+  ), [result.setsTotal]);
 
   const updateMovement = useCallback((index: number, patch: Partial<MovementResult>) => {
     const next = [...(result.movementResults ?? [])];
@@ -54,45 +83,29 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     onChange({ movementResults: next });
   }, [result.movementResults, onChange]);
 
-  // Per-block weight progression (sequential complex): writes to THIS movement's own
-  // weight/weightEnd, so each block keeps an independent start->peak.
-  const handleBlockProgressive = useCallback((index: number, start: number | undefined, peak: number | undefined) => {
-    const next = [...(result.movementResults ?? [])];
-    next[index] = {
-      ...next[index],
-      weight: start,
-      weightEnd: peak,
-      loadMode: peak != null && start != null && peak !== start ? 'range' : 'same',
-    };
+  // The entered load belongs to THIS input's movements and to no others. Writing it per
+  // movement — never onto the parent result — is what lets one block build 40->50kg while the
+  // DB row beside it stays at 22.5kg; the save path reads each movement's own weight/weightEnd.
+  const applyLoad = useCallback((
+    target: MovementResult[],
+    start: number | undefined,
+    peak: number | undefined,
+  ) => {
+    const keys = new Set(target.map((mr) => mr.movementKey));
+    const next = (result.movementResults ?? []).map((mr) => (
+      keys.has(mr.movementKey)
+        ? {
+            ...mr,
+            weight: start,
+            weightEnd: peak,
+            loadMode: peak != null && start != null && peak !== start
+              ? ('range' as const)
+              : ('same' as const),
+          }
+        : mr
+    ));
     onChange({ movementResults: next });
   }, [result.movementResults, onChange]);
-
-  const handleProgressiveChange = useCallback((start: number | undefined, peak: number | undefined) => {
-    const next = [...(result.movementResults ?? [])];
-    for (const idx of weightedIndices) {
-      // For progressive mode, all movements get the start weight
-      // (per-set interpolation is handled at save time by the caller)
-      next[idx] = { ...next[idx], weight: start };
-    }
-    // Store peak in weightEnd on the parent result for save-time interpolation
-    onChange({ movementResults: next, weightEnd: peak, loadMode: peak != null ? 'range' : 'same' });
-  }, [result.movementResults, onChange, weightedIndices]);
-
-  // Get shared weight value and placeholder from first weighted movement
-  const sharedWeight = isComplex && weightedIndices.length > 0
-    ? movements[weightedIndices[0]]?.weight
-    : undefined;
-  const sharedPlaceholder = isComplex && weightedIndices.length > 0
-    ? movements[weightedIndices[0]]?.movement.rxWeights?.male
-    : undefined;
-  // Label: use movement name when single weighted, "Barbell" for multi
-  const progressiveLabel = weightedIndices.length === 1
-    ? movements[weightedIndices[0]]?.movement.name ?? 'Weight'
-    : 'Barbell';
-  // Reps per set for "TOTAL REPS" badge
-  const progressiveReps = weightedIndices.length > 0
-    ? movements[weightedIndices[0]]?.movement.reps ?? result.exercise.suggestedReps
-    : undefined;
 
   const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
   const swapMr = swapOpenKey != null
@@ -163,90 +176,173 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
       : mr.movement.name;
   }, [movements, result.setsTotal]);
 
-  // Sequential complex: one independent block per section. Each weighted block gets its own
-  // ProgressiveWeightRow (own start->peak); any non-weighted movement in a block keeps its row.
-  if (isSequentialBlocks) {
-    return (
-      <>
-        <div className={styles.container}>
-          {movements.map((mr, i) => (
-            mr.kind === 'load' ? (
-              <ProgressiveWeightRow
-                key={mr.movementKey}
-                weight={mr.weight}
-                peakWeight={mr.weightEnd}
-                placeholder={mr.movement.rxWeights?.male}
-                setsTotal={mr.sectionRounds ?? result.setsTotal}
-                repsPerSet={mr.movement.reps ?? result.exercise.suggestedReps}
-                step={getWeightStep(mr.movement.name, mr.movement.equipment, movementLoadUnit(mr.movement))}
-                unit={movementLoadUnit(mr.movement)}
-                onChange={(start, peak) => handleBlockProgressive(i, start, peak)}
-                label={blockLabel(mr)}
-              />
-            ) : (
-              <MovementRow
-                key={mr.movementKey}
-                mr={mr}
-                index={i}
-                onUpdate={(patch) => updateMovement(i, patch)}
-                onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
-                  ? () => setSwapOpenKey(mr.movementKey)
-                  : undefined}
-              />
-            )
-          ))}
-        </div>
+  // The badge states THIS input's own prescription. Several movements on one implement only
+  // have a single rep count when the board gave them the same one — a circuit of 5 press /
+  // 10 row / 8 SLDL has none, and ProgressiveWeightRow falls back to the set count. One
+  // member's reps must never be spoken for the rest.
+  const inputReps = useCallback((input: WeightInput): number | undefined => {
+    if (input.movements.length === 1) {
+      return input.movements[0].movement.reps ?? result.exercise.suggestedReps;
+    }
+    const reps = input.movements
+      .map((mr) => mr.movement.reps)
+      .filter((n): n is number => typeof n === 'number' && n > 0);
+    if (reps.length !== input.movements.length) return undefined;
+    return reps.every((n) => n === reps[0]) ? reps[0] : undefined;
+  }, [result.exercise.suggestedReps]);
 
-        {swapMr && (
-          <SubstitutionSheet
-            open={swapOpenKey != null}
-            originalName={swapMr.movement.name}
-            originalReps={swapMr.movement.reps}
-            originalDistance={swapMr.movement.distance}
-            originalCalories={swapMr.movement.calories}
-            currentSubstitution={swapMr.substitution}
-            aiAlternative={swapMr.movement.alternative}
-            onSelect={handleSubstitution}
-            onClose={() => setSwapOpenKey(null)}
-          />
-        )}
-      </>
-    );
-  }
+  // A weight input says exactly what it buys: one movement names itself, a shared implement
+  // names every movement it covers. A bare "BARBELL" is what let a DB row hide behind a bar.
+  const inputLabel = useCallback((input: WeightInput): string => (
+    input.movements.map(blockLabel).join(' + ')
+  ), [blockLabel]);
+
+  // Render plan in board order: a load movement is replaced by its weight input at the position
+  // of the input's FIRST movement, so nothing silently disappears and nothing is asked twice.
+  // Loads whose input spans a single set keep their inline row — there is no build to log.
+  const renderPlan = useMemo<RenderItem[]>(() => {
+    const inputOf = new Map<string, WeightInput>();
+    weightInputs.forEach((input) => {
+      if (inputSetsTotal(input) <= 1) return;
+      input.movements.forEach((mr) => inputOf.set(mr.movementKey, input));
+    });
+    const emitted = new Set<string>();
+    return movements.flatMap<RenderItem>((mr, index) => {
+      const input = inputOf.get(mr.movementKey);
+      if (!input) return [{ type: 'row', mr, index }];
+      if (emitted.has(input.key)) return [];
+      emitted.add(input.key);
+      return [{ type: 'weight', input }];
+    });
+  }, [movements, weightInputs, inputSetsTotal]);
+
+  // ── How many loads this piece still owes ──────────────────────────
+  // A strength circuit asks for one weight per station, and the first card is the lift the
+  // athlete came for. Without a running count the cards below it read as optional detail and
+  // get scrolled past, so the block states up front how many weights it wants and how many
+  // are in — and names the ones still missing at the bottom, right above the wizard's Next.
+  const weightItems = useMemo(
+    () => renderPlan.filter((item): item is Extract<RenderItem, { type: 'weight' }> => item.type === 'weight'),
+    [renderPlan],
+  );
+  const loadsTotal = weightItems.length;
+  const loadsFilled = weightItems.filter(({ input }) => isInputFilled(input)).length;
+  const showProgress = loadsTotal > 1;
+  const missingNames = weightItems
+    .filter(({ input }) => !isInputFilled(input))
+    .map(({ input }) => inputLabel(input));
+
+  const loadNumberOf = useMemo(() => {
+    const nums = new Map<string, number>();
+    weightItems.forEach(({ input }, i) => nums.set(input.key, i + 1));
+    return nums;
+  }, [weightItems]);
+
+  // Escape hatch in the other direction: several stations on the SAME implement can genuinely
+  // have been one pick-up (a "+"-joined complex the AI didn't flag). Offered only when every
+  // input is that one implement — copying a bar weight onto a DB row is never the intent.
+  const firstFilled = weightItems.find(({ input }) => isInputFilled(input))?.input;
+  const canCopyAcross = showProgress
+    && firstFilled != null
+    && loadsFilled < loadsTotal
+    && weightItems.every(({ input }) => input.type === weightItems[0].input.type);
+
+  const applyToAll = useCallback(() => {
+    if (!firstFilled) return;
+    const anchor = firstFilled.movements.find((mr) => mr.weight != null) ?? firstFilled.movements[0];
+    applyLoad(weightItems.flatMap(({ input }) => input.movements), anchor.weight, anchor.weightEnd);
+  }, [firstFilled, weightItems, applyLoad]);
 
   return (
     <>
       <div className={styles.container}>
-        {isComplex && (
-          <ProgressiveWeightRow
-            weight={sharedWeight}
-            peakWeight={result.weightEnd}
-            placeholder={sharedPlaceholder}
-            setsTotal={result.setsTotal}
-            repsPerSet={progressiveReps}
-            onChange={handleProgressiveChange}
-            label={progressiveLabel}
-          />
+        {showProgress && (
+          <div className={styles.loadProgress}>
+            <span className={styles.loadProgressLabel}>Weights to log</span>
+            <div className={styles.loadPips} aria-hidden="true">
+              {weightItems.map(({ input }) => (
+                <span
+                  key={input.key}
+                  className={`${styles.loadPip} ${isInputFilled(input) ? styles.loadPipDone : ''}`}
+                />
+              ))}
+            </div>
+            <span className={styles.loadProgressCount}>
+              <strong>{loadsFilled}</strong>/{loadsTotal}
+            </span>
+          </div>
         )}
-        {movements.map((mr, i) => {
-          // Skip rendering weighted movements whose weight is already shown
-          // in the ProgressiveWeightRow (avoids redundant row with no inputs)
-          const isHandledByProgressive = isComplex && weightedIndices.includes(i);
-          if (isHandledByProgressive) return null;
 
+        {renderPlan.map((item) => {
+          if (item.type === 'weight') {
+            const { input } = item;
+            const anchor = input.movements.find((mr) => mr.weight != null) ?? input.movements[0];
+            const loadUnit = movementLoadUnit(anchor.movement);
+            const num = loadNumberOf.get(input.key);
+            const filled = isInputFilled(input);
+            // A card covering several movements must account for all of them: the title states
+            // the claim ("One bar · 3 lifts"), the sub-line names them, and the split button
+            // takes them apart. That is what makes trusting the AI's `complex` call safe — a
+            // wrong call costs a tap, instead of leaving a lift with nowhere to be entered.
+            const merged = input.movements.length > 1;
+            return (
+              <div key={input.key} className={styles.loadBlock}>
+                <ProgressiveWeightRow
+                  pending={showProgress && !filled}
+                  weight={anchor.weight}
+                  peakWeight={anchor.weightEnd}
+                  placeholder={anchor.movement.rxWeights?.male}
+                  setsTotal={inputSetsTotal(input)}
+                  repsPerSet={inputReps(input)}
+                  step={getWeightStep(anchor.movement.name, anchor.movement.equipment, loadUnit)}
+                  unit={loadUnit}
+                  onChange={(start, peak) => applyLoad(input.movements, start, peak)}
+                  label={merged
+                    ? `${ONE_LOAD_NOUN[input.type]} · ${input.movements.length} lifts`
+                    : showProgress && num ? `${num} · ${inputLabel(input)}` : inputLabel(input)}
+                  subLabel={merged ? inputLabel(input) : undefined}
+                />
+                {merged && (
+                  <button
+                    type="button"
+                    className={styles.splitLink}
+                    onClick={() => setSplitBlockKeys((prev) => new Set(prev).add(input.key))}
+                  >
+                    Log these separately {'->'}
+                  </button>
+                )}
+              </div>
+            );
+          }
+
+          const { mr, index } = item;
           return (
             <MovementRow
               key={mr.movementKey}
               mr={mr}
-              index={i}
-              hideWeight={isHandledByProgressive}
-              onUpdate={(patch) => updateMovement(i, patch)}
+              onUpdate={(patch) => updateMovement(index, patch)}
               onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
                 ? () => setSwapOpenKey(mr.movementKey)
                 : undefined}
             />
           );
         })}
+
+        {missingNames.length > 0 && showProgress && (
+          <div className={styles.loadFooter}>
+            <p className={styles.loadRemaining}>
+              <strong>
+                {missingNames.length} weight{missingNames.length > 1 ? 's' : ''} left
+              </strong>
+              <span className={styles.loadRemainingNames}>{missingNames.join(' · ')}</span>
+            </p>
+            {canCopyAcross && (
+              <button type="button" className={styles.sameWeightLink} onClick={applyToAll}>
+                Same weight for all {'->'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {swapMr && (
@@ -270,13 +366,11 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
 
 interface MovementRowProps {
   mr: MovementResult;
-  index: number;
-  hideWeight?: boolean;
   onUpdate: (patch: Partial<MovementResult>) => void;
   onSwapTap?: () => void;
 }
 
-function MovementRow({ mr, hideWeight, onUpdate, onSwapTap }: MovementRowProps) {
+function MovementRow({ mr, onUpdate, onSwapTap }: MovementRowProps) {
   const color = kindToTrinityColor(mr.kind);
   const isFilled = isMovementRowFilled(mr);
   const isSubstituted = mr.substitution != null;
@@ -324,7 +418,7 @@ function MovementRow({ mr, hideWeight, onUpdate, onSwapTap }: MovementRowProps) 
       </div>
 
       <div className={styles.movInputRow}>
-        {mr.kind === 'load' && !hideWeight && <WeightInline mr={mr} onUpdate={onUpdate} />}
+        {mr.kind === 'load' && <WeightInline mr={mr} onUpdate={onUpdate} />}
         {mr.kind === 'reps' && <BwConfirmed mr={mr} />}
         {mr.kind === 'duration' && <DurationInline mr={mr} onUpdate={onUpdate} />}
         {mr.kind === 'distance' && <DistanceInline mr={mr} onUpdate={onUpdate} />}
@@ -444,6 +538,11 @@ function DistanceInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Pa
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
+
+/** A weight input counts as logged once any movement it covers carries a load. */
+function isInputFilled(input: WeightInput): boolean {
+  return input.movements.some((mr) => mr.weight != null && mr.weight > 0);
+}
 
 function isMovementRowFilled(mr: MovementResult): boolean {
   switch (mr.kind) {

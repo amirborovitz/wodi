@@ -1,0 +1,123 @@
+{
+  "name": "real-amrap-double-unders-sub-echo-bike-20260810",
+  "description": "15-min AMRAP where the athlete swapped 40 double unders for the Echo Bike and logged 8 cal a round. Pins that a substituted calorie movement divides by the round count (8 CAL per round, 72 cal total) instead of printing the whole 9-round total as the prescription.",
+  "workout": {
+    "title": "GORILLOT – FIT FOR LIFE",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Strength Circuit",
+        "type": "strength",
+        "prescription": "4 sets: 5 Shoulder press (barbell) @80-85%, 10/10 DB row @ R.P.E ~8, 8/8 single leg deadlift",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 23, "weight": 40 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 23, "weight": 40 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 23, "weight": 40 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 23, "weight": 40 }
+        ],
+        "movements": [
+          {
+            "name": "Shoulder Press",
+            "reps": 5,
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "loggedWeights": [40]
+          },
+          {
+            "name": "DB Row",
+            "reps": 10,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round"
+          },
+          {
+            "name": "Single Leg Deadlift",
+            "reps": 8,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round"
+          }
+        ],
+        "rounds": 4,
+        "rawText": "4 sets:\n5 Shoulder press (barbell) @80-85%\n10/10 DB row @ R.P.E ~8\n8/8 single leg deadlift",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "aiPartName": "ANVIL"
+      },
+      {
+        "id": "exercise-1",
+        "name": "15 min AMRAP",
+        "type": "wod",
+        "prescription": "15 Alternating Kettlebell Swings @16/24kg, 10 Push-ups, 40 Double Unders / 80 singles",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 225, "weight": 16 }
+        ],
+        "rxWeights": { "male": 24, "female": 16, "unit": "kg" },
+        "movements": [
+          {
+            "name": "Alt American Kettlebell Swing",
+            "reps": 15,
+            "rxWeights": { "male": 16, "female": 16, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [16]
+          },
+          {
+            "name": "Push-up",
+            "reps": 10,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Echo Bike",
+            "reps": 0,
+            "distance": 0,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "alternative": { "name": "Single Under", "reps": 80 }
+          }
+        ],
+        "rounds": 9,
+        "partialReps": 25,
+        "partialMovements": ["Alt American Kettlebell Swing", "Push-up"],
+        "rawText": "15 minutes AMRAP:\n15 Alternating Kettlebell Swings @16/24kg\n10 push-ups\n40 Double Unders / 80 singles",
+        "partKind": "metcon",
+        "loggingMode": "amrap",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "workDuration": 900,
+        "aiPartName": "SLAB"
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Alt American Kettlebell Swing", "totalReps": 150, "weight": 16, "unit": "kg", "color": "yellow" },
+        { "name": "Push-up", "totalReps": 100, "color": "magenta" },
+        { "name": "DB Row", "totalReps": 40, "weight": 40, "unit": "kg", "color": "yellow" },
+        { "name": "Single Leg Deadlift", "totalReps": 32, "weight": 40, "unit": "kg", "color": "yellow" },
+        { "name": "Shoulder Press", "totalReps": 20, "weight": 40, "unit": "kg", "color": "yellow" },
+        {
+          "name": "Echo Bike",
+          "totalCalories": 72,
+          "unit": "cal",
+          "wasSubstituted": true,
+          "originalMovement": "Double Under",
+          "substitutionType": "equivalent",
+          "color": "magenta"
+        }
+      ]
+    },
+    "rawText": "STRENGTH\n4 sets:\n5 Shoulder press (barbell) @80-85%\n10/10 DB row @ R.P.E ~8\n8/8 single leg deadlift\n\nMETCON (Medium)\n15 minutes AMRAP:\n15 Alternating Kettlebell Swings @16/24kg\n10 push-ups\n40 Double Unders / 80 singles",
+    "format": "amrap"
+  }
+}

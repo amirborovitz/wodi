@@ -1,0 +1,193 @@
+{
+  "name": "real-barbell-complex-emom-plus-metcon-20260810",
+  "description": "Real board 2026-08-10 (Gorillot weightlifting day). Part 2 is a flagged barbell complex — 'Every 01:30 x 8 sets: 1 squat clean + 1 front squat + push jerk' — logged 40kg→50kg, and FRONT SQUAT is trained again in the part-3 metcon at 45kg. Pins three things: (a) the complex row must NOT print a per-set reps sequence ('3-3-3-3-3-3-3-3 reps' is 1+1+1 summed, a number nobody wrote), while single-movement strength pages keep theirs; (b) compound-name recovery must not re-append a sibling lift, which turned the row into '... + Front Squat + Push Jerk + 1 Push Jerk'; (c) the breakdown carries ONE FRONT SQUAT ROW PER PART (exerciseIndex 1 and 2) so the metcon page prints its own 40 reps, not the merged 48 it used to inherit from the complex.",
+  "workout": {
+    "title": "Metcon",
+    "format": "for_time",
+    "timeCap": 840,
+    "partnerWorkout": false,
+    "rawText": "WEIGHTLIFTING\nWarm up & Technique practice:\nTall clean\n3 sets x 4-5 reps @20-40%\nFocus on fast drop & turnover\nEvery 01:30 min x 8 sets:\n1 squat clean + 1 front squat + push jerk\n* Start at ~60% and build up weight\n\nMETCON (Medium)\n5 RFT:\n200m run\n8 front squat @40/60kg\n8 chest to bar pull ups\n<14 minutes T.C.>",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Tall Clean Practice",
+        "type": "skill",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": true,
+        "partnerWorkout": false,
+        "aiPartName": "RIFT",
+        "prescription": "3 sets x 4-5 reps @20-40% — Focus on fast drop & turnover",
+        "rawText": "Warm up & Technique practice:\nTall clean\n3 sets x 4-5 reps @20-40%\nFocus on fast drop & turnover",
+        "movements": [
+          {
+            "name": "Tall Clean",
+            "countingMode": "per_round",
+            "equipment": "barbell",
+            "inputType": "weight",
+            "repsDisplay": "4-5"
+          }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true },
+          { "id": "set-1", "setNumber": 2, "completed": true },
+          { "id": "set-2", "setNumber": 3, "completed": true }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Barbell Complex",
+        "type": "strength",
+        "partKind": "strength",
+        "loggingMode": "emom",
+        "complex": true,
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "aiPartName": "FORGE",
+        "rounds": 8,
+        "intervalCount": 8,
+        "workDuration": 720,
+        "prescription": "Every 01:30 min x 8 sets: 1 squat clean + 1 front squat + push jerk — Start at ~60% and build up weight",
+        "rawText": "Every 01:30 min x 8 sets:\n1 squat clean + 1 front squat + push jerk\n* Start at ~60% and build up weight",
+        "movements": [
+          {
+            "name": "Squat Clean",
+            "reps": 1,
+            "countingMode": "per_round",
+            "equipment": "barbell",
+            "inputType": "weight",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [40, 50],
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" }
+          },
+          {
+            "name": "Front Squat",
+            "reps": 1,
+            "countingMode": "per_round",
+            "equipment": "barbell",
+            "inputType": "weight",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [40, 50],
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" }
+          },
+          {
+            "name": "Push Jerk",
+            "reps": 1,
+            "countingMode": "per_round",
+            "equipment": "barbell",
+            "inputType": "weight",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [40, 50],
+            "rxWeights": { "male": 40, "female": 40, "unit": "kg" }
+          }
+        ],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 3, "weight": 40 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 3 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 3 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 3 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 3 },
+          { "id": "set-5", "setNumber": 6, "completed": true, "actualReps": 3 },
+          { "id": "set-6", "setNumber": 7, "completed": true, "actualReps": 3 },
+          { "id": "set-7", "setNumber": 8, "completed": true, "actualReps": 3, "weight": 50 }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "name": "5 Rounds For Time",
+        "type": "wod",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "aiPartName": "SPARK",
+        "rounds": 5,
+        "prescription": "5 RFT: 200m Run, 8 Front Squat @40/60kg, 8 Chest to Bar Pull-ups",
+        "rawText": "5 RFT:\n200m run\n8 front squat @40/60kg\n8 chest to bar pull ups",
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "countingMode": "per_round",
+            "inputType": "none",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Front Squat",
+            "reps": 8,
+            "countingMode": "per_round",
+            "equipment": "barbell",
+            "inputType": "weight",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [45],
+            "rxWeights": { "male": 45, "female": 45, "unit": "kg" }
+          },
+          {
+            "name": "Chest To Bar Pull-up",
+            "reps": 8,
+            "countingMode": "per_round",
+            "inputType": "none",
+            "scoreEntryMode": "per_round"
+          }
+        ],
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 80, "time": 840, "weight": 45 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Front Squat",
+          "exerciseIndex": 2,
+          "color": "yellow",
+          "implementCount": 1,
+          "totalReps": 40,
+          "totalCalories": 0,
+          "totalDistance": 0,
+          "totalTime": 0,
+          "unit": "kg",
+          "wasSubstituted": false,
+          "weight": 45
+        },
+        { "name": "Chest To Bar Pull-up", "exerciseIndex": 2, "color": "cyan", "totalReps": 40 },
+        {
+          "name": "Front Squat",
+          "exerciseIndex": 1,
+          "color": "yellow",
+          "totalReps": 8,
+          "unit": "kg",
+          "weight": 45,
+          "weightProgression": [40, 50]
+        },
+        {
+          "name": "Squat Clean",
+          "exerciseIndex": 1,
+          "color": "yellow",
+          "totalReps": 8,
+          "unit": "kg",
+          "weight": 45,
+          "weightProgression": [40, 50]
+        },
+        {
+          "name": "Push Jerk",
+          "exerciseIndex": 1,
+          "color": "yellow",
+          "totalReps": 8,
+          "unit": "kg",
+          "weight": 45,
+          "weightProgression": [40, 50]
+        },
+        {
+          "name": "Run",
+          "exerciseIndex": 2,
+          "color": "magenta",
+          "distancePerRep": 200,
+          "totalDistance": 1000,
+          "unit": "m"
+        }
+      ]
+    }
+  }
+}

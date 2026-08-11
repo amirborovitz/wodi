@@ -1,0 +1,87 @@
+{
+  "name": "real-mixed-implement-strength-circuit-20260810",
+  "description": "Real Gorillot doc 2026-08-10, in the shape the fixed logging path now saves. '4 sets: 5 Shoulder press (barbell) @80-85% / 10/10 DB row @RPE~8 / 8/8 single leg deadlift' — three movements, TWO implements, three different loads. Guards the mixed-implement strength circuit: each movement carries its OWN loggedWeights (40 / 22.5 / 20) and its own reps (5 / 10 / 8), and the exercise-level sets[] state the set count and the block's per-set rep total but NO shared weight — there isn't one. The bug this pins: SupersetInput used to treat any multi-set exercise with 1+ weighted movement as one shared bar and stamped a single 40kg + a single 10-rep count across all three.",
+  "workout": {
+    "title": "GORILLOT - FIT FOR LIFE",
+    "format": "amrap",
+    "rawText": "STRENGTH\n4 sets:\n5 Shoulder press (barbell) @80-85%\n10/10 DB row @ R.P.E ~8\n8/8 single leg deadlift\n\nMETCON (Medium)\n15 minutes AMRAP:\n15 Alt. Kettlebell Swings @16/24kg\n10 push ups\n40 Double Unders / 80 singles",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Strength Circuit",
+        "type": "strength",
+        "loggingMode": "strength",
+        "prescription": "4 sets: 5 Shoulder press (barbell) @80-85%, 10/10 DB row @ R.P.E ~8, 8/8 single leg deadlift",
+        "rawText": "4 sets:\n5 Shoulder press (barbell) @80-85%\n10/10 DB row @ R.P.E ~8\n8/8 single leg deadlift",
+        "rounds": 4,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "targetReps": 23, "actualReps": 23, "completed": true },
+          { "id": "set-1", "setNumber": 2, "targetReps": 23, "actualReps": 23, "completed": true },
+          { "id": "set-2", "setNumber": 3, "targetReps": 23, "actualReps": 23, "completed": true },
+          { "id": "set-3", "setNumber": 4, "targetReps": 23, "actualReps": 23, "completed": true }
+        ],
+        "movements": [
+          {
+            "name": "Shoulder Press",
+            "reps": 5,
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "loggedWeights": [40]
+          },
+          {
+            "name": "DB Row",
+            "reps": 10,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "loggedWeights": [22.5]
+          },
+          {
+            "name": "Single Leg Deadlift",
+            "reps": 8,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "loggedWeights": [20]
+          }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "15 min AMRAP",
+        "type": "metcon",
+        "loggingMode": "amrap",
+        "prescription": "15 min AMRAP: 15 Alt. American Kettlebell Swings, 10 Push-ups, 40 Double Unders",
+        "rawText": "METCON (Medium)\n15 minutes AMRAP:\n15 Alt. Kettlebell Swings @16/24kg\n10 push ups\n40 Double Unders / 80 singles",
+        "rounds": 9,
+        "timeCap": 900,
+        "sets": [{ "id": "set-0", "setNumber": 1, "completed": true }],
+        "movements": [
+          {
+            "name": "Alt. American Kettlebell Swing",
+            "reps": 15,
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "rxWeights": { "male": 24, "female": 16, "unit": "kg" },
+            "loggedWeights": [16]
+          },
+          { "name": "Push-up", "reps": 10, "inputType": "none", "isBodyweight": true },
+          { "name": "Double Under", "reps": 40, "inputType": "none", "isBodyweight": true }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Double Under", "totalReps": 360, "color": "magenta" },
+        { "name": "Alt. American Kettlebell Swing", "totalReps": 135, "weight": 16, "unit": "kg", "color": "yellow" },
+        { "name": "Push-up", "totalReps": 90, "color": "magenta" },
+        { "name": "DB Row", "totalReps": 40, "weight": 22.5, "unit": "kg", "color": "yellow" },
+        { "name": "Single Leg Deadlift", "totalReps": 32, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Shoulder Press", "totalReps": 20, "weight": 40, "unit": "kg", "color": "yellow" }
+      ]
+    }
+  }
+}

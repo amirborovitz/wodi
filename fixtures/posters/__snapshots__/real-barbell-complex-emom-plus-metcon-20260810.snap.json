@@ -1,0 +1,207 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Barbell Complex",
+        "blueprint": "8 sets",
+        "rows": [
+          {
+            "primary": "40->50KG",
+            "name": "1 Squat Clean + 1 Front Squat + 1 Push Jerk",
+            "subNote": "8 total",
+            "mineKey": "Squat Clean",
+            "accent": "yellow",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "5 Rounds For Time",
+        "blueprint": "5 rounds for time",
+        "rows": [
+          {
+            "primary": "200m",
+            "name": "Run",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 5
+          },
+          {
+            "primary": "8",
+            "name": "Front Squats",
+            "nameWithLoad": "Front Squats @ 45kg",
+            "loadNote": "45kg",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Front Squat",
+            "accent": "yellow",
+            "repeatCount": 5
+          },
+          {
+            "primary": "8",
+            "name": "Chest To Bar Pull-ups",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Chest To Bar Pull-up",
+            "accent": "cyan",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "14:00",
+    "unit": "MIN",
+    "formatLine": "E1:30MOM × 8 + 5 RFT",
+    "storyLine": "40 front squat · 40 c2b pull-up · 8 front squat · 8 squat clean · 8 push jerk · 1.0km run",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "E1:30MOM × 8",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "Squat Clean",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "Front Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "Push Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "5 ROUNDS FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.0km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "8",
+        "name": "Front Squat",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg"
+      },
+      {
+        "perRound": "8",
+        "name": "Chest To Bar Pull-up",
+        "total": "40 total",
+        "color": "cyan"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "14:00",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "8 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "40->50KG 1 Squat Clean + 1 Front Squat + 1 Push Jerk",
+          "load": "",
+          "mine": "40-50kg",
+          "team": "",
+          "total": "8 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "5 ROUNDS FOR TIME",
+          "cap": "5 rounds for time"
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Front Squats",
+          "load": "",
+          "mine": "45kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Chest To Bar Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ]
+}

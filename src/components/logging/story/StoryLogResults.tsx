@@ -278,6 +278,13 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         ma[n] = m.substitution.selectedName;
         if (!(m.distance != null && m.distance > 0)) md[n] = 0;
         if (!(m.calories != null && m.calories > 0)) mc[n] = 0;
+        // A substitute measured in metres or calories has no rep count of its own. The board's
+        // reps belong to the movement that was swapped out — "40 double unders" traded for an
+        // Echo Bike is 8 cal a round, not 40 bike "reps" — so they must not carry into the
+        // substitute's totals. A rep-measured swap (double unders -> singles) keeps them.
+        const subUnit = m.substitution.targetUnit;
+        const measuredWithoutReps = subUnit === 'distance' || subUnit === 'calories';
+        if (measuredWithoutReps && !(m.reps != null && m.reps > 0)) mr[n] = 0;
       }
       // For relay distance movements, store the per-trip distance so the workload builder
       // can set distancePerRep correctly (critical when substituted, e.g. 200m run → 700m Echo Bike).
@@ -337,11 +344,31 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     };
   }
 
+  // ── Multi-movement block (complex, superset, strength circuit) ──
+  // Each movement's own load is the truth and travels on movementResults → movementWeights /
+  // movementWeightProgressions (buildMaps above), which is what the breakdown, the poster rows
+  // and the peak-load scan read. The exercise-level `sets[]` is a WHOLE-BLOCK record and may
+  // only state what the whole block genuinely shares:
+  //  - weight: only when every load in the block resolved to the SAME number (one bar, one
+  //    load). A barbell press at 40kg beside a DB row at 22.5kg has no exercise-level weight,
+  //    and inventing one is read downstream as fact — `hasVaryingSetWeights` averages it across
+  //    every movement, and the poster's top set quotes it.
+  //  - reps: the block's per-set TOTAL across its movements, the same meaning a round's
+  //    actualReps carries everywhere else. One movement's rep count stamped on the whole block
+  //    is what put "10 reps" on a 5-rep shoulder press.
   if ((r.movementResults?.length ?? 0) > 1) {
-    const wmr = r.movementResults?.find(m => m.kind === 'load' && m.weight != null && m.weight > 0);
-    const sw = wmr?.weight, ew = r.weightEnd ?? sw;
-    const isRange = r.loadMode === 'range' && sw != null && ew != null && sw !== ew;
+    const loads = (r.movementResults ?? []).filter(m => m.kind === 'load' && m.weight != null && m.weight > 0);
+    const anchor = loads[0];
+    const sharesOneLoad = anchor != null && loads.every(
+      m => m.weight === anchor.weight && (m.weightEnd ?? m.weight) === (anchor.weightEnd ?? anchor.weight),
+    );
+    const sw = sharesOneLoad ? anchor.weight : undefined;
+    const ew = sharesOneLoad ? (anchor.weightEnd ?? sw) : undefined;
+    const isRange = sw != null && ew != null && sw !== ew;
     const rps = r.exercise.suggestedRepsPerSet;
+    const blockReps = (r.movementResults ?? []).reduce(
+      (sum, m) => sum + (m.reps ?? m.movement.reps ?? 0), 0,
+    ) || undefined;
     for (let i = 0; i < setsCount; i++) {
       let weight: number | undefined;
       if (isRange && sw != null && ew != null) {
@@ -350,7 +377,7 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         else if (i === setsCount - 1) weight = ew;
         else weight = undefined;
       } else weight = sw;
-      const sr = rps?.[i] ?? r.exercise.suggestedReps;
+      const sr = rps?.[i] ?? blockReps;
       sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: sr, actualReps: sr, weight, completed: true });
     }
     return { exercise: r.exercise, sets, rounds: setsCount, notes: r.notes, ...buildMaps() };

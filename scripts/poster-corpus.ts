@@ -39,13 +39,11 @@ import {
   buildResultLabel,
   buildResultValue,
   aerobicHeroSubject,
+  formatPosterStrengthRepsSequence,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
-import { isMainPart } from '../src/components/celebration/mainPart';
-import {
-  prescribedMovementNames,
-  movementsMatchingNames,
-} from '../src/components/celebration/movementResolution';
+import { isMainPart, hasLoggedMaxEffort } from '../src/components/celebration/mainPart';
+import { movementsForParts } from '../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
 
 interface PosterFixture {
@@ -70,14 +68,23 @@ const SNAPSHOT_DIR = path.join(FIXTURE_DIR, '__snapshots__');
 // whose name (or pre-substitution original) belongs to this exercise. Scoped off the SAME
 // name set the hook uses (sections + flat list) — a mirror that reads fewer names than
 // production drops rows the real poster shows, and the harness stops being evidence.
-function scopePageMovements(exercise: Exercise, allMovements: MovementTotal[]): MovementTotal[] {
-  return movementsMatchingNames(allMovements, prescribedMovementNames([exercise]));
+function scopePageMovements(
+  exercise: Exercise,
+  allMovements: MovementTotal[],
+  allExercises: Exercise[],
+): MovementTotal[] {
+  return movementsForParts(allMovements, [exercise], [allExercises.indexOf(exercise)]);
 }
 
 // Mirrors useCelebrationData.artifactSections: same scoping, but an empty match falls back to
 // the unscoped list rather than rendering nothing.
-function scopeRewardMovements(exercises: Exercise[], allMovements: MovementTotal[]): MovementTotal[] {
-  const scoped = movementsMatchingNames(allMovements, prescribedMovementNames(exercises));
+function scopeRewardMovements(
+  target: Exercise[],
+  allMovements: MovementTotal[],
+  allExercises: Exercise[],
+): MovementTotal[] {
+  const indices = target.map((ex) => allExercises.indexOf(ex)).filter((i) => i >= 0);
+  const scoped = movementsForParts(allMovements, target, indices);
   return scoped.length > 0 ? scoped : allMovements;
 }
 
@@ -114,7 +121,7 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   const reward = sectionExercises.length === 1
     ? buildRewardArtifactSections(
         sectionExercises,
-        exercises.length > sectionExercises.length ? scopeRewardMovements(sectionExercises, movements) : movements,
+        exercises.length > sectionExercises.length ? scopeRewardMovements(sectionExercises, movements, exercises) : movements,
         rawText,
         teamSize,
         title,
@@ -126,7 +133,7 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   const pages = sectionExercises.map((exercise) =>
     buildPageArtifactSections(
       exercise,
-      scopePageMovements(exercise, movements),
+      scopePageMovements(exercise, movements, exercises),
       isStrengthPagePart(exercise),
       scopedRawText,
       teamSize,
@@ -143,12 +150,13 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   // Mirrors useCelebrationData.heroResult: the hero speaks for the poster's MAIN part(s) with
   // the display format, and a lone main part's movements are scoped away from its siblings'.
   const heroMovements = exercises.length > sectionExercises.length && sectionExercises.length === 1
-    ? scopePageMovements(sectionExercises[0], movements)
+    ? scopePageMovements(sectionExercises[0], movements, exercises)
     : movements;
   const hero = computeHeroResult(
     sectionExercises,
     displayFormat, 0, 0, durationMinutes, false, heroMovements,
     fixture.workout.timeCap, undefined, undefined, teamSize, rawText,
+    sectionExercises.map((ex) => exercises.indexOf(ex)),
   );
   const mineMap = new Map([
     ...buildMineMapFromBreakdown(movements),
@@ -189,7 +197,16 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   const resultValue = buildResultValue(hero, resultLabel);
   const resultMeta = aerobicHeroSubject(hero);
 
-  return { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs };
+  // The quiet per-set reps sub-line under a strength page's movement row ("6-6-5-4-3 reps").
+  // Same gate buildPosterWodFromPage applies — it must never print a SUM across a complex's or
+  // a circuit's movements, and it must never stop printing on a real single-lift build-up.
+  const pageRepsSchemes = sectionExercises.map((exercise) => (
+    isStrengthPagePart(exercise) && !hasLoggedMaxEffort(exercise)
+      ? formatPosterStrengthRepsSequence(exercise)
+      : undefined
+  ));
+
+  return { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes };
 }
 
 // ─── Diffing ───────────────────────────────────────────────────────────────

@@ -593,7 +593,11 @@ Output:
   }]
 }
 Why NO sections: the three lifts are ONE unbroken set on ONE bar at ONE weight, all done every round (a "+"-joined complex). A single flat "movements[]" is correct — one shared weight. Contrast 4b, where "Into:" separates blocks each with its own set count and its own building weight.
-ALWAYS set "complex": true on a "+"-joined same-bar complex exercise (like this one). It tells the app the sub-lifts are one combined set — the poster renders them as a single line ("1 Power Clean + 1 Hang Clean + 1 Push Jerk") instead of separate movements, and volume counts the shared bar once. Do NOT set "complex" on 4b's "Into:" blocks (separate sets), nor on ordinary multi-movement metcons.`;
+ALWAYS set "complex": true on a "+"-joined same-bar complex exercise (like this one). It tells the app the sub-lifts are one combined set — the poster renders them as a single line ("1 Power Clean + 1 Hang Clean + 1 Push Jerk") instead of separate movements, and volume counts the shared bar once. It also makes the app ask for ONE weight covering every sub-lift.
+
+WHAT "complex" MEANS: one implement picked up and carried through consecutive lifts WITHOUT setting it down, so there is physically one load. Nothing else is a complex.
+Do NOT set "complex" on: 4b's "Into:" blocks (separate sets); ordinary multi-movement metcons; or a STRENGTH CIRCUIT / SUPERSET — several DIFFERENT movements each done for their own reps inside a set, then on to the next movement ("4 sets: 5 Shoulder press (barbell) / 10/10 DB row / 8/8 single leg deadlift", "3 sets: 8 Back squat / 12 Walking lunge"). Those are separate stations at separate loads and must stay complex: false, so the app asks for each movement's own weight.
+Using the SAME equipment does NOT make a circuit a complex: "10/10 DB row / 8/8 single leg DB deadlift / 10 DB press" is still three stations at three loads. The test is whether the implement is put down between movements, not what the implement is. When unsure, leave "complex" unset — a missing flag costs an extra weight prompt; a wrong one asks for a single weight the athlete never used.`;
 
 const EXAMPLES_METCON_ADVANCED = `### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"

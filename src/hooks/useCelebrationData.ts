@@ -46,8 +46,7 @@ import {
 } from '../services/celebrationStickerConfig';
 import { hasStructuralCorrection } from '../components/celebration/corrections';
 import {
-  prescribedMovementNames,
-  movementsMatchingNames,
+  movementsForParts,
 } from '../components/celebration/movementResolution';
 import { resolveSourceDate } from '../services/sourceDateResolution';
 import {
@@ -256,14 +255,20 @@ function inferPosterDifficultyLevel(params: {
 
 
 /**
- * Movements from the workload breakdown that belong to the given exercises (matched by
- * exercise name, prescribed movement names, or substitution origin). Parts are standalone
+ * Movements from the workload breakdown that belong to the given exercises. Parts are standalone
  * practices: a poster section rendering one part must never receive a sibling part's movements.
+ * `allExercises` is the full saved list — a part's POSITION in it is what the breakdown stamped,
+ * and the only thing that separates the same lift done in two parts.
  */
-function movementsForExercises(target: Exercise[], all: MovementTotal[]): MovementTotal[] {
-  const scoped = movementsMatchingNames(all, prescribedMovementNames(target));
-  // Name-matching failed entirely (aliases, renames) — a wrongly-empty poster is worse than
-  // the unscoped list, so fall back rather than render nothing.
+function movementsForExercises(
+  target: Exercise[],
+  all: MovementTotal[],
+  allExercises: Exercise[],
+): MovementTotal[] {
+  const indices = target.map((ex) => allExercises.indexOf(ex)).filter((i) => i >= 0);
+  const scoped = movementsForParts(all, target, indices);
+  // Scoping failed entirely (a pre-stamping doc whose names were aliased or renamed) — a
+  // wrongly-empty poster is worse than the unscoped list, so fall back rather than render nothing.
   return scoped.length > 0 ? scoped : all;
 }
 
@@ -779,7 +784,7 @@ export function useCelebrationData(
 
     return posterMainExercises.map((ex): CarouselPage => {
       const isStrength = isStrengthPagePart(ex);
-      const fromBreakdown = movementsMatchingNames(allMovements, prescribedMovementNames([ex]));
+      const fromBreakdown = movementsForParts(allMovements, [ex], [exercises.indexOf(ex)]);
 
       if (fromBreakdown.length > 0) return { exercise: ex, movements: fromBreakdown, isStrength };
 
@@ -813,7 +818,7 @@ export function useCelebrationData(
       // renders from its prescription alone rather than borrowing a sibling's numbers.
       return { exercise: ex, movements: [], isStrength };
     });
-  }, [posterLayout, posterMainExercises, activeBreakdown?.movements]);
+  }, [posterLayout, posterMainExercises, exercises, activeBreakdown?.movements]);
 
   // ── Hero result ───────────────────────────────────────────────────────────
 
@@ -832,7 +837,7 @@ export function useCelebrationData(
     // reps into it produces a number traceable to nothing on the poster (same scoping rule
     // as artifactSections).
     const heroMovements = exercises.length > mainExercises.length && mainExercises.length > 0
-      ? movementsForExercises(mainExercises, movements)
+      ? movementsForExercises(mainExercises, movements, exercises)
       : movements;
 
     return computeHeroResult(
@@ -848,6 +853,7 @@ export function useCelebrationData(
       prWeight,
       teamSize,
       heroRawText,
+      (mainExercises.length > 0 ? mainExercises : exercises).map((ex) => exercises.indexOf(ex)),
     );
   }, [
     isReward,
@@ -1028,7 +1034,7 @@ export function useCelebrationData(
       // accessory block), scope the movements to the exercises this artifact actually renders,
       // or the sibling's movements leak into this part's prescription list.
       const scopedMovements = exercises.length > sectionExercises.length
-        ? movementsForExercises(sectionExercises, allMovements)
+        ? movementsForExercises(sectionExercises, allMovements, exercises)
         : allMovements;
       return buildRewardArtifactSections(
         sectionExercises,

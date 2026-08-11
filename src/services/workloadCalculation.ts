@@ -66,6 +66,22 @@ const BW_DISPLAY_PATTERNS = [
  * Check if a movement is an unweighted bodyweight pulling/pressing pattern.
  * Used only for display suppression — does NOT affect volume calculation.
  */
+/**
+ * The breakdown's bucket key. A movement belongs to its PART, never to the session: the same
+ * lift routinely appears twice on one board at two intensities — "1 front squat" inside a
+ * strength complex and "8 front squats @45kg" in the metcon, or a 100kg deadlift triple beside
+ * 50 deadlifts at 60kg. Keying on the name alone merged them into one row, which summed reps
+ * across parts (the metcon page then printed the strength block's reps as its own) and kept
+ * only the FIRST weight — so the other part's reps were priced at a load it never touched.
+ *
+ * Repeats WITHIN one part still merge on the name, which is exactly what a part's own total
+ * means. Every entry carries `exerciseIndex` so consumers can scope back to the part; see
+ * `movementsForParts` in celebration/movementResolution.ts.
+ */
+export function movementBucketKey(name: string, exerciseIndex: number): string {
+  return `${exerciseIndex}::${name.toLowerCase()}`;
+}
+
 export function isBwVolumeMovement(movementName: string): boolean {
   const name = movementName.toLowerCase();
   return BW_DISPLAY_PATTERNS.some(p => name.includes(p));
@@ -506,7 +522,7 @@ export function calculateWorkloadBreakdown(
     // If exercise has movement structure, use it
     if (movementEntries.length > 0) {
       movementEntries.forEach(({ movement, fallbackMultiplier, forceOnce }, movementIndex) => {
-        const key = movement.name.toLowerCase();
+        const key = movementBucketKey(movement.name, exerciseIndex);
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
@@ -574,6 +590,7 @@ export function calculateWorkloadBreakdown(
           // New movement
           movementMap.set(key, {
             name: movement.name,
+            exerciseIndex,
             totalReps: reps > 0 ? reps : undefined,
             totalDistance: distance > 0 ? distance : undefined,
             totalCalories: calories > 0 ? calories : undefined,
@@ -609,7 +626,7 @@ export function calculateWorkloadBreakdown(
         || exercise.rxWeights?.male
         || exercise.rxWeights?.female;
 
-      const key = exercise.name.toLowerCase();
+      const key = movementBucketKey(exercise.name, exerciseIndex);
       const existing = movementMap.get(key);
 
       const color = inferColorFromName(exercise.name, weight);
@@ -623,6 +640,7 @@ export function calculateWorkloadBreakdown(
       } else {
         movementMap.set(key, {
           name: exercise.name,
+          exerciseIndex,
           totalReps: reps > 0 ? reps : undefined,
           weight,
           unit: weight ? (exercise.rxWeights?.unit || 'kg') : undefined,
@@ -708,8 +726,8 @@ export function calculateWorkloadFromExercises(
   let grandTotalWeightedDistance = 0;
   let grandTotalCalories = 0;
 
-  for (const exercise of exercises) {
-    const key = exercise.name.toLowerCase();
+  exercises.forEach((exercise, exerciseIndex) => {
+    const key = movementBucketKey(exercise.name, exerciseIndex);
     let exerciseReps = 0;
     let exerciseDistance = 0;
     let exerciseCalories = 0;
@@ -778,6 +796,7 @@ export function calculateWorkloadFromExercises(
             : undefined;
       movementMap.set(key, {
         name: exercise.name,
+        exerciseIndex,
         totalReps: exerciseReps > 0 ? exerciseReps : undefined,
         totalDistance: exerciseDistance > 0 ? exerciseDistance : undefined,
         totalCalories: exerciseCalories > 0 ? exerciseCalories : undefined,
@@ -801,7 +820,7 @@ export function calculateWorkloadFromExercises(
     if (exerciseCalories > 0) {
       grandTotalCalories += exerciseCalories;
     }
-  }
+  });
 
   const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
   const movements = Array.from(movementMap.values())

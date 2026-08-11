@@ -7,6 +7,16 @@
   background: var(--wodi-card);
   border: 1px solid rgba(245, 194, 0, 0.12);
   overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+/* Awaiting a number. Used when a piece asks for several loads at once (a strength circuit) and
+   the unanswered cards have to read as open slots, not as finished records. */
+.cardPending {
+  background: transparent;
+  border-color: rgba(242, 240, 235, 0.10);
+  border-style: dashed;
 }
 
 /* ── Header ── */
@@ -17,6 +27,7 @@
   padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .label {
@@ -24,8 +35,19 @@
   font-weight: 700;
   color: var(--wodi-yellow, #f5c200);
   letter-spacing: 0.08em;
-  flex-shrink: 0;
+  min-width: 0;
   text-transform: uppercase;
+}
+
+/* The movements this one weight covers, on their own full-width line under the title. */
+.subLabel {
+  flex-basis: 100%;
+  margin: 0;
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(242, 240, 235, 0.72);
 }
 
 .totalBadge {
@@ -206,7 +228,8 @@
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .oval,
-  .chevron {
+  .chevron,
+  .card {
     transition: none;
   }
 }

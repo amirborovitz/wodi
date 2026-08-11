@@ -1,0 +1,227 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Strength Circuit",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "40KG",
+            "name": "Shoulder Press",
+            "subNote": "20 total",
+            "totalNote": "20 total",
+            "mineKey": "Shoulder Press",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "40KG",
+            "name": "DB Row",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "DB Row",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "40KG",
+            "name": "Single Leg Deadlift",
+            "subNote": "32 total",
+            "totalNote": "32 total",
+            "mineKey": "Single Leg Deadlift",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "15 min AMRAP",
+        "blueprint": "15 min AMRAP",
+        "rows": [
+          {
+            "primary": "15",
+            "name": "Alt American Kettlebell Swings",
+            "nameWithLoad": "Alt American Kettlebell Swings @ 16kg",
+            "loadNote": "16kg",
+            "subNote": "150 total",
+            "totalNote": "150 total",
+            "mineKey": "Alt American Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 9
+          },
+          {
+            "primary": "10",
+            "name": "Push-ups",
+            "subNote": "100 total",
+            "totalNote": "100 total",
+            "mineKey": "Push-up",
+            "accent": "magenta",
+            "repeatCount": 9
+          },
+          {
+            "primary": "8 CAL",
+            "name": "Echo Bike",
+            "subNote": "72 cal total",
+            "totalNote": "72 cal total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 9
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "9",
+    "unit": "ROUNDS",
+    "formatLine": "Strength + 15 min AMRAP",
+    "storyLine": "150 alt american kettlebell swing · 100 push-up · 40 db row · 32 single leg deadlift · 20 shoulder press · 72 echo bike cals",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · SHOULDER PRESS",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "5",
+        "name": "Shoulder Press",
+        "total": "20 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "DB Row",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg"
+      },
+      {
+        "perRound": "8",
+        "name": "Single Leg Deadlift",
+        "total": "32 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "15 MIN AMRAP",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "15",
+        "name": "Alt American Kettlebell Swing",
+        "total": "150 total",
+        "color": "yellow",
+        "weight": 16,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Push-up",
+        "total": "100 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "8 cal",
+        "name": "Echo Bike",
+        "total": "72 cal total",
+        "color": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta",
+    "amrapNarrative": "+ some change"
+  },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "9",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "40KG Shoulder Press",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "20 total"
+        },
+        {
+          "kind": "line",
+          "rx": "40KG DB Row",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "40KG Single Leg Deadlift",
+          "load": "",
+          "mine": "40kg",
+          "team": "",
+          "total": "32 total"
+        }
+      ],
+      [
+        {
+          "kind": "line",
+          "rx": "15 Alt American Kettlebell Swings",
+          "load": "",
+          "mine": "16kg",
+          "team": "",
+          "total": "150 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Push-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "100 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 CAL Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "72 cal total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ]
+}

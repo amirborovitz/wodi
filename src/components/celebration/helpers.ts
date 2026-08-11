@@ -25,6 +25,7 @@ import type {
 } from './types';
 import {
   isBwVolumeMovement,
+  movementBucketKey,
 } from '../../services/workloadCalculation';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
@@ -557,11 +558,23 @@ export function repairUndercountedBreakdown(
 ): WorkloadBreakdown {
   const debug = shouldLogCelebrationDebug();
   const movements = breakdown.movements.map((movement) => ({ ...movement }));
+  // Keyed per PART. The breakdown holds one entry per movement PER PART, so a lift trained twice
+  // in a session has two rows; a name-only map keeps whichever arrived last and then repairs it
+  // against the OTHER part's round count — that turned the complex's 8 front squats into the
+  // metcon's 40. Entries from docs saved before exerciseIndex stamping have no part to key on
+  // and fall back to the name, which is safe there: those breakdowns hold one row per name.
+  const byPart = new Map<string, MovementTotal>();
   const byName = new Map<string, MovementTotal>();
-  movements.forEach((movement) => byName.set(movement.name.toLowerCase(), movement));
+  movements.forEach((movement) => {
+    if (movement.exerciseIndex != null) {
+      byPart.set(movementBucketKey(movement.name, movement.exerciseIndex), movement);
+    } else {
+      byName.set(movement.name.toLowerCase(), movement);
+    }
+  });
   let changed = false;
 
-  for (const exercise of exercises) {
+  for (const [exerciseIndex, exercise] of exercises.entries()) {
     if (exercise.sections && exercise.sections.length > 0) continue;
     const repeats = getEffectiveMovementRepeatCount(exercise, getPrescriptionRepeatCount(exercise));
     if (!repeats || repeats <= 1 || !exercise.movements || exercise.movements.length === 0) continue;
@@ -570,7 +583,8 @@ export function repairUndercountedBreakdown(
       : undefined;
 
     for (const movement of exercise.movements) {
-      const target = byName.get(movement.name.toLowerCase());
+      const target = byPart.get(movementBucketKey(movement.name, exerciseIndex))
+        ?? byName.get(movement.name.toLowerCase());
       if (!target) continue;
 
       const isBuyInCashOut = movement.role === 'buy_in'
@@ -1060,9 +1074,19 @@ function buildPairPacerNote(mov: ParsedMovement): string {
 
 // ─── Celebration movement row builder ────────────────────────────────────────
 
+/**
+ * `siblingsJoinedByCaller`: the caller is ALREADY printing this movement's neighbours on the
+ * same line (the complex collapse joins them with " + "). The compound-suffix recovery below
+ * reads the board's own "a + b" and splices the neighbour onto this name, which then gets
+ * printed a second time by the join — "1 Squat Clean + 1 Front Squat + Push Jerk + 1 Push Jerk"
+ * off a board that said "1 squat clean + 1 front squat + push jerk". Recovery exists for a name
+ * the AI TRUNCATED ("Hang Clean" ← "Hang Clean to Jerk"); inside a complex the neighbour is its
+ * own movement, so there is nothing to recover and everything to duplicate.
+ */
 function getMovementDisplayNameFromContext(
   movement: Pick<ParsedMovement, 'name' | 'implementCount'>,
   contextText?: string,
+  siblingsJoinedByCaller = false,
 ): string {
   const name = movement.name;
   if (!contextText || /\b(?:db|dumbbell|kb|kettlebell|twin|double)\b/i.test(name)) {
@@ -1078,7 +1102,9 @@ function getMovementDisplayNameFromContext(
   const escapedName = nameWords
     .map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
     .join('\\s+');
-  const compoundMatch = matchingClause.match(new RegExp(`\\b(${escapedName})(\\s*(?:&|\\+|and|to)\\s+[a-z][a-z\\s-]*)`, 'i'));
+  const compoundMatch = siblingsJoinedByCaller
+    ? null
+    : matchingClause.match(new RegExp(`\\b(${escapedName})(\\s*(?:&|\\+|and|to)\\s+[a-z][a-z\\s-]*)`, 'i'));
   if (compoundMatch) {
     const suffix = compoundMatch[2]
       .replace(/\s+(?:@|\d+(?:\.\d+)?\s*(?:kg|lb|lbs)?|rx|tc|cap).*$/i, '')
@@ -1186,30 +1212,22 @@ function buildCelebrationMovementRow(params: {
         ? Math.round(actual.totalReps / repeatCount)
         : !isLadder ? actual?.totalReps : undefined
   );
-  const substitutedDistance = actual?.wasSubstituted
-    ? actual.distancePerRep || (
-      actual.totalDistance && repeatCount && repeatCount > 1 && prescribed?.distance
-        && actual.totalDistance > prescribed.distance * repeatCount
-        ? Math.round(actual.totalDistance / repeatCount)
-        : actual?.totalDistance
-    )
-    : undefined;
+  // A substituted movement divides by the round count like every other row. It used to be
+  // exempted because the save path stored one round's entry as the whole total, so dividing
+  // would have shrunk an already-too-small number; with that fixed at the source, the exemption
+  // printed the 9-round total as the per-round prescription ("72 CAL Echo Bike").
+  // A relay leg still keeps its own per-trip figure through `distancePerRep`.
   const perRoundDistance = actual?.distancePerRep
     || prescribed?.distance
-    || substitutedDistance
     || (
-      actual?.wasSubstituted && repeatCount && repeatCount > 1 && actual?.totalDistance
-        ? actual.totalDistance
-        : repeatCount && repeatCount > 1 && actual?.totalDistance
-          ? Math.round(actual.totalDistance / repeatCount)
-          : actual?.totalDistance
+      repeatCount && repeatCount > 1 && actual?.totalDistance
+        ? Math.round(actual.totalDistance / repeatCount)
+        : actual?.totalDistance
     );
   const perRoundCalories = prescribed?.calories || (
-    actual?.wasSubstituted && repeatCount && repeatCount > 1 && actual?.totalCalories
-      ? actual.totalCalories
-      : repeatCount && repeatCount > 1 && actual?.totalCalories
-        ? Math.round(actual.totalCalories / repeatCount)
-        : actual?.totalCalories
+    repeatCount && repeatCount > 1 && actual?.totalCalories
+      ? Math.round(actual.totalCalories / repeatCount)
+      : actual?.totalCalories
   );
 
   const totalReps = isMergedAcrossOccurrences
@@ -2862,7 +2880,7 @@ export function buildPageArtifactSections(
         name: prescribedMovements
           .map((m) => {
             const rep = m.reps ?? prescribedRepsMap[m.name.toLowerCase()];
-            const nm = getMovementDisplayNameFromContext(m, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`);
+            const nm = getMovementDisplayNameFromContext(m, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`, true);
             return [rep != null ? `${rep}` : null, nm].filter(Boolean).join(' ');
           })
           .join(' + '),
@@ -3258,10 +3276,23 @@ function buildLadderStoryMovements(exercise: Exercise, movements: MovementTotal[
   return lines.length > 0 ? lines : undefined;
 }
 
-function buildMixedStoryMovements(exercises: Exercise[], movements: MovementTotal[], _rawText?: string): StoryMovementLine[] | undefined {
+/**
+ * `savedIndices[i]` is `exercises[i]`'s position in the SAVED workout's exercises[] — the scope
+ * the breakdown stamps on every `MovementTotal`. It is not the same as `i` here: this builder is
+ * handed the MAIN parts, so a warm-up sibling shifts every position. Getting it wrong is
+ * invisible until one lift appears in two parts ("front squat" in the complex and again in the
+ * metcon), at which point the scoped lookup misses and both lines print the FIRST part's reps.
+ */
+function buildMixedStoryMovements(
+  exercises: Exercise[],
+  movements: MovementTotal[],
+  _rawText?: string,
+  savedIndices?: readonly number[],
+): StoryMovementLine[] | undefined {
   const lines: StoryMovementLine[] = [];
-  for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
-    const ex = exercises[exIdx];
+  for (let i = 0; i < exercises.length; i++) {
+    const exIdx = savedIndices?.[i] ?? i;
+    const ex = exercises[i];
     const rx = normalizeIntervalNotation((ex.name || '') + ' ' + (ex.prescription || '')).toLowerCase();
     const isStrength = ex.type === 'strength';
     const isEmom = /emom|e\d+mom|every\s+\d+:\d+/i.test(rx);
@@ -3376,6 +3407,9 @@ export function computeHeroResult(
   prWeight?: number,
   teamSize?: number,
   rawText?: string,
+  // Positions of `exercises` in the SAVED workout's exercises[] — see buildMixedStoryMovements.
+  // Omit only when `exercises` IS the full saved list.
+  savedIndices?: readonly number[],
 ): HeroResult {
   const storyLine = buildAccomplishmentStory(movements);
   const formatLine = buildFormatLine(format, exercises, durationMinutes, timeCap, teamSize);
@@ -3385,10 +3419,10 @@ export function computeHeroResult(
     : 1;
 
   function buildStory(rounds: number = 1): ReturnType<typeof buildStoryMovements> {
-    if (isMixed) return buildMixedStoryMovements(exercises, movements, rawText);
+    if (isMixed) return buildMixedStoryMovements(exercises, movements, rawText, savedIndices);
     const ex = exercises[0];
     if (ex?.ladderReps && ex.ladderReps.length > 0 && ex.ladderStep != null && ex.ladderStep > 0) return buildLadderStoryMovements(ex, movements);
-    if (ex?.sections && ex.sections.length > 1) return buildSectionedStoryMovements(ex.sections, movements, teamSize, 0);
+    if (ex?.sections && ex.sections.length > 1) return buildSectionedStoryMovements(ex.sections, movements, teamSize, savedIndices?.[0] ?? 0);
     const orderedMovements = orderMovementTotalsByPrescription(ex, movements);
     return buildStoryMovements(orderedMovements, rounds, teamSize, ex?.suggestedRepsPerSet);
   }

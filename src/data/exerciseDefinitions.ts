@@ -250,10 +250,16 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
     category: 'skill',
     defaultUnit: 'reps',
     alternatives: [
-      { name: 'Single-unders', ratio: 3, type: 'easier' },
+      { name: 'Single-unders', ratio: 2, type: 'easier' },
       { name: 'Burpees', ratio: 0.3, type: 'easier' },
       { name: 'Penguin Jumps', ratio: 2, type: 'easier' },
       { name: 'Triple-unders', ratio: 0.5, type: 'harder' },
+      // Cardio machine equivalents (calories), not native jump-rope alternates
+      { name: 'Bike', ratio: 0.3, type: 'equivalent' },
+      { name: 'Echo Bike', ratio: 0.3, type: 'equivalent' },
+      { name: 'Assault Bike', ratio: 0.3, type: 'equivalent' },
+      { name: 'Row', ratio: 0.3, type: 'equivalent' },
+      { name: 'Ski Erg', ratio: 0.3, type: 'equivalent' },
     ],
   },
   {
@@ -265,7 +271,13 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
     alternatives: [
       { name: 'Burpees', ratio: 0.1, type: 'easier' },
       { name: 'Penguin Jumps', ratio: 0.67, type: 'easier' },
-      { name: 'Double-unders', ratio: 0.33, type: 'harder' },
+      { name: 'Double-unders', ratio: 0.5, type: 'harder' },
+      // Cardio machine equivalents (calories), not native jump-rope alternates
+      { name: 'Bike', ratio: 0.15, type: 'equivalent' },
+      { name: 'Echo Bike', ratio: 0.15, type: 'equivalent' },
+      { name: 'Assault Bike', ratio: 0.15, type: 'equivalent' },
+      { name: 'Row', ratio: 0.15, type: 'equivalent' },
+      { name: 'Ski Erg', ratio: 0.15, type: 'equivalent' },
     ],
   },
   {
