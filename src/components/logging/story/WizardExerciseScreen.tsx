@@ -16,7 +16,12 @@ interface WizardExerciseScreenProps {
   blockName: string;
   isLastExercise: boolean;
   isLastBlock: boolean;
-  ctaLabelOverride?: string;
+  /**
+   * Correcting an already-saved workout rather than logging a new one. Changes what the two
+   * exits claim: finishing SAVES CHANGES (it isn't "done for today" — the training happened
+   * days ago), and backing out abandons the EDIT, not the workout, which still exists either way.
+   */
+  isEditing?: boolean;
   hideFooter?: boolean;
   onDone: () => void;
   onBack: () => void;
@@ -35,7 +40,7 @@ export function WizardExerciseScreen({
   blockName,
   isLastExercise,
   isLastBlock,
-  ctaLabelOverride,
+  isEditing = false,
   hideFooter = false,
   onDone,
   onBack,
@@ -44,9 +49,10 @@ export function WizardExerciseScreen({
 }: WizardExerciseScreenProps) {
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const ctaLabel = ctaLabelOverride ?? (isLastExercise
-    ? (isLastBlock ? 'Done for today ->' : 'Next block ->')
-    : 'Next ->');
+  const isFinalStep = isLastExercise && isLastBlock;
+  const ctaLabel = isFinalStep
+    ? (isEditing ? 'Save changes ->' : 'Done for today ->')
+    : (isLastExercise ? 'Next block ->' : 'Next ->');
 
   return (
     <motion.div
@@ -137,8 +143,12 @@ export function WizardExerciseScreen({
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
             >
-              <p className={styles.popupTitle}>Discard this workout?</p>
-              <p className={styles.popupBody}>Your progress won't be saved.</p>
+              {/* Leaving an edit abandons the CHANGES — the workout is already saved and stays
+                  exactly as it was. Saying "discard this workout" there reads as deleting it. */}
+              <p className={styles.popupTitle}>{isEditing ? 'Discard your changes?' : 'Discard this workout?'}</p>
+              <p className={styles.popupBody}>
+                {isEditing ? 'The workout stays as it was.' : "Your progress won't be saved."}
+              </p>
               <div className={styles.popupActions}>
                 <button className={styles.popupBtnSecondary} onClick={() => setShowConfirm(false)}>Keep going</button>
                 <button className={styles.popupBtnPrimary} onClick={() => { setShowConfirm(false); onClose(); }}>Discard</button>

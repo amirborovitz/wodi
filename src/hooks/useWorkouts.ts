@@ -12,6 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { dropRecordsForWorkout, reconcileRecordsForWorkout } from '../services/personalRecordSync';
 import { useAuth } from '../context/AuthContext';
 import {
   POSTER_CUSTOMIZATION_EVENT,
@@ -174,10 +175,12 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
             sourceDate: typeof data.sourceDate === 'string' ? data.sourceDate : undefined,
             title: data.title,
             type: data.type as WorkoutType,
+            stationRotation: data.stationRotation === true ? true : undefined,
             imageUrl: data.imageUrl,
             partnerWorkout: data.partnerWorkout,
             partnerFactor: data.partnerFactor,
             teamSize: data.teamSize,
+            partnerNames: Array.isArray(data.partnerNames) ? (data.partnerNames as string[]) : undefined,
             workloadBreakdown: data.workloadBreakdown,
             status: data.status,
             exercises: data.exercises || [],
@@ -186,9 +189,16 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
             durationSeconds: typeof data.durationSeconds === 'number' ? data.durationSeconds : undefined,
             notes: data.notes,
             rawText: data.rawText || undefined,
+            userContext: typeof data.userContext === 'string' ? data.userContext : undefined,
             corrections: Array.isArray(data.corrections) ? (data.corrections as string[]) : undefined,
             timeCap: data.timeCap,
             format: data.format,
+            // Container fields — the edit path rebuilds the original parse from these; nothing
+            // renders them. See workoutToParsedWorkout.
+            containerRounds: typeof data.containerRounds === 'number' ? data.containerRounds : undefined,
+            sets: typeof data.sets === 'number' ? data.sets : undefined,
+            intervalTime: typeof data.intervalTime === 'number' ? data.intervalTime : undefined,
+            feelRating: data.feelRating,
             difficultyLevel: typeof data.difficultyLevel === 'number' ? data.difficultyLevel : undefined,
             posterSkin: data.posterSkin as PosterSkinId | undefined,
             posterVibe: data.posterVibe as PosterVibeKey | undefined,
@@ -260,6 +270,11 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
 
     try {
       await deleteDoc(doc(db, 'workouts', workoutId));
+      // The records this session set have to go with it, or the Records screen keeps showing a
+      // best that no longer has a workout behind it. Deliberately not awaited into the result:
+      // the workout IS gone, and reporting the delete as failed over a leftover record row would
+      // send the athlete back to re-delete something that no longer exists.
+      void dropRecordsForWorkout(user.id, workoutId);
       // Remove from local state immediately for instant feedback
       setWorkouts(prev => prev.filter(w => w.id !== workoutId));
       return true;
@@ -275,6 +290,18 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
 
     try {
       await updateDoc(doc(db, 'workouts', workoutId), { isTest });
+
+      // Records are the second thing the read filter can't reach. The save-time guard only ever
+      // stopped a TEST workout from writing PRs; a real workout flagged afterwards kept every
+      // record it had set, which is the case the guard exists to prevent. Symmetric on unflag, or
+      // the flag would be a one-way trip for the athlete's records.
+      if (isTest) {
+        void dropRecordsForWorkout(user.id, workoutId);
+      } else if (target) {
+        void reconcileRecordsForWorkout(user.id, {
+          id: workoutId, title: target.title, exercises: target.exercises, date: target.date,
+        });
+      }
 
       // The save already bumped the user-doc counters for this workout, and those are the one
       // thing the read filter can't reach — so flagging has to walk them back, and unflagging has

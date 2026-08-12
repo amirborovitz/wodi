@@ -1,5 +1,113 @@
 # Changelog
 
+## v0.1.24 — A saved workout can be corrected
+
+The release's through-line: **saving is no longer the last word.** A workout could already be
+re-opened, but it could not really be *repaired*. The edit path rebuilt a thinner workout than the
+one it loaded and wrote that back over the original. A personal record, once written, could never
+come back down — the row was overwritten, so there was nothing to fall back to. And finishing an
+edit replayed the whole celebration, as if a corrected weight were a session you just trained.
+
+---
+
+### Records keep one row per PR event
+
+**New `services/personalRecordSync.ts`.** Every PR used to be written to `${userId}_${slug}`, one
+document per movement, so each new record *destroyed* the previous one. A mis-logged 300 kg
+deadlift was permanent: correcting it left nothing behind to restore, and deleting the workout left
+the record standing with no session behind it.
+
+A movement now keeps a row per PR event, and its record is simply the highest of them — which is
+what `buildLiftRecords` in `useRecords` already computed, and why the history list under a record
+works at all.
+
+- **`personalRecordEventId(userId, movement, workoutId)`** — deterministic per workout, so
+  re-saving the same session *replaces* its row instead of appending a duplicate. An edit is
+  idempotent however many times it is repeated.
+- **`syncRecordsForWorkout()`** writes what the workout yields *as it now stands* and deletes the
+  rows it no longer earns. A correction that lowers a weight shrinks or removes this workout's
+  rows, and the movement's record falls back to the next highest row on its own — no recomputation,
+  no scan of workout history.
+- **`dropRecordsForWorkout()`** runs on delete, and on flagging a workout as a test. The save-time
+  test guard only ever stopped a test workout from *writing* PRs; a real workout flagged afterwards
+  kept every record it had set, which is precisely the case the flag exists to prevent.
+  **`reconcileRecordsForWorkout()`** puts them back on unflagging, so the flag is not a one-way
+  trip for the athlete's records.
+- Rows are found by their `workoutId` field rather than by rebuilding an id, so the repair reaches
+  documents written under the old colliding scheme. Nothing needs migrating: an old doc simply
+  becomes the oldest row in its movement's history.
+- **Hand-entered records survive all of it.** A manual row (`personalRecordManualId`, no
+  `workoutId`) belongs to no workout, so no workout-scoped repair can match it. `PRScreen` now
+  deletes and edits *the row on screen by its own id* — rebuilding an id from the movement name
+  only ever addressed one document per movement.
+
+**`bestExistingRecord()` in `achievementDetection`** — with several rows per movement, the old
+`.find()` matched whichever one Firestore happened to order first, frequently an old and lower one.
+That announced "New PR!" for a load that beat nothing and printed a nonsense improvement against it.
+
+**`useRewardData` gained `excludeWorkoutId`.** Re-saving measured a workout against the record it
+already holds, so an unchanged PR read as "beat nothing" and the badge was written back off a
+workout that genuinely set one. It also breaks the fallback: a corrected 300 → 250 measured against
+its own stale 300 yields nothing, and the record collapses to some other session's 200 instead of
+stopping at the 250 actually lifted.
+
+**`usePRCount` counts movements, not rows** — a lift beaten three times is three documents, and
+`snapshot.size` reported the athlete as holding three records in it.
+
+### Firestore: `personalRecords` scoped to its owner
+
+`allow read, write: if request.auth != null` let any signed-in athlete read or overwrite anyone's
+records. Now owner-scoped like `/workouts`, with `create` checking the incoming `userId`.
+
+### The saved doc *is* the parse
+
+**New `utils/workoutToParsed.ts`** replaces the reconstruction that lived inline in
+`AddWorkoutScreen`, which rebuilt a `ParsedWorkout` out of `type` plus `sets[]` plus the workload
+breakdown. Sections, complexes, part names, per-exercise partner flags, the coach's time cap, the
+stored format and `rawText` are all *on the saved doc already*; rebuilding around them threw them
+away — and since an edit rewrites `exercises[]` wholesale, losing them in the wizard destroyed them
+in Firestore. The cap is read from `timeCap`, never from the logged duration; the format is kept
+rather than collapsed back to the workout type.
+
+**The container fields now persist and reload.** `containerRounds`, `sets` and `intervalTime` are
+written on save and read back on load. Nothing displays them — without them, an edit-save's
+duration recompute loses the programmed interval term and an EMOM's duration collapses.
+
+**Prefill mirrors the first log exactly.** The edit's blank results are built with the same
+`teamSize` and sole-exercise flag as the session that logged them, and per-movement restore is
+scoped to the part through `movementsForParts` / `findMovementTotal` — an unscoped lookup handed a
+three-part session every part's movements and let a sibling's load overwrite this one's.
+
+`useWorkouts` also reads `stationRotation`, `partnerNames`, `userContext` and `feelRating` through,
+so they survive the round trip instead of being dropped on the way back in.
+
+### An edit is a repair, not a celebration
+
+- **No overview.** The overview asks "which part did you train first?" — a question with no meaning
+  on a workout where every part is already logged. An edit runs the parts in board order, and
+  backing out of the first one leaves the edit.
+- **The exits say what they do.** The final CTA is "Save changes →", not "Done for today" (the
+  training happened days ago), and the discard popup reads "Discard your changes? The workout stays
+  as it was" — "discard this workout" on an already-saved workout reads as deleting it.
+- **No EP flash, no confetti, no bounce to Home.** `onWorkoutUpdated` hands the updated doc back to
+  `App` and returns the athlete to the poster they opened, re-rendered without a refetch.
+- **A repair doesn't vote twice.** Logging-mode corrections feed the learning system on the first
+  log only; re-casting them once per edit would let one workout stuff the ballot for a pattern it
+  saw once.
+
+### Poster: the "⋯" menu
+
+**New `ui/ActionMenuSheet`** — a bottom sheet of choices, kept separate from `DeleteActionSheet`
+(which is a destructive *confirm* built around one irreversible action). "Edit workout" and the
+quiet "AI got it wrong?" now live behind an overflow button in the poster's top-right. The bottom
+tab row stays what it always was — Style / Felt / Date / Text, the poster's *look* — while the menu
+holds the two things that say *this log is wrong*: one the athlete can fix, one they can only report.
+
+`tsc -b` clean, 367/367 tests (new `workoutToParsed` suite; record-history cases added to
+`achievementDetection`), 38/38 poster fixtures unchanged.
+
+---
+
 ## v0.1.23 — Every load its own number, every part its own row
 
 The release's through-line: **a session is not one bucket.** A strength circuit is several lifts at

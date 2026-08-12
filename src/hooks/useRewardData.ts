@@ -34,7 +34,13 @@ interface UseRewardDataResult {
     userId: string,
     workout: WorkoutSummaryInput,
     currentStreak: number,
-    totalWorkouts: number
+    totalWorkouts: number,
+    /**
+     * Ignore the records this workout already owns. Set when RE-saving an existing workout: it
+     * holds its own record, so measuring against it says "you didn't beat anything" and strips
+     * the PR badge off a workout that genuinely set one.
+     */
+    excludeWorkoutId?: string
   ) => Promise<CalculateRewardResult>;
 }
 
@@ -47,7 +53,8 @@ export function useRewardData(): UseRewardDataResult {
     userId: string,
     workout: WorkoutSummaryInput,
     currentStreak: number,
-    totalWorkouts: number
+    totalWorkouts: number,
+    excludeWorkoutId?: string
   ): Promise<CalculateRewardResult> => {
     setLoading(true);
     setError(null);
@@ -80,10 +87,11 @@ export function useRewardData(): UseRewardDataResult {
           where('userId', '==', userId)
         );
         const prsSnapshot = await getDocs(prsQuery);
-        allTimeRecords = prsSnapshot.docs.map(doc => ({
+        allTimeRecords = (prsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        })) as PersonalRecord[];
+        })) as PersonalRecord[])
+          .filter((pr) => !excludeWorkoutId || pr.workoutId !== excludeWorkoutId);
       } catch (err) {
         console.warn('Could not fetch PRs, using empty:', err);
       }

@@ -59,6 +59,18 @@ function AppContent() {
     setCurrentScreen('add-workout');
   };
 
+  // A repaired workout goes straight back to its own poster. Home and Gallery unmount during the
+  // edit and refetch on return, so only the two lists this screen owns need the fresh doc — the
+  // swipe order comes from `workoutList`, and re-sorting is unnecessary since a repair can't
+  // change the trained date (that's the poster's DATE tab).
+  const handleWorkoutUpdated = (workout: WorkoutWithStats) => {
+    setSelectedWorkout(workout);
+    setWorkoutList((prev) => prev.map((w) => (w.id === workout.id ? workout : w)));
+    setEditingWorkout(null);
+    setNavDir(null);
+    setCurrentScreen('workout-detail');
+  };
+
   const handleLogPlannedWorkout = (planned: PlannedWorkout) => {
     setPendingPlannedWorkout(planned);
     setPendingImage(null);
@@ -139,6 +151,7 @@ function AppContent() {
               setPendingPlannedWorkout(null);
               setCurrentScreen('home');
             }}
+            onWorkoutUpdated={handleWorkoutUpdated}
             initialImage={pendingImage}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}

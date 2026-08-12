@@ -153,6 +153,13 @@ export interface Workout {
   corrections?: string[];  // Athlete-flagged AI mistakes ("AI got it wrong?" on the poster) awaiting a fix pass
   timeCap?: number;        // seconds, from parsedWorkout.timeCap
   format?: WorkoutFormat;  // workout format for EP recalculation
+  // The three container fields carried over from ParsedWorkout. Not read at display time —
+  // they exist so re-opening a saved workout in the logging wizard reproduces the parse it was
+  // logged from (see workoutToParsedWorkout). Without them the edit-save's duration recompute
+  // loses the programmed interval term and an EMOM's duration collapses.
+  containerRounds?: number; // outer rounds (e.g. 7 in "7 rounds of Cindy")
+  sets?: number;            // sets/rounds for interval workouts
+  intervalTime?: number;    // interval duration in seconds (EMOM/intervals)
   difficultyLevel?: number; // AI-assessed programmed difficulty 1–10
   feelRating?: FeelRating;  // user-entered metcon feel rating
   posterSkin?: PosterSkinId;   // chosen celebration poster skin (Slab/Chalk/Flare/Stadium)

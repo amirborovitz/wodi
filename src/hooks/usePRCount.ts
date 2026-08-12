@@ -31,7 +31,15 @@ export function usePRCount(): UsePRCountResult {
       const q = query(prsRef, where('userId', '==', user.id));
       const snapshot = await getDocs(q);
 
-      setPRCount(snapshot.size);
+      // Movements the athlete holds a record in — NOT rows. The collection keeps one row per PR
+      // event, so a lift beaten three times is three documents and `snapshot.size` would report
+      // it as three records.
+      const movements = new Set(
+        snapshot.docs
+          .map((prDoc) => (prDoc.data().movement as string | undefined)?.toLowerCase())
+          .filter((name): name is string => Boolean(name))
+      );
+      setPRCount(movements.size);
     } catch (err) {
       console.error('Error fetching PR count:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch PR count'));

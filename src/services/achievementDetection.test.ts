@@ -73,3 +73,55 @@ describe('extractNewPRs — implement decides PR eligibility', () => {
     expect(extract(strengthExercise('Back Rack Reverse Lunge', [85], 'barbell'), existing)).toHaveLength(1);
   });
 });
+
+// ─── Multiple record rows per movement ──────────────────────────────────────
+// `personalRecords` keeps one row PER PR EVENT, so a movement that has been beaten twice has
+// two rows and only the highest is the standing record. Matching the first row Firestore
+// happens to return announced a "New PR!" for a load that beat nothing.
+
+function record(movement: string, weight: number, workoutId = 'w-old'): PersonalRecord {
+  return {
+    id: `${movement}-${weight}`,
+    movement,
+    weight,
+    date: new Date('2026-07-01'),
+    workoutId,
+  };
+}
+
+describe('extractNewPRs — a movement with several record rows', () => {
+  const history = [
+    record('Back Squat', 100),
+    record('Back Squat', 140),  // the standing record
+    record('Back Squat', 120),
+  ];
+
+  it('measures against the highest row, not the first', () => {
+    expect(extract(strengthExercise('Back Squat', [130]), history)).toHaveLength(0);
+  });
+
+  it('still recognises a lift that beats the highest row', () => {
+    const prs = extract(strengthExercise('Back Squat', [145]), history);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].weight).toBe(145);
+  });
+
+  it('does not treat equalling the record as beating it', () => {
+    expect(extract(strengthExercise('Back Squat', [140]), history)).toHaveLength(0);
+  });
+
+  it('reclaims the record once this workout\'s own rows are excluded', () => {
+    // What the repair path does: a workout that owns the 140 is corrected down to 130. Measured
+    // against every OTHER row (100, 120) it still holds the record, so it keeps a row at 130
+    // rather than surrendering the movement to the 120.
+    const others = history.filter((pr) => pr.weight !== 140);
+    const prs = extract(strengthExercise('Back Squat', [130]), others);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].weight).toBe(130);
+  });
+
+  it('yields nothing when the corrected load no longer beats another session', () => {
+    const others = history.filter((pr) => pr.weight !== 140);
+    expect(extract(strengthExercise('Back Squat', [110]), others)).toHaveLength(0);
+  });
+});

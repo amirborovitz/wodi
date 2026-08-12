@@ -15,8 +15,11 @@ import type { PersonalRecord } from '../types';
 //
 // Two kinds of record live here and they come from different places:
 //
-//   LIFTS      — the `personalRecords` collection. One doc per movement holding the
-//                current best load. That doc is the AUTHORITY for the number shown.
+//   LIFTS      — the `personalRecords` collection. One doc per PR EVENT, so a movement
+//                beaten three times keeps three rows: the highest is the record, the rest
+//                are the history below it. Those rows are the AUTHORITY for the number
+//                shown, and are what lets a record fall BACK when the workout behind it is
+//                corrected or deleted (see services/personalRecordSync.ts).
 //   BENCHMARKS — never persisted as records at all. A named WOD's best is derived on
 //                read from the workouts that logged it, gated to the benchmarks that
 //                are actually scored on a clock.

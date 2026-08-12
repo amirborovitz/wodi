@@ -17,11 +17,19 @@ import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useRewardData } from '../hooks/useRewardData';
 import { extractNewPRs } from '../services/achievementDetection';
+import { syncRecordsForWorkout } from '../services/personalRecordSync';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
+import {
+  workoutToParsedWorkout,
+  getSavedMaxStrengthSet,
+  getSavedWorkingStrengthSets,
+  getSavedStrengthRepScheme,
+} from '../utils/workoutToParsed';
+import { findMovementTotal, movementsForParts } from '../components/celebration/movementResolution';
 import { scaleEnteredToTier } from '../utils/tierScaling';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
 import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
@@ -67,6 +75,12 @@ interface AddWorkoutScreenProps {
   initialImage?: File | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
+  /**
+   * An existing workout was re-logged. Distinct from onWorkoutCreated because a repair is not an
+   * achievement: no EP flash, no confetti, no bounce to Home — the athlete goes back to the
+   * poster they came from, carrying the updated doc so it re-renders without a refetch.
+   */
+  onWorkoutUpdated?: (workout: import('../hooks/useWorkouts').WorkoutWithStats) => void;
   plannedWorkout?: import('../types').PlannedWorkout | null; // Pre-parsed workout — jump straight to log-results
 }
 
@@ -102,35 +116,6 @@ interface ExerciseResult {
   ladderStep?: number;
   metconName?: string;
 }
-
-function getSavedMaxStrengthSet(sets: ExerciseSet[]): ExerciseSet | undefined {
-  const explicit = [...sets].reverse().find(set => set.isMax && (set.actualReps ?? 0) > 0);
-  if (explicit) return explicit;
-
-  const completed = sets.filter(set => set.completed && (set.actualReps ?? 0) > 0);
-  if (completed.length < 2) return undefined;
-  const last = completed[completed.length - 1];
-  const previous = completed.slice(0, -1);
-  const previousMaxReps = Math.max(...previous.map(set => set.actualReps ?? set.targetReps ?? 0), 0);
-  const previousMaxWeight = Math.max(...previous.map(set => set.weight ?? 0), 0);
-  const lastReps = last.actualReps ?? 0;
-  const lastWeight = last.weight ?? 0;
-  return lastReps > previousMaxReps && lastWeight > 0 && lastWeight < previousMaxWeight ? last : undefined;
-}
-
-function getSavedWorkingStrengthSets(sets: ExerciseSet[]): ExerciseSet[] {
-  const completed = sets.filter(set => set.completed && ((set.actualReps ?? set.targetReps ?? 0) > 0 || (set.weight ?? 0) > 0));
-  const maxSet = getSavedMaxStrengthSet(completed);
-  return maxSet ? completed.filter(set => set !== maxSet) : completed;
-}
-
-function getSavedStrengthRepScheme(sets: ExerciseSet[]): number[] | undefined {
-  const reps = getSavedWorkingStrengthSets(sets)
-    .map(set => set.targetReps ?? set.actualReps)
-    .filter((rep): rep is number => typeof rep === 'number' && rep > 0);
-  return reps.length > 0 ? reps : undefined;
-}
-
 
 // A rate limit says nothing about the board, so the copy must not send the athlete off
 // re-shooting the photo or rewriting the WOD — it clears on its own. Every parse catch site
@@ -1509,7 +1494,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = isAdminEmail(user?.email);
   const canUseSavedWorkouts = isAdminEmail(user?.email);
@@ -1673,47 +1658,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
       date: editWorkout.date instanceof Date ? editWorkout.date : new Date(editWorkout.date),
     });
 
-    // Determine format from workout type
-    const format: ParsedWorkout['format'] = editWorkout.type === 'strength' ? 'strength'
-      : editWorkout.type === 'amrap' ? 'amrap'
-      : editWorkout.type === 'emom' ? 'emom'
-      : 'for_time';
-
-    // Convert WorkoutWithStats to ParsedWorkout format
-    const editParsedWorkout: ParsedWorkout = {
-      title: editWorkout.title,
-      type: editWorkout.type,
-      format,
-      scoreType: editWorkout.type === 'strength' ? 'load' : 'time',
-      sourceDate: editWorkout.sourceDate,
-      timeCap: editWorkout.duration ? editWorkout.duration * 60 : undefined,
-      exercises: editWorkout.exercises.map(ex => {
-        const workingSets = getSavedWorkingStrengthSets(ex.sets);
-        const repScheme = getSavedStrengthRepScheme(ex.sets);
-        // Reconstruct movements from workloadBreakdown for multi-movement exercises
-        const breakdownMvts = editWorkout.workloadBreakdown?.movements || [];
-        const movements: ParsedMovement[] | undefined = breakdownMvts.length > 1
-          ? breakdownMvts.map(m => ({
-              name: m.name,
-              reps: m.totalReps ? Math.round(m.totalReps / (ex.sets.length || 1)) : undefined,
-              distance: m.totalDistance ? Math.round(m.totalDistance / (ex.sets.length || 1)) : undefined,
-              calories: m.totalCalories ? Math.round(m.totalCalories / (ex.sets.length || 1)) : undefined,
-            }))
-          : undefined;
-
-        return {
-          name: ex.name,
-          type: ex.type,
-          loggingMode: ex.loggingMode,
-          prescription: ex.prescription,
-          suggestedSets: ex.sets.length || 3,
-          suggestedReps: repScheme?.[0] ?? workingSets[0]?.targetReps ?? workingSets[0]?.actualReps,
-          suggestedRepsPerSet: repScheme,
-          suggestedWeight: workingSets[0]?.weight,
-          movements,
-        };
-      }),
-    };
+    // The saved doc IS the parse — sections, complexes, part names, per-exercise partner flags
+    // and the coach's time cap all survive on it. Rebuilding any of that from `sets[]` or the
+    // workload breakdown loses it, and since an edit rewrites `exercises[]` wholesale, losing it
+    // here destroys it in Firestore.
+    const editParsedWorkout = workoutToParsedWorkout(editWorkout);
 
     // Set up parsed workout and flags
     setParsedWorkout(editParsedWorkout);
@@ -1721,15 +1670,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
     setError(null);
     setIsEditingAfterSave(true); // Flag to update instead of create
 
-    // Build StoryExerciseResult[] from saved data for pre-population
-    const breakdownMovements = editWorkout.workloadBreakdown?.movements || [];
+    // Build StoryExerciseResult[] from saved data for pre-population.
+    // Mirror initStoryResults' blank exactly — same teamSize, same sole-exercise flag — or the
+    // edit session prefills a partner block differently from the session that logged it.
+    const allBreakdownMovements = editWorkout.workloadBreakdown?.movements || [];
+    const editTeamSize = editParsedWorkout.partnerWorkout ? (editParsedWorkout.teamSize ?? 2) : undefined;
+    const isSoleExercise = editParsedWorkout.exercises.length === 1;
     const storyResults: StoryExerciseResult[] = editParsedWorkout.exercises.map((parsedEx, i) => {
       const savedEx = editWorkout.exercises[i];
       const mode = parsedEx.loggingMode ?? 'strength';
-      if (!savedEx) return createBlankResult(parsedEx, i, mode, user?.sex);
-
       // Start with blank to get correct kind, movements, setsTotal, etc.
-      const blank = createBlankResult(parsedEx, i, mode, user?.sex);
+      const blank = createBlankResult(parsedEx, i, mode, user?.sex, editTeamSize, isSoleExercise);
+      if (!savedEx) return blank;
+
       const result: StoryExerciseResult = { ...blank };
 
       // Overlay saved values based on kind
@@ -1818,12 +1771,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         }
       }
 
-      // Restore per-movement data from workloadBreakdown
+      // Restore per-movement data from workloadBreakdown — scoped to THIS part. The breakdown
+      // holds one row per movement per part, so an unscoped lookup handed a 3-part session
+      // every part's movements and let a sibling's load overwrite this one's.
+      const breakdownMovements = movementsForParts(allBreakdownMovements, [savedEx], [i]);
       if (result.movementResults && breakdownMovements.length > 0) {
         result.movementResults = result.movementResults.map(mr => {
-          const bm = breakdownMovements.find(
-            m => m.name.toLowerCase() === mr.movement.name.toLowerCase()
-          );
+          const bm = findMovementTotal(breakdownMovements, mr.movement.name, i);
           if (!bm) return mr;
           const patched = { ...mr };
           if (bm.weight && bm.weight > 0) patched.weight = bm.weight;
@@ -2905,9 +2859,15 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
 
     setStep('saving');
 
+    // Repairing a saved workout, rather than logging a new one. The two differ in what the save
+    // is allowed to do besides write the doc — see the guards below.
+    const isRepair = Boolean(editWorkout);
+
     try {
-      // Record user corrections for learning system
-      for (let i = 0; i < results.length; i++) {
+      // Record user corrections for learning system. Not on a repair: the athlete already voted
+      // on these modes when they first logged the workout, and re-voting once per edit would let
+      // one workout stuff the ballot for a pattern it only saw once.
+      if (!isRepair) for (let i = 0; i < results.length; i++) {
         const exercise = parsedWorkout.exercises[i];
         const guidance = loggingGuidance[i];
         const override = modeOverrides[i];
@@ -3291,6 +3251,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
         // leaving nothing downstream able to tell a cap from a result.
         timeCap: parsedWorkout.timeCap || null,
         format: parsedWorkout.format || null,
+        // Carried purely so re-opening this workout in the wizard reproduces the parse it was
+        // logged from — nothing displays them. See workoutToParsedWorkout.
+        ...(parsedWorkout.containerRounds != null && { containerRounds: parsedWorkout.containerRounds }),
+        ...(parsedWorkout.sets != null && { sets: parsedWorkout.sets }),
+        ...(parsedWorkout.intervalTime != null && { intervalTime: parsedWorkout.intervalTime }),
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         ...(isTestWorkout && { isTest: true }),
         updatedAt: serverTimestamp(),
@@ -3384,17 +3349,25 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           muscleGroups,
         },
         user.stats?.currentStreak || 0,
-        totalWorkoutsForReward
+        totalWorkoutsForReward,
+        // Re-saving: don't let this workout be measured against the record it already holds, or
+        // an unchanged PR reads as "beat nothing" and `isPR` below is written back as false.
+        persistedWorkoutId
       );
 
-      // Write new PRs to Firestore.
-      // A test workout writes none. The PR document id is derived from the movement name, so a
-      // throwaway 200kg deadlift OVERWRITES the real record for that movement — and deleting the
-      // test workout afterwards does not bring it back. This is the guard that makes the flag
-      // safe to use, not just tidy.
-      if (!isTestWorkout) try {
-        const workoutId = persistedWorkoutId || 'unsaved';
-        const newPRs = extractNewPRs(
+      // Reconcile this workout's personal records.
+      //
+      // The question is the same whether this is a first save or a repair: which movements does
+      // this workout hold the record in, AS IT NOW STANDS? `fetchedPRs` already excludes the rows
+      // this workout owns (see the excludeWorkoutId argument above) — without that, a corrected
+      // 300kg→250kg is measured against its own stale 300, yields nothing, and the record falls
+      // all the way back to some other session's 200 instead of stopping at the 250 actually lifted.
+      //
+      // A test workout still writes none: the flag has to suppress the side effects a read-time
+      // filter can never undo. Unflagging replays this same sync (see useWorkouts.setWorkoutTest).
+      if (!isTestWorkout && persistedWorkoutId) try {
+        const workoutId = persistedWorkoutId;
+        const workoutRecords = extractNewPRs(
           { id: workoutId, title: workoutTitle, exercises, date: workoutDate },
           fetchedPRs
         );
@@ -3406,28 +3379,55 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           );
         const prContext = isBarbellComplex ? 'Complex Training' : undefined;
 
-        for (const pr of newPRs) {
-          const prDocId = `${user.id}_${pr.movement.toLowerCase().replace(/\s+/g, '_')}`;
-          await setDoc(doc(db, 'personalRecords', prDocId), {
-            userId: user.id,
-            movement: pr.movement,
-            weight: pr.weight,
-            date: workoutDate,
-            workoutId,
-            ...(prContext && { workoutContext: prContext }),
-          });
-        }
+        await syncRecordsForWorkout(user.id, workoutId, workoutRecords.map((pr) => ({
+          movement: pr.movement,
+          weight: pr.weight,
+          date: workoutDate,
+          workoutContext: prContext,
+        })));
       } catch (prErr) {
         console.warn('Failed to save PRs (non-blocking):', prErr);
       }
 
+      const hasPR = Boolean(
+        reward.achievements?.some(achievement => achievement.type === 'pr') || reward.heroAchievement?.type === 'pr'
+      );
       if (persistedWorkoutId) {
-        const hasPR = reward.achievements?.some(achievement => achievement.type === 'pr') || reward.heroAchievement?.type === 'pr';
         await setDoc(doc(db, 'workouts', persistedWorkoutId), removeUndefined({
           heroAchievement: reward.heroAchievement,
           achievements: reward.achievements,
           isPR: hasPR,
         }), { merge: true });
+      }
+
+      // A repair stops here. Everything past this point is the celebration — the EP flash and the
+      // confetti poster — and replaying it for a corrected weight both cheapens the real thing and
+      // strands the athlete on Home instead of the poster they opened. Hand the caller the doc as
+      // it now stands so the poster re-renders without waiting on a refetch.
+      // Only when a caller is actually listening — returning here without a handler would leave
+      // the athlete on the "Saving workout…" spinner with nothing to advance it.
+      if (isRepair && editWorkout && onWorkoutUpdated) {
+        onWorkoutUpdated({
+          ...editWorkout,
+          ...workoutBase,
+          id: persistedWorkoutId ?? editWorkout.id,
+          status: 'completed',
+          duration: workoutBase.duration ?? undefined,
+          durationSeconds: workoutBase.durationSeconds ?? undefined,
+          notes: workoutBase.notes ?? undefined,
+          rawText: workoutBase.rawText ?? undefined,
+          timeCap: workoutBase.timeCap ?? undefined,
+          format: workoutBase.format ?? undefined,
+          exercises,
+          workloadBreakdown,
+          heroAchievement: reward.heroAchievement,
+          achievements: reward.achievements,
+          isPR: hasPR,
+          totalReps,
+          totalVolume,
+          updatedAt: new Date(),
+        });
+        return;
       }
 
       // Add workload breakdown to reward data
@@ -3906,6 +3906,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onSavedForLater, in
           isSaving={false}
           initialResults={editInitialResults}
           lastMaxReps={lastMaxReps}
+          isEditing={Boolean(editWorkout)}
         />
       )}
 

@@ -4,6 +4,7 @@ import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePRs } from '../hooks/usePRs';
+import { personalRecordManualId } from '../services/personalRecordSync';
 import { Button } from '../components/ui';
 import { getMovementCategory } from '../data/exerciseDefinitions';
 import type { MovementCategory } from '../data/exerciseDefinitions';
@@ -171,8 +172,10 @@ export function PRScreen({ onBack }: PRScreenProps) {
     if (!actionPR || !user) return;
     setSaving(true);
     try {
-      const prDocId = `${user.id}_${actionPR.movement.toLowerCase().replace(/\s+/g, '_')}`;
-      await deleteDoc(doc(db, 'personalRecords', prDocId));
+      // Delete the ROW the athlete tapped, by its own id. Rebuilding an id from the movement name
+      // only ever matched one document per movement — now that a movement keeps a row per PR
+      // event, deleting "the deadlift record" has to mean the one on screen, not a guess.
+      await deleteDoc(doc(db, 'personalRecords', actionPR.id));
       await refresh();
       closeActionSheet();
     } catch (err) {
@@ -241,7 +244,10 @@ export function PRScreen({ onBack }: PRScreenProps) {
 
     setSaving(true);
     try {
-      const prDocId = `${user.id}_${selectedMovement.toLowerCase().replace(/\s+/g, '_')}`;
+      // Editing an existing row updates THAT row. A brand-new hand-entered record gets the stable
+      // manual id, so it stays one row per movement however many times it's edited — and, having
+      // no workoutId, it survives every workout-scoped repair (see personalRecordSync).
+      const prDocId = editingPR ? editingPR.id : personalRecordManualId(user.id, selectedMovement);
       await setDoc(doc(db, 'personalRecords', prDocId), {
         userId: user.id,
         movement: selectedMovement,

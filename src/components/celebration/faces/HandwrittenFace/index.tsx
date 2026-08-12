@@ -17,6 +17,7 @@ import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { CorrectionSheet } from '../../CorrectionSheet';
 import { TextSticker } from './TextSticker';
 import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
+import { ActionMenuSheet, type ActionMenuItem } from '../../../ui/ActionMenuSheet';
 import { PRLift } from '../../PRLift';
 import type { PosterSticker, PosterVibeOffset } from '../../../../types';
 import { shareWorkoutCard } from '../../../../utils/shareUtils';
@@ -68,6 +69,24 @@ function FlagIcon(): React.JSX.Element {
   );
 }
 
+function PencilIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+function MoreIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.9" />
+      <circle cx="12" cy="12" r="1.9" />
+      <circle cx="19" cy="12" r="1.9" />
+    </svg>
+  );
+}
+
 function ShareIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
@@ -101,7 +120,7 @@ const STICKER_DEFAULT_POS = { x: 50, y: 46 };
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, onBack, onDone, onPosterCustomizationChange, onCorrection,
+  data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection,
 }: CelebrationFaceProps): React.JSX.Element {
   const [skinIdx, setSkinIdx]         = useState<number>(() => {
     const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
@@ -117,6 +136,7 @@ export function HandwrittenFace({
   const [dateOverride, setDateOverride] = useState<string | null>(null);
   const [dateDraft, setDateDraft]     = useState<string>(() => data.sourceDate ?? toIsoDate(data.workoutDate));
   const [showCorrection, setShowCorrection] = useState<boolean>(false);
+  const [showMenu, setShowMenu]       = useState<boolean>(false);
   const [sharing, setSharing]         = useState<boolean>(false);
   const [sticker, setSticker]         = useState<PosterSticker | null>(() => data.posterSticker ?? null);
   const [stickerDraft, setStickerDraft] = useState<string>(() => data.posterSticker?.text ?? '');
@@ -455,16 +475,6 @@ export function HandwrittenFace({
         )}
       </AnimatePresence>
 
-      {/* Quiet flag-a-mistake control — deliberately small + dim, not a peer of the tabs */}
-      {onCorrection && data.workoutId && (
-        <div className={styles.flagRow}>
-          <button className={styles.flagBtn} onClick={() => setShowCorrection(true)}>
-            <FlagIcon />
-            <span>AI got it wrong?</span>
-          </button>
-        </div>
-      )}
-
       <div className={styles.tabRow}>
         <button className={`${styles.tabBtn} ${activePanel === 'style' ? styles.tabBtnActive : ''}`}
           onClick={toggleStylePanel} aria-pressed={activePanel === 'style'} aria-label="Change poster style">
@@ -513,6 +523,34 @@ export function HandwrittenFace({
     </div>
   );
 
+  // ─── Overflow menu ("⋯", top right) ───────────────────────────────────
+  // Everything that changes the LOG rather than the poster's look. The style/felt/date/text
+  // tabs stay on the bottom bar because those are the poster; these two are "this log is wrong",
+  // one fixable by the athlete and one only reportable.
+
+  const menuItems: ActionMenuItem[] = [
+    ...(onEdit ? [{ label: 'Edit workout', icon: <PencilIcon />, onClick: onEdit }] : []),
+    ...(onCorrection && data.workoutId
+      ? [{ label: 'AI got it wrong?', icon: <FlagIcon />, quiet: true, onClick: () => setShowCorrection(true) }]
+      : []),
+  ];
+
+  const navRight = menuItems.length > 0 ? (
+    <button className={styles.navMore} onClick={() => setShowMenu(true)} aria-label="More options" aria-haspopup="menu">
+      <MoreIcon />
+    </button>
+  ) : (
+    <div className={styles.navSpacer} />
+  );
+
+  const menuSheet = (
+    <ActionMenuSheet
+      title={showMenu ? (singleWod.title ?? singleWod.type) : null}
+      items={menuItems}
+      onClose={() => setShowMenu(false)}
+    />
+  );
+
   // ─────────────────────────────────────────────────────────────────────
   // RENDER — CAROUSEL PATH
   // ─────────────────────────────────────────────────────────────────────
@@ -527,7 +565,7 @@ export function HandwrittenFace({
         <div className={styles.nav}>
           <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
           <span className={styles.navTitle}>{navTitle}</span>
-          <div className={styles.navSpacer} />
+          {navRight}
         </div>
 
         {/* Page dots */}
@@ -602,6 +640,8 @@ export function HandwrittenFace({
           />
         )}
 
+        {menuSheet}
+
         <DeleteActionSheet
           title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
           deleteLabel="Remove"
@@ -624,7 +664,7 @@ export function HandwrittenFace({
       <div className={styles.nav}>
         <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
         <span className={styles.navTitle}>{singleWod.title ?? singleWod.type}</span>
-        <div className={styles.navSpacer} />
+        {navRight}
       </div>
 
       <div
@@ -664,6 +704,8 @@ export function HandwrittenFace({
       {bottomBar}
 
       {data.prCelebration && <PRLift pr={data.prCelebration} />}
+
+      {menuSheet}
 
       <DeleteActionSheet
         title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}

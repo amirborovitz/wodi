@@ -212,6 +212,15 @@ interface StoryLogResultsProps {
   initialResults?: StoryExerciseResult[];
   /** Most recent logged max per movement (lowercased name) — seeds the max-effort stepper. */
   lastMaxReps?: Record<string, number>;
+  /**
+   * Re-opening an already-logged workout to correct it, rather than logging a new one.
+   *
+   * The overview exists to ask "which part did you train first?" and then walk you through the
+   * rest — a question with no meaning on a workout where every part is already logged. So an
+   * edit runs the parts in board order, start to finish, and ends in "Save changes" instead of
+   * "Done for today".
+   */
+  isEditing?: boolean;
 }
 
 // ─── Ladder helper ───────────────────────────────────────────────
@@ -473,6 +482,7 @@ export function StoryLogResults({
   isSaving: _isSaving = false,
   initialResults,
   lastMaxReps,
+  isEditing = false,
 }: StoryLogResultsProps) {
   const { user } = useAuth();
   const teamSize = parsedWorkout.partnerWorkout ? (parsedWorkout.teamSize ?? 2) : undefined;
@@ -501,7 +511,7 @@ export function StoryLogResults({
 
   // ── Wizard state ──
   const [wizardPhase, setWizardPhase] = useState<WizardPhase>(
-    wizardBlocks.length > 1 ? 'overview' : 'logging',
+    wizardBlocks.length > 1 && !isEditing ? 'overview' : 'logging',
   );
   const [blockOrder, setBlockOrder] = useState<number[]>(() => wizardBlocks.map((_, i) => i));
   const [currentStep, setCurrentStep] = useState(0);
@@ -626,12 +636,14 @@ export function StoryLogResults({
       const prevBlock = wizardBlocks[blockOrder[currentStep - 1]];
       setBlockExerciseStep((prevBlock?.pages.length ?? 1) - 1);
       setWizardPhase('logging');
-    } else if (wizardBlocks.length > 1) {
+    } else if (wizardBlocks.length > 1 && !isEditing) {
       setWizardPhase('overview');
     } else {
+      // An edit never shows the overview, so there is nothing behind the first block to go back
+      // to — backing out of it leaves the edit, same as a single-block workout.
       onBack();
     }
-  }, [blockExerciseStep, currentStep, wizardBlocks, blockOrder, onBack]);
+  }, [blockExerciseStep, currentStep, wizardBlocks, blockOrder, isEditing, onBack]);
 
   // Overview
   const handleOverviewSelect = useCallback((selectedBlockIdx: number) => {
@@ -678,6 +690,7 @@ export function StoryLogResults({
             blockName={currentScoredBlock?.displayName ?? currentBlock?.displayName ?? currentResult.exercise.name}
             isLastExercise={isLastExercise}
             isLastBlock={isLastBlock}
+            isEditing={isEditing}
             hideFooter={isSubstitutionOpen}
             onDone={handleExerciseDone}
             onBack={handleExerciseBack}

@@ -1,0 +1,98 @@
+/* Sits just under DeleteActionSheet's 1100/1101: a menu can raise a destructive confirm, so the
+   confirm has to land on top of the menu that opened it. */
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1080;
+}
+
+.menuSheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1081;
+  background: #1c1c1e;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.menuTitle {
+  padding: 16px 20px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 17px 20px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  color: #fff;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+
+.menuItem:first-of-type {
+  border-top: none;
+}
+
+.menuItem:active {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* A secondary confession ("something's wrong here") rather than an action the athlete came for. */
+.menuItemQuiet {
+  color: rgba(255, 255, 255, 0.55);
+  font-weight: 400;
+}
+
+.menuItemIcon {
+  display: flex;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.menuItemIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.menuCancel {
+  display: block;
+  width: 100%;
+  padding: 17px 20px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.88);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+
+.menuCancel:active {
+  background: rgba(255, 255, 255, 0.05);
+}

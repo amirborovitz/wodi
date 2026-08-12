@@ -112,6 +112,28 @@
   width: 36px;
 }
 
+/* Same 36px footprint as .navBack so the title stays optically centred whether or not the
+   menu is available. */
+.navMore {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  border-radius: 50%;
+  color: rgba(243, 241, 234, 0.8);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.navMore svg {
+  width: 100%;
+  height: 100%;
+}
+
 .cardArea {
   flex: 1;
   display: flex;
@@ -435,34 +457,6 @@
   position: relative;
 }
 
-/* ── Flag-a-mistake control ─────────────────────────────────────────────── */
-
-.flagRow {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 10px;
-}
-
-.flagBtn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(243, 241, 234, 0.45);
-  font-family: 'DM Mono', monospace;
-  font-size: 11.5px;
-  font-weight: 500;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.flagBtn svg {
-  width: 14px;
-  height: 14px;
-}
 
 /* ── Persistent tab row (Style / Felt / Date + Share) ───────────────────── */
 

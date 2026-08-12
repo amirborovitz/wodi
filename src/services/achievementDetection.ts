@@ -148,6 +148,27 @@ function normalizePRMovementName(name: string): string {
 }
 
 /**
+ * The standing record for a movement.
+ *
+ * `personalRecords` holds one row PER PR EVENT, so a movement that has been beaten three times
+ * has three rows and only the highest is the record. A `.find()` here returned whichever row
+ * Firestore happened to order first — frequently an old, lower one — which both announced a
+ * "New PR!" for a load that beat nothing and printed a nonsense improvement against it.
+ */
+function bestExistingRecord(
+  records: readonly PersonalRecord[],
+  movementName: string,
+): PersonalRecord | undefined {
+  const target = normalizePRMovementName(movementName);
+  let best: PersonalRecord | undefined;
+  for (const record of records) {
+    if (normalizePRMovementName(record.movement) !== target) continue;
+    if (!best || record.weight > best.weight) best = record;
+  }
+  return best;
+}
+
+/**
  * Extract weighted movement candidates from an exercise.
  * For WODs with a movements array, returns individual movement names + weights.
  * For simple strength exercises, returns the exercise name + max set weight.
@@ -203,9 +224,7 @@ function detectPRs(
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
-      const existingPR = allTimeRecords.find(
-        pr => normalizePRMovementName(pr.movement) === normalizePRMovementName(movementName)
-      );
+      const existingPR = bestExistingRecord(allTimeRecords, movementName);
 
       if (!existingPR || bestWeight > existingPR.weight) {
         const improvement = existingPR ? bestWeight - existingPR.weight : 0;
@@ -362,9 +381,7 @@ export function extractNewPRs(
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
-      const existingPR = existingPRs.find(
-        pr => normalizePRMovementName(pr.movement) === normalizePRMovementName(movementName)
-      );
+      const existingPR = bestExistingRecord(existingPRs, movementName);
 
       if (!existingPR || bestWeight > existingPR.weight) {
         newPRs.push({
