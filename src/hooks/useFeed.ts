@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { setFlame, subscribeFeedPosts, subscribeFlames } from '../services/feed/feedPosts';
-import type { FeedAuthor, FeedPost, FeedReactor } from '../services/feed/types';
+import type { FeedPost, FeedReactions } from '../services/feed/types';
 
 interface UseFeedResult {
   posts: FeedPost[];
@@ -81,10 +81,7 @@ export function useFeed(): UseFeedResult {
   return { posts, loading, error };
 }
 
-interface UseFeedReactionsResult {
-  count: number;
-  by: FeedReactor[];
-  mine: boolean;
+interface UseFeedReactionsResult extends FeedReactions {
   toggle: () => void;
 }
 
@@ -92,15 +89,15 @@ interface UseFeedReactionsResult {
  * Reactions for one post. Optimistic on tap — the write is idempotent (one doc
  * keyed by uid), so a failed toggle is corrected by the next snapshot rather
  * than needing a rollback.
+ *
+ * Reactors are uids; rendering one is a profile lookup like any other. Reacting
+ * therefore publishes nothing about the reactor beyond the fact that they did.
  */
 export function useFeedReactions(
   postId: string,
   userId: string | undefined,
-  author: FeedAuthor | undefined,
 ): UseFeedReactionsResult {
-  const [state, setState] = useState<{ count: number; by: FeedReactor[]; mine: boolean }>({
-    count: 0, by: [], mine: false,
-  });
+  const [state, setState] = useState<FeedReactions>({ count: 0, by: [], mine: false });
 
   useEffect(() => {
     if (!userId) return;
@@ -108,17 +105,17 @@ export function useFeedReactions(
   }, [postId, userId]);
 
   const toggle = useCallback((): void => {
-    if (!userId || !author) return;
+    if (!userId) return;
     const next = !state.mine;
     setState((prev) => ({
       count: prev.count + (next ? 1 : -1),
-      by: next ? [{ id: userId, ...author }, ...prev.by] : prev.by.filter((a) => a.id !== userId),
+      by: next ? [userId, ...prev.by] : prev.by.filter((id) => id !== userId),
       mine: next,
     }));
-    void setFlame(postId, userId, author, next).catch((err) => {
+    void setFlame(postId, userId, next).catch((err) => {
       console.error('Failed to save reaction:', err);
     });
-  }, [postId, userId, author, state.mine]);
+  }, [postId, userId, state.mine]);
 
   return { ...state, toggle };
 }

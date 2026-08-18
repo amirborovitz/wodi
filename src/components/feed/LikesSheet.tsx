@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { AuthorLine } from './AuthorLine';
-import type { FeedReactor } from '../../services/feed/types';
+import { useProfiles } from '../../hooks/useProfiles';
 import styles from './LikesSheet.module.css';
 
 interface LikesSheetProps {
-  /** Null closes the sheet. */
-  people: FeedReactor[] | null;
-  onOpenAthlete: (person: FeedReactor) => void;
+  /** Reactor uids. Null closes the sheet. */
+  people: string[] | null;
+  onOpenAthlete: (userId: string) => void;
   onClose: () => void;
 }
 
@@ -20,6 +20,8 @@ interface LikesSheetProps {
  * and again, at full width, on the card.
  */
 export function LikesSheet({ people, onOpenAthlete, onClose }: LikesSheetProps): React.ReactElement {
+  const profiles = useProfiles(people ?? []);
+
   return (
     <AnimatePresence>
       {people && (
@@ -46,9 +48,9 @@ export function LikesSheet({ people, onOpenAthlete, onClose }: LikesSheetProps):
               <span className={styles.headerCount}>{people.length}</span>
             </div>
             <div className={styles.list}>
-              {people.map((person) => (
-                <div key={person.id} className={styles.row}>
-                  <AuthorLine author={person} size="row" onOpen={() => onOpenAthlete(person)} />
+              {people.map((id) => (
+                <div key={id} className={styles.row}>
+                  <AuthorLine profile={profiles.get(id)} size="row" onOpen={() => onOpenAthlete(id)} />
                 </div>
               ))}
             </div>

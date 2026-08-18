@@ -20,3 +20,13 @@ export function freshness(createdAt: Date, now: number): number {
 export function isFadingSoon(createdAt: Date, now: number): boolean {
   return now - createdAt.getTime() > FEED_WINDOW_MS - 6 * 60 * 60 * 1000;
 }
+
+/**
+ * What an athlete is called when their profile hasn't resolved — a read still in
+ * flight, or a poster who has no profile doc yet.
+ *
+ * One constant so the loading state and the missing state are visually identical:
+ * a card must never flash a different name than the one it settles on, and an
+ * athlete the directory can't find should look ordinary rather than broken.
+ */
+export const UNKNOWN_ATHLETE = 'Athlete';

@@ -1,12 +1,13 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Avatar } from './Avatar';
 import { instagramUrl } from '../../utils/instagram';
-import type { FeedAuthor } from '../../services/feed/types';
+import { useProfile } from '../../hooks/useProfiles';
+import { UNKNOWN_ATHLETE } from './feedFormat';
 import styles from './AthleteCard.module.css';
 
 interface AthleteCardProps {
-  /** Null closes the card. */
-  athlete: FeedAuthor | null;
+  /** Uid of the athlete to show. Null closes the card. */
+  athleteId: string | null;
   onClose: () => void;
 }
 
@@ -14,25 +15,29 @@ interface AthleteCardProps {
  * One athlete's identity, opened by tapping them anywhere in the feed.
  *
  * Identity only — who they are and where they train. It carries no stats, no
- * history and no body metrics: age, weight and sex never leave the user doc,
- * and cannot reach here even by accident, because FeedAuthor is the only shape
- * this component accepts and it has no field for them.
+ * history and no body metrics: those never leave /users, and cannot reach here
+ * even by accident, because this renders a PublicProfile and that shape has no
+ * field for them.
+ *
+ * It takes a uid rather than an identity object, which is what makes every
+ * route in — the post header, a row in the reactions list — arrive at the same
+ * card. Two frozen copies of the same athlete used to reach this component from
+ * those two paths, and they disagreed.
  *
  * There is no viewer check. Tapping yourself opens your own card exactly as it
  * appears to everyone else, which makes it the one place to see what the feed
  * is actually publishing about you.
  */
-export function AthleteCard({ athlete, onClose }: AthleteCardProps): React.ReactElement {
-  const details: { label: string; value: string }[] = athlete
-    ? [
-        ...(athlete.gym ? [{ label: 'Box', value: athlete.gym }] : []),
-        ...(athlete.location ? [{ label: 'Location', value: athlete.location }] : []),
-      ]
-    : [];
+export function AthleteCard({ athleteId, onClose }: AthleteCardProps): React.ReactElement {
+  const athlete = useProfile(athleteId ?? undefined);
+  const details: { label: string; value: string }[] = [
+    ...(athlete?.gym ? [{ label: 'Box', value: athlete.gym }] : []),
+    ...(athlete?.location ? [{ label: 'Location', value: athlete.location }] : []),
+  ];
 
   return (
     <AnimatePresence>
-      {athlete && (
+      {athleteId && (
         <>
           <motion.div
             className={styles.backdrop}
@@ -52,8 +57,8 @@ export function AthleteCard({ athlete, onClose }: AthleteCardProps): React.React
             <span className={styles.grabber} />
 
             <div className={styles.identity}>
-              <Avatar name={athlete.name} size={88} photoUrl={athlete.photoUrl} />
-              <h2 className={styles.name}>{athlete.name}</h2>
+              <Avatar profile={athlete} size={88} />
+              <h2 className={styles.name}>{athlete?.name ?? UNKNOWN_ATHLETE}</h2>
             </div>
 
             {details.length > 0 && (
@@ -67,7 +72,7 @@ export function AthleteCard({ athlete, onClose }: AthleteCardProps): React.React
               </dl>
             )}
 
-            {athlete.instagram && (
+            {athlete?.instagram && (
               <a
                 className={styles.instagram}
                 href={instagramUrl(athlete.instagram)}
@@ -82,7 +87,7 @@ export function AthleteCard({ athlete, onClose }: AthleteCardProps): React.React
               </a>
             )}
 
-            {details.length === 0 && !athlete.instagram && (
+            {details.length === 0 && !athlete?.instagram && (
               <p className={styles.bare}>No details shared yet</p>
             )}
           </motion.div>

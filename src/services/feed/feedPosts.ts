@@ -1,11 +1,13 @@
 /**
  * Feed post reads and writes.
  *
- * A post is a frozen snapshot, never a pointer into /workouts — the rules keep
- * workouts owner-scoped precisely so a global feed can exist without exposing
- * rawText, corrections, notes or EP. Posts are immutable once written; the only
- * mutable thing about one is its flames subcollection, which is why reactions
- * live there rather than as a counter field on the post.
+ * A post freezes the POSTER and nothing else. The rules keep workouts
+ * owner-scoped precisely so a global feed can exist without exposing rawText,
+ * corrections, notes or EP — but who wrote it is a uid, resolved live through
+ * /publicProfiles, because identity is not a historical fact the way a workout
+ * is. Posts are immutable once written; the only mutable thing about one is its
+ * flames subcollection, which is why reactions live there rather than as a
+ * counter field on the post.
  */
 
 import {
@@ -16,7 +18,7 @@ import type { FirestoreError } from 'firebase/firestore';
 import { db } from '../firebase';
 import { removeUndefined } from '../../utils/firestoreUtils';
 import { FEED_WINDOW_MS } from './types';
-import type { FeedAuthor, FeedPost, FeedPostInput, FeedReactor } from './types';
+import type { FeedPost, FeedPostInput, FeedReactions } from './types';
 import type { PosterWod } from '../../components/celebration/faces/HandwrittenFace/posterData';
 
 /** Cards fetched per feed load. The 24h window keeps this naturally small. */
@@ -39,7 +41,6 @@ function toPosterPayload(stored: StoredPoster): FeedPost['poster'] {
 
 interface FeedPostDoc {
   userId: string;
-  author: FeedAuthor;
   poster: StoredPoster;
   isPR: boolean;
   createdAt: Timestamp | null;
@@ -50,7 +51,6 @@ function toFeedPost(id: string, data: FeedPostDoc): FeedPost {
   return {
     id,
     userId: data.userId,
-    author: data.author,
     poster: toPosterPayload(data.poster),
     isPR: data.isPR ?? false,
     // createdAt is a server timestamp, so it reads back null for the brief
@@ -60,15 +60,10 @@ function toFeedPost(id: string, data: FeedPostDoc): FeedPost {
   };
 }
 
-export async function createFeedPost(
-  userId: string,
-  author: FeedAuthor,
-  input: FeedPostInput,
-): Promise<string> {
+export async function createFeedPost(userId: string, input: FeedPostInput): Promise<string> {
   const ref = doc(collection(db, 'feedPosts'));
   await setDoc(ref, removeUndefined({
     userId,
-    author,
     poster: input.poster,
     isPR: input.isPR,
     createdAt: serverTimestamp(),
@@ -114,25 +109,18 @@ export function subscribeFeedPosts(
 
 // ─── Reactions ──────────────────────────────────────────────────────────────
 
-interface FlameDoc {
-  author: FeedAuthor;
-  createdAt: Timestamp | null;
-}
-
 /**
  * One doc per reactor, id = their uid. Idempotent by construction: reacting
- * twice writes the same doc, so a count can never drift, and nobody needs
- * write access to a post they don't own in order to react to it.
+ * twice writes the same doc, so a count can never drift, and nobody needs write
+ * access to a post they don't own in order to react to it.
+ *
+ * The doc holds only a timestamp — the reactor's identity is its id, and their
+ * name and avatar are looked up live like everywhere else.
  */
-export async function setFlame(
-  postId: string,
-  userId: string,
-  author: FeedAuthor,
-  flamed: boolean,
-): Promise<void> {
+export async function setFlame(postId: string, userId: string, flamed: boolean): Promise<void> {
   const ref = doc(db, 'feedPosts', postId, 'flames', userId);
   if (flamed) {
-    await setDoc(ref, removeUndefined({ author, createdAt: serverTimestamp() }));
+    await setDoc(ref, { createdAt: serverTimestamp() });
   } else {
     await deleteDoc(ref);
   }
@@ -141,14 +129,12 @@ export async function setFlame(
 export function subscribeFlames(
   postId: string,
   userId: string,
-  onChange: (reactions: { count: number; by: FeedReactor[]; mine: boolean }) => void,
+  onChange: (reactions: FeedReactions) => void,
 ): () => void {
   return onSnapshot(collection(db, 'feedPosts', postId, 'flames'), (snap) => {
     onChange({
       count: snap.size,
-      // The doc id IS the reactor's uid, so it is lifted onto the author rather
-      // than stored twice.
-      by: snap.docs.map((d) => ({ id: d.id, ...(d.data() as FlameDoc).author })),
+      by: snap.docs.map((d) => d.id),
       mine: snap.docs.some((d) => d.id === userId),
     });
   });
@@ -160,8 +146,9 @@ export type ReportReason = 'not_a_workout' | 'inappropriate' | 'harassment' | 's
 
 /**
  * Append-only for clients; only triage can read the queue back. Mirrors the
- * movementFlags pattern. The post is snapshotted into the report so a triage
- * read still has context after the post expires out of the feed.
+ * movementFlags pattern. The poster is snapshotted into the report so a triage
+ * read still has context after the post expires out of the feed; the author is
+ * `postUserId`, which triage resolves the same way the app does.
  */
 export async function reportFeedPost(
   post: FeedPost,
@@ -174,7 +161,6 @@ export async function reportFeedPost(
     reporterId,
     postId: post.id,
     postUserId: post.userId,
-    postAuthorName: post.author.name,
     postSnapshot: post.poster,
     reason,
     note: note.trim() || undefined,

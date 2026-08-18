@@ -1,27 +1,30 @@
+import { avatarUrl } from '../../services/feed/types';
+import type { PublicProfile } from '../../services/feed/types';
+import { UNKNOWN_ATHLETE } from './feedFormat';
 import styles from './Avatar.module.css';
 
 interface AvatarProps {
-  name: string;
+  /** Undefined renders the initials tile — the same state as an athlete with no photo. */
+  profile: PublicProfile | undefined;
   size?: number;
-  /** Frozen on the author block at publish time; initials stand in without it. */
-  photoUrl?: string;
 }
 
 /**
- * The athlete's avatar — their photo when the author block carries one, and a
+ * The athlete's avatar — their photo when their profile carries one, and a
  * name-derived initials tile when it doesn't.
  *
- * The initials tile is not a placeholder to be designed around: most posts
- * predate avatars in the feed, and an athlete with no photo keeps it forever,
- * so both forms are permanent and have to look equally deliberate. The colour
- * is hashed from the name, which makes it stable per athlete across sessions.
+ * The initials tile is not a placeholder to be designed around: an athlete with
+ * no photo keeps it forever, so both forms are permanent and have to look
+ * equally deliberate. The colour is hashed from the name, which makes it stable
+ * per athlete across sessions.
  */
-export function Avatar({ name, size = 34, photoUrl }: AvatarProps): React.ReactElement {
-  if (photoUrl) {
+export function Avatar({ profile, size = 34 }: AvatarProps): React.ReactElement {
+  const src = avatarUrl(profile);
+  if (src) {
     return (
       <img
         className={styles.photo}
-        src={photoUrl}
+        src={src}
         alt=""
         width={size}
         height={size}
@@ -30,6 +33,8 @@ export function Avatar({ name, size = 34, photoUrl }: AvatarProps): React.ReactE
       />
     );
   }
+
+  const name = profile?.name ?? UNKNOWN_ATHLETE;
 
   // First letter of the first two words — "Amir Borovitz" reads as AB, where
   // slicing the raw string would give AM.

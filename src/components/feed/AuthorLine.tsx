@@ -1,10 +1,12 @@
 import { Avatar } from './Avatar';
 import { instagramUrl } from '../../utils/instagram';
-import type { FeedAuthor } from '../../services/feed/types';
+import { UNKNOWN_ATHLETE } from './feedFormat';
+import type { PublicProfile } from '../../services/feed/types';
 import styles from './AuthorLine.module.css';
 
 interface AuthorLineProps {
-  author: FeedAuthor;
+  /** Undefined while the lookup is in flight, or if the athlete has no profile doc. */
+  profile: PublicProfile | undefined;
   /** `card` sits above a poster; `row` is the denser likes-list variant. */
   size?: 'card' | 'row';
   /** Opens this athlete's card. Omitted where there is nowhere to go. */
@@ -17,8 +19,12 @@ const AVATAR_SIZE = { card: 34, row: 40 } as const;
  * One athlete's public identity — avatar, name, where they train, Instagram.
  *
  * Shared by the post header and the reactions list so the two can never drift:
- * an athlete looks the same everywhere the feed shows them. Every field below
- * the name is optional, and the block collapses cleanly when they're all empty.
+ * an athlete looks the same everywhere the feed shows them. That used to be a
+ * convention two frozen copies were expected to keep, and they didn't; both
+ * surfaces now render the same live profile object.
+ *
+ * Every field below the name is optional, and the block collapses cleanly when
+ * they're all empty.
  *
  * When `onOpen` is given the block becomes tappable. It never asks whether the
  * athlete is the viewer: tapping yourself opens your own card like anyone
@@ -29,8 +35,9 @@ const AVATAR_SIZE = { card: 34, row: 40 } as const;
  * inside a button, so the two interactive elements sit side by side and the
  * link is stacked above the overlay to keep its own tap.
  */
-export function AuthorLine({ author, size = 'card', onOpen }: AuthorLineProps): React.ReactElement {
-  const meta = [author.gym, author.location].filter(Boolean).join(' · ');
+export function AuthorLine({ profile, size = 'card', onOpen }: AuthorLineProps): React.ReactElement {
+  const name = profile?.name ?? UNKNOWN_ATHLETE;
+  const meta = [profile?.gym, profile?.location].filter(Boolean).join(' · ');
 
   return (
     <div className={`${styles.author} ${styles[size]}`}>
@@ -39,20 +46,20 @@ export function AuthorLine({ author, size = 'card', onOpen }: AuthorLineProps): 
           type="button"
           className={styles.openHit}
           onClick={onOpen}
-          aria-label={`Open ${author.name}'s card`}
+          aria-label={`Open ${name}'s card`}
         />
       )}
-      <Avatar name={author.name} size={AVATAR_SIZE[size]} photoUrl={author.photoUrl} />
+      <Avatar profile={profile} size={AVATAR_SIZE[size]} />
       <div className={styles.identity}>
         <span className={styles.nameRow}>
-          <span className={styles.name}>{author.name}</span>
-          {author.instagram && (
+          <span className={styles.name}>{name}</span>
+          {profile?.instagram && (
             <a
               className={styles.instagram}
-              href={instagramUrl(author.instagram)}
+              href={instagramUrl(profile.instagram)}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`${author.name} on Instagram`}
+              aria-label={`${name} on Instagram`}
             >
               <InstagramIcon />
             </a>

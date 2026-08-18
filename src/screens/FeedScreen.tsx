@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useFeed } from '../hooks/useFeed';
+import { useProfile } from '../hooks/useProfiles';
 import { AthleteCard } from '../components/feed/AthleteCard';
 import { FeedCard } from '../components/feed/FeedCard';
 import { LikesSheet } from '../components/feed/LikesSheet';
 import { PulseRail } from '../components/feed/PulseRail';
+import { UNKNOWN_ATHLETE } from '../components/feed/feedFormat';
 import { ActionMenuSheet } from '../components/ui';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
-import { toFeedAuthor } from '../services/feed/author';
 import { deleteFeedPost, reportFeedPost } from '../services/feed/feedPosts';
 import type { ReportReason } from '../services/feed/feedPosts';
-import type { FeedAuthor, FeedPost, FeedReactor } from '../services/feed/types';
+import type { FeedPost } from '../services/feed/types';
 import styles from './FeedScreen.module.css';
 
 /** Ages are shown to the minute, so the clock only needs to tick that often. */
@@ -28,10 +29,11 @@ export function FeedScreen(): React.ReactElement {
   const { user } = useAuth();
   const { posts, loading, error } = useFeed();
   const [now, setNow] = useState(() => Date.now());
-  const [likes, setLikes] = useState<FeedReactor[] | null>(null);
-  // Held as the author block itself, not a uid: the feed stores frozen copies
-  // of an identity, so there is no live record to look one up in.
-  const [athlete, setAthlete] = useState<FeedAuthor | null>(null);
+  // Both sheets hold uids, never identity objects: whoever the athlete tapped
+  // is resolved through the one directory, so the card that opens from a post
+  // header and the card that opens from the reactions list are the same card.
+  const [likes, setLikes] = useState<string[] | null>(null);
+  const [athleteId, setAthleteId] = useState<string | null>(null);
   const [reporting, setReporting] = useState<FeedPost | null>(null);
   const [deleting, setDeleting] = useState<FeedPost | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -50,8 +52,6 @@ export function FeedScreen(): React.ReactElement {
     return () => clearTimeout(id);
   }, [notice]);
 
-  const viewerAuthor: FeedAuthor | undefined = user ? toFeedAuthor(user) : undefined;
-
   const jumpToPost = useCallback((postId: string): void => {
     cardRefs.current[postId]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, []);
@@ -62,6 +62,8 @@ export function FeedScreen(): React.ReactElement {
       .then(() => setNotice('Reported · thanks, we look at every one'))
       .catch((err) => { console.error('Failed to report post:', err); setNotice("Couldn't send that report"); });
   }, [user]);
+
+  const reportedAuthor = useProfile(reporting?.userId);
 
   const confirmDelete = useCallback((): void => {
     if (!deleting) return;
@@ -105,10 +107,9 @@ export function FeedScreen(): React.ReactElement {
             key={post.id}
             post={post}
             viewerId={user?.id}
-            viewerAuthor={viewerAuthor}
             now={now}
             onOpenLikes={(_, by) => setLikes(by)}
-            onOpenAthlete={setAthlete}
+            onOpenAthlete={setAthleteId}
             onReport={setReporting}
             onDelete={setDeleting}
             cardRef={(el) => { cardRefs.current[post.id] = el; }}
@@ -116,14 +117,14 @@ export function FeedScreen(): React.ReactElement {
         ))}
       </div>
 
-      <LikesSheet people={likes} onOpenAthlete={setAthlete} onClose={() => setLikes(null)} />
+      <LikesSheet people={likes} onOpenAthlete={setAthleteId} onClose={() => setLikes(null)} />
 
       {/* Stacks over the reactions list rather than replacing it, so closing a
           card returns to the list the athlete was tapped in. */}
-      <AthleteCard athlete={athlete} onClose={() => setAthlete(null)} />
+      <AthleteCard athleteId={athleteId} onClose={() => setAthleteId(null)} />
 
       <ActionMenuSheet
-        title={reporting ? `Report ${reporting.author.name}` : null}
+        title={reporting ? `Report ${reportedAuthor?.name ?? UNKNOWN_ATHLETE}` : null}
         items={REPORT_REASONS.map(({ reason, label }) => ({
           label,
           quiet: true,

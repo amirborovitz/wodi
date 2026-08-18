@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode
 } from 'react';
@@ -16,6 +17,8 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, googleProvider, appleProvider, db, storage } from '../services/firebase';
 import { removeUndefined } from '../utils/firestoreUtils';
+import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
+import { toPublicProfile } from '../services/feed/types';
 import type { User, UserStats } from '../types';
 
 export interface UserProfileUpdate {
@@ -242,6 +245,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error refreshing user data:', error);
     }
   };
+
+  // ── Public identity ────────────────────────────────────────────────────────
+  // /publicProfiles/{uid} is the only part of an athlete other people can read,
+  // and it is derived entirely from `user` — so it is published HERE, from the
+  // one place that owns that object, rather than by each screen that edits a
+  // field. A screen that forgets to call something is how the public copy goes
+  // stale; an effect on the value itself cannot forget.
+  //
+  // The fingerprint keeps this to one write per session per actual change:
+  // reopening the app republishes once (which also heals a doc that drifted),
+  // and re-renders that don't touch the public fields write nothing.
+  const publishedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) {
+      publishedRef.current = null;
+      return;
+    }
+    const profile = toPublicProfile(user);
+    const fingerprint = JSON.stringify(profile);
+    if (publishedRef.current === fingerprint) return;
+    publishedRef.current = fingerprint;
+    // Seeded before the write so the viewer's own card renders from the object
+    // the app just built, never from a read that hasn't come back yet.
+    primeProfile(profile);
+    upsertPublicProfile(profile).catch((error) => {
+      console.error('Error publishing public profile:', error);
+    });
+  }, [user]);
 
   const updateUserPhoto = async (file: File) => {
     if (!user || !firebaseUser) {
