@@ -1,0 +1,74 @@
+{
+  "name": "bracket-ladder-run-stated-occurrences",
+  "description": "Same board as real-bracket-ladder-run-between-sets-20260817, but parsed by the CURRENT prompt, which captures what the coach stated: occurrences 5 and placement between_sets. Pins the structured half of the fix. The two fixtures are the two halves deliberately: the 'real-' one is a legacy doc with neither field, so its run row carries no total (the stored 1200m is the old tier-count guess) and the board's footnote alone tells the story; this one has the stated count, so the breakdown holds the truthful 1000m, the row prints '1km total', and the cadence reads on the row itself. Never merge them - the legacy shape must keep being exercised.",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "timeCap": 900,
+    "partnerWorkout": false,
+    "rawText": "METCON (Medium)\nFor time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets (5 total)\n<15 minutes T.C.>",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "For Time",
+        "type": "wod",
+        "prescription": "[14-12-10-8-6-4] Front Squat @40/60kg, Burpees, 200m Run in between sets (5 total)",
+        "rounds": 6,
+        "suggestedRepsPerSet": [14, 12, 10, 8, 6, 4],
+        "rawText": "For time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets (5 total)\n<15 minutes T.C.>",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 168, "weight": 47.5, "time": 1200 }
+        ],
+        "movements": [
+          {
+            "name": "Front Squat",
+            "reps": 14,
+            "rxWeights": { "male": 47.5, "female": 47.5, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [47.5]
+          },
+          {
+            "name": "Burpees",
+            "reps": 14,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "none",
+            "occurrences": 5,
+            "placement": "between_sets",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Front Squat", "exerciseIndex": 0, "totalReps": 54, "weight": 47.5, "unit": "kg", "color": "yellow" },
+        { "name": "Burpees", "exerciseIndex": 0, "totalReps": 54, "color": "magenta" },
+        {
+          "name": "Run",
+          "exerciseIndex": 0,
+          "totalDistance": 1000,
+          "unit": "m",
+          "distancePerRep": 200,
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 108,
+      "grandTotalVolume": 2565,
+      "grandTotalDistance": 1000
+    }
+  }
+}

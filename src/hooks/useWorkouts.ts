@@ -18,6 +18,7 @@ import {
   POSTER_CUSTOMIZATION_EVENT,
   type PosterCustomizationEventDetail,
 } from './usePosterCustomization';
+import { sessionPartnerFactor } from '../services/partnerScope';
 // THE one ordering for the workout list — every consumer (gallery, home rail,
 // recaps) reads this order. Don't re-sort downstream.
 import { byNewestTrained } from '../utils/workoutDate';
@@ -79,7 +80,7 @@ function calculateWorkoutStats(workout: Workout): { totalReps: number; totalVolu
     }
   }
 
-  const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
+  const partnerFactor = sessionPartnerFactor(workout);
   if (partnerFactor !== 1) {
     return {
       totalReps: Math.round(totalReps * partnerFactor),

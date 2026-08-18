@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -96,7 +96,10 @@ export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color="#2d2c25" fill="rgba(255,255,255,0.18)" />
           <span style={{ flex: 1, height: 2, background: '#2d2c25', opacity: 0.36, transform: 'rotate(0.5deg)' }} />
-          <span style={{ fontFamily: fM, fontSize: 10, color: 'rgba(23,24,20,0.48)', letterSpacing: '0.06em' }}>{wod.date}</span>
+          <HeaderMeta>
+            <EffortMeta ep={wod.ep} color="rgba(23,24,20,0.86)" />
+            <span style={{ fontFamily: fM, fontSize: 10, color: 'rgba(23,24,20,0.48)', letterSpacing: '0.06em' }}>{wod.date}</span>
+          </HeaderMeta>
         </div>
 
         <div style={{ marginTop: 14 }}>
@@ -264,7 +267,7 @@ export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
           {vibe && (
             <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}
               style={{ marginRight: 2, marginTop: -4 }} rotateDeg={-7}>
-              <VibeStamp vibe={vibe} scale={0.64} />
+              <VibeStamp vibe={vibe} scale={0.64} surface="light" />
             </DraggableVibeStamp>
           )}
         </div>

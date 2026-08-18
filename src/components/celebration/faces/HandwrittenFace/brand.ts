@@ -42,6 +42,19 @@ export const VIBE: Record<VibeKey, VibeConfig> = {
   wrecked: { label: 'WRECKED', color: '#8590A8' },
 };
 
+/**
+ * Same six hues pulled down to ~30% lightness, for stamps sitting on light or bright
+ * fields (cream paper, the yellow flare). The dark-tuned VIBE colors wash out there.
+ */
+export const LIGHT_VIBE: Record<VibeKey, string> = {
+  chill: '#0e8a63',
+  solid: '#9c7000',
+  sweaty: '#c2540b',
+  cooked: '#c62828',
+  smoked: '#8b2fc9',
+  wrecked: '#4b5568',
+};
+
 export const VIBE_KEYS: VibeKey[] = ['chill', 'solid', 'sweaty', 'cooked', 'smoked', 'wrecked'];
 
 /** Barlow Condensed: hero numbers, WOD name. */

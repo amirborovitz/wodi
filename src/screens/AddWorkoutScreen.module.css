@@ -3,6 +3,8 @@
   min-height: 100dvh;
   background: var(--color-bg);
   padding-bottom: calc(var(--space-6) + var(--safe-bottom));
+  max-width: var(--app-column);
+  margin-inline: auto;
 }
 
 /* Header */
@@ -2090,47 +2092,11 @@
   font-family: var(--font-barlow);
 }
 
-.voiceMicBtn {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  border: 2px solid rgba(242, 240, 235, 0.15);
-  background: var(--wodi-card2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--wodi-dim);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.voiceMicBtnActive {
-  background: var(--wodi-yellow);
-  border-color: var(--wodi-yellow);
-  color: #0c0d0f;
-  box-shadow: 0 0 0 8px rgba(245, 194, 0, 0.18), 0 0 0 16px rgba(245, 194, 0, 0.07);
-  animation: voicePulse 1.4s ease-in-out infinite;
-}
-
-@keyframes voicePulse {
-  0%, 100% { box-shadow: 0 0 0 8px rgba(245, 194, 0, 0.18), 0 0 0 16px rgba(245, 194, 0, 0.07); }
-  50% { box-shadow: 0 0 0 12px rgba(245, 194, 0, 0.22), 0 0 0 24px rgba(245, 194, 0, 0.05); }
-}
-
-.voiceStatus {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--wodi-dim);
-  margin: -8px 0 0;
-  font-family: var(--font-barlow);
-}
-
 .voiceTextarea {
   width: 100%;
-  min-height: 140px;
+  /* The board is the hero of this step now that the mic button is gone —
+     it has to read as the thing you act on, not a field under one. */
+  min-height: 200px;
   background: var(--wodi-card);
   border: 1px solid rgba(242, 240, 235, 0.12);
   border-radius: 12px;

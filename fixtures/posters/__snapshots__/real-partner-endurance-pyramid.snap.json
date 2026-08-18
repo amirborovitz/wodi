@@ -15,14 +15,12 @@
           "name": "",
           "mineKey": "Echo Bike",
           "suppressMine": true,
-          "partnerSplit": "reps",
           "accent": "magenta"
         },
         {
           "primary": "100 Power Cleans @ 35/50kg",
           "name": "",
           "mineKey": "Power Clean",
-          "partnerSplit": "reps",
           "teamShare": "50",
           "accent": "yellow"
         }
@@ -38,14 +36,12 @@
           "name": "",
           "mineKey": "Echo Bike",
           "suppressMine": true,
-          "partnerSplit": "reps",
           "accent": "magenta"
         },
         {
           "primary": "80 Shoulder to Overheads @ 35/50kg",
           "name": "",
           "mineKey": "Shoulder to Overhead",
-          "partnerSplit": "reps",
           "teamShare": "40",
           "accent": "yellow"
         }
@@ -61,14 +57,12 @@
           "name": "",
           "mineKey": "Echo Bike",
           "suppressMine": true,
-          "partnerSplit": "reps",
           "accent": "magenta"
         },
         {
           "primary": "60 Thrusters @ 35/50kg",
           "name": "",
           "mineKey": "Thruster",
-          "partnerSplit": "reps",
           "teamShare": "30",
           "accent": "yellow"
         }
@@ -84,7 +78,6 @@
           "name": "",
           "mineKey": "Echo Bike",
           "suppressMine": true,
-          "partnerSplit": "reps",
           "accent": "magenta"
         },
         {
@@ -92,7 +85,6 @@
           "name": "",
           "mineKey": "Farmer Carry",
           "suppressMine": true,
-          "partnerSplit": "reps",
           "teamShare": "150m",
           "accent": "magenta"
         }
@@ -118,14 +110,12 @@
             "name": "",
             "mineKey": "Echo Bike",
             "suppressMine": true,
-            "partnerSplit": "reps",
             "accent": "magenta"
           },
           {
             "primary": "100 Power Cleans @ 35/50kg",
             "name": "",
             "mineKey": "Power Clean",
-            "partnerSplit": "reps",
             "teamShare": "50",
             "accent": "yellow"
           }
@@ -141,14 +131,12 @@
             "name": "",
             "mineKey": "Echo Bike",
             "suppressMine": true,
-            "partnerSplit": "reps",
             "accent": "magenta"
           },
           {
             "primary": "80 Shoulder to Overheads @ 35/50kg",
             "name": "",
             "mineKey": "Shoulder to Overhead",
-            "partnerSplit": "reps",
             "teamShare": "40",
             "accent": "yellow"
           }
@@ -164,14 +152,12 @@
             "name": "",
             "mineKey": "Echo Bike",
             "suppressMine": true,
-            "partnerSplit": "reps",
             "accent": "magenta"
           },
           {
             "primary": "60 Thrusters @ 35/50kg",
             "name": "",
             "mineKey": "Thruster",
-            "partnerSplit": "reps",
             "teamShare": "30",
             "accent": "yellow"
           }
@@ -187,7 +173,6 @@
             "name": "",
             "mineKey": "Echo Bike",
             "suppressMine": true,
-            "partnerSplit": "reps",
             "accent": "magenta"
           },
           {
@@ -195,7 +180,6 @@
             "name": "",
             "mineKey": "Farmer Carry",
             "suppressMine": true,
-            "partnerSplit": "reps",
             "teamShare": "150m",
             "accent": "magenta"
           }
@@ -340,7 +324,8 @@
         "rx": "100 Power Cleans @ 35/50kg",
         "load": "",
         "mine": "40kg",
-        "team": "50"
+        "team": "50",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
@@ -354,7 +339,8 @@
         "rx": "80 Shoulder to Overheads @ 35/50kg",
         "load": "",
         "mine": "40kg",
-        "team": "40"
+        "team": "40",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
@@ -368,7 +354,8 @@
         "rx": "60 Thrusters @ 35/50kg",
         "load": "",
         "mine": "40kg",
-        "team": "30"
+        "team": "30",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
@@ -382,7 +369,8 @@
         "rx": "300 M Farmer Carry",
         "load": "",
         "mine": "",
-        "team": "150m"
+        "team": "150m",
+        "isPartnerShare": true
       }
     ],
     "pages": [
@@ -404,7 +392,8 @@
           "rx": "100 Power Cleans @ 35/50kg",
           "load": "",
           "mine": "40kg",
-          "team": "50"
+          "team": "50",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
@@ -418,7 +407,8 @@
           "rx": "80 Shoulder to Overheads @ 35/50kg",
           "load": "",
           "mine": "40kg",
-          "team": "40"
+          "team": "40",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
@@ -432,7 +422,8 @@
           "rx": "60 Thrusters @ 35/50kg",
           "load": "",
           "mine": "40kg",
-          "team": "30"
+          "team": "30",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
@@ -446,7 +437,8 @@
           "rx": "300 M Farmer Carry",
           "load": "",
           "mine": "",
-          "team": "150m"
+          "team": "150m",
+          "isPartnerShare": true
         }
       ]
     ]

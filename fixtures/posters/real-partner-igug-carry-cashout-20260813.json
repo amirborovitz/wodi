@@ -1,0 +1,172 @@
+{
+ "name": "real-partner-igug-carry-cashout-20260813",
+ "description": "Real IGUG partner RFT (14 rounds, 7 each) with a cash-out Farmer Carry, saved with NO exercise.sections — the structure comes from the 'Cash-out:' movement role prefix. Regression guard on four things: (1) partnerSplit 'rounds' must survive the sectioned for-time path so every row carries a TEAM total AND a ME share, (2) repairUndercountedBreakdown must not inflate the correctly-halved partner totals (35) back to team numbers (70), (3) the cash-out carry shows the team distance and the personal share, (4) the header must not restate the round count that the section title already carries.",
+ "workout": {
+  "date": "2026-08-13T12:09:16.154Z",
+  "title": "WOD",
+  "type": "for_time",
+  "format": "for_time",
+  "partnerWorkout": true,
+  "partnerFactor": 0.5,
+  "teamSize": 2,
+  "status": "completed",
+  "timeCap": 1200,
+  "duration": 22,
+  "durationSeconds": 1320,
+  "sets": 7,
+  "difficultyLevel": 7,
+  "notes": null,
+  "isPR": false,
+  "isTest": false,
+  "totalReps": 105,
+  "totalVolume": 1400,
+  "achievements": [],
+  "heroAchievement": {
+   "type": "generic",
+   "title": "Keep Going!",
+   "subtitle": "You're building something great",
+   "icon": "star"
+  },
+  "rawText": "Movement focus of the day\nDouble Unders\nAdvanced: EMOM for 8 minutes:\n\"X\" Double Unders (aim for ~30 sec work)\n* You can also practice Triple Unders / Cross Over\n\nMETCON (Intervals)\nIn pairs, I go you go (the whole set):\n14 RFT (7 each):\n5 twin Kettlebell Snatch @12/20kg\n5 twin Kettlebell Shoulder to Overhead @12/20kg\n5 Burpee Box Jumps (facing)\nInto:\n400m Farmer Carry (I go you go)\n<20 minutes T.C.>",
+  "workloadBreakdown": {
+   "grandTotalReps": 105,
+   "grandTotalVolume": 1400,
+   "grandTotalDistance": 400,
+   "movements": [
+    {
+     "name": "Twin KB Snatch",
+     "exerciseIndex": 1,
+     "totalReps": 35,
+     "weight": 40,
+     "unit": "kg",
+     "implementCount": 2,
+     "color": "yellow"
+    },
+    {
+     "name": "Twin Kettlebell Shoulder to Overhead",
+     "exerciseIndex": 1,
+     "totalReps": 35,
+     "weight": 40,
+     "unit": "kg",
+     "implementCount": 2,
+     "color": "yellow"
+    },
+    {
+     "name": "Burpee Box Jump",
+     "exerciseIndex": 1,
+     "totalReps": 35,
+     "color": "magenta"
+    },
+    {
+     "name": "Cash-out: Farmer Carry",
+     "exerciseIndex": 1,
+     "totalDistance": 400,
+     "distancePerRep": 400,
+     "unit": "m",
+     "color": "magenta"
+    }
+   ]
+  },
+  "exercises": [
+   {
+    "id": "exercise-0",
+    "name": "Double Unders",
+    "type": "skill",
+    "loggingMode": "emom",
+    "aiPartName": "RIFT",
+    "partKind": "accessory",
+    "isSecondary": true,
+    "partnerWorkout": false,
+    "prescription": "EMOM for 8 minutes: \"X\" Double Unders (aim for ~30 sec work)",
+    "rawText": "Advanced: EMOM for 8 minutes:\n\"X\" Double Unders (aim for ~30 sec work)\n* You can also practice Triple Unders / Cross Over",
+    "intervalCount": 8,
+    "workDuration": 480,
+    "rounds": 8,
+    "movements": [
+     {
+      "name": "Double Unders",
+      "isMaxReps": true,
+      "inputType": "none",
+      "countingMode": "per_round",
+      "scoreEntryMode": "total"
+     }
+    ],
+    "sets": [
+     { "id": "set-0", "setNumber": 1, "completed": true },
+     { "id": "set-1", "setNumber": 2, "completed": true },
+     { "id": "set-2", "setNumber": 3, "completed": true },
+     { "id": "set-3", "setNumber": 4, "completed": true },
+     { "id": "set-4", "setNumber": 5, "completed": true },
+     { "id": "set-5", "setNumber": 6, "completed": true },
+     { "id": "set-6", "setNumber": 7, "completed": true },
+     { "id": "set-7", "setNumber": 8, "completed": true }
+    ]
+   },
+   {
+    "id": "exercise-1",
+    "name": "14 Rounds For Time",
+    "type": "wod",
+    "loggingMode": "for_time",
+    "aiPartName": "SPARK",
+    "partKind": "metcon",
+    "partnerWorkout": true,
+    "partnerSplit": "rounds",
+    "personalRounds": 7,
+    "rounds": 14,
+    "rxWeights": { "male": 20, "female": 12, "unit": "kg" },
+    "prescription": "14 RFT (7 each): 5 twin KB Snatch @12/20kg, 5 twin KB Shoulder to Overhead @12/20kg, 5 Burpee Box Jumps (facing), then 400m Farmer Carry (I go you go)",
+    "rawText": "METCON (Intervals)\nIn pairs, I go you go (the whole set):\n14 RFT (7 each):\n5 twin Kettlebell Snatch @12/20kg\n5 twin Kettlebell Shoulder to Overhead @12/20kg\n5 Burpee Box Jumps (facing)\nInto:\n400m Farmer Carry (I go you go)\n<20 minutes T.C.>",
+    "movements": [
+     {
+      "name": "Twin KB Snatch",
+      "reps": 5,
+      "equipment": "kettlebell",
+      "implementCount": 2,
+      "inputType": "weight",
+      "rxWeights": { "male": 20, "female": 20, "unit": "kg" },
+      "loggedWeights": [20],
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Twin Kettlebell Shoulder to Overhead",
+      "reps": 5,
+      "equipment": "kettlebell",
+      "implementCount": 2,
+      "inputType": "weight",
+      "rxWeights": { "male": 20, "female": 20, "unit": "kg" },
+      "loggedWeights": [20],
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Burpee Box Jump",
+      "reps": 5,
+      "inputType": "none",
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Cash-out: Farmer Carry",
+      "distance": 400,
+      "unit": "m",
+      "inputType": "none",
+      "countingMode": "once",
+      "perRound": false,
+      "scoreEntryMode": "per_round"
+     }
+    ],
+    "sets": [
+     {
+      "id": "set-summary",
+      "setNumber": 1,
+      "completed": true,
+      "weight": 20,
+      "actualReps": 210,
+      "time": 1320
+     }
+    ]
+   }
+  ]
+ }
+}

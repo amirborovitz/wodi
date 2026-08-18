@@ -1,0 +1,150 @@
+{
+ "name": "team-of-four-shared-total",
+ "description": "A FOUR-person team sharing one total, plus a (together) run and a solo strength block in the same session. Guards the whole partner path against the team-of-2 assumption: every share must be a quarter, not a half; the (together) run must not be divided at all; and the solo strength block must keep its full numbers. Also covers a cash-out carry, whose share is the team distance / 4.",
+ "workout": {
+  "date": "2026-08-13T09:00:00.000Z",
+  "title": "Quad Squad",
+  "type": "for_time",
+  "format": "for_time",
+  "partnerWorkout": true,
+  "teamSize": 4,
+  "status": "completed",
+  "timeCap": 1800,
+  "duration": 26,
+  "durationSeconds": 1560,
+  "isTest": false,
+  "rawText": "A. Back Squat\n4x5 @ 80kg\n\nB. METCON\nIn teams of 4, split however:\nFor time:\n800m Run (together)\n400 Wall Ball Shots @9/6kg\n200 Cal Row\nInto:\n400m Farmer Carry\n<30 minutes T.C.>",
+  "workloadBreakdown": {
+   "grandTotalReps": 120,
+   "grandTotalVolume": 6400,
+   "grandTotalDistance": 900,
+   "grandTotalCalories": 50,
+   "movements": [
+    {
+     "name": "Back Squat",
+     "exerciseIndex": 0,
+     "totalReps": 20,
+     "weight": 80,
+     "unit": "kg",
+     "color": "yellow"
+    },
+    {
+     "name": "Run",
+     "exerciseIndex": 1,
+     "totalDistance": 800,
+     "distancePerRep": 800,
+     "unit": "m",
+     "color": "magenta"
+    },
+    {
+     "name": "Wall Ball Shot",
+     "exerciseIndex": 1,
+     "totalReps": 100,
+     "weight": 9,
+     "unit": "kg",
+     "color": "yellow"
+    },
+    {
+     "name": "Row",
+     "exerciseIndex": 1,
+     "totalCalories": 50,
+     "unit": "cal",
+     "color": "magenta"
+    },
+    {
+     "name": "Cash-out: Farmer Carry",
+     "exerciseIndex": 1,
+     "totalDistance": 100,
+     "distancePerRep": 400,
+     "unit": "m",
+     "color": "magenta"
+    }
+   ]
+  },
+  "exercises": [
+   {
+    "id": "exercise-0",
+    "name": "Back Squat",
+    "type": "strength",
+    "loggingMode": "strength",
+    "partnerWorkout": false,
+    "prescription": "4x5 @ 80kg",
+    "rawText": "A. Back Squat\n4x5 @ 80kg",
+    "rounds": 4,
+    "movements": [
+     {
+      "name": "Back Squat",
+      "reps": 5,
+      "inputType": "weight",
+      "rxWeights": { "male": 80, "female": 80, "unit": "kg" },
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     }
+    ],
+    "sets": [
+     { "id": "set-0", "setNumber": 1, "completed": true, "weight": 80, "actualReps": 5 },
+     { "id": "set-1", "setNumber": 2, "completed": true, "weight": 80, "actualReps": 5 },
+     { "id": "set-2", "setNumber": 3, "completed": true, "weight": 80, "actualReps": 5 },
+     { "id": "set-3", "setNumber": 4, "completed": true, "weight": 80, "actualReps": 5 }
+    ]
+   },
+   {
+    "id": "exercise-1",
+    "name": "Quad Squad For Time",
+    "type": "wod",
+    "loggingMode": "for_time",
+    "partnerWorkout": true,
+    "partnerSplit": "reps",
+    "rounds": 1,
+    "prescription": "In teams of 4: 800m run (together), 400 wall balls @9/6kg, 200 cal row, then 400m farmer carry",
+    "rawText": "B. METCON\nIn teams of 4, split however:\nFor time:\n800m Run (together)\n400 Wall Ball Shots @9/6kg\n200 Cal Row\nInto:\n400m Farmer Carry\n<30 minutes T.C.>",
+    "movements": [
+     {
+      "name": "Run",
+      "distance": 800,
+      "unit": "m",
+      "together": true,
+      "sharedLabel": "together",
+      "inputType": "none",
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Wall Ball Shot",
+      "reps": 400,
+      "inputType": "weight",
+      "rxWeights": { "male": 9, "female": 6, "unit": "kg" },
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Row",
+      "calories": 200,
+      "inputType": "none",
+      "countingMode": "per_round",
+      "scoreEntryMode": "per_round"
+     },
+     {
+      "name": "Cash-out: Farmer Carry",
+      "distance": 400,
+      "unit": "m",
+      "inputType": "weight",
+      "countingMode": "once",
+      "perRound": false,
+      "scoreEntryMode": "per_round"
+     }
+    ],
+    "sets": [
+     {
+      "id": "set-summary",
+      "setNumber": 1,
+      "completed": true,
+      "weight": 9,
+      "actualReps": 150,
+      "time": 1560
+     }
+    ]
+   }
+  ]
+ }
+}

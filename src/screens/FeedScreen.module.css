@@ -1,0 +1,118 @@
+.screen {
+  min-height: 100vh;
+  padding: 20px 0 calc(96px + env(safe-area-inset-bottom));
+  background: var(--wodi-bg);
+  max-width: var(--app-column);
+  margin: 0 auto;
+}
+
+.header {
+  padding: 0 20px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--wodi-white);
+  margin: 0;
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 7px;
+  border: 1px solid rgba(255, 70, 70, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 70, 70, 0.12);
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #ff8a8a;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ff5555;
+  animation: livePulse 1.1s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot { animation: none; opacity: 1; }
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--wodi-dim);
+}
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 18px;
+}
+
+.state {
+  margin: 40px 20px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--wodi-dim);
+}
+
+.empty {
+  padding: 60px 30px;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--wodi-white);
+}
+
+.emptyBody {
+  margin: 4px 0 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--wodi-dim);
+}
+
+.notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 95;
+  transform: translateX(-50%);
+  padding: 11px 18px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: 999px;
+  background: rgba(20, 22, 26, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  white-space: nowrap;
+}

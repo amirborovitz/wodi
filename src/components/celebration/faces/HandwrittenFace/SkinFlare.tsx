@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -43,7 +43,10 @@ export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={BRAND.ink} />
           <span style={{ flex: 1, height: 1.5, background: 'rgba(0,0,0,0.18)' }} />
-          <span style={{ fontFamily: fM, fontSize: 10, color: 'rgba(0,0,0,0.55)', letterSpacing: '0.04em' }}>{wod.date}</span>
+          <HeaderMeta>
+            <EffortMeta ep={wod.ep} color="rgba(0,0,0,0.86)" />
+            <span style={{ fontFamily: fM, fontSize: 10, color: 'rgba(0,0,0,0.55)', letterSpacing: '0.04em' }}>{wod.date}</span>
+          </HeaderMeta>
         </div>
 
         {/* Identity */}
@@ -183,7 +186,7 @@ export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
           </div>
           {vibe && (
             <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}>
-              <VibeStamp vibe={vibe} color={BRAND.ink} scale={0.78} />
+              <VibeStamp vibe={vibe} surface="light" scale={0.78} />
             </DraggableVibeStamp>
           )}
         </div>

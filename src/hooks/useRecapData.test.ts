@@ -701,3 +701,95 @@ describe('buildRecaps — period is the trained date, not the logged date', () =
     expect(recaps.find(r => r.id === 'season-2026-q3')).toBeUndefined();
   });
 });
+
+describe('buildRecaps — the week scope', () => {
+  // NOW is Wed 12 Aug 2026, so the current week began Mon 10 Aug and the last
+  // completed week ran Mon 3 Aug — Sun 9 Aug.
+  const LAST_WEEK_ID = 'week-2026-08-03';
+  const IN_LAST_WEEK = new Date(2026, 7, 5);   // Wed 5 Aug
+  const IN_THIS_WEEK = new Date(2026, 7, 11);  // Tue 11 Aug
+
+  function timed(id: string, date: Date, minutes?: number): WorkoutWithStats {
+    return {
+      ...workout(id, date, [{ name: 'Back Squat', totalReps: 10 }]),
+      duration: minutes,
+    } as WorkoutWithStats;
+  }
+
+  it('buckets a completed week and labels it by ISO week number', () => {
+    const { recaps } = buildRecaps([timed('a', IN_LAST_WEEK, 30)], NOW);
+    const week = recaps.find(r => r.id === LAST_WEEK_ID);
+
+    expect(week).toBeDefined();
+    expect(week!.scope).toBe('week');
+    expect(week!.period).toBe('WEEK 32');
+    expect(week!.periodSub).toBe('AUG 3 — 9');
+    expect(week!.workouts).toBe(1);
+  });
+
+  it('excludes the week in progress, the same way the current month is excluded', () => {
+    const { recaps, weekRecap } = buildRecaps([timed('a', IN_THIS_WEEK, 30)], NOW);
+
+    expect(recaps.find(r => r.scope === 'week')).toBeUndefined();
+    expect(weekRecap).toBeNull();
+  });
+
+  it('points weekRecap at the immediately previous Monday-to-Sunday week', () => {
+    const { weekRecap } = buildRecaps([
+      timed('a', IN_LAST_WEEK, 30),
+      timed('b', new Date(2026, 6, 22), 30), // three weeks earlier
+    ], NOW);
+
+    expect(weekRecap?.id).toBe(LAST_WEEK_ID);
+    expect(weekRecap?.workouts).toBe(1);
+  });
+
+  it('spans the month boundary in the sub-label', () => {
+    // Mon 31 Aug — Sun 6 Sep, read from a "today" inside the week after it.
+    const { recaps } = buildRecaps(
+      [timed('a', new Date(2026, 8, 2), 30)],
+      new Date(2026, 8, 9),
+    );
+    const week = recaps.find(r => r.scope === 'week');
+    expect(week?.periodSub).toBe('AUG 31 — SEP 6');
+  });
+
+  it('sums move time from duration, counting nothing for a session without one', () => {
+    const { weekRecap } = buildRecaps([
+      timed('a', IN_LAST_WEEK, 42.4),
+      timed('b', IN_LAST_WEEK, 31.2),
+      timed('c', IN_LAST_WEEK, undefined),
+    ], NOW);
+
+    // Rounded once on the sum, not per term: 42.4 + 31.2 = 73.6 → 74.
+    expect(weekRecap?.moveMinutes).toBe(74);
+    expect(weekRecap?.workouts).toBe(3);
+  });
+
+  it('reports zero move time rather than guessing when no session was timed', () => {
+    const { weekRecap } = buildRecaps([timed('a', IN_LAST_WEEK, undefined)], NOW);
+    expect(weekRecap?.moveMinutes).toBe(0);
+  });
+
+  it('sums EP across the week', () => {
+    const one = buildRecaps([timed('a', IN_LAST_WEEK, 30)], NOW).weekRecap;
+    const two = buildRecaps([
+      timed('a', IN_LAST_WEEK, 30),
+      timed('b', IN_LAST_WEEK, 30),
+    ], NOW).weekRecap;
+
+    expect(one!.epTotal).toBeGreaterThan(0);
+    expect(two!.epTotal).toBe(one!.epTotal * 2);
+  });
+
+  it('keeps the flag queue at one entry per workout despite the extra tier', () => {
+    // A July session lands in a week, a month AND a season. Only the month tier
+    // collects, so adding weeks must not multiply the queue.
+    const { recaps, unknownMovements } = buildRecaps([
+      workout('a', IN_JULY, [{ name: 'Tibialis Raise', totalReps: 40 }]),
+    ], NOW);
+
+    expect(recaps.filter(r => r.scope === 'week')).toHaveLength(1);
+    expect(unknownMovements).toHaveLength(1);
+  });
+});

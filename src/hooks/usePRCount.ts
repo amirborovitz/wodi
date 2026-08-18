@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
+import { getCanonicalLiftName } from '../data/exerciseDefinitions';
 
 interface UsePRCountResult {
   prCount: number;
@@ -33,11 +34,13 @@ export function usePRCount(): UsePRCountResult {
 
       // Movements the athlete holds a record in — NOT rows. The collection keeps one row per PR
       // event, so a lift beaten three times is three documents and `snapshot.size` would report
-      // it as three records.
+      // it as three records. Bucketed by canonical name, the same key RecordsScreen groups by,
+      // or "Squats" and "Back Squat" count as two lifts on a screen that shows one.
       const movements = new Set(
         snapshot.docs
-          .map((prDoc) => (prDoc.data().movement as string | undefined)?.toLowerCase())
+          .map((prDoc) => prDoc.data().movement as string | undefined)
           .filter((name): name is string => Boolean(name))
+          .map((name) => getCanonicalLiftName(name).toLowerCase())
       );
       setPRCount(movements.size);
     } catch (err) {

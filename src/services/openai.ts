@@ -58,7 +58,9 @@ Cardio: du → Double Under, su → Single Under, cal → Calories
 Equipment: kb → Kettlebell, db → Dumbbell, bb → Barbell, wb → Wall Ball
 CRITICAL: Compound movements written as "X to Y" or "X + Y" (e.g., "Power Clean to Push Press", "Hang Clean to Overhead", "Deadlift to Hang Power Clean") are a SINGLE movement. Preserve the FULL compound name — do NOT simplify to just the first movement ("Power Clean to Push Press" is NOT "Power Clean").
 CRITICAL: Preserve movement modifiers such as Goblet, Front Rack, Overhead, Walking, Alternating/Alt. "20 goblet alt lunges" → "Goblet Alt Lunge", not plain "Lunge".
-CRITICAL: A rep-style qualifier (t&g/tng → Touch-and-Go, ub → Unbroken) describes HOW the reps are done, not a second movement — keep it as a prefix on the one movement it modifies. "8 T&G Power Cleans" → "Touch-and-Go Power Clean", NEVER "Touch + Power Clean" (that reads as the "X + Y compound movement" pattern above, which this is not).`;
+CRITICAL: A rep-style qualifier (t&g/tng → Touch-and-Go, ub → Unbroken) describes HOW the reps are done, not a second movement — keep it as a prefix on the one movement it modifies. "8 T&G Power Cleans" → "Touch-and-Go Power Clean", NEVER "Touch + Power Clean" (that reads as the "X + Y compound movement" pattern above, which this is not).
+CRITICAL: Movement names are SINGULAR — they name the movement, not a count of it. "20 x squats" → "Back Squat", "15 pull ups" → "Pull-up", "50 double unders" → "Double Under". Boards write plurals; a canonical name never does.
+CRITICAL: A bare root ("squat", "press", "row", "snatch") is not a lift name — resolve it to the lift the LOAD implies. Barbell-loaded "squats" → Back Squat; unloaded → Air Squat. A barbell "press" written on its own → Strict Press. Resolve only what the board actually shows: if nothing on the board says how it is loaded, leave the bare word as written rather than guessing an implement.`;
 
 const PARSE_INTRO = `You are an expert CrossFit coach and workout parser. You understand workout structure — buy-ins, cash-outs, chippers, EMOMs, intervals, supersets, partner WODs. Parse the workout text into structured JSON, matching the workout's logical blocks.
 
@@ -307,7 +309,7 @@ const RULES_QUANTITIES = `## WEIGHT PARSING
 ## DISTANCE PARSING
 - "~50m" or "approx 50m" → distance: 50 (use the numeric value as-is, ignore ~ / approx)
 - "50m" → distance: 50
-- Carries (farmer carry, suitcase carry, yoke, etc.) with prescribed distance: set distance field, inputType: "none"
+- LOADED CARRIES (farmer/farmers carry, suitcase carry, front rack carry, overhead carry, yoke, sandbag/sled carry) with a prescribed distance: keep the distance + unit as written, but set inputType: "weight" — the metres are the coach's number, the LOAD is the athlete's and is the one thing worth logging. When the board names the load, set rxWeights (and implementCount: 2 for a pair) exactly as any other loaded movement; when it names none ("400m Farmer Carry"), set inputType: "weight" with NO rxWeights so the athlete fills it in. Same for loaded sled/ruck work over a distance (sled push/pull/drag, weighted run, ruck) — the load is the variable.
 - Equipment DIMENSIONS are never distances: box height ("box step-ups (30cm)", "24\" box"), wall ball target height, sled/rig heights. Do NOT set "distance" from them — keep the movement's reps: "8 weighted box step-ups (30cm)" → { "name": "Weighted Box Step-up", "reps": 8 } (30cm is the box height)
 
 ## REP RANGES
@@ -367,7 +369,22 @@ Rules:
 - Rotating station workouts → countingMode: "per_station_visit" for station movements
 - In rotating station workouts, the athlete logs one result per station visit pattern, so MAX bike cal / MAX row cal / MAX step-ups / MAX rope jumps should usually use scoreEntryMode: "per_round"
 - Use scoreEntryMode: "total" only when the athlete is explicitly entering one final total for the whole workout or whole block
-- Prescribed per-round values that should still be multiplied by rounds/visits (e.g. 10 Renegade Row, 20 DB Snatch) also use scoreEntryMode: "per_round"`;
+- Prescribed per-round values that should still be multiplied by rounds/visits (e.g. 10 Renegade Row, 20 DB Snatch) also use scoreEntryMode: "per_round"
+
+## STATED TOTALS AND PLACEMENT — "occurrences" / "placement"
+A movement written OUTSIDE the main rep scheme — usually a footnote — often says how many times
+it happens and where it sits. Record both; never re-derive them.
+- "occurrences": the explicit total count when the board states one. "* 200m run in between
+  sets (5 total)" → occurrences: 5. Set it ONLY when the board says the number outright.
+- "placement": "between_sets" when the movement happens in the GAPS between sets/rounds rather
+  than inside them ("in between sets", "between rounds", "rest with a 200m run"). This is the
+  only allowed value.
+- CRITICAL — a movement done BETWEEN sets happens ONE FEWER time than there are sets: six tiers
+  hold only five gaps. Set "placement" even when the board also states the total, and set it even
+  when it does not — it is what lets the count be worked out at all. Never fall back to the set
+  count for this shape.
+- A movement that simply repeats every set needs NEITHER field — countingMode "per_round" already
+  says exactly that. Only reach for these when the movement sits outside the scheme.`;
 
 const RULES_MOVEMENT_CORE = `## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
@@ -702,6 +719,25 @@ Output:
     ] }]
 }
 NOTE: SEVEN entries for seven written lines — the second run, the second C&J and the second box-jump-over are each their OWN entry, in board order. This is ONE pass (suggestedSets: 1), so no round-simulation rule applies. Emitting the four distinct movements instead would delete half the work. NO "sections" here: a single pass through a flat list needs none — sections are for work that is GROUPED and REPEATED (see 16, 17).
+
+### 9c. Descending ladder with a FOOTNOTE movement done BETWEEN sets
+Input: "For time:
+[14-12-10-8-6-4]
+Front squat @40/60kg
+Burpees
+* 200m run in between sets (5 total)
+<15 minutes T.C.>"
+Output:
+{
+  "type": "for_time", "format": "for_time", "scoreType": "time", "timeCap": 900,
+  "exercises": [{ "name": "Ladder For Time", "type": "wod", "loggingMode": "for_time", "prescription": "[14-12-10-8-6-4] Front Squat @40/60kg, Burpees, 200m Run in between sets (5 total)", "suggestedSets": 6, "suggestedRepsPerSet": [14, 12, 10, 8, 6, 4],
+    "movements": [
+      { "name": "Front Squat", "reps": 14, "inputType": "weight", "equipment": "barbell", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "countingMode": "per_round" },
+      { "name": "Burpee", "reps": 14, "inputType": "none", "countingMode": "per_round" },
+      { "name": "Run", "distance": 200, "unit": "m", "inputType": "none", "placement": "between_sets", "occurrences": 5 }
+    ] }]
+}
+NOTE: SIX tiers but only FIVE runs — they happen BETWEEN the sets, and six sets hold only five gaps. Never reach for the tier count here. "occurrences" records the total the board stated outright; "placement" records the structure, and is what makes the count derivable on a board that writes "* 200m run in between sets" with NO total — so emit it either way. The two ladder movements carry neither field: countingMode "per_round" already describes them exactly.
 
 ### 10. Barbell Complex
 Input: "EMOM 12: 1 Power Clean + 1 Squat Clean @ 80kg"
@@ -1653,6 +1689,22 @@ function validateMovement(data: unknown): ParsedMovement | null {
     ? raw.implementCount as 1 | 2
     : undefined;
 
+  // A stated occurrence count only means anything as a positive whole number — anything else is
+  // the model improvising, and a bad value here would silently scale a total.
+  const occurrences = typeof raw.occurrences === 'number'
+    && Number.isFinite(raw.occurrences)
+    && raw.occurrences > 0
+    && Number.isInteger(raw.occurrences)
+    ? raw.occurrences
+    : undefined;
+
+  // A closed set, unlike the free-text note this replaced — the value drives a COUNT, so an
+  // unrecognised one must fall through to the structural counting modes rather than be trusted.
+  const validPlacements = ['between_sets'] as const;
+  const placement = validPlacements.includes(raw.placement as typeof validPlacements[number])
+    ? (raw.placement as ParsedMovement['placement'])
+    : undefined;
+
   // Validate rxCalories
   let rxCalories: ParsedMovement['rxCalories'] = undefined;
   if (raw.rxCalories && typeof raw.rxCalories === 'object') {
@@ -1682,6 +1734,8 @@ function validateMovement(data: unknown): ParsedMovement | null {
     perRound: raw.perRound === false || raw.role === 'buy_in' || raw.role === 'cash_out' ? false : undefined,
     countingMode,
     scoreEntryMode,
+    occurrences,
+    placement,
     stationLabel: typeof raw.stationLabel === 'string' ? raw.stationLabel : undefined,
     stationIndex: typeof raw.stationIndex === 'number' ? raw.stationIndex : undefined,
     // A board that named the arrangement is stating there's no split, so the label implies

@@ -26,6 +26,16 @@ describe('movementToKind — AI data outranks the name', () => {
     expect(movementToKind(mov({ name: 'Bicycle Crunch', inputType: 'distance' }))).toBe('distance');
     expect(movementToKind(mov({ name: 'Sit-up', inputType: 'weight' }))).toBe('load');
   });
+
+  it('a prescribed-distance carry logs its LOAD, not its metres', () => {
+    // "400m Farmer Carry": the metres are the coach's and fixed; the kettlebells are the
+    // athlete's choice and the only thing worth logging. A metres tile here also let a
+    // confirmed distance read as athlete-entered, which cancels the partner factor at save.
+    expect(movementToKind(mov({ name: 'Cash-out: Farmer Carry', distance: 400, unit: 'm', inputType: 'weight' })))
+      .toBe('load');
+    // An unloaded prescribed-distance movement must NOT be dragged along with it.
+    expect(movementToKind(mov({ name: 'Run', distance: 400, inputType: 'none' }))).toBe('distance');
+  });
 });
 
 describe('matchesNamePattern', () => {

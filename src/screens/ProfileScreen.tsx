@@ -23,6 +23,7 @@ interface ProfileScreenProps {
   onNavigateToPR?: () => void;
   onNavigateToRecords?: () => void;
   onNavigateToSettings?: () => void;
+  onNavigateToProfile?: () => void;
   onOpenRecap?: (data: RecapData) => void;
 }
 
@@ -63,18 +64,13 @@ function useTickerNumber(target: number, duration = 420): number {
   return display;
 }
 
-export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onOpenRecap }: ProfileScreenProps) {
-  const { user, updateUserPhoto } = useAuth();
+export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap }: ProfileScreenProps) {
+  const { user } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
-  const { recaps, newRecapIds } = useRecapData(workouts, user?.id);
+  const { recaps, newRecapIds } = useRecapData(workouts, user?.id, user?.weight);
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
-  const [photoUploading, setPhotoUploading] = useState(false);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoVersion, setPhotoVersion] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const periodCutoff = useMemo(() => {
     if (timePeriod === 'all') return null;
@@ -113,7 +109,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
     () => aggregateStats(workouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP,
     [workouts, user?.weight]
   );
-  const handle = user?.email ? `@${user.email.split('@')[0]}` : '';
 
   const displayMoveMinutes = useTickerNumber(stats.moveMinutes);
   const displayWorkouts = useTickerNumber(stats.workoutsCount);
@@ -129,28 +124,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
   const moveParts = formatMoveParts(displayMoveMinutes, timePeriod === 'all');
   const distance = formatDistance(displayDistanceMeters);
 
-  const handlePhotoPick = () => fileInputRef.current?.click();
-  const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    event.target.value = '';
-    setPhotoUploading(true);
-    setPhotoError(null);
-    const previewUrl = URL.createObjectURL(file);
-    setPhotoPreviewUrl(previewUrl);
-    try {
-      await updateUserPhoto(file);
-      setPhotoVersion(Date.now());
-      setPhotoPreviewUrl(null);
-    } catch (error) {
-      console.error('Failed to update photo', error);
-      setPhotoError('Failed to update photo.');
-      setPhotoPreviewUrl(null);
-    } finally {
-      setPhotoUploading(false);
-    }
-  };
-
   return (
     <div className={styles.container}>
       {/* Compact Left-Aligned Header */}
@@ -160,42 +133,34 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}
       >
-        <div
-          className={styles.avatarWrap}
-          onClick={handlePhotoPick}
-          onKeyDown={(event) => {
-            if (photoUploading) return;
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              handlePhotoPick();
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Update profile photo"
+        {/* The whole header is the way into Profile — avatar, name and pencil
+            all lead to the same place, so there is no dead target up here. */}
+        <button
+          type="button"
+          className={styles.identity}
+          onClick={onNavigateToProfile}
+          aria-label="Edit your profile"
         >
-          {photoPreviewUrl ? (
-            <img src={photoPreviewUrl} alt={user?.displayName} className={styles.avatar} />
-          ) : user?.photoUrl ? (
-            <img
-              src={`${user.photoUrl}?v=${user.photoUpdatedAt || photoVersion}`}
-              alt={user.displayName}
-              className={styles.avatar}
-            />
-          ) : (
-            <div className={styles.avatarFallback}>{user?.displayName?.[0]?.toUpperCase() || 'W'}</div>
-          )}
-          <span className={styles.avatarButton}>{photoUploading ? '...' : 'E'}</span>
-          <input ref={fileInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={handlePhotoChange} />
-        </div>
+          <span className={styles.avatarWrap}>
+            {user?.photoUrl ? (
+              <img
+                src={`${user.photoUrl}?v=${user.photoUpdatedAt ?? 0}`}
+                alt=""
+                className={styles.avatar}
+              />
+            ) : (
+              <span className={styles.avatarFallback}>{user?.displayName?.[0]?.toUpperCase() || 'W'}</span>
+            )}
+          </span>
 
-        <div className={styles.nameArea}>
-          <h1 className={styles.name}>{user?.displayName}</h1>
-          {handle && <span className={styles.handle}>{handle}</span>}
-        </div>
+          <span className={styles.nameArea}>
+            <span className={styles.name}>{user?.displayName}</span>
+            {user?.instagram && <span className={styles.handle}>@{user.instagram}</span>}
+          </span>
+
+          <span className={styles.editButton}><EditIcon /></span>
+        </button>
       </motion.div>
-
-      {photoError && <span className={styles.photoError}>{photoError}</span>}
 
       {/* Lifetime stats strip */}
       <motion.div
@@ -344,6 +309,14 @@ function formatDistance(meters: number): { value: string; unit: string } {
     return { value: (meters / 1000).toFixed(1), unit: 'km' };
   }
   return { value: Math.round(meters).toString(), unit: 'm' };
+}
+
+function EditIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
 }
 
 function SettingsIcon() {

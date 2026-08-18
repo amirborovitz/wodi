@@ -1,206 +1,408 @@
+/* Profile — Wodi design system v1.0. Value list, not a form.
+   One typeface across the whole screen (Barlow, the app's sans) — no condensed
+   display cuts, no mono. The list is iOS-Settings shaped: unoutlined cards
+   floating on the page black, rows split by a single inset hairline. */
+
 .container {
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--color-bg);
+  background: var(--wodi-bg);
   display: flex;
   flex-direction: column;
 }
+
+/* ── Header ───────────────────────────────────────────────── */
 
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-4);
-  padding-top: calc(var(--space-4) + var(--safe-top));
-  background: var(--color-bg);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 12px;
+  padding: calc(var(--space-3) + var(--safe-top)) 16px 6px;
 }
 
-.backButton {
-  width: 44px;
-  height: 44px;
+.circleButton {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  padding: 9px;
+  border-radius: 999px;
   border: none;
-  color: var(--color-text);
+  background: rgba(242, 240, 235, 0.07);
+  color: var(--wodi-white);
   cursor: pointer;
-  border-radius: var(--radius-full);
-  transition: all 0.2s ease;
-  margin-left: calc(-1 * var(--space-2));
+  transition: background 0.2s ease;
 }
 
-.backButton:hover {
-  background: rgba(255, 255, 255, 0.08);
+.circleButton:active {
+  background: rgba(242, 240, 235, 0.14);
 }
 
-.backButton:active {
-  transform: scale(0.95);
+.circleButton svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
+/* line-height matches the button height, so the title's text box and both
+   circles are the same height and share one centre line exactly. */
 .title {
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
-  color: var(--color-text);
+  flex: 1;
   margin: 0;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 36px;
+  letter-spacing: -0.01em;
+  color: var(--wodi-white);
+  text-align: center;
 }
 
-.headerSpacer {
-  width: 80px;
-  text-align: right;
-}
-
-.savingIndicator {
-  font-size: var(--text-xs);
-  color: var(--color-sessions);
-  font-weight: var(--font-medium);
-}
+/* ── Avatar block ─────────────────────────────────────────── */
 
 .content {
   flex: 1;
-  padding: var(--space-4);
-  padding-bottom: calc(100px + var(--safe-bottom));
-  max-width: 500px;
-  margin: 0 auto;
+  padding-bottom: calc(120px + var(--safe-bottom));
+}
+
+.avatarBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+}
+
+.avatarWrap {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+}
+
+.avatar,
+.avatarFallback {
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarFallback {
+  background: linear-gradient(140deg, var(--wodi-yellow), #d99f00);
+  color: var(--wodi-bg);
+  font-family: var(--font-body);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+/* Lifted off the page black by its own surface plus a shadow — a dark chip on a
+   dark background otherwise reads as a hole in the avatar. */
+.avatarBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 2px solid var(--wodi-bg);
+  background: #2a2d31;
+  color: var(--wodi-white);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+.avatarBadge svg {
   width: 100%;
+  height: 100%;
+  display: block;
 }
 
-.form {
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(242, 240, 235, 0.25);
+  border-top-color: var(--wodi-yellow);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.error {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #ff6b5e;
+}
+
+/* ── Value cards ──────────────────────────────────────────── */
+
+/* Section furniture is inset to the label edge — card margin plus row padding —
+   so headers, notes and labels all start on one line. */
+.sectionTitle {
+  margin: 24px 36px 8px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.42);
+}
+
+.sectionNote {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
+  align-items: baseline;
+  gap: 7px;
+  margin: 9px 36px 0;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: rgba(242, 240, 235, 0.42);
 }
 
-.field {
+.card {
+  margin: 0 20px;
+  border-radius: 16px;
+  background: var(--wodi-card2);
+  overflow: hidden;
+}
+
+.row {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-xl);
-  transition: all 0.3s ease;
+  align-items: center;
+  min-height: 52px;
+  padding: 13px 16px;
+  transition: background 0.3s ease;
 }
 
-.fieldSaved {
-  border-color: rgba(34, 197, 94, 0.5);
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
+/* The hairline belongs to the row that follows and is inset to the label edge,
+   so no row needs a class to opt out of its own bottom border. Keyed off first
+   child rather than an adjacent row because a validation note can sit between
+   two rows, and the line still belongs above the next one. */
+.row:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--wodi-line2);
+}
+
+/* Confirmation lives on the row itself — with no Save button, this is the only
+   signal that a value was written. */
+.rowSaved {
+  background: rgba(245, 194, 0, 0.09);
+}
+
+.rowInvalid {
+  background: rgba(255, 107, 94, 0.08);
+}
+
+/* Sits in the row's own bottom padding, under the value it is about. */
+.fieldNote {
+  margin: -5px 0 0;
+  padding: 0 16px 11px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: right;
+  color: #ff8a7e;
+  background: rgba(255, 107, 94, 0.08);
+}
+
+.requiredDot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  align-self: center;
+  border-radius: 999px;
+  background: var(--wodi-yellow);
 }
 
 .label {
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.input {
-  width: 100%;
-  padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-lg);
-  font-weight: var(--font-medium);
-  font-family: var(--font-family);
-  color: var(--color-text);
-  outline: none;
-  transition: all 0.2s ease;
-}
-
-.input:focus {
-  border-color: var(--color-sessions);
-  background: rgba(0, 255, 255, 0.05);
-}
-
-.input::placeholder {
-  color: var(--color-text-tertiary);
-}
-
-.inputWithUnit {
+  width: 112px;
+  flex-shrink: 0;
+  margin-right: 12px;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 6px;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.6);
 }
 
-.inputNumber {
-  width: 100px;
-  padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-lg);
-  font-weight: var(--font-semibold);
-  font-family: var(--font-family);
-  color: var(--color-text);
-  text-align: center;
+.labelIcon svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  display: block;
+}
+
+/* The one label on the screen that goes somewhere. Yellow is the only cue it
+   needs — a chevron or underline at this size would crowd a 112px column. */
+.labelLink {
+  text-decoration: none;
+  color: var(--wodi-yellow);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.labelLink:active {
+  opacity: 0.6;
+}
+
+/* Values, the "@" and the invisible sizing twin all share one type ramp — they
+   sit on the same line and any drift between them shows. 16px is also the floor
+   that stops iOS zooming the page when a field takes focus. */
+.value,
+.prefix,
+.autoWidth::after {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: -0.005em;
+}
+
+.value {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: none;
+  border: none;
   outline: none;
-  transition: all 0.2s ease;
-  -moz-appearance: textfield;
+  padding: 0;
+  color: var(--wodi-white);
+  text-align: right;
 }
 
-.inputNumber::-webkit-outer-spin-button,
-.inputNumber::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+/* Colour alone marks a placeholder — a lighter weight would render the handle
+   hint narrower than the twin that sizes its field, and reopen the "@" gap. */
+.value::placeholder {
+  color: rgba(242, 240, 235, 0.28);
 }
 
-.inputNumber:focus {
-  border-color: var(--color-sessions);
-  background: rgba(0, 255, 255, 0.05);
+/* The "@" has to touch the handle, but the handle is right-aligned in an elastic
+   row — so the field is sized to its own text and the pair travels right as one. */
+.handle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-.inputNumber::placeholder {
-  color: var(--color-text-tertiary);
+.prefix {
+  color: rgba(242, 240, 235, 0.45);
+}
+
+/* Wide enough for the handle and no wider — but allowed to shrink, so a long
+   one gives ground instead of pushing the "@" out of the card. */
+.autoWidth {
+  display: inline-grid;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* An invisible twin of the text gives the grid cell its width; the field shares
+   the cell and stretches to it. */
+.autoWidth::after {
+  content: attr(data-value);
+  grid-area: 1 / 1;
+  white-space: pre;
+  visibility: hidden;
+  height: 0;
+  overflow: hidden;
+}
+
+.handleInput {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .unit {
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  color: rgba(242, 240, 235, 0.5);
 }
 
-.segmentedControl {
-  display: flex;
-  gap: var(--space-2);
-}
+/* ── Choice pills (Sex) ───────────────────────────────────── */
 
-.segment {
+.choices {
   flex: 1;
-  padding: var(--space-3);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  font-family: var(--font-family);
-  color: var(--color-text-secondary);
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.choice {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(242, 240, 235, 0.08);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: rgba(242, 240, 235, 0.6);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.segment:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--color-text);
-}
-
-.segmentActive {
-  background: rgba(0, 255, 255, 0.15);
-  border-color: var(--color-sessions);
-  color: var(--color-sessions);
-}
-
-.segmentActive:hover {
-  background: rgba(0, 255, 255, 0.2);
+.choiceOn {
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
 }
 
 .hint {
-  margin-top: var(--space-6);
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
+  margin: 26px 20px 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(242, 240, 235, 0.32);
   text-align: center;
+}
+
+@media (max-width: 360px) {
+  .label {
+    width: 96px;
+    letter-spacing: 0.03em;
+  }
+
+  .choice {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
 }

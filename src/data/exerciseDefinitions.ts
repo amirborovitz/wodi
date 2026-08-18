@@ -140,7 +140,7 @@ const CARDIO_EXERCISES: ExerciseDefinition[] = [
       { name: 'Row', distanceMultiplier: 12.5, type: 'equivalent' },
       { name: 'Echo Bike', ratio: 2, type: 'equivalent' }, // 1 burpee ≈ 2 cal
       { name: 'Assault Bike', ratio: 2, type: 'equivalent' },
-      { name: 'Box Jumps', type: 'equivalent' },
+      { name: 'Box Jump', type: 'equivalent' },
     ],
   },
 ];
@@ -307,12 +307,73 @@ const GYMNASTICS_EXERCISES: ExerciseDefinition[] = [
 ];
 
 // ============================================
+// PLYOMETRIC / BOX - jump scaling options
+//
+// No 'harder' entries here on purpose: getDefaultEasierAlternative() treats any
+// movement listed as 'harder' as one to auto-scale DOWN at logging entry
+// (AddWorkoutScreen → getDefaultAlternativesForExercise). Box Jump Over is
+// standard Rx, not an advanced skill, so it stays 'equivalent' — swapping is a
+// choice the athlete makes, never a default.
+//
+// Order matters: 'Box Jump Over' must precede 'Box Jump' because
+// findExerciseDefinition() matches aliases on word boundaries, so the alias
+// "box jump" would otherwise claim "Box Jump Over" first.
+// ============================================
+
+const PLYOMETRIC_EXERCISES: ExerciseDefinition[] = [
+  {
+    id: 'box-jump-over',
+    name: 'Box Jump Over',
+    aliases: ['box jump over', 'box jump overs', 'box jump-over', 'box jump-overs', 'bjo'],
+    category: 'gymnastics',
+    defaultUnit: 'reps',
+    supportsUnits: ['reps', 'time'],
+    alternatives: [
+      { name: 'Step-overs', type: 'easier' },
+      { name: 'Step-ups', type: 'easier' },
+      { name: 'Squat Jumps', type: 'easier' },
+      { name: 'Box Jump', type: 'equivalent' },
+      { name: 'Burpees', type: 'equivalent' },
+    ],
+  },
+  {
+    id: 'box-jump',
+    name: 'Box Jump',
+    aliases: ['box jump', 'box jumps'],
+    category: 'gymnastics',
+    defaultUnit: 'reps',
+    supportsUnits: ['reps', 'time'],
+    alternatives: [
+      { name: 'Step-ups', type: 'easier' },        // 1:1 — the universal box-jump scale
+      { name: 'Squat Jumps', type: 'easier' },     // 1:1 — same stimulus, no box
+      { name: 'Air Squats', ratio: 2, type: 'easier' }, // zero-impact fallback
+      { name: 'Box Jump Over', type: 'equivalent' },
+      { name: 'Burpees', type: 'equivalent' },
+    ],
+  },
+  {
+    id: 'step-up',
+    name: 'Step-up',
+    aliases: ['step-up', 'step-ups', 'step up', 'step ups', 'box step-up', 'box step-ups', 'box step up', 'box step ups'],
+    category: 'gymnastics',
+    defaultUnit: 'reps',
+    supportsUnits: ['reps', 'time'],
+    alternatives: [
+      { name: 'Air Squats', type: 'easier' },
+      { name: 'Lunges', type: 'equivalent' },
+      { name: 'Box Jump', type: 'equivalent' },
+    ],
+  },
+];
+
+// ============================================
 // ALL EXERCISES
 // ============================================
 
 const ALL_EXERCISES: ExerciseDefinition[] = [
   ...CARDIO_EXERCISES,
   ...GYMNASTICS_EXERCISES,
+  ...PLYOMETRIC_EXERCISES,
 ];
 
 // ============================================
@@ -531,6 +592,17 @@ interface CanonicalLift {
 // Order matters for fallback matching: more specific lifts (e.g. "power clean")
 // must be listed so they win over their generic root ("clean") — handled by
 // sorting all aliases by length before matching, longest first.
+//
+// Matching runs in two tiers, decided by the alias itself:
+//   • MULTI-WORD aliases match anywhere in the name, so "Strength: Bench Press",
+//     "Tempo Front Squat" and "3-Position Power Clean" all resolve to their lift.
+//   • SINGLE-WORD aliases are generic roots and match only when they are the WHOLE
+//     name. Matched as a substring a root swallows every variant built on it —
+//     "goblet squat", "deficit bulgarian split squat" and "db snatch" would each
+//     report as the barbell lift and pollute its record with a load that never
+//     touched a bar. A qualified name we don't recognise keeps its own identity and
+//     earns its own record: a movement split into two records is recoverable, a
+//     dumbbell load merged into a barbell PR is not.
 const CANONICAL_LIFTS: CanonicalLift[] = [
   { name: 'Clean and Jerk', aliases: ['clean and jerk', 'clean & jerk', 'c&j', 'c & j', 'cnj'] },
   { name: 'Hang Power Clean', aliases: ['hang power clean', 'hpc'] },
@@ -560,6 +632,11 @@ const CANONICAL_LIFTS: CanonicalLift[] = [
   { name: 'Clean', aliases: ['clean'] },
   { name: 'Jerk', aliases: ['jerk'] },
   { name: 'Thruster', aliases: ['thruster'] },
+  // A bare "squat" stays a bare squat. Which squat it was — back, front, goblet, air — is a
+  // reading of the BOARD, and the parser makes that call with the whole board in front of it
+  // (see MOVEMENT_ALIASES_SECTION in openai.ts). A table folding "squat" into "Back Squat" here
+  // would overrule that reading silently: a front squat written as "squats" would be credited
+  // to the back squat record with nothing on screen to correct. Unresolved is its own lift.
   { name: 'Squat', aliases: ['squat'] },
   { name: 'Press', aliases: ['press'] },
 ];
@@ -572,37 +649,99 @@ const LIFT_NAME_NOISE_SUFFIXES = [
   'for time', 'emom', 'sets', 'set', 'warm up', 'warm-up', 'warmup',
 ];
 
+// Leading words that describe how a lift is being LOADED that session, not which lift
+// it is — "Heavy Squat" and "Barbell Clean" are the plain lift. Only qualifiers that
+// leave the implement alone belong here: "db", "goblet" and "banded" change the
+// movement, "heavy" does not.
+// Execution prefixes belong here too: the parser emits "Touch-and-Go Power Clean" and
+// "Unbroken Power Clean" itself (RULES: a rep-style qualifier describes HOW the reps are done),
+// and those are the plain lift. Without stripping them, exact-root matching would give each its
+// own empty record bucket and announce a first-ever PR for a lift already in the books.
+const LIFT_NAME_NOISE_PREFIXES = [
+  'heavy', 'light', 'tempo', 'paused', 'pause', 'slow',
+  'max effort', 'max', 'building', 'build', 'barbell', 'bb',
+  'touch-and-go', 'touch and go', 't&g', 'tng', 'unbroken', 'ub',
+];
+
 const SORTED_LIFT_ALIASES = CANONICAL_LIFTS
-  .flatMap(lift => lift.aliases.map(alias => ({ alias, name: lift.name })))
+  .flatMap(lift => lift.aliases.map(alias => ({
+    alias,
+    name: lift.name,
+    // A generic root only names the lift when nothing qualifies it. See CANONICAL_LIFTS.
+    exactOnly: !alias.includes(' '),
+  })))
   .sort((a, b) => b.alias.length - a.alias.length);
 
 function toTitleCase(name: string): string {
   return name.replace(/\b\w/g, c => c.toUpperCase());
 }
 
-/**
- * Resolve a movement/exercise name to its canonical lift name, stripping
- * training-context suffixes ("Deadlift Strength" → "Deadlift") and mapping
- * known abbreviations/misspellings (e.g. "rdl" → "Romanian Deadlift").
- * Falls back to a title-cased version of the cleaned input if no known lift matches.
- */
-export function getCanonicalLiftName(name: string): string {
-  let normalized = name.toLowerCase().trim().replace(/\s+/g, ' ');
-
-  // Strip noise suffixes repeatedly (handles "Deadlift Strength Work")
+/** Drops training-context words from both ends, repeatedly ("Heavy Deadlift Strength Work"). */
+function stripLiftNameNoise(name: string): string {
+  let out = name;
   let stripped = true;
   while (stripped) {
     stripped = false;
     for (const suffix of LIFT_NAME_NOISE_SUFFIXES) {
       const regex = new RegExp(`\\s+${escapeRegex(suffix)}$`, 'i');
-      if (regex.test(normalized)) {
-        normalized = normalized.replace(regex, '').trim();
+      if (regex.test(out)) {
+        out = out.replace(regex, '').trim();
+        stripped = true;
+      }
+    }
+    for (const prefix of LIFT_NAME_NOISE_PREFIXES) {
+      const regex = new RegExp(`^${escapeRegex(prefix)}\\s+`, 'i');
+      if (regex.test(out)) {
+        out = out.replace(regex, '').trim();
         stripped = true;
       }
     }
   }
+  return out;
+}
 
-  for (const { alias, name: canonical } of SORTED_LIFT_ALIASES) {
+/**
+ * "Squats" is the same lift as "squat". Alias matching alone can never see that — the word
+ * boundary in `\bsquat\b` does not exist before a trailing "s" — so a plural name matched
+ * nothing, fell through to the title-cased fallback, and opened a brand new record bucket with
+ * no history behind it. An empty bucket makes the next load a first-ever PR at any weight,
+ * which is how a 40kg set of squats out-ranked a 130kg back squat.
+ *
+ * Words of four letters or fewer are left alone so abbreviations survive ("ohs", "hps").
+ */
+function singularizeWords(name: string): string {
+  return name
+    .split(' ')
+    .map((word) => {
+      if (word.length < 5) return word;
+      if (/(?:ss|us|is)$/.test(word)) return word;          // press, status, ...
+      if (/(?:s|x|z|ch|sh)es$/.test(word)) return word.slice(0, -2);  // presses, snatches, boxes
+      if (/ies$/.test(word)) return `${word.slice(0, -3)}y`;
+      if (/s$/.test(word)) return word.slice(0, -1);        // squats, cleans, burpees
+      return word;
+    })
+    .join(' ');
+}
+
+/**
+ * Resolve a movement/exercise name to its canonical lift name — the key every personal record
+ * is bucketed by, so two spellings of one lift must land on the same string or they become two
+ * records that never measure against each other.
+ *
+ * Strips training context from both ends ("Heavy Deadlift Strength" → "Deadlift"), folds
+ * plurals ("Squats" → "Back Squat") and maps known abbreviations ("rdl" → "Romanian Deadlift").
+ * Falls back to a title-cased version of the cleaned input if no known lift matches.
+ */
+export function getCanonicalLiftName(name: string): string {
+  const normalized = singularizeWords(
+    stripLiftNameNoise(name.toLowerCase().trim().replace(/\s+/g, ' '))
+  );
+
+  for (const { alias, name: canonical, exactOnly } of SORTED_LIFT_ALIASES) {
+    if (exactOnly) {
+      if (normalized === alias) return canonical;
+      continue;
+    }
     const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
     if (regex.test(normalized)) return canonical;
   }

@@ -284,3 +284,65 @@ describe('postProcessParsedWorkout — section-shadowed lead-in', () => {
     expect(ex.sections?.map((s) => s.movements[0].name)).toEqual(['Pull-up', 'Pull-up', 'Pull-up']);
   });
 });
+
+// ─── Carry load input ────────────────────────────────────────────────────────
+
+/** A metcon whose cash-out is a carry over a prescribed distance. */
+function carryWod(movement: Record<string, unknown>): ParsedWorkout {
+  return {
+    title: 'WOD',
+    type: 'for_time',
+    format: 'for_time',
+    scoreType: 'time',
+    rawText: 'For time:\n14 RFT:\n5 Burpee Box Jumps\nInto:\n400m Farmer Carry',
+    exercises: [{
+      name: '14 Rounds For Time',
+      type: 'wod',
+      loggingMode: 'for_time',
+      rounds: 14,
+      prescription: '14 RFT: 5 Burpee Box Jumps, then 400m Farmer Carry',
+      movements: [
+        { name: 'Burpee Box Jump', reps: 5, inputType: 'none' },
+        movement,
+      ],
+    }],
+  } as unknown as ParsedWorkout;
+}
+
+const carryOf = (w: ParsedWorkout) => w.exercises[0].movements!.at(-1)!;
+
+describe('backfillCarryLoadInput — a prescribed-distance carry logs its load', () => {
+  it("turns the stale 'none' on a distance carry into a weight input", () => {
+    // The old parse rule stamped inputType 'none' here, which resolves to kind 'distance' and
+    // put a metres stepper on the logging sheet — the load went unrecorded, and confirming the
+    // prescribed distance made it athlete-entered, cancelling the partner factor at save time.
+    const carry = carryOf(postProcessParsedWorkout(carryWod(
+      { name: 'Cash-out: Farmer Carry', distance: 400, unit: 'm', inputType: 'none', countingMode: 'once', perRound: false },
+    )));
+    expect(carry.inputType).toBe('weight');
+    expect(carry.distance).toBe(400);
+  });
+
+  it('leaves the prescribed load and unit untouched when the board named one', () => {
+    const carry = carryOf(postProcessParsedWorkout(carryWod({
+      name: 'Farmers Carry', distance: 200, unit: 'm', inputType: 'none',
+      rxWeights: { male: 24, female: 16, unit: 'kg' }, implementCount: 2,
+    })));
+    expect(carry.inputType).toBe('weight');
+    expect(carry.rxWeights).toEqual({ male: 24, female: 16, unit: 'kg' });
+  });
+
+  it('never overrides an inputType the AI chose for another reason', () => {
+    const carry = carryOf(postProcessParsedWorkout(carryWod(
+      { name: 'Farmer Carry', distance: 400, unit: 'm', inputType: 'distance' },
+    )));
+    expect(carry.inputType).toBe('distance');
+  });
+
+  it('leaves unloaded prescribed-distance work on its distance input', () => {
+    const run = carryOf(postProcessParsedWorkout(carryWod(
+      { name: 'Run', distance: 400, unit: 'm', inputType: 'none' },
+    )));
+    expect(run.inputType).toBe('none');
+  });
+});

@@ -75,13 +75,12 @@ export interface ArtifactRow {
   // ArtifactSection.roundLedger instead). 'reps' means a flat shared total, where a per-row
   // personal share number is still meaningful.
   partnerSplit?: 'reps' | 'rounds';
-  // TEAM/ME contract for split-round partner posters: when present, this is the athlete's
-  // accumulated personal work for the row. The round ledger is context, not the only ME stat.
-  partnerMine?: string;
-  // Per-partner share of a flat team total ("50", "150m", "40 cal"), computed from the movement
+  // This athlete's own number for the row ("50", "150m", "40 cal"), computed from the movement
   // data at row-build time. Preferred over regex-parsing the display line, which fails when the
   // row's primary carries a full sentence (sectioned partner prescriptions). Never set for
-  // (together) movements — work done side by side is not split.
+  // (together) movements — work done side by side is not split. On a flat-share board it is the
+  // prescription divided; on a rounds-traded section it is the per-round work times the rounds
+  // this athlete owned.
   teamShare?: string;
   // Poster rows that already carry their load inline (e.g. sectioned partner prescriptions)
   // should not render a second handwritten/logged load value on the right.

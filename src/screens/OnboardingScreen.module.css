@@ -42,6 +42,12 @@
   margin: auto 0;
 }
 
+/* The one multi-field step. Three labelled inputs need a tighter rhythm than
+   the single-question steps, which are spaced to feel like one big ask. */
+.stepContent.stepContentForm {
+  gap: var(--space-4);
+}
+
 .title {
   font-size: var(--text-2xl);
   font-weight: var(--font-bold);
@@ -110,6 +116,48 @@
   -moz-appearance: textfield;
 }
 
+/* Free-text profile fields read left-aligned: they sit under a label and hold
+   a name, not a single centred number like the steps before them. */
+.inputLeft {
+  text-align: left;
+  font-size: var(--text-base);
+}
+
+/* The "@" is the app's, not the athlete's — it stays outside the value so what
+   they type is exactly what gets stored. */
+.prefixedInput {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.prefixedInput:focus-within {
+  border-color: var(--color-sessions);
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+}
+
+.prefix {
+  padding-left: var(--space-4);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+}
+
+/* The focused selector is listed so the wrapper, not the input, owns the focus
+   ring — otherwise .input:focus would draw a second one inside the frame. */
+.prefixedInput .inputPrefixed,
+.prefixedInput .inputPrefixed:focus {
+  padding-left: var(--space-1);
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .unit {
   font-size: var(--text-base);
   color: var(--color-text-secondary);
@@ -120,6 +168,12 @@
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   text-align: center;
+}
+
+.hintLeft {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-align: left;
 }
 
 .buttonRow {

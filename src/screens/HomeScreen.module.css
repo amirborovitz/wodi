@@ -7,7 +7,11 @@
   padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
+/* Constrained here rather than on .screen so the screen's background still
+   covers the whole viewport — .screen paints a shade darker than body. */
 .layout {
+  max-width: var(--app-column);
+  margin-inline: auto;
   padding: 0 20px;
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   display: flex;
@@ -567,6 +571,8 @@
   right: 0;
   bottom: 0;
   z-index: 1001;
+  max-width: var(--app-column);
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;

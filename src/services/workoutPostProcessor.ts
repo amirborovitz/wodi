@@ -8,6 +8,7 @@ import { getAlternativeType } from '../data/exerciseDefinitions';
 import { hasSameMovementsEveryRound } from '../utils/sectionShape';
 import { matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
+import { isWeightedCarry } from '../utils/xpCalculations';
 
 /**
  * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg", "95/65 lb", "135#"
@@ -327,8 +328,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Backfill inputType on any movements that the AI missed
   const withInputTypes = backfillInputTypes(withIntervalCounts);
 
+  // A prescribed-distance carry logs its LOAD, not its metres — corrects the stale 'none'
+  const withCarryLoads = backfillCarryLoadInput(withInputTypes);
+
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
-  const withSharedWeight = backfillSharedWeightHints(withInputTypes);
+  const withSharedWeight = backfillSharedWeightHints(withCarryLoads);
 
   // Backfill the `complex` flag on "+"-joined same-bar complexes the AI didn't tag
   const withComplex = backfillComplexFlag(withSharedWeight);
@@ -1178,6 +1182,36 @@ function detectLadderReps(workout: ParsedWorkout): ParsedWorkout {
   });
 
   return { ...workout, exercises };
+}
+
+/**
+ * A loaded carry over a prescribed distance asks the athlete for its LOAD, not its metres.
+ *
+ * "400m Farmer Carry" has exactly one number the athlete chooses — the kettlebells they picked
+ * up. The distance is the coach's, fixed, and already printed as prescription. Until the parse
+ * prompt was corrected these came back `inputType: "none"`, which (with a distance set) resolves
+ * to kind 'distance' and put a metres stepper on the logging sheet: the load went unrecorded,
+ * and confirming the prescribed distance marked it athlete-entered, which cancels the partner
+ * factor and stores a pair's 400m as one athlete's.
+ *
+ * Narrow on purpose — it corrects only the specific stale value ('none' on a distance-carry),
+ * never an inputType the AI chose on any other shape. `isWeightedCarry` is the same predicate
+ * the EP system uses for carry work, so the two can't disagree about what a carry is.
+ */
+function backfillCarryLoadInput(workout: ParsedWorkout): ParsedWorkout {
+  const fix = (mov: ParsedMovement): ParsedMovement => (
+    mov.inputType === 'none' && (mov.distance ?? 0) > 0 && isWeightedCarry(mov.name)
+      ? { ...mov, inputType: 'weight' }
+      : mov
+  );
+  return {
+    ...workout,
+    exercises: workout.exercises.map(ex => ({
+      ...ex,
+      movements: ex.movements?.map(fix),
+      sections: ex.sections?.map(s => ({ ...s, movements: s.movements.map(fix) })),
+    })),
+  };
 }
 
 /**

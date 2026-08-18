@@ -1,0 +1,252 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Strength Pull",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "4",
+            "name": "Strict Chin Up",
+            "subNote": "16 total",
+            "totalNote": "16 total",
+            "mineKey": "Strict Chin Up",
+            "accent": "cyan",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10s",
+            "name": "Chin Up Hold",
+            "mineKey": "Chin Up Hold",
+            "accent": "cyan",
+            "repeatCount": 4
+          },
+          {
+            "primary": "15",
+            "name": "Band Pull Apart",
+            "subNote": "60 total",
+            "totalNote": "60 total",
+            "mineKey": "Band Pull Apart",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "6",
+            "name": "Kettlebell Windmill",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Kettlebell Windmill",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "For Time",
+        "blueprint": "[14-12-10-8-6-4] for time (15 MIN CAP)",
+        "rows": [
+          {
+            "primary": "14-12-10-8-6-4",
+            "name": "Front Squats + Burpees",
+            "loadNote": "47.5kg",
+            "totalNote": "54 each",
+            "accent": "yellow",
+            "ladderTrack": {
+              "reps": [
+                14,
+                12,
+                10,
+                8,
+                6,
+                4
+              ],
+              "step": 6,
+              "complete": true
+            }
+          },
+          {
+            "primary": "200m",
+            "name": "Run · between sets",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0,
+        "descLadderScheme": [
+          14,
+          12,
+          10,
+          8,
+          6,
+          4
+        ],
+        "descLadderCompleted": 6,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "20:00",
+    "unit": "MIN",
+    "formatLine": "Strength + 6 RFT",
+    "storyLine": "60 band pull apart · 54 front squat · 54 burpees · 1.2km run · 24 kettlebell windmill · 16 strict chin up",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · STRICT CHIN UP",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "4",
+        "name": "Strict Chin Up",
+        "total": "16 total",
+        "color": "cyan"
+      },
+      {
+        "perRound": "15",
+        "name": "Band Pull Apart",
+        "total": "60 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "Kettlebell Windmill",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          30,
+          35
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 24
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "14-12-10-8-6-4",
+        "name": "Front Squat",
+        "total": "54 total",
+        "color": "yellow",
+        "weight": 47.5,
+        "unit": "kg"
+      },
+      {
+        "perRound": "14-12-10-8-6-4",
+        "name": "Burpees",
+        "total": "54 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.2km total",
+        "color": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "20:00",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "4 Strict Chin Up",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "16 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10s Chin Up Hold",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "15 Band Pull Apart",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Kettlebell Windmill",
+          "load": "",
+          "mine": "30-35kg",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "line",
+          "rx": "14-12-10-8-6-4 Front Squats + Burpees",
+          "load": "",
+          "mine": "47.5kg",
+          "team": "",
+          "total": "54 each",
+          "ladderTrack": {
+            "reps": [
+              14,
+              12,
+              10,
+              8,
+              6,
+              4
+            ],
+            "step": 6,
+            "complete": true
+          }
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run · between sets",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ]
+}

@@ -46,5 +46,51 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
     }
 
+    // ── Feed ────────────────────────────────────────────────────────────────
+    // The feed is global and no-follow, which means /workouts can never be the
+    // read source: that doc carries rawText (raw whiteboard OCR), corrections,
+    // notes and EP, and it stays owner-scoped above. A feed post is instead a
+    // frozen, denormalized SNAPSHOT of just what the card renders. Nobody can
+    // edit anyone's poster because nobody can read the workout behind it.
+
+    match /feedPosts/{postId} {
+      // The author block is copied into the post at write time, so without this
+      // check anyone could publish under someone else's name. Costs one read
+      // per create, which is the right price for making impersonation impossible.
+      function isOwnIdentity() {
+        return request.resource.data.author.name ==
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName;
+      }
+
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId
+                    && request.resource.data.expiresAt is timestamp
+                    // Nothing outlives the 24h window (+1h of clock slack).
+                    && request.resource.data.expiresAt < request.time + duration.value(25, 'h')
+                    && isOwnIdentity();
+      // Posts are immutable. Reaction counts live in the flames subcollection
+      // precisely so reacting never needs write access to someone else's post.
+      allow update: if false;
+      allow delete: if request.auth != null
+                    && (request.auth.uid == resource.data.userId || isAdmin());
+
+      // One doc per reactor, id = their uid: idempotent, no double-flame, and
+      // the "liked by" list is just this collection.
+      match /flames/{uid} {
+        allow read: if request.auth != null;
+        allow create, delete: if request.auth != null && request.auth.uid == uid;
+        allow update: if false;
+      }
+    }
+
+    // Abuse reports — any signed-in athlete files one, only triage reads them.
+    // Mirrors movementFlags: append-only for clients, admin-only to drain.
+    match /feedReports/{reportId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.reporterId;
+      allow read, update, delete: if isAdmin();
+    }
+
   }
 }

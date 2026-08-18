@@ -11,16 +11,21 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'f
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
-import { buildPosterWod, buildPosterWodFromPage, getPrimaryCarouselPageIndex, formatIsoPosterDate } from './posterData';
+import { buildPosterWod, buildPosterWodPages, getPrimaryCarouselPageIndex, formatIsoPosterDate } from './posterData';
 import { useFitScale } from './useFitScale';
 import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { CorrectionSheet } from '../../CorrectionSheet';
 import { TextSticker } from './TextSticker';
+import { PosterPhotoInset } from './PosterPhotoInset';
 import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
 import { ActionMenuSheet, type ActionMenuItem } from '../../../ui/ActionMenuSheet';
+import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { PRLift } from '../../PRLift';
-import type { PosterSticker, PosterVibeOffset } from '../../../../types';
-import { shareWorkoutCard } from '../../../../utils/shareUtils';
+import type { PosterPhoto, PosterSticker, PosterVibeOffset } from '../../../../types';
+import type { PosterPayload } from './posterPayload';
+import { usePostToFeed } from '../../../../hooks/usePostToFeed';
+import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
+import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
 import styles from './index.module.css';
 
 // ─── Bottom bar icons ───────────────────────────────────────────────────────
@@ -87,12 +92,40 @@ function MoreIcon(): React.JSX.Element {
   );
 }
 
+function PhotoIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <circle cx="9" cy="10" r="1.9" />
+      <path d="M21 15l-5-4-4 3-3-2-6 5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FeedIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h3.5L9 5l4 14 2.5-7H21" />
+    </svg>
+  );
+}
+
 function ShareIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
       <polyline points="16 6 12 2 8 6" />
       <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+function DownloadIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }
@@ -131,49 +164,49 @@ export function HandwrittenFace({
   const [pulse, setPulse]             = useState<number>(0);
   const [showHint, setShowHint]       = useState<boolean>(true);
   const [carouselPage, setCarouselPage] = useState<number>(0);
-  const [activePanel, setActivePanel] = useState<'style' | 'felt' | 'date' | 'sticker' | null>(null);
+  const [activePanel, setActivePanel] = useState<'style' | 'felt' | 'date' | 'sticker' | 'photo' | null>(null);
   const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
   const [dateOverride, setDateOverride] = useState<string | null>(null);
   const [dateDraft, setDateDraft]     = useState<string>(() => data.sourceDate ?? toIsoDate(data.workoutDate));
   const [showCorrection, setShowCorrection] = useState<boolean>(false);
   const [showMenu, setShowMenu]       = useState<boolean>(false);
-  const [sharing, setSharing]         = useState<boolean>(false);
+  const [showShare, setShowShare]     = useState<boolean>(false);
+  const [shareState, setShareState]   = useState<'preparing' | 'ready' | 'failed'>('preparing');
   const [sticker, setSticker]         = useState<PosterSticker | null>(() => data.posterSticker ?? null);
   const [stickerDraft, setStickerDraft] = useState<string>(() => data.posterSticker?.text ?? '');
   const [vibeOffset, setVibeOffset]   = useState<PosterVibeOffset | null>(() => data.posterVibeOffset ?? null);
-  const [pendingDelete, setPendingDelete] = useState<'text' | 'vibe' | null>(null);
+  const [photo, setPhoto]             = useState<PosterPhoto | null>(() => data.posterPhoto ?? null);
+  const [pendingDelete, setPendingDelete] = useState<'text' | 'vibe' | 'photo' | null>(null);
+  const [confirmPost, setConfirmPost]  = useState<boolean>(false);
+
+  const photoUpload = usePosterPhotoUpload();
+  const feedPost = usePostToFeed();
 
   const carouselViewportRef = useRef<HTMLDivElement>(null);
   const skinChipRowRef    = useRef<HTMLDivElement>(null);
   const shareCardRef      = useRef<HTMLDivElement>(null);
+  const shareBlob         = useRef<Blob | null>(null);
   const carouselX         = useMotionValue(0);
   const dragRef           = useRef<{ x: number; t: number } | null>(null);
 
   const isCarousel  = data.isCarousel && (data.carouselPageData?.length ?? 0) > 1;
 
-  // Single-page wod (used when not a carousel, or as a fallback title)
-  const singleWod = useMemo(
-    () => buildPosterWod(data),
-    [data],
+  // Per-page wods (carousel path). The first slide matches the summary poster
+  // shown in home/history thumbnails, followed by the individual workout parts.
+  const pageWods = useMemo(
+    () => isCarousel ? buildPosterWodPages(data) : null,
+    [data, isCarousel],
   );
   const primaryCarouselPage = useMemo(
     () => isCarousel ? getPrimaryCarouselPageIndex(data) : 0,
     [data, isCarousel],
   );
 
-  // Per-page wods (carousel path). The first slide matches the summary poster
-  // shown in home/history thumbnails, followed by the individual workout parts.
-  const pageWods = useMemo(
-    () => isCarousel
-      ? [
-          singleWod,
-          ...data.carouselPageData!
-            .map((_, i) => ({ i, wod: buildPosterWodFromPage(data, i) }))
-            .filter((page) => page.i !== primaryCarouselPage)
-            .map((page) => page.wod),
-        ]
-      : null,
-    [data, isCarousel, primaryCarouselPage, singleWod],
+  // Single-page wod (used when not a carousel, or as a fallback title). On the
+  // carousel path it IS the lead page, so the two can't drift.
+  const singleWod = useMemo(
+    () => pageWods?.[0] ?? buildPosterWod(data),
+    [pageWods, data],
   );
 
   // Slide that holds the PR's part. `pageWods` puts the summary (= the primary page) at
@@ -284,26 +317,108 @@ export function HandwrittenFace({
     onPosterCustomizationChange?.({ posterVibe: null, posterVibeOffset: null });
   };
 
-  // ── Sticker deletion (long-press either sticker → confirm sheet) ───────
+  // ── Poster photo (persists to workout.posterPhoto) ─────────────────────
+  // Handled as a sticker, not as media: it lives in the poster tree, so the
+  // share capture and every thumbnail pick it up with no extra wiring.
+
+  const choosePhoto = (file: File): void => {
+    photoUpload.choose(file, photo, (next) => {
+      setPhoto(next);
+      setPulse((p) => p + 1);
+      onPosterCustomizationChange?.({ posterPhoto: next });
+    });
+  };
+
+  const removePhoto = (): void => {
+    if (photo) photoUpload.discard(photo);
+    setPhoto(null);
+    setPulse((p) => p + 1);
+    onPosterCustomizationChange?.({ posterPhoto: null });
+  };
+
+  const movePhoto = (pos: { x: number; y: number }): void => {
+    setPhoto((p) => (p ? { ...p, ...pos } : p));
+  };
+
+  const dropPhoto = (pos: { x: number; y: number }): void => {
+    if (!photo) return;
+    const next = { ...photo, ...pos };
+    setPhoto(next);
+    onPosterCustomizationChange?.({ posterPhoto: next });
+  };
+
+  // ── Sticker deletion (long-press any sticker → confirm sheet) ──────────
 
   const confirmDelete = (): void => {
     if (pendingDelete === 'text') removeSticker();
     if (pendingDelete === 'vibe') removeVibe();
+    if (pendingDelete === 'photo') removePhoto();
     setPendingDelete(null);
   };
 
-  // ── Share (native share sheet, download fallback) ──────────────────────
+  // ── Post to feed ───────────────────────────────────────────────────────
+  // Publishing is global and irreversible-ish, so it lives in the overflow menu
+  // rather than beside Share: a mis-tap next to the most-tapped button would
+  // put a poster in front of everyone. Confirm before it goes out.
 
-  const handleShare = async (): Promise<void> => {
+  const publish = (): void => {
+    setConfirmPost(false);
+    // The whole session goes out — posting from the strength page used to publish
+    // the strength page alone, so the feed showed a fraction of the day. But the
+    // card on screen LEADS the deck: swiping to a part before tapping Post is the
+    // athlete saying "this is the bit I'm proud of", and the sticker/photo ride
+    // that same card in the editor. Never swiping leaves the metcon in front,
+    // since that's where pageWods already starts.
+    const pages = pageWods ?? [singleWod];
+    const lead = pageWods ? carouselPage : 0;
+    const posted = [pages[lead], ...pages.filter((_, i) => i !== lead)];
+    const payload: PosterPayload = {
+      wods: displayDate ? posted.map((w) => ({ ...w, date: displayDate })) : posted,
+      skin: SKINS[skinIdx].id,
+      vibe: vibeConfirmed ? vibe : null,
+      ...(vibeOffset ? { vibeOffset } : {}),
+      ...(sticker ? { sticker } : {}),
+      ...(photo ? { photo } : {}),
+    };
+    feedPost.post(payload, data.prCelebration != null);
+  };
+
+  // ── Share (destination sheet, then a prepared image) ───────────────────
+  // Capture cannot sit between the tap and `navigator.share`: html2canvas takes
+  // long enough that Safari drops the transient activation and refuses the share,
+  // which is why the old one-tap version fell through to a download on iOS.
+  // Opening the sheet starts the capture; the tap that shares is a fresh gesture
+  // on an image that is already in hand.
+
+  const openShare = (): void => {
     const el = shareCardRef.current;
-    if (!el || sharing) return;
+    if (!el) return;
+    shareBlob.current = null;
+    setShareState('preparing');
+    setShowShare(true);
+    void captureBlob(el)
+      .then((blob) => { shareBlob.current = blob; setShareState('ready'); })
+      .catch((err) => { console.error('Failed to render poster:', err); setShareState('failed'); });
+  };
+
+  const shareTitle = (): string => {
     const shareWod = isCarousel && pageWods ? pageWods[carouselPage] : singleWod;
-    setSharing(true);
-    try {
-      await shareWorkoutCard(el, shareWod.title ?? shareWod.type);
-    } finally {
-      setSharing(false);
-    }
+    return shareWod.title ?? shareWod.type;
+  };
+
+  const shareToApps = (): void => {
+    const blob = shareBlob.current;
+    if (!blob) return;
+    void shareImage(blob, shareTitle()).then((shared) => {
+      // Every non-iOS desktop browser and Chrome on iOS refuse file shares, so a
+      // decline that isn't a cancel still has to leave the athlete with the image.
+      if (!shared) downloadBlob(blob, `${shareTitle()}.png`);
+    });
+  };
+
+  const saveImage = (): void => {
+    const blob = shareBlob.current;
+    if (blob) downloadBlob(blob, `${shareTitle()}.png`);
   };
 
   // ── Bottom bar panel ───────────────────────────────────────────────────
@@ -322,10 +437,17 @@ export function HandwrittenFace({
     if (activePanel === 'style') measureSkinScroll();
   }, [activePanel]);
 
+  useEffect(() => {
+    if (!feedPost.notice) return;
+    const timer = setTimeout(feedPost.clearNotice, 2600);
+    return () => clearTimeout(timer);
+  }, [feedPost.notice, feedPost.clearNotice]);
+
   const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
   const toggleDatePanel = (): void => setActivePanel((p) => (p === 'date' ? null : 'date'));
   const toggleStickerPanel = (): void => setActivePanel((p) => (p === 'sticker' ? null : 'sticker'));
+  const togglePhotoPanel = (): void => setActivePanel((p) => (p === 'photo' ? null : 'photo'));
   const toggleVibe = (nextVibe: VibeKey): void => {
     if (vibeConfirmed && nextVibe === vibe) {
       setVibeConfirmed(false);
@@ -473,6 +595,40 @@ export function HandwrittenFace({
             </div>
           </motion.div>
         )}
+        {activePanel === 'photo' && (
+          <motion.div key="photo-panel" className={styles.panel}
+            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
+            <div className={styles.stickerRow}>
+              <label className={styles.photoPickBtn}>
+                {photoUpload.busy ? 'Adding…' : photo ? 'Replace photo' : 'Add photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className={styles.photoInput}
+                  disabled={photoUpload.busy}
+                  onClick={(e) => { e.stopPropagation(); (e.target as HTMLInputElement).value = ''; }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) choosePhoto(file);
+                  }}
+                />
+              </label>
+              {photo && (
+                <button className={styles.photoRemoveBtn}
+                  disabled={photoUpload.busy}
+                  onClick={(e) => { e.stopPropagation(); removePhoto(); }}>
+                  Remove
+                </button>
+              )}
+            </div>
+            <div className={styles.stickerMetaRow}>
+              <span className={styles.stickerMeta}>
+                {photoUpload.error ?? 'Drag it anywhere on the poster'}
+              </span>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       <div className={styles.tabRow}>
@@ -496,8 +652,13 @@ export function HandwrittenFace({
           <StickerIcon />
           <span className={styles.tabLabel}>Text</span>
         </button>
-        <button className={styles.shareBtn} disabled={sharing}
-          onClick={() => { void handleShare(); }} aria-label="Share poster">
+        <button className={`${styles.tabBtn} ${activePanel === 'photo' ? styles.tabBtnActive : ''}`}
+          onClick={togglePhotoPanel} aria-pressed={activePanel === 'photo'} aria-label="Add a photo to the poster">
+          <PhotoIcon />
+          <span className={styles.tabLabel}>Photo</span>
+        </button>
+        <button className={styles.shareBtn}
+          onClick={openShare} aria-label="Share poster" aria-haspopup="menu">
           <ShareIcon />
           <span>Share</span>
         </button>
@@ -523,10 +684,42 @@ export function HandwrittenFace({
     </div>
   );
 
+  // ─── Share sheet ("Share", bottom bar) ────────────────────────────────
+  // Wodi's own feed is the first destination, not one buried behind a "⋯": the
+  // proudest screen in the app should not spend its loudest button exporting to
+  // someone else's. The confirm dialog, not obscurity, is what stops a mis-tap.
+  // A test log is excluded from every count, so it has no business in a public feed.
+
+  const canPostToFeed = feedPost.canPost && !data.isTest;
+
+  // Labels stay fixed and the header carries the capture state: the sheet keys rows
+  // by label, so a label that changes with state would collide across rows.
+  const shareItems: ActionMenuItem[] = [
+    ...(canPostToFeed
+      ? [{ label: 'Post to Wodi feed', icon: <FeedIcon />, onClick: () => setConfirmPost(true) }]
+      : []),
+    ...(isNativeShareSupported()
+      ? [{ label: 'Share image…', icon: <ShareIcon />, onClick: shareToApps, disabled: shareState !== 'ready' }]
+      : []),
+    { label: 'Save image', icon: <DownloadIcon />, onClick: saveImage, disabled: shareState !== 'ready' },
+  ];
+
+  const shareSheet = (
+    <ActionMenuSheet
+      title={showShare
+        ? shareState === 'failed' ? "Couldn't render this poster"
+          : shareState === 'preparing' ? 'Preparing image…'
+          : 'Share this poster'
+        : null}
+      items={shareItems}
+      onClose={() => setShowShare(false)}
+    />
+  );
+
   // ─── Overflow menu ("⋯", top right) ───────────────────────────────────
-  // Everything that changes the LOG rather than the poster's look. The style/felt/date/text
-  // tabs stay on the bottom bar because those are the poster; these two are "this log is wrong",
-  // one fixable by the athlete and one only reportable.
+  // Everything that isn't the poster's look. The style/felt/date/text/photo tabs stay on the
+  // bottom bar because those ARE the poster; these are "this log is wrong" — one fixable by the
+  // athlete, one only reportable.
 
   const menuItems: ActionMenuItem[] = [
     ...(onEdit ? [{ label: 'Edit workout', icon: <PencilIcon />, onClick: onEdit }] : []),
@@ -549,6 +742,24 @@ export function HandwrittenFace({
       items={menuItems}
       onClose={() => setShowMenu(false)}
     />
+  );
+
+  // ─── Feed overlays (shared by both render paths) ──────────────────────
+
+  const feedOverlays = (
+    <>
+      <ConfirmDialog
+        open={confirmPost}
+        title="Post to Feed?"
+        message="Anyone on Wodi can see your whole workout for the next 24 hours, then it disappears. The feed gets a copy — editing this workout later won't change what's posted."
+        confirmText={feedPost.posting ? 'Posting…' : 'Post'}
+        onConfirm={publish}
+        onCancel={() => setConfirmPost(false)}
+      />
+      {feedPost.notice && (
+        <div className={styles.feedNotice} role="status">{feedPost.notice}</div>
+      )}
+    </>
   );
 
   // ─────────────────────────────────────────────────────────────────────
@@ -620,6 +831,9 @@ export function HandwrittenFace({
                     {sticker && i === carouselPage && (
                       <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
                     )}
+                    {photo && i === carouselPage && (
+                      <PosterPhotoInset photo={photo} onMove={movePhoto} onDrop={dropPhoto} onLongPress={() => setPendingDelete('photo')} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -641,13 +855,16 @@ export function HandwrittenFace({
         )}
 
         {menuSheet}
+        {shareSheet}
 
         <DeleteActionSheet
-          title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
+          title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : pendingDelete === 'photo' ? 'Remove this photo?' : null}
           deleteLabel="Remove"
           onDelete={confirmDelete}
           onCancel={() => setPendingDelete(null)}
         />
+
+        {feedOverlays}
       </div>
     );
   }
@@ -696,6 +913,9 @@ export function HandwrittenFace({
             {sticker && (
               <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
             )}
+            {photo && (
+              <PosterPhotoInset photo={photo} onMove={movePhoto} onDrop={dropPhoto} onLongPress={() => setPendingDelete('photo')} />
+            )}
           </div>
         </div>
         {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
@@ -706,13 +926,16 @@ export function HandwrittenFace({
       {data.prCelebration && <PRLift pr={data.prCelebration} />}
 
       {menuSheet}
+      {shareSheet}
 
       <DeleteActionSheet
-        title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : null}
+        title={pendingDelete === 'text' ? 'Remove this note?' : pendingDelete === 'vibe' ? 'Remove the felt stamp?' : pendingDelete === 'photo' ? 'Remove this photo?' : null}
         deleteLabel="Remove"
         onDelete={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
+
+      {feedOverlays}
     </div>
   );
 }

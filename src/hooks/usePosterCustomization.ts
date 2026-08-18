@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { deleteField, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import type { PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset } from '../types';
+import type { PosterPhoto, PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset } from '../types';
 
 export const POSTER_CUSTOMIZATION_EVENT = 'wodi:poster-customization';
 
@@ -11,6 +11,7 @@ export interface PosterCustomizationUpdate {
   sourceDate?: string;  // YYYY-MM-DD — the date shown on the poster (DATE tab)
   posterSticker?: PosterSticker | null;  // free-text note on the poster (TEXT tab); null removes it
   posterVibeOffset?: PosterVibeOffset | null;  // manual drag nudge of the "FELT" stamp; null resets it
+  posterPhoto?: PosterPhoto | null;  // photo clipped to the poster (PHOTO tab); null removes it
 }
 
 export interface PosterCustomizationEventDetail {
@@ -35,6 +36,7 @@ export function usePosterCustomization(workoutId: string | undefined): {
       ...(update.posterVibe === null ? { posterVibe: deleteField() } : {}),
       ...(update.posterSticker === null ? { posterSticker: deleteField() } : {}),
       ...(update.posterVibeOffset === null ? { posterVibeOffset: deleteField() } : {}),
+      ...(update.posterPhoto === null ? { posterPhoto: deleteField() } : {}),
     };
 
     void updateDoc(doc(db, 'workouts', workoutId), firestoreUpdate).catch((err) => {

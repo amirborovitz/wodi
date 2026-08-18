@@ -1,0 +1,77 @@
+/* Above the bottom nav (--z-sticky, 200), below the athlete card (1060+) that
+   opens on top of this sheet. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1041;
+  max-width: var(--app-column);
+  margin-inline: auto;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 18px calc(22px + env(safe-area-inset-bottom));
+  background: var(--wodi-card);
+  border-top: 1px solid var(--wodi-line2);
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.55);
+}
+
+.grabber {
+  width: 38px;
+  height: 4px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: rgba(242, 240, 235, 0.18);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.headerRule {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--wodi-yellow);
+}
+
+.headerTitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wodi-white);
+}
+
+.headerCount {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--wodi-dim2);
+}
+
+.list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  padding: 9px 4px;
+}

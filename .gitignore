@@ -29,3 +29,9 @@ dist-ssr
 
 # Firebase deploy cache (regenerated on every deploy)
 .firebase/
+
+# Store / merch launch assets (74MB of print files — kept out of git)
+wodi_store_launch_pack/
+
+# Codex tooling placeholder
+.codex_keep

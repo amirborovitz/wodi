@@ -15,6 +15,7 @@ import type {
   Exercise,
   MovementTotal,
   PosterSkinId,
+  PosterPhoto,
   PosterSticker,
   PosterVibeKey,
   PosterVibeOffset,
@@ -40,6 +41,7 @@ import {
   calculateWorkloadFromExercises,
   assignMovementColors,
 } from '../services/workloadCalculation';
+import { sessionPartnerFactor } from '../services/partnerScope';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -167,6 +169,14 @@ export interface CelebrationData {
   posterVibe: PosterVibeKey | undefined;
   posterSticker: PosterSticker | undefined;
   posterVibeOffset: PosterVibeOffset | undefined;
+  posterPhoto: PosterPhoto | undefined;
+  /**
+   * A throwaway log, excluded from every count — and from the feed, which is
+   * why this reaches the poster at all. Only known in 'detail' mode: RewardData
+   * doesn't carry the flag, so a test workout re-logged through the reward path
+   * still offers Post to Feed.
+   */
+  isTest: boolean;
 
   // Layout decision
   posterLayout: PosterLayout;
@@ -358,6 +368,8 @@ export function useCelebrationData(
   const posterVibe: PosterVibeKey | undefined = workout?.posterVibe;
   const posterSticker: PosterSticker | undefined = workout?.posterSticker;
   const posterVibeOffset: PosterVibeOffset | undefined = workout?.posterVibeOffset;
+  const posterPhoto: PosterPhoto | undefined = workout?.posterPhoto;
+  const isTest: boolean = workout?.isTest === true;
 
   const activeAchievements: Achievement[] | undefined = isReward
     ? rewardData?.achievements
@@ -402,26 +414,27 @@ export function useCelebrationData(
     if (isReward) {
       const rewardBreakdown = rewardData?.workloadBreakdown;
       return rewardBreakdown && rewardData?.exercises
-        ? repairUndercountedBreakdown(rewardBreakdown, rewardData.exercises)
+        ? repairUndercountedBreakdown(rewardBreakdown, rewardData.exercises, sessionTeamSize)
         : rewardBreakdown ?? null;
     }
     if (workout?.workloadBreakdown) {
       const stored = workout.workloadBreakdown;
       return workout.exercises
-        ? repairUndercountedBreakdown(stored, workout.exercises)
+        ? repairUndercountedBreakdown(stored, workout.exercises, sessionTeamSize)
         : stored;
     }
     if (workout?.exercises && workout.exercises.length > 0) {
-      const partnerFactor = workout.partnerFactor ?? (workout.partnerWorkout ? 0.5 : 1);
+      const partnerFactor = sessionPartnerFactor(workout);
       const breakdown = calculateWorkloadFromExercises(workout.exercises, undefined, partnerFactor);
       breakdown.movements = assignMovementColors(breakdown.movements);
-      return repairUndercountedBreakdown(breakdown, workout.exercises);
+      return repairUndercountedBreakdown(breakdown, workout.exercises, sessionTeamSize);
     }
     return null;
   }, [
     isReward,
     rewardData?.workloadBreakdown,
     rewardData?.exercises,
+    sessionTeamSize,
     workout?.exercises,
     workout?.partnerWorkout,
     workout?.partnerFactor,
@@ -1233,6 +1246,8 @@ export function useCelebrationData(
     posterVibe,
     posterSticker,
     posterVibeOffset,
+    posterPhoto,
+    isTest,
     posterLayout,
     isCarousel,
     heroResult,

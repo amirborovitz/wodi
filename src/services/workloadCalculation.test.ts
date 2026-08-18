@@ -315,3 +315,93 @@ describe('one movement trained in two parts', () => {
     expect(wb.movements[0]).toMatchObject({ totalReps: 15, exerciseIndex: 0 });
   });
 });
+
+// A movement written OUTSIDE the main rep scheme, whose count the board states itself:
+//   [14-12-10-8-6-4] Front Squat / Burpees
+//   * 200m run in between sets (5 total)
+// Six tiers, but only FIVE runs — they happen BETWEEN the sets. Every round-derived multiplier
+// gets this wrong by exactly one rung (6 × 200m = 1200m for 1000m of running), which is why the
+// coach's stated count has to outrank the structure.
+describe('board-stated occurrences outrank the round count', () => {
+  const ladderWithBetweenSetsRun = (run: Record<string, unknown>): ParsedWorkout => ({
+    title: 'Ladder For Time',
+    type: 'for_time',
+    format: 'for_time',
+    scoreType: 'time',
+    exercises: [{
+      name: 'Ladder For Time',
+      type: 'metcon',
+      loggingMode: 'for_time',
+      rounds: 6,
+      // Present so the no-occurrences case has a real interval count to fall back to (6),
+      // making the precedence contrast below sharp rather than incidental.
+      suggestedSets: 6,
+      suggestedRepsPerSet: [14, 12, 10, 8, 6, 4],
+      movements: [
+        { name: 'Front Squat', reps: 14, inputType: 'weight', rxWeights: { male: 47.5, female: 47.5, unit: 'kg' }, implementCount: 1, countingMode: 'per_round' },
+        { name: 'Burpee', reps: 14, inputType: 'none', countingMode: 'per_round' },
+        {
+          name: 'Run',
+          distance: 200,
+          unit: 'm',
+          inputType: 'none',
+          countingMode: 'per_interval',
+          ...run,
+        },
+      ],
+    }],
+  } as unknown as ParsedWorkout);
+
+  it('counts the run five times, not once per tier', () => {
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
+    expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 1000 });
+    expect(wb.grandTotalDistance).toBe(1000);
+  });
+
+  it('a stated count is never flagged as an estimate — it is the coach\'s own number', () => {
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
+    expect(wb.estimated).not.toBe(true);
+  });
+
+  it('without a stated count it still falls back to the interval multiplier', () => {
+    // Regression guard in the other direction: the occurrences path must not swallow the
+    // existing behaviour for boards that state no total.
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({}));
+    expect(wb.movements.find((m) => m.name === 'Run')?.totalDistance).toBe(1200);
+  });
+
+  it('derives the count from placement alone when the board states no total', () => {
+    // The case a free-text cadence note could never serve: 'in between sets' with no '(5
+    // total)'. Six sets hold five gaps, so the count follows from the structure the coach
+    // described - no stated number needed, and no falling back to the tier count.
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ placement: 'between_sets' }));
+    expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 1000 });
+    expect(wb.grandTotalDistance).toBe(1000);
+    expect(wb.estimated).not.toBe(true);
+  });
+
+  it('lets an explicitly written total outrank the derived one', () => {
+    // A coach who writes both wins: the stated number is the answer, not an input to it.
+    const wb = calculateWorkloadBreakdown(
+      ladderWithBetweenSetsRun({ placement: 'between_sets', occurrences: 3 }),
+    );
+    expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 600 });
+  });
+  it('gives the run no reps at all — the flat form has none to give', () => {
+    // The bug the occurrence audit found in real saved data: this run carried totalReps 54,
+    // the ladder's rep SUM (14+12+10+8+6+4) glued onto a movement that has no reps. Counting
+    // actual performances cannot produce that number, because not one run contributes a rep.
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ placement: 'between_sets' }));
+    const run = wb.movements.find((m) => m.name === 'Run');
+    expect(run?.totalReps ?? 0).toBe(0);
+    expect(run?.totalDistance).toBe(1000);
+    // ...and the phantom reps are therefore out of the session total too: 54 + 54, not + 54 more.
+    expect(wb.grandTotalReps).toBe(108);
+  });
+  it('does not disturb the movements that do climb the scheme', () => {
+    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
+    // 14+12+10+8+6+4 = 54 per movement.
+    expect(wb.movements.find((m) => m.name === 'Front Squat')).toMatchObject({ totalReps: 54 });
+    expect(wb.movements.find((m) => m.name === 'Burpee')).toMatchObject({ totalReps: 54 });
+  });
+});

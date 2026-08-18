@@ -14,6 +14,12 @@
   --font-display: 'Barlow Condensed', sans-serif;
   --font-body:    'Barlow', sans-serif;
   --font-barlow:  'Barlow', sans-serif;
+
+  /* The phone column. Wodi is a mobile app that happens to open in a desktop
+     browser, so every screen holds this width and centres rather than
+     stretching — a poster reads at one size everywhere. Bottom sheets track it
+     too, or they detach from the column they belong to. Change it here only. */
+  --app-column: 520px;
   /* ──────────────────────────────────────────────────────────────── */
 
   /* Colors - Deep Dark Theme */

@@ -1,11 +1,5 @@
 import html2canvas from 'html2canvas';
 
-export interface ShareOptions {
-  filename?: string;
-  format?: 'png' | 'jpeg';
-  quality?: number;
-}
-
 /**
  * Renders a DOM element to a canvas
  */
@@ -66,22 +60,16 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /**
- * Copies an image blob to clipboard
+ * Renders an element straight to a PNG blob.
+ *
+ * Capture is slow enough (hundreds of ms on a poster) that it must NOT sit
+ * between a tap and `navigator.share`: Safari expires the transient activation
+ * while html2canvas runs and rejects the share. Callers capture ahead of the
+ * tap that shares, and this is the one call they need to do it.
  */
-export async function copyImageToClipboard(blob: Blob): Promise<boolean> {
-  try {
-    if (!navigator.clipboard || !navigator.clipboard.write) {
-      console.warn('Clipboard API not supported');
-      return false;
-    }
-
-    const item = new ClipboardItem({ 'image/png': blob });
-    await navigator.clipboard.write([item]);
-    return true;
-  } catch (error) {
-    console.error('Failed to copy image to clipboard:', error);
-    return false;
-  }
+export async function captureBlob(element: HTMLElement, scale = 2): Promise<Blob> {
+  const canvas = await elementToCanvas(element, { scale });
+  return canvasToBlob(canvas, 'png');
 }
 
 /**
@@ -113,37 +101,6 @@ export async function shareImage(
       console.error('Share failed:', error);
     }
     return false;
-  }
-}
-
-/**
- * Main function to share a workout card
- * Tries native share first, then falls back to download
- */
-export async function shareWorkoutCard(
-  element: HTMLElement,
-  workoutTitle: string,
-  options?: ShareOptions
-): Promise<{ success: boolean; method: 'share' | 'download' | 'clipboard' }> {
-  const filename = options?.filename || `workout-${Date.now()}`;
-
-  try {
-    // Render element to canvas
-    const canvas = await elementToCanvas(element);
-    const blob = await canvasToBlob(canvas, options?.format || 'png', options?.quality);
-
-    // Try native share first (mobile)
-    const shared = await shareImage(blob, workoutTitle);
-    if (shared) {
-      return { success: true, method: 'share' };
-    }
-
-    // Fall back to download
-    downloadBlob(blob, `${filename}.png`);
-    return { success: true, method: 'download' };
-  } catch (error) {
-    console.error('Failed to share workout card:', error);
-    return { success: false, method: 'download' };
   }
 }
 

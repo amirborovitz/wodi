@@ -13,7 +13,7 @@ import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult } from
 import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 // Value import from helpers directly (not the useCelebrationData re-export): the hook module
 // transitively initializes Firebase, which the Node poster-corpus harness must never load.
-import { shouldLogCelebrationDebug } from '../../helpers';
+import { shouldLogCelebrationDebug, prescribesSingleMovement } from '../../helpers';
 import { formatLoggedLoad } from '../../posterFormatters';
 import { getExercisePeakLoad } from '../../movementResolution';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
@@ -83,6 +83,11 @@ export interface PosterLine {
   mine: string; // "60kg" (what user did)
   total?: string;
   team: string; // "50" — per-partner share of the prescribed total (partner workouts only)
+  // True only when `team` really is a partner share (ArtifactRow.teamShare). The team/me slots
+  // are also reused for unrelated "value + load" pairs on solo posters, so this is what tells a
+  // genuine TEAM|ME row from that reuse — without it the pairs legend labels a total and a
+  // barbell weight as if they were the two athletes' numbers.
+  isPartnerShare?: boolean;
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
   // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
   // render the normal rx/load/mine row AND additionally render this chart right below it.
@@ -297,17 +302,10 @@ function formatPosterStrengthScheme(exercise: Exercise): string | undefined {
 // build-up). When the piece puts several movements in one set — a complex ("1 squat clean +
 // 1 front squat + 1 push jerk") or a strength circuit ("5 press / 10/10 DB row / 8/8 SLDL") —
 // actualReps is their SUM (3, 23): a number no coach wrote and no athlete entered, which reads
-// as a rep scheme and isn't one. The row name already spells out each movement's own reps.
-function prescribesSingleMovement(exercise: Exercise): boolean {
-  const names = new Set(
-    [
-      ...(exercise.sections?.flatMap((section) => section.movements ?? []) ?? []),
-      ...(exercise.movements ?? []),
-    ].map((movement) => movement.name.toLowerCase()),
-  );
-  return names.size <= 1;
-}
-
+// as a rep scheme and isn't one. The row name spells out each movement's own reps instead —
+// buildCelebrationMovementRow gates that on the SAME predicate, so exactly one of the two
+// always speaks.
+//
 // Every set's reps spelled out in full ("6-6-5-4-3"), never ellipsized or collapsed — the
 // climbing/descending reps across sets are the whole story of a build-up day. Lives on the
 // movement row as a quiet sub-line, separate from the scheme line above (which only states
@@ -380,15 +378,25 @@ function buildFormatLine(data: CelebrationData): string {
 // array may lead with a rows-less 'Blueprint' header section carrying the format line
 // (see buildPageArtifactSections), which is not a block the athlete sees.
 // Exported for the poster-corpus harness.
-export function partnerBlocksSub(sections: CelebrationData['artifactSections']): string {
+const COUNT_WORDS: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
+
+export function partnerBlocksSub(
+  sections: CelebrationData['artifactSections'],
+  teamSize?: number,
+): string {
   const blockCount = sections.filter((section) => section.rows.length > 0).length;
-  const labels: Record<number, string> = { 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
-  return `you & your partner - ${labels[blockCount] ?? blockCount} blocks`;
+  const blocks = `${COUNT_WORDS[blockCount] ?? blockCount} blocks`;
+  // "your partner" is singular for a pair only. A team of four has three of them, and calling
+  // them one partner is the same team-of-2 assumption that used to halve their numbers.
+  const squad = !teamSize || teamSize <= 2
+    ? 'you & your partner'
+    : `your team of ${COUNT_WORDS[teamSize] ?? teamSize}`;
+  return `${squad} - ${blocks}`;
 }
 
 function buildSubLine(data: CelebrationData): string {
   if (data.artifactSections[0]?.partnerDisplayMode === 'sections') {
-    return partnerBlocksSub(data.artifactSections);
+    return partnerBlocksSub(data.artifactSections, data.teamSize);
   }
   if (data.artifactSections[0]?.isPartnerConfirmed) {
     return '';
@@ -854,7 +862,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
       kind: 'line',
       rx: rxLabel.trim(),
       load: '',
-      mine: row.partnerMine ?? '',
+      mine: '',
       team: '',
       total: undefined,
       roundLabel: row.roundLabel,
@@ -938,7 +946,17 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     });
   }
 
-  return { kind: 'line', rx: rxLabel.trim(), load, mine, team, total, roundLabel: row.roundLabel, ladderTrack: row.ladderTrack };
+  return {
+    kind: 'line',
+    rx: rxLabel.trim(),
+    load,
+    mine,
+    team,
+    ...(row.teamShare ? { isPartnerShare: true } : {}),
+    total,
+    roundLabel: row.roundLabel,
+    ladderTrack: row.ladderTrack,
+  };
 }
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────
@@ -1066,7 +1084,7 @@ export function buildPosterWodFromPage(
     : undefined;
 
   const sub = (() => {
-    if (section?.partnerDisplayMode === 'sections') return partnerBlocksSub(data.artifactSections);
+    if (section?.partnerDisplayMode === 'sections') return partnerBlocksSub(data.artifactSections, data.teamSize);
     if (isPartnerPage) return '';
     // Pair-paced pieces state their swap structure ("in pairs · swap each 200m run") — the
     // format is unreadable from the movement rows alone.
@@ -1164,6 +1182,32 @@ export function buildPosterWodFromPage(
 }
 
 // ─── Main builder ──────────────────────────────────────────────────────────
+
+/**
+ * Every poster page of a session, in reading order — the single definition of
+ * "what this workout looks like as posters".
+ *
+ * The lead page is the primary part (the metcon, via getPrimaryCarouselPageIndex),
+ * followed by the remaining parts in board order. Everything that shows a whole
+ * workout — the celebration carousel, a feed post — reads this, so a feed card
+ * can never disagree with the deck the athlete swiped through. Surfaces that
+ * show exactly one poster (the thumbnails) take index 0.
+ */
+export function buildPosterWodPages(data: CelebrationData): PosterWod[] {
+  const pages = data.carouselPageData;
+  if (!data.isCarousel || !pages || pages.length <= 1) return [buildPosterWod(data)];
+
+  const primary = getPrimaryCarouselPageIndex(data);
+  return [
+    // Identical to buildPosterWodFromPage(data, primary) — buildPosterWod routes
+    // there for a carousel — so the lead page and the thumbnail stay one thing.
+    buildPosterWod(data),
+    ...pages
+      .map((_, i) => i)
+      .filter((i) => i !== primary)
+      .map((i) => buildPosterWodFromPage(data, i)),
+  ];
+}
 
 export function buildPosterWod(
   data: CelebrationData,

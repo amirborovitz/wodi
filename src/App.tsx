@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { HistoryScreen } from './screens/HistoryScreen';
+import { FeedScreen } from './screens/FeedScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { AddWorkoutScreen } from './screens/AddWorkoutScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
@@ -13,10 +14,10 @@ import { OnboardingScreen } from './screens/OnboardingScreen';
 import { PRScreen } from './screens/PRScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
-import { ProfileSettingsScreen, GoalsSettingsScreen } from './components/settings';
+import { ProfileSettingsScreen } from './components/settings';
 import { BottomNav } from './components/ui';
 import { WrappedStoryScreen } from './components/recap/WrappedStoryScreen';
-import { DEFAULT_USER_GOALS } from './types';
+import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
 import { markRecapViewed } from './hooks/useRecapData';
@@ -24,10 +25,10 @@ import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
-const MAIN_SCREENS: Screen[] = ['home', 'history', 'profile', 'settings'];
+const MAIN_SCREENS: Screen[] = ['home', 'feed', 'history', 'profile', 'settings'];
 
 function AppContent() {
-  const { user, loading, refreshUser, updateUserProfile, updateUserGoals, signOut } = useAuth();
+  const { user, loading, refreshUser, signOut } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
@@ -189,6 +190,8 @@ function AppContent() {
           />
         );
       }
+      case 'feed':
+        return <FeedScreen />;
       case 'history':
         return (
           <HistoryScreen
@@ -207,6 +210,7 @@ function AppContent() {
             onNavigateToPR={() => setCurrentScreen('pr')}
             onNavigateToRecords={() => setCurrentScreen('records')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
+            onNavigateToProfile={() => setCurrentScreen('profile-settings')}
             onOpenRecap={handleOpenRecap}
           />
         );
@@ -215,25 +219,17 @@ function AppContent() {
           <SettingsScreen
             onBack={() => setCurrentScreen('profile')}
             onNavigateToProfile={() => setCurrentScreen('profile-settings')}
-            onNavigateToGoals={() => setCurrentScreen('goals-settings')}
             onSignOut={signOut}
             user={user}
           />
         );
+      // Back goes to Me, not Settings: Me is where the pencil that opens this
+      // lives, and Settings is now the side door rather than the way in.
       case 'profile-settings':
         return (
           <ProfileSettingsScreen
-            onBack={() => setCurrentScreen('settings')}
-            user={user}
-            onSave={updateUserProfile}
-          />
-        );
-      case 'goals-settings':
-        return (
-          <GoalsSettingsScreen
-            onBack={() => setCurrentScreen('settings')}
-            goals={user?.goals || DEFAULT_USER_GOALS}
-            onSave={updateUserGoals}
+            onBack={() => setCurrentScreen('profile')}
+            onOpenSettings={() => setCurrentScreen('settings')}
           />
         );
       case 'pr':
@@ -252,13 +248,17 @@ function AppContent() {
             onBack={() => setCurrentScreen('profile')}
           />
         );
-      case 'recap':
-        return pendingRecapData ? (
-          <WrappedStoryScreen
-            data={pendingRecapData}
-            onClose={() => { setPendingRecapData(null); setCurrentScreen('home'); }}
-          />
-        ) : null;
+      case 'recap': {
+        if (!pendingRecapData) return null;
+        const closeRecap = () => { setPendingRecapData(null); setCurrentScreen('home'); };
+        // One route, one pending recap — the scope decides which face renders it.
+        // A week is too thin for the card deck, so it gets the single page instead.
+        return pendingRecapData.scope === 'week' ? (
+          <WeekDropPage data={pendingRecapData} onClose={closeRecap} />
+        ) : (
+          <WrappedStoryScreen data={pendingRecapData} onClose={closeRecap} />
+        );
+      }
       case 'home':
       default:
         return (

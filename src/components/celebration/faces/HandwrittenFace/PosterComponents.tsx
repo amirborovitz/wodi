@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { BRAND, VIBE, fD, fB, fH } from './brand';
+import { BRAND, VIBE, LIGHT_VIBE, fD, fB, fH, fM } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod, PosterLine, PosterRow } from './posterData';
 
@@ -165,11 +165,10 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
 
 export function shouldShowPairsLegend(wod: PosterWod, rows: PosterRow[]): boolean {
   if (!wod.isPartnerConfirmed || wod.split === 'rounds') return false;
-  return rows.some((row) => {
-    if (row.kind !== 'line') return false;
-    const parts = getMovementValueParts(wod, row);
-    return !!(parts.team && parts.me);
-  });
+  // Only a row carrying a real partner share earns the header. The team/me slots are also reused
+  // for "total + load" on ordinary rows, and gating on their mere presence put a TEAM|ME label
+  // over a barbell weight and a rep total that had nothing to do with either athlete.
+  return rows.some((row) => row.kind === 'line' && !!row.isPartnerShare && !!row.team);
 }
 
 // ─── Ladder track ───────────────────────────────────────────────────────────
@@ -399,6 +398,58 @@ export function Wordmark({ color, dot = BRAND.yellow, size = 15 }: WordmarkProps
   );
 }
 
+interface EffortMetaProps {
+  ep: number;
+  color: string;
+  /** The skin's own meta font — Chalk writes its header by hand, the rest set it in mono. */
+  font?: string;
+  size?: number;
+  /** Handwritten skins cap out below the default 800. */
+  weight?: number;
+}
+
+/**
+ * Session effort, rendered as the lead token of the header's meta cluster.
+ *
+ * EP is the ONE session-level number a poster carries, so every carousel page of the same
+ * session shows the same value on purpose — a shared metcon page reports the whole practice,
+ * not just the block in view. It sits in the header meta row and NEVER in the footer strip:
+ * that row belongs to the achievement badge ("the footer only ever shows a win", design
+ * system §04), and a raw score is not a win.
+ *
+ * It carries the skin's accent at heavy weight so it reads as a scored value; the date beside
+ * it stays dim. Same font, same baseline, different rank — see {@link HeaderMeta}.
+ */
+export function EffortMeta({ ep, color, font = fM, size = 10.5, weight = 800 }: EffortMetaProps): React.JSX.Element | null {
+  if (!Number.isFinite(ep) || ep <= 0) return null;
+  return (
+    <span style={{ fontFamily: font, fontSize: size, fontWeight: weight, color, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+      {Math.round(ep).toLocaleString()} EP
+    </span>
+  );
+}
+
+/**
+ * The right-hand end of every skin's header row: EP then date, locked to a shared baseline and
+ * kept on one line. Grouping them is what lets EP outrank the date instead of reading as another
+ * dim item in an evenly-spaced row.
+ *
+ * Baseline, not center: EP and the date run at different sizes, and only a shared baseline keeps
+ * the smaller date sitting on the line instead of floating inside it.
+ *
+ * lineHeight 1 is load-bearing. Both strings are caps and digits with no descenders, so the
+ * default leading pads dead space under the glyphs; the row centers that padded box and the text
+ * ends up riding ~1px above the FormatTag label beside it. Hugging the glyphs makes the box's
+ * geometric center land on the text's optical center.
+ */
+export function HeaderMeta({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+      {children}
+    </div>
+  );
+}
+
 interface FormatTagProps {
   label: string;
   color: string;
@@ -433,11 +484,13 @@ interface VibeStampProps {
   vibe: VibeKey;
   scale?: number;
   color?: string;
+  /** Lightness of the field behind the stamp. Light/bright skins use the deepened palette. */
+  surface?: 'dark' | 'light';
 }
 
-export function VibeStamp({ vibe, scale = 1, color }: VibeStampProps): React.JSX.Element {
+export function VibeStamp({ vibe, scale = 1, color, surface = 'dark' }: VibeStampProps): React.JSX.Element {
   const v = VIBE[vibe];
-  const c = color ?? v.color;
+  const c = color ?? (surface === 'light' ? LIGHT_VIBE[vibe] : v.color);
 
   return (
     <div

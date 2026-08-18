@@ -2,6 +2,8 @@
   position: fixed;
   inset: 0;
   z-index: 900;
+  max-width: var(--app-column);
+  margin-inline: auto;
   overflow: hidden;
   background: #0b0c0e;
   /* safe area for notch devices */

@@ -15,6 +15,7 @@ import {
 } from '../data/movementRegistry';
 import { flagMovement } from '../services/movementRegistryService';
 import { getEffectiveWorkoutDate } from '../utils/workoutDate';
+import { computeWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 
 /** A variant sub-line under a family row — "Russian 335", "American 216". */
 export interface RecapMoveVariant {
@@ -105,6 +106,23 @@ export interface RecapCardioStat {
  * units; the hero is a single measured figure and `rest` names the others as
  * themselves.
  */
+/**
+ * One machine's total in ONE unit, formatted.
+ *
+ * Exists so a page can print every aerobic figure side by side without doing its
+ * own unit formatting. Cells are never summed, ranked against each other, or
+ * converted: a KM cell and a CAL cell measure disjoint sessions, so they sit
+ * next to each other as separate facts.
+ */
+export interface RecapEngineCell {
+  /** "Echo Bike" — the machine, not the family, when the period only named one. */
+  machine: string;
+  /** "5.1" · "707" */
+  value: string;
+  /** "KM" · "M" · "CAL" */
+  unit: string;
+}
+
 export interface RecapAerobicStat {
   /** The machine the hero number was put up on — "Echo Bike", not "Bike". */
   machine: string;
@@ -116,6 +134,11 @@ export interface RecapAerobicStat {
   compare: string;
   /** "+ Run 5.1 km · Echo Bike 707 cal". Null when the hero was the only figure. */
   rest: string | null;
+  /**
+   * Every aerobic figure the period produced, hero first — the same numbers `rest`
+   * names in prose, structured for pages that lay them out rather than read them.
+   */
+  cells: RecapEngineCell[];
 }
 
 export interface RecapFeltStat {
@@ -123,9 +146,18 @@ export interface RecapFeltStat {
   count: number;
 }
 
+/**
+ * How wide a slice of training a recap covers.
+ *
+ * A week is not a short month: it holds three to five workouts, which is too thin
+ * for the card deck and exactly right for one page. `WrappedStoryScreen` renders
+ * month and season; `WeekDropPage` renders week. Every builder below stays shared.
+ */
+export type RecapScope = 'week' | 'month' | 'season';
+
 export interface RecapData {
   id: string;
-  scope: 'month' | 'season';
+  scope: RecapScope;
   label: string;
   period: string;
   periodSub: string;
@@ -135,6 +167,23 @@ export interface RecapData {
   tonnageComp: string;
   workouts: number;
   prCount: number;
+  /**
+   * Every workout's EP, summed through the single source of truth.
+   *
+   * Depends on bodyweight, which is why `buildRecaps` takes it: computing EP
+   * against `DEFAULT_BW` when the user has a real weight on file produces a
+   * number that silently disagrees with the one their posters showed.
+   */
+  epTotal: number;
+  /**
+   * Minutes actually spent training, summed from each workout's own `duration`.
+   *
+   * NOT `getTimeCapMinutes`, which answers "how much metcon" and returns 0 for
+   * pure strength. `duration` is optional, so a session logged without a time
+   * contributes nothing — this is a floor built from entered numbers, never an
+   * estimate, and a week with no times at all reports 0 rather than a guess.
+   */
+  moveMinutes: number;
   heaviest: { move: string; value: string } | null;
   /**
    * "up from 45kg · your 3rd PR this month" — what makes a modest top set read as
@@ -173,13 +222,15 @@ export interface RecapData {
 }
 
 export interface UseRecapDataResult {
-  /** All completed-period recaps, newest first (season before month on ties). */
+  /** All completed-period recaps, newest first (widest scope first on ties). */
   recaps: RecapData[];
+  /** Recap for the immediately previous Monday-to-Sunday week, if it had workouts. */
+  weekRecap: RecapData | null;
   /** Recap for the immediately previous calendar month, if it had workouts. */
   monthRecap: RecapData | null;
   /** Recap for the immediately previous quarter, if it had workouts. */
   seasonRecap: RecapData | null;
-  /** Ids of current-drop recaps (last month / last season) not yet opened. */
+  /** Ids of current-drop recaps (last week / month / season) not yet opened. */
   newRecapIds: string[];
   /**
    * Every movement across every period that didn't resolve exactly. Returned
@@ -201,12 +252,24 @@ const SEASON_LABELS: Record<number, { name: string; sub: string }> = {
   3: { name: 'FALL', sub: 'OCT — DEC' },
 };
 
+/**
+ * Tonnage as an object you can picture.
+ *
+ * The low end matters more than the high end. A week is a short period, so a
+ * two-session week lands here routinely — and the old floor, "more than you
+ * think", is a shrug that reads as a consolation prize. Every rung now names
+ * something, because a light week has to get a real line or the page quietly
+ * becomes a scoreboard again.
+ */
 function tonnageComp(kg: number): string {
   if (kg >= 20000) return 'a loaded cement truck';
   if (kg >= 8000) return 'a T-rex off the floor';
   if (kg >= 3000) return 'a small car — fully loaded';
   if (kg >= 1000) return 'a baby elephant';
-  return 'more than you think';
+  if (kg >= 400) return 'a grand piano';
+  if (kg >= 150) return 'a vending machine';
+  if (kg > 0) return 'a washing machine';
+  return 'every rep that counted';
 }
 
 function monthRecapId(year: number, month: number): string {
@@ -217,17 +280,59 @@ function seasonRecapId(year: number, quarter: number): string {
   return `season-${year}-q${quarter + 1}`;
 }
 
+const MONTH_ABBR = MONTH_NAMES.map(m => m.slice(0, 3));
+
+/** Midnight on the Monday of `d`'s week. Weeks run Monday to Sunday. */
+function startOfWeek(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = x.getDay(); // 0 = Sunday, which belongs to the week that began six days earlier
+  x.setDate(x.getDate() + (day === 0 ? -6 : 1 - day));
+  return x;
+}
+
+/**
+ * Keyed on the Monday's calendar date rather than an ISO week number, so a week
+ * straddling New Year can't collide with week 1 of the neighbouring year. The
+ * week number is a label; this is an identity.
+ */
+function weekRecapId(monday: Date): string {
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const d = String(monday.getDate()).padStart(2, '0');
+  return `week-${monday.getFullYear()}-${m}-${d}`;
+}
+
+/** ISO-8601 week number — the week owns whichever year its Thursday falls in. */
+function isoWeekNumber(monday: Date): number {
+  const thursday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 3);
+  const yearStart = new Date(thursday.getFullYear(), 0, 1);
+  return Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/** "AUG 11 — 17", or "AUG 28 — SEP 3" when the week crosses a month. */
+function weekSubLabel(monday: Date): string {
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  const to = monday.getMonth() === sunday.getMonth()
+    ? String(sunday.getDate())
+    : `${MONTH_ABBR[sunday.getMonth()]} ${sunday.getDate()}`;
+  return `${MONTH_ABBR[monday.getMonth()]} ${monday.getDate()} — ${to}`;
+}
+
 function buildRecap(
   ws: WorkoutWithStats[],
-  scope: 'month' | 'season',
+  scope: RecapScope,
   id: string,
   period: string,
   periodSub: string,
   year: number,
   unknowns: RecapUnknownMovement[],
+  bodyweight: number,
 ): RecapData {
   const totalVolume = ws.reduce((s, w) => s + (w.totalVolume ?? 0), 0);
   const prCount = ws.filter(w => w.isPR).length;
+  const epTotal = ws.reduce((s, w) => s + computeWorkoutEP(w, { bodyweight }).total, 0);
+  // `duration` is a float (see the duration-minutes note); round the SUM once rather
+  // than each term, so a week of half-minutes doesn't drift by several minutes.
+  const moveMinutes = Math.round(ws.reduce((s, w) => s + (w.duration ?? 0), 0));
 
   const moves = buildMoveStats(ws, unknowns);
   const topMove = pickTopMove(moves);
@@ -278,16 +383,25 @@ function buildRecap(
     ].filter(Boolean).join(' · ') || null;
 
   const workoutWord = ws.length === 1 ? 'workout' : 'workouts';
+  // "Your week 33 in the box" reads like a filing reference; a week says "week".
+  const periodPhrase = scope === 'week' ? 'week' : period.toLowerCase();
   const verdict = prCount > 0
-    ? `${ws.length} ${workoutWord}. ${prCount} ${prCount === 1 ? 'PR' : 'PRs'}. Your ${period.toLowerCase()} in the box.`
+    ? `${ws.length} ${workoutWord}. ${prCount} ${prCount === 1 ? 'PR' : 'PRs'}. Your ${periodPhrase} in the box.`
     : `${ws.length} ${workoutWord}. You showed up.`;
 
-  const tagline = scope === 'month' ? 'your month, felt' : `season ${year}`;
+  const SCOPE_LABEL: Record<RecapScope, string> = {
+    week: 'THE WEEK',
+    month: 'THE MONTH',
+    season: 'THE SEASON',
+  };
+  const tagline = scope === 'season'
+    ? `season ${year}`
+    : scope === 'month' ? 'your month, felt' : 'your week';
 
   return {
     id,
     scope,
-    label: scope === 'month' ? 'THE MONTH' : 'THE SEASON',
+    label: SCOPE_LABEL[scope],
     period,
     periodSub,
     tagline,
@@ -296,6 +410,8 @@ function buildRecap(
     tonnageComp: tonnageComp(totalVolume),
     workouts: ws.length,
     prCount,
+    epTotal: Math.round(epTotal),
+    moveMinutes,
     heaviest,
     prDelta,
     moves,
@@ -756,6 +872,7 @@ function buildAerobicStat(cardio: RecapCardioStat[]): RecapAerobicStat | null {
     rest: rest.length > 0
       ? `+ ${rest.map(e => `${e.machine} ${e.value} ${e.label.toLowerCase()}`).join(' · ')}`
       : null,
+    cells: entries.map(e => ({ machine: e.machine, value: e.value, unit: e.label })),
   };
 }
 
@@ -828,21 +945,31 @@ export function markRecapViewed(data: RecapData): void {
 export function buildRecaps(
   workouts: WorkoutWithStats[],
   now: Date = new Date(),
+  bodyweight: number = DEFAULT_BW,
 ): UseRecapDataResult {
   const curMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const curQuarter = Math.floor(now.getMonth() / 3);
   const curQuarterStart = new Date(now.getFullYear(), curQuarter * 3, 1);
+  const curWeekStart = startOfWeek(now);
 
-  // Bucket workouts into every completed month / quarter (current period excluded).
+  // Bucket workouts into every completed week / month / quarter (current period excluded).
   // Filed by the day the workout was TRAINED, not the day it was logged — Sunday's
   // session logged on Monday belongs to Sunday's month, and a whole week of boards
   // caught up in one sitting still lands on the days they were actually done.
+  const weekBuckets = new Map<string, { monday: Date; ws: WorkoutWithStats[] }>();
   const monthBuckets = new Map<string, { y: number; m: number; ws: WorkoutWithStats[] }>();
   const seasonBuckets = new Map<string, { y: number; q: number; ws: WorkoutWithStats[] }>();
   for (const w of workouts) {
     const trained = getEffectiveWorkoutDate(w);
     const y = trained.getFullYear();
     const m = trained.getMonth();
+    if (trained < curWeekStart) {
+      const monday = startOfWeek(trained);
+      const key = weekRecapId(monday);
+      const bucket = weekBuckets.get(key) ?? { monday, ws: [] };
+      bucket.ws.push(w);
+      weekBuckets.set(key, bucket);
+    }
     if (trained < curMonthStart) {
       const key = monthRecapId(y, m);
       const bucket = monthBuckets.get(key) ?? { y, m, ws: [] };
@@ -859,41 +986,55 @@ export function buildRecaps(
   }
 
   const entries: { data: RecapData; end: number }[] = [];
-  // Months alone cover every workout exactly once; seasons re-walk the same
-  // workouts, so collecting from both would double-count the flag queue.
+  // Months alone cover every workout exactly once; weeks and seasons re-walk the
+  // same workouts, so collecting from more than one tier would multiply the flag
+  // queue by the number of tiers.
   const unknownMovements: RecapUnknownMovement[] = [];
+  for (const { monday, ws } of weekBuckets.values()) {
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+    entries.push({
+      data: buildRecap(
+        ws, 'week', weekRecapId(monday),
+        `WEEK ${isoWeekNumber(monday)}`, weekSubLabel(monday),
+        monday.getFullYear(), [], bodyweight,
+      ),
+      end: sunday.getTime(),
+    });
+  }
   for (const { y, m, ws } of monthBuckets.values()) {
     entries.push({
-      data: buildRecap(ws, 'month', monthRecapId(y, m), MONTH_NAMES[m], String(y), y, unknownMovements),
+      data: buildRecap(ws, 'month', monthRecapId(y, m), MONTH_NAMES[m], String(y), y, unknownMovements, bodyweight),
       end: new Date(y, m + 1, 0).getTime(),
     });
   }
   for (const { y, q, ws } of seasonBuckets.values()) {
     const info = SEASON_LABELS[q];
     entries.push({
-      data: buildRecap(ws, 'season', seasonRecapId(y, q), info.name, `${info.sub} ${y}`, y, []),
+      data: buildRecap(ws, 'season', seasonRecapId(y, q), info.name, `${info.sub} ${y}`, y, [], bodyweight),
       end: new Date(y, q * 3 + 3, 0).getTime(),
     });
   }
-  entries.sort((a, b) =>
-    b.end - a.end
-    || (a.data.scope === 'season' ? 0 : 1) - (b.data.scope === 'season' ? 0 : 1),
-  );
+  // Newest first; on a tie the widest scope leads, so a season sits above the month
+  // that closed with it and a month above its final week.
+  const SCOPE_RANK: Record<RecapScope, number> = { season: 0, month: 1, week: 2 };
+  entries.sort((a, b) => b.end - a.end || SCOPE_RANK[a.data.scope] - SCOPE_RANK[b.data.scope]);
   const recaps = entries.map(e => e.data);
 
-  // Current drops: the immediately previous month / quarter only
+  // Current drops: the immediately previous week / month / quarter only
+  const lastMonday = new Date(curWeekStart.getFullYear(), curWeekStart.getMonth(), curWeekStart.getDate() - 7);
   const lastMonthNum = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
   const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
   const lastQ = curQuarter === 0 ? 3 : curQuarter - 1;
   const lastQYear = curQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  const weekRecap = recaps.find(r => r.id === weekRecapId(lastMonday)) ?? null;
   const monthRecap = recaps.find(r => r.id === monthRecapId(lastMonthYear, lastMonthNum)) ?? null;
   const seasonRecap = recaps.find(r => r.id === seasonRecapId(lastQYear, lastQ)) ?? null;
 
-  const newRecapIds = [monthRecap, seasonRecap]
+  const newRecapIds = [weekRecap, monthRecap, seasonRecap]
     .filter((d): d is RecapData => d !== null && !isRecapViewed(d))
     .map(d => d.id);
 
-  return { recaps, monthRecap, seasonRecap, newRecapIds, unknownMovements };
+  return { recaps, weekRecap, monthRecap, seasonRecap, newRecapIds, unknownMovements };
 }
 
 /**
@@ -906,8 +1047,17 @@ const flaggedThisSession = new Set<string>();
 export function useRecapData(
   workouts: WorkoutWithStats[],
   userId?: string,
+  /**
+   * The athlete's bodyweight, for the EP sum. Left at `DEFAULT_BW` when the user
+   * hasn't set one — but a caller that HAS the real weight must pass it, or the
+   * recap's EP disagrees with the posters the same workouts already showed.
+   */
+  bodyweight?: number,
 ): UseRecapDataResult {
-  const result = useMemo(() => buildRecaps(workouts), [workouts]);
+  const result = useMemo(
+    () => buildRecaps(workouts, new Date(), bodyweight ?? DEFAULT_BW),
+    [workouts, bodyweight],
+  );
 
   useEffect(() => {
     if (!userId) return;

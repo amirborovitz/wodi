@@ -2,7 +2,7 @@
   "reward": [
     {
       "title": "Blueprint",
-      "blueprint": "5 rounds for time",
+      "blueprint": "for time",
       "rows": [],
       "isPartnerConfirmed": false
     },
@@ -45,7 +45,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "5 rounds for time",
+        "blueprint": "for time",
         "rows": [],
         "isPartnerConfirmed": false
       },
@@ -122,11 +122,6 @@
     "reward": [
       {
         "kind": "block",
-        "label": "5 ROUNDS FOR TIME",
-        "cap": ""
-      },
-      {
-        "kind": "block",
         "label": "BUY-IN",
         "cap": ""
       },
@@ -161,11 +156,6 @@
     ],
     "pages": [
       [
-        {
-          "kind": "block",
-          "label": "5 ROUNDS FOR TIME",
-          "cap": ""
-        },
         {
           "kind": "block",
           "label": "BUY-IN",

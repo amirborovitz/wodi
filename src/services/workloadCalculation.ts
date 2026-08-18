@@ -4,49 +4,13 @@ import { hasSequentialBlocks } from '../utils/sectionShape';
 import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 
 /**
- * Whether an exercise inside a partner session was prescribed as a TEAM total —
- * a number the pair produces together, of which this athlete did a share — rather
- * than solo work each athlete completes in full.
- *
- * A partner WOD routinely mixes both: the metcon is shared, the strength and skill
- * blocks before it are not. Applying the partner factor to everything would halve
- * real work; applying it to nothing files the pair's output as one athlete's.
- *
- * `ParsedExercise.partnerWorkout` IS the answer. The AI is prompted for it per
- * block ("set partnerWorkout: false, not omitted, on a solo strength/skill block
- * even when the session overall is partnered"), and workoutPostProcessor's
- * `backfillPartnerSplit` fills it from exercise-scoped text when the AI omits it.
- * Trust it, including an explicit `false` — see [[feedback-trust-ai-over-regex]].
- *
- * The text scan below is ONLY for saved data predating that field. It reads the
- * NAME as well as the prescription: the parser writes the partner marker into the
- * name it generates ("Partner 16 RFT (8 each)") while the prescription it emits is
- * the already-per-person body ("8 rounds each: 5 twin KB Power Clean"), carrying no
- * keyword at all. Scanning the prescription alone missed every multi-part partner
- * WOD — one real board stored 16 rounds of a pair's work as one athlete's 592 reps.
+ * Every partner-scope rule — which blocks are team-prescribed, what divides and what does not —
+ * lives in ONE place: `services/partnerScope.ts`. Re-exported here so existing importers keep
+ * working. See that file for why keeping a second copy is how this bug kept coming back.
  */
-const TEAM_KEYWORDS = /teams?\s+of|i\s*go\s*you\s*go|igug|partner|in\s+pairs/i;
-/** The board's explicit split notation: "16 RFT (8 each)", "14 RFT (7 each)". */
-const EACH_SPLIT = /\(\s*\d+\s*each\s*\)/i;
-
-export function isTeamPrescribedExercise(
-  // Structural, not Pick<ParsedExercise>: the saved Firestore Exercise reaching this from
-  // detail mode carries the same three fields but leaves prescription optional.
-  exercise: { name?: string; prescription?: string; partnerWorkout?: boolean },
-  partnerFactor: number,
-  isSoleExercise: boolean,
-): boolean {
-  if (partnerFactor >= 1) return false;
-  if (typeof exercise.partnerWorkout === 'boolean') return exercise.partnerWorkout;
-
-  // ── Legacy data only, from here down ──
-  // A sectioned WOD often collapses to one exercise whose prescription never
-  // repeats "in pairs" — with nothing else in the session, the workout-level
-  // partner factor is the only signal there is, and it applies.
-  if (isSoleExercise) return true;
-  const text = `${exercise.name ?? ''} ${exercise.prescription ?? ''}`;
-  return TEAM_KEYWORDS.test(text) || EACH_SPLIT.test(text);
-}
+export { isTeamPrescribedExercise } from './partnerScope';
+import { exercisePartnerFactor } from './partnerScope';
+import { expandExercise, totalsForMovementIndex } from './occurrenceExpansion';
 
 /**
  * Bodyweight movements that should not show a weight annotation in the UI
@@ -385,6 +349,28 @@ interface MovementMultiplierResult {
   estimated: boolean;
 }
 
+/**
+ * How many times a movement happens when the BOARD answers that question itself — either by
+ * stating the total outright, or by describing a placement whose count follows from the round
+ * count. Returns undefined when the board said neither, leaving the structural counting modes
+ * to decide.
+ *
+ * THE single owner of this question. Two separate places used to compute a movement's multiplier
+ * (this file at save time, repairUndercountedBreakdown at display time), and they disagreed: the
+ * save path was corrected to 5 runs while the repair pass independently recomputed 6 from the
+ * tier count and inflated it straight back. Both now ask here.
+ */
+export function statedOccurrenceCount(
+  movement: Pick<ParsedMovement, 'occurrences' | 'placement'>,
+  rounds: number | undefined,
+): number | undefined {
+  // An explicitly written total always wins — "(5 total)" is not a derivation, it is the answer.
+  if (movement.occurrences && movement.occurrences > 0) return movement.occurrences;
+  // N sets have N-1 gaps between them. Needs at least two sets for a gap to exist at all.
+  if (movement.placement === 'between_sets' && rounds && rounds > 1) return rounds - 1;
+  return undefined;
+}
+
 function getMovementMultiplier(
   movement: ParsedMovement,
   movementIndex: number,
@@ -399,6 +385,11 @@ function getMovementMultiplier(
   const sessionIntervals = workout.sets || workout.containerRounds;
   const intervalMultiplier = exerciseIntervals || sessionIntervals || fallbackMultiplier || 1;
   const intervalIsGuess = !exerciseIntervals && !!sessionIntervals && !fallbackMultiplier;
+
+  // Neither of these is a guess, so neither is ever flagged estimated: the first is the coach's
+  // own number, the second is arithmetic on the structure the coach described.
+  const stated = statedOccurrenceCount(movement, intervalMultiplier);
+  if (stated != null) return { multiplier: stated, estimated: false };
 
   switch (movement.countingMode) {
     case 'once':
@@ -478,6 +469,13 @@ export function calculateWorkloadBreakdown(
   workout.exercises.forEach((exercise, exerciseIndex) => {
     const multiplier = getContainerMultiplier(workout, exercise);
     const stationVisitCounts = getStationVisitCountsForExercise(workout, exercise, exerciseIndex);
+    // The flat form of this exercise — the individual performances it is actually made of. Used
+    // in place of per-movement multiplier arithmetic ONLY when the expansion reports no gaps,
+    // i.e. when writing the workout out answers "how many times?" on its own. Every other shape
+    // (AMRAP round counts, stations, sections, max efforts) stays on the multiplier path below,
+    // untouched. See occurrenceExpansion.ts for why this is the direction of travel.
+    const expansion = expandExercise(exercise, multiplier);
+    const useFlatForm = expansion.gaps.length === 0 && !exercise.sections?.length;
     // A free/unclassified part's movement totals are estimates by definition — the structure
     // was never understood, so any multiplier is a guess.
     if ((exercise.movements?.length || exercise.sections?.length)
@@ -541,11 +539,16 @@ export function calculateWorkloadBreakdown(
         );
         const movMultiplier = multiplierResult.multiplier;
         if (multiplierResult.estimated) estimated = true;
+        // Flat form: sum this written line's own performances. Keyed by movement INDEX, so a
+        // chipper that writes "600m run" twice keeps two honest rows instead of one merged
+        // figure. A run's rep count comes out as 0 here rather than inheriting the ladder's rep
+        // sum, because no occurrence of a run has reps to contribute.
+        const flat = useFlatForm ? totalsForMovementIndex(expansion, movementIndex) : null;
         const schemeReps = getVariableSchemeMovementReps(movement, exercise);
-        const reps = schemeReps ?? ((movement.reps || 0) * movMultiplier);
-        const distance = (movement.distance || 0) * movMultiplier;
-        const calories = (movement.calories || 0) * movMultiplier;
-        const time = (movement.time || 0) * movMultiplier;
+        const reps = flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier));
+        const distance = flat ? flat.distance : (movement.distance || 0) * movMultiplier;
+        const calories = flat ? flat.calories : (movement.calories || 0) * movMultiplier;
+        const time = flat ? flat.time : (movement.time || 0) * movMultiplier;
 
         // Get per-implement weight from movementWeights override or rxWeights
         const perImplementWeight = movementWeights?.[movement.name]
@@ -754,9 +757,12 @@ export function calculateWorkloadFromExercises(
     // this function used to, at the end of the pipeline) quietly divided the solo strength
     // block of a partner session too, and divided runs on the way to the grand total even
     // though each athlete runs the full distance.
-    const isTeamExercise = isTeamPrescribedExercise(exercise, partnerFactor, exercises.length === 1);
+    // KNOWN DIVERGENCE: the save path (buildWorkloadBreakdownFromResults) has no run exemption,
+    // so a partner run is halved there and not here. The exemption is also a name regex, which
+    // contradicts `together` being the marker for undivided work. Left as-is deliberately —
+    // changing it moves EP on saved partner sessions and deserves its own pass.
     const isRun = /\b(run|running|sprint)\b/i.test(exercise.name);
-    const factor = isTeamExercise && !isRun ? partnerFactor || 1 : 1;
+    const factor = isRun ? 1 : exercisePartnerFactor(exercise, partnerFactor, exercises.length === 1);
     if (factor !== 1) {
       exerciseReps = Math.round(exerciseReps * factor);
       exerciseDistance = Math.round(exerciseDistance * factor);

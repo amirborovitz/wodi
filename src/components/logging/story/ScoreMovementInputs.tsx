@@ -357,20 +357,48 @@ function getTileConfig(mr: MovementResult, distancePrescribedByStructure = false
   }
 
   if (isMaxBodyweight) {
-    return {
-      field: 'reps',
-      value: mr.reps,
-      placeholder: '0',
-      unit: 'reps',
-      color: METRIC_TILE_COLOR,
-      step: 1,
-      min: 0,
-      max: 999,
-      inputMode: 'numeric',
-    };
+    return repsTileConfig(mr);
   }
 
   return null;
+}
+
+function repsTileConfig(mr: MovementResult): TileConfig {
+  return {
+    field: 'reps',
+    value: mr.reps,
+    placeholder: '0',
+    unit: 'reps',
+    color: METRIC_TILE_COLOR,
+    step: 1,
+    min: 0,
+    max: 999,
+    inputMode: 'numeric',
+  };
+}
+
+/**
+ * A LOADED movement the board never counted — "Alt DB Snatches @15/22.5kg": a weight, no reps,
+ * no distance, no calories. The weight tile records the load but nothing records the count, so
+ * the movement used to fall out of the workload breakdown entirely and the block earned no EP.
+ *
+ * This is deliberately NOT the `isMaxBodyweight` guard: that one is about `kind === 'reps'` and
+ * must keep its triple-null rule (a prescribed 400m Run must never sprout a rep field). This is
+ * the load-side sibling, and it renders an EXTRA tile beside the weight rather than replacing it.
+ *
+ * Left empty on purpose — never prefilled. An untouched field means "I didn't say", and the save
+ * path prices it at a default cadence for EP only. Type a count and it becomes yours: it lands in
+ * movementReps, the movement rejoins the breakdown, and it prints on the poster.
+ */
+function isUncountedLoad(mr: MovementResult): boolean {
+  return mr.kind === 'load'
+    && mr.movement.reps == null
+    && mr.movement.distance == null
+    && mr.movement.calories == null;
+}
+
+function uncountedRepsTileId(movementKey: string): string {
+  return `${movementKey}::reps`;
 }
 
 // Swap icon (two-arrow cycle symbol)
@@ -733,13 +761,25 @@ export function ScoreMovementInputs({
       const sub = getSubState(mr);
       const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
       const cleaned = cleanTileLabel(labelSource) || stripWeightFromName(labelSource) || labelSource;
-      return [{
+      const tiles = [{
         tileId: mr.movementKey,
         globalIndex,
         mr,
         label: cleaned.toUpperCase(),
         config,
       }];
+      // The optional count that sits beside an uncounted load — its own tile, so the numpad can
+      // reach it without stealing the weight tile's slot.
+      if (isUncountedLoad(mr)) {
+        tiles.push({
+          tileId: uncountedRepsTileId(mr.movementKey),
+          globalIndex,
+          mr,
+          label: `${cleaned.toUpperCase()} REPS`,
+          config: repsTileConfig(mr),
+        });
+      }
+      return tiles;
     })
   ), [movements, distancePrescribedByStructure]);
 
@@ -974,6 +1014,16 @@ export function ScoreMovementInputs({
               onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)}
               onCenterPress={() => openTile(mr.movementKey)}
               active={activeTileId === mr.movementKey}
+            />
+          )}
+          {/* Optional count for a load the board never quantified — empty unless the athlete
+              fills it. Shown even on a shared bar: the weight is the group's, the count is theirs. */}
+          {isUncountedLoad(mr) && (
+            <RepsField
+              mr={mr}
+              onChange={(patch) => onChange(globalIndex, patch)}
+              onCenterPress={() => openTile(uncountedRepsTileId(mr.movementKey))}
+              active={activeTileId === uncountedRepsTileId(mr.movementKey)}
             />
           )}
           {(tileField === 'distance' || tileField === 'calories') && (

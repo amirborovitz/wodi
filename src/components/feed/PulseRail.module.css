@@ -1,0 +1,58 @@
+.wrapper {
+  padding: 2px 20px 0;
+}
+
+.rail {
+  position: relative;
+  height: 30px;
+}
+
+.track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 194, 0, 0.08) 40%, rgba(245, 194, 0, 0.55) 100%);
+}
+
+.dot {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--wodi-yellow);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dot:active {
+  transform: translateX(-50%) scale(0.85);
+}
+
+.dotFresh {
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  opacity: 1;
+  box-shadow: 0 0 0 4px rgba(245, 194, 0, 0.13);
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  color: var(--wodi-dim2);
+}
+
+.scaleNow {
+  color: var(--wodi-yellow);
+}

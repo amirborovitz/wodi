@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors, getStationVisitCountsForExercise, isTeamPrescribedExercise, movementBucketKey } from '../services/workloadCalculation';
+import { assignMovementColors, getStationVisitCountsForExercise, movementBucketKey } from '../services/workloadCalculation';
+import { exercisePartnerFactor } from '../services/partnerScope';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -282,7 +283,19 @@ function entersTotalValue(movement: ParsedMovement, unprescribedInThisUnit: bool
   return movement.scoreEntryMode ? movement.scoreEntryMode === 'total' : unprescribedInThisUnit;
 }
 
-function buildWorkloadBreakdownFromResults(
+/**
+ * Assumed cadence for a loaded movement the board never counted and the athlete didn't either —
+ * one rep per 5 seconds of work. Only ever reaches EP, never a displayed total, so it is allowed
+ * to be rough; the logging screen's optional count is how an athlete replaces it with the truth.
+ */
+const SECONDS_PER_UNCOUNTED_REP = 5;
+
+/**
+ * Exported for tests only — this is a pure function trapped in a screen component. It owns the
+ * save-time breakdown (every stored total and therefore every workout's EP), so it needs a
+ * regression net; it belongs in src/services/ alongside calculateWorkloadBreakdown.
+ */
+export function buildWorkloadBreakdownFromResults(
   results: ExerciseResult[],
   parsedWorkout?: ParsedWorkout,
   partnerFactor: number = 1,
@@ -290,6 +303,9 @@ function buildWorkloadBreakdownFromResults(
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
   let grandTotalVolume = 0;
+  // Volume from loaded movements the athlete never counted — priced at a default cadence so the
+  // effort scores, deliberately kept off the movement rows so it can never print on a poster.
+  let estimatedVolume = 0;
   let grandTotalDistance = 0;
   let grandTotalCalories = 0;
   let grandTotalWeightedDistance = 0;
@@ -300,12 +316,15 @@ function buildWorkloadBreakdownFromResults(
   );
 
   results.forEach((result, resultIndex) => {
-    const isTeamExercise = isTeamPrescribedExercise(
+    // What divides and what does not — team-prescribed blocks only, never (together) work, never
+    // a number the athlete typed — is defined once in services/partnerScope.ts. The per-metric
+    // arithmetic stays spelled out below because each metric has its own "already a total" rule
+    // (relay pacers, total-entry fields) that the shared helper deliberately does not model.
+    const exerciseFactor = exercisePartnerFactor(
       result.exercise,
       partnerFactor,
       results.length === 1,
     );
-    const exerciseFactor = isTeamExercise ? partnerFactor : 1;
     const movements = result.exercise.movements;
     // Only the real (first/last set) weights are ever stored for a ranged load, so the
     // distinct values are the true endpoints — no per-set fabrication to detect or undo.
@@ -500,7 +519,20 @@ function buildWorkloadBreakdownFromResults(
         ? result.sets.find((s) => s.isMax && (s.actualReps ?? 0) > 0)?.actualReps
         : undefined;
 
-      const perRoundReps = userReps ?? maxSetReps ?? mov.reps ?? 0;
+      // Same hole as the max test above, for the other shape that carries no prescribed count:
+      // a strength part's rep scheme lives on the SETS (10-8-6-5-4), never on the movement, so
+      // perRoundReps is 0 and the guard below drops the part — no reps, no volume, no EP for
+      // the whole block. The sets already hold every rep, so this is a TOTAL (rounds forced to
+      // 1 below), not a per-round count. Only safe when one movement can own those sets: a
+      // complex or a circuit shares its sets across movements and must not claim them all.
+      const setTotalReps = !hasSections
+        && iterationMovements.length === 1
+        && userReps === undefined
+        && !mov.reps && !mov.distance && !mov.calories && !mov.time
+        ? result.sets.reduce((sum, s) => sum + (s.actualReps ?? 0), 0) || undefined
+        : undefined;
+
+      const perRoundReps = userReps ?? maxSetReps ?? setTotalReps ?? mov.reps ?? 0;
       const perRoundDistance = userDistance ?? mov.distance ?? 0;
       const perRoundCalories = userCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
@@ -516,12 +548,34 @@ function buildWorkloadBreakdownFromResults(
       const hasCycleReps = result.completedCycleReps !== undefined && result.completedCycleReps > 0;
 
       if (!hasCycleReps && perRoundReps <= 0 && perRoundDistance <= 0 && perRoundCalories <= 0 && perRoundTime <= 0) {
-        console.warn('🔍 [BREAKDOWN-SKIP]', mov.name, {
-          perRoundReps, perRoundDistance, perRoundCalories, perRoundTime,
-          movReps: mov.reps, userReps,
-          exerciseName: result.exercise.name,
-          hasSections,
-        });
+        // An unprescribed LOADED movement — "Alt DB Snatches @15/22.5kg", a weight with no count
+        // on the board — is real work the athlete did, and dropping it silently cost them the
+        // whole block's EP. The logging screen offers an optional count for exactly these; when
+        // it's left empty, price the block at a default cadence so EP credits the effort, but
+        // leave the movement OUT of the breakdown. That split is the point: a number nobody
+        // entered feeds the score and never reaches the poster (truth standard — estimates may
+        // inform EP, never the artifact).
+        const uncountedWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
+          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
+        if (uncountedWeight && uncountedWeight > 0) {
+          // Station visits, not raw rounds: in a 20-minute rotation this movement came up 5
+          // times, not 20 — the same count the main path gets via getMovementEffectiveRounds.
+          const visits = stationVisitCounts?.[movIdx] ?? movementRounds;
+          const workSeconds = result.exercise.workDuration ?? parsedWorkout?.intervalTime ?? 60;
+          const assumedReps = Math.max(1, Math.round(workSeconds / SECONDS_PER_UNCOUNTED_REP));
+          estimatedVolume += toKg(uncountedWeight, mov.rxWeights?.unit === 'lb' ? 'lb' : 'kg')
+            * assumedReps * Math.max(1, visits);
+        } else {
+          // Unloaded and uncounted (a stretch, a hold with no prescribed time) — nothing to
+          // score, so it drops as before. Kept noisy: this warning is how the loaded case above
+          // was found, and it's the only signal that a movement left the breakdown.
+          console.warn('🔍 [BREAKDOWN-SKIP]', mov.name, {
+            perRoundReps, perRoundDistance, perRoundCalories, perRoundTime,
+            movReps: mov.reps, userReps,
+            exerciseName: result.exercise.name,
+            hasSections,
+          });
+        }
         return;
       }
 
@@ -530,7 +584,7 @@ function buildWorkloadBreakdownFromResults(
       const sectionType = perMovementSectionTypes[movIdx];
       // A max test happens ONCE, whatever the block's set count says — a 14-rep effort inside a
       // 5-set practice is 14 reps, not 70.
-      const effective = maxSetReps != null
+      const effective = maxSetReps != null || setTotalReps != null
         ? { rounds: 1, estimated: false }
         : sectionType && sectionType !== 'rounds'
         ? { rounds: 1, estimated: false }
@@ -811,25 +865,39 @@ function buildWorkloadBreakdownFromResults(
   // what the breakdown displays (weight × totalReps per movement).
   // The per-set/per-loop accumulator can drift when a set is missing weight
   // or the rounds calculation is off by one.
-  // Deduplicate barbell complexes: when multiple movements share the exact same
-  // weight AND rep count they are a single-bar complex — count volume once.
   // Rows keep the coach's unit; grandTotalVolume is kg by definition (EP divides it by
   // bodyweight in kg), so an lb load converts here and only here.
-  const complexKeys = new Set<string>();
+  //
+  // A barbell complex is ONE bar carried through consecutive lifts, so its sub-lifts share a
+  // single load and that load is counted once. WHICH movements share a bar is a structural fact
+  // the parser already answers — `ParsedExercise.complex`, prompted for explicitly and backfilled
+  // by backfillComplexFlag when the AI misses it. It is not something a weight/rep coincidence can
+  // reveal: this used to collapse ANY two rows in the SESSION that happened to match on
+  // `weight:totalReps`, so identical-by-construction work silently lost a whole movement —
+  // two-arm KB snatches (L and R are always the same load for the same reps) dropped an arm's
+  // entire volume, and a goblet squat sharing a load and rep count with a swing in a different
+  // part would too. Asking the flag instead of guessing from the numbers is the same rule the
+  // parser follows everywhere else: the AI classifies, this code does the arithmetic.
+  const complexExerciseIndices = new Set(
+    results.flatMap((result, resultIndex) => (result.exercise.complex ? [resultIndex] : [])),
+  );
+  const countedComplexLoads = new Set<string>();
   const derivedVolume = movements.reduce((sum, m) => {
-    if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-      const key = `${m.weight}:${m.totalReps}`;
-      if (complexKeys.has(key)) return sum;
-      complexKeys.add(key);
-      return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
+    if (!(m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0)) return sum;
+    // Scoped to the PART: two parts that happen to share a load are two different bars, and a
+    // row with no exerciseIndex (pre-stamping doc) is never assumed to be somebody's complex.
+    if (m.exerciseIndex != null && complexExerciseIndices.has(m.exerciseIndex)) {
+      const key = `${m.exerciseIndex}:${m.weight}:${m.totalReps}`;
+      if (countedComplexLoads.has(key)) return sum;
+      countedComplexLoads.add(key);
     }
-    return sum;
+    return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
   }, 0);
 
   return {
     movements,
     grandTotalReps: Math.round(grandTotalReps),
-    grandTotalVolume: Math.round(derivedVolume),
+    grandTotalVolume: Math.round(derivedVolume + estimatedVolume),
     grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
     grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
@@ -1513,10 +1581,9 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
-  // Voice input state
+  // Spoken/typed WOD text. Dictation comes from the OS keyboard's mic key, not from
+  // the page — the Web Speech API is unavailable in standalone iOS PWAs.
   const [voiceTranscript, setVoiceTranscript] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
   // DEV MODE - temporary for testing
   const [showDevWorkouts, setShowDevWorkouts] = useState(Boolean(showRecentOnOpen && isAdmin));
 
@@ -2158,41 +2225,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       setTellWodiBusy(false);
       setReparsingPartIndex(null);
     }
-  };
-
-  const toggleListening = () => {
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError('Voice input is not supported in this browser. Type your workout below.');
-      return;
-    }
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    recognition.onresult = (event: any) => {
-      let final = '';
-      let interim = '';
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          final += result[0].transcript + ' ';
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-      setVoiceTranscript((final + interim).trim());
-    };
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
   };
 
   const fileToBase64 = (file: File): Promise<string> => {
@@ -3553,12 +3585,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
                 fullWidth
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 }
               >
-                Speak your WOD
+                Say it or type it
               </Button>
             </div>
           </Card>
@@ -3659,37 +3690,28 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <button className={styles.voiceBackBtn} onClick={() => { recognitionRef.current?.stop(); setIsListening(false); setStep('capture'); }}>
+          <button className={styles.voiceBackBtn} onClick={() => setStep('capture')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
               <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
 
           <div className={styles.voiceHeader}>
-            <h2 className={styles.voiceTitle}>Speak your WOD</h2>
-            <p className={styles.voiceSubtitle}>Say the workout out loud, then edit if needed</p>
+            <h2 className={styles.voiceTitle}>Say it or type it</h2>
+            <p className={styles.voiceSubtitle}>
+              Tap the mic on your keyboard to speak it — or just write it out
+            </p>
           </div>
 
-          <button
-            className={`${styles.voiceMicBtn} ${isListening ? styles.voiceMicBtnActive : ''}`}
-            onClick={toggleListening}
-            aria-label={isListening ? 'Stop listening' : 'Start listening'}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="32" height="32">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <p className={styles.voiceStatus}>
-            {isListening ? 'Listening… tap to stop' : voiceTranscript ? 'Tap mic to continue' : 'Tap to speak'}
-          </p>
-
+          {/* autoFocus opens the keyboard immediately, putting the OS dictation
+              mic one tap away — that key is the app's entire voice input path. */}
           <textarea
             className={styles.voiceTextarea}
             value={voiceTranscript}
             onChange={e => setVoiceTranscript(e.target.value)}
-            placeholder="Your spoken workout will appear here — or type directly"
-            rows={6}
+            placeholder={'21-15-9\nThrusters 43kg\nPull-ups\nFor time'}
+            rows={8}
+            autoFocus
           />
 
           {error && <p className={styles.voiceError}>{error}</p>}

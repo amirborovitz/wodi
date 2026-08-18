@@ -11,7 +11,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -44,8 +44,11 @@ export function SkinSlab({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
         {/* Meta: outlined yellow FormatTag pill + date */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={BRAND.yellow} />
-          <span style={{ flex: 1, height: 1.5, background: 'rgba(255,255,255,0.12)' }} />
-          <span style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }}>{wod.date}</span>
+          <span style={{ flex: 1 }} />
+          <HeaderMeta>
+            <EffortMeta ep={wod.ep} color={BRAND.yellow} />
+            <span style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }}>{wod.date}</span>
+          </HeaderMeta>
         </div>
 
         {/* Identity: title (named) or format (unnamed) */}

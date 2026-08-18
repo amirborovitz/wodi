@@ -452,9 +452,79 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Positioning context for the draggable TextSticker overlay on the card */
+/* ── Photo panel (PHOTO tab) ────────────────────────────────────────────── */
+
+/* A <label> wrapping a hidden file input, so the whole pill is the picker. */
+.photoPickBtn {
+  flex: 1;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photoInput {
+  display: none;
+}
+
+/* Sits beside the picker rather than under it: long-press is the shortcut, this
+   is the discoverable route, so it needs a real tap target. */
+.photoRemoveBtn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 120, 120, 0.32);
+  background: rgba(255, 120, 120, 0.08);
+  color: rgba(255, 138, 138, 0.95);
+  font-family: 'Barlow', sans-serif;
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photoRemoveBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Positioning context for the draggable TextSticker / photo overlays on the card */
 .stickerLayer {
   position: relative;
+}
+
+/* ── Feed post result ───────────────────────────────────────────────────── */
+
+.feedNotice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(120px + env(safe-area-inset-bottom));
+  z-index: 110;
+  transform: translateX(-50%);
+  padding: 11px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(20, 22, 26, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 

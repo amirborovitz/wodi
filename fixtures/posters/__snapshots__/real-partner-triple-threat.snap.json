@@ -11,18 +11,18 @@
       "title": "3 ROUNDS OF",
       "rows": [
         {
-          "primary": "50 Wall Ball Shots @ 20/14kg",
+          "primary": "50 Wall Ball Shots @ 20/14kg · 150 total",
           "name": "",
-          "totalNote": "150 total",
           "mineKey": "Wall Ball Shot",
+          "teamShare": "100",
           "accent": "yellow"
         },
         {
-          "primary": "100 Double Unders",
+          "primary": "100 Double Unders · 300 total",
           "name": "",
-          "totalNote": "300 total",
           "mineKey": "Double Under",
           "suppressMine": true,
+          "teamShare": "200",
           "accent": "magenta"
         }
       ],
@@ -33,18 +33,18 @@
       "title": "3 ROUNDS OF",
       "rows": [
         {
-          "primary": "50 CAL Machine",
+          "primary": "50 CAL Machine · 150 cal total",
           "name": "",
-          "totalNote": "150 cal total",
           "mineKey": "Machine",
           "suppressMine": true,
+          "teamShare": "50 cal",
           "accent": "magenta"
         },
         {
-          "primary": "20 Devil Presses @ 2x22.5/15kg",
+          "primary": "20 Devil Presses @ 2x22.5/15kg · 60 total",
           "name": "",
-          "totalNote": "60 total",
           "mineKey": "Devil Press",
+          "teamShare": "20",
           "accent": "yellow"
         }
       ],
@@ -55,18 +55,18 @@
       "title": "3 ROUNDS OF",
       "rows": [
         {
-          "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+          "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg · 90 total",
           "name": "",
-          "totalNote": "90 total",
           "mineKey": "Dual Dumbbell Box Step up Over",
+          "teamShare": "60",
           "accent": "yellow"
         },
         {
-          "primary": "20 Bar Muscle-ups",
+          "primary": "20 Bar Muscle-ups · 60 total",
           "name": "",
-          "totalNote": "60 total",
           "mineKey": "Bar Muscle-up",
           "suppressMine": true,
+          "teamShare": "40",
           "accent": "magenta"
         }
       ],
@@ -238,19 +238,19 @@
       },
       {
         "kind": "line",
-        "rx": "50 Wall Ball Shots @ 20/14kg",
+        "rx": "50 Wall Ball Shots @ 20/14kg · 150 total",
         "load": "",
         "mine": "17.5kg",
-        "team": "",
-        "total": "150 total"
+        "team": "100",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
-        "rx": "100 Double Unders",
+        "rx": "100 Double Unders · 300 total",
         "load": "",
         "mine": "",
-        "team": "",
-        "total": "300 total"
+        "team": "200",
+        "isPartnerShare": true
       },
       {
         "kind": "block",
@@ -259,19 +259,19 @@
       },
       {
         "kind": "line",
-        "rx": "50 CAL Machine",
+        "rx": "50 CAL Machine · 150 cal total",
         "load": "",
         "mine": "",
-        "team": "",
-        "total": "150 cal total"
+        "team": "50 cal",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
-        "rx": "20 Devil Presses @ 2x22.5/15kg",
+        "rx": "20 Devil Presses @ 2x22.5/15kg · 60 total",
         "load": "",
         "mine": "35kg",
-        "team": "",
-        "total": "60 total"
+        "team": "20",
+        "isPartnerShare": true
       },
       {
         "kind": "block",
@@ -280,19 +280,19 @@
       },
       {
         "kind": "line",
-        "rx": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+        "rx": "30 Dual DB Box Step up Overs @ 2x22.5/15kg · 90 total",
         "load": "",
         "mine": "35kg",
-        "team": "",
-        "total": "90 total"
+        "team": "60",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
-        "rx": "20 Bar Muscle-ups",
+        "rx": "20 Bar Muscle-ups · 60 total",
         "load": "",
         "mine": "",
-        "team": "",
-        "total": "60 total"
+        "team": "40",
+        "isPartnerShare": true
       }
     ],
     "pages": [

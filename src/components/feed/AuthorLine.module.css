@@ -1,0 +1,119 @@
+.author {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+
+/* Covers the whole row so the name, the avatar and the gap between them all
+   open the card. Transparent and on top — the identity below it is inert
+   markup, which is why it needs no pointer handling of its own. */
+.openHit {
+  position: absolute;
+  inset: -4px;
+  z-index: 1;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.openHit:active {
+  background: rgba(242, 240, 235, 0.05);
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-weight: 800;
+  color: var(--wodi-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-family: var(--font-body);
+  color: var(--wodi-dim2);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A quiet outbound tap, not a second identity: it sits at the weight of the
+   metadata line even though it lives on the name row. Stacked above .openHit
+   so it keeps its own tap on a row that opens the athlete's card. */
+.instagram {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -6px -4px -6px 0;
+  padding: 6px 4px;
+  color: var(--wodi-dim2);
+  transition: color 0.15s ease;
+}
+
+.instagram:active {
+  color: var(--wodi-yellow);
+}
+
+.instagram svg {
+  display: block;
+}
+
+.card .name {
+  font-size: 13.5px;
+}
+
+.card .meta {
+  font-size: 11px;
+}
+
+.card .instagram svg {
+  width: 13px;
+  height: 13px;
+}
+
+.row {
+  gap: 12px;
+}
+
+.row .name {
+  font-size: 14px;
+}
+
+.row .meta {
+  font-size: 11.5px;
+}
+
+.row .instagram svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (hover: hover) {
+  .instagram:hover {
+    color: var(--wodi-white);
+  }
+}

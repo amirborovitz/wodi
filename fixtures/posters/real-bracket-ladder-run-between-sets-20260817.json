@@ -1,0 +1,120 @@
+{
+  "name": "real-bracket-ladder-run-between-sets-20260817",
+  "description": "Real board (17/08/26): bracket-notation descending ladder [14-12-10-8-6-4] with a distance movement written as a footnote BETWEEN tiers ('* 200m run in between sets (5 total)'). Trap: buildDescendingLadderRows filters the movement list down to the ones that climb the scheme (reps, no distance/calories) and used to return ONLY that single track row — so the run was parsed, saved and counted in the breakdown, then silently vanished from the poster. The Run must get its own row below the track. Its total is deliberately NOT printed: countingMode 'per_interval' resolved the multiplier to the tier count (6 x 200m = 1200m) while the board says 5 runs = 1000m, so the per-round '200m' is shown and the untrustworthy total omitted.",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "timeCap": 900,
+    "partnerWorkout": false,
+    "rawText": "STRENGTH (Pull)\n4 sets:\n4 strict chin ups + 10 sec hold (last rep) @0-1 R.I.R\n15 band pull apart\n6/6 Kettlebell windmill\n\nMETCON (Medium)\nFor time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets (5 total)\n<15 minutes T.C.>",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Strength Pull",
+        "type": "strength",
+        "prescription": "4 sets: 4 strict chin ups + 10 sec hold (last rep) @0-1 R.I.R, 15 band pull apart, 6/6 Kettlebell windmill",
+        "rounds": 4,
+        "rawText": "4 sets:\n4 strict chin ups + 10 sec hold (last rep) @0-1 R.I.R\n15 band pull apart\n6/6 Kettlebell windmill",
+        "partKind": "strength",
+        "loggingMode": "sets",
+        "isSecondary": false,
+        "aiPartName": "ANVIL",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 25, "weight": 30 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 25 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 25 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 25, "weight": 35 }
+        ],
+        "movements": [
+          { "name": "Strict Chin Up", "reps": 4, "inputType": "none", "isMaxReps": true, "countingMode": "per_round" },
+          { "name": "Chin Up Hold", "time": 10, "inputType": "none", "countingMode": "per_round" },
+          { "name": "Band Pull Apart", "reps": 15, "inputType": "none", "countingMode": "per_round" },
+          {
+            "name": "Kettlebell Windmill",
+            "reps": 6,
+            "rxWeights": { "male": 30, "female": 30, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "loggedWeights": [30, 35]
+          }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "For Time",
+        "type": "wod",
+        "prescription": "[14-12-10-8-6-4] Front Squat @40/60kg, Burpees, 200m run in between sets",
+        "rounds": 6,
+        "suggestedRepsPerSet": [14, 12, 10, 8, 6, 4],
+        "rawText": "For time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets (5 total)\n<15 minutes T.C.>",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "aiPartName": "SLAB",
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 168, "weight": 47.5, "time": 1200 }
+        ],
+        "movements": [
+          {
+            "name": "Front Squat",
+            "reps": 14,
+            "rxWeights": { "male": 47.5, "female": 47.5, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [47.5]
+          },
+          {
+            "name": "Burpees",
+            "reps": 14,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "none",
+            "countingMode": "per_interval",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Band Pull Apart", "exerciseIndex": 0, "totalReps": 60, "color": "magenta" },
+        { "name": "Front Squat", "exerciseIndex": 1, "totalReps": 54, "weight": 47.5, "unit": "kg", "color": "yellow" },
+        { "name": "Burpees", "exerciseIndex": 1, "totalReps": 54, "color": "magenta" },
+        {
+          "name": "Run",
+          "exerciseIndex": 1,
+          "totalReps": 54,
+          "totalDistance": 1200,
+          "unit": "m",
+          "distancePerRep": 200,
+          "color": "magenta"
+        },
+        {
+          "name": "Kettlebell Windmill",
+          "exerciseIndex": 0,
+          "totalReps": 24,
+          "weight": 32.5,
+          "weightProgression": [30, 35],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        { "name": "Strict Chin Up", "exerciseIndex": 0, "totalReps": 16, "color": "cyan" },
+        { "name": "Chin Up Hold", "exerciseIndex": 0, "totalTime": 40, "color": "magenta" }
+      ],
+      "grandTotalReps": 262,
+      "grandTotalVolume": 3345,
+      "grandTotalDistance": 1200
+    }
+  }
+}

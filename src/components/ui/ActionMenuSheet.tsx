@@ -8,6 +8,8 @@ export interface ActionMenuItem {
   icon?: React.ReactNode;
   /** Dims the row — for an option that admits a problem rather than one the athlete came for. */
   quiet?: boolean;
+  /** Row is visible but not yet selectable — an action still preparing itself. */
+  disabled?: boolean;
 }
 
 interface ActionMenuSheetProps {
@@ -55,6 +57,7 @@ export function ActionMenuSheet({ title, items, onClose }: ActionMenuSheetProps)
                 type="button"
                 role="menuitem"
                 className={`${styles.menuItem} ${item.quiet ? styles.menuItemQuiet : ''}`}
+                disabled={item.disabled}
                 onClick={() => { onClose(); item.onClick(); }}
               >
                 {item.icon && <span className={styles.menuItemIcon}>{item.icon}</span>}

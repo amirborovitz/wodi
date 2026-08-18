@@ -1,0 +1,50 @@
+.pager {
+  position: relative;
+}
+
+.track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* The feed scrolls vertically; the browser owns the axis handoff. */
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+.slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  /* Pages differ in height; the track sizes to the tallest and cards hang from
+     the top so the poster headers line up across a swipe. */
+  align-self: flex-start;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0 1px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(243, 241, 234, 0.2);
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dotActive {
+  background: var(--wodi-yellow);
+  transform: scale(1.3);
+}

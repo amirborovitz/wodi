@@ -1,0 +1,73 @@
+{
+  "name": "bracket-ladder-run-placement-no-total",
+  "description": "The case `placement` exists for: the board says WHERE the run sits but never states how many ('* 200m run in between sets' - no '(5 total)'). occurrences is absent; placement 'between_sets' alone makes the count derivable, because six sets hold exactly five gaps. This is what a free-text cadence note could never do - it would have left the count to the tier-count fallback and printed 1200m. Breakdown totalDistance is 1000m, derived at save time by statedOccurrenceCount, and the poster prints the total because it is arithmetic on stated structure, not a guess.",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "timeCap": 900,
+    "partnerWorkout": false,
+    "rawText": "METCON (Medium)\nFor time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets\n<15 minutes T.C.>",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "For Time",
+        "type": "wod",
+        "prescription": "[14-12-10-8-6-4] Front Squat @40/60kg, Burpees, 200m Run in between sets",
+        "rounds": 6,
+        "suggestedRepsPerSet": [14, 12, 10, 8, 6, 4],
+        "rawText": "For time:\n[14-12-10-8-6-4]\nFront squat @40/60kg\nBurpees\n* 200m run in between sets\n<15 minutes T.C.>",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 168, "weight": 47.5, "time": 1200 }
+        ],
+        "movements": [
+          {
+            "name": "Front Squat",
+            "reps": 14,
+            "rxWeights": { "male": 47.5, "female": 47.5, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [47.5]
+          },
+          {
+            "name": "Burpees",
+            "reps": 14,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "none",
+            "placement": "between_sets",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Front Squat", "exerciseIndex": 0, "totalReps": 54, "weight": 47.5, "unit": "kg", "color": "yellow" },
+        { "name": "Burpees", "exerciseIndex": 0, "totalReps": 54, "color": "magenta" },
+        {
+          "name": "Run",
+          "exerciseIndex": 0,
+          "totalDistance": 1000,
+          "unit": "m",
+          "distancePerRep": 200,
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 108,
+      "grandTotalVolume": 2565,
+      "grandTotalDistance": 1000
+    }
+  }
+}

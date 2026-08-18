@@ -7,11 +7,24 @@ export interface User {
   photoUpdatedAt?: number;
   createdAt: Date;
   stats: UserStats;
-  goals?: UserGoals;
   birthYear?: number;        // Year of birth, age calculated from this
   weight?: number;           // kg, important for calorie calculation
   sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   onboardingComplete?: boolean;  // Track if user completed onboarding
+  /**
+   * Community profile — collected during onboarding, all optional, and the only
+   * part of the user doc the feed ever copies. `displayName` is the feed
+   * identity: onboarding asks for it outright ("What should we call you?"), so
+   * it is a self-chosen name rather than whatever Google filled in.
+   *
+   * `gym` keeps its original key (the UI labels it "Box / Gym") so athletes who
+   * already entered one don't silently lose it.
+   */
+  gym?: string;
+  /** Free text, "City, Country" — never parsed, only shown. */
+  location?: string;
+  /** Instagram username, lowercase and without the leading "@". */
+  instagram?: string;
 }
 
 export interface UserStats {
@@ -20,19 +33,6 @@ export interface UserStats {
   longestStreak: number;
   totalVolume: number;  // legacy field retained for stored workout compatibility
 }
-
-// User's weekly goals for Power Cell Dashboard
-export interface UserGoals {
-  volumeGoal: number;     // legacy key, now weekly rep target
-  metconGoal: number;     // minutes per week (default: 60)
-  streakGoal: number;     // workouts per week (default: 4)
-}
-
-export const DEFAULT_USER_GOALS: UserGoals = {
-  volumeGoal: 500,
-  metconGoal: 60,
-  streakGoal: 4,
-};
 
 // Workout types
 export type WorkoutStatus = 'planned' | 'in_progress' | 'completed';
@@ -128,6 +128,24 @@ export interface PosterVibeOffset {
   dy: number;
 }
 
+/**
+ * Optional photo clipped to the poster — the athlete behind the numbers.
+ *
+ * Deliberately a member of the sticker family (see PosterSticker above) rather
+ * than a media attachment: it lives in the poster tree, so the share image
+ * (html2canvas over shareCardRef) and PosterThumbnail both pick it up with no
+ * extra wiring, and repositioning reuses the vibe-stamp drag path.
+ *
+ * `x`/`y` use PosterSticker's convention — % of poster size, center anchor.
+ */
+export interface PosterPhoto {
+  url: string;       // Storage download URL
+  path: string;      // Storage object path, kept so expiry cleanup can delete the object
+  x: number;
+  y: number;
+  rotation: number;  // degrees of tilt for the clipped-polaroid look
+}
+
 export interface Workout {
   id: string;
   userId: string;
@@ -166,6 +184,7 @@ export interface Workout {
   posterVibe?: PosterVibeKey;  // chosen "FELT" vibe on the celebration poster
   posterSticker?: PosterSticker; // free-text note placed on the celebration poster
   posterVibeOffset?: PosterVibeOffset; // manual drag nudge of the "FELT" vibe stamp
+  posterPhoto?: PosterPhoto;   // optional photo clipped to the poster
   heroAchievement?: Achievement;
   achievements?: Achievement[];
   isPR?: boolean;
@@ -363,6 +382,9 @@ export interface WorkloadBreakdown {
 // Unit types for measurements
 export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
 export type MovementCountingMode = 'per_round' | 'per_interval' | 'per_station_visit' | 'once';
+// Structural position of a movement written outside the main scheme. See ParsedMovement.placement
+// for why this exists alongside MovementCountingMode and why it currently has one member.
+export type MovementPlacement = 'between_sets';
 export type MovementScoreEntryMode = 'per_round' | 'total';
 // Implement a weighted movement's load is on. 'other' = athlete-chosen/odd implements
 // (plate, sandbag, D-ball, med ball, vest, "weighted X" with no stated implement) — these
@@ -407,6 +429,27 @@ export interface ParsedMovement {
                                 // pieces are solo work (partnerWorkout: false).
   stationLabel?: string;        // Rotating interval station label (e.g., "A", "B", "C"). First movement of each station gets this.
   stationIndex?: number;        // Explicit 0-based station index for rotating station workouts.
+  // How many times this movement is performed across the WHOLE piece, when the board states it
+  // outright ("* 200m run in between sets (5 total)" → 5). Never inferred: a movement that
+  // simply repeats every round carries no `occurrences` and is multiplied by the round count as
+  // usual. This is the only way a movement written BETWEEN rounds can be counted correctly — it
+  // happens one fewer time than there are rounds, which no round-based multiplier can express,
+  // and which every counting mode therefore gets wrong (6 × 200m for 5 runs).
+  occurrences?: number;
+  // WHERE in the structure this movement sits, when it sits somewhere the counting modes cannot
+  // describe. Deliberately NOT free text: a structural value can be counted, and that is the
+  // whole point — 'between_sets' means the movement happens in the GAPS between sets, so it
+  // occurs rounds-1 times. That is the one arrangement no MovementCountingMode can express
+  // (they all resolve to the round/interval count itself), and the reason a between-sets run was
+  // counted 6 times on a 6-tier ladder that only holds 5 gaps.
+  //
+  // With this set, the count is derivable even when the board states no total — which is what
+  // `occurrences` alone could not do. An explicitly written total still wins over it.
+  //
+  // One member on purpose: 'before each set' / 'after each set' are already exactly per_round,
+  // so adding them would be a second way to say something countingMode already says. Extend
+  // only for an arrangement with a genuinely different COUNT.
+  placement?: MovementPlacement;
   countingMode?: MovementCountingMode;   // How the movement scales: per round, per interval, per station visit, or once overall.
   scoreEntryMode?: MovementScoreEntryMode; // Whether user-entered score values are totals or per-round values.
   alternative?: {               // OR option (e.g., "40 DU / 60 singles")
@@ -528,13 +571,13 @@ export type Screen =
   | 'stats'
   | 'settings'
   | 'profile-settings'
-  | 'goals-settings'
   | 'workout-detail'
   | 'profile'
   | 'onboarding'
   | 'pr'
   | 'records'
-  | 'recap';
+  | 'recap'
+  | 'feed';
 
 // Common component props
 export interface BaseProps {

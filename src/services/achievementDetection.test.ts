@@ -124,4 +124,22 @@ describe('extractNewPRs — a movement with several record rows', () => {
     const others = history.filter((pr) => pr.weight !== 140);
     expect(extract(strengthExercise('Back Squat', [110]), others)).toHaveLength(0);
   });
+
+  it('measures a plural board spelling against the record it belongs to', () => {
+    // "Squats" matched no alias, so it got its own empty bucket and a 40kg working set was
+    // announced as a first-ever PR — an empty bucket makes any load a first PR.
+    const squatHistory = [record('Squat', 50)];
+    expect(extract(strengthExercise('Squats', [40]), squatHistory)).toHaveLength(0);
+
+    const prs = extract(strengthExercise('Back Squats', [150]), history);
+    expect(prs).toHaveLength(1);
+    expect(prs[0].movement).toBe('Back Squat');
+  });
+
+  it('keeps an unresolved squat out of the back squat record', () => {
+    // The parser decides which squat the board meant. A bare "Squats" it could not resolve
+    // must never be measured against — or write into — the back squat record.
+    expect(extract(strengthExercise('Squats', [140]), history)).toHaveLength(1);
+    expect(extract(strengthExercise('Squats', [140]), history)[0].movement).toBe('Squat');
+  });
 });

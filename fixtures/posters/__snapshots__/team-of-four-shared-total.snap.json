@@ -1,0 +1,211 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Squat",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "80KG",
+            "name": "Back Squat",
+            "subNote": "20 total",
+            "totalNote": "20 total",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "For time (30 MIN CAP)",
+        "rows": [],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "",
+        "rows": [
+          {
+            "primary": "800 M Run (together)",
+            "name": "",
+            "mineKey": "Run",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "400 Wall Ball Shots @ 9/6kg",
+            "name": "",
+            "mineKey": "Wall Ball Shot",
+            "teamShare": "100",
+            "accent": "yellow"
+          },
+          {
+            "primary": "200 CAL Row",
+            "name": "",
+            "mineKey": "Row",
+            "suppressMine": true,
+            "teamShare": "50 cal",
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "BUY-OUT",
+        "rows": [
+          {
+            "primary": "400 M Farmer Carry",
+            "name": "",
+            "mineKey": "Farmer Carry",
+            "suppressMine": true,
+            "teamShare": "100m",
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      }
+    ]
+  ],
+  "hero": {
+    "value": "26:00",
+    "unit": "MIN",
+    "formatLine": "Strength + For Time · Team of 4",
+    "storyLine": "20 back squat · 800m run · 100 wall ball shot · 50 row cals · 100m cash-out: farmer carry",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BACK SQUAT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "5",
+        "name": "Back Squat",
+        "total": "20 total",
+        "color": "yellow",
+        "weight": 80,
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "QUAD SQUAD FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "800m",
+        "name": "Run",
+        "total": "800m total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "400",
+        "name": "Wall Ball Shot",
+        "total": "",
+        "color": "yellow",
+        "weight": 9,
+        "unit": "kg"
+      },
+      {
+        "perRound": "200 cal",
+        "name": "Row",
+        "total": "50 cal total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "400m",
+        "name": "Cash-out: Farmer Carry",
+        "total": "100m total",
+        "color": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "26:00",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "80KG Back Squat",
+          "load": "",
+          "mine": "80kg",
+          "team": "",
+          "total": "20 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "FOR TIME (30 MIN CAP)",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "800 M Run (together)",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "400 Wall Ball Shots @ 9/6kg",
+          "load": "",
+          "mine": "9kg",
+          "team": "100",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "line",
+          "rx": "200 CAL Row",
+          "load": "",
+          "mine": "",
+          "team": "50 cal",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "block",
+          "label": "BUY-OUT",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "400 M Farmer Carry",
+          "load": "",
+          "mine": "",
+          "team": "100m",
+          "isPartnerShare": true
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      "your team of four - two blocks"
+    ]
+  },
+  "pageRepsSchemes": [
+    "5-5-5-5 reps",
+    null
+  ]
+}

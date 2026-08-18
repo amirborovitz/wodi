@@ -1,0 +1,216 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "For Time",
+      "blueprint": "[14-12-10-8-6-4] for time (15 MIN CAP)",
+      "rows": [
+        {
+          "primary": "14-12-10-8-6-4",
+          "name": "Front Squats + Burpees",
+          "loadNote": "47.5kg",
+          "totalNote": "54 each",
+          "accent": "yellow",
+          "ladderTrack": {
+            "reps": [
+              14,
+              12,
+              10,
+              8,
+              6,
+              4
+            ],
+            "step": 6,
+            "complete": true
+          }
+        },
+        {
+          "primary": "200m",
+          "name": "Run · between sets",
+          "subNote": "1.00 km total",
+          "totalNote": "1.00 km total",
+          "mineKey": "Run",
+          "accent": "magenta"
+        }
+      ],
+      "hiddenCount": 0,
+      "descLadderScheme": [
+        14,
+        12,
+        10,
+        8,
+        6,
+        4
+      ],
+      "descLadderCompleted": 6,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "For Time",
+        "blueprint": "[14-12-10-8-6-4] for time (15 MIN CAP)",
+        "rows": [
+          {
+            "primary": "14-12-10-8-6-4",
+            "name": "Front Squats + Burpees",
+            "loadNote": "47.5kg",
+            "totalNote": "54 each",
+            "accent": "yellow",
+            "ladderTrack": {
+              "reps": [
+                14,
+                12,
+                10,
+                8,
+                6,
+                4
+              ],
+              "step": 6,
+              "complete": true
+            }
+          },
+          {
+            "primary": "200m",
+            "name": "Run · between sets",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0,
+        "descLadderScheme": [
+          14,
+          12,
+          10,
+          8,
+          6,
+          4
+        ],
+        "descLadderCompleted": 6,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "20:00",
+    "unit": "MIN",
+    "formatLine": "6 Rounds",
+    "storyLine": "54 front squat · 54 burpees · 1.0km run",
+    "storyMovements": [
+      {
+        "perRound": "14-12-10-8-6-4",
+        "name": "Front Squat",
+        "total": "54 total",
+        "color": "yellow",
+        "weight": 47.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "14-12-10-8-6-4",
+        "name": "Burpees",
+        "total": "54 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.0km total",
+        "color": "magenta",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "20:00",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "[14-12-10-8-6-4] for time (15 MIN CAP)"
+      },
+      {
+        "kind": "line",
+        "rx": "14-12-10-8-6-4 Front Squats + Burpees",
+        "load": "",
+        "mine": "47.5kg",
+        "team": "",
+        "total": "54 each",
+        "ladderTrack": {
+          "reps": [
+            14,
+            12,
+            10,
+            8,
+            6,
+            4
+          ],
+          "step": 6,
+          "complete": true
+        }
+      },
+      {
+        "kind": "line",
+        "rx": "200m Run · between sets",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "1.00 km total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "[14-12-10-8-6-4] for time (15 MIN CAP)"
+        },
+        {
+          "kind": "line",
+          "rx": "14-12-10-8-6-4 Front Squats + Burpees",
+          "load": "",
+          "mine": "47.5kg",
+          "team": "",
+          "total": "54 each",
+          "ladderTrack": {
+            "reps": [
+              14,
+              12,
+              10,
+              8,
+              6,
+              4
+            ],
+            "step": 6,
+            "complete": true
+          }
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run · between sets",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ]
+}

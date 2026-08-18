@@ -14,7 +14,7 @@
   padding: var(--space-4);
   padding-top: calc(var(--safe-top) + var(--space-4));
   padding-bottom: calc(var(--safe-bottom) + var(--space-8));
-  max-width: 520px;
+  max-width: var(--app-column);
   margin: 0 auto;
   overflow-x: hidden;
   overscroll-behavior-x: none;

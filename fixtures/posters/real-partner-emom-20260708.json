@@ -1,6 +1,7 @@
 {
     "name":  "real-partner-emom-20260708",
-    "description":  "REAL saved doc: EMOM 8 Double Under Practice",
+    "description":  "REAL saved doc: EMOM 8 Double Under Practice. Also pins an OPEN bug (see knownDroppedMovements): the athlete logged no count for the X double unders, so the breakdown has no entry for this part - and poster rows are built from the BREAKDOWN, not the prescription, so the Double Under line never renders. The part used to vanish entirely (buildPageArtifactSections returned [] on an empty breakdown, leaving a blank carousel page); it now renders its structure header, but the movement row still needs the breakdown-to-prescription inversion.",
+    "knownDroppedMovements":  ["EMOM 8 Double Under Practice: Double Under"],
     "workout":  {
                     "date":  "2026-07-08T19:46:02.652Z",
                     "title":  "Today Workout",

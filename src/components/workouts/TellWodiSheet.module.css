@@ -11,6 +11,8 @@
   left: 0;
   right: 0;
   z-index: 301;
+  max-width: var(--app-column);
+  margin-inline: auto;
   background: #141618;
   border-top-left-radius: 20px;
   border-top-right-radius: 20px;

@@ -33,6 +33,40 @@
   color: rgba(243, 241, 234, 0.5);
 }
 
+/* ── Scope tabs ── */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tab {
+  flex: 1;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  background: transparent;
+  color: rgba(243, 241, 234, 0.5);
+  border-radius: 999px;
+  padding: 7px 0 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.14s, background 0.14s, border-color 0.14s;
+}
+
+.tabActive {
+  background: #f5c200;
+  border-color: #f5c200;
+  color: #0b0c0e;
+}
+
+.tab:focus-visible {
+  outline: 2px solid #f5c200;
+  outline-offset: 2px;
+}
+
 /* ── Featured tile ── */
 .featuredTile {
   width: 100%;

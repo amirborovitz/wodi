@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue } from './PosterComponents';
+import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -62,7 +62,12 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <FormatTag label={wod.type} color={BRAND.paperInk} />
-          <span style={{ fontFamily: fH, fontSize: compact ? 20 : 22, fontWeight: 700, color: '#5a4628' }}>{wod.date}</span>
+          {/* Chalk writes its header by hand — the effort reads as a margin note, not a readout,
+              so it keeps Caveat's 700 ceiling and earns its rank from ink weight instead. */}
+          <HeaderMeta>
+            <EffortMeta ep={wod.ep} color="#5a4628" font={fH} size={compact ? 16 : 18} weight={700} />
+            <span style={{ fontFamily: fH, fontSize: compact ? 20 : 22, fontWeight: 700, color: 'rgba(90,70,40,0.62)' }}>{wod.date}</span>
+          </HeaderMeta>
         </div>
 
         {/* Title — yellow highlighter swipe if named */}
@@ -205,7 +210,7 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
           {vibe && (
             <DraggableVibeStamp offset={vibeOffset} onMove={onVibeMove} onDrop={onVibeDrop} onLongPress={onVibeLongPress}
               style={{ flex: '0 0 auto', marginLeft: 'auto', paddingBottom: compact ? 1 : 3 }}>
-              <VibeStamp vibe={vibe} color={BRAND.paperInk} scale={compact ? 0.56 : 0.62} />
+              <VibeStamp vibe={vibe} surface="light" scale={compact ? 0.56 : 0.62} />
             </DraggableVibeStamp>
           )}
         </div>

@@ -16,14 +16,22 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, googleProvider, appleProvider, db, storage } from '../services/firebase';
 import { removeUndefined } from '../utils/firestoreUtils';
-import type { User, UserStats, UserGoals } from '../types';
+import type { User, UserStats } from '../types';
 
-interface UserProfileUpdate {
+export interface UserProfileUpdate {
   displayName?: string;
-  age?: number;
+  birthYear?: number;
   weight?: number;
   sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   onboardingComplete?: boolean;
+  /**
+   * Community profile. Written as trimmed strings including "" — an empty value
+   * is how an athlete clears a field they'd rather not share, so these must not
+   * be dropped the way an undefined is.
+   */
+  gym?: string;
+  location?: string;
+  instagram?: string;
 }
 
 interface AuthContextValue {
@@ -33,7 +41,6 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
-  updateUserGoals: (goals: UserGoals) => Promise<void>;
   updateUserPhoto: (file: File) => Promise<string>;
   updateUserProfile: (profile: UserProfileUpdate) => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -182,11 +189,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
       createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
       stats: { ...DEFAULT_STATS, ...data.stats },
-      goals: data.goals,
       birthYear: data.birthYear ?? data.age,
       weight: data.weight,
       sex: data.sex,
       onboardingComplete: data.onboardingComplete,
+      // Community profile. Read back here or it exists only until the next
+      // load: this is the one doc→User mapping, so anything it skips is
+      // silently dropped from `user` — and from the author block the feed
+      // freezes onto every post.
+      gym: data.gym,
+      location: data.location,
+      instagram: data.instagram,
     };
   };
 
@@ -227,24 +240,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error refreshing user data:', error);
-    }
-  };
-
-  const updateUserGoals = async (goals: UserGoals) => {
-    if (!user || !firebaseUser) {
-      throw new Error('No user logged in');
-    }
-
-    try {
-      const userRef = doc(db, 'users', firebaseUser.uid);
-      await setDoc(userRef, { goals }, { merge: true });
-
-      const updatedUser = { ...user, goals };
-      setUser(updatedUser);
-      setCachedUser(updatedUser);
-    } catch (error) {
-      console.error('Error updating user goals:', error);
-      throw error;
     }
   };
 
@@ -344,7 +339,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signInWithApple,
       signOut,
-      updateUserGoals,
       updateUserPhoto,
       updateUserProfile,
       completeOnboarding,

@@ -45,6 +45,7 @@ import { hasStructuralCorrection } from '../src/components/celebration/correctio
 import { isMainPart, hasLoggedMaxEffort } from '../src/components/celebration/mainPart';
 import { movementsForParts } from '../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
+import type { ArtifactSection } from '../src/components/celebration/types';
 
 interface PosterFixture {
   name: string;
@@ -55,10 +56,18 @@ interface PosterFixture {
     workloadBreakdown?: { movements: MovementTotal[] };
     rawText?: string;
     format?: WorkoutFormat;
+    // Seconds. Read by the computeHeroResult call below; the interface simply never declared
+    // it, which `tsc -b` could not catch because scripts/ is outside both project references.
+    timeCap?: number;
     teamSize?: number;
     partnerWorkout?: boolean;
     corrections?: string[];
   };
+  // Movements this fixture is KNOWN to drop, with the reason recorded in `description`. Listed
+  // drops warn instead of failing, so a real open bug stays visible on every run without
+  // holding the whole corpus red. An unlisted drop is always a failure, and a listed movement
+  // that starts rendering is also a failure — the entry must be removed when it gets fixed.
+  knownDroppedMovements?: string[];
 }
 
 const FIXTURE_DIR = path.resolve(process.cwd(), 'fixtures', 'posters');
@@ -88,28 +97,95 @@ function scopeRewardMovements(
   return scoped.length > 0 ? scoped : allMovements;
 }
 
-function buildSnapshot(fixture: PosterFixture): unknown {
+// ─── Invariant: no prescribed movement may silently vanish ──────────────────
+//
+// Snapshots only pin what a builder DOES render — they are blind to a movement the board
+// wrote and the poster never printed, because the missing line is absent from the blessed
+// file too. That blind spot is exactly how a bracket-notation ladder swallowed its "200m run
+// in between sets": parsed, saved, counted in the breakdown, then dropped by a builder that
+// returned one row for the movements it understood and nothing for the rest.
+//
+// So the corpus asserts totality directly: every movement prescribed on a rendered part must
+// be ACCOUNTED FOR somewhere in that part's rendered text. Accounted-for is deliberately
+// loose — collapses are legitimate (a complex joins with " + ", a pair alternates into one
+// line, a substitution renames) and this check is not trying to pin layout. It only refuses
+// to let a movement disappear without trace.
+const normalizeForMatch = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function pageHaystack(sections: ArtifactSection[]): string {
+  const parts: string[] = [];
+  for (const section of sections) {
+    // Deliberately NOT section.title: a part named "EMOM 8 Double Under Practice" would
+    // otherwise vouch for a Double Under row that was never rendered. The title names the
+    // piece; only rows and the blueprint actually state the work.
+    parts.push(section.blueprint ?? '', section.structureNote ?? '');
+    for (const row of section.rows ?? []) {
+      parts.push(
+        row.name ?? '', row.nameWithLoad ?? '', row.mineKey ?? '',
+        row.primary ?? '', row.subNote ?? '', row.roundLabel ?? '', row.stationHeaderCap ?? '',
+      );
+    }
+  }
+  return normalizeForMatch(parts.join(' '));
+}
+
+function findDroppedMovements(
+  exercise: Exercise,
+  sections: ArtifactSection[],
+  movements: MovementTotal[],
+): string[] {
+  const prescribed = exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements || [])
+    : (exercise.movements || []);
+  if (prescribed.length === 0) return [];
+
+  const haystack = pageHaystack(sections);
+  // A whiteboard-verbatim part renders the coach's raw text rather than movement rows; the
+  // board's own wording is the render, so name-matching against it proves nothing.
+  if (exercise.loggingMode === 'free') return [];
+
+  return prescribed
+    .filter((movement) => {
+      // The name as written, the name it was SUBSTITUTED for (the row shows the substitute),
+      // and the board's stated alternative ("40 DU / 60 singles") all count as accounted for.
+      const substitutes = movements
+        .filter((total) => normalizeForMatch(total.originalMovement ?? '') === normalizeForMatch(movement.name))
+        .map((total) => total.name);
+      // The AI sometimes writes the ROLE into the name ("Cash-out: Farmer Carry"). The poster
+      // carries that role on the section header (BUY-OUT) and renders the bare movement, so
+      // match the stripped name too — the role is relocated, not lost.
+      const roleStripped = movement.name.replace(/^\s*(buy[-\s]?in|cash[-\s]?out|buy[-\s]?out)\s*:\s*/i, '');
+      const candidates = [movement.name, roleStripped, movement.alternative?.name, ...substitutes]
+        .filter((name): name is string => !!name);
+      return !candidates.some((name) => haystack.includes(normalizeForMatch(name)));
+    })
+    .map((movement) => movement.name);
+}
+
+function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: string[] } {
   const { title, rawText, format } = fixture.workout;
   // Mirrors useCelebrationData's correction fallback: a structural "AI got it wrong?" flag
   // downgrades every part carrying its own board text to 'free' (whiteboard-verbatim rendering).
   const exercises = hasStructuralCorrection(fixture.workout.corrections ?? [])
     ? fixture.workout.exercises.map((ex) => (ex.rawText?.trim() ? { ...ex, loggingMode: 'free' as const } : ex))
     : fixture.workout.exercises;
-  // Mirrors useCelebrationData.activeBreakdown: the stored breakdown passes through
-  // repairUndercountedBreakdown before ANY builder sees it.
-  const movements = fixture.workout.workloadBreakdown
-    ? repairUndercountedBreakdown(
-        { grandTotalReps: 0, grandTotalVolume: 0, ...fixture.workout.workloadBreakdown },
-        exercises,
-      ).movements
-    : [];
-  const scopedRawText = exercises.length === 1 ? rawText : undefined;
   // Mirrors useCelebrationData.sessionTeamSize: AI-set field, else title+rawText inference —
   // suppressed when the doc explicitly says partnerWorkout: false (pair-paced pieces).
   const teamSize = fixture.workout.teamSize
     ?? (fixture.workout.partnerWorkout === false
       ? undefined
       : inferTeamSizeFromText([title, rawText].filter(Boolean).join('\n')));
+  // Mirrors useCelebrationData.activeBreakdown: the stored breakdown passes through
+  // repairUndercountedBreakdown before ANY builder sees it — teamSize included, so a partner
+  // block's already-halved totals aren't "repaired" back up to the team's numbers.
+  const movements = fixture.workout.workloadBreakdown
+    ? repairUndercountedBreakdown(
+        { grandTotalReps: 0, grandTotalVolume: 0, ...fixture.workout.workloadBreakdown },
+        exercises,
+        teamSize,
+      ).movements
+    : [];
+  const scopedRawText = exercises.length === 1 ? rawText : undefined;
   // Mirrors useCelebrationData: the whole-workout artifact and every display decision follow
   // the MAIN part(s) — one main part owns the artifact even when secondary siblings exist,
   // and its own format (loggingMode-first) outranks the persisted session format.
@@ -179,9 +255,9 @@ function buildSnapshot(fixture: PosterFixture): unknown {
   // Poster header sub-line for sectioned partner artifacts ("you & your partner - N blocks") —
   // the block count must skip the rows-less Blueprint header section.
   const partnerSubs = {
-    reward: reward?.[0]?.partnerDisplayMode === 'sections' ? partnerBlocksSub(reward) : null,
+    reward: reward?.[0]?.partnerDisplayMode === 'sections' ? partnerBlocksSub(reward, teamSize) : null,
     pages: pages.map((sections) =>
-      sections[0]?.partnerDisplayMode === 'sections' ? partnerBlocksSub(sections) : null,
+      sections[0]?.partnerDisplayMode === 'sections' ? partnerBlocksSub(sections, teamSize) : null,
     ),
   };
 
@@ -206,7 +282,17 @@ function buildSnapshot(fixture: PosterFixture): unknown {
       : undefined
   ));
 
-  return { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes };
+  // Checked against the PAGE sections (the per-part artifact), which is where a part's full
+  // movement list is meant to land. Each page maps 1:1 to sectionExercises by index.
+  const dropped = sectionExercises.flatMap((exercise, index) =>
+    findDroppedMovements(exercise, pages[index] ?? [], movements)
+      .map((name) => `${exercise.name}: ${name}`),
+  );
+
+  return {
+    snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes },
+    dropped,
+  };
 }
 
 // ─── Diffing ───────────────────────────────────────────────────────────────
@@ -269,12 +355,34 @@ function main(): void {
     const snapshotPath = path.join(SNAPSHOT_DIR, file.replace(/\.json$/, '.snap.json'));
 
     let actual: unknown;
+    let dropped: string[];
     try {
-      actual = normalize(buildSnapshot(fixture));
+      const built = buildSnapshot(fixture);
+      actual = normalize(built.snapshot);
+      dropped = built.dropped;
     } catch (error) {
       failures += 1;
       console.error(`✗ ${fixture.name} — builder threw: ${(error as Error).message}`);
       continue;
+    }
+
+    // A dropped movement fails the fixture even when the snapshot matches — re-blessing must
+    // never be able to launder a movement out of the poster.
+    const known = new Set(fixture.knownDroppedMovements ?? []);
+    const unexpectedDrops = dropped.filter((line) => !known.has(line));
+    const fixedDrops = [...known].filter((line) => !dropped.includes(line));
+    if (unexpectedDrops.length > 0) {
+      failures += 1;
+      console.error(`✗ ${fixture.name} — prescribed movement(s) missing from the rendered poster:`);
+      unexpectedDrops.forEach((line) => console.error(`    ${line}`));
+    }
+    if (fixedDrops.length > 0) {
+      failures += 1;
+      console.error(`✗ ${fixture.name} — knownDroppedMovements lists movement(s) that now render:`);
+      fixedDrops.forEach((line) => console.error(`    ${line} — remove it from the fixture`));
+    }
+    if (unexpectedDrops.length === 0 && dropped.length > 0) {
+      console.warn(`! ${fixture.name} — known open drop: ${dropped.join(', ')}`);
     }
 
     if (update || !fs.existsSync(snapshotPath)) {
@@ -287,7 +395,9 @@ function main(): void {
     const mismatches: string[] = [];
     diffValues(expected, actual, 'snapshot', mismatches);
     if (mismatches.length === 0) {
-      console.log(`✓ ${fixture.name}`);
+      if (unexpectedDrops.length === 0 && fixedDrops.length === 0 && dropped.length === 0) {
+        console.log(`✓ ${fixture.name}`);
+      }
     } else {
       failures += 1;
       console.error(`✗ ${fixture.name}`);

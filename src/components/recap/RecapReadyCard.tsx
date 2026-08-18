@@ -12,10 +12,18 @@ interface RecapReadyCardProps {
   onDismiss?: () => void;
 }
 
+/** Per-scope card copy. A week says "week", not "WEEK 33" — that's a filing reference. */
+const DROP_COPY: Record<RecapData['scope'], { pill: string; cta: string }> = {
+  week: { pill: 'WEEK DROP', cta: 'See my week' },
+  month: { pill: 'NEW DROP', cta: 'See my recap' },
+  season: { pill: 'SEASON DROP', cta: 'See my season' },
+};
+
 export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: RecapReadyCardProps): React.JSX.Element {
   const [closing, setClosing] = useState(false);
-  const isSeason = data.scope === 'season';
+  const copy = DROP_COPY[data.scope];
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  const headline = data.scope === 'week' ? 'Your week is ready' : `Your ${cap(data.period)} is ready`;
   const metaLine = data.felt.length > 0
     ? `${getTopMoveLine(data)} - mostly ${VIBE[data.felt[0].vibe].label.toLowerCase()}`
     : `${getTopMoveLine(data)} - ${data.workouts} workouts`;
@@ -50,7 +58,7 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
             <div className={styles.headerRow}>
               <span className={styles.pill} style={{ fontFamily: fB }}>
                 <span className={styles.dot} />
-                {isSeason ? 'SEASON DROP' : 'NEW DROP'}
+                {copy.pill}
               </span>
               <span style={{ flex: 1 }} />
               {onDismiss && (
@@ -74,13 +82,13 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
               </div>
               <div className={styles.copy}>
                 <div className={styles.headline} style={{ fontFamily: fD }}>
-                  Your {cap(data.period)} is ready
+                  {headline}
                 </div>
                 <div className={styles.meta} style={{ fontFamily: fB }}>
                   {metaLine}
                 </div>
                 <div className={styles.inlineCta} style={{ fontFamily: fB, color: BRAND.yellow }}>
-                  See {isSeason ? 'my season' : 'my recap'}
+                  {copy.cta}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="5" y1="12" x2="19" y2="12" />
                     <polyline points="13 6 19 12 13 18" />

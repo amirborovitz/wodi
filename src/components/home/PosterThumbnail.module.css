@@ -52,14 +52,6 @@
   width: 100%;
 }
 
-.card {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  flex-shrink: 0;
-  transform-origin: center top;
-}
-
 /* ── Label below the card ─────────────────────────────────────── */
 .label {
   display: flex;

@@ -14,7 +14,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, FormatTag, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -94,8 +94,11 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
       <div style={{ position: 'relative', zIndex: 5, padding: '20px 22px 16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={BRAND.yellow} />
-          <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(245,194,0,0.3), transparent)' }} />
-          <span style={{ fontFamily: fM, fontSize: 10, color: AU_DIM, letterSpacing: '0.06em' }}>{wod.date}</span>
+          <span style={{ flex: 1 }} />
+          <HeaderMeta>
+            <EffortMeta ep={wod.ep} color={BRAND.yellow} />
+            <span style={{ fontFamily: fM, fontSize: 10, color: AU_DIM, letterSpacing: '0.06em' }}>{wod.date}</span>
+          </HeaderMeta>
         </div>
 
         <div style={{ marginTop: 13 }}>

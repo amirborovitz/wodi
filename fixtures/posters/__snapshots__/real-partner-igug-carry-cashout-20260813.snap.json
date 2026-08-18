@@ -1,0 +1,268 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "for time (20 MIN CAP)",
+      "rows": [],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "14 ROUNDS OF",
+      "rows": [
+        {
+          "primary": "5 Twin KB Snatches @ 2x20kg · 70 total",
+          "name": "",
+          "mineKey": "Twin KB Snatch",
+          "teamShare": "35",
+          "accent": "yellow"
+        },
+        {
+          "primary": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
+          "name": "",
+          "mineKey": "Twin Kettlebell Shoulder to Overhead",
+          "teamShare": "35",
+          "accent": "yellow"
+        },
+        {
+          "primary": "5 Burpee Box Jumps · 70 total",
+          "name": "",
+          "mineKey": "Burpee Box Jump",
+          "suppressMine": true,
+          "teamShare": "35",
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    },
+    {
+      "title": "BUY-OUT",
+      "rows": [
+        {
+          "primary": "400 M Farmer Carry",
+          "name": "",
+          "mineKey": "Farmer Carry",
+          "suppressMine": true,
+          "teamShare": "200m",
+          "accent": "magenta"
+        }
+      ],
+      "isPartnerConfirmed": true,
+      "partnerDisplayMode": "sections"
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "for time (20 MIN CAP)",
+        "rows": [],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "14 ROUNDS OF",
+        "rows": [
+          {
+            "primary": "5 Twin KB Snatches @ 2x20kg · 70 total",
+            "name": "",
+            "mineKey": "Twin KB Snatch",
+            "teamShare": "35",
+            "accent": "yellow"
+          },
+          {
+            "primary": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
+            "name": "",
+            "mineKey": "Twin Kettlebell Shoulder to Overhead",
+            "teamShare": "35",
+            "accent": "yellow"
+          },
+          {
+            "primary": "5 Burpee Box Jumps · 70 total",
+            "name": "",
+            "mineKey": "Burpee Box Jump",
+            "suppressMine": true,
+            "teamShare": "35",
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      },
+      {
+        "title": "BUY-OUT",
+        "rows": [
+          {
+            "primary": "400 M Farmer Carry",
+            "name": "",
+            "mineKey": "Farmer Carry",
+            "suppressMine": true,
+            "teamShare": "200m",
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": true,
+        "partnerDisplayMode": "sections"
+      }
+    ]
+  ],
+  "hero": {
+    "value": "22:00",
+    "unit": "MIN",
+    "storyLine": "35 twin kb snatch · 35 twin kettlebell shoulder to overhead · 35 burpee box jump · 400m cash-out: farmer carry",
+    "storyMovements": [
+      {
+        "perRound": "5",
+        "name": "Twin KB Snatch",
+        "total": "70 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 35",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "5",
+        "name": "Twin Kettlebell Shoulder to Overhead",
+        "total": "70 total",
+        "color": "yellow",
+        "weight": 40,
+        "unit": "kg",
+        "partnerNote": "your part 35",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "5",
+        "name": "Burpee Box Jump",
+        "total": "70 total",
+        "color": "magenta",
+        "unit": "kg",
+        "partnerNote": "your part 35",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "400m",
+        "name": "Cash-out: Farmer Carry",
+        "total": "800m total",
+        "color": "magenta",
+        "partnerNote": "your part 400m",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "OUR TIME",
+  "resultValue": "22:00",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "FOR TIME (20 MIN CAP)",
+        "cap": ""
+      },
+      {
+        "kind": "block",
+        "label": "14 ROUNDS OF",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "5 Twin KB Snatches @ 2x20kg · 70 total",
+        "load": "",
+        "mine": "40kg",
+        "team": "35",
+        "isPartnerShare": true
+      },
+      {
+        "kind": "line",
+        "rx": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
+        "load": "",
+        "mine": "40kg",
+        "team": "35",
+        "isPartnerShare": true
+      },
+      {
+        "kind": "line",
+        "rx": "5 Burpee Box Jumps · 70 total",
+        "load": "",
+        "mine": "",
+        "team": "35",
+        "isPartnerShare": true
+      },
+      {
+        "kind": "block",
+        "label": "BUY-OUT",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "400 M Farmer Carry",
+        "load": "",
+        "mine": "",
+        "team": "200m",
+        "isPartnerShare": true
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "FOR TIME (20 MIN CAP)",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "14 ROUNDS OF",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "5 Twin KB Snatches @ 2x20kg · 70 total",
+          "load": "",
+          "mine": "40kg",
+          "team": "35",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "line",
+          "rx": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
+          "load": "",
+          "mine": "40kg",
+          "team": "35",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "line",
+          "rx": "5 Burpee Box Jumps · 70 total",
+          "load": "",
+          "mine": "",
+          "team": "35",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "block",
+          "label": "BUY-OUT",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "400 M Farmer Carry",
+          "load": "",
+          "mine": "",
+          "team": "200m",
+          "isPartnerShare": true
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": "you & your partner - two blocks",
+    "pages": [
+      "you & your partner - two blocks"
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ]
+}

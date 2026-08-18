@@ -11,6 +11,8 @@
 
 .sheet {
   width: 100%;
+  max-width: var(--app-column);
+  margin-inline: auto;
   background: #111318;
   border-radius: 22px 22px 0 0;
   padding: 18px 18px calc(24px + env(safe-area-inset-bottom, 0px));

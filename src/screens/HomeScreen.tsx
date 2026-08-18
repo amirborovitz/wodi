@@ -66,29 +66,44 @@ export function HomeScreen({
   const { user } = useAuth();
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(100);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
-  const { monthRecap, seasonRecap } = useRecapData(workouts, user?.id);
+  const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
-  // Show season recap if this is a quarter-start month (Jan/Apr/Jul/Oct) + day ≤ 7; else month recap.
-  // Both windows: day 1–7 of the new period.
+  // One drop card at a time, widest scope first. The month / season drop owns the
+  // first seven days of a new period because it's the rarer, bigger artifact; the
+  // week drop takes Monday to Wednesday, the same early slice of its own period.
   const recapForToday = useMemo(() => {
     const now = new Date();
-    if (now.getDate() > 7) return null;
-    if (now.getMonth() % 3 === 0 && seasonRecap) return seasonRecap;
-    return monthRecap;
-  }, [monthRecap, seasonRecap]);
+    if (now.getDate() <= 7) {
+      if (now.getMonth() % 3 === 0 && seasonRecap) return seasonRecap;
+      if (monthRecap) return monthRecap;
+    }
+    const day = now.getDay(); // 0 = Sunday
+    if (day >= 1 && day <= 3) return weekRecap;
+    return null;
+  }, [weekRecap, monthRecap, seasonRecap]);
 
   const recapHandledKey = recapForToday
     ? `wodi_recap_handled_${recapForToday.id}`
     : null;
-  const [recapHandled, setRecapHandled] = useState(() => {
-    if (!recapHandledKey) return false;
-    return localStorage.getItem(recapHandledKey) === '1';
-  });
+  // Ids handled in THIS session, so the card collapses the moment it's dismissed.
+  const [handledIds, setHandledIds] = useState<readonly string[]>([]);
+  // Re-read whenever the key changes rather than once at mount: workouts arrive
+  // after the first render, so an initializer would have run while the key was
+  // still null and resurrected a drop the athlete already dismissed.
+  const recapHandled = useMemo(() => {
+    if (!recapForToday || !recapHandledKey) return false;
+    return handledIds.includes(recapForToday.id)
+      || localStorage.getItem(recapHandledKey) === '1';
+  }, [recapForToday, recapHandledKey, handledIds]);
   const showRecapCard = Boolean(recapForToday) && !recapHandled;
+  const markRecapHandled = () => {
+    if (!recapForToday || !recapHandledKey) return;
+    localStorage.setItem(recapHandledKey, '1');
+    setHandledIds(prev => (prev.includes(recapForToday.id) ? prev : [...prev, recapForToday.id]));
+  };
   const handleOpenRecap = () => {
-    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
-    setRecapHandled(true);
+    markRecapHandled();
     if (recapForToday) onOpenRecap?.(recapForToday);
   };
   const deleteSheet = useDeleteSheet(deleteWorkout);
@@ -114,8 +129,7 @@ export function HomeScreen({
   };
 
   const handleDismissRecap = () => {
-    if (recapHandledKey) localStorage.setItem(recapHandledKey, '1');
-    setRecapHandled(true);
+    markRecapHandled();
     const offset = pendingRecapScrollOffsetRef.current;
     pendingRecapScrollOffsetRef.current = 0;
     if (offset <= 0) return;

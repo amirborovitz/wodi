@@ -2,7 +2,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   background: #0c0d0f;
-  max-width: 500px;
+  max-width: var(--app-column);
   margin: 0 auto;
   padding-bottom: calc(120px + var(--safe-bottom));
 }

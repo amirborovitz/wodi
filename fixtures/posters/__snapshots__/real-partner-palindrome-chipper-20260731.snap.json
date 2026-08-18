@@ -220,35 +220,40 @@
         "rx": "80 Twin Kettlebells Clean and Jerks",
         "load": "",
         "mine": "20kg each",
-        "team": "40"
+        "team": "40",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
         "rx": "60 Box Jump Overs",
         "load": "",
         "mine": "",
-        "team": "30"
+        "team": "30",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
         "rx": "40 Bar Muscle-ups",
         "load": "",
         "mine": "",
-        "team": "20"
+        "team": "20",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
         "rx": "60 Box Jump Overs",
         "load": "",
         "mine": "",
-        "team": "30"
+        "team": "30",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
         "rx": "80 Twin Kettlebells Clean and Jerks",
         "load": "",
         "mine": "20kg each",
-        "team": "40"
+        "team": "40",
+        "isPartnerShare": true
       },
       {
         "kind": "line",
@@ -277,35 +282,40 @@
           "rx": "80 Twin Kettlebells Clean and Jerks",
           "load": "",
           "mine": "20kg each",
-          "team": "40"
+          "team": "40",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
           "rx": "60 Box Jump Overs",
           "load": "",
           "mine": "",
-          "team": "30"
+          "team": "30",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
           "rx": "40 Bar Muscle-ups",
           "load": "",
           "mine": "",
-          "team": "20"
+          "team": "20",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
           "rx": "60 Box Jump Overs",
           "load": "",
           "mine": "",
-          "team": "30"
+          "team": "30",
+          "isPartnerShare": true
         },
         {
           "kind": "line",
           "rx": "80 Twin Kettlebells Clean and Jerks",
           "load": "",
           "mine": "20kg each",
-          "team": "40"
+          "team": "40",
+          "isPartnerShare": true
         },
         {
           "kind": "line",

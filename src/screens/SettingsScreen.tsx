@@ -1,80 +1,31 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { SettingsList } from '../components/settings/SettingsList';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import type { SettingsSection } from '../components/settings/SettingsList';
 import type { User } from '../types';
 import styles from './SettingsScreen.module.css';
 
 interface SettingsScreenProps {
   onBack: () => void;
   onNavigateToProfile: () => void;
-  onNavigateToGoals: () => void;
   onSignOut: () => void;
   user: User | null;
 }
 
+/**
+ * Account-level settings.
+ *
+ * Deliberately almost empty. Profile used to live two rows deep in here; it is
+ * now one tap from Me, and this screen keeps a row to it only for people who
+ * still come looking. Nothing is listed that the app cannot actually do — no
+ * units toggle, no notification switch, no version row that goes nowhere.
+ */
 export function SettingsScreen({
   onBack,
   onNavigateToProfile,
-  onNavigateToGoals,
   onSignOut,
   user,
-}: SettingsScreenProps) {
+}: SettingsScreenProps): React.JSX.Element {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-
-  const handleSignOut = () => {
-    setShowSignOutConfirm(false);
-    onSignOut();
-  };
-
-  const sections: SettingsSection[] = [
-    {
-      title: 'Account',
-      items: [
-        {
-          id: 'profile',
-          label: 'Profile',
-          icon: <ProfileIcon />,
-          value: user?.displayName || 'Set up profile',
-          type: 'navigation',
-          onPress: onNavigateToProfile,
-        },
-        {
-          id: 'goals',
-          label: 'Training Goals',
-          icon: <GoalsIcon />,
-          value: `${user?.goals?.streakGoal || 5} days/week`,
-          type: 'navigation',
-          onPress: onNavigateToGoals,
-        },
-      ],
-    },
-    {
-      title: 'About',
-      items: [
-        {
-          id: 'version',
-          label: 'App Version',
-          icon: <InfoIcon />,
-          value: '1.0.0',
-          type: 'navigation',
-          onPress: () => {},
-        },
-      ],
-    },
-    {
-      items: [
-        {
-          id: 'signout',
-          label: 'Sign Out',
-          icon: <SignOutIcon />,
-          type: 'destructive',
-          onPress: () => setShowSignOutConfirm(true),
-        },
-      ],
-    },
-  ];
 
   return (
     <motion.div
@@ -85,71 +36,69 @@ export function SettingsScreen({
       transition={{ type: 'spring', damping: 25, stiffness: 200 }}
     >
       <header className={styles.header}>
-        <button className={styles.backButton} onClick={onBack}>
-          <BackIcon />
+        <button type="button" className={styles.circleButton} onClick={onBack} aria-label="Back">
+          <ChevronLeftIcon />
         </button>
         <h1 className={styles.title}>Settings</h1>
-        <div className={styles.headerSpacer} />
+        <span className={styles.headerSpacer} />
       </header>
 
-      <div className={styles.content}>
-        <SettingsList sections={sections} />
+      <div className={styles.rows}>
+        <button type="button" className={styles.row} onClick={onNavigateToProfile}>
+          <span className={styles.rowIcon}><EditIcon /></span>
+          <span className={styles.rowText}>
+            <span className={styles.rowLabel}>Profile</span>
+            {user?.displayName && <span className={styles.rowSub}>{user.displayName}</span>}
+          </span>
+          <span className={styles.rowChevron}>›</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.row} ${styles.rowDanger}`}
+          onClick={() => setShowSignOutConfirm(true)}
+        >
+          <span className={`${styles.rowIcon} ${styles.rowIconDanger}`}><SignOutIcon /></span>
+          <span className={styles.rowText}>
+            <span className={styles.rowLabel}>Log out</span>
+          </span>
+          <span className={styles.rowChevron}>›</span>
+        </button>
       </div>
 
       <ConfirmDialog
         open={showSignOutConfirm}
-        title="Sign Out"
-        message="Are you sure you want to sign out of your account?"
-        confirmText="Sign Out"
+        title="Log out"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Log out"
         cancelText="Cancel"
         destructive
-        onConfirm={handleSignOut}
+        onConfirm={() => { setShowSignOutConfirm(false); onSignOut(); }}
         onCancel={() => setShowSignOutConfirm(false)}
       />
     </motion.div>
   );
 }
 
-function BackIcon() {
+function ChevronLeftIcon(): React.JSX.Element {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="15 18 9 12 15 6" />
     </svg>
   );
 }
 
-function ProfileIcon() {
+function EditIcon(): React.JSX.Element {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
     </svg>
   );
 }
 
-function GoalsIcon() {
+function SignOutIcon(): React.JSX.Element {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="16" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12.01" y2="8" />
-    </svg>
-  );
-}
-
-function SignOutIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
