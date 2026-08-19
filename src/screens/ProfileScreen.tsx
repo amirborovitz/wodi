@@ -7,6 +7,7 @@ import { useRecapData } from '../hooks/useRecapData';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
+import { computeWeekStreak } from '../utils/weekStreak';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './ProfileScreen.module.css';
 
@@ -95,25 +96,25 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
       (sum, w) => sum + (w.workloadBreakdown?.grandTotalDistance || 0),
       0
     );
-    const ep = aggregateStats(filteredWorkouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP;
     return {
       moveMinutes,
       workoutsCount,
       distanceMeters,
-      ep,
     };
-  }, [filteredWorkouts, user?.weight]);
+  }, [filteredWorkouts]);
 
   const totalWorkouts = workouts.length;
   const totalEP = useMemo(
     () => aggregateStats(workouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP,
     [workouts, user?.weight]
   );
+  // Lifetime, never period-scoped: a streak counts back from today by
+  // definition, so the Week/Month toggle has nothing to say about it.
+  const weekStreak = useMemo(() => computeWeekStreak(workouts), [workouts]);
 
   const displayMoveMinutes = useTickerNumber(stats.moveMinutes);
   const displayWorkouts = useTickerNumber(stats.workoutsCount);
   const displayDistanceMeters = useTickerNumber(stats.distanceMeters);
-  const displayEP = useTickerNumber(stats.ep);
 
   const periodIndex = PERIODS.indexOf(timePeriod);
   const sliderStyle = {
@@ -169,10 +170,14 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.28 }}
       >
+        {/* Three, and each says something the others don't. "Posters" was
+            workouts.length under a second name, and the PR count is the
+            subtitle of the Records row immediately below — a strip that
+            reprints what is already on screen costs the space and pays
+            nothing. */}
         {[
           ['Workouts', totalWorkouts],
-          ['Posters', workouts.length],
-          ['PRs', prCount],
+          ['Week Streak', weekStreak],
           ['Total EP', totalEP],
         ].map(([label, value]) => (
           <div key={label} className={styles.lifetimeStat}>
@@ -250,10 +255,6 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
           )}
         </motion.div>
 
-        <motion.div className={styles.statCard} layout transition={{ duration: 0.2 }}>
-          <span className={styles.cardLabel}>EP</span>
-          <span className={styles.metricValue}>{Math.round(displayEP).toLocaleString()}</span>
-        </motion.div>
       </div>
 
       {/* Your Wrapped \u2014 permanent home, independent of the period toggle */}
