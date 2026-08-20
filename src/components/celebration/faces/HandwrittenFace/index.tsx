@@ -359,7 +359,8 @@ export function HandwrittenFace({
   // ── Post to feed ───────────────────────────────────────────────────────
   // Publishing is global and irreversible-ish, so it lives in the overflow menu
   // rather than beside Share: a mis-tap next to the most-tapped button would
-  // put a poster in front of everyone. Confirm before it goes out.
+  // put a poster in front of everyone. The explainer dialog runs in front of the
+  // athlete's FIRST post only — after that the sheet row publishes straight away.
 
   const publish = (): void => {
     setConfirmPost(false);
@@ -687,7 +688,8 @@ export function HandwrittenFace({
   // ─── Share sheet ("Share", bottom bar) ────────────────────────────────
   // Wodi's own feed is the first destination, not one buried behind a "⋯": the
   // proudest screen in the app should not spend its loudest button exporting to
-  // someone else's. The confirm dialog, not obscurity, is what stops a mis-tap.
+  // someone else's. The sheet itself, not obscurity, is what stops a mis-tap —
+  // the dialog behind this row is a one-time explainer, not a per-post gate.
   // A test log is excluded from every count, so it has no business in a public feed.
 
   const canPostToFeed = feedPost.canPost && !data.isTest;
@@ -696,7 +698,7 @@ export function HandwrittenFace({
   // by label, so a label that changes with state would collide across rows.
   const shareItems: ActionMenuItem[] = [
     ...(canPostToFeed
-      ? [{ label: 'Post to Wodi feed', icon: <FeedIcon />, onClick: () => setConfirmPost(true) }]
+      ? [{ label: 'Post to Wodi feed', icon: <FeedIcon />, onClick: () => (feedPost.needsConfirm ? setConfirmPost(true) : publish()) }]
       : []),
     ...(isNativeShareSupported()
       ? [{ label: 'Share image…', icon: <ShareIcon />, onClick: shareToApps, disabled: shareState !== 'ready' }]

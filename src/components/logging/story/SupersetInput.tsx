@@ -12,7 +12,8 @@ import {
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
-import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
+import { hasAlternatives } from '../../../data/exerciseDefinitions';
+import { buildSubstitutionPatch } from './substitutionPatch';
 import type { MovementSubstitution } from '../../../types';
 import styles from './SupersetInput.module.css';
 
@@ -116,49 +117,8 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     if (!swapMr) return;
     const idx = movements.indexOf(swapMr);
     if (idx < 0) return;
-    const patch: Partial<MovementResult> = { substitution: sub };
-    if (sub?.adjustedValue != null) {
-      if (sub.targetUnit) {
-        if (sub.targetUnit === 'distance') {
-          patch.distance = sub.adjustedValue;
-          patch.calories = undefined;
-        } else if (sub.targetUnit === 'calories') {
-          patch.calories = sub.adjustedValue;
-          patch.distance = undefined;
-        }
-      } else {
-        // Legacy fallback
-        const originIsDistance = swapMr.kind === 'distance'
-          || (swapMr.movement.distance != null && swapMr.movement.distance > 0);
-        const originIsCal = !originIsDistance && (
-          swapMr.movement.inputType === 'calories' ||
-          (swapMr.movement.calories != null && swapMr.movement.calories > 0)
-        );
-        if (originIsDistance) {
-          patch.distance = sub.adjustedValue;
-          patch.calories = undefined;
-        } else if (originIsCal) {
-          patch.calories = sub.adjustedValue;
-          patch.distance = undefined;
-        } else {
-          const targetDef = findExerciseDefinition(sub.selectedName);
-          const targetUsesCal = targetDef?.defaultUnit === 'calories';
-          if (targetUsesCal) {
-            patch.calories = sub.adjustedValue;
-          } else if (swapMr.movement.distance != null) {
-            patch.distance = sub.adjustedValue;
-          }
-        }
-      }
-    } else if (!sub) {
-      const isCal = swapMr.movement.inputType === 'calories' || (swapMr.movement.calories != null && swapMr.movement.calories > 0);
-      if (isCal) patch.calories = swapMr.movement.calories ?? undefined;
-      else if (swapMr.movement.distance != null) {
-        patch.distance = swapMr.movement.distance;
-        patch.calories = undefined;
-      }
-    }
-    updateMovement(idx, patch);
+    // Substituting and reverting are exact inverses — one shared builder owns both.
+    updateMovement(idx, buildSubstitutionPatch(swapMr, sub));
     setSwapOpenKey(null);
   }, [swapMr, movements, updateMovement]);
 

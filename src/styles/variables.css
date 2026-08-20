@@ -20,6 +20,14 @@
      stretching — a poster reads at one size everywhere. Bottom sheets track it
      too, or they detach from the column they belong to. Change it here only. */
   --app-column: 520px;
+  /* The width a poster is DESIGNED at — POSTER_REFERENCE_WIDTH in PosterCard.
+     PosterCard scales the skin to whatever width its container gives it, so a
+     wider container does not merely fit the poster, it magnifies it: inside the
+     520px column every glyph renders at 1.33x the size it was drawn at. A
+     surface showing a poster as its CONTENT holds this width instead, so type
+     lands at its design size and never above it. Thumbnails, which are meant to
+     be small, are free to go under it. */
+  --poster-width: 360px;
   /* ──────────────────────────────────────────────────────────────── */
 
   /* Colors - Deep Dark Theme */

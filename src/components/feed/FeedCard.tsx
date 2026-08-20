@@ -36,15 +36,17 @@ export function FeedCard({
   return (
     <article ref={cardRef} className={`${styles.card} ${fading ? styles.cardFading : ''}`}>
       <header className={styles.author}>
+        {/* The age rides the identity's metadata line rather than a column of
+            its own: it belongs with the box and the city as one quiet line
+            under the name, and giving it a second column pushed the name into
+            an awkwardly narrow middle. */}
         <AuthorLine
           profile={profiles.get(post.userId)}
+          lead={formatAge(post.createdAt, now)}
           size="card"
           onOpen={() => onOpenAthlete(post.userId)}
         />
-        <div className={styles.age}>
-          <span>{formatAge(post.createdAt, now)}</span>
-          {fading && <span className={styles.fading}>fading soon</span>}
-        </div>
+        {fading && <span className={styles.fading}>fading soon</span>}
         {/* Owner deletes, everyone else reports. There is no "edit" — a post is
             an immutable snapshot, and it isn't the viewer's poster to change. */}
         <button

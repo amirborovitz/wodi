@@ -63,7 +63,7 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
     <nav className={styles.nav}>
       <div className={styles.container}>
         {navItems.map((item) => {
-          const isActive = currentScreen === item.id || (item.id === 'profile' && (currentScreen === 'settings' || currentScreen === 'stats'));
+          const isActive = currentScreen === item.id || (item.id === 'profile' && currentScreen === 'settings');
           return (
             <button
               key={item.id}

@@ -6,6 +6,7 @@ import { useLongPress } from '../hooks/useLongPress';
 import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
+import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
@@ -67,6 +68,7 @@ export function HomeScreen({
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(100);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
   const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
+  const profile = useProfileCompleteness();
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
@@ -305,7 +307,7 @@ export function HomeScreen({
                 type="button"
                 className={styles.avatarBtn}
                 onClick={onOpenProfile}
-                aria-label="Open profile"
+                aria-label={profile.prompt ? `Open profile — ${profile.prompt}` : 'Open profile'}
               >
                 {user?.photoUrl ? (
                   <img
@@ -316,6 +318,10 @@ export function HomeScreen({
                 ) : (
                   <span className={styles.avatarFallback}>{firstName.charAt(0).toUpperCase()}</span>
                 )}
+                {/* The same yellow dot Profile Settings puts beside a required row,
+                    two levels up. It adds no tap target and no layout of its own —
+                    the avatar already leads to the one place that can clear it. */}
+                {!profile.isComplete && <span className={styles.avatarDot} aria-hidden="true" />}
               </button>
             )}
           </div>

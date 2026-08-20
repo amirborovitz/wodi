@@ -90,6 +90,18 @@
   letter-spacing: 0.02em;
 }
 
+/* Sits in the handle's slot while a required field is blank. Yellow because
+   that is already the colour of a required row in Profile Settings — the dot on
+   the home avatar, this line, and the row that clears it are one trail. */
+.profilePrompt {
+  display: block;
+  margin-top: 4px;
+  font-family: 'DM Mono', monospace;
+  color: var(--wodi-yellow);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
 .editButton {
   width: 36px;
   height: 36px;

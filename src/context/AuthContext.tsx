@@ -46,7 +46,6 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   updateUserPhoto: (file: File) => Promise<string>;
   updateUserProfile: (profile: UserProfileUpdate) => Promise<void>;
-  completeOnboarding: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -324,10 +323,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const completeOnboarding = async () => {
-    await updateUserProfile({ onboardingComplete: true });
-  };
-
   const refreshUser = async () => {
     if (firebaseUser) {
       await fetchAndSetUser(firebaseUser);
@@ -372,7 +367,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       updateUserPhoto,
       updateUserProfile,
-      completeOnboarding,
       refreshUser,
     }}>
       {children}

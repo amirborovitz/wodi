@@ -134,7 +134,9 @@ export function ProfileSettingsScreen({
           <FieldNote id="profile-error-gym" message={errors.gym} />
 
           <label className={rowClass('location')}>
-            <span className={styles.label}>City<RequiredDot field="location" /></span>
+            {/* Labelled for both halves: the row said "City" while asking for
+                "City, country", and what the feed shows is the whole string. */}
+            <span className={styles.label}>City &amp; country<RequiredDot field="location" /></span>
             <input
               className={styles.value}
               value={fields.location}

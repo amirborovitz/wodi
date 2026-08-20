@@ -90,10 +90,10 @@
 }
 
 .avatarBtn {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  overflow: hidden;
   background: #16181c;
   border: 2px solid rgba(243, 241, 234, 0.15);
   display: flex;
@@ -107,7 +107,25 @@
 .avatar {
   width: 100%;
   height: 100%;
+  /* Rounds the photo itself, because the button can no longer clip it: the
+     completeness dot below sits proud of that circle. */
+  border-radius: 50%;
   object-fit: cover;
+}
+
+/* Profile completeness. The same yellow Profile Settings marks a required row
+   with, ring-cut against the header so it reads as a badge and not as a speck
+   on the photo. Rendered only while something is actually missing — there is no
+   dismissed state, so it clears itself the moment the field saves. */
+.avatarDot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #f5c200;
+  border: 2px solid #0b0c0e;
 }
 
 .avatarFallback {

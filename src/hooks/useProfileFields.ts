@@ -149,6 +149,38 @@ function toFields(user: User | null): ProfileFields {
   };
 }
 
+/**
+ * Everything the profile asks for except the name. The name arrives free with
+ * the Google account, so it says nothing about whether the athlete has actually
+ * told us anything — every other field had to be typed in on purpose.
+ */
+const DETAIL_FIELDS: readonly ProfileFieldKey[] = [
+  'weight',
+  'sex',
+  'birthYear',
+  'gym',
+  'location',
+  'instagram',
+];
+
+/**
+ * Whether the athlete has filled in at least one detail beyond their name.
+ *
+ * Judged by the same validateField the form uses, so a value that screen would
+ * reject cannot count as filled here — and blank is checked separately because
+ * an empty optional field is *valid*, just not filled.
+ *
+ * A null user (still loading) counts as filled: a nudge that flashes on every
+ * cold start is noise, not a nudge.
+ */
+export function hasProfileDetails(user: User | null): boolean {
+  if (!user) return true;
+  const fields = toFields(user);
+  return DETAIL_FIELDS.some(
+    (key) => fields[key].trim() !== '' && validateField(key, fields) === null
+  );
+}
+
 export function useProfileFields(): UseProfileFieldsResult {
   const { user, updateUserProfile } = useAuth();
   const [fields, setFields] = useState<ProfileFields>(() => toFields(user));

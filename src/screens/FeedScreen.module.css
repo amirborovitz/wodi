@@ -1,8 +1,15 @@
+/* The one screen whose content has an intrinsic width. Everywhere else holds
+   --app-column, but a feed card IS a poster, and a poster is drawn at
+   --poster-width: hand it the wider column and PosterCard doesn't fit it there,
+   it magnifies it a third past its design size, which is what made a single
+   card eat a whole screen. The gutters are added on so the poster lands at
+   exactly its own width and the header, rail and reaction rows stay flush with
+   its edges. Below this width — every real phone — nothing changes. */
 .screen {
   min-height: 100vh;
   padding: 20px 0 calc(96px + env(safe-area-inset-bottom));
   background: var(--wodi-bg);
-  max-width: var(--app-column);
+  max-width: calc(var(--poster-width) + 40px);
   margin: 0 auto;
 }
 
@@ -67,8 +74,8 @@
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  margin-top: 18px;
+  gap: 18px;
+  margin-top: 16px;
 }
 
 .state {

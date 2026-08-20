@@ -13,7 +13,8 @@ import {
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { CustomNumpadSheet } from './CustomNumpadSheet';
-import { hasAlternatives, findExerciseDefinition } from '../../../data/exerciseDefinitions';
+import { hasAlternatives } from '../../../data/exerciseDefinitions';
+import { buildSubstitutionPatch } from './substitutionPatch';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
 
@@ -265,19 +266,24 @@ function AiAlternativeToggle({ mr, onChange }: AiToggleProps) {
 
   const handleToggle = () => {
     if (isUsingAiAlt) {
-      // Revert to original
-      onChange({ substitution: null });
-    } else {
-      // Switch to AI alternative
-      const sub: MovementSubstitution = {
-        originalName: mr.movement.name,
-        selectedName: aiAlt.name,
-        substitutionType: 'easier',
-        originalValue: mr.movement.reps ?? mr.movement.distance ?? mr.movement.calories,
-        adjustedValue: aiAlt.reps ?? aiAlt.distance ?? aiAlt.calories,
-      };
-      onChange({ substitution: sub });
+      onChange(buildSubstitutionPatch(mr, null));
+      return;
     }
+    // The board wrote both sides ("40 DU / 60 singles"), so the alternative carries its own
+    // quantity and its own unit — the chip must move the row's number too, not just its name.
+    const targetUnit = aiAlt.reps != null ? 'reps'
+      : aiAlt.distance != null ? 'distance'
+      : aiAlt.calories != null ? 'calories'
+      : undefined;
+    const sub: MovementSubstitution = {
+      originalName: mr.movement.name,
+      selectedName: aiAlt.name,
+      substitutionType: 'easier',
+      originalValue: mr.movement.reps ?? mr.movement.distance ?? mr.movement.calories,
+      adjustedValue: aiAlt.reps ?? aiAlt.distance ?? aiAlt.calories,
+      targetUnit,
+    };
+    onChange(buildSubstitutionPatch(mr, sub));
   };
 
   return (
@@ -657,67 +663,8 @@ export function ScoreMovementInputs({
     const globalIndex = movements.indexOf(swapMr);
     if (globalIndex < 0) return;
 
-    // When substituting, auto-adjust the logged value if conversion data exists
-    const patch: Partial<MovementResult> = { substitution: sub };
-    if (sub) {
-      if (sub.adjustedValue != null) {
-        // Use targetUnit from the substitution sheet if available; it knows
-        // the target movement's default unit (e.g., Run -> Echo Bike = calories).
-        if (sub.targetUnit) {
-          if (sub.targetUnit === 'distance') {
-            patch.distance = sub.adjustedValue;
-            patch.calories = undefined;
-          } else if (sub.targetUnit === 'calories') {
-            patch.calories = sub.adjustedValue;
-            patch.distance = undefined;
-          } else if (sub.targetUnit === 'reps') {
-            patch.reps = sub.adjustedValue;
-          }
-          // time: no special field to set
-        } else {
-          // Legacy fallback: detect from origin movement
-          const originIsDistance = swapMr.kind === 'distance'
-            || (swapMr.movement.distance != null && swapMr.movement.distance > 0);
-          const originIsCal = !originIsDistance && (
-            swapMr.movement.inputType === 'calories' ||
-            (swapMr.movement.calories != null && swapMr.movement.calories > 0)
-          );
-          if (originIsDistance) {
-            patch.distance = sub.adjustedValue;
-            patch.calories = undefined;
-          } else if (originIsCal) {
-            patch.calories = sub.adjustedValue;
-            patch.distance = undefined;
-          } else {
-            const targetDef = findExerciseDefinition(sub.selectedName);
-            const targetUsesCal = targetDef?.defaultUnit === 'calories';
-            if (targetUsesCal) {
-              patch.calories = sub.adjustedValue;
-            } else if (swapMr.movement.distance != null) {
-              patch.distance = sub.adjustedValue;
-            }
-          }
-        }
-      }
-    } else {
-      // Reverting to Rx: restore original prescribed values
-      const isDistance = swapMr.kind === 'distance'
-        || (swapMr.movement.distance != null && swapMr.movement.distance > 0);
-      const isCal = !isDistance && (
-        swapMr.movement.inputType === 'calories' ||
-        (swapMr.movement.calories != null && swapMr.movement.calories > 0)
-      );
-      if (isCal) {
-        patch.calories = swapMr.movement.calories ?? undefined;
-      } else if (swapMr.movement.distance != null) {
-        patch.distance = swapMr.movement.distance;
-        // Clear calories if reverting from a calorie-based substitute
-        patch.calories = undefined;
-      } else if (isDistance) {
-        // Distance-based row but no prescribed distance: clear user-entered distance.
-        patch.distance = undefined;
-      }
-    }
+    // Substituting and reverting are exact inverses — one shared builder owns both.
+    const patch = buildSubstitutionPatch(swapMr, sub);
 
     const sameMovementIndices = movements
       .map((mr, index) => ({ mr, index }))

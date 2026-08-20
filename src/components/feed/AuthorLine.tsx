@@ -7,6 +7,13 @@ import styles from './AuthorLine.module.css';
 interface AuthorLineProps {
   /** Undefined while the lookup is in flight, or if the athlete has no profile doc. */
   profile: PublicProfile | undefined;
+  /**
+   * Post-scoped text to open the metadata line with — the feed card passes the
+   * post's age. It leads rather than trails because it is the one part of that
+   * line that must survive on the narrowest phone: the line ellipsises from the
+   * right, so whatever is last is what gets eaten.
+   */
+  lead?: string;
   /** `card` sits above a poster; `row` is the denser likes-list variant. */
   size?: 'card' | 'row';
   /** Opens this athlete's card. Omitted where there is nowhere to go. */
@@ -16,7 +23,8 @@ interface AuthorLineProps {
 const AVATAR_SIZE = { card: 34, row: 40 } as const;
 
 /**
- * One athlete's public identity — avatar, name, where they train, Instagram.
+ * One athlete's public identity — avatar, name, where they train, what city
+ * they're in, Instagram.
  *
  * Shared by the post header and the reactions list so the two can never drift:
  * an athlete looks the same everywhere the feed shows them. That used to be a
@@ -35,9 +43,11 @@ const AVATAR_SIZE = { card: 34, row: 40 } as const;
  * inside a button, so the two interactive elements sit side by side and the
  * link is stacked above the overlay to keep its own tap.
  */
-export function AuthorLine({ profile, size = 'card', onOpen }: AuthorLineProps): React.ReactElement {
+export function AuthorLine({ profile, lead, size = 'card', onOpen }: AuthorLineProps): React.ReactElement {
   const name = profile?.name ?? UNKNOWN_ATHLETE;
-  const meta = [profile?.gym, profile?.location].filter(Boolean).join(' · ');
+  // When, where they train, and what city they're in — one line, in that order,
+  // and it collapses entirely when the athlete has filled none of them in.
+  const meta = [lead, profile?.gym, profile?.location].filter(Boolean).join(' · ');
 
   return (
     <div className={`${styles.author} ${styles[size]}`}>

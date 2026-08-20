@@ -1,5 +1,204 @@
 # Changelog
 
+## v0.1.27 — The second time through
+
+Everything here is a thing that looked fine once and wrong on the second pass: the second poster
+in a scroll, the second time a swap sheet is opened, the second time the same explainer is read.
+Plus a trail back to the one screen that can turn a nameless athlete into somebody.
+
+---
+
+### A poster in the feed is drawn at the size it was drawn at
+
+**New `--poster-width: 360px` token.** `PosterCard` scales a skin to whatever width its container
+gives it, so a wider container does not *fit* the poster — it *magnifies* it. Inside the 520px
+`--app-column` every glyph rendered at 1.33× the size it was designed at, which is what made a
+single card eat a whole screen. `FeedScreen` is the one surface whose content has an intrinsic
+width — a feed card **is** a poster — so it holds `--poster-width` plus gutters instead of the app
+column, and the header, pulse rail and reaction rows stay flush with the poster's own edges. Below
+that width — every real phone — nothing changes. Thumbnails, which are meant to be small, remain
+free to go under it.
+
+Card gaps and header spacing tighten to match (22 → 18px between cards, 11 → 9px above the
+reaction row): at true size the old rhythm was built for a poster a third too big.
+
+### The post's age joins the identity line
+
+`formatAge` now speaks **one unit, never two**. "14h 51m ago" is a stopwatch reading; nobody
+scrolling a feed needs the odd minutes, and the second term cost the metadata line exactly the
+room the athlete's box and city need. Minutes read as "50 min ago", hours are **rounded** rather
+than floored because that is how the number is said out loud — 1h50 is "2 hours ago" — and the
+rounding is capped at 23 so the last minutes of the window never claim to be "24 hours ago" inside
+a 24-hour feed.
+
+**`AuthorLine` gained `lead`.** The age rides the metadata line under the name — when · where they
+train · what city — instead of holding a column of its own, which had squeezed the name into an
+awkwardly narrow middle. It *leads* rather than trails because that line ellipsises from the right
+on a narrow phone, and the age is the part that must survive. The whole line collapses when an
+athlete has filled none of it in, and `location` joins it: what the feed shows is the whole
+"City, country" string, so Profile Settings now labels that row for both halves instead of asking
+for "City".
+
+**"fading soon" is a warning, not a timestamp.** Now a pill — uppercase, red-tinted — so it reads
+as a state the post is in rather than one more number to compare against the ones on the poster.
+
+### The 24-hour explainer is a first-post lesson, not a gate
+
+`usePostToFeed` gained **`needsConfirm`**, and the share sheet's "Post to Wodi feed" row publishes
+straight away once an athlete has published before. Re-reading the same paragraph every time turns
+posting into paperwork; the sheet itself, not the dialog, is what stops a mis-tap. The flag is
+`localStorage`, keyed by uid — a second account on the same device still gets told once — and it
+is re-read **during render** when the uid changes, so the first paint after a sign-in is never
+wrong about it. Private mode simply reads the explainer again.
+
+### One builder owns substituting *and* reverting
+
+**New `components/logging/story/substitutionPatch.ts`.** Three call sites — the substitution sheet,
+the superset sheet, and the inline AI-alternative chip — each carried their own copy of the
+"substitution → row patch" logic, drifting in the usual way: `SupersetInput`'s copy handled
+`distance` and `calories` but never `reps`, and no copy cleared what it did not set.
+
+Substituting and reverting must be **exact inverses**. A substitution re-prescribes the row in a
+single unit, so applying one now clears the other two quantity fields and reverting restores all
+three from the board. Without that symmetry a rep-ratio swap (200m Run → 20 Burpees) or a
+cross-unit swap (10 Burpees → 20 cal Echo Bike) left its converted number behind after the athlete
+went back to Rx, and the row logged both quantities at once. The pre-`targetUnit` inference
+survives as a documented fallback for substitutions saved before the sheet stamped the unit, not
+as a live path.
+
+**The AI-alternative chip moves the number too.** The board wrote both sides ("40 DU / 60
+singles"), so the alternative carries its own quantity *and* its own unit — the chip stamps
+`targetUnit` and hands the whole thing to the same builder instead of swapping only the name.
+
+### The substitution sheet remembers what the row already chose
+
+`SubstitutionSheet` now **rehydrates from the row's saved substitution** and re-seeds on every
+open. Reopening a substituted movement used to show nothing selected and no value adjuster — and
+on a structure-prescribed row (a rounds-scored 200m run) this sheet is the *only* place that
+distance can be changed, so the athlete had no way back to their own number. `isOriginalSelected`
+now reads `pending` alone, which mirrors the saved state.
+
+- **The value adjuster is always available.** It used to render only when a converted value already
+  existed, which hid it for exactly the swap that needs it most: a cross-unit swap with no
+  conversion ratio (Run → Echo Bike in calories) starts empty and the athlete types it. An empty
+  value shows "—", not "0".
+- **Cleared means `undefined`, not zero.** A swap the athlete hasn't put a number on stays blank
+  rather than claiming a 0m effort.
+- **The before/after hint carries units.** "200m → 45 cal", never a bare number pair — a cross-unit
+  swap read as nonsense without them.
+
+### The trail to a filled-in profile
+
+**New `hooks/useProfileCompleteness.ts`** — derived, never stored. No dismissed flag, no Firestore
+field, no `localStorage`: it reads the user doc, so it disappears the moment a detail saves and can
+never get stuck on for someone who already filled one in.
+
+It asks for **engagement, not completion**. One filled field is enough to turn it off — an athlete
+who has been to the profile screen does not need to be told about it again, and a nudge that keeps
+score of what is still blank is a nag. That is also why there is no percentage: a completion number
+invites people to fill fields for the number.
+
+- **`hasProfileDetails`** judges by the same `validateField` the form uses, so a value that screen
+  would reject cannot count as filled, and blankness is checked separately because an empty
+  *optional* field is valid but not filled. The name is excluded — it arrives free with the Google
+  account and says nothing about whether the athlete has told us anything. A null user (still
+  loading) counts as filled: a nudge that flashes on every cold start is noise.
+- **A yellow dot on the home avatar** — the same yellow Profile Settings marks a required row with,
+  ring-cut against the header so it reads as a badge and not a speck on the photo. It adds no tap
+  target and no layout of its own; the avatar already leads to the one place that can clear it.
+- **"Add your details →" on Me**, in the handle's slot. The nudge outranks the handle for that line:
+  the handle is decoration that will still be there tomorrow, while this goes away for good the
+  first time anything is filled in. The two cannot collide in practice either — an Instagram handle
+  is itself a detail, so having one turns the nudge off.
+
+### Dead code
+
+`completeOnboarding` deleted from `AuthContext` — the onboarding flow it belonged to is gone, and
+it was a one-line wrapper over `updateUserProfile` with no callers. `'stats'` and `'onboarding'`
+leave the `Screen` union with it, along with the `BottomNav` branch that lit "Me" for a screen that
+no longer exists.
+
+**Verification:** `tsc -b` clean; 471 tests across 28 files pass. Display and logging-input changes
+only — no calc, EP or poster-render path touched, so the poster fixtures are unaffected.
+
+---
+
+## v0.1.26 — An athlete is one object
+
+Two changes, both about a number or a name that existed in more than one place and disagreed with
+itself.
+
+- **The feed stopped freezing identities.** Tapping the same athlete from a post header and from the
+  reactions list opened two sheets built from two copies, stapled into two documents at two
+  different moments — one carried an Instagram handle, the other didn't. Identity is now a live
+  lookup through `/publicProfiles`, split out of `/users` because Firestore rules are
+  **per-document**: "allow read" on the user doc hands over email, sex, bodyweight and stats along
+  with the name, and there is no read-side equivalent of `diff().affectedKeys()`.
+- **The Profile strip stopped repeating itself.** "Posters" was `workouts.length` under a second
+  name, the PR count was already the subtitle of the row beneath it, and EP was printed twice on the
+  same screen. Those tiles now read Workouts / Week Streak / Total EP.
+
+---
+
+## v0.1.25 — Other athletes exist
+
+A poster stopped being something you look at alone. Everything in this release either builds the
+surface where someone else sees your work, or fixes a number that would have been wrong in front of
+them. Full detail in commit `f2cfc40`.
+
+### The Feed — global, no-follow, 24h
+
+- A post is a **frozen snapshot**, never a pointer into `/workouts`. That doc carries `rawText`,
+  corrections, notes and EP, and it stays owner-scoped — so the feed could only exist by copying
+  what a card renders. Editing a workout tomorrow never rewrites what you posted today; renaming
+  yourself never rewrites your history.
+- `PosterCard` is the read-only poster renderer; `HandwrittenFace` is an **editor** and must never
+  render someone else's poster. `PosterThumbnail` renders `PosterCard` too, so thumbnail, feed card
+  and editor cannot drift.
+- A snapshot carries **every page** of a session — a multi-part day is several posters, and freezing
+  only the metcon publishes a fraction of the work.
+- `firestore.rules`: posts are immutable, creation checks `author.name` against the user doc, and
+  `expiresAt` must sit inside the 24h window. Reactions live in a `flames/{uid}` subcollection
+  precisely so reacting never needs write access to another athlete's post. `storage.rules` is now
+  managed in this repo — **the next deploy replaces whatever is in the console.**
+- `PulseRail` renders the 24h window as a horizontal timeline instead of an infinite scroll.
+- Poster photo: an optional shot clipped to the poster as a tucked polaroid, deliberately a member
+  of the sticker family so the share image and thumbnail pick it up with no extra wiring.
+
+### `partnerScope.ts` — one owner of team-to-personal math
+
+`ParsedMovement.reps: 5` never says whether 5 is the pair's work or yours. Ten consumers joined
+scope, team size and quantity independently, and the same bug came back in June, July and twice in
+August. A convention cannot be enforced; a function can. The legacy `0.5` is a last-resort fallback
+only — two call sites reached for it *first* and quietly halved a team of four's work.
+
+### `occurrenceExpansion.ts` — how many times did this happen?
+
+"[14-12-10-8-6-4] … 200m run in between sets": six tiers hold **five** gaps, and every counting mode
+answered six. New `occurrences` / `placement` parse fields, `statedOccurrenceCount()` as the single
+owner, and `expandExercise()` writing a piece out flat so totals are *counted* rather than
+multiplied. Derived, never stored. Audited by `npm run occurrences`.
+
+### Numbers that were wrong
+
+- Barbell-complex volume dedupe asks the parser's `complex` flag instead of guessing from a
+  weight/rep coincidence — two-arm KB snatches used to drop an entire arm.
+- An unprescribed loaded movement is priced for EP but kept **out** of the breakdown: a number
+  nobody entered can feed the score, never the poster.
+- A strength part's rep scheme lives on the **sets**, not the movement.
+- Loaded carries log their load, not their metres.
+- Canonical lift matching is two-tier: multi-word aliases match anywhere, single-word roots only as
+  the whole name — a substring match polluted a barbell record with loads that never touched a bar.
+
+### Week Drop, and a smaller Me
+
+Recaps gained a "week" scope with its own one-page `WeekDropPage`. `RecapData` gained `epTotal`
+(against the athlete's real bodyweight) and `moveMinutes` (entered durations only — a week with no
+times reports 0, never a guess). **Training Goals are gone** — nothing consumed them; Profile is now
+one tap from Me, and Settings keeps only what the app can actually do.
+
+---
+
 ## v0.1.24 — A saved workout can be corrected
 
 The release's through-line: **saving is no longer the last word.** A workout could already be

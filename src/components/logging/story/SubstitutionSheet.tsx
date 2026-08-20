@@ -145,8 +145,25 @@ interface PendingSelection {
   adjustedValue?: number;
   ratio?: number;
   distanceMultiplier?: number;
-  isAi?: boolean;
   targetUnit?: 'reps' | 'distance' | 'calories' | 'time';
+}
+
+/**
+ * Rehydrates the sheet from the substitution already on the row. Without it, reopening a
+ * substituted movement shows nothing selected and no value adjuster - and on a
+ * structure-prescribed row (a rounds-scored 200m run) this sheet is the ONLY place the
+ * distance can be changed, so the athlete has no way back to their own number.
+ */
+function pendingFromSubstitution(sub: MovementSubstitution | null | undefined): PendingSelection | null {
+  if (!sub) return null;
+  return {
+    name: sub.selectedName,
+    type: sub.substitutionType,
+    adjustedValue: sub.adjustedValue,
+    ratio: sub.repMultiplier,
+    distanceMultiplier: sub.distanceMultiplier,
+    targetUnit: sub.targetUnit,
+  };
 }
 
 // ─── Main component ──────────────────────────────────────────────
@@ -169,7 +186,15 @@ export function SubstitutionSheet({
   const equivalent = useMemo(() => alternatives.filter(a => a.type === 'equivalent'), [alternatives]);
   const harder = useMemo(() => alternatives.filter(a => a.type === 'harder'), [alternatives]);
 
-  const [pending, setPending] = useState<PendingSelection | null>(null);
+  const [pending, setPending] = useState<PendingSelection | null>(
+    () => pendingFromSubstitution(currentSubstitution),
+  );
+  // Re-seed on every open so the sheet always shows the row's saved choice and its value.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setPending(open ? pendingFromSubstitution(currentSubstitution) : null);
+  }
   const [numpadOpen, setNumpadOpen] = useState(false);
   const [numpadValue, setNumpadValue] = useState('');
   const [replaceOnDigit, setReplaceOnDigit] = useState(true);
@@ -198,6 +223,14 @@ export function SubstitutionSheet({
     return 'reps';
   };
 
+  // A cross-unit swap (200m Run → 45 cal Echo Bike) must never read as a bare number pair.
+  const fmtWithUnit = (v: number, unit: string | undefined) => {
+    if (unit === 'distance') return v >= 1000 ? `${(v / 1000).toFixed(1)}km` : `${v}m`;
+    if (unit === 'calories') return `${v} cal`;
+    if (unit === 'time') return `${v}s`;
+    return `${v}`;
+  };
+
   // Smart step: scale-aware increments
   const getAdjustStep = (targetUnit?: string) => {
     // Cross-unit swap (e.g., distance→calories): step by 1 since the numbers are different scale
@@ -213,7 +246,8 @@ export function SubstitutionSheet({
     return originalValue && originalValue > 1 ? originalValue : 5;
   };
 
-  const isOriginalSelected = pending == null && currentSubstitution == null;
+  // pending mirrors the saved substitution, so it alone says whether Rx is the active choice.
+  const isOriginalSelected = pending == null;
   const isPendingName = (name: string) =>
     pending?.name?.toLowerCase() === name.toLowerCase();
 
@@ -257,7 +291,6 @@ export function SubstitutionSheet({
       name: aiAlternative.name,
       type: 'easier',
       adjustedValue: aiValue ?? originalValue,
-      isAi: true,
       targetUnit: tUnit,
     });
   }, [aiAlternative, originalValue, resolveTargetUnit]);
@@ -287,9 +320,10 @@ export function SubstitutionSheet({
     onClose();
   }, [pending, originalName, originalValue, onSelect, onClose]);
 
-  // Update adjusted value from stepper
+  // Update adjusted value from stepper or numpad. undefined = cleared, NOT zero: a swap the
+  // athlete hasn't put a number on yet must stay blank rather than claim a 0m effort.
   const handleAdjust = useCallback((v: number | undefined) => {
-    setPending(prev => prev ? { ...prev, adjustedValue: v ?? 0 } : null);
+    setPending(prev => prev ? { ...prev, adjustedValue: v } : null);
   }, []);
 
   // Reset pending when sheet closes
@@ -488,37 +522,36 @@ export function SubstitutionSheet({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               >
-                {/* Value adjuster — shows selected name + stepper */}
-                {pending.adjustedValue != null && (
-                  <div className={styles.bottomAdjust}>
-                    <span className={styles.bottomAdjustLabel}>
-                      {pending.name}
-                      {originalValue != null && (
-                        <span className={styles.bottomAdjustHint}>
-                          {' '}{originalValue} → {pending.adjustedValue}
-                        </span>
-                      )}
-                    </span>
-                    <div className={styles.inlineStepper}>
-                      <button
-                        type="button"
-                        className={styles.inlineBtn}
-                        onClick={() => handleAdjust(Math.max(1, (pending.adjustedValue ?? 0) - getAdjustStep(pending.targetUnit)))}
-                      >−</button>
-                      <div className={styles.inlineValueArea} onClick={openNumpad}>
-                        <span className={styles.inlineInput}>
-                          {pending.adjustedValue != null ? pending.adjustedValue : '0'}
-                        </span>
-                        <span className={styles.inlineUnit}>{unitLabel(pending.targetUnit)}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.inlineBtn}
-                        onClick={() => handleAdjust((pending.adjustedValue ?? 0) + getAdjustStep(pending.targetUnit))}
-                      >+</button>
+                {/* Value adjuster — always available: a cross-unit swap with no conversion
+                    ratio (Run → Echo Bike in calories) starts empty and the athlete types it. */}
+                <div className={styles.bottomAdjust}>
+                  <span className={styles.bottomAdjustLabel}>
+                    {pending.name}
+                    {originalValue != null && pending.adjustedValue != null && (
+                      <span className={styles.bottomAdjustHint}>
+                        {' '}{fmtWithUnit(originalValue, originUnit)} → {fmtWithUnit(pending.adjustedValue, pending.targetUnit)}
+                      </span>
+                    )}
+                  </span>
+                  <div className={styles.inlineStepper}>
+                    <button
+                      type="button"
+                      className={styles.inlineBtn}
+                      onClick={() => handleAdjust(Math.max(1, (pending.adjustedValue ?? 0) - getAdjustStep(pending.targetUnit)))}
+                    >−</button>
+                    <div className={styles.inlineValueArea} onClick={openNumpad}>
+                      <span className={styles.inlineInput}>
+                        {pending.adjustedValue != null ? pending.adjustedValue : '—'}
+                      </span>
+                      <span className={styles.inlineUnit}>{unitLabel(pending.targetUnit)}</span>
                     </div>
+                    <button
+                      type="button"
+                      className={styles.inlineBtn}
+                      onClick={() => handleAdjust((pending.adjustedValue ?? 0) + getAdjustStep(pending.targetUnit))}
+                    >+</button>
                   </div>
-                )}
+                </div>
                 <motion.button
                   type="button"
                   className={styles.doneBtn}

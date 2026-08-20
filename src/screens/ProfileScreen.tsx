@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { usePRCount } from '../hooks/usePRCount';
 import { useRecapData } from '../hooks/useRecapData';
+import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
@@ -70,6 +71,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
   const { recaps, newRecapIds } = useRecapData(workouts, user?.id, user?.weight);
+  const profile = useProfileCompleteness();
 
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
 
@@ -156,7 +158,16 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
 
           <span className={styles.nameArea}>
             <span className={styles.name}>{user?.displayName}</span>
-            {user?.instagram && <span className={styles.handle}>@{user.instagram}</span>}
+            {/* One line under the name, and the nudge outranks the handle for it:
+                the handle is decoration that will still be there tomorrow, while
+                this goes away for good the first time the athlete fills anything
+                in. It cannot collide with the handle in practice either — an
+                Instagram handle is itself a detail, so having one turns it off. */}
+            {profile.prompt ? (
+              <span className={styles.profilePrompt}>{profile.prompt} &rarr;</span>
+            ) : (
+              user?.instagram && <span className={styles.handle}>@{user.instagram}</span>
+            )}
           </span>
 
           <span className={styles.editButton}><EditIcon /></span>
