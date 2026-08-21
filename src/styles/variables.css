@@ -248,11 +248,22 @@
   padding: 0;
 }
 
+/* `clip` over `hidden` on both html and body — the pair below states the same
+   intent twice on purpose, the way the 100vh/100dvh pairs elsewhere do, so a
+   browser without `clip` still gets `hidden`.
+
+   They are not interchangeable: `overflow: hidden` makes the element a SCROLL
+   CONTAINER (just one that can't be scrolled by hand), and on iOS WebKit a
+   scroll container on the root is what makes position:fixed elements drift and
+   position:sticky quietly stop working — the dock and roughly twenty bottom
+   sheets all depend on both. `clip` refuses the overflow without creating that
+   container, which is what was wanted here all along. */
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -264,6 +275,7 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   overflow-x: hidden;
+  overflow-x: clip;
   overscroll-behavior-x: none;
 }
 

@@ -3,9 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/wodi-mark.svg" />
+    <link rel="apple-touch-icon" href="/wodi-icon-180.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="application-name" content="wodi" />
     <meta name="apple-mobile-web-app-title" content="wodi" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- viewport-fit=cover is what makes env(safe-area-inset-*) resolve to
+         anything other than 0. Roughly forty rules across the app reserve room
+         for the notch and the home indicator through --safe-top / --safe-bottom;
+         without this attribute every one of them silently computed to zero and
+         the app drew under the hardware. Pinch-zoom is deliberately NOT disabled:
+         the involuntary zoom this app used to suffer came from sub-16px inputs,
+         which variables.css already guards against, and taking scaling away from
+         people who need it to read is not a fix. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- Paints the browser's own chrome in the app's background instead of the
+         default white, so the seam above and below the page disappears. -->
+    <meta name="theme-color" content="#0c0d0f" />
+
+    <!-- Standalone mode. iOS grants this only to home-screen installs made from
+         Safari — a third-party browser on iOS always keeps its own chrome, and
+         no markup here can change that. `black` rather than `black-translucent`
+         because a translucent bar hands the page the status-bar strip to fill,
+         and not every screen reserves --safe-top for it yet. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">

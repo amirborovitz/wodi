@@ -6,8 +6,14 @@
    exactly its own width and the header, rail and reaction rows stay flush with
    its edges. Below this width — every real phone — nothing changes. */
 .screen {
+  /* Every other full-height screen pairs these; the feed was the one that only
+     had 100vh. On mobile 100vh is the LARGE viewport — the height the page
+     would have if the browser's toolbars were hidden — so the feed reserved
+     about a toolbar more than the screen actually has, leaving dead scroll
+     under the last card. 100dvh tracks the real height as the bars slide. */
   min-height: 100vh;
-  padding: 20px 0 calc(96px + env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  padding: calc(20px + var(--safe-top)) 0 calc(96px + var(--safe-bottom));
   background: var(--wodi-bg);
   max-width: calc(var(--poster-width) + 40px);
   margin: 0 auto;
@@ -109,7 +115,7 @@
 .notice {
   position: fixed;
   left: 50%;
-  bottom: calc(96px + env(safe-area-inset-bottom));
+  bottom: calc(96px + var(--safe-bottom));
   z-index: 95;
   transform: translateX(-50%);
   padding: 11px 18px;

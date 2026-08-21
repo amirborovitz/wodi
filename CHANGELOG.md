@@ -1,5 +1,94 @@
 # Changelog
 
+## v0.1.28 — The phone is not a browser window
+
+Wodi is used on a phone, held in one hand, usually straight after a workout. Everything here is
+about the app admitting that: installing to a home screen, drawing around the notch and the home
+indicator instead of under them, and a poster that is the right size the first time it paints
+rather than after the fonts land.
+
+---
+
+### The app can live on a home screen
+
+**New `public/manifest.webmanifest`**, plus the four icons it names. `display: standalone`,
+portrait, `#0c0d0f` on both `background_color` and `theme_color` so the install splash and the
+app's own background are the same colour rather than a dark app flashing white on launch. The SVG
+mark stays first in the `icons` array — it is the sharpest thing available on any platform that
+takes it — with 192 and 512 PNGs behind it for the ones that don't, and a separate **maskable**
+512 whose art sits inside the safe circle so Android's icon shape crops the padding, not the mark.
+
+`index.html` links the manifest and an `apple-touch-icon`, and declares standalone for iOS.
+`apple-mobile-web-app-status-bar-style` is **`black`**, not `black-translucent`: translucent hands
+the page the status-bar strip to fill itself, and not every screen reserves `--safe-top` for that
+yet — a translucent bar today would put the status clock on top of a header.
+
+### `viewport-fit=cover` — the line that made forty other lines work
+
+The viewport meta was `width=device-width, initial-scale=1.0` and nothing else. **`env(safe-area-inset-*)`
+resolves to zero without `viewport-fit=cover`** — that is the whole contract. Around forty rules
+across the app reserve room for the notch and the home indicator through `--safe-top` /
+`--safe-bottom`, and every one of them had been silently computing to `0px` since the day it was
+written. The app was drawing under the hardware and the CSS that was supposed to prevent it looked
+correct.
+
+Pinch-zoom is **not** disabled while we are in here. The involuntary zoom this app used to suffer
+came from sub-16px inputs, which `variables.css` already guards against; taking scaling away from
+people who need it to read is not a fix for that, it is a fix for a different app's bug.
+
+**`BottomNav` counted the home indicator twice.** Its `bottom` was
+`var(--space-4) + var(--safe-bottom) + env(safe-area-inset-bottom)` — and `--safe-bottom` *is*
+`env(safe-area-inset-bottom)`. Harmless for exactly as long as both terms were zero; the moment
+`viewport-fit=cover` landed, the dock would have jumped ~34px up the screen on every notched
+phone. One count. Nothing else in the app doubles them.
+
+**`theme-color: #0c0d0f`** paints the browser's own chrome in the app's background, so the seam
+above and below the page disappears in a normal tab too, not just in a standalone install.
+
+### `overflow: clip`, because `hidden` on the root breaks `position: fixed`
+
+`html` and `body` both carried `overflow-x: hidden`, and both now state `hidden` then `clip` — the
+same deliberate double-declaration the `100vh` / `100dvh` pairs use, so a browser without `clip`
+still gets the old behaviour.
+
+They are not synonyms. **`overflow: hidden` makes an element a scroll container** — one that
+cannot be scrolled by hand, but a scroll container all the same — and on iOS WebKit a scroll
+container on the root is exactly what makes `position: fixed` elements drift while the page
+scrolls and `position: sticky` quietly stop holding. The dock and roughly twenty bottom sheets all
+depend on both. `clip` refuses the horizontal overflow without creating the container, which is
+what these two rules meant in the first place.
+
+### The feed's last card had dead space under it
+
+`FeedScreen` had `min-height: 100vh` alone, where every other full-height screen in the app pairs
+`100vh` with `100dvh`. On mobile **`100vh` is the *large* viewport** — the height the page would
+have if the browser's toolbars were hidden — so the feed reserved about a toolbar's worth of
+height it did not have, and the scroll ran on past the last poster into nothing. `100dvh` tracks
+the real height as the bars slide away.
+
+Its padding now goes through `--safe-top` / `--safe-bottom` like the rest of the app instead of
+calling `env()` inline, and the top padding reserves for the notch at all — previously the feed
+header started under it.
+
+### A poster measured before its fonts arrive is measured wrong
+
+**`PosterCard` now waits on `document.fonts.ready`.** A poster is almost entirely display type and
+its height is whatever that type happens to occupy, so measuring while the webfonts are still
+swapping in returns the *fallback's* height — off by enough to leave a gap under the card or clip
+its footer. The `ResizeObserver` catches the reflow on browsers that report one, but a text reflow
+is not guaranteed to fire it, so we ask the font loader directly. The callback is guarded by a
+`live` flag cleared on unmount, since `fonts.ready` can settle long after a poster has scrolled
+away.
+
+**`ResultValue`'s unit was rendering at about 4px.** The unit is sized `0.28em` — relative, by
+design, so "kg" scales with whatever hero number it hangs off — but the flex wrapper holding the
+pair carried no font size of its own, so that `em` resolved against the inherited 16px root
+instead of the ~200px score beside it. The wrapper now carries `primaryStyle.fontSize`, and the
+unit is a unit again. All 43 poster fixtures still match: the harness compares poster *content*,
+and this was always meant to be the rendered size.
+
+---
+
 ## v0.1.27 — The second time through
 
 Everything here is a thing that looked fine once and wrong on the second pass: the second poster

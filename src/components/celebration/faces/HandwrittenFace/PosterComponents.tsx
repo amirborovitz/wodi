@@ -52,8 +52,10 @@ interface ResultValueProps {
 
 export function ResultValue({ value, narrative, primaryStyle, unitStyle, narrativeStyle, style }: ResultValueProps): React.JSX.Element {
   const parts = splitResultValue(value);
+  // The wrapper carries the primary font size so the unit's 0.28em resolves against the hero
+  // number instead of the inherited 16px root — without it every unit rendered at ~4px (invisible).
   const score = parts.unit ? (
-    <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, fontSize: primaryStyle?.fontSize }}>
       <span style={primaryStyle}>{parts.primary}</span>
       <span style={{ fontSize: '0.28em', lineHeight: 1.05, ...unitStyle }}>{parts.unit}</span>
     </span>

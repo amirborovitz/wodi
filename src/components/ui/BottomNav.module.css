@@ -1,6 +1,10 @@
 .nav {
   position: fixed;
-  bottom: calc(var(--space-4) + var(--safe-bottom) + env(safe-area-inset-bottom, 0px));
+  /* --safe-bottom IS env(safe-area-inset-bottom), so adding both counted the
+     home indicator twice. It read as zero for as long as the viewport meta
+     lacked viewport-fit=cover; the moment that landed, the doubled value would
+     have thrown the dock ~68px up the screen. One count. */
+  bottom: calc(var(--space-4) + var(--safe-bottom));
   left: 50%;
   transform: translateX(-50%);
   background: var(--dock-bg);

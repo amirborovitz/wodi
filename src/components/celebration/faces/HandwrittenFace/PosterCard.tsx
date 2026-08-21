@@ -55,7 +55,17 @@ export function PosterCard({ payload, page = 0 }: PosterCardProps): React.ReactE
     const ro = new ResizeObserver(measure);
     ro.observe(frame);
     ro.observe(card);
-    return () => ro.disconnect();
+
+    // A poster is mostly display type, and its height is whatever that type
+    // happens to occupy. Measure it while the webfonts are still swapping in
+    // and the number is the FALLBACK's height — off by enough to leave a gap
+    // under the card or clip its footer. The observer above catches the reflow
+    // on any browser that reports one, but that is not guaranteed for a text
+    // reflow, so ask the font loader directly.
+    let live = true;
+    void document.fonts?.ready.then(() => { if (live) measure(); });
+
+    return () => { live = false; ro.disconnect(); };
   }, [payload, page, Skin]);
 
   return (
