@@ -14,7 +14,7 @@
  * ask for `{ team, mine }` and render or score whichever scope they mean.
  */
 
-import type { ParsedMovement } from '../types';
+import type { ExerciseLoggingMode, ParsedMovement } from '../types';
 
 // ─── Scope ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,36 @@ export interface TeamScopedExercise {
   name?: string;
   prescription?: string;
   partnerWorkout?: boolean;
+  // Structural timing, read by prescribesOwnRest() below. Carried by ParsedExercise and by the
+  // saved Firestore Exercise alike, so the same gate answers during logging and during display.
+  loggingMode?: ExerciseLoggingMode;
+  workDuration?: number;
+  restDuration?: number;
+}
+
+/**
+ * Does the board prescribe this block's OWN rest?
+ *
+ * This is the one partner question that needs no language, and it exists because the bug kept
+ * coming back through the words instead of the arithmetic. In a genuinely shared piece your rest
+ * is a side effect — you rest because your partner is working, and the board never has to write
+ * it down. When the board DOES write it down ("[2:30 AMRAP, 2:30 REST] x 4"), the rest belongs to
+ * everyone's prescription at once, so nobody is covering anyone's work. The reps on that board
+ * are one athlete's reps, whatever the note underneath says about pairing.
+ *
+ * So "work in pairs (two heats)", "one works while the other rests", "alternate", "share a rig"
+ * and every phrasing not yet invented all decide the same way — because none of them is read.
+ * Pair language on such a board is logistics (who is on the rig during which window); this app
+ * had three separate regexes that each mistook it for arithmetic.
+ *
+ * Boundary, stated honestly: a shared MAX-effort piece can also prescribe rest ("in pairs, 3:00
+ * to accumulate max calories, 3:00 rest"). It lands on the true side of this test, but such a
+ * board carries no fixed rep prescription to divide — what the athletes log is what they
+ * accumulated — so nothing is misattributed.
+ */
+export function prescribesOwnRest(exercise: TeamScopedExercise): boolean {
+  if (exercise.loggingMode === 'amrap_intervals') return true;
+  return (exercise.workDuration ?? 0) > 0 && (exercise.restDuration ?? 0) > 0;
 }
 
 /**
@@ -63,6 +93,10 @@ export function isTeamPrescribedExercise(
   isSoleExercise: boolean,
 ): boolean {
   if (partnerFactor >= 1) return false;
+  // Structure outranks the flag. `partnerWorkout` is a judgement — the AI's, or a regex that read
+  // "in pairs" — and on a work/rest board there is nothing for that judgement to divide. Asking
+  // this BEFORE the flag is what makes a wrong call cost nothing; see prescribesOwnRest().
+  if (prescribesOwnRest(exercise)) return false;
   if (typeof exercise.partnerWorkout === 'boolean') return exercise.partnerWorkout;
 
   // ── Legacy data only, from here down ──

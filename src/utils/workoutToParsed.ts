@@ -2,6 +2,7 @@ import type {
   Exercise,
   ExerciseSet,
   ParsedExercise,
+  ParsedMovement,
   ParsedWorkout,
   ScoreType,
   Workout,
@@ -46,6 +47,51 @@ export function getSavedStrengthRepScheme(sets: ExerciseSet[]): number[] | undef
   return reps.length > 0 ? reps : undefined;
 }
 
+// ─── Un-baking a substitution ───────────────────────────────────────────────
+
+/**
+ * One saved movement, back on the coach's prescription with the athlete's swap alongside it.
+ *
+ * The save path bakes the SUBSTITUTE onto the movement — its name, its converted distance or
+ * calories, its zeroed reps — because the poster and every totals consumer read the movement
+ * list as "what was done". Re-opening the log has to undo that, or the wizard offers Echo Bike
+ * as the prescription: the run is gone, so there is no Rx row to tap back to and no original for
+ * the scaling sheet to re-convert from. Both halves of the bug an athlete hits on edit.
+ *
+ * `substitution.originalPrescription` makes this exact, per occurrence — which is what a
+ * per-movement ladder needs: each tier prescribes its own amount, and `scaleEnteredToTier` reads
+ * those back on the next save. Docs saved before that field existed recorded the swap nowhere on
+ * the movement, so nothing here can recover them; they keep reading as though the coach
+ * prescribed the substitute.
+ */
+function unbakeMovement(mov: ParsedMovement): ParsedMovement {
+  const sub = mov.substitution;
+  if (!sub) return mov;
+  return {
+    ...mov,
+    name: sub.originalName,
+    reps: sub.originalPrescription?.reps,
+    distance: sub.originalPrescription?.distance,
+    calories: sub.originalPrescription?.calories,
+  };
+}
+
+function unbakeSubstitutions(exercise: Exercise): Exercise {
+  const swapped = exercise.movements?.some(m => m.substitution)
+    || exercise.sections?.some(s => s.movements.some(m => m.substitution));
+  if (!swapped) return exercise;
+  return {
+    ...exercise,
+    ...(exercise.movements && { movements: exercise.movements.map(unbakeMovement) }),
+    ...(exercise.sections && {
+      sections: exercise.sections.map(section => ({
+        ...section,
+        movements: section.movements.map(unbakeMovement),
+      })),
+    }),
+  };
+}
+
 // ─── Workout → ParsedWorkout ────────────────────────────────────────────────
 
 const SCORE_TYPE_BY_FORMAT: Record<WorkoutFormat, ScoreType> = {
@@ -72,7 +118,8 @@ function formatFromType(workout: Workout): WorkoutFormat {
   }
 }
 
-function toParsedExercise(exercise: Exercise): ParsedExercise {
+function toParsedExercise(saved: Exercise): ParsedExercise {
+  const exercise = unbakeSubstitutions(saved);
   const workingSets = getSavedWorkingStrengthSets(exercise.sets);
   const repScheme = getSavedStrengthRepScheme(exercise.sets);
 
@@ -132,6 +179,11 @@ function toParsedExercise(exercise: Exercise): ParsedExercise {
  * Note the movements it returns carry the athlete's LOGGED values — the save path bakes entered
  * weights/reps onto `movements[].rxWeights` and `.reps`. That is what you want prefilled when
  * re-opening your own log; it is not the coach's original prescription.
+ *
+ * The one bake this DOES reverse is a substitution: a swapped movement comes back on the coach's
+ * name and quantities with `movements[].substitution` describing the swap, so the wizard can
+ * re-apply it, offer the way back to Rx, and let the conversion be re-adjusted. See
+ * `unbakeSubstitutions`.
  */
 export function workoutToParsedWorkout(workout: Workout): ParsedWorkout {
   const format = workout.format ?? formatFromType(workout);

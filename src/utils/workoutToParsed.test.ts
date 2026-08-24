@@ -187,4 +187,102 @@ describe('workoutToParsedWorkout', () => {
     expect(parsed.exercises[0].suggestedReps).toBe(3);
     expect(parsed.exercises[0].suggestedRepsPerSet).toEqual([3, 3]);
   });
+
+  // ── Substitutions ──
+  // The doc records what was DONE: a swapped run is saved as "Echo Bike, 700m, 0 reps". Re-opening
+  // it has to hand back the board — 200m Run — with the swap alongside, or the wizard treats the
+  // bike as the prescription: no Rx to go back to, and no original for the sheet to re-convert.
+
+  const swappedRun = (extra: Partial<import('../types').MovementSubstitution> = {}): Workout => ({
+    ...base,
+    exercises: [{
+      id: 'e1', name: '8 Rounds For Time', type: 'wod', prescription: '', sets: [],
+      movements: [{
+        name: 'Echo Bike', reps: 0, distance: 700, unit: 'm',
+        substitution: {
+          originalName: 'Run',
+          selectedName: 'Echo Bike',
+          substitutionType: 'equivalent',
+          distanceMultiplier: 3,
+          originalValue: 200,
+          adjustedValue: 700,
+          targetUnit: 'distance',
+          originalPrescription: { distance: 200 },
+          ...extra,
+        },
+      }],
+    }],
+  });
+
+  it('hands a swapped movement back on the board, not on the substitute', () => {
+    const mov = workoutToParsedWorkout(swappedRun()).exercises[0].movements![0];
+    expect(mov.name).toBe('Run');
+    expect(mov.distance).toBe(200);
+    expect(mov.reps).toBeUndefined();
+    // The swap survives so the wizard can re-apply it — and so the sheet has something to edit.
+    expect(mov.substitution?.selectedName).toBe('Echo Bike');
+    expect(mov.substitution?.adjustedValue).toBe(700);
+  });
+
+  it('restores each tier of a per-movement ladder to its OWN prescription', () => {
+    // The single entered figure answers for tier 1; the other tiers scale by the ratio it
+    // implies. That only works if every tier comes back with the distance it prescribes —
+    // restoring them all to 800m is what turned 800/600/400 into 3 x 2400m.
+    const tiers = [800, 600, 400];
+    const parsed = workoutToParsedWorkout({
+      ...base,
+      exercises: [{
+        id: 'e1', name: 'Ladder', type: 'wod', prescription: '', sets: [],
+        movements: tiers.map((distance, i) => ({
+          name: 'Echo Bike', reps: 0, distance: (i + 1) * 100,
+          substitution: {
+            originalName: 'Run', selectedName: 'Echo Bike', substitutionType: 'equivalent' as const,
+            targetUnit: 'distance' as const, originalPrescription: { distance },
+          },
+        })),
+      }],
+    });
+    expect(parsed.exercises[0].movements!.map(m => m.distance)).toEqual(tiers);
+  });
+
+  it('leaves a movement alone when nothing recorded a swap on it', () => {
+    // Docs saved before `substitution` was persisted read as though the coach prescribed the
+    // substitute. Nothing here may invent the board back from them.
+    const doc = swappedRun();
+    delete doc.exercises[0].movements![0].substitution;
+    const mov = workoutToParsedWorkout(doc).exercises[0].movements![0];
+    expect(mov.name).toBe('Echo Bike');
+    expect(mov.distance).toBe(700);
+  });
+
+  it('restores only the name when the swap recorded no prescription', () => {
+    const doc = swappedRun();
+    delete doc.exercises[0].movements![0].substitution!.originalPrescription;
+    const mov = workoutToParsedWorkout(doc).exercises[0].movements![0];
+    expect(mov.name).toBe('Run');
+    // Unknown, so the row asks — never the substitute's 700m wearing the run's name.
+    expect(mov.distance).toBeUndefined();
+  });
+
+  it('un-bakes swaps inside sections too', () => {
+    const parsed = workoutToParsedWorkout({
+      ...base,
+      exercises: [{
+        id: 'e1', name: 'Chipper', type: 'wod', prescription: '', sets: [],
+        sections: [{
+          sectionType: 'buy_in',
+          movements: [{
+            name: 'Ski Erg', calories: 30,
+            substitution: {
+              originalName: 'Row', selectedName: 'Ski Erg', substitutionType: 'equivalent',
+              targetUnit: 'calories', adjustedValue: 30, originalPrescription: { calories: 25 },
+            },
+          }],
+        }],
+      }],
+    });
+    const mov = parsed.exercises[0].sections![0].movements[0];
+    expect(mov.name).toBe('Row');
+    expect(mov.calories).toBe(25);
+  });
 });

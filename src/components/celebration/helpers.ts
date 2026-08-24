@@ -34,6 +34,7 @@ import {
   exercisePartnerFactor,
   movementTotals,
   perRoundQuantity,
+  prescribesOwnRest,
   splitRounds,
   type MovementQuantity,
 } from '../../services/partnerScope';
@@ -2704,15 +2705,17 @@ export function buildPageArtifactSections(
   // fix shouldn't touch.
   const exercisePartnerScopedText = `${partnerContextText || ''} ${exercise.rawText || ''} ${exerciseOnlyText}`;
   const partnerRoundCount = getSectionedRoundTradeCount(exercise) ?? repeatCount;
-  // AMRAP-intervals is never a real team score, even when the AI stamps partnerWorkout/
-  // partnerSplit — "work in pairs" here means alternating solo turns on shared equipment
-  // (each athlete's rounds are entirely their own), not a round-trade/shared-total WOD. The
-  // round ledger, "OUR ___" hero label, and partner blueprint override all exist for genuine
+  // A block that prescribes its own rest is never a real team score, even when the AI stamps
+  // partnerWorkout/partnerSplit — "work in pairs" there means alternating solo turns on shared
+  // equipment (each athlete's rounds are entirely their own), not a round-trade/shared-total WOD.
+  // The round ledger, "OUR ___" hero label, and partner blueprint override all exist for genuine
   // round-trade structures (RFT, sectioned metcons) where a discrete round unit is meaningfully
-  // handed off between partners — that model doesn't apply to a variable, self-paced AMRAP
-  // performed during your own turn. Never confirm partner status for this loggingMode.
-  const isAmrapIntervalsExercise = exercise.loggingMode === 'amrap_intervals';
-  const splitInfo = teamSize && teamSize > 1 && !isStrength && !isAmrapIntervalsExercise
+  // handed off between partners — that model doesn't apply to work you did during your own
+  // window. This rule used to live here as a local `loggingMode === 'amrap_intervals'` check, and
+  // the logging screen — which had never heard of it — halved the same board's prescription on
+  // the way into Firestore. It is now prescribesOwnRest() in the partner kernel, one answer for
+  // parse, logging and poster alike.
+  const splitInfo = teamSize && teamSize > 1 && !isStrength && !prescribesOwnRest(exercise)
     ? detectPartnerSplit({
         teamSize,
         scopedText: exercisePartnerScopedText,

@@ -165,6 +165,17 @@ export function PosterPhotoInset({ photo, onMove, onDrop, onLongPress }: PosterP
           onClick={() => setLightboxOpen(false)}
           onPointerDown={(e) => e.stopPropagation()}
         >
+          <button
+            type="button"
+            className={styles.lightboxClose}
+            onClick={() => setLightboxOpen(false)}
+            aria-label="Close photo"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
+          </button>
           <img className={styles.lightboxImage} src={photo.url} alt="Workout photo" draggable={false} />
         </div>,
         document.body,

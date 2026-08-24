@@ -428,6 +428,37 @@ describe('buildRecaps — the engine card', () => {
   });
 });
 
+describe('buildRecaps — the rep hero', () => {
+  it('sums every family, conditioning and unplaced movements included', () => {
+    const recap = july([
+      workout('a', IN_JULY, [
+        { name: 'Barbell Clean', totalReps: 100 },
+        { name: 'Double Under', totalReps: 400 },
+        { name: 'Tibialis Raise', totalReps: 30 },
+      ]),
+      workout('b', IN_JULY, [{ name: 'Pull-up', totalReps: 70 }]),
+    ]);
+
+    // The hero has to agree with the ledger that lists the same rows.
+    expect(recap.totalReps).toBe(600);
+    expect(recap.moves.reduce((s, m) => s + m.reps, 0)).toBe(recap.totalReps);
+  });
+
+  it('states the rate as well as the total once there is more than one session', () => {
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Barbell Clean', totalReps: 100 }]),
+      workout('b', IN_JULY, [{ name: 'Barbell Clean', totalReps: 140 }]),
+    ]);
+    expect(recap.repsPerSession).toBe(120);
+  });
+
+  it('has no rate for a single session, where it would be the hero twice', () => {
+    const recap = july([workout('a', IN_JULY, [{ name: 'Barbell Clean', totalReps: 100 }])]);
+    expect(recap.totalReps).toBe(100);
+    expect(recap.repsPerSession).toBeNull();
+  });
+});
+
 describe('buildRecaps — the PR reads as a jump', () => {
   function prWorkout(id: string, movement: string, value: number, previousBest?: number): WorkoutWithStats {
     return {
@@ -449,25 +480,27 @@ describe('buildRecaps — the PR reads as a jump', () => {
     ]);
 
     expect(recap.heaviest).toEqual({ move: 'Clean & Jerk', value: '50kg' });
-    expect(recap.prDelta).toBe('up from 48kg · your 3rd PR this month');
+    expect(recap.prPrevious).toBe('48kg');
+    expect(recap.prCount).toBe(3);
   });
 
-  it('still says something when no previous best was recorded', () => {
+  it('has no previous best when none was recorded', () => {
     const recap = july([prWorkout('a', 'Deadlift', 150)]);
-    expect(recap.prDelta).toBe('your 1st PR this month');
+    expect(recap.prPrevious).toBeNull();
+    expect(recap.prCount).toBe(1);
   });
 
   it('drops a previous best that is not below the PR', () => {
-    // A "previous best" at or above the lift is stale data, and "up from 55kg"
-    // under a 50kg PR is worse than saying nothing.
+    // A "previous best" at or above the lift is stale data, and a struck-through
+    // "55kg" over a 50kg PR is worse than saying nothing.
     const recap = july([prWorkout('a', 'Snatch', 50, 55)]);
-    expect(recap.prDelta).toBe('your 1st PR this month');
+    expect(recap.prPrevious).toBeNull();
   });
 
-  it('has no delta for a period with no PR', () => {
+  it('has no PR line for a period with no PR', () => {
     const recap = july([workout('a', IN_JULY, [{ name: 'Back Squat', totalReps: 25 }])]);
     expect(recap.heaviest).toBeNull();
-    expect(recap.prDelta).toBeNull();
+    expect(recap.prPrevious).toBeNull();
   });
 });
 

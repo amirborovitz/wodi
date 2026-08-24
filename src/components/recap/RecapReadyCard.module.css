@@ -117,8 +117,10 @@
 
 .peek {
   flex-shrink: 0;
-  width: 54px;
-  height: 84px;
+  /* 1.4 is the poster ratio the mini face composes for; below ~78px its
+     floored type stops fitting side by side. */
+  width: 78px;
+  height: 109px;
   border-radius: 7px;
   overflow: hidden;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);

@@ -165,6 +165,25 @@ export interface RecapData {
   verdict: string;
   tonnage: number;
   tonnageComp: string;
+  /**
+   * Every rep the period counted, across every non-cardio family.
+   *
+   * The one number that needs no context to land — a stranger who has never seen
+   * a WOD understands "31,480 reps". Summed from `moves`, so it can never
+   * disagree with the ledger that lists them.
+   */
+  totalReps: number;
+  /**
+   * Reps per session — the same total said as a rate.
+   *
+   * A five-figure number is a lump until you divide it by the times you showed
+   * up; then it is a habit, which is the thing worth bragging about. It is a
+   * number and not a sentence because the card sets it in condensed at 1.5x the
+   * line it sits in, and a baked string cannot be typeset. Both terms are
+   * counted, never estimated. Null on a single-session period, where the rate
+   * would be the hero number printed twice.
+   */
+  repsPerSession: number | null;
   workouts: number;
   prCount: number;
   /**
@@ -186,10 +205,15 @@ export interface RecapData {
   moveMinutes: number;
   heaviest: { move: string; value: string } | null;
   /**
-   * "up from 45kg · your 3rd PR this month" — what makes a modest top set read as
-   * a jump. Null when there was no PR to talk about.
+   * "45kg" — the mark the PR beat, for the struck-through WAS line.
+   *
+   * This is what makes a modest top set read as a jump: "50kg" next to a
+   * five-figure tonnage card reads small, and "50kg, was 45kg" is the same fact
+   * told so a stranger can see it move. Null when no previous best was recorded,
+   * or when the one on file is at or above the lift — stale data, and a WAS
+   * higher than the PR is worse than silence.
    */
-  prDelta: string | null;
+  prPrevious: string | null;
   /** Every non-cardio family, reps-descending — the full ledger, conditioning included. */
   moves: RecapMoveStat[];
   /** The movement that defined the period. Null when nothing resolved to a known family. */
@@ -335,6 +359,7 @@ function buildRecap(
   const moveMinutes = Math.round(ws.reduce((s, w) => s + (w.duration ?? 0), 0));
 
   const moves = buildMoveStats(ws, unknowns);
+  const totalReps = moves.reduce((s, m) => s + m.reps, 0);
   const topMove = pickTopMove(moves);
   const families = pickFamilies(moves, topMove);
   const conditioning = moves.filter(m => m.category === 'conditioning');
@@ -373,14 +398,7 @@ function buildRecap(
     }
   }
 
-  // Counted in the same unit as `verdict`'s PR line, so the card and the cover
-  // can never disagree about how many PRs the period had.
-  const prDelta = heaviest === null
-    ? null
-    : [
-      previousBest !== null ? `up from ${previousBest}kg` : null,
-      prCount > 0 ? `your ${ordinal(prCount)} PR this ${scope}` : null,
-    ].filter(Boolean).join(' · ') || null;
+  const prPrevious = previousBest !== null ? `${previousBest}kg` : null;
 
   const workoutWord = ws.length === 1 ? 'workout' : 'workouts';
   // "Your week 33 in the box" reads like a filing reference; a week says "week".
@@ -408,12 +426,14 @@ function buildRecap(
     verdict,
     tonnage: Math.round(totalVolume),
     tonnageComp: tonnageComp(totalVolume),
+    totalReps,
+    repsPerSession: ws.length > 1 && totalReps > 0 ? Math.round(totalReps / ws.length) : null,
     workouts: ws.length,
     prCount,
     epTotal: Math.round(epTotal),
     moveMinutes,
     heaviest,
-    prDelta,
+    prPrevious,
     moves,
     topMove,
     families,
@@ -893,25 +913,48 @@ function buildConditioningNote(conditioning: RecapMoveStat[]): string | null {
 }
 
 /** "3rd". Used where a count is read as a position, not a quantity. */
-function ordinal(n: number): string {
+export function ordinal(n: number): string {
   const teen = n % 100;
   if (teen >= 11 && teen <= 13) return `${n}th`;
   const last = n % 10;
   return `${n}${last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th'}`;
 }
 
-const PERSONA_NAMES: Record<PosterVibeKey, string> = {
-  cooked:  'certified cooked',
-  smoked:  'the redliner',
-  wrecked: 'fully send',
-  sweaty:  'the furnace',
-  solid:   'the machine',
-  chill:   'the cruiser',
+/**
+ * Who the period made you, read off the vibe you tapped most.
+ *
+ * Every persona celebrates. None of them grades — there is no "scaled", no
+ * "room to improve", and no name that would sting to screenshot. `sub` is the
+ * handwritten line under the stamp, so it has to sound like a friend saying it.
+ */
+const PERSONAS: Record<PosterVibeKey, { name: string; sub: string }> = {
+  cooked:  { name: 'certified cooked', sub: 'you left it all on the floor' },
+  smoked:  { name: 'the redliner',     sub: 'you lived in the pain cave' },
+  wrecked: { name: 'fully send',       sub: 'no such thing as too much' },
+  sweaty:  { name: 'the furnace',      sub: 'you ran hot all period' },
+  solid:   { name: 'the machine',      sub: 'steady, relentless, repeatable' },
+  chill:   { name: 'the cruiser',      sub: 'smooth is fast' },
 };
 
-export function getPersonaName(data: RecapData): string {
-  if (data.felt.length === 0) return 'you showed up';
-  return PERSONA_NAMES[data.felt[0].vibe];
+export interface RecapPersona {
+  /** Lowercase, always — it is set in Caveat as often as it is stamped. */
+  name: string;
+  sub: string;
+  vibe: PosterVibeKey;
+  /** Sessions that ended on this vibe. 0 when nothing was tagged. */
+  count: number;
+}
+
+/**
+ * The one persona path. The story stamp, the Me hero and every thumbnail read
+ * this — two tables would eventually disagree about who you were that month.
+ */
+export function getPersona(data: RecapData): RecapPersona {
+  const dominant = data.felt[0];
+  if (!dominant) {
+    return { name: 'you showed up', sub: "that's the whole flex", vibe: 'solid', count: 0 };
+  }
+  return { ...PERSONAS[dominant.vibe], vibe: dominant.vibe, count: dominant.count };
 }
 
 /**

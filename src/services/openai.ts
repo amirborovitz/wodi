@@ -476,6 +476,9 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 
 ## PARTNER / TEAM WORKOUTS
 - A partner workout means the WORK IS SHARED OR SPLIT between athletes: a team total divided up, whole rounds traded (IGUG), or one shared score built by both. Pair language alone is NOT enough — see PAIR-PACED below for pairs that only time each other.
+- THE ONE QUESTION, ask it before any keyword: while I am doing this movement, is my partner DOING IT TOO (or taking some of its reps), or is my partner IDLE / on something else / waiting for their turn? An idle or alternating partner contributes nothing to these numbers, so the board's reps are MINE in full → partnerWorkout: false. Only an actively-sharing partner makes the board a team total. Sharing needs positive evidence on the board ("between you", "split however", "team total", "as a team", "(N each)" on a round count); turn-taking language is not evidence of sharing. Apply this question to wording that does not appear anywhere in these rules — the phrasings below are examples of it, never the whole list.
+- SPECIFICALLY: "two heats", "one works while the other rests", "one on one off", "alternate/alternating", "you go I go on the minute", "share a rig/bar/rower", "partner counts for you", "partner holds" all describe WHO IS ON THE EQUIPMENT WHEN. They are logistics. Every athlete still completes the full written prescription → partnerWorkout: false, NO teamSize.
+- A PRESCRIBED REST SETTLES IT: when the board writes the rest into the structure ("[2:30 AMRAP, 2:30 REST] x 4", "3:00 on / 3:00 off"), that rest is part of every athlete's prescription, so nobody is covering anyone's work. Such a block is NEVER shared → partnerWorkout: false on it, and NO partnerSplit — no matter how much pair language surrounds it. In a genuinely shared piece the rest is never written down, because the rest IS the partner working.
 - "IGUG", "I go you go", "in pairs", "with a partner" WITH shared/split work → partnerWorkout: true, teamSize: 2
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N — but ONLY when that team shares ONE target or score. If the work written on the board is a per-person prescription that every athlete completes in full, the team wording is a logistics grouping (who rotates onto which machine, how many share a rig) → partnerWorkout: false, NO teamSize.
 - A TEAM SIZE MUST BE EXACT TO BE REAL: a range or approximate headcount ("teams of 4-5", "groups of 3-4", "~6 per team", "max 5 per team") can never describe a shared total — a team target cannot be divided by an indeterminate number. Treat it as a logistics grouping: partnerWorkout: false, NO teamSize. Same when the team note only explains equipment sharing or turn-taking ("work in teams of 4, 30 sec segments on the bike", "share a bar", "2 per rower") — the reps on the board are still each athlete's own work.
@@ -1044,6 +1047,26 @@ Output:
   ]
 }
 NOTE: ONE exercise — the pacer keeps its per-trip quantity with "relay": true (the athlete logs how many trips they did; the AMRAP rounds counter is separate). Same shape when the pacer is a machine or bodyweight movement ("P1: 10 cal Echo Bike while P2 AMRAPs" → { "name": "Echo Bike", "calories": 10, "relay": true, "inputType": "calories" }). partnerWorkout stays false: nothing is shared or split — the pair is only the clock.
+
+### 15b. Alternating-heat interval AMRAP (pairs as the ROSTER — NOT a partner workout)
+Input: "[02:30 min AMRAP, 02:30 min REST] x 4 rounds: 6 Chest to Bar Pull-up, 6 twin Kettlebell Thruster @12/20kg (x2), 30 Double Under / 60 singles. * Continue from where you stopped. ** Work in pairs (two heats) - one work while the other rest"
+Output:
+{
+  "title": "WOD", "type": "amrap", "format": "amrap_intervals", "timeCap": 1200, "sets": 4, "intervalTime": 150,
+  "partnerWorkout": false,
+  "exercises": [{
+    "name": "2:30 AMRAP x 4", "type": "wod", "loggingMode": "amrap_intervals",
+    "prescription": "6 Chest to Bar Pull-up, 6 twin Kettlebell Thruster @12/20kg, 30 Double Under / 60 singles",
+    "partnerWorkout": false,
+    "intervalCount": 4, "workDuration": 600, "restDuration": 600,
+    "movements": [
+      { "name": "Chest to Bar Pull-up", "reps": 6, "inputType": "none" },
+      { "name": "Twin Kettlebell Thruster", "reps": 6, "implementCount": 2, "rxWeights": { "male": 20, "female": 12, "unit": "kg" } },
+      { "name": "Double Under", "reps": 30, "inputType": "none", "alternative": { "name": "Single Under", "reps": 60 } }
+    ]
+  }]
+}
+NOTE: the reps stay 6 / 6 / 30 — the FULL board. "Work in pairs (two heats), one work while the other rest" says only who is on the rig during which 2:30; the partner is idle while you work, so they take none of your reps. The written 2:30 REST proves it: a shared piece never prescribes the rest, because the rest is the partner working. partnerWorkout false at BOTH levels, no teamSize, no partnerSplit. Halving these to 3 / 3 / 15 would rewrite the coach's board.
 
 ### 16. Progressive / building chipper (each round adds a movement)
 Input: "For time (TC 41 min): Buy In: 100 DB Hip Thrusts (17.5/22.5 kg). Into: Round 1: 10 Burpees Over Bar, 10 Cal Row. Round 2 - Add 20 Thrusters (30/40 kg). Round 3 - Add 30 Power Cleans. Round 4 - Add 40 Back Squats. Round 5: 10 BOB, 20 Thrusters, 30 Power Cleans, 40 Back Squats, 50 Bent Over Rows, 10 Cal Row. Cash Out: 50 Deadlifts (70/90 kg)"

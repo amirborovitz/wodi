@@ -1,5 +1,161 @@
 # Changelog
 
+## v0.1.29 — A recap is a poster, not a stats screen
+
+Wrapped was a stats screen wearing story chrome: bar charts, cards framed around a dash, and a hub
+whose filter chips could narrow a 2-up grid down to one tile and a lot of black. It is now nine
+posters built to leave the app and land in front of people who have never heard of wodi, which
+means every number on them has to pass the stranger test — legible on sight, and a flex.
+
+Underneath it, two data bugs that turn out to be the same bug: the app reading the words on a board
+where it should have read the board's structure.
+
+---
+
+### Wrapped v2 — nine posters, and not one chart
+
+`WrappedStoryScreen.tsx` was 597 lines of deck and chrome in one file. It is now 19 lines of
+player. **`wrapped/wrappedCards.tsx`** builds the deck, **`wrapped/primitives.tsx`** is the shell
+every card is built from, and the screen does nothing but advance an index and invert its chrome on
+the light cards — white segments on a yellow field are invisible.
+
+Three rules the deck holds to, each of them a v1 mistake:
+
+- **No charts.** Rankings are typographic — rank · name · number. Proportion is one full-width tape
+  strip, never a grid of per-row bars. A five-way split scaled against its family total is five
+  stubs that answer nothing.
+- **No card with an empty body.** A period that lacks the material for a card *drops the card*; it
+  never renders the frame around a dash. The rhythm survives the drop, because it was authored as
+  one: black · YELLOW · black · black · YELLOW · black · black · vibe · black.
+- **Nothing sized in px.** Type and spacing go through `V(cw, ch)` — `min(Xcqw, Ycqh)` against the
+  card's own container box — so a card authored at 393×852 stays a composition at 375×667 and at
+  54×84 in a thumbnail. And the body zone *spaces* its children apart instead of centring them,
+  which is what left v1 with a void above **and** below its content on a tall phone.
+
+**Two new numbers, both counted, neither estimated.** `totalReps` is every rep the period counted
+across every non-cardio family — the one figure that needs no context, because a stranger who has
+never seen a WOD understands "31,480 reps". `repsPerSession` is the same total said as a rate: a
+five-figure number is a lump until you divide it by the times you showed up, and then it is a
+habit, which is the part worth bragging about. Both are summed from `moves`, so neither can
+disagree with the ledger that lists them. `repsPerSession` is null on a single-session period,
+where it would be the hero number printed twice.
+
+**`prDelta` → `prPrevious`.** The old field baked a sentence — "up from 45kg · your 3rd PR this
+month" — and a baked string cannot be typeset. The card now takes the bare mark that was beaten and
+sets it as a struck-through WAS line, which is what makes a modest top set read as a jump when it
+sits next to a five-figure tonnage. Null when the previous best on file is at or above the lift:
+that is stale data, and a WAS higher than the PR is worse than silence.
+
+**One persona path.** `getPersonaName()` returned a name while the story screen kept its own
+`PERSONA_MAP` with the sub-lines — two tables that would eventually disagree about who you were
+that month. `getPersona()` is the only one now, and returns the name, the handwritten sub-line, the
+vibe and its count together. Every persona still celebrates: no "scaled", no "room to improve", no
+name that would sting to screenshot.
+
+### Me › Your Wrapped — a hero and a shelf, no chrome around nothing
+
+The hub put a 108px column of near-empty thumbnail next to its copy and then let WEEKS / MONTHS /
+SEASONS chips filter a grid that often held one tile. Two rows of chrome around almost no content.
+
+There are no filter chips now and no grid to fall into. The tier is a pill on the tile itself, the
+shelf runs chronologically like a body of work, and the newest recap renders as a **real poster**
+with its own open and share actions. A single week never takes the hero slot — it is the thinnest
+recap there is, and the newest month is what someone opens Me to look at.
+
+The hero is a poster and its caption, never the same poster printed twice: the tilted print carries
+the period, `wrapped.`, the rep count and the persona, so the copy beside it carries only what the
+print cannot show — the move that defined the month, the sessions, the tonnage. The first build put
+the persona and the rep hero on both halves, and the card read as a rendering bug.
+
+**`RecapPeek` is deleted.** `W2MiniFace` replaces it everywhere — the hub hero, the shelf, and the
+"recap ready" card on Home — so a thumbnail is a scaled-down copy of the real cover rather than a
+second drawing of it that can drift. Share captures the same finale card the story ends on,
+rendered off-screen at phone proportions, so what leaves the app is identical whichever button sent
+it.
+
+**Me lost its Week / Month / All-Time toggle** and the three ticker tiles under it. Wrapped already
+tells that data with a personality, and wodi is not a tracker; the lifetime numbers worth keeping
+were already in the strip above. The animated count-up hook went with them.
+
+### The rest a board writes down is the proof it isn't shared
+
+`[2:30 AMRAP, 2:30 REST] x 4 — work in pairs (two heats), one works while the other rests` was
+being halved. Every consumer read the pair language and divided the board's 6 / 6 / 30 down to
+3 / 3 / 15, which rewrites what the coach wrote.
+
+The fix is not another phrase in a regex. **`prescribesOwnRest()`** now lives in the partner kernel
+(`services/partnerScope.ts`) and reads structure, not words: when the board prescribes this block's
+own rest, that rest belongs to everyone's prescription at once, so nobody is covering anyone's
+work. In a genuinely shared piece the rest is never written down — because the rest *is* the
+partner working.
+
+- **Structure outranks the flag.** `isTeamPrescribedExercise` asks this before it reads
+  `partnerWorkout`. That flag is a judgement — the AI's, or a regex that saw "in pairs" — and on a
+  work/rest board there is nothing for a judgement to divide, so a wrong call now costs nothing.
+- **One answer for parse, logging and poster.** This rule used to exist as a local
+  `loggingMode === 'amrap_intervals'` check inside the poster builder, and the logging screen had
+  never heard of it — so it halved the same board on the way into Firestore, and the poster then
+  faithfully rendered the halved doc. `helpers.ts`, `workoutPostProcessor.ts` and the kernel gate
+  all call the one function now.
+- **The post-processor persists it.** A block that prescribes its own rest is written back as
+  `partnerWorkout: false` with any `partnerSplit` dropped, so the saved doc cannot contradict the
+  gate that will later refuse to divide it. The *session* keeps its own partner flag — the athletes
+  really were paired.
+- **The prompt learned the question**, not the phrasings: *while I am doing this movement, is my
+  partner doing it too, or are they idle / waiting their turn?* "Two heats", "one on one off",
+  "alternate", "share a rig", "partner counts for you" all describe who is on the equipment when.
+  That is logistics. New example 15b pins it, and `prescribesOwnRest` covers the phrasings nobody
+  has invented yet — because none of them is read.
+
+Boundary, stated honestly: a shared *max-effort* piece can also prescribe rest ("in pairs, 3:00 to
+accumulate max calories, 3:00 rest"). It lands on the true side of this test, but such a board
+carries no fixed rep prescription to divide, so nothing is misattributed.
+
+### A swap you make survives re-opening the log
+
+Substituting Echo Bike for the 200m run was one-way. The save path bakes the **substitute** onto
+the movement — its name, its converted distance, its zeroed reps — because that is what the poster
+and every totals consumer read as "what was done". Re-opening the log then read `Echo Bike 700m` as
+the coach's prescription: no Rx row to tap back to, and no original for the scaling sheet to
+re-convert from.
+
+`MovementSubstitution` now carries **`originalPrescription`** (reps / distance / calories), stamped
+per occurrence at save time — per occurrence because a per-movement ladder prescribes a different
+amount at every tier. `workoutToParsedWorkout` un-bakes it on the way out, handing the wizard the
+board's own name and quantities with the swap alongside it, and `AddWorkoutScreen` re-applies the
+swap to the row last, after the totals overlay has run. The field is *assigned*, not
+spread-when-present, so going back to Rx clears it instead of resurrecting the swap on the next
+open. Docs saved before it existed recorded the swap nowhere, and still read as though the coach
+prescribed the substitute.
+
+**The scaling sheet said "0m → 231m".** `originalValue` took the first non-nullish of
+reps / distance / calories, and the save path writes a zeroed `reps` onto a movement measured in
+metres — so a 700m row converted from zero. It takes the first **positive** one now, matching
+`originUnit`, which had always used `> 0`.
+
+### The gym's heartbeat on Home
+
+**New `components/home/FeedPulse.tsx`**: how many other athletes posted inside the feed's 24-hour
+window, three of their faces, one tap to the feed. Home is otherwise entirely your own work, which
+means it only changes on the days you train; this row changes every day, and it is the reason to
+open the app when there is nothing to log.
+
+It counts athletes, not posts — a two-a-day is one person training. It says "last 24h" rather than
+"today", because that is the window the feed actually keeps: at 6am, most of "today" was last
+night. It renders nothing when no one else is in the window, so a quiet gym costs no space, and it
+sits last so it never competes with your own work above it.
+
+### Smaller things
+
+- **The poster rail's captions were reading the wrong date.** `PosterThumbnail` labelled by the
+  logging timestamp while the rail is sorted by the trained date, so a Monday board logged on
+  Wednesday sat in Monday's slot captioned "Today". It uses `getEffectiveWorkoutDate` now.
+- **The photo lightbox has a close button.** Tapping the backdrop always worked, but a full-bleed
+  photo with no visible way out is a screen people back-swipe from.
+- New poster fixture `real-alternating-heat-interval-amrap-20260821` pins the two-heat board that
+  started the partner-rest work. 44 fixtures, 493 tests and `tsc -b` all clean.
+
+
 ## v0.1.28 — The phone is not a browser window
 
 Wodi is used on a phone, held in one hand, usually straight after a workout. Everything here is

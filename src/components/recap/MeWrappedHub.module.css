@@ -1,21 +1,21 @@
+/* The hub itself has no horizontal padding — the shelf has to bleed to the
+   screen edge, so every child pays for its own inset. */
 .hub {
-  padding: 4px 18px 0;
-  margin-top: 26px;
+  margin: 26px auto 0;
   padding-bottom: 24px;
   max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .hubHeader {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 14px;
+  padding: 0 18px;
+  margin-bottom: 13px;
 }
 
 .hubTitle {
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 900;
   color: #fff;
   letter-spacing: 0.01em;
@@ -33,114 +33,110 @@
   color: rgba(243, 241, 234, 0.5);
 }
 
-/* ── Scope tabs ── */
-.tabs {
+/* ── Hero ── */
+.heroWrap {
+  padding: 0 18px;
+}
+
+.hero {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0a0b0d;
+  border: 1px solid rgba(245, 194, 0, 0.33);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+
+.heroGlow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(90% 60% at 88% 0%, rgba(245, 194, 0, 0.12), transparent 60%);
+  pointer-events: none;
+}
+
+/* The felt spectrum as a ribbon along the top edge — the same tape the story
+   cards carry, at the scale a card edge allows. */
+.heroRibbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
   display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
+  pointer-events: none;
+  z-index: 3;
 }
 
-.tab {
-  flex: 1;
-  border: 1px solid rgba(243, 241, 234, 0.12);
-  background: transparent;
-  color: rgba(243, 241, 234, 0.5);
-  border-radius: 999px;
-  padding: 7px 0 8px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: color 0.14s, background 0.14s, border-color 0.14s;
-}
-
-.tabActive {
-  background: #f5c200;
-  border-color: #f5c200;
-  color: #0b0c0e;
-}
-
-.tab:focus-visible {
-  outline: 2px solid #f5c200;
-  outline-offset: 2px;
-}
-
-/* ── Featured tile ── */
-.featuredTile {
-  width: 100%;
-  text-align: left;
+/* The whole card opens the recap. It sits UNDER the content so the share button
+   stays its own target. */
+.heroOpen {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   border: none;
   background: transparent;
-  cursor: pointer;
   padding: 0;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
-.featuredTile:active .featuredInner {
-  opacity: 0.88;
+.heroOpen:active {
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.featuredInner {
+.heroOpen:focus-visible {
+  outline: 2px solid #f5c200;
+  outline-offset: -3px;
+}
+
+/* Content is decoration over the open target — only the share button takes
+   pointer events back. */
+.heroContent {
   position: relative;
-  width: 100%;
-  height: 176px;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: #0a0c0f;
+  z-index: 2;
+  padding: 16px 16px 15px;
+  pointer-events: none;
+}
+
+.heroTop {
   display: flex;
-  transition: opacity 0.12s;
+  align-items: center;
+  gap: 8px;
 }
 
-.featuredPeek {
-  width: 108px;
-  flex-shrink: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative;
-}
-
-.featuredCopy {
-  position: relative;
-  flex: 1;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.featuredEyebrow {
+.heroPill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  background: #f5c200;
+  color: #0a0b0d;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 9.5px;
   font-weight: 900;
-  letter-spacing: 0.16em;
-  color: #f5c200;
+  letter-spacing: 0.14em;
 }
 
-/* ── NEW (unviewed) markers ── */
 .newDot {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #f5c200;
+  background: #0a0b0d;
   flex-shrink: 0;
   animation: newPulse 1.6s ease-in-out infinite;
 }
 
 .newDotCorner {
   position: absolute;
-  top: 9px;
-  left: 9px;
+  top: 8px;
+  left: 8px;
   width: 7px;
   height: 7px;
   border-radius: 999px;
   background: #f5c200;
   box-shadow: 0 0 8px rgba(245, 194, 0, 0.7);
   animation: newPulse 1.6s ease-in-out infinite;
+  z-index: 2;
 }
 
 @keyframes newPulse {
@@ -148,98 +144,210 @@
   50% { opacity: 0.35; }
 }
 
-.featuredPeriod {
-  font-size: 30px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 0.9;
-  margin-top: 4px;
+.heroSub {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: rgba(243, 241, 234, 0.3);
 }
 
-.featuredMeta {
-  font-size: 12px;
-  font-weight: 700;
-  color: rgba(243, 241, 234, 0.5);
+.heroMid {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  align-items: flex-end;
+}
+
+.heroCopy {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The move that defined the period — the one headline fact the tilted print
+   does not already carry. */
+.heroTopMove {
   margin-top: 5px;
+  font-size: 35px;
+  font-weight: 900;
+  color: #f3f1ea;
+  line-height: 0.84;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.featuredCta {
-  margin-top: 11px;
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: #f5c200;
-  color: #0a0c0f;
-  border-radius: 10px;
-  padding: 7px 13px;
-  font-size: 11px;
+.heroTopMoveValue {
+  margin-top: 8px;
+  font-size: 28px;
   font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  color: #f5c200;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
-/* ── Tier badge (shared) ── */
-.tierBadge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+.heroTopMoveValue span {
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.heroTopMoveLabel {
   font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  color: #0a0c0f;
-  background: #f5c200;
-  border-radius: 999px;
-  padding: 2px 7px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: rgba(243, 241, 234, 0.3);
 }
 
-/* ── Grid ── */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 16px;
+.heroFallback {
+  font-size: 34px;
+  font-weight: 900;
+  color: #f3f1ea;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
 }
 
-.gridTile {
-  text-align: left;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
+.heroMeta {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.5);
+  margin-top: 6px;
 }
 
-.gridTile:active .gridPeek {
-  opacity: 0.88;
-}
-
-.gridPeek {
+/* The real story cover, as a tilted print. */
+.heroPrint {
   position: relative;
-  width: 100%;
-  aspect-ratio: 0.7;
-  border-radius: 14px;
+  width: 104px;
+  height: 146px;
+  flex-shrink: 0;
+  border-radius: 9px;
   overflow: hidden;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  transform: rotate(2.5deg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.heroActions {
+  display: flex;
+  gap: 9px;
+  margin-top: 15px;
+}
+
+.heroCta {
+  flex: 1;
+  height: 42px;
+  border-radius: 12px;
+  background: #f5c200;
+  color: #0a0b0d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heroShare {
+  pointer-events: auto;
+  width: 46px;
+  height: 42px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3f1ea;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
   transition: opacity 0.12s;
 }
 
-.gridCaption {
+.heroShare:active {
+  opacity: 0.7;
+}
+
+.heroShare:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Shelf ── */
+.shelfLabel {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 234, 0.3);
+  padding: 0 18px;
+  margin: 20px 0 11px;
+}
+
+.shelf {
+  display: flex;
+  gap: 11px;
+  overflow-x: auto;
+  padding: 0 18px 4px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.shelf::-webkit-scrollbar {
+  display: none;
+}
+
+.shelfTile {
+  flex-shrink: 0;
+  width: 132px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  scroll-snap-align: start;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shelfTile:active .shelfFace {
+  opacity: 0.88;
+}
+
+/* 1.4 is the poster ratio the mini face is composed for — the shelf is a row of
+   prints, not a row of cards. */
+.shelfFace {
+  position: relative;
+  width: 132px;
+  height: 185px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.12s;
+}
+
+.shelfCaption {
+  font-size: 10.5px;
+  color: rgba(243, 241, 234, 0.3);
   margin-top: 8px;
 }
 
-.gridPeriod {
-  font-size: 17px;
-  font-weight: 900;
-  color: #f3f1ea;
-  line-height: 0.95;
+/* Trailing air, so the last tile can scroll clear of the screen edge. */
+.shelfEnd {
+  flex-shrink: 0;
+  width: 4px;
 }
 
-.gridMeta {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(243, 241, 234, 0.5);
-  margin-top: 2px;
+/* ── Off-screen share plate ──
+   Phone proportions, so the captured poster composes the way the story's finale
+   does rather than at whatever size the hub happens to be. */
+.sharePlate {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 393px;
+  height: 852px;
+  pointer-events: none;
 }

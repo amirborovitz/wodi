@@ -199,8 +199,11 @@ export function SubstitutionSheet({
   const [numpadValue, setNumpadValue] = useState('');
   const [replaceOnDigit, setReplaceOnDigit] = useState(true);
 
-  // The original rep/distance/calorie value (whichever is relevant)
-  const originalValue = originalReps ?? originalDistance ?? originalCalories;
+  // The original rep/distance/calorie value (whichever is relevant). First POSITIVE one, not
+  // first non-nullish: the save path writes a zeroed `reps` onto a movement measured in metres,
+  // so `??` handed a 700m row an original of 0 and the conversion read "0m -> 231m".
+  // Matches originUnit below, which has always used `> 0`.
+  const originalValue = [originalReps, originalDistance, originalCalories].find(v => v != null && v > 0);
 
   // Determine the origin unit
   const originUnit: 'distance' | 'calories' | 'reps' =

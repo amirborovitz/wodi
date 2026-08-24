@@ -3,6 +3,7 @@ import {
   sessionPartnerFactor,
   isTeamPrescribedExercise,
   exercisePartnerFactor,
+  prescribesOwnRest,
   splitRounds,
   movementTotals,
 } from './partnerScope';
@@ -32,9 +33,40 @@ describe('sessionPartnerFactor', () => {
   });
 });
 
+describe('prescribesOwnRest', () => {
+  it('reads the structure, never the pair language', () => {
+    // The 21 Aug board: "[02:30 AMRAP, 02:30 REST] x 4 ... Work in pairs (two heats) - one work
+    // while the other rest". The AI called it partnerSplit 'reps' and the logging prefill halved
+    // 6/6/30 to 3/3/15 into Firestore, permanently. No word on that board decides this now.
+    expect(prescribesOwnRest({ loggingMode: 'amrap_intervals' })).toBe(true);
+    expect(prescribesOwnRest({ workDuration: 150, restDuration: 150 })).toBe(true);
+  });
+
+  it('is false when the board never writes a rest down', () => {
+    // A genuinely shared piece: your rest is your partner working, so it is never prescribed.
+    expect(prescribesOwnRest({ loggingMode: 'for_time', workDuration: 900 })).toBe(false);
+    expect(prescribesOwnRest({ name: 'Partner RFT (8 each)' })).toBe(false);
+  });
+});
+
 describe('isTeamPrescribedExercise', () => {
   const ex = (name: string, prescription = '', partnerWorkout?: boolean) =>
     ({ name, prescription, partnerWorkout });
+
+  it('lets structure outrank the partner flag on a work/rest board', () => {
+    // Every phrasing of "we alternated heats" lands here without being read, which is the point:
+    // the next board will word it differently and must still come out false.
+    const intervals = { name: '2:30 AMRAP x 4', loggingMode: 'amrap_intervals' as const };
+    expect(isTeamPrescribedExercise({ ...intervals, partnerWorkout: true }, 0.5, false)).toBe(false);
+    expect(isTeamPrescribedExercise({ ...intervals, partnerWorkout: true }, 0.5, true)).toBe(false);
+    expect(
+      isTeamPrescribedExercise(
+        { name: 'Metcon', prescription: 'in pairs', workDuration: 150, restDuration: 150 },
+        0.5,
+        true,
+      ),
+    ).toBe(false);
+  });
 
   it("trusts the AI's per-exercise verdict, including an explicit false", () => {
     expect(isTeamPrescribedExercise(ex('Back Squat', '', false), 0.5, false)).toBe(false);

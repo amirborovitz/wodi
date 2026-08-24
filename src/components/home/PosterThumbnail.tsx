@@ -1,6 +1,7 @@
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
 import { usePosterPayload } from '../../hooks/usePosterPayload';
 import { PosterCard } from '../celebration/faces/HandwrittenFace/PosterCard';
+import { getEffectiveWorkoutDate } from '../../utils/workoutDate';
 import styles from './PosterThumbnail.module.css';
 
 interface PosterThumbnailProps {
@@ -30,7 +31,10 @@ function getRelativeLabel(date: Date): string {
 
 export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnailProps): React.ReactElement {
   const payload = usePosterPayload(workout);
-  const relativeLabel = getRelativeLabel(workout.date);
+  // The day it was TRAINED, not the day the doc was written — the rail is sorted
+  // that way (byNewestTrained), so labelling by the logging date would caption a
+  // Monday board logged on Wednesday as "Today" while it sits in Monday's slot.
+  const relativeLabel = getRelativeLabel(getEffectiveWorkoutDate(workout));
 
   return (
     <div className={`${styles.wrapper} ${fullWidth ? styles.wrapperFull : ''}`}>

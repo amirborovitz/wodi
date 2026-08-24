@@ -12,6 +12,7 @@ import { aggregateStats } from '../utils/statsAggregation';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
+import { FeedPulse } from '../components/home/FeedPulse';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import { isAdminEmail } from '../utils/admin';
 import type { PlannedWorkout } from '../types';
@@ -28,6 +29,7 @@ interface HomeScreenProps {
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   onOpenRecap?: (data: RecapData) => void;
+  onOpenFeed?: () => void;
   ringsKey?: number; // kept for API compatibility — unused
 }
 
@@ -63,6 +65,7 @@ export function HomeScreen({
   onSelectWorkout,
   onLogPlannedWorkout,
   onOpenRecap,
+  onOpenFeed,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(100);
@@ -447,6 +450,11 @@ export function HomeScreen({
             />
           </motion.div>
         )}
+
+        {/* The gym's heartbeat, last so it never competes with the athlete's own work
+            above it or with a recap drop. It renders nothing when the 24h window holds
+            no one else, so a quiet day costs no space. */}
+        {onOpenFeed && <FeedPulse userId={user?.id} onOpenFeed={onOpenFeed} />}
       </div>
 
       <DeleteActionSheet

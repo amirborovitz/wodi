@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BRAND, VIBE, fD, fB } from '../celebration/faces/HandwrittenFace/brand';
-import { RecapPeek } from './RecapPeek';
+import { W2MiniFace } from './wrapped/W2MiniFace';
 import { getTopMoveLine } from '../../hooks/useRecapData';
 import type { RecapData } from '../../hooks/useRecapData';
 import styles from './RecapReadyCard.module.css';
@@ -78,7 +78,7 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
 
             <div className={styles.mainRow}>
               <div className={styles.peek}>
-                <RecapPeek data={data} />
+                <W2MiniFace data={data} />
               </div>
               <div className={styles.copy}>
                 <div className={styles.headline} style={{ fontFamily: fD }}>

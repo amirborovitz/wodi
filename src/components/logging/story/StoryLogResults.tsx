@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet } from '../../../types';
+import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet, MovementSubstitution } from '../../../types';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
 import { initStoryResults } from './WodStoryScreen';
 import { InputRouter } from './InputRouter';
@@ -45,6 +45,9 @@ export interface LegacyExerciseResult {
   // Per-movement start->peak weight (sequential complex: each block builds its own weight).
   movementWeightProgressions?: Record<string, number[]>;
   movementAlternatives?: Record<string, string>;
+  // The whole swap, not just the name it landed on. `movementAlternatives` is what the save path
+  // bakes onto the movement; this is what lets a later edit take the bake back off.
+  movementSubstitutions?: Record<string, MovementSubstitution>;
   movementDistances?: Record<string, number>;
   movementDistancesPerRep?: Record<string, number>;
   movementReps?: Record<string, number>;
@@ -268,7 +271,8 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     const mw: Record<string, number> = {}, md: Record<string, number> = {},
           mr: Record<string, number> = {}, mc: Record<string, number> = {},
           ic: Record<string, number> = {}, ma: Record<string, string> = {},
-          mdpr: Record<string, number> = {}, mwp: Record<string, number[]> = {};
+          mdpr: Record<string, number> = {}, mwp: Record<string, number[]> = {},
+          ms: Record<string, MovementSubstitution> = {};
     for (const m of r.movementResults ?? []) {
       const n = m.movementKey || m.movement.name;
       if (m.kind === 'load' && m.weight != null && m.weight > 0) {
@@ -285,6 +289,17 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       if (m.implementCount && m.implementCount > 1) ic[n] = m.implementCount;
       if (m.substitution) {
         ma[n] = m.substitution.selectedName;
+        // Keep the swap whole, next to the prescription it replaced. The lines below are about
+        // to zero the board's own quantities on the way to the saved doc; this is what a later
+        // edit reads to put them back and offer the way to Rx.
+        ms[n] = {
+          ...m.substitution,
+          originalPrescription: {
+            reps: m.movement.reps,
+            distance: m.movement.distance,
+            calories: m.movement.calories,
+          },
+        };
         if (!(m.distance != null && m.distance > 0)) md[n] = 0;
         if (!(m.calories != null && m.calories > 0)) mc[n] = 0;
         // A substitute measured in metres or calories has no rep count of its own. The board's
@@ -313,6 +328,7 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       ...(Object.keys(mc).length > 0 ? { movementCalories: mc } : {}),
       ...(Object.keys(ic).length > 0 ? { implementCounts: ic } : {}),
       ...(Object.keys(ma).length > 0 ? { movementAlternatives: ma } : {}),
+      ...(Object.keys(ms).length > 0 ? { movementSubstitutions: ms } : {}),
     };
   }
 

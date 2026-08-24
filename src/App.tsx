@@ -281,6 +281,7 @@ function AppContent() {
             }}
             onLogPlannedWorkout={handleLogPlannedWorkout}
             onOpenRecap={handleOpenRecap}
+            onOpenFeed={() => setCurrentScreen('feed')}
             ringsKey={homeRingsKey}
           />
         );

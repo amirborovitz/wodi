@@ -1,0 +1,108 @@
+{
+  "name": "real-alternating-heat-interval-amrap-20260821",
+  "description": "REAL saved doc (21 Aug 2026), reps restored to the board. '[2:30 AMRAP, 2:30 REST] x 4 ... Work in pairs (two heats) - one work while the other rest'. The AI stamped partnerWorkout/partnerSplit:'reps' and the logging prefill halved 6/6/30 to 3/3/15 into Firestore. The flags are kept here on purpose: prescribesOwnRest() must refuse to divide a work/rest board no matter what the flags say, so this fixture fails the moment anything starts halving again.",
+  "workout": {
+    "date": "2026-08-21T08:45:41.518Z",
+    "sourceDate": "2026-08-21",
+    "title": "WOD",
+    "type": "amrap",
+    "format": "amrap_intervals",
+    "partnerWorkout": true,
+    "partnerFactor": 0.5,
+    "teamSize": 2,
+    "duration": 20,
+    "durationSeconds": 1200,
+    "timeCap": 1200,
+    "sets": 4,
+    "intervalTime": 150,
+    "difficultyLevel": 6,
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Double Under", "exerciseIndex": 2, "totalReps": 240, "color": "magenta" },
+        { "name": "Banded Shoulder External Rotation", "exerciseIndex": 1, "totalReps": 36, "color": "magenta" },
+        { "name": "Chest To Bar Pull-up", "exerciseIndex": 2, "totalReps": 48, "color": "cyan" },
+        { "name": "Twin KB Thruster", "exerciseIndex": 2, "totalReps": 48, "weight": 32, "unit": "kg", "implementCount": 2, "color": "yellow" },
+        { "name": "Bench Press", "exerciseIndex": 0, "totalReps": 23, "weight": 60, "weightProgression": [50, 70], "unit": "kg", "color": "yellow" }
+      ],
+      "grandTotalReps": 395,
+      "grandTotalVolume": 2916
+    },
+    "rawText": "21/08/26\nSTRENGTH (press)\nBench Press\n5 sets as follows:\n[8-6-4-3-2] @75➜90+%\nIn between, 3 sets of:\n12 banded shoulder external rotations\n\nMETCON (Intervals)\n[02:30 min AMRAP, 02:30 min REST] x 4 rounds:\n6 Chest to Bar Pull-up\n6 twin Kettlebell Thruster @12/20kg (x2)\n30 Double Under / 60 singles\n* Continue from where you stopped\n** Work in pairs (two heats) - one work while the other rest",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Bench Press",
+        "type": "strength",
+        "prescription": "5 sets as follows: [8-6-4-3-2] @75➜90+%",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 8, "actualReps": 8, "weight": 50 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 4, "actualReps": 4 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 3, "actualReps": 3 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "targetReps": 2, "actualReps": 2, "weight": 70 }
+        ],
+        "movements": [
+          { "name": "Bench Press", "inputType": "weight", "equipment": "barbell", "countingMode": "per_round" }
+        ],
+        "suggestedRepsPerSet": [8, 6, 4, 3, 2],
+        "rawText": "Bench Press\n5 sets as follows:\n[8-6-4-3-2] @75➜90+%",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "aiPartName": "FURNACE"
+      },
+      {
+        "id": "exercise-1",
+        "name": "Banded Shoulder External Rotations",
+        "type": "strength",
+        "prescription": "3 sets of 12 banded shoulder external rotations",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 36 }
+        ],
+        "movements": [
+          { "name": "Banded Shoulder External Rotation", "reps": 12, "inputType": "none", "countingMode": "per_round" }
+        ],
+        "rounds": 3,
+        "rawText": "In between, 3 sets of:\n12 banded shoulder external rotations",
+        "partKind": "strength",
+        "loggingMode": "bodyweight",
+        "isSecondary": true
+      },
+      {
+        "id": "exercise-2",
+        "name": "2:30 AMRAP x 4",
+        "type": "wod",
+        "prescription": "6 Chest to Bar Pull-up, 6 twin Kettlebell Thruster @12/20kg, 30 Double Under / 60 singles",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 336, "weight": 16 }
+        ],
+        "rxWeights": { "male": 20, "female": 12, "unit": "kg" },
+        "movements": [
+          { "name": "Chest To Bar Pull-up", "reps": 6, "inputType": "none", "countingMode": "per_round" },
+          {
+            "name": "Twin KB Thruster",
+            "reps": 6,
+            "implementCount": 2,
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "countingMode": "per_round",
+            "rxWeights": { "male": 16, "female": 16, "unit": "kg" },
+            "loggedWeights": [16]
+          },
+          { "name": "Double Under", "reps": 30, "inputType": "none", "countingMode": "per_round", "alternative": { "name": "Single Under", "reps": 60 } }
+        ],
+        "rounds": 8,
+        "rawText": "6 Chest to Bar Pull-up\n6 twin Kettlebell Thruster @12/20kg (x2)\n30 Double Under / 60 singles",
+        "partKind": "metcon",
+        "loggingMode": "amrap_intervals",
+        "isSecondary": false,
+        "partnerWorkout": true,
+        "partnerSplit": "reps",
+        "intervalCount": 4,
+        "workDuration": 600,
+        "restDuration": 600,
+        "aiPartName": "TWIN HEAT"
+      }
+    ]
+  }
+}

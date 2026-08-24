@@ -8,6 +8,7 @@ import { getAlternativeType } from '../data/exerciseDefinitions';
 import { hasSameMovementsEveryRound } from '../utils/sectionShape';
 import { matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
+import { prescribesOwnRest } from './partnerScope';
 import { isWeightedCarry } from '../utils/xpCalculations';
 
 /**
@@ -1269,6 +1270,17 @@ function backfillTogetherFlag(workout: ParsedWorkout): ParsedWorkout {
 }
 
 /**
+ * Clear a sole block's partner scope when its structure rules one out. The session keeps its own
+ * `partnerWorkout` — the athletes really were paired, and EP/streak copy may still want to say so
+ * — but the block that carries the reps is marked unshared, so nothing downstream divides them.
+ */
+function stripBlockPartnerScope(workout: ParsedWorkout, ex: ParsedExercise): ParsedWorkout {
+  if (ex.partnerWorkout === false && ex.partnerSplit == null) return workout;
+  const { partnerSplit: _dropped, ...rest } = ex;
+  return { ...workout, exercises: [{ ...rest, partnerWorkout: false }] };
+}
+
+/**
  * Backfill per-exercise partnerWorkout/partnerSplit when the AI didn't set them. Scoped to THIS
  * exercise's own text via getExerciseScopedText (never the shared workout-level rawText for a
  * multi-exercise workout) — a sibling block being partnered must never flag an unrelated block
@@ -1289,6 +1301,7 @@ function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
   // persisted and detectPartnerSplit trusts it forever, killing the partner poster treatment.
   if (workout.exercises.length === 1) {
     const ex = workout.exercises[0];
+    if (prescribesOwnRest(ex)) return stripBlockPartnerScope(workout, ex);
     if (ex.partnerWorkout === true) return workout;
     const hasRoundStructure = (ex.suggestedSets ?? 1) > 1
       || (ex.sections?.some(s => (s.rounds ?? 1) > 1) ?? false);
@@ -1304,6 +1317,16 @@ function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
 
   let changed = false;
   const exercises = workout.exercises.map(ex => {
+    // Structure first, for the same reason isTeamPrescribedExercise asks it first: a block that
+    // prescribes its own rest has no shared work to describe, so a partner scope on it is not a
+    // judgement call that could go either way — it is simply wrong. Persisting it false here is
+    // what keeps the saved doc from contradicting the gate that will later refuse to divide it.
+    if (prescribesOwnRest(ex)) {
+      if (ex.partnerWorkout === false && ex.partnerSplit == null) return ex;
+      changed = true;
+      const { partnerSplit: _dropped, ...rest } = ex;
+      return { ...rest, partnerWorkout: false };
+    }
     if (ex.partnerWorkout != null) return ex; // AI already classified this exercise — trust it, including an explicit false
 
     changed = true;

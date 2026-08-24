@@ -380,7 +380,11 @@ export function AchievementBadge({ label, variant = 'onDark', paperInkColor = BR
 interface WordmarkProps {
   color: string;
   dot?: string;
-  size?: number;
+  /**
+   * A px number, or any CSS length — container-query units included, so a poster
+   * that sizes itself in `cqw`/`cqh` signs off at the same scale as its type.
+   */
+  size?: number | string;
 }
 
 export function Wordmark({ color, dot = BRAND.yellow, size = 15 }: WordmarkProps): React.JSX.Element {

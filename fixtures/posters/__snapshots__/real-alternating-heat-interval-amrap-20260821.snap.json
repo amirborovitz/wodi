@@ -1,0 +1,193 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Bench Press",
+        "blueprint": "5 sets",
+        "rows": [
+          {
+            "primary": "50->70KG",
+            "name": "Bench Press",
+            "subNote": "23 total",
+            "totalNote": "23 total",
+            "mineKey": "Bench Press",
+            "accent": "yellow",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "descLadderScheme": [
+          8,
+          6,
+          4,
+          3,
+          2
+        ],
+        "descLadderCompleted": 5,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "2:30 AMRAP x 4",
+        "blueprint": "2:30 AMRAP · 2:30 rest · 4 rounds",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Chest To Bar Pull-ups",
+            "subNote": "48 total",
+            "totalNote": "48 total",
+            "mineKey": "Chest To Bar Pull-up",
+            "accent": "cyan",
+            "repeatCount": 8
+          },
+          {
+            "primary": "6",
+            "name": "Twin KB Thrusters",
+            "nameWithLoad": "Twin KB Thrusters @ 16kg each",
+            "loadNote": "16kg each",
+            "subNote": "48 total",
+            "totalNote": "48 total",
+            "mineKey": "Twin KB Thruster",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "30",
+            "name": "Double Unders",
+            "subNote": "240 total",
+            "totalNote": "240 total",
+            "mineKey": "Double Under",
+            "accent": "magenta",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "8",
+    "unit": "ROUNDS",
+    "formatLine": "4 × 2:30 · In Pairs",
+    "storyLine": "240 du · 36 banded shoulder external rotation · 48 c2b pull-up · 48 twin kb thruster · 23 bench press",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BENCH PRESS",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Bench Press",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          50,
+          70
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 23
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "2:30 AMRAP X 4",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "6",
+        "name": "Chest To Bar Pull-up",
+        "total": "48 total",
+        "color": "cyan"
+      },
+      {
+        "perRound": "6",
+        "name": "Twin KB Thruster",
+        "total": "48 total",
+        "color": "yellow",
+        "weight": 32,
+        "unit": "kg"
+      },
+      {
+        "perRound": "30",
+        "name": "Double Under",
+        "total": "240 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "8",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "50->70KG Bench Press",
+          "load": "",
+          "mine": "50-70kg",
+          "team": "",
+          "total": "23 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2:30 AMRAP X 4",
+          "cap": "2:30 AMRAP · 2:30 rest · 4 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Chest To Bar Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "48 total"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Twin KB Thrusters",
+          "load": "",
+          "mine": "16kg each",
+          "team": "",
+          "total": "48 total"
+        },
+        {
+          "kind": "line",
+          "rx": "30 Double Unders",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "240 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "8-6-4-3-2 reps",
+    null
+  ]
+}

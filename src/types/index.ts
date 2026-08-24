@@ -458,6 +458,12 @@ export interface ParsedMovement {
     distance?: number;
     calories?: number;
   };
+  // The swap the ATHLETE made on this movement — never the AI, never the coach. Written at save
+  // time and read back by the edit path only. On a SAVED movement the fields above are the
+  // substitute (Echo Bike, 700m); this carries the prescription it replaced (Run, 200m). On a
+  // movement rebuilt for editing the reverse holds: the fields above are back to the board's Rx
+  // and this is the swap to re-apply on top of it.
+  substitution?: MovementSubstitution;
 }
 
 export type ParsedSectionType = 'buy_in' | 'rounds' | 'cash_out';
@@ -561,6 +567,23 @@ export interface MovementSubstitution {
   adjustedValue?: number;         // Adjusted value after multiplier
   /** The unit the adjusted value is measured in (target movement's default unit) */
   targetUnit?: 'reps' | 'distance' | 'calories' | 'time';
+  /**
+   * What the COACH prescribed for `originalName`, stamped at save time.
+   *
+   * The saved movement's own name and quantities are the SUBSTITUTE — what the athlete actually
+   * did, and what every poster/totals consumer reads — so this is the only surviving record of
+   * what the board said. Without it a saved swap is one-way: re-opening the log reads
+   * "Echo Bike 700m" as the prescription, so there is no Rx to go back to and no original to
+   * re-convert from.
+   *
+   * Absent on docs saved before it was persisted. Those recover the original NAME from
+   * `workloadBreakdown.originalMovement` and nothing else — see workoutToParsed.
+   */
+  originalPrescription?: {
+    reps?: number;
+    distance?: number;
+    calories?: number;
+  };
 }
 
 // App navigation

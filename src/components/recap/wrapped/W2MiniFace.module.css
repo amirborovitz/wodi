@@ -1,0 +1,124 @@
+/* The mini face is its own container, so every size below is relative to the
+   tile rather than the page — one composition for the hero's tilted print
+   (104px), the shelf (132px) and the Today card's chip (78px). */
+.face {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  background: #0a0b0d;
+  overflow: hidden;
+}
+
+.glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(110% 55% at 50% 104%, rgba(245, 194, 0, 0.11), transparent 62%);
+}
+
+.inner {
+  position: relative;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: min(7cqw, 5cqh) min(7cqw, 5cqh) min(6cqw, 4.4cqh);
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: min(3cqw, 2cqh);
+}
+
+.title {
+  min-width: 0;
+}
+
+/* Every size carries a px floor: the container-relative value alone collapses
+   to a few px on a chip and the tile turns to mush. Nothing here renders below
+   8px at any size the app uses. */
+.period {
+  font-size: max(11px, min(17cqw, 12cqh));
+  font-weight: 900;
+  color: #f3f1ea;
+  line-height: 0.86;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wrapped {
+  font-size: max(8px, min(9.5cqw, 6.6cqh));
+  font-weight: 700;
+  color: #f5c200;
+  line-height: 1;
+  margin-top: min(0.8cqw, 0.6cqh);
+}
+
+.tier {
+  flex-shrink: 0;
+  font-size: max(8px, min(5cqw, 3.5cqh));
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #0a0b0d;
+  background: #f5c200;
+  border-radius: 999px;
+  padding: min(1.6cqw, 1.2cqh) min(3.4cqw, 2.4cqh);
+}
+
+.hero {
+  display: flex;
+  align-items: baseline;
+  gap: min(2cqw, 1.4cqh);
+}
+
+/* The result is the visual centre of the print. v1 anchored this whole block
+   to the bottom edge, leaving the middle of every month card as dead black. */
+.story {
+  align-self: center;
+  width: 100%;
+  padding-top: min(4cqw, 3cqh);
+}
+
+.heroValue {
+  font-size: max(18px, min(26cqw, 18cqh));
+  font-weight: 900;
+  color: #f5c200;
+  line-height: 0.78;
+  letter-spacing: -0.035em;
+}
+
+.heroUnit {
+  font-size: max(8px, min(4.6cqw, 3.2cqh));
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #f5c200;
+}
+
+.persona {
+  font-size: max(8px, min(6cqw, 4.2cqh));
+  font-weight: 800;
+  color: #f3f1ea;
+  margin-top: min(2.4cqw, 1.7cqh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tape {
+  align-self: end;
+}
+
+/* Two reasons the tier pill steps out at the small end. Below ~110px the px
+   floors stop fitting side by side, and a pill squeezed against the period is
+   what turns a dense tile back into a broken one. And the two places this
+   narrow — the Me hero's tilted print and the Today chip — both already say
+   the tier in the copy beside them, so the pill was printing it twice.
+   The shelf (132px) keeps it, which is where it earns its place: a mixed row
+   of weeks, months and seasons needs the label to be scannable. */
+@container (max-width: 110px) {
+  .tier {
+    display: none;
+  }
+}

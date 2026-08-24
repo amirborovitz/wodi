@@ -1,0 +1,88 @@
+/* Same chrome as HomeScreen's For Later row, deliberately: both are "tap to go
+   somewhere else" rows, and Home should have one row idiom rather than two. */
+/* Spacing lives here rather than on a wrapper in HomeScreen: the row renders
+   nothing when the window is empty, and a wrapper would leave its margin behind
+   as phantom space. Fades in because the feed subscription resolves after mount. */
+.row {
+  margin-top: 22px;
+  animation: pulseRowIn 0.3s ease both;
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #16181c;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  border-radius: 12px;
+  color: #f3f1ea;
+  cursor: pointer;
+  padding: 9px 12px;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.row:active {
+  border-color: rgba(243, 241, 234, 0.24);
+}
+
+/* The feed's own live dot, same red and same beat, so the two screens read as
+   one live surface. */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ff5555;
+  flex-shrink: 0;
+  animation: livePulse 1.1s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; opacity: 1; }
+}
+
+.faces {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.face {
+  display: flex;
+  border: 2px solid #16181c;
+  border-radius: 999px;
+}
+
+.face + .face {
+  margin-left: -9px;
+}
+
+.copy {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arrow {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: rgba(243, 241, 234, 0.35);
+}
+
+@keyframes pulseRowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row { animation: none; }
+}

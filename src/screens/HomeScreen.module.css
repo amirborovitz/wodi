@@ -409,8 +409,10 @@
 }
 
 .skeleton {
-  width: 120px;
-  height: 168px;
+  /* Tracks .frame in PosterThumbnail.module.css so the rail does not resize once
+     the real posters replace the skeletons. */
+  width: clamp(120px, 42vw, 176px);
+  aspect-ratio: 120 / 168;
   background: #16181c;
   border-radius: 10px;
   flex-shrink: 0;

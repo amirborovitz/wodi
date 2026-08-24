@@ -23,7 +23,7 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal, MovementSubstitution } from '../types';
 import {
   workoutToParsedWorkout,
   getSavedMaxStrengthSet,
@@ -44,6 +44,7 @@ import {
 import { StoryLogResults } from '../components/logging/story/StoryLogResults';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult, movementToKind } from '../components/logging/story/types';
+import { buildSubstitutionPatch } from '../components/logging/story/substitutionPatch';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 import { removeUndefined } from '../utils/firestoreUtils';
@@ -95,6 +96,7 @@ interface ExerciseResult {
   movementWeights?: Record<string, number>; // Per-movement weights for volume calculation
   movementWeightProgressions?: Record<string, number[]>; // Per-movement start->peak (sequential complex blocks)
   movementAlternatives?: Record<string, string>; // Selected alternatives for movements
+  movementSubstitutions?: Record<string, MovementSubstitution>; // The whole swap, so an edit can undo it
   movementDistances?: Record<string, number>; // Per-movement distance overrides
   movementDistancesPerRep?: Record<string, number>; // Per-movement per-trip distance (relay)
   movementReps?: Record<string, number>; // Per-movement rep overrides
@@ -1858,6 +1860,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         });
       }
 
+      // Re-apply the athlete's swaps LAST. `workoutToParsedWorkout` handed each swapped movement
+      // back on the coach's prescription (Run, 200m) with the swap alongside it; this puts the
+      // swap back on the ROW — its converted number (700m of Echo Bike) and the substitution
+      // record the scaling sheet rehydrates from. Without it a re-opened log offers no way back
+      // to Rx and no conversion to edit, and the overlay above leaves the row on the whole-piece
+      // total (5600m) instead of the per-trip figure the athlete swapped to.
+      if (result.movementResults) {
+        result.movementResults = result.movementResults.map(mr => (
+          mr.movement.substitution
+            ? { ...mr, ...buildSubstitutionPatch(mr, mr.movement.substitution) }
+            : mr
+        ));
+      }
+
       return result;
     });
 
@@ -2939,6 +2955,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         // entry onto every occurrence saved an 800/600/400m run swapped for a bike as 3 × 2400m.
         // Later tiers scale their own prescription by the ratio that entry implies (tierScaling) —
         // the same rule the breakdown above already follows, so both agree on 5400m.
+        // The swap kept next to the prescription it replaced. Everything else in this block bakes
+        // the SUBSTITUTE onto the movement — its name, its converted distance, its zeroed reps —
+        // because that is what the poster and every totals consumer read. This is the only record
+        // of what the board said, and the only thing that lets a later edit hand back the Rx.
+        // Stamped per occurrence: a per-movement ladder prescribes a different amount each tier.
+        const substitutionForSave = (mk: string, mov: ParsedMovement): MovementSubstitution | undefined => {
+          const sub = movementLookup(result.movementSubstitutions || {}, mk, mov.name);
+          if (!sub) return undefined;
+          return {
+            ...sub,
+            originalPrescription: { reps: mov.reps, distance: mov.distance, calories: mov.calories },
+          };
+        };
         const saveBasePrescribed = new Map<string, ParsedMovement>();
         const movementsForSave = baseMovements?.map((mov, mi) => {
           const mk = fsKeys[mi];
@@ -2957,6 +2986,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           return {
             ...mov,
             name: selectedName,
+            // Assigned, not spread-when-present: `mov` may already carry the swap an earlier
+            // edit un-baked, so going back to Rx has to CLEAR it here or the swap returns on the
+            // next open. `undefined` never reaches Firestore — removeUndefined strips it.
+            substitution: substitutionForSave(mk, mov),
             ...(selectedReps !== undefined ? { reps: selectedReps } : {}),
             // Relay pacers keep their prescribed per-trip distance — the logged value is a TOTAL
             // (already in the breakdown), and detail mode needs the per-trip prescription to
@@ -2996,6 +3029,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
             return {
               ...mov,
               name: selectedName,
+              substitution: substitutionForSave(mk, mov),
               ...(loggedWeights ? { loggedWeights } : {}),
               ...(selectedWeight && selectedWeight > 0 ? {
                 rxWeights: {
