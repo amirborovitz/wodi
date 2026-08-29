@@ -163,6 +163,21 @@ const exercise = obj({
   cashOut: nullable({ type: 'array', items: movement }),
 });
 
+/**
+ * One thing on the board the model could not read with confidence.
+ *
+ * Until this existed, "the board doesn't say" and "I can't make it out" were the same answer —
+ * both an absent field — and the post-processor filled the blank either way. So an illegible 15
+ * became a confident 10, stored as the coach's own number and never questioned again.
+ *
+ * `field` is a dotted path into THIS response (`exercises[0].movements[2].reps`), which is what
+ * lets the app act on it: a flagged blank is one the app refuses to fill in.
+ */
+const uncertainty = obj({
+  field: str,
+  reason: str,
+});
+
 const workout = obj({
   title: str,
   type: { type: 'string', enum: ['strength', 'metcon', 'emom', 'amrap', 'for_time', 'mixed'] },
@@ -184,6 +199,9 @@ const workout = obj({
   teamSize: nullable(num),
   stationRotation: nullable(bool),
   exercises: { type: 'array', items: exercise },
+
+  // Everything above is what the model COULD read. This is what it could not.
+  uncertain: nullable({ type: 'array', items: uncertainty }),
 });
 
 export const PARSE_RESPONSE_SCHEMA = {

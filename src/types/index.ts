@@ -319,6 +319,22 @@ export interface ParsedWorkout {
   teamSize?: number;            // Team size (2 for pairs, N for "team of N")
   difficultyLevel?: number;     // AI-assessed programmed difficulty 1–10
   userContext?: string;         // Athlete-supplied context/correction fed into the parse (may state facts not on the board)
+  uncertain?: ParseUncertainty[]; // Fields the AI could not read — see ParseUncertainty
+}
+
+/**
+ * A field the AI explicitly could not read off the board.
+ *
+ * The distinction this exists to draw: "the board doesn't say" and "I can't make it out" used to
+ * arrive as the same thing — an absent field — and the app filled the blank either way, turning an
+ * illegible number into a confident one. A field named here is one the app must NOT invent; it
+ * stays empty and the athlete is asked.
+ */
+export interface ParseUncertainty {
+  /** Dotted path into the parse, e.g. `exercises[0].movements[2].reps`. */
+  field: string;
+  /** What the model actually saw — the athlete's context when it asks. */
+  reason: string;
 }
 
 // Workload breakdown types

@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind, ParseUncertainty } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
+import { refuseGuessesOnUncertainFields, shiftUncertaintyPaths } from './parseUncertainty';
 import { resolveSourceDate } from './sourceDateResolution';
 import { PARSE_RESPONSE_SCHEMA } from './parseSchema';
 
@@ -1219,9 +1220,23 @@ Output:
 }
 NOTE: Each section with different reps/distances gets its own sections entry with rounds: 1. The sections are the source of truth here, so the movements[] at top is just the distinct movements involved. DO NOT drop the sections in favour of that flat list — the pyramid structure must be preserved.`;
 
+/**
+ * Deliberately one short, general rule and no examples. The failure it addresses is not a shape
+ * the model needs shown — it is permission the model did not have. Examples here would only teach
+ * it which four things are allowed to be unreadable.
+ */
+const RULES_UNCERTAINTY = `## WHEN YOU CANNOT READ SOMETHING
+If a number, word or structure is genuinely illegible or ambiguous, do NOT settle on the most
+likely value. Leave that field null and add an entry to "uncertain": the field's dotted path in
+this response, and what you actually saw.
+An honest "I could not read this" is a CORRECT answer. It costs the athlete one tap. A plausible
+guess is stored as the coach's own number and is never questioned again.
+This is for what you cannot read — not for what the board simply doesn't say. A board that states
+no weight is complete, not uncertain. Use it only where you genuinely cannot tell.`;
+
 const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not parse workout from text"}';
 
-const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP].join('\n\n');
+const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP, RULES_UNCERTAINTY].join('\n\n');
 const RULES_METCON = [RULES_METCON_STRUCTURE, RULES_STATIONS, RULES_BENCHMARKS, RULES_LADDERS_PARTNERS].join('\n\n');
 
 // Kind-scoped prompt: a strength/accessory part skips the metcon structure rules and examples it
@@ -1321,11 +1336,15 @@ export async function parseWorkoutText(
     ...(athleteNote ? { userContext: athleteNote } : {}),
   };
   const postProcessed = postProcessParsedWorkout(withResolvedDate);
+  // Applied HERE, per part, because the model's paths index its own response — see
+  // parseUncertainty.ts. Post-processing is free to backfill every other blank; a blank the model
+  // flagged as unreadable is the one it must hand back empty so the athlete can be asked.
+  const { workout: withoutGuesses } = refuseGuessesOnUncertainFields(withResolvedDate, postProcessed);
 
   logAiWorkoutSummary(`${sourceLabel} PARSE AI`, data);
-  logAiWorkoutSummary(`${sourceLabel} PARSE POST`, postProcessed);
+  logAiWorkoutSummary(`${sourceLabel} PARSE POST`, withoutGuesses);
 
-  return { raw: rawJson, parsed: postProcessed };
+  return { raw: rawJson, parsed: withoutGuesses };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -1577,11 +1596,21 @@ function mergeSegmentedParses(
   const firstDefined = <K extends keyof ParsedWorkout>(key: K): ParsedWorkout[K] =>
     primary[key] ?? partParses.find((parse) => parse[key] != null)?.[key] as ParsedWorkout[K];
 
+  // Each part flagged against its OWN exercise indices; re-base them onto the merged session or
+  // an entry from part B would end up pointing at part A's first exercise.
+  let exerciseOffset = 0;
+  const uncertain = partParses.flatMap((parse) => {
+    const shifted = shiftUncertaintyPaths(parse.uncertain, exerciseOffset);
+    exerciseOffset += parse.exercises.length;
+    return shifted;
+  });
+
   return {
     ...primary,
     title: segmented.title || primary.title,
     rawText: originalText,
     exercises,
+    uncertain: uncertain.length > 0 ? uncertain : undefined,
     teamSize: firstDefined('teamSize'),
     // A session is a partner session when ANY part is partnered. firstDefined alone gets this
     // wrong: the primary (first metcon) part may be a solo sibling whose post-processed
@@ -1904,6 +1933,23 @@ function validateMovement(data: unknown): ParsedMovement | null {
   };
 }
 
+/**
+ * The model's own list of what it could not read. Entries without both halves are dropped: a path
+ * with no reason cannot be shown to an athlete, and a reason with no path cannot be acted on.
+ */
+function validateUncertainty(raw: unknown): ParseUncertainty[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const entries = raw.flatMap((item): ParseUncertainty[] => {
+    const record = asRecord(item);
+    const field = record?.field;
+    const reason = record?.reason;
+    return typeof field === 'string' && field.trim() && typeof reason === 'string' && reason.trim()
+      ? [{ field: field.trim(), reason: reason.trim() }]
+      : [];
+  });
+  return entries.length > 0 ? entries : undefined;
+}
+
 export function validateParsedWorkout(data: unknown): ParsedWorkout {
   const raw = data as Record<string, unknown>;
   const sourceDate = resolveSourceDate(
@@ -2183,6 +2229,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
     difficultyLevel: typeof raw.difficultyLevel === 'number' && raw.difficultyLevel >= 1 && raw.difficultyLevel <= 10
       ? Math.round(raw.difficultyLevel)
       : undefined,
+    uncertain: validateUncertainty(raw.uncertain),
   };
 }
 
