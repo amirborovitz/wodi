@@ -380,7 +380,7 @@ export function getStationVisitCountsForExercise(
   return null;
 }
 
-interface MovementMultiplierResult {
+export interface MovementMultiplierResult {
   multiplier: number;
   // True when the multiplier had to be GUESSED (station counting without station structure,
   // or a session-level sets/containerRounds fallback that may belong to a sibling part).
@@ -410,15 +410,33 @@ export function statedOccurrenceCount(
   return undefined;
 }
 
-function getMovementMultiplier(
+/**
+ * How many times one movement happened — THE single owner of that question, for both the
+ * parse-time breakdown and the save-time one.
+ *
+ * It used to be answered twice: here, and again by a near-copy inside AddWorkoutScreen that had
+ * drifted four ways — it never consulted `statedOccurrenceCount`, so a board that wrote its own
+ * total ("(5 total)", "between sets") had that number thrown away at save time; it dropped the
+ * `!fallbackMultiplier` term from `intervalIsGuess`, so a total the copy DID guess could reach a
+ * poster without its "~"; and it skipped the station-visit normalisation entirely. Two answers to
+ * one question is one answer too many, and the one that reached Firestore was the wrong one.
+ *
+ * `loggedIntervals` is the single fact the save path legitimately knows and the parse path cannot:
+ * how many intervals the athlete actually logged. It ranks below the board's own numbers and above
+ * the session-level fallback, and it is never a guess — the athlete counted it.
+ */
+export function getMovementMultiplier(
   movement: ParsedMovement,
   movementIndex: number,
   exercise: ParsedExercise,
-  workout: ParsedWorkout,
+  // Only the two session-level counts are read, so the save path — where a session may not have
+  // been parsed at all — can pass `{}` instead of faking a whole ParsedWorkout.
+  workout: Pick<ParsedWorkout, 'sets' | 'containerRounds'>,
   fallbackMultiplier: number,
-  stationVisitCounts: number[] | null
+  stationVisitCounts: number[] | null,
+  loggedIntervals?: number
 ): MovementMultiplierResult {
-  const exerciseIntervals = exercise.intervalCount || exercise.suggestedSets;
+  const exerciseIntervals = exercise.intervalCount || exercise.suggestedSets || loggedIntervals;
   // Session-level fields describe the primary part, not necessarily THIS one — a multiplier
   // sourced from them is a guess (parts are standalone practices).
   const sessionIntervals = workout.sets || workout.containerRounds;

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors, getStationVisitCountsForExercise, movementBucketKey, movementForSectionCounting, scopeSectionMovements } from '../services/workloadCalculation';
+import { assignMovementColors, getMovementMultiplier, getStationVisitCountsForExercise, movementBucketKey, movementForSectionCounting, scopeSectionMovements } from '../services/workloadCalculation';
 import type { SectionMovementScope } from '../services/workloadCalculation';
 import { exercisePartnerFactor } from '../services/partnerScope';
 import { getMaxMetric } from '../utils/maxMetric';
@@ -233,54 +233,6 @@ function inferStationVisitCounts(
   }
 
   return null;
-}
-
-interface EffectiveRoundsResult {
-  rounds: number;
-  // True when the multiplier had to be GUESSED (station counting without station structure,
-  // or a session-level sets/containerRounds fallback that may belong to a sibling part).
-  // Flows into WorkloadBreakdown.estimated — poster totals never render off a guess.
-  estimated: boolean;
-}
-
-function getMovementEffectiveRounds(
-  movement: ParsedMovement,
-  movementRounds: number,
-  stationVisits: number | undefined,
-  exercise: ParsedExercise,
-  result: ExerciseResult,
-  parsedWorkout?: ParsedWorkout
-): EffectiveRoundsResult {
-  const exerciseIntervals = exercise.intervalCount
-    || exercise.suggestedSets
-    || result.sets.length
-    || result.rounds;
-  // Session-level fields describe the primary part, not necessarily THIS one — a multiplier
-  // sourced from them is a guess (parts are standalone practices).
-  const sessionIntervals = parsedWorkout?.sets || parsedWorkout?.containerRounds;
-  const intervalMultiplier = exerciseIntervals || sessionIntervals || movementRounds || 1;
-  const intervalIsGuess = !exerciseIntervals && !!sessionIntervals;
-
-  switch (movement.countingMode) {
-    case 'once':
-      return { rounds: 1, estimated: false };
-    case 'per_interval':
-      return { rounds: intervalMultiplier, estimated: intervalIsGuess };
-    case 'per_station_visit':
-      // No station structure to distribute over — the interval-chain fallback is a guess.
-      return stationVisits != null
-        ? { rounds: stationVisits, estimated: false }
-        : { rounds: intervalMultiplier, estimated: true };
-    case 'per_round':
-    default:
-      break;
-  }
-
-  const isBuyInCashOut = movement.role === 'buy_in' || movement.role === 'cash_out' || movement.perRound === false;
-
-  return isBuyInCashOut
-    ? { rounds: 1, estimated: false }
-    : { rounds: stationVisits ?? movementRounds, estimated: false };
 }
 
 /**
@@ -638,18 +590,20 @@ export function buildWorkloadBreakdownFromResults(
       // much as a max-rep burpee. Reading `maxSetReps` here instead meant routing the bike's 40
       // to calories quietly re-enabled the multiplier and stored 200.
       const effective = maxSetEarned != null || setTotalReps != null
-        ? { rounds: 1, estimated: false }
-        : getMovementEffectiveRounds(
+        ? { multiplier: 1, estimated: false }
+        : getMovementMultiplier(
           scope ? movementForSectionCounting(scope) : mov,
-          movementRounds,
-          stationVisits,
+          movIdx,
           result.exercise,
-          result,
-          parsedWorkout
+          parsedWorkout ?? {},
+          movementRounds,
+          stationVisitCounts ?? null,
+          // The one thing this path knows and the parse path cannot: what the athlete logged.
+          result.sets.length || result.rounds
         );
       // The block's own repeat multiplies ON TOP of the counting mode: they are different
       // layers (once per window × twice inside each window).
-      const effectiveRounds = effective.rounds * (scope?.sectionRepeat ?? 1);
+      const effectiveRounds = effective.multiplier * (scope?.sectionRepeat ?? 1);
       if (effective.estimated) estimated = true;
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round

@@ -373,3 +373,101 @@ describe('buildWorkloadBreakdownFromResults — who owns the block max sets', ()
     expect(bike?.totalReps ?? 0).toBe(0);
   });
 });
+
+/**
+ * The save path used to run its own copy of the round math, and that copy never asked
+ * `statedOccurrenceCount`. So a board that wrote how many times a movement happened — outright
+ * ("5 total"), or by placing it between sets — had that number thrown away on the way to
+ * Firestore, and the round count multiplied through instead. The parse path had been right about
+ * this since the occurrence work landed; only the copy that actually wrote the document was wrong.
+ *
+ * Both paths now ask the one resolver, so these assert the same totals from either direction.
+ */
+describe('buildWorkloadBreakdownFromResults — the board states the count', () => {
+  it('honours an explicit occurrence total instead of multiplying by rounds', () => {
+    const parsedWorkout: ParsedWorkout = {
+      title: '5 rounds for time',
+      format: 'for_time',
+      type: 'for_time',
+      scoreType: 'time',
+      exercises: [],
+    };
+    const ex = exercise({
+      name: '5 rounds for time',
+      type: 'wod',
+      loggingMode: 'for_time',
+      suggestedSets: 5,
+      movements: [
+        movement({ name: 'Wall Ball', reps: 10 }),
+        // "400m Run (3 total)" — the run is not per-round work, the board counted it.
+        // Deliberately NOT equal to the round count, or the wrong answer would look right.
+        movement({ name: 'Run', reps: 0, distance: 400, occurrences: 3, countingMode: 'per_round' }),
+      ],
+    });
+    const results = [{ exercise: ex, sets: [], rounds: 5 }];
+
+    const breakdown = buildWorkloadBreakdownFromResults(results, parsedWorkout);
+    const run = breakdown.movements.find((m) => m.name === 'Run');
+
+    // 3 stated occurrences × 400m = 1200m. The deleted copy multiplied by the 5 rounds
+    // and stored 2000m; the wall ball beside it stays on the round count either way.
+    expect(run?.totalDistance).toBe(1200);
+    expect(breakdown.movements.find((m) => m.name === 'Wall Ball')?.totalReps).toBe(50);
+  });
+
+  it('counts a between-sets movement once per GAP, not once per set', () => {
+    const parsedWorkout: ParsedWorkout = {
+      title: '6 sets',
+      format: 'for_time',
+      type: 'for_time',
+      scoreType: 'time',
+      exercises: [],
+    };
+    const ex = exercise({
+      name: '6 sets',
+      type: 'wod',
+      loggingMode: 'for_time',
+      suggestedSets: 6,
+      movements: [
+        movement({ name: 'Deadlift', reps: 5 }),
+        // Written under the sets, done in the gaps between them: 6 sets have 5 gaps.
+        movement({ name: 'Run', reps: 0, distance: 200, placement: 'between_sets', countingMode: 'per_round' }),
+      ],
+    });
+    const results = [{ exercise: ex, sets: [], rounds: 6 }];
+
+    const breakdown = buildWorkloadBreakdownFromResults(results, parsedWorkout);
+
+    // 5 gaps × 200m = 1000m. The deleted copy had no placement rule at all and stored 1200m.
+    expect(breakdown.movements.find((m) => m.name === 'Run')?.totalDistance).toBe(1000);
+    expect(breakdown.movements.find((m) => m.name === 'Deadlift')?.totalReps).toBe(30);
+  });
+
+  it('agrees with the parse path on the same board', () => {
+    const ex = exercise({
+      name: '5 rounds for time',
+      type: 'wod',
+      loggingMode: 'for_time',
+      suggestedSets: 5,
+      movements: [
+        movement({ name: 'Wall Ball', reps: 10 }),
+        movement({ name: 'Run', reps: 0, distance: 400, occurrences: 3, countingMode: 'per_round' }),
+      ],
+    });
+    const parsedWorkout: ParsedWorkout = {
+      title: '5 rounds for time',
+      format: 'for_time',
+      type: 'for_time',
+      scoreType: 'time',
+      exercises: [ex],
+    };
+
+    const saved = buildWorkloadBreakdownFromResults([{ exercise: ex, sets: [], rounds: 5 }], parsedWorkout);
+    const parsed = calculateWorkloadBreakdown(parsedWorkout);
+
+    // The whole point of one resolver: these two can no longer drift.
+    expect(saved.movements.find((m) => m.name === 'Run')?.totalDistance)
+      .toBe(parsed.movements.find((m) => m.name === 'Run')?.totalDistance);
+    expect(saved.grandTotalDistance).toBe(parsed.grandTotalDistance);
+  });
+});
