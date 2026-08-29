@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Exercise, MovementTotal, ParsedExercise, ParsedSection } from '../types';
-import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted } from './blockScore';
+import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort } from './blockScore';
 import { computeHeroResult } from '../components/celebration/helpers';
 import { createBlankResult, getRowState, getMissingLabel } from '../components/logging/story/types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -362,5 +362,45 @@ describe('a station board counts as logged from its stations', () => {
   it('never asks a station board for a rounds score', () => {
     // getMissingLabel is keyed on the kind, and the kind is the open count — never rounds.
     expect(getMissingLabel('score_open_reps')).toBe('reps');
+  });
+});
+
+/**
+ * The board that surfaced this (29/08/26):
+ *
+ *   In pairs - 14 minutes AMRAP:
+ *   P1: 200m Run
+ *   P2: AMRAP: 6 Hang Power Clean / 6 Front Squat / 6 Push Press
+ *       ➔ Max Sit-up
+ *
+ * The AI read it correctly — isMaxReps on the Sit-up — and then two screens disagreed about what
+ * that meant. The logging tile said "SIT-UP" and gave a rep box identical to every other rep box
+ * on the page, so nothing told the athlete the max effort was what was being asked for. The
+ * poster, on a board with no stations, built its rows from the workload breakdown; the sit-ups
+ * carried no logged count, so they were in no breakdown, so the movement the coach wrote left the
+ * poster entirely and a reader saw a three-movement couplet.
+ *
+ * This predicate is the shared answer both screens now ask for, so they cannot drift again.
+ */
+describe('statesMaxEffort', () => {
+  it('is true when the board stamped max and wrote no count', () => {
+    expect(statesMaxEffort({ name: 'Sit-up', isMaxReps: true })).toBe(true);
+  });
+
+  it('is false for an ordinary prescribed movement', () => {
+    expect(statesMaxEffort({ name: 'Front Squat', reps: 6 })).toBe(false);
+  });
+
+  it('keeps a prescribed count that also carries the max stamp', () => {
+    // "Max" in the quantity slot would throw away a number the coach actually wrote. A stamped
+    // movement WITH a count has something to show, so it shows it.
+    expect(statesMaxEffort({ name: 'Burpee', isMaxReps: true, reps: 10 })).toBe(false);
+    expect(statesMaxEffort({ name: 'Echo Bike', isMaxReps: true, calories: 20 })).toBe(false);
+    expect(statesMaxEffort({ name: 'Run', isMaxReps: true, distance: 400 })).toBe(false);
+  });
+
+  it('does not fire on a name that merely mentions max', () => {
+    // The stamp is the parser's judgement; a name is not. "Max Effort Day" is a title.
+    expect(statesMaxEffort({ name: 'Max Effort Deadlift', reps: 3 })).toBe(false);
   });
 });

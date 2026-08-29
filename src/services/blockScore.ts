@@ -80,6 +80,28 @@ export function findOpenMovements(
 }
 
 /**
+ * True when the athlete's own effort IS this movement's quantity — the board stamped it "max" and
+ * wrote no count of its own.
+ *
+ * THE ONE OWNER of the "print/say Max here" question. The poster already answered it in two places
+ * with this exact expression (the section row builder and the flat row builder); the logging screen
+ * answered it nowhere, which is why a board that said "➔ Max Sit-up" offered an unlabelled rep box
+ * that looked like every other rep box on the page. The input the athlete is given and the line the
+ * poster prints have to describe the same movement, so they ask here.
+ *
+ * Distinct from {@link findOpenMovements}, which asks whether the block HAS an open movement (a
+ * scoring question). This asks how a single movement should be presented, and so it also requires
+ * that the board left the quantity empty: a movement stamped max that still carries a prescribed
+ * count has a number to show, and showing "Max" instead would throw it away.
+ */
+export function statesMaxEffort(movement: ParsedMovement): boolean {
+  return movement.isMaxReps === true
+    && movement.reps == null
+    && movement.calories == null
+    && movement.distance == null;
+}
+
+/**
  * The FIRST open movement, for callers asking only whether the block has one at all
  * (`isMainPart`, the logging-kind switch). Delegates so the predicate has one owner — a caller
  * that needs to ask the athlete for numbers must use {@link findOpenMovements} instead.

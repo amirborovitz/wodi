@@ -1,0 +1,131 @@
+{
+  "name": "real-pairs-amrap-max-situp-20260829",
+  "description": "In-pairs 14-min AMRAP: P1 runs 200m while P2 works 6/6/6 twin-KB then MAX SIT-UPS until the swap. The AI reads it right (isMaxReps + maxMetric on Sit-up), but the sit-up carries no logged count, and on a non-station board the poster's prescription rows are built from the BREAKDOWN, so the movement the board wrote vanishes. The line must read 'Max Sit-up' whether or not a number was entered — layer 1 of the poster is what the coach wrote.",
+  "workout": {
+    "title": "WOD (שבת / חג)",
+    "format": "amrap",
+    "rawText": "STRENGTH\n4 sets:\n8 Dips @2-3 R.I.R\n8/8 Bulgarian Split Squat @R.P.E 7-8\n10 Supinated Barbell Row\n\nMETCON (Medium)\nIn pairs - 14 minutes AMRAP:\nP1: 200m Run\nP2: AMRAP:\n6 Twin Kettlebell/Dumbbell Hang Power Clean\n6 Twin Kettlebell/Dumbbell Front Squat\n6 Twin Kettlebell/Dumbbell Push Press\n➔ Max Sit-up\n<WEIGHT: 12/20kg>",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Pairs AMRAP 14",
+        "type": "wod",
+        "loggingMode": "amrap",
+        "scoreType": "rounds",
+        "prescription": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
+        "rawText": "P1: 200m Run\nP2: AMRAP:\n6 Twin Kettlebell/Dumbbell Hang Power Clean\n6 Twin Kettlebell/Dumbbell Front Squat\n6 Twin Kettlebell/Dumbbell Push Press\n➔ Max Sit-up\n<WEIGHT: 12/20kg>",
+        "workDuration": 840,
+        "rounds": 5,
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true
+          }
+        ],
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "distance",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "total",
+            "relay": true
+          },
+          {
+            "name": "Twin Kettlebell Hang Power Clean",
+            "reps": 6,
+            "rxWeights": {
+              "male": 20,
+              "female": 12,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          },
+          {
+            "name": "Twin Kettlebell Front Squat",
+            "reps": 6,
+            "rxWeights": {
+              "male": 20,
+              "female": 12,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          },
+          {
+            "name": "Twin Kettlebell Push Press",
+            "reps": 6,
+            "rxWeights": {
+              "male": 20,
+              "female": 12,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          },
+          {
+            "name": "Sit-up",
+            "inputType": "none",
+            "equipment": "none",
+            "isMaxReps": true,
+            "maxMetric": "reps",
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          }
+        ],
+        "movementWeights": {
+          "Twin Kettlebell Hang Power Clean": 20,
+          "Twin Kettlebell Front Squat": 20,
+          "Twin Kettlebell Push Press": 20
+        }
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Run",
+          "totalDistance": 600,
+          "unit": "m",
+          "color": "magenta"
+        },
+        {
+          "name": "Twin Kettlebell Hang Power Clean",
+          "totalReps": 18,
+          "weight": 20,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Twin Kettlebell Front Squat",
+          "totalReps": 18,
+          "weight": 20,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Twin Kettlebell Push Press",
+          "totalReps": 18,
+          "weight": 20,
+          "unit": "kg",
+          "color": "yellow"
+        }
+      ],
+      "grandTotalReps": 54,
+      "grandTotalVolume": 1080,
+      "grandTotalDistance": 600
+    }
+  }
+}

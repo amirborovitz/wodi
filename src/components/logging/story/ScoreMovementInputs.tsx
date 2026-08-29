@@ -14,6 +14,7 @@ import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { CustomNumpadSheet } from './CustomNumpadSheet';
 import { hasAlternatives } from '../../../data/exerciseDefinitions';
+import { statesMaxEffort } from '../../../services/blockScore';
 import { buildSubstitutionPatch } from './substitutionPatch';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
@@ -749,7 +750,11 @@ export function ScoreMovementInputs({
       if (!config) return [];
       const sub = getSubState(mr);
       const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
-      const cleaned = cleanTileLabel(labelSource) || stripWeightFromName(labelSource) || labelSource;
+      const bare = cleanTileLabel(labelSource) || stripWeightFromName(labelSource) || labelSource;
+      // "➔ Max Sit-up" is a different question from "6 Front Squats", and an unlabelled rep box
+      // asks the second one. Say what the board said, in the same words the poster will print —
+      // otherwise the athlete types a number without knowing it was the max effort being asked for.
+      const cleaned = statesMaxEffort(mr.movement) ? `Max ${bare}` : bare;
       const tiles = [{
         tileId: mr.movementKey,
         globalIndex,

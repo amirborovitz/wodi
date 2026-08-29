@@ -47,7 +47,7 @@ import {
 } from '../../services/partnerScope';
 // Block score — the ONE owner of "what does this piece count?", read from the block rather than
 // from its format name. A clock is not a score.
-import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted } from '../../services/blockScore';
+import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort } from '../../services/blockScore';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -1057,9 +1057,10 @@ function findPrescribedMovementIndex(movement: MovementTotal, prescribedOrder: s
 }
 
 function orderMovementTotalsByPrescription(exercise: Exercise | null | undefined, movements: MovementTotal[]): MovementTotal[] {
-  const prescribedOrder = getPrescribedMovementsInOrder(exercise)
-    .map((movement) => normalizeStampMovementName(movement.name))
-    .filter(Boolean);
+  const prescribed = getPrescribedMovementsInOrder(exercise)
+    .map((movement) => ({ movement, key: normalizeStampMovementName(movement.name) }))
+    .filter((entry) => Boolean(entry.key));
+  const prescribedOrder = prescribed.map((entry) => entry.key);
   if (prescribedOrder.length <= 1 || movements.length <= 1) return movements;
 
   const withOrder = movements.map((movement, index) => ({
@@ -1070,7 +1071,29 @@ function orderMovementTotalsByPrescription(exercise: Exercise | null | undefined
 
   if (!withOrder.some((entry) => entry.order !== Number.MAX_SAFE_INTEGER)) return movements;
 
-  return withOrder
+  // A movement the board wrote that no breakdown row matched is still part of the workout, and
+  // the poster's first layer is the PRESCRIPTION — what the coach put up — not a list of what
+  // produced a number. The station path has always known this (it falls back to `{ name }` for a
+  // station nobody logged); the flat path only ever REORDERED the breakdown, so a movement with
+  // nothing to total silently left the board.
+  //
+  // "➔ Max Sit-up" is the shape that makes it obvious: an open movement carries no prescribed
+  // count by definition, so if the athlete doesn't type one it has no reps, no distance, no
+  // calories and no weight — the save path drops it, and a reader of the poster is shown a
+  // three-movement couplet the coach never wrote.
+  const claimed = new Set(withOrder.map((entry) => entry.order));
+  const unlogged = prescribed
+    .map((entry, order) => ({ ...entry, order }))
+    .filter((entry) => !claimed.has(entry.order))
+    .map((entry) => ({
+      // Name only. Every quantity on the row comes from the prescription lookup downstream, so
+      // there is nothing to invent here — and nothing logged to overstate (truth standard).
+      movement: { name: entry.movement.name } as MovementTotal,
+      index: Number.MAX_SAFE_INTEGER,
+      order: entry.order,
+    }));
+
+  return [...withOrder, ...unlogged]
     .sort((a, b) => (a.order - b.order) || (a.index - b.index))
     .map((entry) => entry.movement);
 }
@@ -1941,8 +1964,7 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
 }
 
 function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement, multiplier = 1): { text: string; hasWeight: boolean } {
-  const qty = movement.isMaxReps && movement.reps == null
-      && movement.calories == null && movement.distance == null
+  const qty = statesMaxEffort(movement)
     // The coach's own word, in the slot a quantity would occupy. Same rule the flat row builder
     // already applies (see isMaxEffort in buildCelebrationMovementRow) — a section row that
     // dropped it printed a bare "Burpees Over the Bar", a line with no number and no reason for

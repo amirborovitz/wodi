@@ -1,0 +1,312 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Pairs AMRAP 14",
+      "blueprint": "5 rounds",
+      "structureNote": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
+      "rows": [
+        {
+          "primary": "6",
+          "name": "Twin Kettlebell Hang Power Cleans",
+          "nameWithLoad": "Twin Kettlebell Hang Power Cleans @ 20kg each",
+          "loadNote": "20kg each",
+          "subNote": "18 total",
+          "totalNote": "18 total",
+          "mineKey": "Twin Kettlebell Hang Power Clean",
+          "accent": "yellow",
+          "repeatCount": 3,
+          "partnerSplit": "rounds"
+        },
+        {
+          "primary": "6",
+          "name": "Twin Kettlebell Front Squats",
+          "nameWithLoad": "Twin Kettlebell Front Squats @ 20kg each",
+          "loadNote": "20kg each",
+          "subNote": "18 total",
+          "totalNote": "18 total",
+          "mineKey": "Twin Kettlebell Front Squat",
+          "accent": "yellow",
+          "repeatCount": 3,
+          "partnerSplit": "rounds"
+        },
+        {
+          "primary": "6",
+          "name": "Twin Kettlebell Push Presses",
+          "nameWithLoad": "Twin Kettlebell Push Presses @ 20kg each",
+          "loadNote": "20kg each",
+          "subNote": "18 total",
+          "totalNote": "18 total",
+          "mineKey": "Twin Kettlebell Push Press",
+          "accent": "yellow",
+          "repeatCount": 3,
+          "partnerSplit": "rounds"
+        },
+        {
+          "primary": "Max",
+          "name": "Sit-up",
+          "mineKey": "Sit-up",
+          "accent": "magenta",
+          "repeatCount": 3,
+          "partnerSplit": "rounds"
+        },
+        {
+          "primary": "3×",
+          "name": "Run",
+          "nameWithLoad": "200m Run",
+          "subNote": "600 m total",
+          "totalNote": "600 m total",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 3,
+          "partnerSplit": "rounds",
+          "roundLabel": "SWAP"
+        }
+      ],
+      "hiddenCount": 0,
+      "roundLedger": {
+        "totalRounds": 5,
+        "personalRounds": 3,
+        "rounds": [
+          "me",
+          "partner",
+          "me",
+          "pending",
+          "pending"
+        ]
+      },
+      "isPartnerConfirmed": true
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Pairs AMRAP 14",
+        "blueprint": "5 rounds",
+        "structureNote": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Twin Kettlebell Hang Power Cleans",
+            "nameWithLoad": "Twin Kettlebell Hang Power Cleans @ 20kg each",
+            "loadNote": "20kg each",
+            "subNote": "18 total",
+            "totalNote": "18 total",
+            "mineKey": "Twin Kettlebell Hang Power Clean",
+            "accent": "yellow",
+            "repeatCount": 3,
+            "partnerSplit": "rounds"
+          },
+          {
+            "primary": "6",
+            "name": "Twin Kettlebell Front Squats",
+            "nameWithLoad": "Twin Kettlebell Front Squats @ 20kg each",
+            "loadNote": "20kg each",
+            "subNote": "18 total",
+            "totalNote": "18 total",
+            "mineKey": "Twin Kettlebell Front Squat",
+            "accent": "yellow",
+            "repeatCount": 3,
+            "partnerSplit": "rounds"
+          },
+          {
+            "primary": "6",
+            "name": "Twin Kettlebell Push Presses",
+            "nameWithLoad": "Twin Kettlebell Push Presses @ 20kg each",
+            "loadNote": "20kg each",
+            "subNote": "18 total",
+            "totalNote": "18 total",
+            "mineKey": "Twin Kettlebell Push Press",
+            "accent": "yellow",
+            "repeatCount": 3,
+            "partnerSplit": "rounds"
+          },
+          {
+            "primary": "Max",
+            "name": "Sit-up",
+            "mineKey": "Sit-up",
+            "accent": "magenta",
+            "repeatCount": 3,
+            "partnerSplit": "rounds"
+          },
+          {
+            "primary": "3×",
+            "name": "Run",
+            "nameWithLoad": "200m Run",
+            "subNote": "600 m total",
+            "totalNote": "600 m total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 3,
+            "partnerSplit": "rounds",
+            "roundLabel": "SWAP"
+          }
+        ],
+        "hiddenCount": 0,
+        "roundLedger": {
+          "totalRounds": 5,
+          "personalRounds": 3,
+          "rounds": [
+            "me",
+            "partner",
+            "me",
+            "pending",
+            "pending"
+          ]
+        },
+        "isPartnerConfirmed": true
+      }
+    ]
+  ],
+  "hero": {
+    "value": "54",
+    "unit": "REPS",
+    "storyLine": "600m run · 18 twin kettlebell hang power clean · 18 twin kettlebell front squat · 18 twin kettlebell push press",
+    "storyMovements": [
+      {
+        "perRound": "1.2km",
+        "name": "Run",
+        "total": "",
+        "color": "magenta",
+        "partnerNote": "your part 600m",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "36",
+        "name": "Twin Kettlebell Hang Power Clean",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "partnerNote": "your part 18",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "36",
+        "name": "Twin Kettlebell Front Squat",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "partnerNote": "your part 18",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "36",
+        "name": "Twin Kettlebell Push Press",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "partnerNote": "your part 18",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "OUR REPS",
+  "resultValue": "54",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "5 rounds"
+      },
+      {
+        "kind": "line",
+        "rx": "6 Twin Kettlebell Hang Power Cleans @ 20kg each",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "6 Twin Kettlebell Front Squats @ 20kg each",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "6 Twin Kettlebell Push Presses @ 20kg each",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "Max Sit-up",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "3× Run",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "SWAP"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Twin Kettlebell Hang Power Cleans @ 20kg each",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "6 Twin Kettlebell Front Squats @ 20kg each",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "6 Twin Kettlebell Push Presses @ 20kg each",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "Max Sit-up",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "3× Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "SWAP"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}
