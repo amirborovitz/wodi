@@ -117,6 +117,19 @@ export interface StoryExerciseResult {
   // The value itself lands in the matching field above (timeSeconds / rounds / repsTotal / weight).
   freeScoreType?: 'time' | 'rounds' | 'reps' | 'load';
 
+  /**
+   * The kind this part WOULD have been logged as, kept aside while the athlete logs it flat.
+   *
+   * Its presence is what "flattened" means — there is no second boolean to disagree with it.
+   * Flattening does not delete the AI's reading, it declines to use it, which is the whole reason
+   * the trip back is one tap and needs no re-parse: `kind` goes back to what is parked here.
+   *
+   * Why park it rather than derive it again: `createBlankResult` reads a dozen fields to decide a
+   * kind, and re-deciding on the way back would let the answer drift from the one the athlete
+   * actually turned down.
+   */
+  structuredKind?: ExerciseKind;
+
   // Per-block scores, indexed by section index — set only on a piece whose blocks are scored
   // separately (exercise.sections[i].scoreType present). The wizard gives each such block its
   // own page and writes its score here; save copies each entry into sections[i].result.
@@ -617,6 +630,40 @@ export function getRowState(result: StoryExerciseResult): RowState {
 }
 
 // ─── Check if result has no user-entered data ────────────────────
+
+/**
+ * Log this part as a flat list — movements, weights and counts — with no structural claims.
+ *
+ * WHAT THIS IS FOR
+ * The structured reading is a chain of inferences: this is an AMRAP, so it is scored in rounds, so
+ * every movement repeats per round, so the totals are reps × rounds. When the chain is right it
+ * gives the athlete a poster full of numbers nobody had to type. When a link is wrong every figure
+ * downstream is wrong with it, and confidently so.
+ *
+ * Flat is the floor under that. It claims nothing about rounds, scoring or repetition; it records
+ * what was lifted, how far, how many. It cannot be wrong about structure because it does not
+ * describe any — which makes it the honest answer whenever the structured reading isn't trusted.
+ *
+ * Nothing is destroyed. `kind` becomes 'free_score' — a shape every input, save and poster path
+ * already handles, so this adds no branches downstream — and the real kind waits in
+ * `structuredKind` for {@link unflattenResult}.
+ */
+export function flattenResult(result: StoryExerciseResult): StoryExerciseResult {
+  if (result.structuredKind) return result;
+  return { ...result, kind: 'free_score', structuredKind: result.kind };
+}
+
+/** Undo {@link flattenResult}. The parked kind comes back exactly as it was — never re-derived. */
+export function unflattenResult(result: StoryExerciseResult): StoryExerciseResult {
+  if (!result.structuredKind) return result;
+  const { structuredKind, ...rest } = result;
+  return { ...rest, kind: structuredKind };
+}
+
+/** True while this part is being logged flat. One source of truth: the parked kind. */
+export function isFlattened(result: StoryExerciseResult): boolean {
+  return result.structuredKind != null;
+}
 
 export function isResultEmpty(result: StoryExerciseResult): boolean {
   return getRowState(result) === 'empty';

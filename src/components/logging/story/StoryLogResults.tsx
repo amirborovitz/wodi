@@ -8,7 +8,8 @@ import { InputRouter } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
-import { getPrescribedSetCount, getMaxRepsMovement, hasOpenStationEntry } from './types';
+import { getPrescribedSetCount, getMaxRepsMovement, hasOpenStationEntry, flattenResult, unflattenResult, isFlattened } from './types';
+import { uncertaintyForExercise } from '../../../services/parseUncertainty';
 import type { ScoredBlock } from './blockScoping';
 import { applyBlockScoresToSections, getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from './blockScoping';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -251,6 +252,19 @@ function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
  */
 function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const legacy = buildLegacyResult(r);
+
+  // A part logged flat is SAVED flat. `loggingMode: 'free'` is the shape every downstream reader
+  // already treats as "structure not to be trusted" — the poster renders the board rather than a
+  // format line and a hero score it would have to derive. Without this the athlete would decline
+  // the reading on screen and get a recap built from it anyway.
+  //
+  // Block scores are dropped for the same reason: they are per-block claims, and a flat log makes
+  // none. A stale set left over from before the athlete flattened must not sneak the structure
+  // back in through the save.
+  if (isFlattened(r)) {
+    return { ...legacy, exercise: { ...legacy.exercise, loggingMode: 'free' } };
+  }
+
   const scores = r.blockScores;
   if (!scores?.length) return legacy;
 
@@ -601,6 +615,25 @@ export function StoryLogResults({
     }));
   }, [currentGlobalIdx, currentScoredBlock]);
 
+  /**
+   * Swap this part between Wodi's reading and a flat log.
+   *
+   * The entered values are deliberately kept across the swap. A weight is a weight whichever way
+   * the board was read, and throwing the athlete's own typing away to punish them for changing
+   * their mind is the opposite of an easy exit. Only the structure's CLAIMS are set aside.
+   */
+  const setFlattened = useCallback((flat: boolean) => {
+    setResults(prev => prev.map((r, i) =>
+      i === currentGlobalIdx ? (flat ? flattenResult(r) : unflattenResult(r)) : r));
+  }, [currentGlobalIdx]);
+
+  // What the AI told us it could not read on THIS part — it doesn't change the choice below,
+  // only how loudly the flat option is offered.
+  const currentUncertainty = useMemo(
+    () => uncertaintyForExercise(parsedWorkout.uncertain, currentGlobalIdx),
+    [parsedWorkout.uncertain, currentGlobalIdx],
+  );
+
   // ── Save pipeline ──
   const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
     onSave(source.map(r => ({ ...toLegacyResult(r), metconName: r.metconName })));
@@ -751,6 +784,15 @@ export function StoryLogResults({
             isLastBlock={isLastBlock}
             isEditing={isEditing}
             hideFooter={isSubstitutionOpen}
+            // Nothing to offer on a part the PARSER already gave up on: it arrives as
+            // 'free_score' with no structured reading parked behind it, so it is already the flat
+            // log, and "log it flat instead" would point at where the athlete is standing.
+            flatten={isFlattened(currentResult) || currentResult.kind !== 'free_score' ? {
+              isFlat: isFlattened(currentResult),
+              uncertain: currentUncertainty.length > 0,
+              onFlatten: () => setFlattened(true),
+              onRestore: () => setFlattened(false),
+            } : undefined}
             onDone={handleExerciseDone}
             onBack={handleExerciseBack}
             onClose={onBack}

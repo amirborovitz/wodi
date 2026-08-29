@@ -326,3 +326,58 @@
   font-weight: 900;
   cursor: pointer;
 }
+
+/* ── The way out of Wodi's reading ──
+   Sits at the end of the inputs, inside the scroll, so it reads as the last thing about THIS
+   part rather than a third action competing with the two in the footer. Quiet by default: the
+   parse is usually right, and an exit that shouts invites doubt the board didn't earn. */
+.flatNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--wodi-line);
+}
+
+/* Same control, said out loud — the AI told us it couldn't read this board, so the exit stops
+   being something you have to go looking for. */
+.flatNoticeFlagged {
+  composes: flatNotice;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: 12px;
+  background: var(--wodi-card2);
+}
+
+.flatNoticeText {
+  margin: 0;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.flatLink {
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.flatNoticeFlagged .flatLink {
+  color: var(--wodi-yellow);
+}
+
+.flatLink:active {
+  color: var(--wodi-white);
+}

@@ -21,7 +21,13 @@ import styles from './ScoreMovementInputs.module.css';
 
 interface ScoreMovementInputsProps {
   movements: MovementResult[];
-  inputMovements: MovementResult[];
+  /**
+   * Flat mode: the athlete turned down the structured reading, so nothing above these tiles is
+   * multiplying anything. Every movement therefore has to be able to state its OWN total — a
+   * prescribed "10 Pull-ups" rightly takes no input while a rounds counter does the multiplying,
+   * and must take one the moment that counter is gone, or the reps leave with the structure.
+   */
+  flat?: boolean;
   onChange: (index: number, patch: Partial<MovementResult>) => void;
   /** Called when multiple movements need to update atomically (e.g. weight propagation). */
   onBatch?: (next: MovementResult[]) => void;
@@ -107,8 +113,8 @@ function movementAlternateKey(mr: MovementResult): string {
     .trim();
 }
 
-function movementHasInput(mr: MovementResult, distancePrescribedByStructure: boolean): boolean {
-  return getTileConfig(mr, distancePrescribedByStructure) != null;
+function movementHasInput(mr: MovementResult, distancePrescribedByStructure: boolean, flat: boolean): boolean {
+  return getTileConfig(mr, distancePrescribedByStructure, flat) != null;
 }
 
 /**
@@ -326,12 +332,17 @@ interface TileConfig {
 const LOAD_TILE_COLOR = '#f5c200';
 const METRIC_TILE_COLOR = '#f5c200';
 
-function getTileConfig(mr: MovementResult, distancePrescribedByStructure = false): TileConfig | null {
+function getTileConfig(mr: MovementResult, distancePrescribedByStructure = false, flat = false): TileConfig | null {
+  // In flat mode the athlete states every count themselves, so the two suppressions below both
+  // lift: a prescribed rep count is only "already answered" while a rounds counter is multiplying
+  // it, and the same goes for a prescribed distance.
   const isMaxBodyweight =
     mr.kind === 'reps' &&
-    mr.movement.reps == null &&
-    mr.movement.distance == null &&
-    mr.movement.calories == null;
+    (flat || (
+      mr.movement.reps == null &&
+      mr.movement.distance == null &&
+      mr.movement.calories == null
+    ));
 
   if (mr.kind === 'load') {
     const loadUnit = movementLoadUnit(mr.movement);
@@ -352,7 +363,7 @@ function getTileConfig(mr: MovementResult, distancePrescribedByStructure = false
     const isCal = isCalorieBased(mr);
     // Solo rounds-scored workout: the ROUNDS counter already counts every trip of a
     // prescribed-distance movement, so it takes no input of its own.
-    if (distancePrescribedByStructure && getPrescribedTripDistance(mr) > 0) return null;
+    if (!flat && distancePrescribedByStructure && getPrescribedTripDistance(mr) > 0) return null;
     const unit = isCal ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
     return {
       field: isCal ? 'calories' : 'distance',
@@ -416,7 +427,11 @@ function formatStationChip(label: string): string {
   return label.toUpperCase();
 }
 
-function isUncountedLoad(mr: MovementResult): boolean {
+function isUncountedLoad(mr: MovementResult, flat = false): boolean {
+  // Flat mode: a loaded movement always gets the count tile beside its weight. Nothing is
+  // multiplying a prescribed rep count any more, so without it the load would be recorded and
+  // the work it moved would not.
+  if (flat) return mr.kind === 'load';
   return mr.kind === 'load'
     && mr.movement.reps == null
     && mr.movement.distance == null
@@ -479,7 +494,7 @@ function groupBySections(mrs: MovementResult[]): SectionGroup[] | null {
  */
 export function ScoreMovementInputs({
   movements,
-  inputMovements: _inputMovements,
+  flat = false,
   onChange,
   onBatch,
   onSubstitutionOpenChange,
@@ -730,7 +745,7 @@ export function ScoreMovementInputs({
 
   const editableTiles = useMemo(() => (
     movements.flatMap((mr, globalIndex) => {
-      const config = getTileConfig(mr, distancePrescribedByStructure);
+      const config = getTileConfig(mr, distancePrescribedByStructure, flat);
       if (!config) return [];
       const sub = getSubState(mr);
       const labelSource = sub.isSubstituted ? sub.displayName : mr.movement.name;
@@ -744,7 +759,7 @@ export function ScoreMovementInputs({
       }];
       // The optional count that sits beside an uncounted load — its own tile, so the numpad can
       // reach it without stealing the weight tile's slot.
-      if (isUncountedLoad(mr)) {
+      if (isUncountedLoad(mr, flat)) {
         tiles.push({
           tileId: uncountedRepsTileId(mr.movementKey),
           globalIndex,
@@ -755,7 +770,7 @@ export function ScoreMovementInputs({
       }
       return tiles;
     })
-  ), [movements, distancePrescribedByStructure]);
+  ), [movements, distancePrescribedByStructure, flat]);
 
   const tileRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
@@ -918,7 +933,7 @@ export function ScoreMovementInputs({
     const partnerNote = teamSize != null ? partnerAnnotation(mr, teamSize) : null;
     const schemeLabel = prescribedSchemeLabel(mr);
     const isSharedWeight = sharedWeightKeys.has(mr.movementKey);
-    const tileField = getTileConfig(mr, distancePrescribedByStructure)?.field;
+    const tileField = getTileConfig(mr, distancePrescribedByStructure, flat)?.field;
 
     return (
       <React.Fragment key={mr.movementKey}>
@@ -992,7 +1007,7 @@ export function ScoreMovementInputs({
               max-effort Renegade Row went a whole workout without ever being counted). */}
           {(() => {
             const showWeight = mr.kind === 'load' && !isSharedWeight;
-            const showUncountedReps = isUncountedLoad(mr);
+            const showUncountedReps = isUncountedLoad(mr, flat);
             const weightField = showWeight && (
               <WeightField
                 mr={mr}
@@ -1244,7 +1259,7 @@ export function ScoreMovementInputs({
   // 40-30-20) that tells the athlete what the tier structure actually is. Dropping the no-input
   // rows told the story of a workout with one run in it.
   const visibleMovements = movements.filter(mr =>
-    movementHasInput(mr, distancePrescribedByStructure)
+    movementHasInput(mr, distancePrescribedByStructure, flat)
     || canOpenAlternate(mr)
     || prescribedSchemeLabel(mr) != null);
   const visibleSectionGroups = groupBySections(visibleMovements);

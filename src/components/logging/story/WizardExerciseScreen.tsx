@@ -23,6 +23,22 @@ interface WizardExerciseScreenProps {
    */
   isEditing?: boolean;
   hideFooter?: boolean;
+  /**
+   * The way out of Wodi's reading of this board.
+   *
+   * Always offered, never asked. Asking up front ("should I guess?") makes the athlete decide
+   * before they have seen anything to judge, and taxes the boards the parse gets right — which is
+   * most of them. So the structured reading is always shown, and this is the exit beside it.
+   *
+   * `uncertain` doesn't change the choice, only how loudly it is offered: when the AI told us it
+   * could not read the board, the exit stops being a quiet link and says so.
+   */
+  flatten?: {
+    isFlat: boolean;
+    uncertain: boolean;
+    onFlatten: () => void;
+    onRestore: () => void;
+  };
   onDone: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -42,6 +58,7 @@ export function WizardExerciseScreen({
   isLastBlock,
   isEditing = false,
   hideFooter = false,
+  flatten,
   onDone,
   onBack,
   onClose,
@@ -112,6 +129,31 @@ export function WizardExerciseScreen({
 
         <div className={styles.body}>
           {children}
+          {flatten && !hideFooter && (
+            <div className={flatten.uncertain && !flatten.isFlat ? styles.flatNoticeFlagged : styles.flatNotice}>
+              {flatten.isFlat ? (
+                <>
+                  <p className={styles.flatNoticeText}>
+                    Logging this one flat — movements, weights and counts, nothing assumed.
+                  </p>
+                  <button type="button" className={styles.flatLink} onClick={flatten.onRestore}>
+                    Use Wodi&rsquo;s version
+                  </button>
+                </>
+              ) : (
+                <>
+                  {flatten.uncertain && (
+                    <p className={styles.flatNoticeText}>
+                      Wodi couldn&rsquo;t read part of this board, so some of this is its best reading.
+                    </p>
+                  )}
+                  <button type="button" className={styles.flatLink} onClick={flatten.onFlatten}>
+                    {flatten.uncertain ? 'Log it flat instead' : 'Not how it went? Log it flat'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {!hideFooter && (

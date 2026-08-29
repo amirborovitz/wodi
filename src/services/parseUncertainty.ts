@@ -140,6 +140,21 @@ export function refuseGuessesOnUncertainFields(
 }
 
 /**
+ * The flags that belong to one exercise, for a screen that only shows that exercise.
+ *
+ * Session-level flags (`timeCap`, `sourceDate`) belong to no exercise and are deliberately not
+ * returned: a part's own screen should not carry a warning about the board's date.
+ */
+export function uncertaintyForExercise(
+  flags: ParseUncertainty[] | undefined,
+  exerciseIndex: number,
+): ParseUncertainty[] {
+  if (!flags) return [];
+  const prefix = `exercises[${exerciseIndex}]`;
+  return flags.filter((flag) => flag.field.startsWith(`${prefix}.`) || flag.field === prefix);
+}
+
+/**
  * Re-base a part's paths onto the merged session, where its exercises start at `exerciseOffset`.
  *
  * Without this an entry from the session's second part would point at the first part's exercise

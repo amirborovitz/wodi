@@ -23,7 +23,7 @@ interface InputRouterProps {
 
 /**
  * Routes an ExerciseKind to its corresponding input component.
- * Used inside EditExerciseSheet to render the right editor.
+ * Rendered by StoryLogResults inside WizardExerciseScreen, one part per page.
  *
  * Trust the AI: movementResults carry inputType from the parser.
  * If a movement says inputType: "weight", we show a weight input —
@@ -172,7 +172,6 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {showMovements && (
           <ScoreMovementInputs
             movements={displayMovements}
-            inputMovements={inputMovements}
             isRelayContext={hasRelay && kind === 'score_rounds'}
             // Prescribed distances are display-only on any scored-by-structure block: the board
             // states every metre, so there is nothing to type. Open-reps blocks are the same —
@@ -204,18 +203,23 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     );
   }
 
-  // Free/unclassified part: one generic score entry (athlete picks time/rounds/reps/load)
-  // plus the usual weight/distance fills for any movements the parser did extract.
+  // Free/unclassified part: one generic score entry (athlete picks time/rounds/reps/load) plus a
+  // row per movement. Reached two ways — the parser couldn't classify the board, or the athlete
+  // turned down the reading it did produce (flattenResult) — and the input is identical either
+  // way, because the question is: nothing here is being multiplied, so what did you actually do?
+  //
+  // Every movement gets a row, not just the loaded and distance ones. `flat` is what makes a
+  // prescribed "10 Pull-ups" take an input: with no rounds counter above it there is nothing left
+  // to multiply that 10 by, so the athlete states the total or the reps are simply lost.
   // Must run BEFORE the superset branch — a multi-movement free part is not a superset.
   if (kind === 'free_score') {
-    const freeInputMovements = movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance');
     return (
       <>
         <FreeScoreInput result={result} onChange={onChange} />
-        {freeInputMovements.length > 0 && (
+        {movements.length > 0 && (
           <ScoreMovementInputs
             movements={movements}
-            inputMovements={freeInputMovements}
+            flat
             teamSize={teamSize}
             onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {
@@ -267,7 +271,6 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       return (
         <ScoreMovementInputs
           movements={movements}
-          inputMovements={movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance')}
           teamSize={teamSize}
           onSubstitutionOpenChange={onSubstitutionOpenChange}
           onChange={(index: number, patch: Partial<MovementResult>) => {
