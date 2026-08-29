@@ -10,6 +10,7 @@ import { matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 import { prescribesOwnRest } from './partnerScope';
 import { isWeightedCarry } from '../utils/xpCalculations';
+import { auditPostProcess } from './parseAudit';
 
 /**
  * Weight notation patterns: "32/24kg", "32/24 kg", "70/47.5kg", "@60kg", "95/65 lb", "135#"
@@ -310,6 +311,10 @@ function reportPasses(log: PassLog): void {
  */
 export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout {
   const passes: PassLog = { changed: [], total: 0 };
+  // The AI's answer as it arrived, kept whole so the boundary can be diffed on the way out.
+  // Cloned because passes are free to mutate in place, and a shared reference would make the
+  // "before" quietly become the "after". See parseAudit.ts for what this is for.
+  const asReturnedByAi = structuredClone(workout);
 
   // Detect partner workout if AI missed it
   const partnerResult = detectAndAdjustPartnerWorkout(workout);
@@ -438,6 +443,9 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   const withMovementSemantics = runPass(passes, 'backfillMovementSemantics', withInterleaved, backfillMovementSemantics);
 
   reportPasses(passes);
+  // Which passes ran is not the same question as what they did to the AI's answer. This answers
+  // the second one, field by field, and is the only record that a heuristic overruled the model.
+  auditPostProcess(asReturnedByAi, withMovementSemantics);
   return withMovementSemantics;
 }
 
