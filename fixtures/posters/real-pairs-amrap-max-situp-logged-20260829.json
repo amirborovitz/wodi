@@ -1,6 +1,6 @@
 {
-  "name": "real-pairs-amrap-max-situp-20260829",
-  "description": "In-pairs 14-min AMRAP: P1 runs 200m while P2 works 6/6/6 twin-KB then MAX SIT-UPS until the swap. The AI reads it right (isMaxReps + maxMetric on Sit-up), but the sit-up carries no logged count, and on a non-station board the poster's prescription rows are built from the BREAKDOWN, so the movement the board wrote vanishes. The line must read 'Max Sit-up' whether or not a number was entered — layer 1 of the poster is what the coach wrote.",
+  "name": "real-pairs-amrap-max-situp-logged-20260829",
+  "description": "Same board as real-pairs-amrap-max-situp-20260829, but the athlete DID log the max sit-ups (20 across the piece). The board prescribed no count, so the row must read 'Max Sit-up' with 20 as the athlete's own total — never '20 Sit-ups', which prints the athlete's number as if the coach had written it.",
   "workout": {
     "title": "WOD (שבת / חג)",
     "format": "amrap",
@@ -91,6 +91,9 @@
           "Twin Kettlebell Front Squat": 20,
           "Twin Kettlebell Push Press": 20
         },
+        "movementReps": {
+          "Sit-up": 20
+        },
         "partnerWorkout": false
       }
     ],
@@ -122,9 +125,14 @@
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
+        },
+        {
+          "name": "Sit-up",
+          "totalReps": 20,
+          "color": "magenta"
         }
       ],
-      "grandTotalReps": 54,
+      "grandTotalReps": 74,
       "grandTotalVolume": 1080,
       "grandTotalDistance": 600
     },

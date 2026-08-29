@@ -42,6 +42,8 @@
         {
           "primary": "Max",
           "name": "Sit-up",
+          "subNote": "20 total",
+          "totalNote": "20 total",
           "mineKey": "Sit-up",
           "accent": "magenta",
           "repeatCount": 5
@@ -106,6 +108,8 @@
           {
             "primary": "Max",
             "name": "Sit-up",
+            "subNote": "20 total",
+            "totalNote": "20 total",
             "mineKey": "Sit-up",
             "accent": "magenta",
             "repeatCount": 5
@@ -130,7 +134,7 @@
   "hero": {
     "value": "5",
     "unit": "ROUNDS",
-    "storyLine": "600m run · 30 twin kettlebell hang power clean · 30 twin kettlebell front squat · 30 twin kettlebell push press",
+    "storyLine": "600m run · 30 twin kettlebell hang power clean · 30 twin kettlebell front squat · 30 twin kettlebell push press · 20 sit-up",
     "storyMovements": [
       {
         "perRound": "600m",
@@ -163,6 +167,14 @@
         "total": "30 total",
         "color": "yellow",
         "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "4",
+        "name": "Sit-up",
+        "total": "20 total",
+        "color": "magenta",
         "unit": "kg",
         "wasSubstituted": false
       }
@@ -207,7 +219,8 @@
         "rx": "Max Sit-up",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "20 total"
       },
       {
         "kind": "line",
@@ -255,7 +268,8 @@
           "rx": "Max Sit-up",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "20 total"
         },
         {
           "kind": "line",

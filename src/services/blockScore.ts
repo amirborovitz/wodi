@@ -80,6 +80,37 @@ export function findOpenMovements(
 }
 
 /**
+ * True when the athlete earns the ROUND COUNT itself — so an open movement inside the block is
+ * texture, not the score.
+ *
+ * THE GAP THIS CLOSES
+ * The rule above says the score is whatever the board leaves open, and every board it was written
+ * for shares a property that went unstated: the round count was PRESCRIBED. "2 rounds of X, into
+ * max burpees" fixes the rounds, so the burpees are the only number anyone earns.
+ *
+ * A plain AMRAP breaks that. "14 minutes: 6/6/6, then max sit-ups" leaves the sit-ups open AND
+ * earns its rounds — how many times you got through the sequence is the whole point of the clock.
+ * Reading the open movement as the score there demotes the real result and heroes the texture:
+ * a 14-minute AMRAP came out reading "20 SIT-UP".
+ *
+ * So: an open movement is the score UNLESS the container is already earning one.
+ *
+ * TWO CONDITIONS, both necessary.
+ * - ONE OPEN CLOCK. "[2:00 AMRAP] x 4" is a fixed set of windows; nothing about that container is
+ *   earned. A single "14 min AMRAP" is open-ended, and its round count is the athlete's output.
+ * - PRESCRIBED WORK TO MAKE A ROUND OF. "10 min AMRAP: max burpees" leaves everything open — its
+ *   "rounds" would just be the burpees counted a second time, so the max stays the score.
+ */
+export function earnsRoundCount(
+  exercise: (ParsedExercise | Exercise) & { intervalCount?: number },
+): boolean {
+  const isSingleOpenClock = exercise.loggingMode === 'amrap' && exercise.intervalCount == null;
+  if (!isSingleOpenClock) return false;
+  const open = new Set(findOpenMovements(exercise));
+  return (exercise.movements ?? []).some((movement) => !open.has(movement));
+}
+
+/**
  * True when the athlete's own effort IS this movement's quantity — the board stamped it "max" and
  * wrote no count of its own.
  *

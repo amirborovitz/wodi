@@ -47,7 +47,7 @@ import {
 } from '../../services/partnerScope';
 // Block score — the ONE owner of "what does this piece count?", read from the block rather than
 // from its format name. A clock is not a score.
-import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort } from '../../services/blockScore';
+import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from '../../services/blockScore';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -4065,8 +4065,14 @@ export function computeHeroResult(
     // set when there is more than one.
     const stationMovements = amrapExercise.movements ?? [];
     const maxEffortMovements = stationMovements.filter((m) => m.isMaxReps || /\bmax\b/i.test(m.name));
-    const scoresOpenCount = resolveBlockScore(amrapExercise).type === 'open_reps'
-      || maxEffortMovements.length > 0;
+    // ...unless the container is earning a number of its own. A plain AMRAP's round count IS the
+    // athlete's output, and a max movement inside each round is texture on top of it — leading
+    // with the texture is how "14 minutes of 6/6/6 + max sit-ups" came out reading "20 SIT-UP".
+    // See earnsRoundCount: prescribed rounds mean the open count is the only earned number, an
+    // open clock with prescribed work in it means the rounds are.
+    const scoresOpenCount = (resolveBlockScore(amrapExercise).type === 'open_reps'
+      || maxEffortMovements.length > 0)
+      && !earnsRoundCount(amrapExercise);
     if (scoresOpenCount) {
       const maxTotalReps = maxEffortMovements
         .reduce((sum, m) => sum + (findMovementTotal(movements, m.name)?.totalReps || 0), 0);

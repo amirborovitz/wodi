@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Exercise, MovementTotal, ParsedExercise, ParsedSection } from '../types';
-import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort } from './blockScore';
+import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from './blockScore';
 import { computeHeroResult } from '../components/celebration/helpers';
 import { createBlankResult, getRowState, getMissingLabel } from '../components/logging/story/types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -402,5 +402,51 @@ describe('statesMaxEffort', () => {
   it('does not fire on a name that merely mentions max', () => {
     // The stamp is the parser's judgement; a name is not. "Max Effort Day" is a title.
     expect(statesMaxEffort({ name: 'Max Effort Deadlift', reps: 3 })).toBe(false);
+  });
+});
+
+/**
+ * "The score is whatever the board leaves open" was written against boards that all shared one
+ * unstated property: their round count was PRESCRIBED. A plain AMRAP breaks that — it leaves a
+ * movement open AND earns its rounds — and reading the open movement as the score there heroed
+ * the texture: a 14-minute AMRAP of 6/6/6 + max sit-ups came out reading "20 SIT-UP".
+ */
+describe('earnsRoundCount', () => {
+  const amrap = (over: Partial<ParsedExercise> = {}): ParsedExercise => ({
+    name: 'Pairs AMRAP 14',
+    type: 'wod',
+    prescription: '14 minutes AMRAP',
+    suggestedSets: 1,
+    loggingMode: 'amrap',
+    movements: [
+      { name: 'Twin Kettlebell Front Squat', reps: 6 },
+      { name: 'Sit-up', isMaxReps: true },
+    ],
+    ...over,
+  });
+
+  it('is true for one open clock with prescribed work in it', () => {
+    // The rounds are the athlete's output; the sit-ups are what fills each round.
+    expect(earnsRoundCount(amrap())).toBe(true);
+  });
+
+  it('is false when the windows are fixed', () => {
+    // "[2:00 AMRAP] x 4" — the container is a fixed set of windows, so nothing about it is
+    // earned and the open movement is the only number anyone brings.
+    expect(earnsRoundCount(amrap({ loggingMode: 'amrap_intervals', intervalCount: 4 }))).toBe(false);
+    expect(earnsRoundCount(amrap({ intervalCount: 4 }))).toBe(false);
+  });
+
+  it('is false when EVERY movement is open', () => {
+    // "10 min AMRAP: max burpees" — counting its rounds would just be counting the burpees
+    // again, so the max stays the score.
+    expect(earnsRoundCount(amrap({
+      movements: [{ name: 'Burpee', isMaxReps: true }],
+    }))).toBe(false);
+  });
+
+  it('is false for anything that is not an open AMRAP clock', () => {
+    expect(earnsRoundCount(amrap({ loggingMode: 'for_time' }))).toBe(false);
+    expect(earnsRoundCount(amrap({ loggingMode: 'emom' }))).toBe(false);
   });
 });
