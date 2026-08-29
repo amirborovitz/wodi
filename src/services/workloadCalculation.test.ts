@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateWorkloadBreakdown,
   calculateWorkloadFromExercises,
+  getStationVisitCountsForExercise,
   isTeamPrescribedExercise,
+  normalizeStationTotalIntervals,
 } from './workloadCalculation';
 import type { ParsedWorkout } from '../types';
 
@@ -403,5 +405,191 @@ describe('board-stated occurrences outrank the round count', () => {
     // 14+12+10+8+6+4 = 54 per movement.
     expect(wb.movements.find((m) => m.name === 'Front Squat')).toMatchObject({ totalReps: 54 });
     expect(wb.movements.find((m) => m.name === 'Burpee')).toMatchObject({ totalReps: 54 });
+  });
+});
+
+describe('a buy-in that repeats inside each interval', () => {
+  // "[02:00 AMRAP , 02:00 REST] x 4 rounds: 2 rounds / 8 Push Press / 8 Box Jumps / Into - Max
+  // Burpees Over the Bar". The fixed work runs TWICE inside each of the four windows, so each
+  // movement is done 8 × 2 × 4 = 64 times. `rounds` has always been on ParsedSection ("how many
+  // times this block is repeated"), but every consumer hardcoded 1 unless the section was type
+  // 'rounds' — so the ×2 vanished and 64 was stored as 32.
+  const fixedWorkIntoMax = (buyInRounds?: number): ParsedWorkout => ({
+    title: 'WOD',
+    format: 'amrap_intervals',
+    sets: 4,
+    exercises: [{
+      name: '2:00 AMRAP x 4',
+      type: 'wod',
+      loggingMode: 'amrap_intervals',
+      prescription: '[02:00 AMRAP / 02:00 REST] x 4: 2 rounds of 8 Push Press + 8 Box Jumps, then Max Burpees',
+      suggestedSets: 4,
+      intervalCount: 4,
+      sections: [
+        {
+          sectionType: 'buy_in',
+          rounds: buyInRounds,
+          movements: [
+            { name: 'Push Press', reps: 8, inputType: 'weight', rxWeights: { male: 50, female: 35, unit: 'kg' }, countingMode: 'per_interval' },
+            { name: 'Box Jump', reps: 8, inputType: 'none', countingMode: 'per_interval' },
+          ],
+        },
+        {
+          sectionType: 'rounds',
+          rounds: 1,
+          movements: [{ name: 'Burpees Over the Bar', inputType: 'none', isMaxReps: true }],
+        },
+      ],
+    }],
+  } as unknown as ParsedWorkout);
+
+  it('multiplies the buy-in by its own round count on top of the interval count', () => {
+    const wb = calculateWorkloadBreakdown(fixedWorkIntoMax(2));
+    expect(wb.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(64);
+    expect(wb.movements.find((m) => m.name === 'Box Jump')?.totalReps).toBe(64);
+  });
+
+  it('still treats an unstated buy-in count as one pass', () => {
+    // The default the type documents. A buy-in is normally done once per interval, and boards
+    // that say nothing must keep reading exactly as they did.
+    const wb = calculateWorkloadBreakdown(fixedWorkIntoMax(undefined));
+    expect(wb.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(32);
+  });
+});
+
+// The real board of 2026-08-28: "EMOM (50:10) for 25 minutes (5 rounds)" over five max-effort
+// stations. The AI wrote intervalCount 5 — the ROUND count, not the interval count — and
+// getStationTotalIntervals took it verbatim as the total. Five intervals across five stations is
+// one visit each, so every station's stored total was a single round's work while the poster
+// header (which normalized the same number to 25) said five rounds.
+const STATION_EMOM_5010: ParsedWorkout = {
+  title: 'WOD',
+  type: 'metcon',
+  format: 'emom',
+  scoreType: 'reps',
+  exercises: [
+    {
+      name: 'EMOM 25',
+      type: 'wod',
+      loggingMode: 'emom',
+      stationRotation: true,
+      // The board's own round count is what proves intervalCount 5 cannot be the interval total.
+      prescription: 'EMOM (50:10) for 25 minutes (5 rounds): Calories Echo Bike, Bar Muscle-up / Pull-up, Box Jump, Renegade Row, Burpee',
+      rawText: 'EMOM (50:10) for 25 minutes (5 rounds):\nCalories Echo Bike\nBar Muscle-up / Pull-up\nBox Jump\nRenegade Row\nBurpee',
+      intervalCount: 5,
+      workDuration: 1250,
+      restDuration: 250,
+      movements: [
+        { name: 'Echo Bike', inputType: 'calories', isMaxReps: true, maxMetric: 'calories', countingMode: 'per_station_visit', stationLabel: 'Station 1', stationIndex: 0 },
+        { name: 'Bar Muscle-up', reps: 4, inputType: 'none', isMaxReps: true, countingMode: 'per_station_visit', stationLabel: 'Station 2', stationIndex: 1 },
+        { name: 'Box Jump', reps: 5, inputType: 'none', isMaxReps: true, countingMode: 'per_station_visit', stationLabel: 'Station 3', stationIndex: 2 },
+        { name: 'Renegade Row', inputType: 'weight', isMaxReps: true, countingMode: 'per_station_visit', stationLabel: 'Station 4', stationIndex: 3 },
+        { name: 'Burpee', reps: 6, inputType: 'none', isMaxReps: true, countingMode: 'per_station_visit', stationLabel: 'Station 5', stationIndex: 4 },
+      ],
+    },
+  ],
+} as unknown as ParsedWorkout;
+
+describe('normalizeStationTotalIntervals', () => {
+  it('trusts the AI interval count verbatim', () => {
+    // intervalCount IS the interval total by contract. An earlier version multiplied through
+    // whenever the count was not divisible by the station count, which doubled every honest
+    // rotation board: a "x5 (alt)" over 2 stations really is 5 intervals, not 10.
+    expect(normalizeStationTotalIntervals(6, 2)).toBe(6);
+    expect(normalizeStationTotalIntervals(5, 2)).toBe(5);
+    expect(normalizeStationTotalIntervals(3, 2)).toBe(3);
+    expect(normalizeStationTotalIntervals(4, 3)).toBe(4);
+    expect(normalizeStationTotalIntervals(7, 2)).toBe(7);
+    expect(normalizeStationTotalIntervals(12, 3)).toBe(12);
+  });
+
+  it('corrects only the count that contradicts the board', () => {
+    // 5 intervals over 5 stations says each came up once — impossible beside "(5 rounds)".
+    expect(normalizeStationTotalIntervals(5, 5, 5)).toBe(25);
+    expect(normalizeStationTotalIntervals(3, 3, 4)).toBe(12);
+  });
+
+  it('leaves a genuine single pass alone', () => {
+    // Same shape, but the board never claims more than one round: 3 stations, 3 minutes, once.
+    expect(normalizeStationTotalIntervals(3, 3)).toBe(3);
+    expect(normalizeStationTotalIntervals(3, 3, 1)).toBe(3);
+  });
+
+  it('is a no-op on degenerate counts', () => {
+    expect(normalizeStationTotalIntervals(0, 5)).toBe(0);
+    expect(normalizeStationTotalIntervals(5, 0)).toBe(0);
+  });
+});
+
+describe('a station EMOM whose intervalCount is really its round count', () => {
+  it('gives every station its five visits instead of one', () => {
+    const visits = getStationVisitCountsForExercise(
+      STATION_EMOM_5010,
+      STATION_EMOM_5010.exercises[0],
+      0,
+    );
+    expect(visits).toEqual([5, 5, 5, 5, 5]);
+  });
+
+  it('counts each station over all five visits, not one', () => {
+    const wb = calculateWorkloadBreakdown(STATION_EMOM_5010);
+    const total = (name: string) => wb.movements.find((m) => m.name === name)?.totalReps;
+    // 4/5/6 per visit × 5 visits — the stored figures used to equal the per-visit value itself.
+    expect(total('Bar Muscle-up')).toBe(20);
+    expect(total('Box Jump')).toBe(25);
+    expect(total('Burpee')).toBe(30);
+  });
+});
+
+// Guards the blast radius of the fix above. Correcting the one self-contradicting interval count
+// must not touch any other rotation board: an interval total that simply doesn't divide evenly
+// across the stations is normal ("x5 (alt)" over 2 stations = 3 visits then 2), and multiplying
+// it through inflates every one of them.
+describe('rotation boards the station fix must not touch', () => {
+  const rotation = (stations: number, intervalCount: number, text: string): ParsedWorkout => ({
+    title: 'T',
+    type: 'metcon',
+    format: 'emom',
+    scoreType: 'reps',
+    exercises: [{
+      name: 'Block',
+      type: 'wod',
+      loggingMode: 'emom',
+      stationRotation: true,
+      intervalCount,
+      prescription: text,
+      rawText: text,
+      movements: Array.from({ length: stations }, (_, i) => ({
+        name: `M${i}`,
+        inputType: 'none',
+        isMaxReps: true,
+        countingMode: 'per_station_visit',
+        stationLabel: `Station ${i + 1}`,
+        stationIndex: i,
+      })),
+    }],
+  } as unknown as ParsedWorkout);
+
+  const visits = (stations: number, intervalCount: number, text: string) => {
+    const w = rotation(stations, intervalCount, text);
+    return getStationVisitCountsForExercise(w, w.exercises[0], 0);
+  };
+
+  it('splits an uneven interval total across the stations, unchanged', () => {
+    expect(visits(2, 5, '[02:00 AMRAP / 01:00 REST] x 5 (alt)')).toEqual([3, 2]);
+    expect(visits(2, 3, '[02:00 AMRAP / 01:00 REST] x 3 (alt)')).toEqual([2, 1]);
+    expect(visits(2, 7, '[01:00 on / 01:00 off] x 7 alternating')).toEqual([4, 3]);
+    expect(visits(3, 4, 'Every 1:00 x 4, alternating stations')).toEqual([2, 1, 1]);
+  });
+
+  it('keeps an evenly-dividing total exactly as the AI stated it', () => {
+    expect(visits(2, 6, '[02:00 AMRAP / 01:00 REST] x 6 (alt)')).toEqual([3, 3]);
+    expect(visits(3, 12, 'EMOM for 12 minutes (4 rounds)')).toEqual([4, 4, 4]);
+  });
+
+  it('leaves a genuine single pass at one visit each', () => {
+    // The same count-equals-stations shape as the corrected board, but with no round count to
+    // contradict it — three stations, three minutes, done once.
+    expect(visits(3, 3, 'EMOM for 3 minutes')).toEqual([1, 1, 1]);
   });
 });

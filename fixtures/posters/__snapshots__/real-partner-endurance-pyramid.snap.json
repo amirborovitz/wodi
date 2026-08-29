@@ -451,5 +451,8 @@
   },
   "pageRepsSchemes": [
     null
+  ],
+  "pageMaxPractices": [
+    false
   ]
 }

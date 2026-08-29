@@ -1,0 +1,125 @@
+/* 9:16 — the whole reason this composition works. A poster-shaped frame leaves
+   the photo nowhere to be except underneath the poster; a story-shaped one
+   leaves a band top and bottom and a margin either side, which is where the
+   photo lives. */
+.frame {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #0a0b0d;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The feed card: take the column's width, be as tall as 9:16 says. */
+.frameFillWidth {
+  width: 100%;
+}
+
+/* The post sheet: the container caps the height, and the width follows. The
+   WHOLE composition has to be on screen — a preview that clips the bottom of
+   the frame is showing the athlete something they aren't posting. */
+.frameFillHeight {
+  height: 100%;
+  width: auto;
+  margin-inline: auto;
+}
+
+/* Only the feed card opens things full-size; the post sheet's frame is one you
+   compose, not one you zoom. */
+.frameTappable {
+  cursor: zoom-in;
+}
+
+/* The pan/pinch gesture has to beat the browser's own scrolling and zooming.
+   `touch-action` is NOT inherited, so setting it on the frame alone left every
+   descendant on `auto` — and the poster covers three quarters of the frame. A
+   touch that started there went to the browser instead of to us, which is what
+   made the page swipe sideways and the whole thing pinch-zoom and tilt as if
+   the poster were being dragged. Every descendant has to opt out too. */
+.frameInteractive,
+.frameInteractive * {
+  touch-action: none;
+}
+
+.frameInteractive {
+  cursor: grab;
+  overscroll-behavior: contain;
+}
+
+.frameInteractive:active {
+  cursor: grabbing;
+}
+
+/* The poster itself takes the press — that is what makes it draggable — but
+   nothing INSIDE it does. Its stickers carry their own lightboxes and drag
+   handlers for the poster editor, and none of that belongs in a compose
+   preview: here the poster is one object you move, not a card you operate. */
+.frameInteractive .poster {
+  pointer-events: auto;
+}
+
+.frameInteractive .poster * {
+  pointer-events: none;
+}
+
+/* `cover` is the baseline the crop scales from: at scale 1 the photo exactly
+   fills the frame, and everything above that is the athlete zooming in. */
+.photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  /* A long press on an image is "Save Image"/drag on both platforms, which
+     interrupts a pan that paused for a moment. */
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+  transform-origin: center center;
+  /* No transition — this tracks a finger, and easing a drag feels like lag. */
+}
+
+/* Darkens the bands the poster does NOT cover, so a bright gym ceiling can't
+   out-shout the card. Weighted to the edges — the middle is behind the poster
+   anyway, and scrimming it would only dull the photo where it still shows
+   around the poster's corners. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  /* Bottom-weighted, because that is where the poster is and the photo behind
+     it only has to stop competing. The top is left alone on purpose — that is
+     the open area the athlete frames themselves into, and darkening it would
+     dim the one part of the picture anyone is looking at. */
+  background: linear-gradient(
+    180deg,
+    rgba(6, 7, 9, 0) 0%,
+    rgba(6, 7, 9, 0.06) 42%,
+    rgba(6, 7, 9, 0.42) 78%,
+    rgba(6, 7, 9, 0.62) 100%
+  );
+  pointer-events: none;
+}
+
+/* Hangs from the bottom, always — see POSTER_BOTTOM_PCT. The photo is the thing
+   that moves; the poster never does. */
+.poster {
+  position: absolute;
+  left: 50%;
+  transform-origin: bottom center;
+  /* The poster is opaque and sits ON the photo — this is what separates it
+     from the picture behind, the way a story sticker has its own edge. */
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.55));
+}
+
+.posterTappable {
+  cursor: zoom-in;
+}
+
+.posterDraggable {
+  cursor: grab;
+}
+
+.posterDraggable:active {
+  cursor: grabbing;
+}

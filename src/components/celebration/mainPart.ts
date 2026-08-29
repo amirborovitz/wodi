@@ -1,5 +1,6 @@
 import type { Exercise } from '../../types';
 import { getMaxRepsMovement } from '../logging/story/types';
+import { isStrengthPagePart } from './helpers';
 
 /**
  * Which parts of a session the poster is about.
@@ -20,6 +21,29 @@ import { getMaxRepsMovement } from '../logging/story/types';
 export function hasLoggedMaxEffort(ex: Exercise): boolean {
   if (!getMaxRepsMovement(ex)) return false;
   return (ex.sets ?? []).some((s) => s.isMax === true && (s.actualReps ?? 0) > 0);
+}
+
+/**
+ * Is this block a max-effort PRACTICE — a piece whose whole point is the tested number?
+ *
+ * A LOGGED MAX IS NOT THE SAME AS A MAX PRACTICE, and conflating them is what tagged a
+ * four-window interval metcon "SKILL", stripped its AMRAP blueprint, and captioned its hero
+ * "MAX REPS":
+ *
+ *     [02:00 min AMRAP , 02:00 min REST] x 4 rounds:
+ *       2 rounds: 8 Push Press, 8 Box Jumps
+ *       Into - Max Burpees Over the Bar
+ *
+ * That board is a metcon. It leaves one movement open, which is how it is SCORED — not what it
+ * IS. A max practice ("8 min: test your max unbroken T2B") is set-structured work with nothing
+ * else in it, and `isStrengthPagePart` is already THE definition of that distinction, so this
+ * composes with it rather than deciding it a second way.
+ *
+ * The poster reads this for everything the practice framing changes: the type pill, the
+ * blueprint/sub lines a practice has no use for, and the hero's caption.
+ */
+export function isMaxEffortPractice(ex: Exercise): boolean {
+  return isStrengthPagePart(ex) && hasLoggedMaxEffort(ex);
 }
 
 /**

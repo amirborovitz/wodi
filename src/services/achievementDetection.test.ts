@@ -5,22 +5,23 @@ import type { Exercise, MovementEquipment, PersonalRecord } from '../types';
 function strengthExercise(
   name: string,
   weights: number[],
-  equipment?: MovementEquipment
+  equipment?: MovementEquipment,
+  reps = 12
 ): Exercise {
   return {
     id: 'exercise-1',
     name,
     type: 'strength',
-    prescription: '4 sets x 12 reps',
+    prescription: `4 sets x ${reps} reps`,
     sets: weights.map((weight, i) => ({
       id: `set-${i}`,
       setNumber: i + 1,
       completed: true,
-      targetReps: 12,
-      actualReps: 12,
+      targetReps: reps,
+      actualReps: reps,
       weight,
     })),
-    movements: [{ name, reps: 12, inputType: 'weight', equipment }],
+    movements: [{ name, reps, inputType: 'weight', equipment }],
   };
 }
 
@@ -126,20 +127,68 @@ describe('extractNewPRs — a movement with several record rows', () => {
   });
 
   it('measures a plural board spelling against the record it belongs to', () => {
-    // "Squats" matched no alias, so it got its own empty bucket and a 40kg working set was
-    // announced as a first-ever PR — an empty bucket makes any load a first PR.
-    const squatHistory = [record('Squat', 50)];
-    expect(extract(strengthExercise('Squats', [40]), squatHistory)).toHaveLength(0);
-
     const prs = extract(strengthExercise('Back Squats', [150]), history);
     expect(prs).toHaveLength(1);
     expect(prs[0].movement).toBe('Back Squat');
   });
 
-  it('keeps an unresolved squat out of the back squat record', () => {
+  it('keeps an unresolved squat out of the back squat record — and out of every other', () => {
     // The parser decides which squat the board meant. A bare "Squats" it could not resolve
-    // must never be measured against — or write into — the back squat record.
-    expect(extract(strengthExercise('Squats', [140]), history)).toHaveLength(1);
-    expect(extract(strengthExercise('Squats', [140]), history)[0].movement).toBe('Squat');
+    // must never write into the back squat record, and has no record of its own either: an
+    // empty bucket makes any load a first-ever PR, which is how a 40kg set of squats stood
+    // in the week recap next to a 130kg back squat.
+    expect(extract(strengthExercise('Squats', [140]), history)).toHaveLength(0);
+    expect(extract(strengthExercise('Squats', [40]), [record('Squat', 50)])).toHaveLength(0);
+    expect(extract(strengthExercise('Press', [60]))).toHaveLength(0);
+    expect(extract(strengthExercise('Rows', [40]))).toHaveLength(0);
+
+    // A qualified name still resolves to a lift and keeps its record.
+    expect(extract(strengthExercise('Strict Press', [60]))).toHaveLength(1);
+    expect(extract(strengthExercise('Bent Over Row', [40], 'barbell'))).toHaveLength(1);
+  });
+});
+
+// ─── Rep count decides whether a load is a max attempt ───────────────────────
+
+describe('extractNewPRs — high-rep sets are volume, not maxes', () => {
+  it('ignores a barbell lift cycled for conditioning reps', () => {
+    expect(extract(strengthExercise('Back Squat', [60], 'barbell', 20))).toHaveLength(0);
+  });
+
+  it('still counts a normal strength rep range', () => {
+    expect(extract(strengthExercise('Back Squat', [60], 'barbell', 12))).toHaveLength(1);
+    expect(extract(strengthExercise('Back Squat', [60], 'barbell', 1))).toHaveLength(1);
+  });
+
+  it('reads the reps off the movement, not the block, in a circuit', () => {
+    // IRON SURGE: "4 sets of / 20 x squats / 15 pull ups / 45 sec hollow". The sets carry the
+    // block's 40kg with no rep count; the 20 lives on the movement.
+    const circuit: Exercise = {
+      id: 'exercise-1',
+      name: 'Strength Circuit',
+      type: 'strength',
+      prescription: '4 sets',
+      sets: [1, 2, 3, 4].map((setNumber) => ({
+        id: `set-${setNumber}`, setNumber, completed: true, weight: 40,
+      })),
+      movements: [
+        { name: 'Back Squat', reps: 20, inputType: 'weight', equipment: 'barbell' },
+        { name: 'Pull-ups', reps: 15, inputType: 'none' },
+      ],
+    };
+    expect(extract(circuit)).toHaveLength(0);
+  });
+
+  it('keeps a lift whose reps nobody recorded', () => {
+    // A missing count is unknown, not high — it must not cost a real lift its record.
+    const noReps: Exercise = {
+      id: 'exercise-1',
+      name: 'Back Squat',
+      type: 'strength',
+      prescription: 'build to a heavy single',
+      sets: [{ id: 'set-1', setNumber: 1, completed: true, weight: 140 }],
+      movements: [{ name: 'Back Squat', inputType: 'weight', equipment: 'barbell' }],
+    };
+    expect(extract(noReps)).toHaveLength(1);
   });
 });

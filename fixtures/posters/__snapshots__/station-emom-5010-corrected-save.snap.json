@@ -1,0 +1,261 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "EMOM 25",
+      "blueprint": "EMOM 25 MIN · 5 rounds · 0:50 work / 0:10 rest",
+      "rows": [
+        {
+          "primary": "Max Echo Bike",
+          "name": "Echo Bike",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "STATION 1"
+        },
+        {
+          "primary": "Max Bar Muscle-up",
+          "name": "Bar Muscle-up",
+          "totalNote": "4 / round · 20 reps total",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "STATION 2"
+        },
+        {
+          "primary": "Max Box Jump",
+          "name": "Box Jump",
+          "totalNote": "5 / round · 25 reps total",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "STATION 3"
+        },
+        {
+          "primary": "Max Renegade Row",
+          "name": "Renegade Row",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "STATION 4"
+        },
+        {
+          "primary": "Max Burpee",
+          "name": "Burpee",
+          "totalNote": "6 / round · 30 reps total",
+          "accent": "yellow",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "STATION 5"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "EMOM 25",
+        "blueprint": "EMOM 25 MIN · 5 rounds · 0:50 work / 0:10 rest",
+        "rows": [
+          {
+            "primary": "Max Echo Bike",
+            "name": "Echo Bike",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "STATION 1"
+          },
+          {
+            "primary": "Max Bar Muscle-up",
+            "name": "Bar Muscle-up",
+            "totalNote": "4 / round · 20 reps total",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "STATION 2"
+          },
+          {
+            "primary": "Max Box Jump",
+            "name": "Box Jump",
+            "totalNote": "5 / round · 25 reps total",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "STATION 3"
+          },
+          {
+            "primary": "Max Renegade Row",
+            "name": "Renegade Row",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "STATION 4"
+          },
+          {
+            "primary": "Max Burpee",
+            "name": "Burpee",
+            "totalNote": "6 / round · 30 reps total",
+            "accent": "yellow",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "STATION 5"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "75",
+    "unit": "REPS",
+    "storyLine": "20 bar mu · 25 box jump · 30 burpee",
+    "storyMovements": [
+      {
+        "perRound": "1",
+        "name": "Bar Muscle-up",
+        "total": "20 total",
+        "color": "cyan",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "1",
+        "name": "Box Jump",
+        "total": "25 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "1",
+        "name": "Burpee",
+        "total": "30 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "75",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "EMOM 25 MIN · 5 ROUNDS · 0:50 WORK / 0:10 REST",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "Max Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "ST. 1"
+      },
+      {
+        "kind": "line",
+        "rx": "Max Bar Muscle-up",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "4 / round · 20 reps total",
+        "roundLabel": "ST. 2"
+      },
+      {
+        "kind": "line",
+        "rx": "Max Box Jump",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "5 / round · 25 reps total",
+        "roundLabel": "ST. 3"
+      },
+      {
+        "kind": "line",
+        "rx": "Max Renegade Row",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "ST. 4"
+      },
+      {
+        "kind": "line",
+        "rx": "Max Burpee",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "6 / round · 30 reps total",
+        "roundLabel": "ST. 5"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "EMOM 25 MIN · 5 ROUNDS · 0:50 WORK / 0:10 REST",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "Max Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "ST. 1"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Bar Muscle-up",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "4 / round · 20 reps total",
+          "roundLabel": "ST. 2"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Box Jump",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "5 / round · 25 reps total",
+          "roundLabel": "ST. 3"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Renegade Row",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "ST. 4"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Burpee",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "6 / round · 30 reps total",
+          "roundLabel": "ST. 5"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

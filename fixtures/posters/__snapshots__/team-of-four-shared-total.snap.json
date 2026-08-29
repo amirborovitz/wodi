@@ -207,5 +207,9 @@
   "pageRepsSchemes": [
     "5-5-5-5 reps",
     null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
   ]
 }

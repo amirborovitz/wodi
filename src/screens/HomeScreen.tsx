@@ -75,40 +75,45 @@ export function HomeScreen({
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
-  // first seven days of a new period because it's the rarer, bigger artifact; the
-  // week drop takes Monday to Wednesday, the same early slice of its own period.
+  // first seven days of a new period because it's the rarer, bigger artifact.
+  // Outside that window the week drop holds the slot for its whole life: it is
+  // always LAST week's recap, so `weekRecap` rolls to a new id every Monday and the
+  // card is replaced by the next drop rather than expiring into an empty slot.
   const recapForToday = useMemo(() => {
     const now = new Date();
     if (now.getDate() <= 7) {
       if (now.getMonth() % 3 === 0 && seasonRecap) return seasonRecap;
       if (monthRecap) return monthRecap;
     }
-    const day = now.getDay(); // 0 = Sunday
-    if (day >= 1 && day <= 3) return weekRecap;
-    return null;
+    return weekRecap;
   }, [weekRecap, monthRecap, seasonRecap]);
 
-  const recapHandledKey = recapForToday
-    ? `wodi_recap_handled_${recapForToday.id}`
+  // Only an explicit swipe writes this. The `_handled_` prefix it replaces was also
+  // written on open, so a fresh prefix retires those flags instead of leaving drops
+  // the athlete merely read hidden for the rest of their period.
+  const recapDismissedKey = recapForToday
+    ? `wodi_recap_dismissed_${recapForToday.id}`
     : null;
-  // Ids handled in THIS session, so the card collapses the moment it's dismissed.
-  const [handledIds, setHandledIds] = useState<readonly string[]>([]);
+  // Ids dismissed in THIS session, so the card collapses the moment it's swiped.
+  const [dismissedIds, setDismissedIds] = useState<readonly string[]>([]);
   // Re-read whenever the key changes rather than once at mount: workouts arrive
   // after the first render, so an initializer would have run while the key was
   // still null and resurrected a drop the athlete already dismissed.
-  const recapHandled = useMemo(() => {
-    if (!recapForToday || !recapHandledKey) return false;
-    return handledIds.includes(recapForToday.id)
-      || localStorage.getItem(recapHandledKey) === '1';
-  }, [recapForToday, recapHandledKey, handledIds]);
-  const showRecapCard = Boolean(recapForToday) && !recapHandled;
-  const markRecapHandled = () => {
-    if (!recapForToday || !recapHandledKey) return;
-    localStorage.setItem(recapHandledKey, '1');
-    setHandledIds(prev => (prev.includes(recapForToday.id) ? prev : [...prev, recapForToday.id]));
+  const recapDismissed = useMemo(() => {
+    if (!recapForToday || !recapDismissedKey) return false;
+    return dismissedIds.includes(recapForToday.id)
+      || localStorage.getItem(recapDismissedKey) === '1';
+  }, [recapForToday, recapDismissedKey, dismissedIds]);
+  const showRecapCard = Boolean(recapForToday) && !recapDismissed;
+  const markRecapDismissed = () => {
+    if (!recapForToday || !recapDismissedKey) return;
+    localStorage.setItem(recapDismissedKey, '1');
+    setDismissedIds(prev => (prev.includes(recapForToday.id) ? prev : [...prev, recapForToday.id]));
   };
+  // Opening is not dismissing. The drop keeps its slot until the athlete swipes it
+  // away or the next period replaces it, so a recap read on Monday is still there
+  // on Thursday to open again.
   const handleOpenRecap = () => {
-    markRecapHandled();
     if (recapForToday) onOpenRecap?.(recapForToday);
   };
   const deleteSheet = useDeleteSheet(deleteWorkout);
@@ -134,7 +139,7 @@ export function HomeScreen({
   };
 
   const handleDismissRecap = () => {
-    markRecapHandled();
+    markRecapDismissed();
     const offset = pendingRecapScrollOffsetRef.current;
     pendingRecapScrollOffsetRef.current = 0;
     if (offset <= 0) return;
@@ -432,7 +437,7 @@ export function HomeScreen({
           )}
         </motion.section>
 
-        {/* Season Drop / recap card (first 7 days of a new period) */}
+        {/* Week / month / season drop. Holds its slot until swiped away or replaced. */}
         {showRecapCard && recapForToday && (
           <motion.div
             ref={recapSlotRef}

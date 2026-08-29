@@ -1,4 +1,4 @@
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, MovementTotal, WorkloadBreakdown } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks } from '../utils/sectionShape';
 import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
@@ -11,6 +11,7 @@ import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 export { isTeamPrescribedExercise } from './partnerScope';
 import { exercisePartnerFactor } from './partnerScope';
 import { expandExercise, totalsForMovementIndex } from './occurrenceExpansion';
+import { sectionRoundsCompleted } from './blockScore';
 
 /**
  * Bodyweight movements that should not show a weight annotation in the UI
@@ -188,6 +189,37 @@ function hasAlternatingStationText(workout: ParsedWorkout, exercise: ParsedExerc
     || /\b[A-Z]\.\d+\b/.test(text);
 }
 
+/** The round count the board writes down ("(5 rounds)", "5 rounds:"), or undefined. */
+function statedRoundCount(workout: ParsedWorkout, exercise: ParsedExercise): number | undefined {
+  const text = [exercise.rawText, exercise.name, exercise.prescription, workout.rawText]
+    .filter(Boolean).join('\n');
+  const match = text.match(/\((\d+)\s*rounds?\)|\b(\d+)\s*rounds?\b/i);
+  const value = match ? parseInt(match[1] ?? match[2], 10) : NaN;
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * `intervalCount` is the number of clock intervals BY CONTRACT ("[2:00 AMRAP] x 4" → 4), so it is
+ * trusted verbatim. This exists for the single value that cannot be true: a count equal to the
+ * station count claims every station came up exactly once, and a board that also writes "(5
+ * rounds)" is contradicting that — the AI put the round count in the interval slot.
+ *
+ * Narrow on purpose. An earlier version multiplied through whenever the count wasn't divisible by
+ * the station count, which quietly doubled every honest rotation board: "[2:00 AMRAP / 1:00 REST]
+ * x 5 (alt)" over 2 stations really is 5 intervals (3 visits then 2), not 10.
+ */
+export function normalizeStationTotalIntervals(
+  count: number,
+  stationCount: number,
+  statedRounds?: number,
+): number {
+  if (count <= 0 || stationCount <= 0) return 0;
+  if (count === stationCount && statedRounds && statedRounds > 1) {
+    return statedRounds * stationCount;
+  }
+  return count;
+}
+
 function getStationTotalIntervals(
   workout: ParsedWorkout,
   exercise: ParsedExercise,
@@ -197,7 +229,14 @@ function getStationTotalIntervals(
   const suggestedSets = exercise.suggestedSets || 0;
   const workoutSets = workout.sets || 0;
 
-  if (exercise.intervalCount && exercise.intervalCount > 0) return exercise.intervalCount;
+  // Verbatim, except for the one self-contradicting value — see normalizeStationTotalIntervals.
+  if (exercise.intervalCount && exercise.intervalCount > 0) {
+    return normalizeStationTotalIntervals(
+      exercise.intervalCount,
+      stationCount,
+      statedRoundCount(workout, exercise),
+    );
+  }
   if (suggestedSets > stationCount && suggestedSets % stationCount === 0) return suggestedSets;
   if (workoutSets > stationCount && workoutSets % stationCount === 0) return workoutSets;
   // "Alternating stations" AMRAPs merge stations into one exercise and put the TOTAL interval
@@ -438,6 +477,91 @@ function getMovementMultiplier(
     : { multiplier: stationVisitCounts?.[movementIndex] ?? fallbackMultiplier, estimated: false };
 }
 
+/**
+ * One movement of a sectioned piece, with everything the section around it says about HOW MANY
+ * TIMES it happened.
+ *
+ * THE ONE OWNER OF THAT QUESTION. It used to be answered twice — here for the parse-time
+ * breakdown and again, differently, inside `buildWorkloadBreakdownFromResults` for the save-time
+ * one. The save path knew only two of the three facts below, so a board written
+ *
+ *     [02:00 min AMRAP , 02:00 min REST] x 4 rounds:
+ *       2 rounds
+ *         8 Push Press
+ *         8 Box Jumps
+ *       Into - Max Burpees Over the Bar
+ *
+ * stored 8 push press where the athlete did 64, and every figure downstream — the poster's row
+ * total, the week's volume, the session's EP — inherited it. The two builders reach a movement by
+ * different routes and always will (one has the parse, the other has what the athlete typed), but
+ * the section's OWN contribution is the same fact in both, so it is computed in one place.
+ */
+export interface SectionMovementScope {
+  movement: ParsedMovement;
+  /**
+   * How many times the block ran, for a movement whose own `countingMode` doesn't answer.
+   * The athlete's logged score on a separately-scored block; the board's repeat otherwise.
+   */
+  fallbackMultiplier: number;
+  /**
+   * This block is not a rounds tier (a buy-in, a cash-out), so a movement that states no
+   * counting mode of its own is done once rather than every round. A movement that DOES state
+   * one keeps it — that is the layer this flag must not overwrite.
+   */
+  forceOnce: boolean;
+  /**
+   * How many times the block itself repeats within ONE pass of the piece — the "2 rounds" above.
+   * Multiplies ON TOP of the movement's counting mode, because the two describe different
+   * layers: `per_interval` says "once per window" (×4 windows), this says "twice inside each
+   * window". 8 × 2 × 4 = 64.
+   *
+   * `rounds` has always been on ParsedSection for exactly this. Nothing read it unless the
+   * section was type 'rounds', which is how the ×2 went missing.
+   */
+  sectionRepeat: number;
+}
+
+/**
+ * See {@link SectionMovementScope.sectionRepeat}. Its own export because the poster asks the
+ * same question when deciding whether a row's work happened often enough to be worth totalling.
+ *
+ * A 'rounds' tier is excluded because its repeat is already the round count every consumer
+ * multiplies by; double-counting it there would square the tier.
+ */
+export function sectionRepeatCount(section: ParsedSection): number {
+  return section.sectionType === 'rounds' ? 1 : Math.max(1, section.rounds ?? 1);
+}
+
+export function scopeSectionMovements(sections: ParsedSection[]): SectionMovementScope[] {
+  return sections.flatMap((section) => {
+    // A separately-scored block (an A/B/C interval AMRAP) repeats as many times as the athlete
+    // MANAGED, not as many as the board prescribed — see sectionRoundsCompleted.
+    const sectionMultiplier = sectionRoundsCompleted(section);
+    const sectionRepeat = sectionRepeatCount(section);
+    // Partial round, same rule as a whole-exercise AMRAP: a movement the athlete finished before
+    // the buzzer counts one MORE time than the full rounds — that work was really done. Scoped
+    // per block, since each block stops at its own point in its own round.
+    const partialNames = new Set(section.result?.partialMovements ?? []);
+    return section.movements.map((movement) => ({
+      movement,
+      fallbackMultiplier: sectionMultiplier + (partialNames.has(movement.name) ? 1 : 0),
+      forceOnce: section.sectionType !== 'rounds',
+      sectionRepeat,
+    }));
+  });
+}
+
+/**
+ * The movement as the counting rule should see it. `forceOnce` only speaks for a movement that
+ * stayed silent: in a ladder AMRAP `perRound: false` means "fixed reps every round", not "done
+ * once", so overwriting a stated mode here would halve real work.
+ */
+export function movementForSectionCounting(scope: SectionMovementScope): ParsedMovement {
+  return scope.forceOnce && !scope.movement.countingMode
+    ? { ...scope.movement, countingMode: 'once' as const }
+    : scope.movement;
+}
+
 function getVariableSchemeMovementReps(
   movement: ParsedMovement,
   exercise: ParsedExercise,
@@ -486,49 +610,24 @@ export function calculateWorkloadBreakdown(
     // Prefer structured sections when present. They preserve semantic repeat
     // scope from the single AI parse: buy-in/cash-out sections are once,
     // rounds sections use their explicit section round count.
-    const movementEntries = exercise.sections && exercise.sections.length > 0
-      ? exercise.sections.flatMap((section) => {
-          // A separately-scored block (an A/B/C interval AMRAP) repeats as many times as the
-          // athlete MANAGED, not as many as the board prescribed — its `rounds` is how often
-          // the block comes up in the piece (usually 1), while the AMRAP rounds they actually
-          // completed is the logged score. Using `rounds` here would count one round of each
-          // block and undercount the whole piece.
-          const loggedRounds =
-            section.scoreType === 'rounds' && section.result?.value != null
-              ? section.result.value
-              : undefined;
-          const sectionMultiplier = section.sectionType === 'rounds'
-            ? (loggedRounds ?? section.rounds ?? 1)
-            : 1;
-          // Partial round, same rule as a whole-exercise AMRAP (see AddWorkoutScreen): a
-          // movement the athlete finished before the buzzer counts one MORE time than the full
-          // rounds — that work was really done. Scoped per block, since each block stops at its
-          // own point in its own round.
-          const partialNames = new Set(section.result?.partialMovements ?? []);
-          return section.movements.map((movement) => ({
-            movement,
-            fallbackMultiplier: sectionMultiplier + (partialNames.has(movement.name) ? 1 : 0),
-            forceOnce: section.sectionType !== 'rounds',
-          }));
-        })
+    const movementEntries: SectionMovementScope[] = exercise.sections && exercise.sections.length > 0
+      ? scopeSectionMovements(exercise.sections)
       : (exercise.movements || []).map((movement) => ({
           movement,
           fallbackMultiplier: multiplier,
           forceOnce: false,
+          sectionRepeat: 1,
         }));
 
     // If exercise has movement structure, use it
     if (movementEntries.length > 0) {
-      movementEntries.forEach(({ movement, fallbackMultiplier, forceOnce }, movementIndex) => {
+      movementEntries.forEach((scope, movementIndex) => {
+        const { movement, fallbackMultiplier, sectionRepeat } = scope;
         const key = movementBucketKey(movement.name, exerciseIndex);
         const existing = movementMap.get(key);
 
         // Calculate totals for this movement
-        // perRound: false means "done once" ONLY for buy-in/cash-out sections.
-        // In ladder AMRAPs, perRound: false means fixed reps every round (not on the ladder).
-        const movementForCounting = forceOnce && !movement.countingMode
-          ? { ...movement, countingMode: 'once' as const }
-          : movement;
+        const movementForCounting = movementForSectionCounting(scope);
         const multiplierResult = getMovementMultiplier(
           movementForCounting,
           movementIndex,
@@ -537,7 +636,7 @@ export function calculateWorkloadBreakdown(
           fallbackMultiplier,
           stationVisitCounts
         );
-        const movMultiplier = multiplierResult.multiplier;
+        const movMultiplier = multiplierResult.multiplier * sectionRepeat;
         if (multiplierResult.estimated) estimated = true;
         // Flat form: sum this written line's own performances. Keyed by movement INDEX, so a
         // chipper that writes "600m run" twice keeps two honest rows instead of one merged
@@ -545,10 +644,15 @@ export function calculateWorkloadBreakdown(
         // sum, because no occurrence of a run has reps to contribute.
         const flat = useFlatForm ? totalsForMovementIndex(expansion, movementIndex) : null;
         const schemeReps = getVariableSchemeMovementReps(movement, exercise);
-        const reps = flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier));
-        const distance = flat ? flat.distance : (movement.distance || 0) * movMultiplier;
-        const calories = flat ? flat.calories : (movement.calories || 0) * movMultiplier;
-        const time = flat ? flat.time : (movement.time || 0) * movMultiplier;
+        // "6/6 KB Windmill" and "20/20m Suitcase Carry" write ONE SIDE's number. The athlete does
+        // both, so the written quantity is half the real work — which is why a 6/6 windmill
+        // counted 6 and a 20/20m carry counted 20. Applied to every quantity uniformly, and to
+        // the flat form too, since that sums the same written values per occurrence.
+        const sideMultiplier = movement.perSide ? 2 : 1;
+        const reps = (flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier))) * sideMultiplier;
+        const distance = (flat ? flat.distance : (movement.distance || 0) * movMultiplier) * sideMultiplier;
+        const calories = (flat ? flat.calories : (movement.calories || 0) * movMultiplier) * sideMultiplier;
+        const time = (flat ? flat.time : (movement.time || 0) * movMultiplier) * sideMultiplier;
 
         // Get per-implement weight from movementWeights override or rxWeights
         const perImplementWeight = movementWeights?.[movement.name]

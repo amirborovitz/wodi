@@ -335,5 +335,8 @@
   },
   "pageRepsSchemes": [
     null
+  ],
+  "pageMaxPractices": [
+    false
   ]
 }

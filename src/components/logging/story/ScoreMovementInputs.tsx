@@ -40,6 +40,13 @@ interface ScoreMovementInputsProps {
    *  ladder (the tiers state 800/600/400m; ONE box cannot hold that scheme and would silently
    *  log the first tier as the whole run). */
   distancePrescribedByStructure?: boolean;
+  /**
+   * This block asks ONE question per station, so every station is on screen at once. Tightens the
+   * card rhythm, moves the station letter into the tile header instead of a divider row above it,
+   * and pairs a loaded station's weight and reps side by side. Layout only — it never changes
+   * which inputs a movement gets.
+   */
+  perStation?: boolean;
 }
 
 function getEquipmentLabel(type: SharedEquipment): string {
@@ -396,6 +403,19 @@ function repsTileConfig(mr: MovementResult): TileConfig {
  * path prices it at a default cadence for EP only. Type a count and it becomes yours: it lands in
  * movementReps, the movement rejoins the breakdown, and it prints on the poster.
  */
+/**
+ * The station letter as a chip: "Station 1" → "ST. 1", "B.2" → "ST. 2". A minute-slot label
+ * ("Min 1") is the board's own wording for a time, not a station number, so it stays as written.
+ * Mirrors the poster's chip so the athlete logs against the same label they'll read back.
+ */
+function formatStationChip(label: string): string {
+  const numbered = label.match(/\b[A-Z]\.(\d+)\b/i);
+  if (numbered) return `ST. ${numbered[1]}`;
+  const station = label.match(/\b(?:station|st)\.?\s*(\d+|[A-Z])\b/i);
+  if (station) return `ST. ${station[1].toUpperCase()}`;
+  return label.toUpperCase();
+}
+
 function isUncountedLoad(mr: MovementResult): boolean {
   return mr.kind === 'load'
     && mr.movement.reps == null
@@ -466,6 +486,7 @@ export function ScoreMovementInputs({
   teamSize,
   isRelayContext = false,
   distancePrescribedByStructure = false,
+  perStation = false,
 }: ScoreMovementInputsProps) {
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
@@ -488,13 +509,19 @@ export function ScoreMovementInputs({
 
   // Only the first (focused) load group uses the hero shared-weight screen.
   // Secondary groups (different equipment type) are rendered as individual tiles.
+  //
+  // Never on a per-station board. The hero screen answers "what weight is on the ONE bar this
+  // metcon revolves around" and replaces the movement's whole tile to ask it — so a lone DB
+  // station became a full-height weight screen with no rep input at all, and the Renegade Row
+  // went a whole workout without ever being counted. Here the load is one field of a station's
+  // card, sitting beside its reps, the same size as every other station's.
   const sharedWeightKeys = useMemo(() => {
     const keys = new Set<string>();
     const focusedGroup = loadGroups[0];
-    if (!focusedGroup || separateWeightGroups.has(focusedGroup.type)) return keys;
+    if (perStation || !focusedGroup || separateWeightGroups.has(focusedGroup.type)) return keys;
     focusedGroup.movements.forEach((mr) => keys.add(mr.movementKey));
     return keys;
-  }, [loadGroups, separateWeightGroups]);
+  }, [loadGroups, separateWeightGroups, perStation]);
 
   // Movements in a group the athlete split apart. Their weights are theirs alone — no
   // first-edit propagation in or out, or "different weights" would immediately re-sync them.
@@ -895,14 +922,14 @@ export function ScoreMovementInputs({
 
     return (
       <React.Fragment key={mr.movementKey}>
-        {mr.movement.stationLabel && (
+        {mr.movement.stationLabel && !perStation && (
           <div className={styles.stationDivider}>
             <span className={styles.stationLabel}>{mr.movement.stationLabel}</span>
             <span className={styles.sectionLine} />
           </div>
         )}
         <div
-          className={styles.tile}
+          className={`${styles.tile} ${perStation ? styles.tileDense : ''}`}
           ref={(node) => {
             tileRefs.current[mr.movementKey] = node;
           }}
@@ -914,6 +941,11 @@ export function ScoreMovementInputs({
             role={hasAlts ? 'button' : undefined}
             style={hasAlts ? { cursor: 'pointer' } : undefined}
           >
+            {perStation && mr.movement.stationLabel && (
+              <span className={styles.tileStation}>
+                {formatStationChip(mr.movement.stationLabel)}
+              </span>
+            )}
             {sub.isSubstituted ? (
               <div className={styles.tileNameSubstituted}>
                 <span className={styles.tileNameOriginal}>
@@ -954,25 +986,38 @@ export function ScoreMovementInputs({
           {/* AI quick-toggle chip */}
           {hasAlts && <AiAlternativeToggle mr={mr} onChange={(patch) => handleAiAlternativeToggle(mr, patch)} />}
 
-          {/* Input: arcade stepper or nothing for prescribed-reps display movements */}
-          {mr.kind === 'load' && !isSharedWeight && (
-            <WeightField
-              mr={mr}
-              onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)}
-              onCenterPress={() => openTile(mr.movementKey)}
-              active={activeTileId === mr.movementKey}
-            />
-          )}
-          {/* Optional count for a load the board never quantified — empty unless the athlete
-              fills it. Shown even on a shared bar: the weight is the group's, the count is theirs. */}
-          {isUncountedLoad(mr) && (
-            <RepsField
-              mr={mr}
-              onChange={(patch) => onChange(globalIndex, patch)}
-              onCenterPress={() => openTile(uncountedRepsTileId(mr.movementKey))}
-              active={activeTileId === uncountedRepsTileId(mr.movementKey)}
-            />
-          )}
+          {/* A loaded station asks TWO things about one movement — what you held and how many you
+              got. Paired side by side so it reads as the single question it is; stacked, one
+              movement filled the screen and the count looked like an afterthought (which is how a
+              max-effort Renegade Row went a whole workout without ever being counted). */}
+          {(() => {
+            const showWeight = mr.kind === 'load' && !isSharedWeight;
+            const showUncountedReps = isUncountedLoad(mr);
+            const weightField = showWeight && (
+              <WeightField
+                mr={mr}
+                onChange={(patch) => handleWeightChange(globalIndex, mr, patch.weight)}
+                onCenterPress={() => openTile(mr.movementKey)}
+                active={activeTileId === mr.movementKey}
+                dense={perStation}
+              />
+            );
+            // Optional count for a load the board never quantified — empty unless the athlete
+            // fills it. Shown even on a shared bar: the weight is the group's, the count is theirs.
+            const repsField = showUncountedReps && (
+              <RepsField
+                mr={mr}
+                onChange={(patch) => onChange(globalIndex, patch)}
+                onCenterPress={() => openTile(uncountedRepsTileId(mr.movementKey))}
+                active={activeTileId === uncountedRepsTileId(mr.movementKey)}
+                dense={perStation}
+              />
+            );
+            if (weightField && repsField) {
+              return <div className={styles.fieldPair}>{weightField}{repsField}</div>;
+            }
+            return <>{weightField}{repsField}</>;
+          })()}
           {(tileField === 'distance' || tileField === 'calories') && (
             <DistanceField
               mr={mr}
@@ -980,6 +1025,7 @@ export function ScoreMovementInputs({
               onCenterPress={() => openTile(mr.movementKey)}
               active={activeTileId === mr.movementKey}
               isRelayContext={isRelayContext}
+              dense={perStation}
             />
           )}
           {/* MAX bodyweight: no prescribed quantity; let user log their score */}
@@ -989,6 +1035,7 @@ export function ScoreMovementInputs({
               onChange={(patch) => onChange(globalIndex, patch)}
               onCenterPress={() => openTile(mr.movementKey)}
               active={activeTileId === mr.movementKey}
+              dense={perStation}
             />
           )}
         </div>
@@ -996,7 +1043,9 @@ export function ScoreMovementInputs({
     );
   };
 
-  const focusedLoadGroup = loadGroups[0] ?? null;
+  // See sharedWeightKeys: a per-station board has no focused group, so every station renders as
+  // its own tile and nothing swaps a card for a full-height weight screen.
+  const focusedLoadGroup = perStation ? null : (loadGroups[0] ?? null);
   const renderFocusedLoadStep = () => {
     if (!focusedLoadGroup) return null;
 
@@ -1223,6 +1272,18 @@ export function ScoreMovementInputs({
 
   return (
     <>
+      {/* The tiles alone would read as "total for the workout". They aren't: each is one round's
+          work, and the app multiplies by how many times that station came up. An athlete typing
+          30 burpees where the app expects 6 is a 5× error nothing downstream can catch, so the
+          screen says which number it wants before asking for any of them. */}
+      {perStation && (
+        <div className={styles.perStationIntro}>
+          <span className={styles.perStationEyebrow}>Average per round</span>
+          <span className={styles.perStationNote}>
+            Roughly is fine — nobody counts perfectly mid-workout.
+          </span>
+        </div>
+      )}
       {movementTileBlock}
 
       {/* Substitution sheet; single instance, driven by swapOpenKey */}
@@ -1261,11 +1322,13 @@ function WeightField({
   onChange,
   onCenterPress,
   active,
+  dense,
 }: {
   mr: MovementResult;
   onChange: (p: Partial<MovementResult>) => void;
   onCenterPress: () => void;
   active: boolean;
+  dense?: boolean;
 }) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
   const loadUnit = movementLoadUnit(mr.movement);
@@ -1284,6 +1347,7 @@ function WeightField({
       color={LOAD_TILE_COLOR}
       inputMode="decimal"
       size="arcade"
+      dense={dense}
       onCenterPress={onCenterPress}
       active={active}
     />
@@ -1296,12 +1360,14 @@ function DistanceField({
   onCenterPress,
   active,
   isRelayContext = false,
+  dense,
 }: {
   mr: MovementResult;
   onChange: (p: Partial<MovementResult>) => void;
   onCenterPress: () => void;
   active: boolean;
   isRelayContext?: boolean;
+  dense?: boolean;
 }) {
   const isCal = isCalorieBased(mr);
 
@@ -1329,6 +1395,7 @@ function DistanceField({
         color={METRIC_TILE_COLOR}
         inputMode="numeric"
         size="arcade"
+        dense={dense}
         onCenterPress={onCenterPress}
         active={active}
       />
@@ -1356,6 +1423,7 @@ function DistanceField({
       color={METRIC_TILE_COLOR}
       inputMode="decimal"
       size="arcade"
+      dense={dense}
       onCenterPress={onCenterPress}
       active={active}
     />
@@ -1367,11 +1435,13 @@ function RepsField({
   onChange,
   onCenterPress,
   active,
+  dense,
 }: {
   mr: MovementResult;
   onChange: (p: Partial<MovementResult>) => void;
   onCenterPress: () => void;
   active: boolean;
+  dense?: boolean;
 }) {
   return (
     <StepperInput
@@ -1384,6 +1454,7 @@ function RepsField({
       color={METRIC_TILE_COLOR}
       inputMode="numeric"
       size="arcade"
+      dense={dense}
       onCenterPress={onCenterPress}
       active={active}
     />

@@ -13,6 +13,35 @@ export interface HeroResult {
   // movements) — that reconciliation belongs in the log/edit view, never on the shared poster.
   ladderIntoRungReps?: number;
   amrapNarrative?: string;
+  /**
+   * The hero is a summed recollection, not a measured tally — a max-effort count logged window
+   * by window ("roughly how many burpees each window?"). Skins render it with a leading "~".
+   *
+   * This is the design system's ghost-rung rule applied to a number: never render precision the
+   * athlete didn't log. There a partial round gets a fixed half-fill instead of a measured
+   * level; here a summed estimate wears a tilde rather than passing as exact.
+   */
+  approximate?: boolean;
+  /**
+   * How many windows an open-count hero was summed over — 4 for a "[2:00 AMRAP, 2:00 REST] × 4"
+   * board whose burpees were logged window by window.
+   *
+   * The number alone is ambiguous in the worst way: "~11 BURPEES" over a piece the athlete ran
+   * four times reads as eleven burpees in one go, which is a much smaller day than the one they
+   * had. Present only when the count really is a sum (more than one window), so the poster can
+   * say so beside it.
+   */
+  openCountWindows?: number;
+  /**
+   * ONE CLOCK, ONE SCORE — the scoreboard for a piece made of several independently-timed
+   * blocks (two 6-minute AMRAPs, four 3-minute windows, any number of them).
+   *
+   * Present only when the piece has MORE THAN ONE separately-scored block, and then `value` is
+   * the first block's score rather than a total: there is no honest whole-piece number to put
+   * there. Adding the blocks up gives a figure nobody reports and no part of the workout
+   * matches, so skins render every entry here side by side instead.
+   */
+  blockScores?: { label: string; value: string; unit?: string }[];
 }
 
 export interface StoryMovementLine {
@@ -64,7 +93,6 @@ export interface ArtifactRow {
   accent: 'yellow' | 'magenta' | 'cyan';
   missing?: boolean;
   stationRow?: boolean;
-  stationHeaderCap?: string;
   roundLabel?: string; // left-aligned label for progressive round rows (R1, R2, BUY-IN, etc.)
   // Rounds this row's `primary` repeats over (e.g. 12 for "12 RFT"). When set and >1, `primary`
   // is a per-round/per-turn value (e.g. "5 reps every round"), never a one-shot team total — the

@@ -126,7 +126,6 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
         where('userId', '==', user.id)
       );
 
-      console.log('Fetching workouts for user:', user.id);
       const prsRef = collection(db, 'personalRecords');
       const prQuery = query(
         prsRef,
@@ -158,12 +157,10 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
         existing.push(achievement);
         prAchievementsByWorkoutId.set(workoutId, existing);
       });
-      console.log('Found documents:', snapshot.size);
 
       const fetchedWorkouts: WorkoutWithStats[] = snapshot.docs
         .map((doc) => {
           const data = doc.data();
-          console.log('Workout doc:', doc.id, data);
           const prAchievements = prAchievementsByWorkoutId.get(doc.id) || [];
           const achievements = (data.achievements as Achievement[] | undefined) || prAchievements;
           const heroAchievement = (data.heroAchievement as Achievement | undefined) || achievements[0];
@@ -223,7 +220,6 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
         .sort(byNewestTrained)
         .slice(0, maxCount);
 
-      console.log('Processed workouts:', fetchedWorkouts.length);
       setWorkouts(fetchedWorkouts);
     } catch (err) {
       console.error('Error fetching workouts:', err);

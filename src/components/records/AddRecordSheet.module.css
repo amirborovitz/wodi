@@ -1,0 +1,251 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  border: none;
+  padding: 0;
+  z-index: 210;
+  cursor: pointer;
+}
+
+.sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--app-column);
+  margin-inline: auto;
+  background: var(--wodi-card);
+  border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--wodi-line2);
+  z-index: 211;
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  max-height: 84dvh;
+  overflow-y: auto;
+}
+
+.handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(242, 240, 235, 0.2);
+  border-radius: 999px;
+  margin: 0 auto 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--wodi-white);
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  background: rgba(242, 240, 235, 0.08);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.closeBtn svg {
+  width: 16px;
+  height: 16px;
+  color: var(--wodi-white);
+}
+
+/* ── Movement picker ──────────────────────────────────────────── */
+.search {
+  width: 100%;
+  background: rgba(242, 240, 235, 0.06);
+  border: 1px solid var(--wodi-line);
+  border-radius: 12px;
+  padding: 13px 14px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--wodi-white);
+  outline: none;
+}
+
+.search:focus {
+  border-color: rgba(245, 194, 0, 0.5);
+}
+
+.search::placeholder {
+  color: rgba(242, 240, 235, 0.35);
+}
+
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  max-height: 46dvh;
+  overflow-y: auto;
+}
+
+.suggestion {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--wodi-line);
+  text-align: left;
+  padding: 13px 4px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.suggestion:last-child {
+  border-bottom: none;
+}
+
+.suggestion:active {
+  color: var(--wodi-yellow);
+}
+
+/* ── Chosen movement ──────────────────────────────────────────── */
+.chosenRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(245, 194, 0, 0.08);
+  border: 1px solid rgba(245, 194, 0, 0.2);
+  border-radius: 12px;
+}
+
+.chosenName {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--wodi-white);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.changeBtn {
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--wodi-yellow);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Load ─────────────────────────────────────────────────────── */
+.fieldLabel {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(242, 240, 235, 0.45);
+  letter-spacing: 0.15em;
+  margin: 22px 0 8px;
+}
+
+.weightRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 2px solid var(--wodi-line2);
+  padding-bottom: 8px;
+}
+
+.weightInput {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--wodi-yellow);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  -moz-appearance: textfield;
+}
+
+.weightInput::-webkit-outer-spin-button,
+.weightInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.weightInput::placeholder {
+  color: rgba(245, 194, 0, 0.25);
+}
+
+.unit {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(242, 240, 235, 0.45);
+}
+
+.saveBtn {
+  width: 100%;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px;
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.saveBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.checkIcon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Same as the Records sheet: the global yellow `:focus-visible` ring double-borders a field that
+   already shows focus itself. The load row's rule goes yellow on focus (below) so the cue stays. */
+.weightInput:focus-visible,
+.search:focus-visible {
+  outline: none;
+}
+
+.weightRow:focus-within {
+  border-bottom-color: var(--wodi-yellow);
+}

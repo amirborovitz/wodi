@@ -50,6 +50,13 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
     }
     return { text: formatTime(r.timeSeconds) };
   }
+  // The open count, summed. Reads "~46 burpees" rather than a rounds figure, and wears the same
+  // "~" the poster does, so the athlete sees the estimate marked from the moment they enter it.
+  if (r.kind === 'score_open_reps') {
+    const total = r.maxReps ?? 0;
+    if (total <= 0) return { text: 'Log results' };
+    return { text: `~${total} reps` };
+  }
   if (r.kind === 'score_rounds') {
     if (r.rounds == null || r.rounds === 0) return { text: 'Log results' };
     const rds = `${r.rounds} rds`;

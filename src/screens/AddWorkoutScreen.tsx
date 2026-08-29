@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors, getStationVisitCountsForExercise, movementBucketKey } from '../services/workloadCalculation';
+import { assignMovementColors, getStationVisitCountsForExercise, movementBucketKey, movementForSectionCounting, scopeSectionMovements } from '../services/workloadCalculation';
+import type { SectionMovementScope } from '../services/workloadCalculation';
 import { exercisePartnerFactor } from '../services/partnerScope';
+import { getMaxMetric } from '../utils/maxMetric';
+import { loggedBlockScores, sectionRoundsCompleted } from '../services/blockScore';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -23,7 +26,7 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal, MovementSubstitution } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, Exercise, WorkloadBreakdown, MovementTotal, MovementSubstitution } from '../types';
 import {
   workoutToParsedWorkout,
   getSavedMaxStrengthSet,
@@ -166,6 +169,13 @@ function inferStationVisitCounts(
   totalIntervals: number
 ): number[] | null {
   if (totalIntervals <= 0) return null;
+  // A block-scored piece needs no station-visit ESTIMATE: how many times each block ran is the
+  // athlete's own logged score. This function divides an interval count evenly across the
+  // sections as if they were a rotation, and being a per-movement override it WINS over the real
+  // per-block rounds — silently flattening two 4-round AMRAPs to one round each. Same refusal
+  // getStationVisitCountsForExercise already makes; the two must answer alike or the breakdown
+  // depends on which caller happened to run.
+  if (loggedBlockScores(exercise).length > 0) return null;
 
   if (exercise.sections && exercise.sections.length > 1) {
     const roundSections = exercise.sections
@@ -426,24 +436,21 @@ export function buildWorkloadBreakdownFromResults(
       const hasSections = result.exercise.sections && result.exercise.sections.length > 0;
       let iterationMovements: ParsedMovement[];
       let perMovementRounds: number[];
-      let perMovementSectionTypes: Array<ParsedSection['sectionType'] | undefined>;
+      // What the SECTION around each movement says about how many times it happened. Read from
+      // scopeSectionMovements, the same owner calculateWorkloadBreakdown reads, so the number
+      // this function stores and the number the parse computed can never disagree again. The
+      // save path used to answer this itself, and knew one fewer fact than the parse did.
+      let perMovementScopes: Array<SectionMovementScope | undefined>;
 
       if (hasSections) {
-        // Flatten sections: each movement appears once per section, with that section's rounds
-        iterationMovements = [];
-        perMovementRounds = [];
-        perMovementSectionTypes = [];
-        for (const sec of result.exercise.sections!) {
-          const sectionRounds = sec.sectionType === 'rounds' ? (sec.rounds ?? 1) : 1;
-          for (const m of sec.movements) {
-            iterationMovements.push(m);
-            perMovementRounds.push(sectionRounds);
-            perMovementSectionTypes.push(sec.sectionType);
-          }
-        }
+        // Flatten sections: each movement appears once per section, with that section's scope.
+        const scopes = scopeSectionMovements(result.exercise.sections!);
+        iterationMovements = scopes.map((scope) => scope.movement);
+        perMovementRounds = scopes.map((scope) => scope.fallbackMultiplier);
+        perMovementScopes = scopes;
       } else {
         iterationMovements = movements;
-        perMovementSectionTypes = movements.map(() => undefined);
+        perMovementScopes = movements.map(() => undefined);
         const repsPerRound = movements.reduce((sum, mov) => {
           const reps = result.movementReps?.[mov.name] ?? mov.reps ?? 0;
           return sum + reps;
@@ -483,6 +490,23 @@ export function buildWorkloadBreakdownFromResults(
     // because a per-movement ladder collapses to one input row built from tier 1. Later tiers
     // prescribe their own amounts and scale by the ratio that entry implies (see tierScaling).
     const basePrescribed = new Map<string, ParsedMovement>();
+    // The exercise's max SETS are one score for the whole block, so exactly one movement can own
+    // them. On a station board several movements are max-effort with nothing entered, and handing
+    // the same set-sum to each of them invented the work outright — a 5×8 EMOM printed 40 reps on
+    // the bike AND 40 on the renegade row, 80 of a 95-rep "total" from one number counted twice.
+    // Claimed only when the block leaves it unambiguous; otherwise the sets stay on the exercise
+    // and the untouched stations report nothing, which is the truth.
+    // Keyed on the BLOCK's shape, not on which inputs happen to be blank: "[2:00 AMRAP] x4 into
+    // max burpees" has one max movement and those four sets are unambiguously its score, while a
+    // five-station rotation has five and the sets belong to none of them in particular. Deciding
+    // by blankness instead would dump the whole set-sum onto whichever station the athlete
+    // skipped — a guess wearing the athlete's own number.
+    const maxMovementIndices = iterationMovements
+      .map((mov, movIdx) => ({ mov, movIdx }))
+      .filter(({ mov }) => mov.isMaxReps && !mov.reps && !mov.distance && !mov.calories);
+    const soleMaxSetClaimant = maxMovementIndices.length === 1
+      ? maxMovementIndices[0].movIdx
+      : undefined;
     iterationMovements.forEach((mov, movIdx) => {
       const mk = movKeys[movIdx];
       const lowerName = mov.name.toLowerCase();
@@ -517,9 +541,21 @@ export function buildWorkloadBreakdownFromResults(
       // prescribed and 0 entered, gets skipped below, and the early return past the sets-based
       // fallback means the one thing the athlete actually measured never reaches the breakdown,
       // the rep total, or the poster.
-      const maxSetReps = mov.isMaxReps && !mov.reps && !mov.distance && !mov.calories
-        ? result.sets.find((s) => s.isMax && (s.actualReps ?? 0) > 0)?.actualReps
+      // SUMMED, not first: a practice block records one max set, but an interval board records
+      // one per window ("[2:00 AMRAP] x4 … into max burpees" → four sets). Taking the first
+      // would have counted window 1's burpees as the whole piece. Summing is identical for the
+      // single-set case, so both shapes read through one rule.
+      // Routed by the movement's OWN metric: "max calories" on an Echo Bike earns calories, not
+      // reps. The parser records which quantity slot said "max" (maxMetric); before that field
+      // existed every earned number landed in `reps`, so a bike's 40 calories printed "40 reps"
+      // and fed the session's rep total.
+      const maxSetEarned = movIdx === soleMaxSetClaimant
+        ? result.sets.reduce((sum, s) => sum + (s.isMax ? (s.actualReps ?? 0) : 0), 0) || undefined
         : undefined;
+      const maxSetMetric = getMaxMetric(mov);
+      const maxSetReps = maxSetMetric === 'reps' ? maxSetEarned : undefined;
+      const maxSetCalories = maxSetMetric === 'calories' ? maxSetEarned : undefined;
+      const maxSetDistance = maxSetMetric === 'distance' ? maxSetEarned : undefined;
 
       // Same hole as the max test above, for the other shape that carries no prescribed count:
       // a strength part's rep scheme lives on the SETS (10-8-6-5-4), never on the movement, so
@@ -527,16 +563,21 @@ export function buildWorkloadBreakdownFromResults(
       // the whole block. The sets already hold every rep, so this is a TOTAL (rounds forced to
       // 1 below), not a per-round count. Only safe when one movement can own those sets: a
       // complex or a circuit shares its sets across movements and must not claim them all.
+      // Reps ONLY, for the same reason the max-set sum above is routed: the sets hold a bare
+      // number and the movement's own metric says what it counts. Unguarded, a lone "max
+      // calories" Echo Bike banked its 40 as calories here AND as 40 reps, so one effort was
+      // stored twice in two different units and the poster still had a rep figure to print.
       const setTotalReps = !hasSections
         && iterationMovements.length === 1
+        && maxSetMetric === 'reps'
         && userReps === undefined
         && !mov.reps && !mov.distance && !mov.calories && !mov.time
         ? result.sets.reduce((sum, s) => sum + (s.actualReps ?? 0), 0) || undefined
         : undefined;
 
       const perRoundReps = userReps ?? maxSetReps ?? setTotalReps ?? mov.reps ?? 0;
-      const perRoundDistance = userDistance ?? mov.distance ?? 0;
-      const perRoundCalories = userCalories ?? mov.calories ?? 0;
+      const perRoundDistance = userDistance ?? maxSetDistance ?? mov.distance ?? 0;
+      const perRoundCalories = userCalories ?? maxSetCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
 
       // Partner factor only applies to AI-prescribed values, not user-entered ones.
@@ -581,24 +622,34 @@ export function buildWorkloadBreakdownFromResults(
         return;
       }
 
-      // Buy-in/cash-out sections are done once, not per AMRAP/round block.
       const stationVisits = stationVisitCounts?.[movIdx];
-      const sectionType = perMovementSectionTypes[movIdx];
+      const scope = perMovementScopes[movIdx];
+      // A buy-in/cash-out movement that states no counting mode is done once, not once per
+      // round — movementForSectionCounting says so, and says it in exactly the words the parse
+      // path uses. This used to be a blanket "any non-rounds section counts once", which threw
+      // away TWO things the board wrote: the movement's own counting mode ("per_interval", ×4
+      // windows) and the block's own repeat ("2 rounds of…", ×2). 8 push press stored where the
+      // athlete did 64.
+      //
       // A max test happens ONCE, whatever the block's set count says — a 14-rep effort inside a
       // 5-set practice is 14 reps, not 70.
-      const effective = maxSetReps != null || setTotalReps != null
-        ? { rounds: 1, estimated: false }
-        : sectionType && sectionType !== 'rounds'
+      // Keyed on the earned VALUE, not on the reps slot: the sum is already a total across every
+      // window whichever unit it lands in, so a max-calorie bike needs this exemption exactly as
+      // much as a max-rep burpee. Reading `maxSetReps` here instead meant routing the bike's 40
+      // to calories quietly re-enabled the multiplier and stored 200.
+      const effective = maxSetEarned != null || setTotalReps != null
         ? { rounds: 1, estimated: false }
         : getMovementEffectiveRounds(
-          mov,
+          scope ? movementForSectionCounting(scope) : mov,
           movementRounds,
           stationVisits,
           result.exercise,
           result,
           parsedWorkout
         );
-      const effectiveRounds = effective.rounds;
+      // The block's own repeat multiplies ON TOP of the counting mode: they are different
+      // layers (once per window × twice inside each window).
+      const effectiveRounds = effective.rounds * (scope?.sectionRepeat ?? 1);
       if (effective.estimated) estimated = true;
 
       // AMRAP partial round: if this movement was completed in the partial round, add 1 extra round
@@ -1803,6 +1854,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         case 'score_time': {
           const time = savedEx.sets[0]?.time;
           if (time != null) result.timeSeconds = time;
+          break;
+        }
+        // Re-opening a saved block for edit: rebuild the per-window counts from the sets they
+        // were stored on, so the four boxes come back filled instead of blank.
+        case 'score_open_reps': {
+          const perWindow = savedEx.sets.filter((s) => s.isMax).map((s) => s.actualReps ?? 0);
+          if (perWindow.length > 0) {
+            result.maxRepsPerInterval = perWindow;
+            const total = perWindow.reduce((sum, v) => sum + v, 0);
+            if (total > 0) result.maxReps = total;
+          }
           break;
         }
         case 'score_rounds': {
@@ -3043,8 +3105,20 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         }));
         let repsFromMovements = 0;
 
-        // Calculate volume from per-movement weights if available
-        if (baseMovements && baseMovements.length > 0) {
+        // A piece made of several independently-scored blocks has no single round count — each
+        // clock earned its own. Its rep total is therefore built block by block: this block's
+        // per-round reps × the rounds THIS block scored. Reading a piece-level round count here
+        // multiplied every movement in the piece by every block's rounds at once (two 4-round
+        // 6-min AMRAPs came out as 560 reps instead of 280). Works for any number of blocks.
+        const scoredSections = (sectionsForSave ?? []).filter((sec) => sec.scoreType != null);
+        const isMultiClockPiece = scoredSections.length > 1;
+        if (scoredSections.length > 0) {
+          repsFromMovements = scoredSections.reduce((total, sec) => {
+            const perRound = sec.movements.reduce((sum, mov) => sum + (mov.reps ?? 0), 0);
+            return total + perRound * sectionRoundsCompleted(sec);
+          }, 0);
+        } else if (baseMovements && baseMovements.length > 0) {
+          // Single-clock piece: one round count for the whole thing.
           const repsPerRound = baseMovements.reduce((sum, mov, mi) => {
             const reps = result.movementReps?.[fsKeys[mi]] ?? result.movementReps?.[mov.name] ?? mov.reps ?? 0;
             return sum + reps;
@@ -3182,7 +3256,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           ...(movementsForSave && movementsForSave.length > 0 && { movements: movementsForSave }),
           ...(sectionsForSave && sectionsForSave.length > 0 && { sections: sectionsForSave }),
           ...(result.exercise.suggestedRepsPerSet && result.exercise.suggestedRepsPerSet.length > 0 && { suggestedRepsPerSet: result.exercise.suggestedRepsPerSet }),
-          ...(rounds > 1 && { rounds }),
+          // ONE clock, ONE score. A piece with several independently-scored blocks has no
+          // piece-level round count — its scores live on `sections[].result`, one per block, and
+          // summing them produces a number that describes no part of the workout ("8 rounds" for
+          // two separate 6-minute AMRAPs of 4). A single-clock piece still carries its rounds here.
+          ...(!isMultiClockPiece && rounds > 1 && { rounds }),
           ...(result.exercise.ladderReps && result.exercise.ladderReps.length > 0 && { ladderReps: result.exercise.ladderReps }),
           ...(result.ladderStep != null && result.ladderStep > 0 && { ladderStep: result.ladderStep }),
           ...(result.partialReps != null && result.partialReps > 0 && { partialReps: result.partialReps }),

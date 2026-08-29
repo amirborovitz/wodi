@@ -1,0 +1,264 @@
+{
+  "name": "real-two-amraps-legacy-undercounted-20260827",
+  "description": "The SAME 27/08/26 board as real-two-amraps-b1-b2, but with the breakdown exactly as it was stored before the save-time fix: one round of each movement. Pins that an already-saved doc still reads correctly — the poster repairs the undercount at view time rather than leaving old workouts short.",
+  "workout": {
+    "title": "WOD",
+    "format": "amrap_intervals",
+    "timeCap": 960,
+    "rawText": "27/08/26\nSTRENGTH (squat)\nBack Squat\n4 sets x 4 reps @~85%\n\nMETCON (Medium)\nb.1.\n6 minutes AMRAP:\n10 Toes to Bar\n10 alt' weighted box step up\n02:00 minutes REST\nb.2\n6 minutes AMRAP:\n10 American Kettlebell Swing @16/24kg\n40 Double Under / 80 singles",
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Back Squat",
+          "exerciseIndex": 0,
+          "totalReps": 16,
+          "weight": 57.5,
+          "weightProgression": [
+            50,
+            65
+          ],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Toes to Bar",
+          "exerciseIndex": 1,
+          "totalReps": 10,
+          "color": "cyan"
+        },
+        {
+          "name": "Alt Weighted Box Step Up",
+          "exerciseIndex": 1,
+          "totalReps": 10,
+          "weight": 15,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "American Kettlebell Swing",
+          "exerciseIndex": 1,
+          "totalReps": 10,
+          "weight": 20,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Double Under",
+          "exerciseIndex": 1,
+          "totalReps": 40,
+          "color": "magenta"
+        }
+      ]
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Squat",
+        "type": "strength",
+        "prescription": "4 sets x 4 reps @~85%",
+        "loggingMode": "strength",
+        "partKind": "strength",
+        "aiPartName": "SLAB",
+        "isSecondary": false,
+        "rawText": "Back Squat\n4 sets x 4 reps @~85%",
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "targetReps": 4,
+            "actualReps": 4,
+            "weight": 50
+          },
+          {
+            "id": "set-1",
+            "setNumber": 2,
+            "completed": true,
+            "targetReps": 4,
+            "actualReps": 4
+          },
+          {
+            "id": "set-2",
+            "setNumber": 3,
+            "completed": true,
+            "targetReps": 4,
+            "actualReps": 4
+          },
+          {
+            "id": "set-3",
+            "setNumber": 4,
+            "completed": true,
+            "targetReps": 4,
+            "actualReps": 4,
+            "weight": 65
+          }
+        ],
+        "movements": [
+          {
+            "name": "Back Squat",
+            "reps": 4,
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round"
+          }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "6 Min AMRAP x 2",
+        "type": "wod",
+        "loggingMode": "amrap_intervals",
+        "partKind": "metcon",
+        "aiPartName": "FORGE",
+        "prescription": "B.1 6 min AMRAP: 10 Toes to Bar, 10 Alt Weighted Box Step Up, 2 min REST; B.2 6 min AMRAP: 10 American Kettlebell Swing @16/24kg, 40 Double Under / 80 Singles",
+        "rawText": "METCON (Medium)\nb.1.\n6 minutes AMRAP:\n10 Toes to Bar\n10 alt' weighted box step up\n02:00 minutes REST\nb.2\n6 minutes AMRAP:\n10 American Kettlebell Swing @16/24kg\n40 Double Under / 80 singles",
+        "intervalCount": 2,
+        "workDuration": 720,
+        "restDuration": 240,
+        "rxWeights": {
+          "male": 24,
+          "female": 16,
+          "unit": "kg"
+        },
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 560,
+            "weight": 17.5
+          }
+        ],
+        "movements": [
+          {
+            "name": "Toes to Bar",
+            "reps": 10,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Alt Weighted Box Step Up",
+            "reps": 10,
+            "rxWeights": {
+              "male": 15,
+              "female": 15,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "other",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [
+              15
+            ]
+          },
+          {
+            "name": "American Kettlebell Swing",
+            "reps": 10,
+            "rxWeights": {
+              "male": 20,
+              "female": 20,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [
+              20
+            ]
+          },
+          {
+            "name": "Double Under",
+            "reps": 40,
+            "inputType": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "alternative": {
+              "name": "Single Under",
+              "reps": 80
+            }
+          }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "label": "B.1",
+            "scoreType": "rounds",
+            "result": {
+              "value": 4
+            },
+            "movements": [
+              {
+                "name": "Toes to Bar",
+                "reps": 10,
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round"
+              },
+              {
+                "name": "Alt Weighted Box Step Up",
+                "reps": 10,
+                "rxWeights": {
+                  "male": 15,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "other",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "loggedWeights": [
+                  15
+                ]
+              }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "label": "B.2",
+            "scoreType": "rounds",
+            "result": {
+              "value": 4
+            },
+            "movements": [
+              {
+                "name": "American Kettlebell Swing",
+                "reps": 10,
+                "rxWeights": {
+                  "male": 20,
+                  "female": 20,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "kettlebell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "loggedWeights": [
+                  20
+                ]
+              },
+              {
+                "name": "Double Under",
+                "reps": 40,
+                "inputType": "none",
+                "countingMode": "per_round",
+                "scoreEntryMode": "per_round",
+                "alternative": {
+                  "name": "Single Under",
+                  "reps": 80
+                }
+              }
+            ]
+          }
+        ],
+        "rounds": 8
+      }
+    ]
+  }
+}

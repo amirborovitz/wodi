@@ -1,0 +1,143 @@
+/* Above the post sheet (1041) — it opens from inside it and is always the
+   frontmost thing while it is up. */
+.camera {
+  position: fixed;
+  inset: 0;
+  z-index: 1090;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A selfie preview HAS to be a mirror — framing yourself against an
+   un-mirrored image is like combing your hair on video. The capture applies
+   the same flip, so this is a preview convention and not a lie. */
+.videoMirrored {
+  transform: scaleX(-1);
+}
+
+.notice {
+  position: absolute;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.denied {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.deniedText {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.deniedBtn {
+  height: 46px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 12px;
+  background: var(--wodi-yellow);
+  color: #17140a;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px calc(30px + env(safe-area-inset-bottom));
+  /* The shutter sits over the picture, so it needs its own ground to stay
+     legible against a bright gym floor. */
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.55) 60%);
+  padding-top: 40px;
+}
+
+.side {
+  width: 54px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.side svg {
+  width: 24px;
+  height: 24px;
+}
+
+.side:disabled {
+  opacity: 0.35;
+}
+
+.shutter {
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.9);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shutterInner {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.12s ease;
+}
+
+.shutter:active .shutterInner {
+  transform: scale(0.88);
+}
+
+.shutter:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

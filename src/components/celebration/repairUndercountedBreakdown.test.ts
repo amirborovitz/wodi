@@ -77,3 +77,40 @@ describe('repairUndercountedBreakdown — partner blocks', () => {
     expect(repsOf(repaired)).toEqual([35, 70]);
   });
 });
+
+describe('a max-effort count is never repaired', () => {
+  // "[02:00 AMRAP , 02:00 REST] x 4 rounds: 2 rounds / 8 Push Press / 8 Box Jumps / Into - Max
+  // Burpees Over the Bar". getPrescriptionRepeatCount matches the INNER "2 rounds of" and hands
+  // this pass repeats=2, which it applied to the burpees — turning a logged 10 into 20 on the
+  // poster while the stored breakdown still said 10.
+  const fixedWorkIntoMax = (): Exercise => ({
+    id: 'exercise-1',
+    name: '2:00 AMRAP x 4',
+    type: 'wod',
+    loggingMode: 'amrap_intervals',
+    prescription: '[02:00 AMRAP / 02:00 REST] x 4: 2 rounds of 8 Push Press @35/50kg + 8 Box Jumps, then Max Burpees Over the Bar',
+    intervalCount: 4,
+    rounds: 4,
+    movements: [
+      { name: 'Buy-In: Push Press', reps: 8, perRound: false, countingMode: 'per_interval' },
+      { name: 'Buy-In: Box Jump', reps: 8, perRound: false, countingMode: 'per_interval' },
+      { name: 'Burpees Over The Bar', reps: 10, isMaxReps: true },
+    ],
+    sets: [],
+  } as unknown as Exercise);
+
+  const stored = (): WorkloadBreakdown => ({
+    movements: [
+      { name: 'Buy-In: Push Press', exerciseIndex: 0, totalReps: 32, weight: 50, unit: 'kg', color: 'yellow' },
+      { name: 'Buy-In: Box Jump', exerciseIndex: 0, totalReps: 32, color: 'magenta' },
+      { name: 'Burpees Over The Bar', exerciseIndex: 0, totalReps: 10, color: 'magenta' },
+    ],
+    grandTotalReps: 74,
+    grandTotalVolume: 1600,
+  } as unknown as WorkloadBreakdown);
+
+  it('leaves the athlete\'s logged max exactly as logged', () => {
+    const repaired = repairUndercountedBreakdown(stored(), [fixedWorkIntoMax()]);
+    expect(repaired.movements.find((m) => m.name === 'Burpees Over The Bar')?.totalReps).toBe(10);
+  });
+});

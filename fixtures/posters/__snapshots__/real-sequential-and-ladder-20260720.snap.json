@@ -410,5 +410,9 @@
   "pageRepsSchemes": [
     null,
     null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
   ]
 }

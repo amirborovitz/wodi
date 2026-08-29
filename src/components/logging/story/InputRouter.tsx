@@ -1,7 +1,7 @@
 import type { StoryExerciseResult, MovementResult } from './types';
 import { prescribesBuildingLoad } from './types';
 import { LoadInput } from './LoadInput';
-import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput } from './ScoreInputs';
+import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput, OpenRepsPerIntervalInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
 import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
@@ -10,6 +10,7 @@ import { LadderInput } from './LadderInput';
 import { DescendingSetTrack } from './DescendingSetTrack';
 import { FreeScoreInput } from './FreeScoreInput';
 import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
+import { resolveBlockScore } from '../../../services/blockScore';
 
 interface InputRouterProps {
   result: StoryExerciseResult;
@@ -31,14 +32,38 @@ interface InputRouterProps {
 export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChange, lastMaxReps }: InputRouterProps) {
   const kind = result.kind;
   const movements = result.movementResults ?? [];
-  if (kind === 'score_time' || kind === 'score_rounds') {
+  if (kind === 'score_time' || kind === 'score_rounds' || kind === 'score_open_reps') {
     const isLadder = !!(result.exercise.ladderReps && result.exercise.ladderReps.length > 0);
+
+    // What this block is actually scored by, read from the block rather than its format name.
+    // A board can run on an AMRAP clock and still have no rounds to earn: "[2:00 AMRAP] x4 —
+    // 2 rounds of 8 Push Press + 8 Box Jumps, into max burpees" prescribes both rounds, so the
+    // only number the athlete brings is the burpees.
+    const blockScore = resolveBlockScore(result.exercise);
+    // The per-window grid answers ONE question — "how many X each window?" — so it only fits a
+    // block with a single open movement. A station board leaves every station open, and there is
+    // no single X to ask about: the bike was taking the grid while the other four stations were
+    // demoted to side tiles, two logging surfaces disagreeing about the same workout. With
+    // several open movements each station is simply its own tile, answered once as a per-round
+    // average, and the visit count turns that into the total.
+    const openMovements = blockScore.type === 'open_reps' ? blockScore.movements : [];
+    const isPerStationBoard = openMovements.length > 1;
+    const scoresOpenCount = kind === 'score_open_reps'
+      && blockScore.type === 'open_reps'
+      && !isPerStationBoard;
+    const openMovementKey = scoresOpenCount ? openMovements[0].name.toLowerCase() : null;
 
     // For ladder AMRAP, bodyweight reps movements are determined by the rung —
     // only weighted/distance movements need user input.
-    const visibleMovements = isLadder
+    //
+    // The open movement is dropped here because its count is the block's SCORE and already has
+    // its own per-window input below. Left in, it also drew a max-reps tile from
+    // ScoreMovementInputs (getTileConfig's isMaxBodyweight branch) — so the athlete was asked
+    // for the same burpees twice, in two different shapes, with no hint which one counted.
+    const visibleMovements = (isLadder
       ? movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance')
-      : movements;
+      : movements
+    ).filter(mr => !openMovementKey || mr.movement.name.toLowerCase() !== openMovementKey);
     const inputMovements = visibleMovements.filter(
       mr => mr.kind === 'load' || mr.kind === 'distance'
     );
@@ -118,6 +143,15 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {kind === 'score_rounds' && !useSimplifiedIntervalRounds && !isLadder && !isPureRelay && (
           <ScoreRoundsInput result={result} onChange={onChange} />
         )}
+        {scoresOpenCount && blockScore.type === 'open_reps' && !isLadder && (
+          <OpenRepsPerIntervalInput
+            result={result}
+            movementName={blockScore.movements[0].name}
+            intervals={blockScore.intervals}
+            seed={lastMaxReps?.[blockScore.movements[0].name.toLowerCase()]}
+            onChange={onChange}
+          />
+        )}
         {useSimplifiedIntervalRounds && (
           <RoundsPerIntervalInput
             result={result}
@@ -140,7 +174,12 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
             movements={displayMovements}
             inputMovements={inputMovements}
             isRelayContext={hasRelay && kind === 'score_rounds'}
-            distancePrescribedByStructure={(kind === 'score_rounds' || isPerMovementLadder) && !hasRelay}
+            // Prescribed distances are display-only on any scored-by-structure block: the board
+            // states every metre, so there is nothing to type. Open-reps blocks are the same —
+            // their prescribed work is fully written, which is precisely why the score is the
+            // one movement that isn't.
+            distancePrescribedByStructure={(kind === 'score_rounds' || kind === 'score_open_reps' || isPerMovementLadder) && !hasRelay}
+            perStation={isPerStationBoard}
             teamSize={teamSize}
             onSubstitutionOpenChange={onSubstitutionOpenChange}
             onChange={(index: number, patch: Partial<MovementResult>) => {

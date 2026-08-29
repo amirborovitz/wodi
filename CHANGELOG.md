@@ -1,5 +1,93 @@
 # Changelog
 
+## v0.1.30 — The parse stops asking nicely, and the feed gets a face
+
+Two of this release's three big pieces are the same move made twice: stop asking the model to
+remember a rule buried in 27,000 words of prompt, and make the rule structural instead. The third
+is the feed growing the one thing it was missing — the athlete in the picture.
+
+---
+
+### The parse contract is now a schema, not a plea
+
+`parseSchema.ts` sends the parse as an OpenAI structured output with `strict: true`. The difference
+is what happens when the model forgets: a prose "MUST" is a request the response can quietly miss,
+a required schema slot is a response that gets rejected.
+
+`equipment` is the case that forced it. The prompt already said the field was mandatory and the
+model still returned a Renegade Row with no implement, which fell through four name-based fallbacks
+to a hardcoded `return 'barbell'` — a wrong answer produced with total confidence, by us, about
+something the AI never claimed. It can no longer be omitted.
+
+### A format is a clock. A score is what you count.
+
+`blockScore.ts` — new, and the owner of a question that was previously answered by whichever
+fallback ran first. "Every 2:00 x 4 rounds, 2 rounds of 8 push press + 8 box jumps" is a board whose
+rounds are *prescribed*: the athlete does not earn a round count, so putting `ROUNDS 7` on the
+poster was inventing a score out of a clock. The block is the scored unit, read from the block
+itself and never from the format name.
+
+`maxMetric.ts` is the same principle one level down. When a station says "max", the parser now
+records *which slot* the word "max" was written into, so nothing downstream has to guess whether an
+Echo Bike swap scores calories or the burpees it replaced score reps. Old docs fall back to
+`inputType`; new ones never need to.
+
+### Round counting gets one owner (mostly)
+
+`sectionedMovementOccurrences` in `workloadCalculation.ts` is now the single answer to "how many
+times did this movement actually happen" for sectioned pieces. It used to be answered twice —
+once at parse time, once, differently, at save time — and the save path knew two of the three facts,
+so a board that wrote its round count in words got a different total depending on which path you
+came through.
+
+Also fixed: a count equal to the station count claims every station came up exactly once, and a
+board that also writes "(5 rounds)" is contradicting that — the AI put the round count in the
+interval slot. Deliberately narrow. An earlier attempt multiplied through whenever the count wasn't
+divisible by the station count, which quietly doubled every honest rotation board.
+
+**Known divergence, documented not fixed:** the save path still runs its own copy of the
+per-movement round math (`getMovementEffectiveRounds` in `AddWorkoutScreen.tsx`) and has no run
+exemption. Next release.
+
+### Post to the feed with your face in it
+
+The feed was already global, no-follow and ephemeral. What it lacked was any reason to look like
+*you*. `PostToFeedSheet` is now the one step between "I want this up" and it being up — two taps,
+four with a photo — and nothing is written until you tap post, so backing out leaves no orphaned
+upload and no edit to your poster.
+
+`StoryFrame` is the part worth stealing: a poster on a photo composed at 9:16, where the photo is a
+*border* and not a surface. The first attempt put the photo behind a poster-shaped card, the two
+fought over the same pixels and the poster lost. The fix was the aspect ratio, not the overlay.
+`SelfieCamera` and `usePhotoCrop` feed it. Captions are capped at one line — 120 characters, held
+in `feed/types.ts` and backstopped in `firestore.rules` for anything that doesn't go through the
+client.
+
+### Records absorbs PRs
+
+`PRScreen` is deleted — 1,191 lines of screen and stylesheet that existed to do manual entry, which
+is now `AddRecordSheet` inside `RecordsScreen` where the records already live. One place to see a
+record, one place to add one.
+
+### The week is a poster too
+
+`recap/week/` gives the week drop the same treatment the WOD poster got: six skins that are
+surfaces only, and `useWeekPosterData` deciding every string and number once so Slab and Hazard
+can't disagree about how many sessions there were. Same truth standard — a week with no logged
+durations drops the element rather than inventing a figure. `WeekDropPage` lost 364 lines of CSS
+doing this.
+
+### Small
+
+- **`UpdatePill` + `useAppVersion`** — installed from the home screen there is no browser chrome and
+  so no reload. The app now compares the bundle it is running against `/version.json` and offers
+  the reload itself.
+- **Logging inputs** — `ScoreInputs` split out of the score sheet; `ScoreMovementInputs` reworked.
+- **Fixtures** — 6 new poster fixtures (station EMOM 50:10, two-AMRAP boards, interval AMRAP with
+  buy-in, plus their legacy-undercounted twins) and 1 new WOD corpus fixture. 50 poster fixtures
+  and 577 tests green.
+
+
 ## v0.1.29 — A recap is a poster, not a stats screen
 
 Wrapped was a stats screen wearing story chrome: bar charts, cards framed around a dash, and a hub

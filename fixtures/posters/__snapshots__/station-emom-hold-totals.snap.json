@@ -12,8 +12,7 @@
           "accent": "yellow",
           "stationRow": true,
           "suppressMine": true,
-          "roundLabel": "MIN 1",
-          "stationHeaderCap": "4 rds · 1:00"
+          "roundLabel": "MIN 1"
         },
         {
           "primary": "8-10 Burpee",
@@ -22,8 +21,7 @@
           "accent": "magenta",
           "stationRow": true,
           "suppressMine": true,
-          "roundLabel": "MIN 2",
-          "stationHeaderCap": "4 rds · 1:00"
+          "roundLabel": "MIN 2"
         },
         {
           "primary": "45s Plank Hold",
@@ -32,8 +30,7 @@
           "accent": "cyan",
           "stationRow": true,
           "suppressMine": true,
-          "roundLabel": "MIN 3",
-          "stationHeaderCap": "4 rds · 1:00"
+          "roundLabel": "MIN 3"
         }
       ],
       "hiddenCount": 0,
@@ -54,8 +51,7 @@
             "accent": "yellow",
             "stationRow": true,
             "suppressMine": true,
-            "roundLabel": "MIN 1",
-            "stationHeaderCap": "4 rds · 1:00"
+            "roundLabel": "MIN 1"
           },
           {
             "primary": "8-10 Burpee",
@@ -64,8 +60,7 @@
             "accent": "magenta",
             "stationRow": true,
             "suppressMine": true,
-            "roundLabel": "MIN 2",
-            "stationHeaderCap": "4 rds · 1:00"
+            "roundLabel": "MIN 2"
           },
           {
             "primary": "45s Plank Hold",
@@ -74,8 +69,7 @@
             "accent": "cyan",
             "stationRow": true,
             "suppressMine": true,
-            "roundLabel": "MIN 3",
-            "stationHeaderCap": "4 rds · 1:00"
+            "roundLabel": "MIN 3"
           }
         ],
         "hiddenCount": 0,
@@ -118,22 +112,13 @@
         "cap": ""
       },
       {
-        "kind": "block",
-        "label": "MIN 1",
-        "cap": "4 rds · 1:00"
-      },
-      {
         "kind": "line",
         "rx": "8-10 Thruster @ 40kg",
         "load": "",
         "mine": "",
         "team": "",
-        "total": "36 total"
-      },
-      {
-        "kind": "block",
-        "label": "MIN 2",
-        "cap": "4 rds · 1:00"
+        "total": "36 total",
+        "roundLabel": "MIN 1"
       },
       {
         "kind": "line",
@@ -141,12 +126,8 @@
         "load": "",
         "mine": "",
         "team": "",
-        "total": "36 total"
-      },
-      {
-        "kind": "block",
-        "label": "MIN 3",
-        "cap": "4 rds · 1:00"
+        "total": "36 total",
+        "roundLabel": "MIN 2"
       },
       {
         "kind": "line",
@@ -154,7 +135,8 @@
         "load": "",
         "mine": "",
         "team": "",
-        "total": "3 min total"
+        "total": "3 min total",
+        "roundLabel": "MIN 3"
       }
     ],
     "pages": [
@@ -165,22 +147,13 @@
           "cap": ""
         },
         {
-          "kind": "block",
-          "label": "MIN 1",
-          "cap": "4 rds · 1:00"
-        },
-        {
           "kind": "line",
           "rx": "8-10 Thruster @ 40kg",
           "load": "",
           "mine": "",
           "team": "",
-          "total": "36 total"
-        },
-        {
-          "kind": "block",
-          "label": "MIN 2",
-          "cap": "4 rds · 1:00"
+          "total": "36 total",
+          "roundLabel": "MIN 1"
         },
         {
           "kind": "line",
@@ -188,12 +161,8 @@
           "load": "",
           "mine": "",
           "team": "",
-          "total": "36 total"
-        },
-        {
-          "kind": "block",
-          "label": "MIN 3",
-          "cap": "4 rds · 1:00"
+          "total": "36 total",
+          "roundLabel": "MIN 2"
         },
         {
           "kind": "line",
@@ -201,7 +170,8 @@
           "load": "",
           "mine": "",
           "team": "",
-          "total": "3 min total"
+          "total": "3 min total",
+          "roundLabel": "MIN 3"
         }
       ]
     ]
@@ -214,5 +184,8 @@
   },
   "pageRepsSchemes": [
     null
+  ],
+  "pageMaxPractices": [
+    false
   ]
 }

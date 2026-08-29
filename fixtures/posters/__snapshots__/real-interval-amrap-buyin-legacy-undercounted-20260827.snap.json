@@ -1,0 +1,228 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Barbell Complex",
+        "blueprint": "8 sets",
+        "rows": [
+          {
+            "primary": "40->50KG",
+            "name": "1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk",
+            "subNote": "8 total",
+            "mineKey": "Power Clean",
+            "accent": "yellow",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "2 min rest between",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "BUY-IN",
+        "blueprint": "2 rounds",
+        "rows": [
+          {
+            "primary": "8 Push Presses @ 50kg",
+            "name": "",
+            "totalNote": "8 total",
+            "mineKey": "Push Press",
+            "accent": "yellow"
+          },
+          {
+            "primary": "8 Box Jumps",
+            "name": "",
+            "totalNote": "8 total",
+            "mineKey": "Box Jump",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "THEN",
+        "rows": [
+          {
+            "primary": "Max Burpees Over the Bar",
+            "name": "",
+            "mineKey": "Burpees Over the Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "11",
+    "unit": "BURPEES OVER THE BAR",
+    "formatLine": "4 × 2 MIN · In Pairs",
+    "storyLine": "11 burpees over the bar · 8 power clean · 8 hang squat clean · 8 push jerk · 8 push press · 8 box jump",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "E1:15MOM × 8",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "Power Clean",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "Hang Squat Clean",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "Push Jerk",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 8
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "2:00 AMRAP X 4",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "8",
+        "name": "Buy-In: Push Press",
+        "total": "",
+        "color": "magenta",
+        "weight": 50,
+        "unit": "kg"
+      },
+      {
+        "perRound": "8",
+        "name": "Buy-In: Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "3",
+        "name": "Burpees Over The Bar",
+        "total": "11 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta",
+    "approximate": true,
+    "openCountWindows": 4
+  },
+  "resultLabel": "BURPEES OVER THE BAR",
+  "resultValue": "~11",
+  "resultMeta": "total across 4 rounds",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "8 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "40->50KG 1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk",
+          "load": "",
+          "mine": "40-50kg",
+          "team": "",
+          "total": "8 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2 MIN REST BETWEEN",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": "2 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Push Presses",
+          "load": "",
+          "mine": "50kg",
+          "team": "",
+          "total": "8 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "8 total"
+        },
+        {
+          "kind": "block",
+          "label": "THEN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "Max Burpees Over the Bar",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ]
+}

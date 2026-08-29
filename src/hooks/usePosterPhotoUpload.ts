@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { deletePosterPhoto, uploadPosterPhoto } from '../services/feed/feedPhoto';
+import { deleteStoredImage, uploadPosterPhoto } from '../services/feed/feedPhoto';
 import type { PosterPhoto } from '../types';
 
 interface UsePosterPhotoUploadResult {
@@ -28,7 +28,7 @@ export function usePosterPhotoUpload(): UsePosterPhotoUploadResult {
         onReady(photo);
         // Only after the replacement is safely up, so a failed upload never
         // leaves the poster with a photo whose object is already gone.
-        if (previous) void deletePosterPhoto(previous);
+        if (previous) void deleteStoredImage(previous.path);
       })
       .catch((err) => {
         console.error('Failed to add poster photo:', err);
@@ -38,7 +38,7 @@ export function usePosterPhotoUpload(): UsePosterPhotoUploadResult {
   }, [user, busy]);
 
   const discard = useCallback((photo: PosterPhoto): void => {
-    void deletePosterPhoto(photo);
+    void deleteStoredImage(photo.path);
   }, []);
 
   return { busy, error, clearError: useCallback(() => setError(null), []), choose, discard };

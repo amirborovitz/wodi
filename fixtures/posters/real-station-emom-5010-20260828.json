@@ -1,0 +1,79 @@
+{
+  "name": "real-station-emom-5010-20260828",
+  "description": "REAL saved doc 9bc8EZwbW87BXTAnDjsG (2026-08-28). A. Core & Stability 3 sets (accessory) + B. station EMOM (50:10) for 25 min, 5 stations x 5 rounds, every station max-effort. Reproduces four reported bugs: (1) Burpee shows 6 reps the athlete never logged, (2) per-station totals are the single per-visit value, not multiplied by the 5 visits, (3) Echo Bike and Renegade Row BOTH inherit the exercise-level 8-rep sets (40 each), (4) the metcon page shows '3 sets' leaked from part A and never shows the board's 50:10 work/rest.",
+  "workout": {
+    "title": "WOD",
+    "format": "emom",
+    "timeCap": 1500,
+    "rawText": "Core & Stability\n3 sets:\n6/6 Kettlebell Windmill\n20/20m Suitcase Carry\n40 sec Weighted Plank Hold\n\nMETCON (Long)\nEMOM (50:10) for 25 minutes (5 rounds):\nCalories Echo Bike\nBar Muscle-up / Pull-up\nBox Jump\nRenegade Row\nBurpee",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Core & Stability",
+        "type": "strength",
+        "prescription": "3 sets: 6/6 Kettlebell Windmill, 20/20m Suitcase Carry, 40 sec Weighted Plank Hold",
+        "rawText": "3 sets:\n6/6 Kettlebell Windmill\n20/20m Suitcase Carry\n40 sec Weighted Plank Hold",
+        "rounds": 3,
+        "partKind": "metcon",
+        "loggingMode": "strength",
+        "isSecondary": true,
+        "partnerWorkout": false,
+        "aiPartName": "HAMMER",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 6, "actualReps": 6 }
+        ],
+        "movements": [
+          { "name": "Kettlebell Windmill", "reps": 6, "repsDisplay": "6/6", "perSide": true, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Suitcase Carry", "repsDisplay": "20/20m", "distance": 20, "perSide": true, "unit": "m", "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Weighted Plank Hold", "time": 40, "inputType": "none", "equipment": "other", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "EMOM 25",
+        "type": "wod",
+        "stationRotation": true,
+        "prescription": "EMOM (50:10) for 25 minutes (5 rounds): Calories Echo Bike, Bar Muscle-up / Pull-up, Box Jump, Renegade Row, Burpee",
+        "rawText": "EMOM (50:10) for 25 minutes (5 rounds):\nCalories Echo Bike\nBar Muscle-up / Pull-up\nBox Jump\nRenegade Row\nBurpee",
+        "partKind": "metcon",
+        "loggingMode": "emom",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "intervalCount": 5,
+        "workDuration": 1500,
+        "aiPartName": "GRIND",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 8, "isMax": true },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 8, "isMax": true },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 8, "isMax": true },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 8, "isMax": true },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 8, "isMax": true }
+        ],
+        "movements": [
+          { "name": "Echo Bike", "inputType": "calories", "equipment": "none", "isMaxReps": true, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Station 1", "stationIndex": 0 },
+          { "name": "Bar Muscle-up", "reps": 4, "inputType": "none", "equipment": "none", "isMaxReps": true, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Station 2", "stationIndex": 1, "alternative": { "name": "Pull-up" } },
+          { "name": "Box Jump", "reps": 5, "inputType": "none", "equipment": "none", "isMaxReps": true, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Station 3", "stationIndex": 2 },
+          { "name": "Renegade Row", "inputType": "weight", "equipment": "dumbbell", "implementCount": 1, "isMaxReps": true, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Station 4", "stationIndex": 3 },
+          { "name": "Burpee", "reps": 6, "inputType": "none", "equipment": "none", "isMaxReps": true, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Station 5", "stationIndex": 4 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Echo Bike", "exerciseIndex": 1, "totalReps": 40, "color": "magenta" },
+        { "name": "Renegade Row", "exerciseIndex": 1, "totalReps": 40, "color": "yellow" },
+        { "name": "Kettlebell Windmill", "exerciseIndex": 0, "totalReps": 18, "color": "yellow" },
+        { "name": "Burpee", "exerciseIndex": 1, "totalReps": 6, "color": "magenta" },
+        { "name": "Box Jump", "exerciseIndex": 1, "totalReps": 5, "color": "magenta" },
+        { "name": "Bar Muscle-up", "exerciseIndex": 1, "totalReps": 4, "color": "cyan" },
+        { "name": "Suitcase Carry", "exerciseIndex": 0, "totalDistance": 60, "unit": "m", "distancePerRep": 20, "color": "magenta" },
+        { "name": "Weighted Plank Hold", "exerciseIndex": 0, "totalTime": 120, "color": "magenta" }
+      ],
+      "grandTotalReps": 113,
+      "grandTotalVolume": 0,
+      "grandTotalDistance": 60
+    }
+  }
+}

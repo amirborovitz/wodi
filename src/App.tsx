@@ -11,15 +11,15 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { AddWorkoutScreen } from './screens/AddWorkoutScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
-import { PRScreen } from './screens/PRScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen } from './components/settings';
-import { BottomNav } from './components/ui';
+import { BottomNav, UpdatePill } from './components/ui';
 import { WrappedStoryScreen } from './components/recap/WrappedStoryScreen';
 import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
+import { useAppVersion } from './hooks/useAppVersion';
 import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
@@ -40,6 +40,9 @@ function AppContent() {
   const [navDir, setNavDir] = useState<'up' | 'down' | null>(null);
   const [workoutDetailOrigin, setWorkoutDetailOrigin] = useState<'home' | 'history'>('history');
   const [pendingRecapData, setPendingRecapData] = useState<RecapData | null>(null);
+  // Installed from the home screen there is no browser chrome and so no reload
+  // gesture; this is the app's only route onto a newer deploy.
+  const { updateReady, applyUpdate } = useAppVersion();
 
   const handleOpenRecap = (recapData: RecapData) => {
     markRecapViewed(recapData);
@@ -207,7 +210,6 @@ function AppContent() {
       case 'profile':
         return (
           <ProfileScreen
-            onNavigateToPR={() => setCurrentScreen('pr')}
             onNavigateToRecords={() => setCurrentScreen('records')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
             onNavigateToProfile={() => setCurrentScreen('profile-settings')}
@@ -230,16 +232,6 @@ function AppContent() {
           <ProfileSettingsScreen
             onBack={() => setCurrentScreen('profile')}
             onOpenSettings={() => setCurrentScreen('settings')}
-          />
-        );
-      case 'pr':
-        return (
-          <PRScreen
-            onBack={() => setCurrentScreen('profile')}
-            onSelectWorkout={(workoutId) => {
-              void workoutId;
-              setCurrentScreen('history');
-            }}
           />
         );
       case 'records':
@@ -290,6 +282,8 @@ function AppContent() {
 
   return (
     <>
+      <UpdatePill visible={updateReady} onApply={applyUpdate} />
+
       <AnimatePresence mode="wait">
         <motion.div
           key={currentScreen}

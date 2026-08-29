@@ -147,7 +147,7 @@
       },
       {
         "kind": "line",
-        "rx": "7 Push Jerks @ 135lb",
+        "rx": "7 Push Jerks",
         "load": "",
         "mine": "135lb",
         "team": "",
@@ -183,7 +183,7 @@
         },
         {
           "kind": "line",
-          "rx": "7 Push Jerks @ 135lb",
+          "rx": "7 Push Jerks",
           "load": "",
           "mine": "135lb",
           "team": "",
@@ -200,5 +200,8 @@
   },
   "pageRepsSchemes": [
     null
+  ],
+  "pageMaxPractices": [
+    false
   ]
 }

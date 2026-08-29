@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue, heroScoreScale } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -42,6 +42,8 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
   const resultParts = splitResultValue(wod.result.value);
   const resultPrimary = resultParts.primary;
   const resultUnit = resultParts.unit;
+  // Several independent clocks — see PosterWod.result. Only ever set when there are 2+.
+  const heroScores = (wod.result.scores?.length ?? 0) > 1 ? wod.result.scores : undefined;
 
   return (
     <div style={{ width: '100%', position: 'relative', transform: 'rotate(-1.3deg)' }}>
@@ -104,7 +106,7 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: i ? (compact ? 6 : 10) : 0 }}>
                 {r.label && <span style={{ fontFamily: fD, fontSize: compact ? 14 : 16, fontWeight: 900, letterSpacing: '0.03em' }}>{r.label}</span>}
                 {r.cap && <span style={{ fontFamily: fD, fontSize: compact ? 9 : 10, fontWeight: 700, letterSpacing: '0.05em', color: '#7a6038', textTransform: 'uppercase' }}>{r.cap}</span>}
-                <span style={{ flex: 1 }} />
+                <BlockHeaderRule ruled={r.ruled} color="rgba(33,29,21,0.18)" />
                 {r.score && (
                   <span style={{ fontFamily: fH, fontSize: 25, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block' }}>
                     <span style={hl()}>{r.score} {r.scoreSub}</span>
@@ -146,15 +148,19 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                           <span style={hl()}>{parts.team}</span>
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 800, color: 'rgba(33,29,21,0.8)', whiteSpace: 'nowrap' }}>
+                          <span style={parts.meIsLoad ? loadVoice('rgba(33,29,21,0.5)') : { fontFamily: fD, fontSize: 15, fontWeight: 800, color: 'rgba(33,29,21,0.8)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
+                      parts.singleIsLoad ? (
+                        <span style={loadVoice('rgba(33,29,21,0.5)')}>{parts.single}</span>
+                      ) : (
                       <span style={{ fontFamily: fH, fontSize: compact ? 20 : 23, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         <span style={hl()}>{parts.single}</span>
                       </span>
+                      )
                     ) : <span />}
                   </div>
                   {r.ladderTrack && (
@@ -187,10 +193,29 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               {wod.rx && <AchievementBadge label={wod.rx} variant="onPaper" paperInkColor={BRAND.paperInk} />}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', height: 'auto', width: 'auto', marginTop: 8 }}>
+              {/* One clock, one score — every block's number gets the highlighter, none of them
+                  gets added to another. Chalk keeps its own marker treatment rather than the
+                  shared scoreboard's plain type. */}
+              {heroScores ? (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
+                  {heroScores.map((score, i) => (
+                    <React.Fragment key={`${score.label}-${i}`}>
+                      {i > 0 && <span style={{ width: 2, alignSelf: 'stretch', background: 'rgba(33,29,21,0.22)', margin: '6px 0 10px' }} />}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                        <span style={{ fontFamily: fH, fontSize: compact ? 14 : 16, color: '#5a4628', lineHeight: 1 }}>{score.label.toLowerCase()}</span>
+                        <span style={{ fontFamily: fD, fontSize: Math.round((compact ? 60 : 74) * heroScoreScale(heroScores.length)), fontWeight: 900, lineHeight: 0.88, color: BRAND.paperInk, whiteSpace: 'nowrap' }}>
+                          <span style={hl()}>{score.value}</span>
+                        </span>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
               <span style={{ fontFamily: fD, fontSize: compact ? 60 : 74, fontWeight: 900, lineHeight: 0.88, color: BRAND.paperInk, whiteSpace: 'nowrap' }}>
                 <span style={hl()}>{resultPrimary}</span>
               </span>
-              {resultUnit && (
+              )}
+              {!heroScores && resultUnit && (
                 <span style={{ fontFamily: fD, fontSize: compact ? 16 : 20, fontWeight: 700, color: '#7a6038', whiteSpace: 'nowrap', paddingBottom: compact ? 4 : 6 }}>
                   {resultUnit}
                 </span>

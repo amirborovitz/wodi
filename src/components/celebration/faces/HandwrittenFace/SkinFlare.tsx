@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -87,7 +87,7 @@ export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: i ? 12 : 0, marginBottom: 2 }}>
                 {r.label && <span style={{ fontFamily: fD, fontSize: 15, fontWeight: 900, letterSpacing: '0.05em' }}>{r.label}</span>}
                 {r.cap && <span style={{ fontFamily: fB, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(0,0,0,0.65)', textTransform: 'uppercase' }}>{r.cap}</span>}
-                <span style={{ flex: 1 }} />
+                <BlockHeaderRule ruled={r.ruled} color="rgba(0,0,0,0.18)" />
                 {r.score && (
                   <span style={{ fontFamily: fH, fontSize: 23, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-3deg)', display: 'inline-block' }}>
                     {r.score} <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)' }}>{r.scoreSub}</span>
@@ -131,13 +131,13 @@ export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.75)', whiteSpace: 'nowrap' }}>
+                          <span style={parts.meIsLoad ? loadVoice('rgba(0,0,0,0.5)') : { fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(0,0,0,0.75)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleIsLoad ? loadVoice('rgba(0,0,0,0.5)') : { fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.ink, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -175,6 +175,9 @@ export function SkinFlare({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               narrative={wod.result.narrative}
               style={{ marginTop: 2 }}
               primaryStyle={{ fontFamily: fD, fontSize: 90, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.ink, whiteSpace: 'nowrap' }}
+              scores={wod.result.scores}
+              scoreLabelStyle={{ color: 'rgba(0,0,0,0.55)' }}
+              scoreDividerColor="rgba(0,0,0,0.28)"
               unitStyle={{ fontFamily: fD, fontWeight: 700, color: 'rgba(0,0,0,0.5)', paddingBottom: 8 }}
               narrativeStyle={{ color: BRAND.ink }}
             />

@@ -9,6 +9,7 @@ import type {
 } from '../../../types';
 import type { LoadUnit } from '../../../utils/loadUnits';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
+import { findOpenMovement, findOpenMovements, scoresOpenReps } from '../../../services/blockScore';
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
 import { matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
@@ -24,6 +25,12 @@ export type ExerciseKind =
   | 'distance'         // runs, rows, carries — meters/km
   | 'score_time'       // "for time" metcon — mm:ss completion time
   | 'score_rounds'     // AMRAP — rounds + partial reps
+  // The board prescribes all its work except ONE movement, and that movement's count is the
+  // score ("2 rounds of 8/8, into max burpees"). Its own kind rather than a flavour of
+  // score_rounds: everything that asks "is this logged?", "what's missing?", "what noun does
+  // this piece score in?" reads the KIND, so leaving it as score_rounds meant the submit check
+  // still demanded a rounds count the board never had. See services/blockScore.
+  | 'score_open_reps'
   | 'intervals'        // EMOM / every X:XX — cadence + sets completed
   | 'free_score'       // unrecognized shape — user picks what they scored (time/rounds/reps/load)
   | 'note';            // fallback — free text
@@ -64,6 +71,16 @@ export interface StoryExerciseResult {
   // scheme (with maxRepsWeight), and a skill practice whose board asks for a max-effort test
   // ("max unbroken toes to bar") — see getMaxRepsMovement.
   maxReps?: number;
+  /**
+   * The open count window by window, when the block repeats on an interval clock — the four
+   * numbers behind "[2:00 AMRAP] x4 … into max burpees". `maxReps` stays the sum, so every
+   * existing consumer keeps working; this is the texture the poster tells the story with
+   * ("14 · 12 · 11 · 9" says the piece fell apart in window 3, which a bare 46 cannot).
+   *
+   * Rough by design — the logging screen asks for a recollection, not a tally, which is why the
+   * poster marks the total it derives from these with "~" (see formatApproximate).
+   */
+  maxRepsPerInterval?: number[];
   maxRepsWeight?: number;             // weight used for the "max" set
 
   // reps
@@ -317,21 +334,11 @@ export function prescribesBuildingLoad(exercise: ParsedExercise): boolean {
  * for it — that's the whole point — so nothing downstream can derive it, and without an input
  * the part logs as "5/5 sets" and the poster has nothing to say about those 8 minutes.
  *
- * THE AI DECIDES. The parse prompt asks it, for every practice block, whether the athlete earns a
- * number the board doesn't prescribe, and to stamp `isMaxReps` on the movement that carries it.
- * This function only reads that answer — it does not re-derive it from the prescribed quantities,
- * which would put a heuristic above the model on the one judgment we explicitly asked it to make.
- * `inferIsMaxReps` in the post-processor still backfills the stamp for docs parsed before the
- * prompt asked (and it defers to the AI whenever the field is present).
+ * A metcon asks the identical question ("2 rounds of 8/8, into max burpees"), so the answer has
+ * ONE owner: {@link findOpenMovement} in services/blockScore. This alias only keeps the name the
+ * practice-block call sites read well under.
  */
-export function getMaxRepsMovement(
-  // Structural, so the SAME rule answers for a ParsedExercise (logging) and a saved Exercise
-  // (poster). Two gates decide whether a practice block is worth showing — the wizard's
-  // needsLoggingStep and the poster's isMainPart — and they must not drift apart.
-  exercise: { movements?: ParsedMovement[] } | null | undefined,
-): ParsedMovement | undefined {
-  return exercise?.movements?.find((m) => m.isMaxReps === true);
-}
+export const getMaxRepsMovement = findOpenMovement;
 
 /** True when the board asks for UNBROKEN reps — its word, so the label can echo it. */
 export function prescribesUnbrokenMax(
@@ -491,10 +498,34 @@ function isMovementFilled(mr: MovementResult): boolean {
   }
 }
 
+/**
+ * The per-station entries that ARE the score, on a block that leaves several movements open.
+ *
+ * Such a block has no single `maxReps`: the athlete answers one question per station and the
+ * count lives on each movement. Anything asking "has this been logged?" has to look here, or a
+ * fully-filled five-station EMOM reads as empty and the screen demands a score already given.
+ * Empty for every other shape — one open movement still scores through `maxReps`.
+ */
+export function openStationResults(result: StoryExerciseResult): MovementResult[] {
+  const open = findOpenMovements(result.exercise);
+  if (open.length <= 1) return [];
+  const names = new Set(open.map((m) => m.name.toLowerCase()));
+  return (result.movementResults ?? []).filter((mr) => names.has(mr.movement.name.toLowerCase()));
+}
+
+/** True once any station on a multi-station block carries a number. */
+export function hasOpenStationEntry(result: StoryExerciseResult): boolean {
+  return openStationResults(result).some(
+    (mr) => (mr.reps ?? 0) > 0 || (mr.calories ?? 0) > 0 || (mr.distance ?? 0) > 0,
+  );
+}
+
 export function getRowState(result: StoryExerciseResult): RowState {
   // Scored exercises (for_time, AMRAP): primary state is always the score,
   // NOT the per-movement fill state. Movements are context, not targets.
-  const isScored = result.kind === 'score_time' || result.kind === 'score_rounds';
+  const isScored = result.kind === 'score_time'
+    || result.kind === 'score_rounds'
+    || result.kind === 'score_open_reps';
 
   // Superset: check movementResults (but not for scored exercises)
   if (!isScored && result.movementResults && result.movementResults.length > 0) {
@@ -541,6 +572,25 @@ export function getRowState(result: StoryExerciseResult): RowState {
       if (result.partialMovements != null && result.partialMovements.length > 0) return 'partial';
       return 'empty';
 
+    // The open movement's count IS the score, so `maxReps` (the sum of the per-window entries)
+    // is the only thing that can fill this block. It must never fall through to the rounds
+    // checks above: this board has no rounds, and asking for them is what started all of this.
+    case 'score_open_reps': {
+      // Several open movements: the score is spread across the stations, not summed into
+      // maxReps — that field is only ever written by the single-movement per-window input.
+      const stations = openStationResults(result);
+      if (stations.length > 0) {
+        const filled = stations.filter(
+          (mr) => (mr.reps ?? 0) > 0 || (mr.calories ?? 0) > 0 || (mr.distance ?? 0) > 0,
+        ).length;
+        if (filled === stations.length) return 'filled';
+        return filled > 0 ? 'partial' : 'empty';
+      }
+      if ((result.maxReps ?? 0) > 0) return 'filled';
+      if ((result.maxRepsPerInterval?.some((v) => v > 0)) === true) return 'partial';
+      return 'empty';
+    }
+
     case 'intervals':
       if (result.intervalsCompleted != null && result.intervalsCompleted > 0) {
         return result.intervalsCompleted >= (result.intervalsTotal ?? 0) ? 'filled' : 'partial';
@@ -582,6 +632,7 @@ export function getMissingLabel(kind: ExerciseKind): string {
     case 'distance':     return 'distance';
     case 'score_time':   return 'completion time';
     case 'score_rounds': return 'rounds';
+    case 'score_open_reps': return 'reps';
     case 'intervals':    return 'intervals completed';
     case 'free_score':   return 'score';
     case 'note':         return 'notes';
@@ -599,6 +650,7 @@ export function kindToTrinityColor(kind: ExerciseKind): string {
     case 'distance':     return 'var(--color-metcon)';   // magenta
     case 'score_time':   return 'var(--color-metcon)';   // magenta
     case 'score_rounds': return 'var(--color-metcon)';   // magenta
+    case 'score_open_reps': return 'var(--color-metcon)'; // magenta
     case 'intervals':    return 'var(--color-sessions)'; // cyan
     case 'free_score':   return 'var(--color-metcon)';   // magenta
     case 'note':         return 'var(--color-text-secondary)';
@@ -633,6 +685,27 @@ export function getWeightMax(unit: LoadUnit): number {
 }
 
 // ─── Create blank result from parsed exercise ───────────────────
+
+/**
+ * The kind implied by the AI's own `scoreType` — what the board is scored IN.
+ *
+ * Returns undefined when the AI didn't answer, which is the normal case: clock and score usually
+ * agree, so the prompt asks for this field only when they DIFFER. An undefined here means "use
+ * the format's conventional score", not "no score".
+ *
+ * 'reps' splits two ways, and only the movements can say which: a count the board PRESCRIBES is
+ * ordinary rep work, while a count it leaves OPEN ("max burpees") is a score the athlete earns
+ * and needs its own per-window input.
+ */
+function scoredKindFromAI(exercise: ParsedExercise): ExerciseKind | undefined {
+  switch (exercise.scoreType) {
+    case 'time': return 'score_time';
+    case 'rounds': return 'score_rounds';
+    case 'load': return 'load';
+    case 'reps': return findOpenMovement(exercise) ? 'score_open_reps' : 'reps';
+    default: return undefined;
+  }
+}
 
 export function createBlankResult(
   exercise: ParsedExercise,
@@ -673,7 +746,24 @@ export function createBlankResult(
   const isAllBodyweight = allMovements.length > 0
     ? allMovements.every(m => movementToKind(m) === 'reps')
     : !exercise.rxWeights && classifyMovementName(exercise.name) === 'bodyweight';
-  const kind = weightedKind === 'load' && isAllBodyweight ? 'reps' : weightedKind;
+  // Everything above derives a kind from the block's CLOCK — which timer it runs on. That is a
+  // guess about the score, and it is the guess that categorised "2 rounds of 8/8, into max
+  // burpees" as a rounds workout: an AMRAP clock conventionally scores rounds, so the app
+  // assumed rounds, and then had to be talked out of it.
+  const containerKind = weightedKind === 'load' && isAllBodyweight ? 'reps' : weightedKind;
+  // The AI's own answer outranks it. `scoreType` is the model telling us what the board is
+  // scored IN, which is the only thing that can distinguish a clock from a score — it reads the
+  // whiteboard; the format map only knows a convention. Absent (every workout parsed before this
+  // field existed, and every board where clock and score agree) falls through to the guess, so
+  // this is purely additive.
+  const kind: ExerciseKind = scoredKindFromAI(exercise)
+    ?? (containerKind === 'score_rounds' && scoresOpenReps(exercise)
+      // Safety net for a parse that omitted scoreType: an open movement means the rounds are
+      // prescription, whatever the clock says. Scoped to score_rounds deliberately — a skill
+      // practice also carries an open max test, but it has prescribed sets to log alongside it
+      // and keeps its own input.
+      ? 'score_open_reps'
+      : containerKind);
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;

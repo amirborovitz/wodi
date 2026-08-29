@@ -14,7 +14,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -62,6 +62,9 @@ function AurumMedallion({ wod }: { wod: PosterWod }): React.JSX.Element {
         <ResultValue
           value={wod.result.value}
           primaryStyle={{ ...inkStyle, fontFamily: fD, fontSize: 52, fontWeight: 900, lineHeight: 0.86, letterSpacing: '-0.02em', marginTop: 2, whiteSpace: 'nowrap' }}
+          scores={wod.result.scores}
+          scoreLabelStyle={{ ...inkStyle, opacity: 0.72 }}
+          scoreDividerColor="rgba(74,56,10,0.35)"
           unitStyle={{ ...inkStyle, fontFamily: fD, fontWeight: 900 }}
         />
       </div>
@@ -151,7 +154,7 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                   </span>
                 )}
                 {r.cap && <span style={{ fontFamily: fM, fontSize: 9.5, color: AU_DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{r.cap}</span>}
-                <span style={{ flex: 1 }} />
+                <BlockHeaderRule ruled={r.ruled} color="rgba(74,56,10,0.28)" />
                 {r.score && (
                   <span style={{ ...gold, fontFamily: fD, fontSize: 19, fontWeight: 900, display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {r.score} <span style={{ fontFamily: fM, fontSize: 10, color: AU_DIM }}>{r.scoreSub}</span>
@@ -236,13 +239,13 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(239,233,216,0.85)', whiteSpace: 'nowrap' }}>
+                          <span style={parts.meIsLoad ? loadVoice('rgba(74,56,10,0.62)') : { fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(239,233,216,0.85)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ ...gold, fontFamily: fD, fontSize: 18, fontWeight: 900, display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={parts.singleIsLoad ? loadVoice('rgba(74,56,10,0.62)') : { ...gold, fontFamily: fD, fontSize: 18, fontWeight: 900, display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {parts.single}
                       </span>
                     ) : <span />}

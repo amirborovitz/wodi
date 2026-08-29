@@ -51,6 +51,18 @@
   height: 100%;
 }
 
+/* Sentence case and a normal weight — everything else on the card is set in
+   uppercase athlete-speak, and the caption is the one place a person is just
+   talking. Wrapping is fine; it is capped at CAPTION_MAX, so it stays short. */
+.caption {
+  margin: 11px 2px 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(242, 240, 235, 0.82);
+  overflow-wrap: anywhere;
+}
+
 .reactions {
   display: flex;
   align-items: center;

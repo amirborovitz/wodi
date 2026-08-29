@@ -267,28 +267,78 @@ const MOVEMENT_ALIASES: Record<string, string> = {
   'running': 'Run',
 };
 
+// ─── Pass instrumentation ────────────────────────────────────────────────────
+// Every pass below was added because some board once parsed wrong. Which ones still EARN their
+// place is a question about live data, not about reading the code — so each parse records the
+// passes that actually CHANGED the AI's answer. Filter the console on "POST-PROC": a pass that
+// never appears across real logs is a pass the AI no longer needs (make the field required in
+// parseSchema.ts and delete it); one that fires constantly is a prompt bug, not a code bug.
+interface PassLog {
+  changed: string[];
+  total: number;
+}
+
+function sameShape(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function recordPass(log: PassLog, name: string, changed: boolean): void {
+  log.total += 1;
+  if (changed) log.changed.push(name);
+}
+
+function runPass(
+  log: PassLog,
+  name: string,
+  input: ParsedWorkout,
+  pass: (workout: ParsedWorkout) => ParsedWorkout,
+): ParsedWorkout {
+  const output = pass(input);
+  recordPass(log, name, !sameShape(output, input));
+  return output;
+}
+
+function reportPasses(log: PassLog): void {
+  const headline = `🧹 POST-PROC · ${log.changed.length}/${log.total} passes changed the AI's answer`;
+  console.info(log.changed.length === 0
+    ? `${headline} — the parse was used as returned`
+    : `${headline}\n${log.changed.map((name) => `  ✏️ ${name}`).join('\n')}`);
+}
+
 /**
  * Main post-processor function
  */
 export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout {
+  const passes: PassLog = { changed: [], total: 0 };
+
   // Detect partner workout if AI missed it
   const partnerResult = detectAndAdjustPartnerWorkout(workout);
+  recordPass(passes, 'detectAndAdjustPartnerWorkout',
+    (partnerResult.partnerWorkout != null && partnerResult.partnerWorkout !== workout.partnerWorkout)
+    || (partnerResult.teamSize != null && partnerResult.teamSize !== workout.teamSize)
+    || partnerResult.adjustedSets != null);
 
   // Extract time cap if missing
   const timeCap = workout.timeCap || partnerResult.timeCap || extractTimeCap(workout);
+  recordPass(passes, 'extractTimeCap', workout.timeCap == null && timeCap != null);
 
   // Correct format and type if AI returned wrong one (e.g., "strength" for AMRAP)
   const correctedFormat = correctWorkoutFormat(workout);
   const correctedType = correctWorkoutType(workout, correctedFormat);
+  recordPass(passes, 'correctWorkoutFormat', correctedFormat !== workout.format);
+  recordPass(passes, 'correctWorkoutType', correctedType !== workout.type);
 
   // Post-process exercises and detect implied supersets
   let processedExercises = workout.exercises.map(postProcessExercise);
+  recordPass(passes, 'postProcessExercise', !sameShape(processedExercises, workout.exercises));
 
   // Merge alternative movements that AI created as separate entries
-  processedExercises = processedExercises.map(ex => ({
+  const withMergedAlternatives = processedExercises.map(ex => ({
     ...ex,
     movements: ex.movements ? mergeAlternativeMovements(ex.movements) : undefined,
   }));
+  recordPass(passes, 'mergeAlternativeMovements', !sameShape(withMergedAlternatives, processedExercises));
+  processedExercises = withMergedAlternatives;
 
 
   const result = {
@@ -312,41 +362,41 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   };
 
   // Detect ladder rep patterns (e.g., "4-6-8-10-12") on amrap exercises
-  const withLadder = detectLadderReps(result);
+  const withLadder = runPass(passes, 'detectLadderReps', result, detectLadderReps);
 
   // Backfill "together" flag from rawText when AI missed it
-  const withTogether = backfillTogetherFlag(withLadder);
+  const withTogether = runPass(passes, 'backfillTogetherFlag', withLadder, backfillTogetherFlag);
 
   // Backfill per-exercise partnerWorkout/partnerSplit when the AI missed them
-  const withPartnerSplit = backfillPartnerSplit(withTogether);
+  const withPartnerSplit = runPass(passes, 'backfillPartnerSplit', withTogether, backfillPartnerSplit);
 
   // Backfill loggingMode on exercises that the AI missed
-  const withLoggingModes = backfillLoggingModes(withPartnerSplit);
+  const withLoggingModes = runPass(passes, 'backfillLoggingModes', withPartnerSplit, backfillLoggingModes);
 
   // Persist the interval count of interval AMRAPs as a structured field
-  const withIntervalCounts = backfillIntervalCount(withLoggingModes);
+  const withIntervalCounts = runPass(passes, 'backfillIntervalCount', withLoggingModes, backfillIntervalCount);
 
   // Backfill inputType on any movements that the AI missed
-  const withInputTypes = backfillInputTypes(withIntervalCounts);
+  const withInputTypes = runPass(passes, 'backfillInputTypes', withIntervalCounts, backfillInputTypes);
 
   // A prescribed-distance carry logs its LOAD, not its metres — corrects the stale 'none'
-  const withCarryLoads = backfillCarryLoadInput(withInputTypes);
+  const withCarryLoads = runPass(passes, 'backfillCarryLoadInput', withInputTypes, backfillCarryLoadInput);
 
   // Backfill loggingHints.sharedWeightMovements for barbell complexes
-  const withSharedWeight = backfillSharedWeightHints(withCarryLoads);
+  const withSharedWeight = runPass(passes, 'backfillSharedWeightHints', withCarryLoads, backfillSharedWeightHints);
 
   // Backfill the `complex` flag on "+"-joined same-bar complexes the AI didn't tag
-  const withComplex = backfillComplexFlag(withSharedWeight);
+  const withComplex = runPass(passes, 'backfillComplexFlag', withSharedWeight, backfillComplexFlag);
 
   // Backfill Min 1 / Min 2 / ... labels on rotating EMOM stations when the AI
   // parsed the movements but missed the station metadata.
-  const withEmomMinuteStations = backfillEmomMinuteStations(withComplex);
+  const withEmomMinuteStations = runPass(passes, 'backfillEmomMinuteStations', withComplex, backfillEmomMinuteStations);
 
   // Detect rotating interval "station" workouts (A/B/C/D repeated across outer rounds)
-  const withStationRotation = detectStationRotation(withEmomMinuteStations);
+  const withStationRotation = runPass(passes, 'detectStationRotation', withEmomMinuteStations, detectStationRotation);
 
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
-  const withBuyIns = detectMisplacedBuyIns(withStationRotation);
+  const withBuyIns = runPass(passes, 'detectMisplacedBuyIns', withStationRotation, detectMisplacedBuyIns);
 
   // Diagnostic only — warns if the AI's amrap_intervals/Buy-In classification looks inconsistent
   // with its own text, but does NOT override loggingMode/role/perRound. See function doc.
@@ -366,26 +416,29 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
 
   // Restore a lead-in movement the AI left ONLY in movements[], where sections shadow it. Pure
   // backfill of something otherwise invisible — it never moves or rewrites what the AI placed.
-  const withPerTierBuyIns = backfillSectionShadowedLeadIn(withCorrectedIntervals);
+  const withPerTierBuyIns = runPass(passes, 'backfillSectionShadowedLeadIn', withCorrectedIntervals, backfillSectionShadowedLeadIn);
 
   // Deterministically rebuild per-round sections for a per-movement independent rep ladder
   // ("[50-40-30] air squats / [30-20-10] push press / 15 box jumps each") when the AI collapsed it
   // to one shared scheme — so the poster shows each movement's own scheme, not a false 50-40-30.
-  const withPerMovementLadder = normalizePerMovementLadder(withPerTierBuyIns);
+  const withPerMovementLadder = runPass(passes, 'normalizePerMovementLadder', withPerTierBuyIns, normalizePerMovementLadder);
 
   // Collapse a lone single-pass `rounds` section into flat movements[] — ONE representation for
   // a plain chipper, so downstream never has to branch on which shape the AI happened to emit.
   // After the section-BUILDING normalizers above (a ladder/per-tier shape they just created has
   // >= 2 sections and is left alone) and before the interleaved repair, which skips sectioned
   // exercises.
-  const withSinglePassCollapsed = normalizeSinglePassSections(withPerMovementLadder);
+  const withSinglePassCollapsed = runPass(passes, 'normalizeSinglePassSections', withPerMovementLadder, normalizeSinglePassSections);
 
   // Restore interleaved repeats a flat for-time chipper collapsed at parse (e.g. a run written
   // before each station that the AI deduplicated to one) — rebuilt deterministically from board text.
-  const withInterleaved = normalizeInterleavedMovements(withSinglePassCollapsed);
+  const withInterleaved = runPass(passes, 'normalizeInterleavedMovements', withSinglePassCollapsed, normalizeInterleavedMovements);
 
   // Normalize explicit movement semantics so downstream math can trust structure
-  return backfillMovementSemantics(withInterleaved);
+  const withMovementSemantics = runPass(passes, 'backfillMovementSemantics', withInterleaved, backfillMovementSemantics);
+
+  reportPasses(passes);
+  return withMovementSemantics;
 }
 
 function isScoredLoggingMode(loggingMode?: ExerciseLoggingMode): boolean {

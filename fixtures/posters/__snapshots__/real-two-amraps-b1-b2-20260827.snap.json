@@ -1,0 +1,250 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Squat",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "50->65KG",
+            "name": "Back Squat",
+            "subNote": "16 total",
+            "totalNote": "16 total",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "2 min rest between",
+        "rows": [],
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "B.1",
+        "blueprint": "AMRAP 6:00",
+        "rows": [
+          {
+            "primary": "10 Toes to Bars",
+            "name": "",
+            "totalNote": "40 total",
+            "mineKey": "Toes to Bar",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "primary": "10 Alt Weighted Box Step Ups @ 15kg",
+            "name": "",
+            "totalNote": "40 total",
+            "mineKey": "Alt Weighted Box Step Up",
+            "accent": "yellow"
+          }
+        ],
+        "blockScore": {
+          "value": "4",
+          "unit": "rds"
+        },
+        "isPartnerConfirmed": false
+      },
+      {
+        "title": "B.2",
+        "blueprint": "AMRAP 6:00",
+        "rows": [
+          {
+            "primary": "10 American KB Swings @ 20kg",
+            "name": "",
+            "totalNote": "40 total",
+            "mineKey": "American Kettlebell Swing",
+            "accent": "yellow"
+          },
+          {
+            "primary": "40 Double Unders / 80 Single Unders",
+            "name": "",
+            "totalNote": "160 total",
+            "mineKey": "Double Under",
+            "suppressMine": true,
+            "accent": "magenta"
+          }
+        ],
+        "blockScore": {
+          "value": "4",
+          "unit": "rds"
+        },
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "4",
+    "unit": "ROUNDS",
+    "blockScores": [
+      {
+        "label": "B.1",
+        "value": "4",
+        "unit": "rds"
+      },
+      {
+        "label": "B.2",
+        "value": "4",
+        "unit": "rds"
+      }
+    ],
+    "formatLine": "2 × 6 MIN",
+    "storyLine": "16 back squat · 40 ttb · 40 alt weighted box step up · 40 american kettlebell swing · 160 du",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BACK SQUAT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Back Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          50,
+          65
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 16
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "6 MIN AMRAP X 2",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Toes to Bar",
+        "total": "",
+        "color": "cyan",
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Alt Weighted Box Step Up",
+        "total": "",
+        "color": "yellow",
+        "weight": 15,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "American Kettlebell Swing",
+        "total": "",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg"
+      },
+      {
+        "perRound": "40",
+        "name": "Double Under",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "ROUNDS",
+  "resultValue": "4",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "50->65KG Back Squat",
+          "load": "",
+          "mine": "50-65kg",
+          "team": "",
+          "total": "16 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2 MIN REST BETWEEN",
+          "cap": ""
+        },
+        {
+          "kind": "block",
+          "label": "B.1",
+          "cap": "AMRAP 6:00",
+          "ruled": true
+        },
+        {
+          "kind": "line",
+          "rx": "10 Toes to Bars",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Alt Weighted Box Step Ups",
+          "load": "",
+          "mine": "15kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "block",
+          "label": "B.2",
+          "cap": "AMRAP 6:00",
+          "ruled": true
+        },
+        {
+          "kind": "line",
+          "rx": "10 American KB Swings",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "40 Double Unders / 80 Single Unders",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "160 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "4-4-4-4 reps",
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ]
+}

@@ -2,17 +2,18 @@
   "reward": [
     {
       "title": "Blueprint",
-      "blueprint": "10 min AMRAP · 2 min rest · 3 rounds",
+      "blueprint": "2 min rest between",
       "rows": [],
       "isPartnerConfirmed": false
     },
     {
       "title": "AMRAP A",
-      "blueprint": "10:00",
+      "blueprint": "AMRAP 10:00",
       "rows": [
         {
           "primary": "7 CAL Echo Bike",
           "name": "",
+          "totalNote": "35 cal total",
           "mineKey": "Echo Bike",
           "suppressMine": true,
           "accent": "magenta"
@@ -20,12 +21,14 @@
         {
           "primary": "10 Alt Single DB Devil Presses @ 22.5/15kg",
           "name": "",
+          "totalNote": "50 total",
           "mineKey": "Alt Single Dumbbell Devil Press",
           "accent": "yellow"
         },
         {
           "primary": "30 Bicycle Crunches",
           "name": "",
+          "totalNote": "150 total",
           "mineKey": "Bicycle Crunch",
           "suppressMine": true,
           "accent": "magenta"
@@ -39,11 +42,12 @@
     },
     {
       "title": "AMRAP B",
-      "blueprint": "10:00",
+      "blueprint": "AMRAP 10:00",
       "rows": [
         {
           "primary": "50 Double Unders / 100 Single Unders",
           "name": "",
+          "totalNote": "250 total",
           "mineKey": "Double Under",
           "suppressMine": true,
           "accent": "magenta"
@@ -51,12 +55,14 @@
         {
           "primary": "10 Alt Weighted Box Step Ups @ 15kg",
           "name": "",
+          "totalNote": "50 total",
           "mineKey": "Alt Weighted Box Step Up",
           "accent": "yellow"
         },
         {
           "primary": "10 Toes to Bars",
           "name": "",
+          "totalNote": "50 total",
           "mineKey": "Toes to Bar",
           "suppressMine": true,
           "accent": "magenta"
@@ -70,23 +76,26 @@
     },
     {
       "title": "AMRAP C",
-      "blueprint": "10:00",
+      "blueprint": "AMRAP 10:00",
       "rows": [
         {
           "primary": "15 Russian KB Swings @ 28/20kg",
           "name": "",
+          "totalNote": "90 total",
           "mineKey": "Russian Kettlebell Swing",
           "accent": "yellow"
         },
         {
           "primary": "12 Goblet Squats @ 28/20kg",
           "name": "",
+          "totalNote": "72 total",
           "mineKey": "Goblet Squat",
           "accent": "yellow"
         },
         {
           "primary": "9 Push-ups",
           "name": "",
+          "totalNote": "54 total",
           "mineKey": "Push-up",
           "suppressMine": true,
           "accent": "magenta"
@@ -103,17 +112,18 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "10 min AMRAP · 2 min rest · 3 rounds",
+        "blueprint": "2 min rest between",
         "rows": [],
         "isPartnerConfirmed": false
       },
       {
         "title": "AMRAP A",
-        "blueprint": "10:00",
+        "blueprint": "AMRAP 10:00",
         "rows": [
           {
             "primary": "7 CAL Echo Bike",
             "name": "",
+            "totalNote": "35 cal total",
             "mineKey": "Echo Bike",
             "suppressMine": true,
             "accent": "magenta"
@@ -121,12 +131,14 @@
           {
             "primary": "10 Alt Single DB Devil Presses @ 22.5/15kg",
             "name": "",
+            "totalNote": "50 total",
             "mineKey": "Alt Single Dumbbell Devil Press",
             "accent": "yellow"
           },
           {
             "primary": "30 Bicycle Crunches",
             "name": "",
+            "totalNote": "150 total",
             "mineKey": "Bicycle Crunch",
             "suppressMine": true,
             "accent": "magenta"
@@ -140,11 +152,12 @@
       },
       {
         "title": "AMRAP B",
-        "blueprint": "10:00",
+        "blueprint": "AMRAP 10:00",
         "rows": [
           {
             "primary": "50 Double Unders / 100 Single Unders",
             "name": "",
+            "totalNote": "250 total",
             "mineKey": "Double Under",
             "suppressMine": true,
             "accent": "magenta"
@@ -152,12 +165,14 @@
           {
             "primary": "10 Alt Weighted Box Step Ups @ 15kg",
             "name": "",
+            "totalNote": "50 total",
             "mineKey": "Alt Weighted Box Step Up",
             "accent": "yellow"
           },
           {
             "primary": "10 Toes to Bars",
             "name": "",
+            "totalNote": "50 total",
             "mineKey": "Toes to Bar",
             "suppressMine": true,
             "accent": "magenta"
@@ -171,23 +186,26 @@
       },
       {
         "title": "AMRAP C",
-        "blueprint": "10:00",
+        "blueprint": "AMRAP 10:00",
         "rows": [
           {
             "primary": "15 Russian KB Swings @ 28/20kg",
             "name": "",
+            "totalNote": "90 total",
             "mineKey": "Russian Kettlebell Swing",
             "accent": "yellow"
           },
           {
             "primary": "12 Goblet Squats @ 28/20kg",
             "name": "",
+            "totalNote": "72 total",
             "mineKey": "Goblet Squat",
             "accent": "yellow"
           },
           {
             "primary": "9 Push-ups",
             "name": "",
+            "totalNote": "54 total",
             "mineKey": "Push-up",
             "suppressMine": true,
             "accent": "magenta"
@@ -202,8 +220,25 @@
     ]
   ],
   "hero": {
-    "value": "16",
+    "value": "5",
     "unit": "ROUNDS",
+    "blockScores": [
+      {
+        "label": "A",
+        "value": "5",
+        "unit": "rds"
+      },
+      {
+        "label": "B",
+        "value": "5",
+        "unit": "rds"
+      },
+      {
+        "label": "C",
+        "value": "6",
+        "unit": "rds"
+      }
+    ],
     "formatLine": "3 × 10 MIN",
     "storyLine": "35 echo bike cals · 50 alt single dumbbell devil press · 150 bicycle crunch · 250 du · 50 alt weighted box step up · 50 ttb · 105 russian kettlebell swing · 84 goblet squat · 54 push-up",
     "storyMovements": [
@@ -303,190 +338,202 @@
     ],
     "accentClass": "accentMagenta"
   },
-  "resultLabel": "TOTAL ROUNDS",
-  "resultValue": "16",
+  "resultLabel": "ROUNDS",
+  "resultValue": "5",
   "posterRows": {
     "reward": [
       {
         "kind": "block",
-        "label": "10 MIN AMRAP · 2 MIN REST · 3 ROUNDS",
+        "label": "2 MIN REST BETWEEN",
         "cap": ""
       },
       {
         "kind": "block",
         "label": "AMRAP A",
-        "cap": "10:00",
-        "score": "5",
-        "scoreSub": "rds"
+        "cap": "AMRAP 10:00",
+        "ruled": true
       },
       {
         "kind": "line",
         "rx": "7 CAL Echo Bike",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "35 cal total"
       },
       {
         "kind": "line",
         "rx": "10 Alt Single DB Devil Presses @ 22.5/15kg",
         "load": "",
         "mine": "22.5kg",
-        "team": ""
+        "team": "",
+        "total": "50 total"
       },
       {
         "kind": "line",
         "rx": "30 Bicycle Crunches",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "150 total"
       },
       {
         "kind": "block",
         "label": "AMRAP B",
-        "cap": "10:00",
-        "score": "5",
-        "scoreSub": "rds"
+        "cap": "AMRAP 10:00",
+        "ruled": true
       },
       {
         "kind": "line",
         "rx": "50 Double Unders / 100 Single Unders",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "250 total"
       },
       {
         "kind": "line",
-        "rx": "10 Alt Weighted Box Step Ups @ 15kg",
+        "rx": "10 Alt Weighted Box Step Ups",
         "load": "",
         "mine": "15kg",
-        "team": ""
+        "team": "",
+        "total": "50 total"
       },
       {
         "kind": "line",
         "rx": "10 Toes to Bars",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "50 total"
       },
       {
         "kind": "block",
         "label": "AMRAP C",
-        "cap": "10:00",
-        "score": "6",
-        "scoreSub": "rds"
+        "cap": "AMRAP 10:00",
+        "ruled": true
       },
       {
         "kind": "line",
         "rx": "15 Russian KB Swings @ 28/20kg",
         "load": "",
         "mine": "20kg",
-        "team": ""
+        "team": "",
+        "total": "90 total"
       },
       {
         "kind": "line",
         "rx": "12 Goblet Squats @ 28/20kg",
         "load": "",
         "mine": "20kg",
-        "team": ""
+        "team": "",
+        "total": "72 total"
       },
       {
         "kind": "line",
         "rx": "9 Push-ups",
         "load": "",
         "mine": "",
-        "team": ""
+        "team": "",
+        "total": "54 total"
       }
     ],
     "pages": [
       [
         {
           "kind": "block",
-          "label": "10 MIN AMRAP · 2 MIN REST · 3 ROUNDS",
+          "label": "2 MIN REST BETWEEN",
           "cap": ""
         },
         {
           "kind": "block",
           "label": "AMRAP A",
-          "cap": "10:00",
-          "score": "5",
-          "scoreSub": "rds"
+          "cap": "AMRAP 10:00",
+          "ruled": true
         },
         {
           "kind": "line",
           "rx": "7 CAL Echo Bike",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "35 cal total"
         },
         {
           "kind": "line",
           "rx": "10 Alt Single DB Devil Presses @ 22.5/15kg",
           "load": "",
           "mine": "22.5kg",
-          "team": ""
+          "team": "",
+          "total": "50 total"
         },
         {
           "kind": "line",
           "rx": "30 Bicycle Crunches",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "150 total"
         },
         {
           "kind": "block",
           "label": "AMRAP B",
-          "cap": "10:00",
-          "score": "5",
-          "scoreSub": "rds"
+          "cap": "AMRAP 10:00",
+          "ruled": true
         },
         {
           "kind": "line",
           "rx": "50 Double Unders / 100 Single Unders",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "250 total"
         },
         {
           "kind": "line",
-          "rx": "10 Alt Weighted Box Step Ups @ 15kg",
+          "rx": "10 Alt Weighted Box Step Ups",
           "load": "",
           "mine": "15kg",
-          "team": ""
+          "team": "",
+          "total": "50 total"
         },
         {
           "kind": "line",
           "rx": "10 Toes to Bars",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "50 total"
         },
         {
           "kind": "block",
           "label": "AMRAP C",
-          "cap": "10:00",
-          "score": "6",
-          "scoreSub": "rds"
+          "cap": "AMRAP 10:00",
+          "ruled": true
         },
         {
           "kind": "line",
           "rx": "15 Russian KB Swings @ 28/20kg",
           "load": "",
           "mine": "20kg",
-          "team": ""
+          "team": "",
+          "total": "90 total"
         },
         {
           "kind": "line",
           "rx": "12 Goblet Squats @ 28/20kg",
           "load": "",
           "mine": "20kg",
-          "team": ""
+          "team": "",
+          "total": "72 total"
         },
         {
           "kind": "line",
           "rx": "9 Push-ups",
           "load": "",
           "mine": "",
-          "team": ""
+          "team": "",
+          "total": "54 total"
         }
       ]
     ]
@@ -499,5 +546,8 @@
   },
   "pageRepsSchemes": [
     null
+  ],
+  "pageMaxPractices": [
+    false
   ]
 }

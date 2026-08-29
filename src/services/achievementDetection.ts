@@ -1,5 +1,5 @@
-import type { Achievement, Exercise, MovementEquipment, PersonalRecord, Workout } from '../types';
-import { getCanonicalLiftName } from '../data/exerciseDefinitions';
+import type { Achievement, Exercise, ExerciseSet, MovementEquipment, PersonalRecord, Workout } from '../types';
+import { getCanonicalLiftName, isUnresolvedLiftName } from '../data/exerciseDefinitions';
 
 interface AchievementContext {
   workout: {
@@ -138,7 +138,15 @@ function isPureStrengthExercise(exercise: Exercise): boolean {
 function isPREligible(movementName: string, equipment?: MovementEquipment): boolean {
   const lower = movementName.toLowerCase();
   if (NEVER_PR_PATTERNS.some(p => lower.includes(p))) return false;
+  // A name that says only which family was trained has no record to measure against.
+  if (isUnresolvedLiftName(movementName)) return false;
   if (equipment === 'barbell') return true;
+  // Only a DEFINITE non-barbell implement disqualifies a lift. "other" is the AI's
+  // unsure bucket as well as its plate/ball/sled bucket (see MOVEMENT EQUIPMENT in
+  // openai.ts), so reading it as "not a barbell" would silently drop a real barbell
+  // PR every time the parser hedged. It falls through to the name list instead,
+  // alongside legacy docs that carry no classification at all.
+  if (equipment === 'dumbbell' || equipment === 'kettlebell' || equipment === 'none') return false;
   if (ACCESSORY_UNLESS_BARBELL_PATTERNS.some(p => lower.includes(p))) return false;
   return PR_ELIGIBLE_PATTERNS.some(p => lower.includes(p));
 }
@@ -169,10 +177,24 @@ function bestExistingRecord(
 }
 
 /**
+ * Above this, a set is conditioning volume rather than a max attempt. A record here is the
+ * heaviest load ever handled, and strength programming tops out around 12-15 reps; past that
+ * the number on the bar is what the athlete can CYCLE, not what they can lift. Counting it
+ * announces a PR against a record the set never met — 20 squats at 40kg reading as a squat PR.
+ */
+const MAX_PR_REPS = 15;
+
+/** Reps actually performed in a set, preferring what was logged over what was prescribed. */
+function setReps(set: ExerciseSet): number | undefined {
+  return set.actualReps ?? set.targetReps;
+}
+
+/**
  * Extract weighted movement candidates from an exercise.
  * For WODs with a movements array, returns individual movement names + weights.
  * For simple strength exercises, returns the exercise name + max set weight.
- * Only returns PR-eligible movements (barbell lifts, not accessories).
+ * Only returns PR-eligible movements (barbell lifts, not accessories) lifted for
+ * max-attempt rep counts.
  */
 function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight: number }> {
   // If exercise has individual movements (WODs, AMRAPs, etc.), use those
@@ -182,14 +204,23 @@ function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight:
     // Find peak set weight — for complexes all movements share one bar,
     // so the peak set weight is the PR candidate weight for every movement.
     let maxSetWeight = 0;
+    let peakSetReps: number | undefined;
     for (const set of exercise.sets) {
-      if (set.weight && set.weight > maxSetWeight) maxSetWeight = set.weight;
+      if (set.weight && set.weight > maxSetWeight) {
+        maxSetWeight = set.weight;
+        peakSetReps = setReps(set);
+      }
     }
 
     for (const m of exercise.movements) {
       const rxW = m.rxWeights?.male ?? m.rxWeights?.female ?? 0;
       // Prefer peak actual weight over prescribed Rx weight
       const w = maxSetWeight > 0 ? maxSetWeight : rxW;
+      // The movement carries its own rep count in a circuit; the set's reps describe the
+      // whole block, so they only stand in when the movement states none. Unknown reps stay
+      // eligible — a missing count must not cost a real lift its record.
+      const reps = m.reps ?? peakSetReps;
+      if (reps !== undefined && reps > MAX_PR_REPS) continue;
       if (w > 0 && isPREligible(m.name, m.equipment)) {
         candidates.push({ name: m.name, weight: w });
       }
@@ -200,10 +231,14 @@ function getWeightedMovements(exercise: Exercise): Array<{ name: string; weight:
   // Fallback: simple exercise — use exercise name + max set weight
   if (!isPREligible(exercise.name)) return [];
   let bestWeight = 0;
+  let bestWeightReps: number | undefined;
   for (const set of exercise.sets) {
-    if (set.weight && set.weight > bestWeight) bestWeight = set.weight;
+    if (set.weight && set.weight > bestWeight) {
+      bestWeight = set.weight;
+      bestWeightReps = setReps(set);
+    }
   }
-  if (bestWeight > 0) {
+  if (bestWeight > 0 && !(bestWeightReps !== undefined && bestWeightReps > MAX_PR_REPS)) {
     return [{ name: exercise.name, weight: bestWeight }];
   }
   return [];

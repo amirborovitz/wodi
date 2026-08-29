@@ -686,3 +686,73 @@
     transition: none;
   }
 }
+
+/* ── Per-station block: one question per station, all of them on one screen ──────────────
+   A five-station EMOM is five small numbers. Rendered at the default tile rhythm — a divider
+   row, then a full card, then a 60px stepper each — it ran past 900px and the athlete scrolled
+   through half the screen to answer "how many burpees". These variants tighten only spacing and
+   chrome; nothing about what is asked changes. */
+.tileDense {
+  padding: 10px 12px 10px;
+  gap: 6px;
+  border-radius: 18px;
+}
+
+/* The station letter rides IN the header rather than on a divider row above the card, which
+   removes a whole row per station and matches how the poster prints the same line. */
+.tileStation {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--wodi-dim);
+  letter-spacing: 0.12em;
+  font-family: var(--font-barlow);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(242, 240, 235, 0.06);
+}
+
+/* Two fields for ONE movement — a loaded max-effort station asks what you held AND how many you
+   got ("22.5kg × 8"). Stacked, that is two 60px steppers for a single question; side by side it
+   reads as the one thing it is. Collapses to stacked under 320px where 2×~130px would squeeze
+   the value out of the centre column. */
+.fieldPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+@media (max-width: 320px) {
+  .fieldPair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Says WHICH number the tiles below want. Without it they read as "total for the workout", and
+   an athlete entering 30 burpees where the app expects 6 is a 5x error nothing can catch. */
+.perStationIntro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.perStationEyebrow {
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wodi-yellow, #f5c200);
+}
+
+.perStationNote {
+  font-family: var(--font-barlow);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  max-width: 260px;
+}

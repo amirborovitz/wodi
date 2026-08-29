@@ -1,8 +1,18 @@
+/* THE scroll container for this screen — and it has to be a real one. `min-height`
+   is only a floor, so with `overflow-y: auto` the element just grew to fit its
+   content and the DOCUMENT scrolled instead. Everything that reads or writes
+   `scrollTop` here — the pull-to-refresh "am I at the top?" guard, the
+   recap-dismiss scroll correction — was addressing an element whose scrollTop was
+   permanently 0. `height` is what makes the scrollport exist.
+
+   `overscroll-behavior-y: none` rather than `contain`: contain only stops the
+   scroll chaining to the document, and the container's own rubber-band would still
+   drag the page out from under the pull indicator this screen draws itself. */
 .screen {
-  min-height: 100dvh;
+  height: 100dvh;
   background: #0b0c0e;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
   /* fix #3: enough clearance for the floating tab bar */
   padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }

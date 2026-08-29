@@ -5,7 +5,19 @@
 import React from 'react';
 import { BRAND, VIBE, LIGHT_VIBE, fD, fB, fH, fM } from './brand';
 import type { VibeKey } from './brand';
-import type { PosterWod, PosterLine, PosterRow } from './posterData';
+import type { PosterWod, PosterLine, PosterRow, PosterHeroScore } from './posterData';
+
+/**
+ * The quiet voice a LOAD is printed in.
+ *
+ * HANDWRITING = ME: the tilted Caveat every skin uses in its value column means "this is what I
+ * did" — the score, the weight I chose. A number that is only the coach's prescription, or a
+ * weight sitting beside a result that outranks it, drops to dim mono so the reader's eye lands
+ * on the result instead. Skins pass their own dim ink because half of them are light surfaces.
+ */
+export function loadVoice(color: string): React.CSSProperties {
+  return { fontFamily: fM, fontSize: 10.5, fontWeight: 500, color, whiteSpace: 'nowrap' };
+}
 
 export function parseRxLoad(rx: string): { name: string; load: string } {
   const match = rx.match(/^(\d+(?:\.\d+)?(?:\s*->\s*\d+(?:\.\d+)?)?\s*(?:kg|lb))\s+(.+)$/i);
@@ -29,28 +41,87 @@ export interface MovementValueParts {
   // The inline "@ 45kg" weight tag for a split:'rounds' row, split out of movName so skins can
   // render it as a quiet/dim suffix instead of full-weight movement-name text.
   loadTag?: string | null;
+  /**
+   * HANDWRITING = ME. The value in this slot is a LOAD, not a result — skins render it in the
+   * quiet mono voice, never the tilted handwriting they reserve for what the athlete scored.
+   *
+   * Kilos and rounds were coming out in the same yellow Caveat, so a card whose real result was
+   * "4 rounds" read as if the weights were the headline and the score were an annotation. A
+   * weight is prescription the athlete matched; the score is the only thing they earned.
+   */
+  meIsLoad?: boolean;
+  singleIsLoad?: boolean;
 }
 
 // Any unit buildResultValue appended — not just weights. Naming kg/lb explicitly left "2.4km"
 // and "50cal" as one opaque string, which Stadium's numeric dot-matrix cannot render at all
 // (the letters came out blank, so a distance hero read as a bare "2.4"). The split is the
 // number and whatever trailing letters it carries, whichever measure it is.
+//
+// The "~" an estimated hero wears is part of the NUMBER, not a reason to stop splitting: without
+// it here, "~11burpees" failed the match and printed whole at the 90px hero size, one unbroken
+// word running off the edge of the card.
 export function splitResultValue(value: string): { primary: string; unit: string } {
-  const match = value.match(/^(-?\d+(?:\.\d+)?)\s*([a-z]+)$/i);
+  const match = value.match(/^(~?-?\d+(?:\.\d+)?)\s*([a-z]+)$/i);
   if (!match) return { primary: value, unit: '' };
   return { primary: match[1], unit: match[2].toLowerCase() };
 }
 
+/**
+ * How far the hero number shrinks to fit N scores where one used to sit.
+ *
+ * Two 6-minute AMRAPs is the common shape, but the rule is "one clock, one score" and a board
+ * can write five of them — so the scale is a function of the count, not a pair of hand-tuned
+ * cases. The floor keeps a six-block piece legible rather than letting it dwindle to nothing;
+ * past that the row wraps.
+ */
+export function heroScoreScale(count: number): number {
+  if (count <= 1) return 1;
+  return Math.max(0.4, 0.82 - 0.13 * (count - 2));
+}
+
+/** Applies {@link heroScoreScale} to whatever numeric font size the skin gave the hero. */
+function scaleHeroFont(style: React.CSSProperties | undefined, count: number): React.CSSProperties {
+  const size = style?.fontSize;
+  if (typeof size !== 'number') return { ...style };
+  return { ...style, fontSize: Math.round(size * heroScoreScale(count)) };
+}
+
 interface ResultValueProps {
   value: string;
+  /**
+   * One score per independent clock — see PosterWod.result. When there are two or more, they
+   * ALL render, side by side, and `value` is ignored: adding independent scores together
+   * produces a number that describes no part of the workout.
+   */
+  scores?: PosterHeroScore[];
   narrative?: string;
   primaryStyle?: React.CSSProperties;
   unitStyle?: React.CSSProperties;
   narrativeStyle?: React.CSSProperties;
   style?: React.CSSProperties;
+  /** Per-clock caption ("B.1") above each number. Skins pass their own quiet meta type. */
+  scoreLabelStyle?: React.CSSProperties;
+  /** Rule between two clocks' numbers — the visual full stop that stops them reading as a sum. */
+  scoreDividerColor?: string;
 }
 
-export function ResultValue({ value, narrative, primaryStyle, unitStyle, narrativeStyle, style }: ResultValueProps): React.JSX.Element {
+export function ResultValue({
+  value, scores, narrative, primaryStyle, unitStyle, narrativeStyle, style,
+  scoreLabelStyle, scoreDividerColor,
+}: ResultValueProps): React.JSX.Element {
+  if (scores && scores.length > 1) {
+    return (
+      <ResultScoreboard
+        scores={scores}
+        primaryStyle={primaryStyle}
+        unitStyle={unitStyle}
+        style={style}
+        labelStyle={scoreLabelStyle}
+        dividerColor={scoreDividerColor}
+      />
+    );
+  }
   const parts = splitResultValue(value);
   // The wrapper carries the primary font size so the unit's 0.28em resolves against the hero
   // number instead of the inherited 16px root — without it every unit rendered at ~4px (invisible).
@@ -69,6 +140,66 @@ export function ResultValue({ value, narrative, primaryStyle, unitStyle, narrati
       <span style={{ fontFamily: fH, fontSize: 24, fontWeight: 700, lineHeight: 0.9, marginTop: -5, color: BRAND.yellow, ...narrativeStyle }}>
         {narrative}
       </span>
+    </span>
+  );
+}
+
+/**
+ * The rest of a block-header row: a hairline when the header opens its own clock, plain space
+ * otherwise.
+ *
+ * A GAP IS NOT A BOUNDARY. Two separately-timed AMRAPs stacked with only whitespace between them
+ * read as one list of four movements, and nothing on the card says where the first clock stopped
+ * and the second began. The rule is what makes each block visibly its own effort — which is the
+ * whole premise of showing its own score.
+ */
+export function BlockHeaderRule({ ruled, color }: { ruled?: boolean; color: string }): React.JSX.Element {
+  return ruled
+    ? <span style={{ flex: 1, height: 1, alignSelf: 'center', background: color, marginLeft: 2 }} />
+    : <span style={{ flex: 1 }} />;
+}
+
+interface ResultScoreboardProps {
+  scores: PosterHeroScore[];
+  primaryStyle?: React.CSSProperties;
+  unitStyle?: React.CSSProperties;
+  style?: React.CSSProperties;
+  labelStyle?: React.CSSProperties;
+  dividerColor?: string;
+}
+
+/**
+ * The hero slot for a piece that ran several independent clocks: every score, labelled by the
+ * block it came off, with a rule between them.
+ *
+ * The rule is not decoration — it is the punctuation that says these are separate results. A
+ * summed hero ("8") for two 6-minute AMRAPs of 4 was a number the athlete never scored and
+ * nobody reports, and it sat in the loudest slot on the card. Any number of blocks works: the
+ * type scales down with the count and the row wraps when it runs out of width.
+ */
+function ResultScoreboard({
+  scores, primaryStyle, unitStyle, style, labelStyle, dividerColor,
+}: ResultScoreboardProps): React.JSX.Element {
+  const numberStyle = scaleHeroFont(primaryStyle, scores.length);
+  const divider = dividerColor ?? `${BRAND.yellow}4d`;
+  return (
+    <span style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', ...style }}>
+      {scores.map((score, i) => (
+        <React.Fragment key={`${score.label}-${i}`}>
+          {i > 0 && (
+            <span style={{ width: 1, alignSelf: 'stretch', background: divider, margin: '6px 0 8px' }} />
+          )}
+          <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}>
+            <span style={{ fontFamily: fM, fontSize: 9.5, fontWeight: 500, letterSpacing: '0.16em', color: BRAND.dim, whiteSpace: 'nowrap', ...labelStyle }}>
+              {score.label}
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, fontSize: numberStyle.fontSize }}>
+              <span style={numberStyle}>{score.value}</span>
+              {score.unit && <span style={{ fontSize: '0.28em', lineHeight: 1.05, ...unitStyle }}>{score.unit}</span>}
+            </span>
+          </span>
+        </React.Fragment>
+      ))}
     </span>
   );
 }
@@ -142,6 +273,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       strengthValue: null,
       team: total,
       me: r.mine,
+      meIsLoad: true,
       single: null,
       total,
       roundLabel: r.roundLabel,
@@ -152,13 +284,17 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   // quiet inline tag ("Max DB Devil Press 22.5/15kg — 18 reps") and let the total own the
   // value column.
   const inlineLoad = !!(r.load && total && !r.mine);
+  const single = r.mine || (inlineLoad ? total : r.load || total);
   return {
     movName,
     isStrength: false,
     strengthValue: null,
     team: null,
     me: null,
-    single: r.mine || (inlineLoad ? total : r.load || total),
+    single,
+    // Prescription with nothing logged against it and no total to report: the board's own load
+    // is all this row has, and the board's words are not the athlete's handwriting.
+    singleIsLoad: !r.mine && !inlineLoad && !!r.load && single === r.load,
     total,
     roundLabel: r.roundLabel,
     loadTag: inlineLoad ? r.load : null,

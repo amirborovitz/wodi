@@ -311,3 +311,30 @@
     transition: none;
   }
 }
+
+/* ── Dense arcade: several steppers on one screen ──────────────────────────
+   A block that asks one question PER STATION shows five of these at once, and at full height
+   that is a 900px scroll for five small numbers. Shorter body, smaller +/− glyphs, tighter
+   value — but the value stays the largest thing in the control, because it is what the athlete
+   reads back to check they typed the right number. Touch targets stay above 44px: the +/− zones
+   are full-height columns, so height is the only thing being spent here. */
+.arcadeStepperDense {
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.arcadeStepperDense .arcadeIcon {
+  font-size: 26px;
+}
+
+.arcadeStepperDense .arcadeValueButton {
+  min-height: 34px;
+}
+
+.arcadeStepperDense .arcadeValue {
+  font-size: 30px;
+}
+
+.arcadeStepperDense .arcadeUnit {
+  font-size: 10px;
+}

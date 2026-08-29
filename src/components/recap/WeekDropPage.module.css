@@ -1,3 +1,17 @@
+/* The week poster stage: one fixed 1080×1920 artifact, scaled to the phone, with
+   the flip chrome under it. Nothing here paints the poster — the skins own that
+   entirely, so this file can never fight a surface for a colour. */
+
+@keyframes flipIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hintPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 .root {
   position: fixed;
   inset: 0;
@@ -5,330 +19,107 @@
   max-width: var(--app-column);
   margin-inline: auto;
   overflow: hidden;
-  background: #0b0c0e;
+  background: #08090b;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px 0;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* The shareable frame. Everything html2canvas captures lives inside it, which is
-   why it paints its own background rather than borrowing .root's. */
-.page {
+/* The only element that flexes. Everything below it is fixed chrome, so a short
+   phone shrinks the poster rather than pushing the share button off-screen. */
+.stage {
   flex: 1;
   min-height: 0;
-  position: relative;
-  background: #0b0c0e;
-  display: flex;
-  flex-direction: column;
-  padding: 40px 26px 18px;
-  overflow: hidden;
-}
-
-/* This page never scrolls, so when a big week runs out of room something has to
-   give — and it must be the bottom of the board, never the EP total or the
-   closing line. Everything else refuses to shrink; the board absorbs it. */
-.page > *:not(.glow):not(.board) {
-  flex-shrink: 0;
-}
-
-.glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(110% 42% at 50% -8%, rgba(245, 194, 0, 0.16), transparent 58%);
-  pointer-events: none;
-}
-
-.page > *:not(.glow) {
-  position: relative;
-}
-
-.eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(243, 241, 234, 0.46);
-}
-
-.spacer {
-  flex: 1;
-  min-height: 10px;
-}
-
-/* ── Hero ── */
-
-/* The unit sits on the number's baseline. A caption underneath reads as a
-   footnote; a suffix reads as the score. */
-.heroRow {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.heroValue {
-  font-weight: 900;
-  font-size: clamp(66px, 21vw, 104px);
-  line-height: 0.78;
-  letter-spacing: -0.03em;
-  color: #f5c200;
-  font-variant-numeric: tabular-nums;
-}
-
-.heroUnit {
-  font-weight: 900;
-  font-size: clamp(20px, 6vw, 30px);
-  line-height: 1;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: rgba(245, 194, 0, 0.62);
-}
-
-.metaRow {
-  margin-top: 13px;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1.5;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(243, 241, 234, 0.58);
-}
-
-.sep {
-  font-style: normal;
-  color: rgba(243, 241, 234, 0.22);
-  padding: 0 7px;
-}
-
-/* The week's dominant feeling — the one non-yellow hue on the page, because how it
-   felt is the only thing yellow can't say. */
-.vibeDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  margin-right: 6px;
-  vertical-align: 1px;
-}
-
-/* ── Moves board ── */
-
-.board {
   width: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Each row IS its bar: the name and the count ride on top of a yellow wash whose
-   width is the movement's share of the week. Two stacked elements — text, then a
-   hairline track under it — read as a chart of the week. This reads as the week. */
-.row,
-.rowLead {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: center;
+}
+
+.frame {
+  position: relative;
   overflow: hidden;
-  border-radius: 8px;
-  padding: 6px 11px 7px;
-  margin-bottom: 7px;
-  font-weight: 900;
-  line-height: 1.05;
-  text-transform: uppercase;
-  font-size: clamp(18px, 5.4vw, 22px);
-  background: rgba(243, 241, 234, 0.04);
-}
-
-.rowLead {
-  font-size: clamp(22px, 6.6vw, 27px);
-  letter-spacing: -0.01em;
-}
-
-/* A wash, not a solid: the text has to stay readable across the fill edge, so the
-   bar tints the row rather than painting over it. */
-.fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: 8px;
-  background: rgba(245, 194, 0, 0.13);
-}
-
-.rowLead .fill {
-  background: linear-gradient(90deg, rgba(245, 194, 0, 0.3), rgba(245, 194, 0, 0.16));
-}
-
-.rowName {
-  position: relative;
-  min-width: 0;
-  color: rgba(243, 241, 234, 0.9);
-}
-
-.rowLead .rowName {
-  color: #f5c200;
-}
-
-.rowReps {
-  position: relative;
   flex-shrink: 0;
-  color: #f5c200;
-  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  background: #0b0c0e;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* ── The engine ── */
+/* The fit-scale lives here and nowhere else — the poster inside stays at its own
+   1080×1920, which is what the share capture reads. */
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+}
 
-.engineRow {
+.layerLive {
+  animation: flipIn 0.26s linear;
+}
+
+.skinLabel {
+  flex-shrink: 0;
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 10px;
+  height: 18px;
 }
 
-.cell,
-.cellLead {
-  flex: 1;
-  min-width: 0;
-  border-radius: 12px;
-  padding: 9px 11px 10px;
-  border: 1px solid rgba(243, 241, 234, 0.1);
-  background: rgba(243, 241, 234, 0.03);
-}
-
-/* The figure that led the week gets the same emphasis the board's top row does. */
-.cellLead {
-  border-color: rgba(245, 194, 0, 0.3);
-  background: rgba(245, 194, 0, 0.07);
-}
-
-.cellFigure {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.cellValue {
-  font-weight: 900;
-  font-size: clamp(20px, 6vw, 26px);
-  line-height: 0.92;
-  letter-spacing: -0.01em;
-  color: #f5c200;
-  font-variant-numeric: tabular-nums;
-}
-
-.cellUnit {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  color: rgba(245, 194, 0, 0.7);
-}
-
-.cellMachine {
-  margin-top: 6px;
-  font-size: 9px;
-  font-weight: 900;
-  line-height: 1.25;
-  letter-spacing: 0.12em;
+.skinName {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: rgba(243, 241, 234, 0.5);
 }
 
-/* ── Closing band: stamp + handwritten note ── */
-
-.closingRow {
-  display: flex;
-  align-items: center;
-  gap: 15px;
+.hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px;
+  color: #f5c200;
+  animation: hintPulse 1.8s ease-in-out infinite;
 }
 
-.sticker {
+.chipRow {
   flex-shrink: 0;
+  display: flex;
+  gap: 7px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex-shrink: 0;
+  padding: 7px 15px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(243, 241, 234, 0.85);
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: background 0.18s, color 0.18s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chipActive {
   background: #f5c200;
   color: #0b0c0e;
-  padding: 8px 13px 9px;
-  border-radius: 4px;
-  transform: rotate(-3deg);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
 }
-
-.stickerTop {
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-}
-
-.stickerValue {
-  font-weight: 900;
-  font-size: 28px;
-  line-height: 0.85;
-}
-
-.stickerMove {
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.hand {
-  flex: 1;
-  min-width: 0;
-  font-size: 21px;
-  line-height: 1.22;
-  color: #f3f1ea;
-  opacity: 0.92;
-}
-
-/* ── Footer ── */
-
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid rgba(243, 241, 234, 0.10);
-  padding-top: 12px;
-  margin-top: 15px;
-}
-
-/* EP is the week's currency — it reads as a stamped total, not a legal footnote. */
-.epBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px 7px;
-  border-radius: 10px;
-  border: 1px solid rgba(245, 194, 0, 0.32);
-  background: rgba(245, 194, 0, 0.08);
-}
-
-.ep {
-  font-weight: 900;
-  font-size: 28px;
-  line-height: 0.9;
-  color: #f5c200;
-  font-variant-numeric: tabular-nums;
-}
-
-.epUnit {
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.18em;
-  color: rgba(245, 194, 0, 0.75);
-}
-
-.mark {
-  font-weight: 900;
-  font-size: 19px;
-  line-height: 1;
-  color: #f3f1ea;
-}
-
-.markDot {
-  color: #f5c200;
-}
-
-/* ── Chrome ── */
 
 .closeBtn {
   position: absolute;
@@ -360,10 +151,11 @@
 }
 
 /* Real space above the button, so it reads as chrome under the artifact instead of
-   sitting on the EP total. */
+   sitting on the poster's footer. */
 .shareBar {
   flex-shrink: 0;
-  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  padding: 12px 0 calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .shareBtn {

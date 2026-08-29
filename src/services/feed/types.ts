@@ -3,10 +3,11 @@
  *
  * The feed is global, no-follow and ephemeral: every post is younger than
  * FEED_WINDOW_MS and disappears on its own. There is no archive and no follow
- * graph. A post carries the POSTER it renders — frozen, because that is a
- * record of what the athlete did — and nothing else: identity is a live lookup
- * through /publicProfiles, so an athlete looks the same everywhere at once.
- * Nothing here points back at /workouts.
+ * graph. A post carries the POSTER it renders and the athlete's own line about
+ * it — both frozen, because they are a record of what the athlete did and said
+ * — and nothing else: identity is a live lookup through /publicProfiles, so an
+ * athlete looks the same everywhere at once. Nothing here points back at
+ * /workouts.
  */
 
 import type { PosterPayload } from '../../components/celebration/faces/HandwrittenFace/posterPayload';
@@ -85,12 +86,99 @@ export function avatarUrl(profile: PublicProfile | undefined): string | undefine
 /** 24 hours. A post older than this is never shown and is eligible for deletion. */
 export const FEED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Longest caption a post can carry. One line under the card, not a post body:
+ * the poster is the artifact and the caption is the aside beside it.
+ */
+export const CAPTION_MAX = 120;
+
+/** Stored absent rather than as "", so an untouched prompt publishes nothing. */
+export function normalizeCaption(text: string | undefined): string | undefined {
+  const trimmedText = text?.trim().slice(0, CAPTION_MAX);
+  return trimmedText ? trimmedText : undefined;
+}
+
+/**
+ * The photo behind ONE post — deliberately NOT `workout.posterPhoto`.
+ *
+ * That field is a polaroid the athlete sticks on their poster: permanent, part
+ * of the artifact, visible on the Home thumbnail and in the share capture. This
+ * is the shot behind a 24-hour post, chosen at publish time and gone when the
+ * post is. Posting the same workout twice means two of these and still one
+ * poster. Collapsing them into one field is what made adding a photo to a post
+ * silently edit the athlete's poster.
+ */
+export interface FeedPhoto {
+  /** Tokenized Storage download URL. */
+  url: string;
+  /** Storage object path, kept so deleting the post can delete the file. */
+  path: string;
+  /** How the photo is framed. Absent means dead centre at cover scale. */
+  crop?: PhotoCrop;
+  /** Where the poster was dragged to. Absent means its resting place. */
+  posterOffset?: PosterOffset;
+}
+
+/**
+ * The poster's displacement from where the frame parks it, in % of frame width
+ * and height. Both the photo AND the poster move: dragging the photo decides
+ * what shows, dragging the poster decides what it covers, and there is no
+ * single one of those that solves both.
+ */
+export interface PosterOffset {
+  x: number;
+  y: number;
+}
+
+export const NO_POSTER_OFFSET: PosterOffset = { x: 0, y: 0 };
+
+/**
+ * How a photo sits inside the 9:16 story frame.
+ *
+ * The frame crops — a phone photo is 3:4 or 4:3 and the frame is 9:16, so
+ * something is always cut off and WHICH something is the athlete's call. This
+ * is the control that makes it theirs: drag to choose what shows, pinch to
+ * decide how close.
+ *
+ * The poster, by contrast, does not move. It is a document rather than a
+ * sticker, so there is no placement that improves it — and with the photo
+ * movable there is nothing left for a poster nudge to solve: you frame the
+ * subject into the bands rather than sliding the poster off the subject.
+ * One draggable thing per frame, so a drag is never ambiguous.
+ */
+export interface PhotoCrop {
+  /** 1 = exactly covers the frame. Panning is bounded by whatever overhangs. */
+  scale: number;
+  /** Pan from centred, in % of frame width / height. */
+  x: number;
+  y: number;
+}
+
+export const DEFAULT_CROP: PhotoCrop = { scale: 1, x: 0, y: 0 };
+
+/** Past this the 1080px upload starts to show its pixels. */
+export const MAX_PHOTO_SCALE = 3;
+
 export interface FeedPost {
   id: string;
   /** The author, resolved through /publicProfiles at render time. */
   userId: string;
   /** Frozen at publish time — editing the workout later never changes this. */
   poster: PosterPayload;
+  /**
+   * Optional. Absent means the card is the poster alone, which is the majority
+   * of posts and reads fine: the poster is the artifact, the photo is context.
+   */
+  photo?: FeedPhoto;
+  /**
+   * The athlete's own line about the session, frozen with the poster.
+   *
+   * Optional and deliberately unprompted-for as a result: the sheet asks "What
+   * happened in there?", never "how did it go", so "not my day, still went" is
+   * as postable as a PR. Immutable like the rest of the post — there is no
+   * edit, only delete.
+   */
+  caption?: string;
   createdAt: Date;
   expiresAt: Date;
   isPR: boolean;
@@ -99,6 +187,8 @@ export interface FeedPost {
 /** What the client hands to createFeedPost; ids and timestamps are set there. */
 export interface FeedPostInput {
   poster: PosterPayload;
+  photo?: FeedPhoto;
+  caption?: string;
   isPR: boolean;
 }
 

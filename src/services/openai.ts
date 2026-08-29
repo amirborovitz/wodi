@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 import { resolveSourceDate } from './sourceDateResolution';
+import { PARSE_RESPONSE_SCHEMA } from './parseSchema';
 
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
 
@@ -99,6 +100,15 @@ Return ONLY valid JSON:
       "name": "Exercise or Block Name",
       "type": "strength" | "cardio" | "skill" | "wod",
       "loggingMode": "strength" | "for_time" | "amrap" | "amrap_intervals" | "intervals" | "emom" | "cardio" | "cardio_distance" | "bodyweight" | "sets" | "free",
+      // scoreType: what this block is SCORED in — the noun the athlete's result is counted in.
+      // loggingMode is the CLOCK; this is the SCORE. Usually they match, so OMIT this field and
+      // the app uses the clock's conventional score. Set it ONLY when they differ — which is
+      // whenever the board writes down all its work except one movement:
+      //   "[02:00 AMRAP] x4: 2 rounds of 8 Push Press + 8 Box Jumps, into max burpees"
+      //   → loggingMode "amrap_intervals" (the clock) + scoreType "reps" (the burpees).
+      // The rounds there are PRESCRIPTION — the athlete cannot do three — so rounds cannot be
+      // the score. Pair it with "isMaxReps": true on the movement that carries the count.
+      "scoreType": "time" | "rounds" | "reps" | "load",
       "prescription": "human-readable prescription",
       // isSecondary: see HIGH-LEVEL PARTS section below. false for the session's main part(s)
       // (the strength piece and/or the metcon), true for everything else (warm-up, body armor,
@@ -292,7 +302,18 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
 | amrap | "AMRAP 12" (single) | rounds_reps |
 | emom | "EMOM", "every 1:00", "E2MOM" | reps |
 | strength | "5x5", "3x8 @70%", "build to 1RM" | load |
-| tabata | "tabata", "20s on/10s off" | reps |`;
+| tabata | "tabata", "20s on/10s off" | reps |
+
+OVERRIDE — the scoreType column is a DEFAULT, not a rule. A format is a CLOCK; scoreType is what
+the athlete COUNTS, and they are independent. Before taking the default, ask: does this block
+leave any quantity OPEN ("max", "as many as possible", "max reps in the time remaining")?
+  - YES → "scoreType": "reps", and "isMaxReps": true on that movement. Whatever else the board
+    prescribes — rounds, reps, distance — is prescription the athlete cannot change, so it is
+    never the score. This holds no matter which format you picked.
+  - NO  → use the column's default.
+"[02:00 AMRAP] x 4: 2 rounds of 8 Push Press + 8 Box Jumps, into max burpees" is amrap_intervals
+with scoreType "reps": every round is written down, so there are no rounds to earn. The word
+AMRAP there describes the burpees, not the structure. See example 12b.`;
 
 const RULES_QUANTITIES = `## WEIGHT PARSING
 - "40/60 kg" → rxWeights: { female: 40, male: 60, unit: "kg" } (higher = male)
@@ -348,7 +369,17 @@ Every movement performed with an external load MUST also include "equipment" —
 - "kettlebell": KB movements
 - "other": everything else — wall ball / med ball, plate, sandbag, D-ball, sled, weighted vest, and any "weighted X" with no stated implement ("weighted box step-ups", "weighted pull-ups"). When unsure which implement, use "other".
 A DOUBLE implement (implementCount 2 — "twin", "double", "2x", "pair" of DBs or KBs, e.g. "twin DB's / KB's push press", "double DB thrusters") is ALWAYS "dumbbell" or "kettlebell", NEVER "barbell" — you cannot hold two barbells. Keep implementCount 2 AND set equipment "dumbbell" (or "kettlebell" if the board says KB). A press/clean/thruster done with two DBs/KBs is NOT a barbell lift.
-The logging UI merges same-equipment movements into ONE weight input, so "equipment" decides what shares a bar and what gets asked separately. Omit the field for unweighted movements.`;
+The logging UI merges same-equipment movements into ONE weight input, so "equipment" decides what shares a bar and what gets asked separately.
+"equipment" is REQUIRED on every movement and "none" is a real answer, not a blank — but it means
+BODYWEIGHT BY NATURE (burpee, pull-up, box jump, run, sit-up, double under, air squat). It does
+NOT mean "the board wrote no weight". A movement that needs an implement to exist at all keeps
+that implement whether or not a load is printed: a Renegade Row is done ON DUMBBELLS, a Devil
+Press and Man Maker on dumbbells, a Goblet Squat / Turkish Get-up / Suitcase Carry / Farmers Carry
+on a KB or DB, a Weighted Plank or weighted step-up on a plate ("other"). Naming one of those
+"none" is a parse failure — it strips the load out of the workout entirely and the athlete is
+never asked what they held. Same test as inputType above: how is it performed in a gym?
+This matters most on max-effort stations, where no weight is ever written: "Renegade Row" with no
+number and no load is still "reps": "max" AND equipment "dumbbell" AND inputType "weight".`;
 
 const RULES_STATIONS = `## ROTATING STATION LABELS
 When an interval workout has labeled stations (A, B, C… or Station 1, 2, 3…), set "stationLabel" on the FIRST movement of each station only.
@@ -386,7 +417,39 @@ it happens and where it sits. Record both; never re-derive them.
 - A movement that simply repeats every set needs NEITHER field — countingMode "per_round" already
   says exactly that. Only reach for these when the movement sits outside the scheme.`;
 
-const RULES_MOVEMENT_CORE = `## IMPLEMENT COUNT (DB/KB)
+const RULES_MOVEMENT_CORE = `## QUANTITIES — write what the board wrote, never invent one
+A movement carries a number ONLY when the board writes one next to it. Never fall back to 1,
+never borrow a neighbouring line's count, never split a sibling's number across the block.
+When the board writes no number, say so with the value "max" — the quantity fields accept the
+literal string "max" as well as a number. "max" means THE ATHLETE EARNS THIS NUMBER; a number
+means THE COACH PRESCRIBED IT. Use the slot the work is measured in: "reps": "max",
+"calories": "max" for a machine, "distance": "max".
+- Timed block (emom / amrap / amrap_intervals / intervals / tabata) → a bare movement under a
+  work window IS a max-effort station. Write "max". This holds whether or not the word "max"
+  appears — a board not writing "max" is the normal way to program one.
+  "EMOM (50:10) for 25 minutes (5 rounds): Calories Echo Bike / Bar Muscle-up / Box Jump /
+  Renegade Row / Burpee" → five stations, no number on any of them, so ALL FIVE carry "max"
+  ("calories": "max" for the bike, "reps": "max" for the other four). A "1" on any of them is a
+  parse failure: it reads downstream as a real prescription, the athlete is never asked what they
+  actually did, and 25 minutes of work logs as one rep per round.
+- Untimed block (strength / sets / bodyweight / skill) → the count is simply open. Leave the
+  quantity null and do NOT write "max"; an open weight is not an earned score.
+CONSISTENCY: movements in the same block that are all max-effort must share ONE "scoreEntryMode".
+Never mix (e.g. bike calories as "total" beside four movements as "per_round") — the block's
+numbers then read on different scales and cannot be added up.
+
+## PER-SIDE NOTATION ("6/6", "20/20m", "8 each arm")
+A quantity written twice around a slash, or followed by "each side"/"each arm"/"each leg"/"/side",
+is ONE SIDE's number. Keep the quantity as the per-side value EXACTLY as written and set
+"perSide": true — the app doubles it for totals.
+- "6/6 Kettlebell Windmill" → reps: 6, perSide: true (NOT 12, and NOT 6 with perSide unset)
+- "20/20m Suitcase Carry" → distance: 20, unit: "m", perSide: true
+- "8 each arm Devil Press" → reps: 8, perSide: true
+A slash between two DIFFERENT things is not this: "40 DU / 60 singles" is an alternative,
+"Bar Muscle-up / Pull-up" is an alternative, and "40/60 kg" is an rxWeights pair. Per-side is only
+when the SAME number repeats, or the words say each side.
+
+## IMPLEMENT COUNT (DB/KB)
 Every DB or KB movement MUST include "implementCount": 1 or 2.
 - rxWeights is ALWAYS the weight of ONE implement (never pre-doubled)
 - implementCount: 2 when "twin", "double", "2x", "pair" is explicit, OR the movement naturally uses two (DB Thrusters, DB Front Squats, Farmers Carry)
@@ -812,6 +875,36 @@ Equivalent alternatives (both are correct):
   Option A: "buyIn": [{ "name": "Run", "distance": 200 }], "movements": [{ "name": "BMU", "reps": 4 }, ...]
   Option B: "movements": [{ "name": "Run", "distance": 200, "role": "buy_in" }, { "name": "BMU", "reps": 4 }, ...]
 
+### 12b. Interval whose fixed work repeats, then a MAX movement for the remaining time
+Input: "METCON (Intervals) [02:00 min AMRAP , 02:00 min REST] x 4 rounds: 2 rounds / 8 Push Press @35/50kg / 8 Box Jumps / Into - Max Burpees Over the Bar"
+Output:
+{
+  "type": "amrap", "format": "amrap_intervals", "scoreType": "reps", "sets": 4, "timeCap": 960, "intervalTime": 120,
+  "exercises": [{
+    "name": "2:00 AMRAP x 4", "type": "wod", "loggingMode": "amrap_intervals", "scoreType": "reps",
+    "prescription": "[02:00 AMRAP / 02:00 REST] x 4: 2 rounds of 8 Push Press @35/50kg + 8 Box Jumps, then Max Burpees Over the Bar",
+    "intervalCount": 4, "workDuration": 480, "restDuration": 480,
+    "sections": [
+      { "sectionType": "buy_in", "rounds": 2, "movements": [
+        { "name": "Push Press", "reps": 8, "inputType": "weight", "rxWeights": { "male": 50, "female": 35, "unit": "kg" }, "countingMode": "per_interval" },
+        { "name": "Box Jump", "reps": 8, "inputType": "none", "countingMode": "per_interval" }
+      ] },
+      { "sectionType": "rounds", "rounds": 1, "scoreType": "reps", "movements": [
+        { "name": "Burpees Over the Bar", "inputType": "none", "isMaxReps": true }
+      ] }
+    ]
+  }]
+}
+NOTE: the "2 rounds" is PRESCRIPTION, not a score — the athlete cannot do three. Carry it as the
+buy-in section's own "rounds" so the count survives; writing it only into the prescription text
+loses it, and the fixed work then counts 8 per interval instead of 16 (32 instead of 64 total).
+CRITICAL — what this block SCORES: every round on it is written down, so there is no rounds count
+to earn. The only number the athlete brings is the max movement. Set "scoreType": "reps" at the
+workout level and "isMaxReps": true on that movement; do NOT emit "scoreType": "rounds_reps" just
+because the word AMRAP appears. The word describes the max movement, not the structure.
+This generalizes: "3 rounds of X, then max Y", "200m run, then max burpees for the rest" — any
+interval whose work is fully prescribed except one movement is scored by that movement.
+
 ### 13. For time with buy-in + multiple round sections (Lion's Roar style)
 Input:
 "Lion's Roar
@@ -1161,6 +1254,10 @@ function athleteContextBlock(note: string): { type: 'text'; text: string } {
   };
 }
 
+// Banner around every verbatim AI response in the console. Filter devtools on "AI-RAW" to see
+// exactly what the model returned for a log, stage 1 and stage 2, and nothing else.
+const AI_RAW_RULE = '═'.repeat(60);
+
 /**
  * Parse a workout from plain text (no image).
  * `kind` scopes the prompt to the part's shape (see buildParsePrompt); omit it for full coverage.
@@ -1186,7 +1283,14 @@ export async function parseWorkoutText(
       },
     ],
     max_tokens: 4000,
-    temperature: 0.2,
+    // Reading a board has exactly one right answer, so sampling buys nothing and costs
+    // reproducibility: at 0.2 the same board parsed correctly on one log and invented
+    // "reps": 1 on the next, which is unfixable because it will not reproduce.
+    temperature: 0,
+    // The form. Fields the app cannot work without (equipment, the work/rest split) are slots
+    // the response is rejected without, instead of MUSTs buried in the prompt that the model
+    // was free to skip. See parseSchema.ts.
+    response_format: { type: 'json_schema', json_schema: PARSE_RESPONSE_SCHEMA },
   });
   console.info(`[TIMING] structure (${kind ?? 'full'}): ${Math.round(performance.now() - startedAt)}ms`);
 
@@ -1196,6 +1300,11 @@ export async function parseWorkoutText(
   if (jsonMatch) jsonStr = jsonMatch[1];
 
   const rawJson = jsonStr.trim();
+  // Logged BEFORE JSON.parse so a truncated or malformed response is still readable when the parse throws.
+  console.info(
+    `\n${AI_RAW_RULE}\n🤖 AI-RAW · STAGE 2 STRUCTURE · ${sourceLabel} · part=${kind ?? 'full'}\n${AI_RAW_RULE}\n`
+    + `${rawJson}\n${AI_RAW_RULE}`,
+  );
   const data = JSON.parse(rawJson);
   const validated = validateParsedWorkout(data);
   // Seed rawText from the parse input so post-processing has the board text to work from (the
@@ -1389,6 +1498,11 @@ async function requestSegmentation(
   const raw = response.choices[0]?.message?.content || '';
   const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (jsonMatch ? jsonMatch[1] : raw).trim();
+  // Stage 1 output verbatim — the transcribed + cleaned board text, before any validation drops a part.
+  console.info(
+    `\n${AI_RAW_RULE}\n🤖 AI-RAW · STAGE 1 TRANSCRIBE + SEGMENT\n${AI_RAW_RULE}\n`
+    + `${jsonStr}\n${AI_RAW_RULE}`,
+  );
   try {
     return validateSegmentedWorkout(JSON.parse(jsonStr));
   } catch {
@@ -1739,20 +1853,38 @@ function validateMovement(data: unknown): ParsedMovement | null {
     }
   }
 
+  // "max" in a quantity slot is the schema's way of saying the ATHLETE earns this number and the
+  // board prescribed none. It replaces the old two-step (omit the quantity AND set isMaxReps),
+  // where getting only half of it right is exactly what wrote "reps": 1 onto a 25-minute EMOM.
+  // Read from any quantity slot, so "max calories" on a bike says it as naturally as "max reps".
+  // WHICH slot said it is the score's UNIT, and dropping that is what made a "max calories"
+  // bike print "40 reps": collapsing all three slots into one boolean left the unit knowable
+  // only by guessing from inputType downstream. Kept as maxMetric so nobody has to guess.
+  const maxMetric: ParsedMovement['maxMetric'] | undefined =
+    raw.calories === 'max' ? 'calories'
+    : raw.distance === 'max' ? 'distance'
+    : raw.reps === 'max' ? 'reps'
+    : undefined;
+  const saysMax = maxMetric !== undefined;
+  const quantity = (value: unknown): number | undefined =>
+    typeof value === 'number' ? value : undefined;
+
   return {
     name: raw.name,
-    reps: typeof raw.reps === 'number' ? raw.reps : undefined,
+    reps: quantity(raw.reps),
     repsDisplay: typeof raw.repsDisplay === 'string' && raw.repsDisplay.trim() ? raw.repsDisplay.trim() : undefined,
-    distance: typeof raw.distance === 'number' ? raw.distance : undefined,
+    distance: quantity(raw.distance),
     time: typeof raw.time === 'number' ? raw.time : undefined,
-    calories: typeof raw.calories === 'number' ? raw.calories : undefined,
+    calories: quantity(raw.calories),
+    perSide: raw.perSide === true ? true : undefined,
     rxCalories,
     rxWeights: validateRxWeights(raw.rxWeights),
     unit: validateMeasurementUnit(raw.unit),
     inputType,
     equipment,
     implementCount,
-    isMaxReps: raw.isMaxReps === true ? true : undefined,
+    isMaxReps: raw.isMaxReps === true || saysMax ? true : undefined,
+    maxMetric,
     // "role": "buy_in" or "cash_out" from AI means this movement is not repeated per round
     perRound: raw.perRound === false || raw.role === 'buy_in' || raw.role === 'cash_out' ? false : undefined,
     countingMode,
@@ -1965,6 +2097,14 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         ? (exercise.loggingMode as ExerciseLoggingMode)
         : undefined;
 
+      // Validate scoreType — what the block is scored IN, as distinct from the clock it runs on.
+      // Absent is the normal case and means "the clock's conventional score"; a value here is the
+      // AI telling us those two differ.
+      const validBlockScoreTypes: BlockScoreType[] = ['time', 'rounds', 'reps', 'load'];
+      const scoreType = validBlockScoreTypes.includes(exercise.scoreType as BlockScoreType)
+        ? (exercise.scoreType as BlockScoreType)
+        : undefined;
+
       // Validate loggingHints
       let loggingHints: ParsedExercise['loggingHints'] = undefined;
       if (exercise.loggingHints && typeof exercise.loggingHints === 'object') {
@@ -1991,6 +2131,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         movements: movements.length > 0 ? movements : undefined,
         sections,
         loggingMode,
+        scoreType,
         loggingHints,
         stationRotation: exercise.stationRotation === true ? true : undefined,
         intervalCount: typeof exercise.intervalCount === 'number' && exercise.intervalCount > 0 ? exercise.intervalCount : undefined,

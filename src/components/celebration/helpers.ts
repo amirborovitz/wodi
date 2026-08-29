@@ -26,8 +26,15 @@ import type {
 import {
   isBwVolumeMovement,
   movementBucketKey,
+  sectionRepeatCount,
   statedOccurrenceCount,
 } from '../../services/workloadCalculation';
+import {
+  formatMaxMetricQuantity,
+  formatMaxMetricValue,
+  getMaxMetric,
+  type MaxMetric,
+} from '../../utils/maxMetric';
 // Partner scope — the ONE owner of what a team's number means for one athlete. Nothing in this
 // file multiplies a per-round quantity by a round count without going through it.
 import {
@@ -38,6 +45,9 @@ import {
   splitRounds,
   type MovementQuantity,
 } from '../../services/partnerScope';
+// Block score — the ONE owner of "what does this piece count?", read from the block rather than
+// from its format name. A clock is not a score.
+import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted } from '../../services/blockScore';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -770,6 +780,13 @@ export function repairUndercountedBreakdown(
         || movement.countingMode === 'once'
         || /^(cash[-\s]?out|buy[-\s]?in)\s*:/i.test(movement.name);
       if (isBuyInCashOut) continue;
+
+      // A max-effort count is the athlete's own number — there is no "reps × rounds" for it,
+      // because the board prescribed no reps. This repair exists to restore work the save path
+      // undercounted; applied to an open quantity it FABRICATES work instead. A logged 10
+      // burpees printed as 20, because `repeats` here came from the prescription's inner
+      // "2 rounds of" (the fixed work's own count, never this movement's).
+      if (movement.isMaxReps === true) continue;
 
       // Station-rotation movements run on only a subset of the intervals (3 of 6 in an
       // alternating two-station AMRAP), so reps × prescription-round-count over-counts them —
@@ -1656,6 +1673,33 @@ function hasBlockScoredSections(exercise: Exercise | null | undefined): boolean 
   return (exercise?.sections ?? []).some((section) => section.scoreType != null);
 }
 
+/**
+ * The one structural fact a block-scored piece's own header has to carry: the rest between its
+ * blocks.
+ *
+ * Everything else about the structure is already on the card and cannot be said again without
+ * repeating itself — the scheme is the poster title, each block's clock is that block's header,
+ * and the number of blocks is how many headers there are. The rest is the only part with nowhere
+ * else to live, and it matters: "6 min AMRAP × 2" back-to-back is a different workout from the
+ * same thing with two minutes between.
+ *
+ * Number-of-blocks agnostic: it reads the piece's own cadence fields, not a block count.
+ */
+function buildBlockScoredStructureLine(exercise: Exercise): string | undefined {
+  const timingText = `${exercise.rawText || ''} ${exercise.name || ''} ${exercise.prescription || ''}`
+    .replace(/(d+).(d{2})/g, '$1:$2');
+  const count = exercise.intervalCount
+    ?? (exercise.sections ?? []).filter((s) => s.scoreType != null).length
+    ?? 0;
+  const restSeconds = resolvePerIntervalSeconds(
+    exercise.restDuration,
+    parseExplicitRestSeconds(timingText),
+    count,
+  ) ?? parseExplicitRestSeconds(timingText);
+  if (!restSeconds) return undefined;
+  return `${formatIntervalDuration(restSeconds)} rest between`;
+}
+
 function isProgressiveChipper(exercise: Exercise | null | undefined): boolean {
   if (!exercise?.sections?.length) return false;
   if (hasBlockScoredSections(exercise)) return false;
@@ -1897,7 +1941,14 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
 }
 
 function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement, multiplier = 1): { text: string; hasWeight: boolean } {
-  const qty = movement.reps != null
+  const qty = movement.isMaxReps && movement.reps == null
+      && movement.calories == null && movement.distance == null
+    // The coach's own word, in the slot a quantity would occupy. Same rule the flat row builder
+    // already applies (see isMaxEffort in buildCelebrationMovementRow) — a section row that
+    // dropped it printed a bare "Burpees Over the Bar", a line with no number and no reason for
+    // having none, when what the board wrote was "Into - Max Burpees Over the Bar".
+    ? 'Max'
+    : movement.reps != null
     ? `${movement.reps * multiplier}`
     : movement.calories != null
       ? /\bcal(?:orie|ories)?\b/i.test(movement.name)
@@ -2057,6 +2108,29 @@ function formatTotalNote(totals: { distance?: number; calories?: number; reps?: 
   return undefined;
 }
 
+/** A breakdown entry's total, in the row's own words. */
+function totalNoteFor(total: MovementTotal | undefined): string | undefined {
+  return total
+    ? formatTotalNote({
+        distance: total.totalDistance,
+        calories: total.totalCalories,
+        reps: total.totalReps,
+      })
+    : undefined;
+}
+
+/**
+ * How many of a piece's blocks state this movement. A breakdown entry is the movement's total
+ * across the WHOLE part, so it may only stand in for a section's own row when that section is
+ * the only place the movement appears.
+ */
+function countSectionsStating(sections: ParsedSection[], name: string): number {
+  const key = name.toLowerCase();
+  return sections.filter((section) =>
+    (section.movements ?? []).some((movement) => movement.name.toLowerCase() === key),
+  ).length;
+}
+
 // Per-section aggregate for a fixed prescription row ("40 DU" × 2 rounds → "80 total").
 // Pure prescription math — for_time work is fixed, so this never leans on breakdown
 // aggregation (which merges a movement appearing in several sections into one number
@@ -2154,7 +2228,11 @@ function buildMultiSectionForTimeSections(
   // is a single round (a pyramid/chipper of one-round blocks, a partner piece), those render as
   // clean untitled inline lines, so forcing a "1 ROUND" block on each would be noise/regression.
   const hasMultiRoundTier = exerciseSections
-    .some((s) => s.sectionType === 'rounds' && (s.rounds ?? 1) > 1);
+    .some((s) => s.sectionType === 'rounds' && sectionRoundsCompleted(s) > 1);
+
+  // Whether this piece ran several independent clocks (b.1 / b.2) or one window with a scored
+  // tail. Asked of the sections actually being rendered, so it can never disagree with them.
+  const hasMultipleClocks = hasIndependentBlocks({ sections: exerciseSections });
 
   // "THEN" exists to close a buy-in — it marks the boundary between the work done once and the
   // work that repeats, which is the one thing a flat list cannot say. Ladder tiers stacked on
@@ -2167,6 +2245,12 @@ function buildMultiSectionForTimeSections(
     if (sectionMovements.length === 0) continue;
 
     const rounds = section.rounds ?? 1;
+    // What the athlete actually did, block by block. `rounds` above is the board's repeat count
+    // for this block inside one pass of the piece — 1 for a separately-scored AMRAP block, which
+    // is why every movement row on a two-AMRAP poster printed no total at all: nothing was
+    // multiplied, so nothing looked worth stating. Scales to any number of blocks; each asks
+    // its own section and gets its own answer.
+    const completedRounds = sectionRoundsCompleted(section);
 
     const moveEntries = sectionMovements
       .map((m) => resolveSubstitution(m, rounds))
@@ -2186,7 +2270,11 @@ function buildMultiSectionForTimeSections(
     // count — the label is how the athlete and anyone reading the poster identify it, and its
     // round count is the score, shown on the same header row. Titled whenever the block declares
     // its own score, logged or not: an unscored block still needs its header to stay readable.
-    const isScoredBlock = section.scoreType != null;
+    //
+    // ONLY when the piece actually ran more than one clock, though. A lone scored section is the
+    // tail of the piece's single window ("...into max burpees"), and heading it "BLOCK 2 ·
+    // AMRAP 2:00" invents a second AMRAP — see hasIndependentBlocks.
+    const isScoredBlock = section.scoreType != null && hasMultipleClocks;
     const blockScore = formatBlockScore(section);
     // "N ROUNDS OF" reads as the lead-in to the list printed directly beneath it, which is what
     // the block actually is. A bare "N ROUNDS" floats above those lines without claiming them.
@@ -2249,15 +2337,29 @@ function buildMultiSectionForTimeSections(
       // "1000m … 1000m total" states the same fact twice, and beside sibling rows whose totals
       // ARE multiplied (125, 35) it implies the buy-in was multiplied too.
       const isOnceOnlySection = section.sectionType !== 'rounds' && rounds <= 1;
-      const sectionTotal = !isOnceOnlySection && (rounds > 1 || hasMultiRoundTier)
-        ? (logged && !splitInfo
-            ? formatTotalNote({
-                distance: logged.totalDistance,
-                calories: logged.totalCalories,
-                reps: logged.totalReps,
-              })
-            : formatSectionRowTotal(movement, rounds))
-        : undefined;
+      // Does this row's work happen more than once? TWO independent layers can say so: how many
+      // passes the athlete completed, and how many times the block repeats inside one pass
+      // ("2 rounds of 8 Push Press…" — sectionRepeatCount, the same owner the breakdown reads).
+      // Only the first was ever asked, so a buy-in the board repeated printed no total at all.
+      const repeatsWithinPass = sectionRepeatCount(section);
+      const sectionTotal = ((): string | undefined => {
+        if (isOnceOnlySection) return undefined;
+        if (!(completedRounds > 1 || repeatsWithinPass > 1 || hasMultiRoundTier)) return undefined;
+        // A substituted row's truth is the breakdown — the resolver already joined the two.
+        if (logged && !splitInfo) return totalNoteFor(logged);
+        // One layer only: prescription × rounds is exact, and stays the default.
+        if (repeatsWithinPass <= 1) return formatSectionRowTotal(movement, completedRounds);
+        // BOTH layers in play. Prescription math can count one of them and no more — 8 × 1 for
+        // work done 64 times — so the poster stops deriving and reads the figure the workload
+        // owner already computed from the same section scope.
+        //
+        // Only for a movement this piece states ONCE: the breakdown merges a movement appearing
+        // in several sections into a single number, which would read wrong repeated on each of
+        // their rows (the reason formatSectionRowTotal is prescription math in the first place).
+        // And never on a partner row, where the value column means something else entirely.
+        if (splitInfo || countSectionsStating(exerciseSections, movement.name) !== 1) return undefined;
+        return totalNoteFor(findMovementTotal(movements, movement.name));
+      })();
       // WHOSE total this is decides where it goes. On a solo row it is the athlete's own number,
       // so it belongs in the value column. On a partner row it is the PAIR's — and the value
       // column is the ME column (see PairsLegend), where it read as this athlete's own work and
@@ -2286,7 +2388,15 @@ function buildMultiSectionForTimeSections(
       title: sectionTitle,
       // A scored block's cap is its OWN clock ("10:00") — each block is its own timed effort,
       // and the piece-wide cadence already leads the poster.
-      blueprint: isScoredBlock ? formatBlockClock(exercise) : undefined,
+      //
+      // A buy-in the board repeats states that repeat instead ("BUY-IN · 2 ROUNDS"). Its title
+      // is the word BUY-IN, which has nowhere to carry a count, so a "2 rounds of 8 Push Press
+      // + 8 Box Jumps" buy-in printed as a bare 8 and 8 — half the prescribed work, silently.
+      blueprint: isScoredBlock
+        ? formatBlockClock(exercise)
+        : section.sectionType === 'buy_in' && rounds > 1
+          ? `${rounds} rounds`
+          : undefined,
       rows,
       ...(blockScore ? { blockScore } : {}),
       isPartnerConfirmed,
@@ -2323,8 +2433,13 @@ function formatBlockLabel(exercise: Exercise, section: ParsedSection, index: num
 }
 
 /**
- * One block's clock ("10:00") — the piece's work time split across its intervals. workDuration is
- * stored CUMULATIVE across all intervals, so it must be divided before it means "this block".
+ * One block's clock ("AMRAP 6:00") — the piece's work time split across its intervals, named by
+ * what runs on it. workDuration is stored CUMULATIVE across all intervals, so it must be divided
+ * before it means "this block".
+ *
+ * The clock is named because this is now the ONLY place the block's format appears: the piece
+ * states the scheme once in its title, and the block header is what says each of these is a
+ * separate 6-minute AMRAP rather than two halves of one.
  */
 function formatBlockClock(exercise: Exercise): string | undefined {
   const count = exercise.intervalCount ?? 0;
@@ -2333,7 +2448,38 @@ function formatBlockClock(exercise: Exercise): string | undefined {
   const perBlock = Math.round(work / count);
   const mins = Math.floor(perBlock / 60);
   const secs = perBlock % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const clock = `${mins}:${secs.toString().padStart(2, '0')}`;
+  const word =
+    exercise.loggingMode === 'amrap' || exercise.loggingMode === 'amrap_intervals' ? 'AMRAP'
+    : exercise.loggingMode === 'emom' ? 'EMOM'
+    : undefined;
+  return word ? `${word} ${clock}` : clock;
+}
+
+/**
+ * The scoreboard label for a block — the board's own shorthand ("B.1", "A"), kept short because
+ * it sits directly above a hero-sized number and its only job is to say WHICH clock that number
+ * came off. The long form ("AMRAP B.1") belongs on the block's header row, where there is a line
+ * to fill; repeating it under the hero crowds two numbers that need to stay readable side by side.
+ */
+function formatBlockShortLabel(section: ParsedSection, index: number): string {
+  const label = section.label?.trim().toUpperCase().replace(/s*-s*/g, ' ').replace(/s+/g, ' ');
+  return label || `#${index + 1}`;
+}
+
+/**
+ * Every independently-scored block of this piece, formatted for the poster's hero scoreboard.
+ *
+ * Returns entries only for blocks that BOTH declare a score and have one logged, so a piece
+ * where the athlete filled in one block and skipped another shows the one real number rather
+ * than a "0" beside it (poster truth standard). The caller treats a single entry as an ordinary
+ * one-clock hero — the scoreboard is what a piece with two or more clocks needs.
+ */
+function buildHeroBlockScores(exercise: Exercise): { label: string; value: string; unit?: string }[] {
+  return loggedBlockScores(exercise).flatMap(({ section, index }) => {
+    const score = formatBlockScore(section);
+    return score ? [{ label: formatBlockShortLabel(section, index), ...score }] : [];
+  });
 }
 
 function formatBlockScore(section: ParsedSection): { value: string; unit?: string } | undefined {
@@ -2548,6 +2694,23 @@ function parseExplicitRestSeconds(text: string): number | undefined {
   return match ? clockTokenToSeconds(match[1].trim()) : undefined;
 }
 
+/**
+ * The compact work/rest split a board writes beside the format word — "EMOM (50:10)", "EMOM
+ * (40/20)". Both numbers are SECONDS of one interval, so this is the interval, not a cumulative
+ * duration; the other parsers here need the words "work"/"rest"/"amrap" and never saw it.
+ *
+ * Deliberately anchored to the format keyword and to parentheses: a bare "50:10" in board text is
+ * far more often a clock time than a split, and reading one as the other would rewrite the piece.
+ */
+function parseCompactWorkRestSplit(text: string): { work: number; rest: number } | undefined {
+  const match = text.match(/\b(?:e\d*mom|emom|intervals?|tabata)\s*\(\s*(\d{1,3})\s*[:/]\s*(\d{1,3})\s*\)/i);
+  if (!match) return undefined;
+  const work = parseInt(match[1], 10);
+  const rest = parseInt(match[2], 10);
+  if (work <= 0 || rest <= 0 || work > 600 || rest > 600) return undefined;
+  return { work, rest };
+}
+
 function parseExplicitWorkSeconds(text: string): number | undefined {
   const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?(?:amrap|work)`, 'i'))
     ?? text.match(new RegExp(`(?:amrap|work)\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
@@ -2607,9 +2770,7 @@ export function buildPageArtifactSections(
   const prescribedMaxMap: Record<string, boolean> = {};
   const prescribedRxLabelMap: Record<string, string> = {};
   const prescribedAltMap: Record<string, string> = {};
-  const stationOrderMap: Record<string, number> = {};
   const stationLabelsInOrder: string[] = [];
-  let stationIdx = 0;
   const formatStationDistance = (meters: number): string => (
     meters >= 1000
       ? `${meters % 1000 === 0 ? meters / 1000 : (meters / 1000).toFixed(1)}km`
@@ -2647,14 +2808,20 @@ export function buildPageArtifactSections(
     }
     if (m.implementCount) prescribedImplementMap[key] = m.implementCount;
     if (m.isMaxReps || /\bmax\b/i.test(m.name)) prescribedMaxMap[key] = true;
-    if (!(key in stationOrderMap)) stationOrderMap[key] = stationIdx++;
   }
   const hasStations = Object.keys(stationLabelMap).length > 0;
 
+  // A station board is driven by its PRESCRIPTION, not by what got logged: the five stations are
+  // the workout, and a station the athlete put no number against still has to appear or the
+  // poster silently rewrites the board into a four-station piece. The breakdown joins in per
+  // station where it exists (matched through a substitution back to the prescribed name).
   const orderedMovements = hasStations
-    ? [...movements].sort((a, b) =>
-        (stationOrderMap[a.name.toLowerCase()] ?? 999) - (stationOrderMap[b.name.toLowerCase()] ?? 999),
-      )
+    ? prescribedMovements.map((prescribed): MovementTotal => {
+        const key = prescribed.name.toLowerCase();
+        return movements.find((m) =>
+          m.name.toLowerCase() === key || m.originalMovement?.toLowerCase() === key,
+        ) ?? { name: prescribed.name };
+      })
     : orderMovementTotalsByPrescription(exercise, movements);
 
   const exerciseOnlyText = `${exercise.name || ''} ${exercise.prescription || ''}`;
@@ -2668,31 +2835,25 @@ export function buildPageArtifactSections(
     const remainder = totalIntervals % stationCount;
     return baseVisits + (stationIndex < remainder ? 1 : 0);
   };
-  const formatStationHeaderDuration = (seconds: number): string => {
-    const rounded = Math.round(seconds);
-    const mins = Math.floor(rounded / 60);
-    const secs = rounded % 60;
-    return `${mins}:${String(secs).padStart(2, '0')}`;
-  };
   // repeatCount may be either the total interval count (rotation boards: "×6" with 2 stations)
-  // or the complete-cycle count (minute EMOMs: "5 rounds" over 3 stations). Same normalization
-  // heuristic as getStationVisitCountsForExercise in workloadCalculation: a count larger than
-  // the station count and divisible by it already IS the total; otherwise multiply through.
+  // or the complete-cycle count (minute EMOMs: "5 rounds" over 3 stations). Deliberately NOT the
+  // same rule as getStationTotalIntervals in workloadCalculation: that one is handed the AI's
+  // `intervalCount`, which is an interval TOTAL by contract, while repeatCount here is read from
+  // the board's round wording. Same-looking numbers, different questions — unifying them turned
+  // a "×5 over 2 stations" board's five intervals into ten.
   const stationTotalIntervals = (stationCount: number): number => {
     if (!repeatCount) return 0;
     return repeatCount > stationCount && repeatCount % stationCount === 0
       ? repeatCount
       : repeatCount * stationCount;
   };
-  const getStationHeaderCap = (stationLabel?: string): string | undefined => {
+  // How many times this station came up. Also what a per-visit value must be multiplied by to
+  // become a total, so the row and the header can never quote different round counts.
+  const getStationVisits = (stationLabel?: string): number | undefined => {
     if (!stationLabel || !repeatCount || stationLabelsInOrder.length <= 1) return undefined;
     const stationIndex = Math.max(0, stationLabelsInOrder.indexOf(stationLabel));
     const totalIntervals = stationTotalIntervals(stationLabelsInOrder.length);
-    const visits = getStationVisitCount(totalIntervals, stationLabelsInOrder.length, stationIndex);
-    const workPerVisit = exercise.workDuration && totalIntervals > 0
-      ? formatStationHeaderDuration(exercise.workDuration / totalIntervals)
-      : undefined;
-    return [`${visits} rds`, workPerVisit].filter(Boolean).join(' · ');
+    return getStationVisitCount(totalIntervals, stationLabelsInOrder.length, stationIndex);
   };
   // Strength is individual even in a team session — a "6 sets" rep scheme is not a round-trade
   // structure, and each partner lifts their own top set. Never run partner-split detection on it.
@@ -2779,7 +2940,17 @@ export function buildPageArtifactSections(
     // a derived work/rest split would restate it worse.
     const stationCadence = extractEveryXCadence(exerciseOnlyText);
     if (stationCadence && /^emom/i.test(stationCadence)) {
-      blueprint = [stationCadence, rounds ? `${rounds} rounds` : null].filter(Boolean).join(' · ');
+      // …unless the board wrote the split itself. "EMOM (50:10)" states a 50-second work window
+      // inside each minute, and dropping it left the poster claiming a full 1:00 of work — the
+      // board's own number, silently overwritten by the assumption that an EMOM fills its minute.
+      const split = parseCompactWorkRestSplit(
+        `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2'),
+      );
+      blueprint = [
+        stationCadence,
+        rounds ? `${rounds} rounds` : null,
+        split ? `${formatIntervalDuration(split.work)} work / ${formatIntervalDuration(split.rest)} rest` : null,
+      ].filter(Boolean).join(' · ');
     } else {
       // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
       // hardcoded "1 min each" here would silently lie about the actual work/rest split.
@@ -2908,14 +3079,20 @@ export function buildPageArtifactSections(
       exercise, movements, teamSize, splitInfo, !!splitInfo,
     );
     if (blockSections.length > 0) {
+      const pieceLine = buildBlockScoredStructureLine(exercise);
       return [
-        {
+        // SAY THE STRUCTURE ONCE. The poster title carries the scheme ("6 MIN AMRAP X 2") and
+        // each block header carries its own clock ("B.1 · 6:00"), so this line exists only for
+        // the fact neither of them states: the rest between blocks. It used to restate the whole
+        // scheme here, so a two-AMRAP card said "6 min AMRAP" three times before the reader
+        // reached a single movement. Dropped entirely when there is no rest to report.
+        ...(pieceLine ? [{
           title: 'Blueprint',
-          blueprint,
+          blueprint: pieceLine,
           rows: [],
           isPartnerConfirmed: blockSections[0].isPartnerConfirmed,
           partnerDisplayMode: blockSections[0].partnerDisplayMode,
-        },
+        }] : []),
         ...blockSections,
       ];
     }
@@ -3063,14 +3240,33 @@ export function buildPageArtifactSections(
 
           if (isMaxMovement) {
             // Max-effort movement: the prescription is just "Max <movement>"; the Rx load rides
-            // along as a quiet tag and the logged aggregate is the row's value ("24 reps").
+            // along as a quiet tag and the logged aggregate is the row's value.
             fullLine = `Max ${displayName}`;
             rxLoadTag = prescribedRxLabelMap[key]
               || ((movement.weight || 0) > 0 ? `${movement.weight}${wUnit}` : undefined);
-            totalNote = totalD > 0 ? (totalD >= 1000 ? `${(totalD / 1000).toFixed(1)} km` : `${totalD}m`)
-              : totalC > 0 ? `${totalC} cal`
-              : totalR > 0 ? `${totalR} reps`
-              : undefined;
+            // In the unit the athlete EARNED it in — a bike told to go for max calories scores
+            // "40 cal", never "40 reps". The parse records which quantity slot said "max"; older
+            // docs fall back to inputType (see getMaxMetric).
+            const prescribedMov = prescribedMovements.find((m) => m.name.toLowerCase() === key);
+            const metric: MaxMetric = totalD > 0 ? 'distance'
+              : totalC > 0 ? 'calories'
+              : prescribedMov ? getMaxMetric(prescribedMov)
+              : 'reps';
+            const earnedTotal = totalD > 0 ? totalD : totalC > 0 ? totalC : totalR;
+            if (earnedTotal > 0) {
+              // A station done five times states both numbers: what one round cost and what the
+              // five added up to. One number alone can't say which it is, and the header's
+              // "5 rds" makes the ambiguity worse — the same "6" read as a round and as a total.
+              const visits = getStationVisits(stationLabel);
+              const perVisit = visits && visits > 1 && earnedTotal % visits === 0
+                ? earnedTotal / visits
+                : undefined;
+              totalNote = perVisit
+                ? `${formatMaxMetricQuantity(perVisit, metric)} / round · ${formatMaxMetricValue(earnedTotal, metric)} total`
+                : formatMaxMetricValue(earnedTotal, metric);
+            } else {
+              totalNote = undefined;
+            }
           } else {
             // Fixed prescription: one line as the athlete would read it off the whiteboard
             // ("200m Run", "50 Double Under / 80 Singles"). The ST. header shows how many times
@@ -3104,11 +3300,7 @@ export function buildPageArtifactSections(
             suppressMine: true,
           };
           if (stationLabel) {
-            return {
-              ...base,
-              roundLabel: stationLabel.toUpperCase(),
-              stationHeaderCap: getStationHeaderCap(stationLabel),
-            };
+            return { ...base, roundLabel: stationLabel.toUpperCase() };
           }
           return base;
         }
@@ -3715,6 +3907,42 @@ function buildMixedStoryMovements(
   return lines.length > 0 ? lines : undefined;
 }
 
+/**
+ * The hero's unit line when the score is an open count: the movement's own name.
+ *
+ * "BURPEES" over 46 says what the number counts; a generic "REPS" makes the reader hunt the
+ * movement list for it, and the hero exists precisely so they don't have to. Several max
+ * movements (a two-station rotation) have no single name to claim, so those fall back to REPS.
+ */
+function heroOpenCountLabel(maxMovements: ParsedMovement[]): string {
+  if (maxMovements.length !== 1) return 'REPS';
+  // Never pluralized: the label states WHAT was counted, and the coach's own name already reads
+  // correctly there ("BURPEES OVER THE BAR"). The row pluralizer is for lines that lead with a
+  // count ("8 Box Jumps"), and applying it here produced "BURPEES OVER THE BARS".
+  const name = maxMovements[0].name.replace(/^(?:max|buy-in|cash-out)\s*:?\s*/i, '').trim();
+  if (!name) return 'REPS';
+  // Long names get the poster's own abbreviation pass rather than overflowing the label slot,
+  // which sits above an ~80px hero and has far less room than a movement row.
+  return (name.length > MAX_FULL_POSTER_MOVEMENT_NAME_LENGTH
+    ? abbreviateMovementForPoster(name)
+    : name).toUpperCase();
+}
+
+/**
+ * How many windows the open count was logged across — 0 or 1 when it was entered as one figure.
+ *
+ * Read from the SETS (one per window, each flagged isMax) so a saved doc answers the same as a
+ * freshly logged one, with no extra persisted flag. Deliberately the LOGGED count rather than
+ * the board's `intervalCount`: it is the number of entries actually added together, so anything
+ * the poster says about the sum stays true even when a window was skipped.
+ *
+ * A count above 1 is what earns the hero both its "~" (a summed recollection, not a measured
+ * tally) and its "total across N rounds" note (the sum is not one effort).
+ */
+function perWindowOpenCount(exercise: Exercise): number {
+  return exercise.sets?.filter((set) => set.isMax).length ?? 0;
+}
+
 export function computeHeroResult(
   exercises: Exercise[],
   format: string | undefined,
@@ -3803,31 +4031,60 @@ export function computeHeroResult(
         }
       }
     }
-    // Alternating-station interval AMRAP: exercise.rounds is the prescribed interval count
-    // (the "× 6" on the clock), never a logged score — the real score is the reps accumulated
-    // on the max-effort movements ("Max Devil Press" + "Max Sit-up" → 39 reps). Prescribed
-    // structure must never become the hero.
-    // Gate on STRUCTURAL markers only, never countingMode — a post-processor bug (fixed
-    // 2026-07-06) stamped per_station_visit onto plain-AMRAP movements in multi-part sessions,
-    // and those exercises DO have a real logged rounds score that must stay the hero.
+    // The board left a quantity OPEN — the athlete's own count on it is the score, and the
+    // prescribed structure around it must never become the hero. Two shapes reach here and they
+    // are the same shape: an alternating-station AMRAP ("Max Devil Press" + "Max Sit-up" → 39
+    // reps) and a fixed-work interval ("2 rounds of 8/8, into max burpees" → the burpees).
+    // Both used to be answered by a station-marker test, which silently excluded the second —
+    // resolveBlockScore asks what the block leaves open instead, so neither needs its own gate.
+    //
+    // Station rotations still sum ACROSS max movements (two stations, two maxes, one score);
+    // resolveBlockScore names the single open movement, so the sum is scoped to the max-flagged
+    // set when there is more than one.
     const stationMovements = amrapExercise.movements ?? [];
-    const isStationRotation = stationMovements.some((m) =>
-      m.stationLabel != null || m.stationIndex != null);
-    if (isStationRotation) {
-      const maxTotalReps = stationMovements
-        .filter((m) => m.isMaxReps || /\bmax\b/i.test(m.name))
+    const maxEffortMovements = stationMovements.filter((m) => m.isMaxReps || /\bmax\b/i.test(m.name));
+    const scoresOpenCount = resolveBlockScore(amrapExercise).type === 'open_reps'
+      || maxEffortMovements.length > 0;
+    if (scoresOpenCount) {
+      const maxTotalReps = maxEffortMovements
         .reduce((sum, m) => sum + (findMovementTotal(movements, m.name)?.totalReps || 0), 0);
+      const openCountWindows = perWindowOpenCount(amrapExercise);
       if (maxTotalReps > 0) {
         return {
           value: `${maxTotalReps}`,
-          unit: 'REPS',
+          // The movement's own name, not a generic "REPS" — "BURPEES" tells the reader what the
+          // number counts, which is the whole point of leading with it.
+          unit: heroOpenCountLabel(maxEffortMovements),
           formatLine, storyLine,
           storyMovements: buildStory(amrapExercise.rounds || 1),
           accentClass: 'accentMagenta',
+          // Summed from per-window recollections, so it is marked as an estimate rather than
+          // printed as a measured tally. Same honesty rule as the ghost rung — and the window
+          // count travels with it, so the poster can say the number is a total and not one set.
+          approximate: openCountWindows > 1,
+          ...(openCountWindows > 1 ? { openCountWindows } : {}),
         };
       }
       // No max-effort reps logged — fall through to calories/EP/duration, never the structure.
     } else {
+      // ONE CLOCK, ONE SCORE. A piece whose blocks each ran their own clock ("[6:00 AMRAP,
+      // 2:00 REST] × 2" over B.1 and B.2) has one score per block and no total: 4 and 4 is not
+      // an 8, and an 8 describes nothing the athlete did. Hand every block's score to the skins
+      // as a scoreboard and let them print all of them. Works for two blocks or ten.
+      const blocks = buildHeroBlockScores(amrapExercise);
+      if (blocks.length > 1) {
+        return {
+          value: blocks[0].value,
+          unit: 'ROUNDS',
+          blockScores: blocks,
+          formatLine,
+          storyLine,
+          // The story lists every block's own movements, so it must not be multiplied by any one
+          // block's round count — each row already carries its own total.
+          storyMovements: buildStory(1),
+          accentClass: 'accentMagenta',
+        };
+      }
       // Sum across exercises only for old-shape docs that saved each interval as its own
       // exercise — and only over AMRAP-named ones: in a multi-PART session a sibling part's
       // rounds (e.g. a 4-set strength block) must never inflate the AMRAP score.

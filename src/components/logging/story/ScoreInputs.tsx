@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult, MovementResult } from './types';
 import { PartialRoundChecklist, type PartialRow } from './PartialRoundChecklist';
+import { StepperInput } from './StepperInput';
 import styles from './ScoreInputs.module.css';
 
 function selectAllInput(target: HTMLInputElement) {
@@ -314,6 +315,177 @@ interface RoundsPerIntervalInputProps {
   result: StoryExerciseResult;
   intervalCount: number;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// OpenRepsPerIntervalInput — the block's open count, window by window
+// ═══════════════════════════════════════════════════════════════════
+// For a board that prescribes all its rounds and leaves one movement open: "[2:00 AMRAP /
+// 2:00 REST] x4 — 2 rounds of 8 Push Press + 8 Box Jumps, INTO max burpees". The rounds are
+// written down, so there is no rounds score to ask for; the burpees are the only number the
+// athlete brings. See services/blockScore.
+//
+// Asked per window rather than as one total because the shape of the four numbers IS the story
+// ("14 · 12 · 11 · 9" — you can see where it fell apart), and because a per-window recollection
+// is more honest than a summed one. Nobody counts burpees precisely while racing a clock, so the
+// prompt says so out loud: a rough number entered beats an exact one skipped. That admission is
+// what earns the "~" the poster prints on the total.
+//
+// Entering the first window copies it forward, so the common case is one number plus small
+// tweaks rather than four entries from a cold start.
+//
+// ONLY while the windows are few enough to remember. The grid drew one box per interval with no
+// limit, so a perfectly ordinary "EMOM 25: max cal bike" asked for twenty-five numbers on a
+// scrolling wall of boxes — for a workout the athlete experienced as "about twelve a minute".
+// Past the threshold the question changes to the average, which is the honest one at that
+// length, and the block's total is that average across the windows.
+
+/**
+ * How many windows an athlete can still recall one by one. Six is a set of numbers you remember
+ * as a shape ("14 · 12 · 11 · 9 · 9 · 8"); twenty-five is a wall of boxes nobody fills honestly,
+ * and the per-window story it exists to capture is gone at that length anyway.
+ */
+const MAX_RECALLED_WINDOWS = 6;
+
+/**
+ * Whether the block is asked window by window, or once as an average.
+ *
+ * Exported so the boundary has a regression net: the per-window grid drew one box per interval
+ * with NO limit, and a 25-minute EMOM with one open movement rendered twenty-five of them. There
+ * are no component tests here, so this is the only place that behaviour can be pinned.
+ */
+export function asksPerWindow(intervals: number): boolean {
+  return (intervals > 0 ? intervals : 1) <= MAX_RECALLED_WINDOWS;
+}
+
+interface OpenRepsPerIntervalInputProps {
+  result: StoryExerciseResult;
+  /** The open movement's name, for the prompt — "burpees over the bar", not "reps". */
+  movementName: string;
+  intervals: number;
+  /** This athlete's last logged count on the movement, to seed window 1. */
+  seed?: number;
+  onChange: (patch: Partial<StoryExerciseResult>) => void;
+}
+
+export function OpenRepsPerIntervalInput({
+  result,
+  movementName,
+  intervals,
+  seed,
+  onChange,
+}: OpenRepsPerIntervalInputProps) {
+  const windowCount = intervals > 0 ? intervals : 1;
+  const asAverage = !asksPerWindow(windowCount);
+
+  const values = useMemo(() => {
+    const stored = result.maxRepsPerInterval ?? [];
+    return Array.from({ length: windowCount }, (_, i) => stored[i]);
+  }, [result.maxRepsPerInterval, windowCount]);
+
+  const commit = useCallback((next: (number | undefined)[]) => {
+    const entered = next.filter((v): v is number => typeof v === 'number' && v > 0);
+    onChange({
+      maxRepsPerInterval: next.map((v) => v ?? 0),
+      // The sum is the block's score — kept in the field every existing consumer already reads,
+      // so hero/EP/breakdown need no per-window awareness to get the right total.
+      maxReps: entered.length > 0 ? entered.reduce((sum, v) => sum + v, 0) : undefined,
+    });
+  }, [onChange]);
+
+  const setWindow = useCallback((index: number, raw: number) => {
+    const value = Math.max(0, Math.min(999, raw));
+    const next = [...values];
+    next[index] = value;
+    // First entry seeds the rest: four windows of the same movement land in the same
+    // neighbourhood, so copying forward turns this into one entry plus adjustments. Only ever
+    // fills windows the athlete hasn't touched.
+    if (index === 0) {
+      for (let i = 1; i < windowCount; i += 1) {
+        if (next[i] == null) next[i] = value;
+      }
+    }
+    commit(next);
+  }, [values, windowCount, commit]);
+
+  const total = values.reduce((sum: number, v) => sum + (v ?? 0), 0);
+
+  if (asAverage) {
+    // One number, spread across every window. Written into the SAME field the grid fills so the
+    // total, the poster's "~", and the breakdown all read it without knowing which way it was
+    // asked — a second storage shape here would be a second thing to keep in sync.
+    const average = values[0];
+    const setAverage = (next: number) => {
+      const value = Math.max(0, Math.min(999, next));
+      commit(Array.from({ length: windowCount }, () => value));
+    };
+    return (
+      <div className={styles.center}>
+        <div className={styles.prompt}>
+          How many {movementName.toLowerCase()} in an average round?
+        </div>
+        <div className={styles.roughNote}>
+          Roughly is fine — we'll count it across all {windowCount}.
+        </div>
+        <StepperInput
+          value={average}
+          onChange={(v: number | undefined) => setAverage(v ?? 0)}
+          step={1}
+          min={0}
+          max={999}
+          placeholder={seed ? String(seed) : '0'}
+          unit="per round"
+          size="arcade"
+          emphasis="hero"
+        />
+        {average != null && average > 0 && (
+          <div className={styles.windowTotal}>
+            ~{average * windowCount} total
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.center}>
+      <div className={styles.prompt}>
+        How many {movementName.toLowerCase()} each window?
+      </div>
+      <div className={styles.roughNote}>
+        Roughly is fine — nobody counts perfectly mid-workout.
+      </div>
+
+      <div className={styles.windowGrid}>
+        {values.map((value, index) => (
+          <div className={styles.windowCell} key={index}>
+            <span className={styles.windowLabel}>{index + 1}</span>
+            <input
+              className={styles.windowInput}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={999}
+              placeholder={index === 0 && seed ? String(seed) : '–'}
+              value={value != null ? String(value) : ''}
+              onFocus={(e) => selectAllInput(e.currentTarget)}
+              onChange={(e) => {
+                const parsed = parseInt(e.currentTarget.value, 10);
+                setWindow(index, Number.isNaN(parsed) ? 0 : parsed);
+              }}
+              aria-label={`${movementName}, window ${index + 1} of ${windowCount}`}
+            />
+          </div>
+        ))}
+      </div>
+
+      {total > 0 && (
+        <div className={styles.windowTotal}>
+          ~{total} total
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function RoundsPerIntervalInput({ result, intervalCount, onChange }: RoundsPerIntervalInputProps) {

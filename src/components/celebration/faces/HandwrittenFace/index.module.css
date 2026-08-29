@@ -227,7 +227,9 @@
   overflow-y: hidden;
   position: relative;
   padding: 18px 0 6px;
-  touch-action: pan-y;
+  /* Horizontal only. The deck's swipe is JS-driven and nothing inside scrolls
+     vertically, so the browser is left no gesture to turn into a page drag. */
+  touch-action: none;
 }
 
 .carouselViewportPanelOpen {

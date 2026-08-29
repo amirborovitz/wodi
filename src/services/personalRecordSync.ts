@@ -24,7 +24,7 @@ import type { Exercise, PersonalRecord } from '../types';
  * docs written under the old colliding scheme too. Nothing needs migrating — an old doc simply
  * becomes the oldest row in its movement's history.
  *
- * MANUAL rows (`workoutId: ''`, written by PRScreen) belong to no workout and are never matched
+ * MANUAL rows (`workoutId: ''`, hand-entered on the Records screen) belong to no workout and are never matched
  * by either function here. That is the whole reason manual entry can survive an edit or a
  * delete: a workout-scoped repair cannot see them.
  */

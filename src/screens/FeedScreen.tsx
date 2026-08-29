@@ -69,7 +69,7 @@ export function FeedScreen(): React.ReactElement {
     if (!deleting) return;
     setDeleteBusy(true);
     setDeleteError(null);
-    void deleteFeedPost(deleting.id)
+    void deleteFeedPost(deleting)
       .then(() => { setDeleting(null); setNotice('Removed from the feed'); })
       .catch((err) => { console.error('Failed to delete post:', err); setDeleteError("Couldn't remove that post"); })
       .finally(() => setDeleteBusy(false));

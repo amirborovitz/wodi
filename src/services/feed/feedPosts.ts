@@ -1,11 +1,12 @@
 /**
  * Feed post reads and writes.
  *
- * A post freezes the POSTER and nothing else. The rules keep workouts
- * owner-scoped precisely so a global feed can exist without exposing rawText,
- * corrections, notes or EP — but who wrote it is a uid, resolved live through
- * /publicProfiles, because identity is not a historical fact the way a workout
- * is. Posts are immutable once written; the only mutable thing about one is its
+ * A post freezes the POSTER and the athlete's caption, and nothing else. The
+ * rules keep workouts owner-scoped precisely so a global feed can exist without
+ * exposing rawText, corrections, notes or EP — but who wrote it is a uid,
+ * resolved live through /publicProfiles, because identity is not a historical
+ * fact the way a workout is. Posts are immutable once written, caption
+ * included; the only mutable thing about one is its
  * flames subcollection, which is why reactions live there rather than as a
  * counter field on the post.
  */
@@ -17,8 +18,9 @@ import {
 import type { FirestoreError } from 'firebase/firestore';
 import { db } from '../firebase';
 import { removeUndefined } from '../../utils/firestoreUtils';
-import { FEED_WINDOW_MS } from './types';
-import type { FeedPost, FeedPostInput, FeedReactions } from './types';
+import { FEED_WINDOW_MS, normalizeCaption } from './types';
+import { deleteStoredImage } from './feedPhoto';
+import type { FeedPhoto, FeedPost, FeedPostInput, FeedReactions } from './types';
 import type { PosterWod } from '../../components/celebration/faces/HandwrittenFace/posterData';
 
 /** Cards fetched per feed load. The 24h window keeps this naturally small. */
@@ -42,6 +44,8 @@ function toPosterPayload(stored: StoredPoster): FeedPost['poster'] {
 interface FeedPostDoc {
   userId: string;
   poster: StoredPoster;
+  photo?: FeedPhoto;
+  caption?: string;
   isPR: boolean;
   createdAt: Timestamp | null;
   expiresAt: Timestamp;
@@ -52,6 +56,11 @@ function toFeedPost(id: string, data: FeedPostDoc): FeedPost {
     id,
     userId: data.userId,
     poster: toPosterPayload(data.poster),
+    // Posts written before photos and captions existed simply have neither.
+    // Both are optional all the way to the card, which renders the poster
+    // alone for them — which is exactly what those posts always looked like.
+    photo: data.photo,
+    caption: data.caption,
     isPR: data.isPR ?? false,
     // createdAt is a server timestamp, so it reads back null for the brief
     // window between the local write and the server ack.
@@ -65,6 +74,8 @@ export async function createFeedPost(userId: string, input: FeedPostInput): Prom
   await setDoc(ref, removeUndefined({
     userId,
     poster: input.poster,
+    photo: input.photo,
+    caption: normalizeCaption(input.caption),
     isPR: input.isPR,
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromDate(new Date(Date.now() + FEED_WINDOW_MS)),
@@ -72,8 +83,18 @@ export async function createFeedPost(userId: string, input: FeedPostInput): Prom
   return ref.id;
 }
 
-export async function deleteFeedPost(postId: string): Promise<void> {
-  await deleteDoc(doc(db, 'feedPosts', postId));
+/**
+ * Deleting a post takes its photo with it — the file belongs to the post, and
+ * nothing else will ever collect it. (The Firestore TTL that reaps expired
+ * posts does NOT run this, so photos on posts that simply age out still need a
+ * sweep; that is the same gap poster polaroids have always had.)
+ *
+ * The doc goes first: an orphaned file is invisible, whereas a post whose photo
+ * has been deleted out from under it renders a broken card.
+ */
+export async function deleteFeedPost(post: FeedPost): Promise<void> {
+  await deleteDoc(doc(db, 'feedPosts', post.id));
+  if (post.photo) await deleteStoredImage(post.photo.path);
 }
 
 /**
@@ -162,6 +183,9 @@ export async function reportFeedPost(
     postId: post.id,
     postUserId: post.userId,
     postSnapshot: post.poster,
+    // The caption is athlete-written free text, so it can BE the thing being
+    // reported. Triage needs it beside the poster, not just the poster.
+    postCaption: post.caption,
     reason,
     note: note.trim() || undefined,
     createdAt: serverTimestamp(),

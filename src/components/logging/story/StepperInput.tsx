@@ -34,6 +34,14 @@ interface StepperInputProps {
   /** Compact size for inline use; 'arcade' = full-width horizontal dashboard tile */
   size?: 'sm' | 'md' | 'arcade';
   /**
+   * Arcade only. Shrinks the stepper so several fit on one screen: shorter body, smaller +/−
+   * glyphs, tighter unit. The VALUE keeps its size — that is the number the athlete reads back,
+   * and shrinking it to save pixels would trade the one thing the control exists to show.
+   * Used where a block asks one question per station and five full-height steppers turned a
+   * one-screen job into a long scroll.
+   */
+  dense?: boolean;
+  /**
    * 'hero' renders the arcade value as the screen's headline: condensed display face, accent
    * colour, oversized. For a screen whose whole job is capturing ONE number, the design system's
    * hierarchy rule applies — "the achievement is the hero". Ignored outside arcade size.
@@ -73,6 +81,7 @@ export function StepperInput({
   color,
   inputMode = 'numeric',
   size = 'md',
+  dense = false,
   emphasis = 'default',
   onCenterPress,
   active = false,
@@ -220,7 +229,10 @@ export function StepperInput({
   // ── Arcade mode: horizontal [−] [value] [+] ──────────────────────
   if (size === 'arcade') {
     const arcadeContent = (
-      <div className={styles.arcadeStepper} style={containerStyle}>
+      <div
+        className={`${styles.arcadeStepper} ${dense ? styles.arcadeStepperDense : ''}`}
+        style={containerStyle}
+      >
         <button
           type="button"
           className={`${styles.arcadeZone} ${heldBtnRef.current === 'minus' ? styles.arcadeZoneHeld : ''}`}

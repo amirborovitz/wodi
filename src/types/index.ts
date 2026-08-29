@@ -398,6 +398,17 @@ export interface ParsedMovement {
   reps?: number;                // Rep count (undefined if max reps); midpoint when a range was prescribed
   repsDisplay?: string;         // Coach-written rep text when a range was prescribed (e.g. "10-12")
   isMaxReps?: boolean;          // True if user does max reps (label shows "max", user enters actual count)
+  // WHICH quantity slot said "max" — i.e. the unit the earned score is measured in. `isMaxReps`
+  // alone records only THAT the athlete earns the number, never in what: a bike's
+  // `"calories": "max"` and a burpee's `"reps": "max"` collapsed to the same boolean, so every
+  // consumer downstream assumed reps and a max-calorie bike printed "40 reps". Defaults to
+  // 'reps' when absent (legacy docs), which is what those consumers already assumed.
+  maxMetric?: 'reps' | 'calories' | 'distance';
+  // The board wrote the quantity PER SIDE ("6/6 KB Windmill", "20/20m Suitcase Carry", "8 each
+  // arm"). `reps`/`distance` stay the per-side value exactly as the coach wrote it — this says
+  // the real total is double. Without it the second half was silently dropped: a 6/6 windmill
+  // logged 6, a 20/20m carry logged 20, and every per-side movement counted at half.
+  perSide?: boolean;
   distance?: number;            // Distance in meters
   time?: number;                // Time in seconds
   calories?: number;            // Calorie target
@@ -519,6 +530,21 @@ export interface ParsedExercise {
   // Each section groups movements that are repeated together.
   sections?: ParsedSection[];
   loggingMode?: ExerciseLoggingMode;  // AI-classified logging UI mode
+  /**
+   * What this block is SCORED in — the noun the athlete's result is counted in.
+   *
+   * Separate from `loggingMode` because a clock is not a score. `loggingMode` says which timer
+   * the block runs on ("amrap_intervals" = work/rest windows); this says what the athlete
+   * actually earns. They are usually predictable from each other, which is why the app derived
+   * one from the other for a long time — and why "[02:00 AMRAP] x4: 2 rounds of 8/8, into max
+   * burpees" came out scored in ROUNDS. That board runs on an AMRAP clock and is scored in reps:
+   * every round on it is written down, so there is nothing to count but the burpees.
+   *
+   * Set by the AI, which is the only thing that reads the board. Absent means "nothing unusual" —
+   * consumers fall back to the format's conventional score (LOGGING_MODE_TO_KIND). The fallback
+   * is the guess; this field is the answer.
+   */
+  scoreType?: BlockScoreType;
   loggingHints?: {
     sharedWeightMovements?: string[];  // movements sharing one barbell/implement
   };
@@ -595,7 +621,6 @@ export type Screen =
   | 'profile-settings'
   | 'workout-detail'
   | 'profile'
-  | 'pr'
   | 'records'
   | 'recap'
   | 'feed';

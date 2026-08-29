@@ -2,12 +2,13 @@ import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet, MovementSubstitution } from '../../../types';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
+import { resolveBlockScore } from '../../../services/blockScore';
 import { initStoryResults } from './WodStoryScreen';
 import { InputRouter } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
-import { getPrescribedSetCount, getMaxRepsMovement } from './types';
+import { getPrescribedSetCount, getMaxRepsMovement, hasOpenStationEntry } from './types';
 import type { ScoredBlock } from './blockScoping';
 import { applyBlockScoresToSections, getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from './blockScoping';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
@@ -241,8 +242,12 @@ function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
 /**
  * A block-scored piece carries its per-block scores on its own sections, so everything
  * downstream (workload, poster) reads each block's result next to the block it belongs to.
- * The piece-level `rounds` becomes the total across blocks — the one honest whole-piece
- * number for a workout the athlete scored three times.
+ *
+ * ONE CLOCK, ONE SCORE. There is deliberately no piece-level total across blocks. Two 6-minute
+ * AMRAPs of 4 rounds are a 4 and a 4, never an 8 — nobody reports that number, no part of the
+ * workout is described by it, and everything derived from it (the hero, the rep summary, EP)
+ * inherits the error. A piece with ONE scored block does have a single score, and that one is
+ * still its `rounds`.
  */
 function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const legacy = buildLegacyResult(r);
@@ -250,14 +255,14 @@ function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   if (!scores?.length) return legacy;
 
   const sections = applyBlockScoresToSections(legacy.exercise, scores);
-  const roundsTotal = (legacy.exercise.sections ?? []).reduce(
-    (sum, section, i) => (section.scoreType === 'rounds' ? sum + (scores[i]?.value ?? 0) : sum),
-    0,
-  );
+  const roundsBlocks = (legacy.exercise.sections ?? [])
+    .map((section, i) => (section.scoreType === 'rounds' ? scores[i]?.value : undefined))
+    .filter((value): value is number => value != null && value > 0);
+  const soleClockRounds = roundsBlocks.length === 1 ? roundsBlocks[0] : undefined;
   return {
     ...legacy,
     exercise: { ...legacy.exercise, sections },
-    ...(roundsTotal > 0 ? { rounds: roundsTotal } : {}),
+    ...(soleClockRounds ? { rounds: soleClockRounds } : {}),
   };
 }
 
@@ -332,10 +337,28 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     };
   }
 
-  const isScored = r.kind === 'score_time' || r.kind === 'score_rounds';
+  const isScored = r.kind === 'score_time'
+    || r.kind === 'score_rounds'
+    || r.kind === 'score_open_reps';
   const hasM = (r.movementResults?.length ?? 0) >= 1;
 
   if (isScored && hasM) {
+    // The open count, window by window — one set each, flagged isMax so the breakdown reads them
+    // through the same path a practice block's max test uses. NO `rounds`: this board's rounds
+    // are prescription, and storing a number for them is what put "ROUNDS 7" on the poster and
+    // then multiplied it through every total derived from it. buildMaps still runs, so the
+    // prescribed work's logged weights (the push press bar) travel exactly as before.
+    if (r.kind === 'score_open_reps') {
+      const windows = resolveBlockScore(r.exercise);
+      const count = windows.type === 'open_reps' ? windows.intervals : 1;
+      const perWindow = r.maxRepsPerInterval ?? [];
+      for (let i = 0; i < count; i += 1) {
+        sets.push({
+          id: `set-${i}`, setNumber: i + 1, actualReps: perWindow[i] ?? 0, isMax: true, completed: true,
+        });
+      }
+      return { exercise: r.exercise, sets, notes: r.notes, ...buildMaps() };
+    }
     const rc = r.kind === 'score_time' ? (r.setsCompleted ?? effectiveSetsTotal) : r.rounds;
     if (r.kind === 'score_time') {
       const rps = r.exercise.suggestedRepsPerSet;
@@ -449,6 +472,18 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     case 'score_time':
       sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
       return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined, notes: r.notes };
+    // Same shape as the movement-carrying branch above, for a block with no movementResults.
+    case 'score_open_reps': {
+      const windows = resolveBlockScore(r.exercise);
+      const count = windows.type === 'open_reps' ? windows.intervals : 1;
+      const perWindow = r.maxRepsPerInterval ?? [];
+      for (let i = 0; i < count; i += 1) {
+        sets.push({
+          id: `set-${i}`, setNumber: i + 1, actualReps: perWindow[i] ?? 0, isMax: true, completed: true,
+        });
+      }
+      return { exercise: r.exercise, sets, notes: r.notes };
+    }
     case 'score_rounds':
       sets.push({ id: 'set-0', setNumber: 1, completed: true });
       return {
@@ -614,9 +649,17 @@ export function StoryLogResults({
   // A scored exercise's score IS the workout result (time for for_time, rounds for AMRAP).
   // Leaving it empty is allowed, but never silently — the poster hero falls back to EP and
   // the athlete usually just forgot. Ask before advancing: stay and add it, or keep anyway.
-  const getMissingScoreLabel = (result: StoryExerciseResult | null): 'time' | 'rounds' | null => {
+  const getMissingScoreLabel = (result: StoryExerciseResult | null): 'time' | 'rounds' | 'reps' | null => {
     if (!result || result.skipped) return null;
     if (result.kind === 'score_time' && !((result.timeSeconds ?? 0) > 0)) return 'time';
+    // Asks for the count the board actually left open, never for rounds — this block's rounds
+    // are prescription. Keyed on the kind, so the question and the input can't disagree.
+    // A multi-station block never fills maxReps (that field belongs to the single-movement
+    // per-window input), so its stations are what "logged" means — reading maxReps alone
+    // demanded a score off an athlete who had just entered all five.
+    if (result.kind === 'score_open_reps'
+      && !((result.maxReps ?? 0) > 0)
+      && !hasOpenStationEntry(result)) return 'reps';
     if (result.kind === 'score_rounds'
       && !((result.rounds ?? 0) > 0)
       && !((result.ladderStep ?? 0) > 0)
@@ -625,7 +668,7 @@ export function StoryLogResults({
     return null;
   };
 
-  const [missingScoreConfirm, setMissingScoreConfirm] = useState<'time' | 'rounds' | null>(null);
+  const [missingScoreConfirm, setMissingScoreConfirm] = useState<'time' | 'rounds' | 'reps' | null>(null);
 
   const handleExerciseDone = useCallback(() => {
     const missing = getMissingScoreLabel(currentResult);
@@ -725,14 +768,23 @@ export function StoryLogResults({
 
       </AnimatePresence>
 
+      {/* Three kinds, three wordings. 'reps' used to fall into the rounds branch, so a block with
+          no rounds at all — the whole point of score_open_reps — was told "this AMRAP is scored by
+          rounds" on a board that is neither an AMRAP nor scored by rounds. */}
       <ConfirmDialog
         open={missingScoreConfirm != null}
-        title={missingScoreConfirm === 'time' ? 'No time logged' : 'No rounds logged'}
+        title={missingScoreConfirm === 'time' ? 'No time logged'
+          : missingScoreConfirm === 'reps' ? 'No reps logged'
+          : 'No rounds logged'}
         message={missingScoreConfirm === 'time'
           ? 'This piece is scored by your finish time — without it the recap can’t show a real score. Save it anyway?'
-          : 'This AMRAP is scored by rounds — without them the recap can’t show a real score. Save it anyway?'}
+          : missingScoreConfirm === 'reps'
+            ? 'This piece is scored by what you counted — without it the recap can’t show a real score. Save it anyway?'
+            : 'This AMRAP is scored by rounds — without them the recap can’t show a real score. Save it anyway?'}
         confirmText="Keep anyway"
-        cancelText={missingScoreConfirm === 'time' ? 'Add time' : 'Add rounds'}
+        cancelText={missingScoreConfirm === 'time' ? 'Add time'
+          : missingScoreConfirm === 'reps' ? 'Add reps'
+          : 'Add rounds'}
         onConfirm={() => {
           setMissingScoreConfirm(null);
           advanceExercise();

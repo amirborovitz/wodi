@@ -10,7 +10,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -160,7 +160,7 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                   </span>
                 )}
                 {r.cap && <span style={{ fontFamily: fM, fontSize: 9.5, color: FOIL_DIM, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{r.cap}</span>}
-                <span style={{ flex: 1 }} />
+                <BlockHeaderRule ruled={r.ruled} color="rgba(245,194,0,0.24)" />
                 {r.score && (
                   <span style={{ ...silver, fontFamily: fH, fontSize: 24, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {r.score} <span style={{ fontSize: 13 }}>{r.scoreSub}</span>
@@ -244,13 +244,13 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(232,231,239,0.85)', whiteSpace: 'nowrap' }}>
+                          <span style={parts.meIsLoad ? loadVoice('rgba(232,231,239,0.45)') : { fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(232,231,239,0.85)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleIsLoad ? loadVoice('rgba(232,231,239,0.45)') : { ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -284,6 +284,7 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
               value={wod.result.value}
               narrative={wod.result.narrative}
               primaryStyle={{ ...gold, fontFamily: fD, fontSize: 80, fontWeight: 900, lineHeight: 0.8, letterSpacing: '-0.03em', whiteSpace: 'nowrap', filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.55)) drop-shadow(0 0 22px rgba(245,194,0,0.28))' }}
+              scores={wod.result.scores}
               unitStyle={{ ...gold, paddingBottom: 3 }}
             />
             {wod.result.meta && (

@@ -38,11 +38,11 @@ import {
   partnerBlocksSub,
   buildResultLabel,
   buildResultValue,
-  aerobicHeroSubject,
+  buildHeroResultMeta,
   formatPosterStrengthRepsSequence,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
-import { isMainPart, hasLoggedMaxEffort } from '../src/components/celebration/mainPart';
+import { isMainPart, isMaxEffortPractice } from '../src/components/celebration/mainPart';
 import { movementsForParts } from '../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
 import type { ArtifactSection } from '../src/components/celebration/types';
@@ -122,7 +122,7 @@ function pageHaystack(sections: ArtifactSection[]): string {
     for (const row of section.rows ?? []) {
       parts.push(
         row.name ?? '', row.nameWithLoad ?? '', row.mineKey ?? '',
-        row.primary ?? '', row.subNote ?? '', row.roundLabel ?? '', row.stationHeaderCap ?? '',
+        row.primary ?? '', row.subNote ?? '', row.roundLabel ?? '',
       );
     }
   }
@@ -246,6 +246,10 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     // under an "8 ROUNDS" badge — is actually exercised here instead of stubbed away.
     format: hero.formatLine ? hero.formatLine.toUpperCase() : '',
     sub: '',
+    // Mirror the poster builders: when the hero prints every block's score, the block headers
+    // drop their own copy. Stubbing this false left the snapshot showing a number twice that
+    // production shows once.
+    hasScoreboard: !!hero.blockScores?.length,
   };
   const posterRows = {
     reward: reward ? sectionsToRows(reward, mineMap, headerContext) : null,
@@ -265,22 +269,34 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   // harness could never catch: a cardio EMOM heroed "10.0" (km) while the label was picked from
   // the workout FORMAT and read "ROUNDS" — a number and a caption that contradicted each other,
   // and contradicted the poster's own "10.00 KM TOTAL" row. Both halves must be pinned.
-  const resultLabel = buildResultLabel(displayFormat, reward?.[0]?.isPartnerConfirmed === true, hero.unit);
+  const resultLabel = buildResultLabel(
+    displayFormat,
+    reward?.[0]?.isPartnerConfirmed === true,
+    hero.unit,
+    !!hero.blockScores?.length,
+  );
 
   // The hero exactly as the skin prints it: the number WITH its unit, plus the machine an
   // aerobic score was set on. Snapshotting hero.value alone left a poster reading
   // "DISTANCE / 1.0" — a number with no unit anywhere on the card, and no clue which machine.
   const resultValue = buildResultValue(hero, resultLabel);
-  const resultMeta = aerobicHeroSubject(hero);
+  const resultMeta = buildHeroResultMeta(displayFormat === 'amrap' || displayFormat === 'amrap_intervals', hero);
 
   // The quiet per-set reps sub-line under a strength page's movement row ("6-6-5-4-3 reps").
   // Same gate buildPosterWodFromPage applies — it must never print a SUM across a complex's or
   // a circuit's movements, and it must never stop printing on a real single-lift build-up.
   const pageRepsSchemes = sectionExercises.map((exercise) => (
-    isStrengthPagePart(exercise) && !hasLoggedMaxEffort(exercise)
+    isStrengthPagePart(exercise) && !isMaxEffortPractice(exercise)
       ? formatPosterStrengthRepsSequence(exercise)
       : undefined
   ));
+
+  // Which pages the poster treats as a max-effort PRACTICE. One boolean, but it swings four
+  // things at once on the real card — the type pill ("SKILL"), the blueprint and sub lines
+  // (both blanked), and the hero's caption ("MAX REPS") — and none of them were pinned here.
+  // That is how a 4-window interval metcon shipped tagged SKILL with a hero reading
+  // "MAX REPS · ~11burpees".
+  const pageMaxPractices = sectionExercises.map((exercise) => isMaxEffortPractice(exercise));
 
   // Checked against the PAGE sections (the per-part artifact), which is where a part's full
   // movement list is meant to land. Each page maps 1:1 to sectionExercises by index.
@@ -290,7 +306,7 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   );
 
   return {
-    snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes },
+    snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes, pageMaxPractices },
     dropped,
   };
 }

@@ -10,7 +10,13 @@ import { loadMovementRegistry } from './services/movementRegistryService'
 void loadMovementRegistry()
 
 // __BUILD_TIME__ / __APP_VERSION__ are injected at build time by vite.config.ts.
-const WODI_BUILD_ID = `v${__APP_VERSION__} · built ${__BUILD_TIME__}`
+// The stamp is UTC ISO (useAppVersion compares it against /version.json verbatim),
+// so it stays ISO there and is rendered in the reader's own timezone only here.
+const buildStamp = new Date(__BUILD_TIME__)
+const localBuildTime = Number.isNaN(buildStamp.getTime())
+  ? __BUILD_TIME__
+  : buildStamp.toLocaleString()
+const WODI_BUILD_ID = `v${__APP_VERSION__} · built ${localBuildTime}`
 
 declare global {
   interface Window {

@@ -153,6 +153,11 @@ export interface PRCelebration {
 export interface CelebrationData {
   // Raw inputs normalised from both modes
   exercises: Exercise[];
+  // The part(s) the poster is actually ABOUT — `exercises` minus the secondary ones. Session
+  // order is not poster order: `exercises[0]` on an accessory-then-metcon board is the warm-up,
+  // so anything describing "the workout" must read THIS. Reading exercises[0] beside the session
+  // format is how a metcon poster came to be titled "3 SETS" off its sibling core block.
+  posterMainExercises: Exercise[];
   // DISPLAY format: when the poster leads with exactly one main part, this is that part's own
   // format (loggingMode-first) — NOT necessarily the persisted session `format`, which is only
   // authoritative for EP/aggregate math and can describe a different (secondary) part.
@@ -355,11 +360,13 @@ export function useCelebrationData(
   // The workout's actual date — never "now at render time". Reward mode carries it on
   // rewardData (set at save time); detail mode reads the persisted Firestore field.
   const workoutDate: Date = (isReward ? rewardData?.date : workout?.date) ?? new Date();
-  const sourceDate = resolveSourceDate(
-    isReward ? rewardData?.sourceDate : workout?.sourceDate,
-    rawText,
-    workoutDate,
-  );
+  const storedSourceDate: string | undefined = isReward ? rewardData?.sourceDate : workout?.sourceDate;
+  // The stored date is the authority: either what the parser resolved at save time, or what the
+  // athlete typed on the poster's DATE tab. rawText only BACKFILLS a missing one — letting it
+  // compete would let a board date that sits closer to the logging day outvote the athlete's own
+  // correction, so the poster snapped back to the old date every time it was reopened.
+  const sourceDate = resolveSourceDate(storedSourceDate, undefined, workoutDate)
+    ?? resolveSourceDate(undefined, rawText, workoutDate);
 
   // ── Poster customization (persisted to Firestore) ──────────────────────────
 
@@ -1235,6 +1242,7 @@ export function useCelebrationData(
 
   return {
     exercises,
+    posterMainExercises,
     workoutFormat: mainFormat,
     rawText,
     durationMinutes,

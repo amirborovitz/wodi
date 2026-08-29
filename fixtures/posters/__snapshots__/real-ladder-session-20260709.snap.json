@@ -180,5 +180,9 @@
   "pageRepsSchemes": [
     "10-10-10-10 reps",
     null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
   ]
 }

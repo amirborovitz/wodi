@@ -19,11 +19,11 @@ import { TextSticker } from './TextSticker';
 import { PosterPhotoInset } from './PosterPhotoInset';
 import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
 import { ActionMenuSheet, type ActionMenuItem } from '../../../ui/ActionMenuSheet';
-import { ConfirmDialog } from '../../../ui/ConfirmDialog';
+import { PostToFeedSheet } from '../../../feed/PostToFeedSheet';
 import { PRLift } from '../../PRLift';
 import type { PosterPhoto, PosterSticker, PosterVibeOffset } from '../../../../types';
 import type { PosterPayload } from './posterPayload';
-import { usePostToFeed } from '../../../../hooks/usePostToFeed';
+import { usePostToFeed, type FeedDraft } from '../../../../hooks/usePostToFeed';
 import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
 import styles from './index.module.css';
@@ -177,7 +177,7 @@ export function HandwrittenFace({
   const [vibeOffset, setVibeOffset]   = useState<PosterVibeOffset | null>(() => data.posterVibeOffset ?? null);
   const [photo, setPhoto]             = useState<PosterPhoto | null>(() => data.posterPhoto ?? null);
   const [pendingDelete, setPendingDelete] = useState<'text' | 'vibe' | 'photo' | null>(null);
-  const [confirmPost, setConfirmPost]  = useState<boolean>(false);
+  const [showPost, setShowPost]        = useState<boolean>(false);
 
   const photoUpload = usePosterPhotoUpload();
   const feedPost = usePostToFeed();
@@ -362,18 +362,21 @@ export function HandwrittenFace({
   // put a poster in front of everyone. The explainer dialog runs in front of the
   // athlete's FIRST post only — after that the sheet row publishes straight away.
 
-  const publish = (): void => {
-    setConfirmPost(false);
-    // The whole session goes out — posting from the strength page used to publish
-    // the strength page alone, so the feed showed a fraction of the day. But the
-    // card on screen LEADS the deck: swiping to a part before tapping Post is the
-    // athlete saying "this is the bit I'm proud of", and the sticker/photo ride
-    // that same card in the editor. Never swiping leaves the metcon in front,
-    // since that's where pageWods already starts.
+  // The exact deck that will be published. Built once and used twice — the post
+  // sheet previews THIS, and publish sends THIS — so what the athlete approves
+  // and what lands in the feed can never be two different builders.
+  //
+  // The whole session goes out: posting from the strength page used to publish
+  // the strength page alone, so the feed showed a fraction of the day. But the
+  // card on screen LEADS the deck — swiping to a part before tapping Post is the
+  // athlete saying "this is the bit I'm proud of", and the sticker/photo ride
+  // that same card in the editor. Never swiping leaves the metcon in front,
+  // since that's where pageWods already starts.
+  const postPayload = useMemo((): PosterPayload => {
     const pages = pageWods ?? [singleWod];
     const lead = pageWods ? carouselPage : 0;
     const posted = [pages[lead], ...pages.filter((_, i) => i !== lead)];
-    const payload: PosterPayload = {
+    return {
       wods: displayDate ? posted.map((w) => ({ ...w, date: displayDate })) : posted,
       skin: SKINS[skinIdx].id,
       vibe: vibeConfirmed ? vibe : null,
@@ -381,7 +384,11 @@ export function HandwrittenFace({
       ...(sticker ? { sticker } : {}),
       ...(photo ? { photo } : {}),
     };
-    feedPost.post(payload, data.prCelebration != null);
+  }, [pageWods, singleWod, carouselPage, displayDate, skinIdx, vibeConfirmed, vibe, vibeOffset, sticker, photo]);
+
+  const publish = (draft: FeedDraft): void => {
+    setShowPost(false);
+    feedPost.post(draft);
   };
 
   // ── Share (destination sheet, then a prepared image) ───────────────────
@@ -689,8 +696,9 @@ export function HandwrittenFace({
   // Wodi's own feed is the first destination, not one buried behind a "⋯": the
   // proudest screen in the app should not spend its loudest button exporting to
   // someone else's. The sheet itself, not obscurity, is what stops a mis-tap —
-  // the dialog behind this row is a one-time explainer, not a per-post gate.
-  // A test log is excluded from every count, so it has no business in a public feed.
+  // and the post sheet behind this row is the confirmation, so there is no
+  // dialog in front of it. A test log is excluded from every count, so it has
+  // no business in a public feed.
 
   const canPostToFeed = feedPost.canPost && !data.isTest;
 
@@ -698,7 +706,9 @@ export function HandwrittenFace({
   // by label, so a label that changes with state would collide across rows.
   const shareItems: ActionMenuItem[] = [
     ...(canPostToFeed
-      ? [{ label: 'Post to Wodi feed', icon: <FeedIcon />, onClick: () => (feedPost.needsConfirm ? setConfirmPost(true) : publish()) }]
+      // A photo failure from an earlier attempt has no business greeting the
+      // next one, so the sheet always opens on a clean error slate.
+      ? [{ label: "Post to Wodi feed…", icon: <FeedIcon />, onClick: () => setShowPost(true) }]
       : []),
     ...(isNativeShareSupported()
       ? [{ label: 'Share image…', icon: <ShareIcon />, onClick: shareToApps, disabled: shareState !== 'ready' }]
@@ -750,13 +760,14 @@ export function HandwrittenFace({
 
   const feedOverlays = (
     <>
-      <ConfirmDialog
-        open={confirmPost}
-        title="Post to Feed?"
-        message="Anyone on Wodi can see your whole workout for the next 24 hours, then it disappears. The feed gets a copy — editing this workout later won't change what's posted."
-        confirmText={feedPost.posting ? 'Posting…' : 'Post'}
-        onConfirm={publish}
-        onCancel={() => setConfirmPost(false)}
+      <PostToFeedSheet
+        open={showPost}
+        payload={postPayload}
+        isPR={data.prCelebration != null}
+        explain={feedPost.needsConfirm}
+        posting={feedPost.posting}
+        onPost={publish}
+        onClose={() => setShowPost(false)}
       />
       {feedPost.notice && (
         <div className={styles.feedNotice} role="status">{feedPost.notice}</div>

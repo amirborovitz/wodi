@@ -13,14 +13,13 @@ import type { RecapData } from '../hooks/useRecapData';
 import styles from './ProfileScreen.module.css';
 
 interface ProfileScreenProps {
-  onNavigateToPR?: () => void;
   onNavigateToRecords?: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToProfile?: () => void;
   onOpenRecap?: (data: RecapData) => void;
 }
 
-export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap }: ProfileScreenProps) {
   const { user } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
@@ -120,7 +119,7 @@ export function ProfileScreen({ onNavigateToPR, onNavigateToRecords, onNavigateT
       <div className={styles.navRows}>
         <button
           className={`${styles.navRow} ${styles.navRowAccent}`}
-          onClick={onNavigateToRecords ?? onNavigateToPR}
+          onClick={onNavigateToRecords}
           aria-label="View records and PRs"
         >
           <span className={`${styles.navRowIcon} ${styles.navRowIconAccent}`}>★</span>

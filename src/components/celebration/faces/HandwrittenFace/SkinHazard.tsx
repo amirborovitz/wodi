@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -144,7 +144,7 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
                   </span>
                 )}
                 {r.cap && <span style={{ fontFamily: fB, fontSize: 10, fontWeight: 900, letterSpacing: '0.06em', color: BRAND.dim, textTransform: 'uppercase' }}>{r.cap}</span>}
-                <span style={{ flex: 1 }} />
+                <BlockHeaderRule ruled={r.ruled} color="rgba(245,194,0,0.24)" />
                 {r.score && (
                   <span style={{ fontFamily: fH, fontSize: 23, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-3deg)', display: 'inline-block' }}>
                     {r.score} <span style={{ fontSize: 13, color: BRAND.dim }}>{r.scoreSub}</span>
@@ -207,13 +207,13 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
                           {parts.team}
                         </span>
                         {parts.me && (
-                          <span style={{ fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(243,241,234,0.82)', whiteSpace: 'nowrap' }}>
+                          <span style={parts.meIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fB, fontSize: 13, fontWeight: 800, color: 'rgba(243,241,234,0.82)', whiteSpace: 'nowrap' }}>
                             {parts.me}
                           </span>
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={{ fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={parts.singleIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {parts.single}
                       </span>
                     ) : <span />}
@@ -245,6 +245,7 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
               value={wod.result.value}
               narrative={wod.result.narrative}
               primaryStyle={{ fontFamily: fD, fontSize: 88, fontWeight: 900, lineHeight: 0.88, letterSpacing: '-0.03em', color: BRAND.white, whiteSpace: 'nowrap' }}
+              scores={wod.result.scores}
               unitStyle={{ fontFamily: fD, fontWeight: 900, color: BRAND.yellow, paddingBottom: 8 }}
             />
             {wod.result.meta && (

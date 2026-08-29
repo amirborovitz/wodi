@@ -51,7 +51,7 @@ export function EditExerciseSheet({
               '--sheet-color':
                 result.kind === 'load'
                   ? 'var(--neon-yellow)'
-                  : result.kind === 'score_time' || result.kind === 'score_rounds'
+                  : result.kind === 'score_time' || result.kind === 'score_rounds' || result.kind === 'score_open_reps'
                     ? 'var(--neon-magenta)'
                     : 'var(--neon-cyan)',
             } as React.CSSProperties}

@@ -75,7 +75,13 @@ service cloud.firestore {
                     && request.auth.uid == request.resource.data.userId
                     && request.resource.data.expiresAt is timestamp
                     // Nothing outlives the 24h window (+1h of clock slack).
-                    && request.resource.data.expiresAt < request.time + duration.value(25, 'h');
+                    && request.resource.data.expiresAt < request.time + duration.value(25, 'h')
+                    // The caption is one line, not a post body. Clients already
+                    // cap it (CAPTION_MAX in feed/types.ts); this is the
+                    // backstop for anything that doesn't go through them.
+                    && (!('caption' in request.resource.data)
+                        || (request.resource.data.caption is string
+                            && request.resource.data.caption.size() <= 120));
       // Posts are immutable. Reaction counts live in the flames subcollection
       // precisely so reacting never needs write access to someone else's post.
       allow update: if false;

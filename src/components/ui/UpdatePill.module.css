@@ -1,0 +1,46 @@
+/* Sits above every screen, below nothing — a stale build is the one message worth
+   interrupting for, and it is dismissed by acting on it. */
+.pill {
+  position: fixed;
+  top: calc(var(--safe-top) + var(--sp-2));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+
+  padding: var(--sp-2) var(--sp-4);
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+
+  font-family: var(--font-barlow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  /* No double-tap-zoom delay on the one control whose whole job is one tap. */
+  touch-action: manipulation;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--wodi-bg);
+  animation: updatePulse 1.6s ease-in-out infinite;
+}
+
+@keyframes updatePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; }
+}

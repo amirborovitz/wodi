@@ -17,7 +17,7 @@ import { shouldLogCelebrationDebug, prescribesSingleMovement } from '../../helpe
 import { formatLoggedLoad } from '../../posterFormatters';
 import { getExercisePeakLoad } from '../../movementResolution';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
-import { hasLoggedMaxEffort } from '../../mainPart';
+import { isMaxEffortPractice } from '../../mainPart';
 import { prescribesUnbrokenMax } from '../../../logging/story/types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -41,7 +41,12 @@ export interface PosterWod {
   // meta: quiet context beside the hero score — "12:00 CAP" for a plain AMRAP, or "into round 7"
   // for a ladder AMRAP's partial reps. No rep-total field by design — the poster never carries a
   // checkable reps total for a ladder score; see buildAmrapResultMeta.
-  result: { label: string; value: string; meta?: string; narrative?: string };
+  // The hero. `scores` is present ONLY for a piece made of several independently-timed blocks
+  // (two 6-minute AMRAPs, four 3-minute windows — any number): one clock, one score, and no
+  // total, because adding independent scores gives a number that describes no part of the
+  // workout. Skins that see it render every entry side by side in the hero slot instead of
+  // `value`, and the block header rows drop their own copy so each number is printed once.
+  result: { label: string; value: string; meta?: string; narrative?: string; scores?: PosterHeroScore[] };
   rx: string | null;    // "RX'D" | "PR" | null
   totals: PosterTotal[]; // Supporting stats for the brand strip
   ep: number;            // Effort Points — shown in brand strip
@@ -68,12 +73,25 @@ export interface PosterWod {
   rounds?: ('me' | 'partner' | 'pending')[];
 }
 
+export interface PosterHeroScore {
+  /** Which clock this number came off — the board's own shorthand ("B.1", "A"). */
+  label: string;
+  value: string;
+  unit?: string;
+}
+
 export interface PosterBlock {
   kind: 'block';
   label: string;
   cap?: string;
   score?: string;
   scoreSub?: string;
+  /**
+   * This header opens a block that ran its own clock, so skins draw a rule across the rest of
+   * the row. A gap is not a boundary: without the rule, two separately-timed AMRAPs read as one
+   * list with a blank line in it, and nothing on the card says where the first clock stopped.
+   */
+  ruled?: boolean;
 }
 
 export interface PosterLine {
@@ -193,6 +211,12 @@ interface PosterHeaderContext {
   type?: string;
   format?: string;
   sub?: string;
+  /**
+   * The hero is printing every block's score. The block header rows then carry the label and the
+   * clock only — a second copy of the same number beside the prescription is what made the real
+   * result look like a load annotation instead of the result.
+   */
+  hasScoreboard?: boolean;
 }
 
 function isDuplicatePosterHeader(value: string | null | undefined, context: PosterHeaderContext): boolean {
@@ -320,7 +344,14 @@ export function formatPosterStrengthRepsSequence(exercise: Exercise): string | u
   return `${reps.join('-')} reps`;
 }
 
-function buildFormatLine(data: CelebrationData): string {
+/**
+ * The structure line under the poster's type pill ("12 MIN", "5 × 3", "8 ROUNDS").
+ *
+ * Exported for tests only: it reads a part off the session and the choice of WHICH part is the
+ * whole bug it exists to not have — worth a regression net without standing up a full
+ * CelebrationData to reach it.
+ */
+export function buildFormatLine(data: CelebrationData): string {
   if (data.artifactSections[0]?.partnerDisplayMode === 'sections') {
     return 'FOR TIME';
   }
@@ -337,7 +368,11 @@ function buildFormatLine(data: CelebrationData): string {
   }
 
   const fmt = data.workoutFormat;
-  const exercises = data.exercises;
+  // The part the format line is DESCRIBING, not the session's first exercise. `fmt` is already
+  // the main part's own format, so pairing it with exercises[0] mixed two different blocks: a
+  // metcon EMOM read its set count off the 3-set core accessory logged before it and the poster
+  // announced "3 SETS". Falls back to the raw list for a session with no main part flagged.
+  const exercises = data.posterMainExercises.length > 0 ? data.posterMainExercises : data.exercises;
   const ex0 = exercises[0];
 
   // The FormatTag pill already states the format word (AMRAP/EMOM/FOR TIME/etc) — the design
@@ -348,6 +383,13 @@ function buildFormatLine(data: CelebrationData): string {
     return `${data.durationMinutes} MIN`;
   }
   if (fmt === 'emom' && ex0) {
+    // A station EMOM's interval count is not a set count an athlete recognises — 25 intervals is
+    // five rounds through five stations, and "25 SETS" reads as 25 rounds. The blueprint block
+    // above the rows already states the clock, the rounds and the work/rest, so say nothing.
+    const stationCount = new Set(
+      (ex0.movements ?? []).map((m) => m.stationLabel?.trim()).filter(Boolean),
+    ).size;
+    if (stationCount > 1) return '';
     const intervalCount = ex0.intervalCount ?? ex0.sets?.length;
     if (intervalCount && intervalCount > 1) return `${intervalCount} SETS`;
   }
@@ -404,7 +446,7 @@ function buildSubLine(data: CelebrationData): string {
   const fmt = data.workoutFormat;
   const ex0 = data.exercises[0];
   // A load cue over a practice that never touched a weight.
-  if (data.exercises.length === 1 && ex0 && hasLoggedMaxEffort(ex0)) return '';
+  if (data.exercises.length === 1 && ex0 && isMaxEffortPractice(ex0)) return '';
   if (fmt === 'strength') {
     return 'build to heavy';
   }
@@ -485,7 +527,15 @@ function buildTotals(data: CelebrationData, heroValue: string): PosterTotal[] {
 // per-movement readout above it does). Strength stays individual even in a team session.
 // isPartner must come from isPartnerConfirmed (this card's own content), never raw teamSize —
 // a session-level teamSize doesn't mean this specific card's block is the partnered one.
-export function buildResultLabel(format: string | undefined, isPartner: boolean, heroUnit?: string): string {
+export function buildResultLabel(
+  format: string | undefined,
+  isPartner: boolean,
+  heroUnit?: string,
+  // The hero is a scoreboard of several independent clocks, so there is no total to label. "TOTAL
+  // ROUNDS" over two separate AMRAP scores invites the reader to add them, which is the one thing
+  // those numbers must never be.
+  isScoreboard = false,
+): string {
   // The label follows the hero's unit before falling back to the format — a fallback hero
   // (EP when no time was logged, calories on a cardio EMOM) must never sit under "MY TIME".
   if (heroUnit === 'REPS') return isPartner ? 'OUR REPS' : 'TOTAL REPS';
@@ -499,10 +549,19 @@ export function buildResultLabel(format: string | undefined, isPartner: boolean,
   if (heroUnit === 'KM' || heroUnit === 'M') return 'DISTANCE';
   if (heroUnit === 'KG') return 'TOP SET';
   if (heroUnit === 'KG PR') return 'PR';
+  // An open-count hero names its own score: the movement the board declined to prescribe
+  // ("BURPEES" over 46). That name is whatever the coach wrote, so it can't be enumerated the
+  // way the units above are — but every enumerable unit has now been handled, leaving only the
+  // clock's own measures below. Falling through to the format switch is what printed "TOTAL
+  // ROUNDS" over a burpee count on a board whose rounds were prescribed.
+  if (heroUnit && heroUnit !== 'MIN' && heroUnit !== 'ROUNDS') {
+    return isPartner ? `OUR ${heroUnit}` : heroUnit;
+  }
   switch (format) {
     case 'for_time':        return isPartner ? 'OUR TIME' : 'MY TIME';
     case 'amrap':
-    case 'amrap_intervals': return isPartner ? 'OUR ROUNDS' : 'TOTAL ROUNDS';
+    case 'amrap_intervals':
+      return isPartner ? 'OUR ROUNDS' : isScoreboard ? 'ROUNDS' : 'TOTAL ROUNDS';
     case 'strength':        return 'TOP SET';
     case 'emom':
     case 'intervals':       return 'ROUNDS';
@@ -520,8 +579,13 @@ export function buildResultLabel(format: string | undefined, isPartner: boolean,
  * label doesn't already say it. ResultValue renders a trailing unit small beside the number.
  */
 export function buildResultValue(hero: HeroResult | null | undefined, label: string): string {
-  const value = hero?.value ?? '--';
-  if (value === '--') return value;
+  const raw = hero?.value ?? '--';
+  if (raw === '--') return raw;
+  // "~" marks a hero summed from per-window recollections ("roughly how many burpees each
+  // window?"). It rides on the VALUE rather than the label so it survives every skin unchanged
+  // and can never drift away from the number it qualifies. Same rule as the ghost rung: never
+  // render precision the athlete didn't log.
+  const value = hero?.approximate ? `~${raw}` : raw;
   // A clock states its own unit ("12:34" is not 12.34 of anything) — "12:34min" reads as noise.
   if (value.includes(':')) return value;
   // The measure only ("KG PR" is the PR badge's business; the number is in kilos).
@@ -619,6 +683,39 @@ function buildAmrapResultMeta(
 }
 
 /**
+ * The one quiet line under the hero number, whichever of its three sources fills it.
+ *
+ * THE single producer, called by both poster builders AND the snapshot harness. It used to be
+ * an inline `a ?? b` chain re-typed at each of the three call sites, and the harness's copy was
+ * already a beat behind the app's — so a hero note could ship without a fixture ever showing it.
+ *
+ * Precedence is narrowest-first: the ladder's own rung note, then the "this is a sum" note, then
+ * the machine an aerobic score was set on.
+ */
+export function buildHeroResultMeta(
+  isAmrap: boolean,
+  hero: HeroResult | null | undefined,
+): string | undefined {
+  return buildAmrapResultMeta(isAmrap, hero).meta
+    ?? openCountWindowsMeta(hero)
+    ?? aerobicHeroSubject(hero);
+}
+
+/**
+ * The note that turns an open-count hero from one effort into the sum it actually is.
+ *
+ * "~11 BURPEES" over a board run four times reads as eleven burpees in one go — a far smaller
+ * day than the athlete had, and the loudest number on the card. This says which it is.
+ *
+ * Not gated on the AMRAP format: a for-time piece that ends "…then max devil press" earns the
+ * same note off the same field, because the ambiguity is in the SUM, not in the clock.
+ */
+function openCountWindowsMeta(hero: HeroResult | null | undefined): string | undefined {
+  const windows = hero?.openCountWindows;
+  return windows && windows > 1 ? `total across ${windows} rounds` : undefined;
+}
+
+/**
  * Converts ArtifactSection[] → PosterRow[] (block header + lines per section).
  * Sections with empty/generic titles get no block header row.
  */
@@ -633,17 +730,17 @@ export function sectionsToRows(
     const isDuplicateTitle =
       isDuplicatePosterHeader(section.title, { title: headerContext.title })
       || isRoundCountForTimeCoveredByFormat(section.title, headerContext);
-    // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and the
-    // per-station ST. header blocks — a section-level block on top would restate both.
-    const hasStationHeaderRows = section.rows.some((row) => row.stationRow && row.roundLabel);
+    // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and in the
+    // blueprint cap below — a section-level block on top would restate both.
+    const hasStationRows = section.rows.some((row) => row.stationRow && row.roundLabel);
     const hasHeader =
-      !hasStationHeaderRows &&
+      !hasStationRows &&
       section.title &&
       section.title !== '' &&
       !isFormatHeader(section.title);
     const cap = section.blueprint ?? section.eyebrow ?? '';
 
-    const isCadenceTitle = !hasStationHeaderRows
+    const isCadenceTitle = !hasStationRows
       && CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
 
     // 'Blueprint' is the section builders' generic placeholder title — it says nothing an
@@ -662,8 +759,10 @@ export function sectionsToRows(
         kind: 'block',
         label: section.title.toUpperCase(),
         cap: capDuplicatesPosterHeader ? '' : cap,
-        score: section.blockScore.value,
-        scoreSub: section.blockScore.unit,
+        ruled: true,
+        ...(headerContext.hasScoreboard
+          ? {}
+          : { score: section.blockScore.value, scoreSub: section.blockScore.unit }),
       } satisfies PosterBlock);
     } else if (hasHeader) {
       // Suppress the label when it's just repeating the poster title, but
@@ -677,32 +776,23 @@ export function sectionsToRows(
       if (label || visibleCap) {
         rows.push({ kind: 'block', label, cap: isGenericTitle ? '' : visibleCap } satisfies PosterBlock);
       }
-    } else if (!hasStationHeaderRows && (isDuplicateTitle || isCadenceTitle) && cap && !capDuplicatesPosterHeader) {
+    } else if (!hasStationRows && (isDuplicateTitle || isCadenceTitle) && cap && !capDuplicatesPosterHeader) {
       // Section title was a format/cadence header (suppressed as label) but the
       // blueprint cap carries structural context worth showing (e.g. "EVERY 4 MIN · 4 ROUNDS").
       rows.push({ kind: 'block', label: '', cap } satisfies PosterBlock);
-    } else if (hasStationHeaderRows && cap && /^emom/i.test(cap)) {
-      // Minute-slot EMOM stations: the MIN 1/2/3 header blocks don't say how long the clock
-      // runs — lead with the board's own structure line ("EMOM 15 MIN · 5 ROUNDS").
+    } else if (hasStationRows && cap) {
+      // Station rows carry only their own letter, so the clock has to be stated once above them
+      // ("EMOM 25 MIN · 5 ROUNDS · 0:50 WORK / 0:10 REST"). It is the same for every station on
+      // the board, which is exactly why it belongs here and not repeated on each row.
       rows.push({ kind: 'block', label: cap.toUpperCase(), cap: '' } satisfies PosterBlock);
     }
 
-    let lastStationLabel: string | undefined;
     for (const row of section.rows) {
-      if (row.stationRow && row.roundLabel && row.roundLabel !== lastStationLabel) {
-        rows.push({
-          kind: 'block',
-          label: formatStationBlockLabel(row.roundLabel),
-          cap: row.stationHeaderCap,
-        } satisfies PosterBlock);
-        lastStationLabel = row.roundLabel;
-      }
-      // Convert with roundLabel intact — artifactRowToPosterLine relies on it to know a
-      // station row's primary already embeds the movement name ("200M RUN") and must not
-      // append the name again ("200M RUN RUN"). The chip itself is still suppressed on the
-      // emitted line: the ST. header block above already carries the station label.
-      const line = artifactRowToPosterLine(row, mineMap);
-      rows.push(row.stationRow ? { ...line, roundLabel: undefined } : line);
+      // The station letter rides ON the row, as the chip every skin already renders. A station
+      // is one line of whiteboard ("ST. 1 — Max Echo Bike — 40 cal"), and giving each one a
+      // full-width header block above its single line turned a five-station board into eleven
+      // rows of mostly label.
+      rows.push(artifactRowToPosterLine(row, mineMap));
     }
   }
 
@@ -784,6 +874,14 @@ function isRxLoad(subNote: string): boolean {
 // the TEAM share and would just duplicate it.
 function isWeightValue(value: string): boolean {
   return /(kg|lb)\b/i.test(value);
+}
+
+// Do a row's two load readouts say the same thing? Compared loosely on purpose: the inline
+// prescription and the value column are formatted by different builders, so "@ 50 kg" and
+// "50kg" are the same fact and must collapse, while "35/50kg" and "50kg" are not.
+function sameLoadText(a: string, b: string): boolean {
+  const normalize = (value: string): string => value.toLowerCase().replace(/\s+/g, '');
+  return normalize(a) === normalize(b);
 }
 
 // Pulls the logged weight out of `nameWithLoad` ("Hang Power Clean @ 40kg" → "40kg").
@@ -874,6 +972,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   const relayMatch = primaryTrimmed.match(/^(\d+)×$/);
 
   let rxLabel: string;
+  let stationChip: string | undefined;
   if (relayMatch) {
     // Relay row (e.g. "5×"). Reconstruct per-round prescription from the total in subNote.
     const relayCount = parseInt(relayMatch[1], 10);
@@ -901,6 +1000,11 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   } else if (row.stationRow || row.roundLabel != null) {
     // Station rows carry their complete display line in primary — never re-append the name.
     rxLabel = row.primary ?? '';
+    // Shortened here rather than at the builder: "STATION 1" is the board's own wording and the
+    // row keeps it, but the chip is a few characters wide and "ST. 1" is what fits.
+    if (row.stationRow && row.roundLabel) {
+      stationChip = formatStationBlockLabel(row.roundLabel);
+    }
   } else {
     rxLabel = row.primary ? `${row.primary} ${row.name}` : row.name;
   }
@@ -930,6 +1034,22 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     mine = '';
   }
 
+  // ONE LOAD, ONE PLACE. A section row states the prescribed weight inline ("8 Push Presses
+  // @ 50kg") and the value column states the logged one ("50kg") — when they are the same
+  // number that is one fact printed at both ends of the same line. The value column keeps it:
+  // it is the athlete's own number, in the slot every other row uses for loads.
+  //
+  // Only an IDENTICAL load is dropped. "@ 35/50kg" beside a logged "40kg" is the board's
+  // prescription and what the athlete actually lifted — two facts, and the poster owes the
+  // reader both.
+  // Trimmed first: a row with no movement name appends an empty one, so the load is not
+  // actually last until the trailing space is gone.
+  rxLabel = rxLabel.trim();
+  const inlineLoad = rxLabel.match(/\s+@\s+(\S+)$/);
+  if (inlineLoad && mine && sameLoadText(inlineLoad[1], mine)) {
+    rxLabel = rxLabel.slice(0, inlineLoad.index).trimEnd();
+  }
+
   if (shouldLogCelebrationDebug()) {
     console.log('[CelebrationDebug:artifactRowToPosterLine]', {
       rowName: row.name,
@@ -954,7 +1074,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     team,
     ...(row.teamShare ? { isPartnerShare: true } : {}),
     total,
-    roundLabel: row.roundLabel,
+    roundLabel: stationChip ?? row.roundLabel,
     ladderTrack: row.ladderTrack,
   };
 }
@@ -993,6 +1113,8 @@ export function buildPosterWodFromPage(
   // sections by the builders — the first section is the page's authority for them.
   const section = sections[0] ?? null;
   const heroResult = data.perPageHeroResults?.[pageIndex] ?? null;
+  // Present only when this page's piece ran several independent clocks — see PosterWod.result.
+  const heroScores = heroResult?.blockScores;
 
   const date = data.workoutDate;
 
@@ -1012,7 +1134,7 @@ export function buildPosterWodFromPage(
   // session's format ("FOR TIME", inherited from a sibling metcon) nor "STRENGTH" describes it.
   // It also must not read "PRACTICE" — the title already says so, and the tag exists to add what
   // the title can't.
-  const isMaxPractice = hasLoggedMaxEffort(page.exercise);
+  const isMaxPractice = isMaxEffortPractice(page.exercise);
 
   // Map to display label via the same canonical mapping the summary card uses
   // (mapFormatToType) — 'free' is the one label it doesn't cover.
@@ -1025,7 +1147,7 @@ export function buildPosterWodFromPage(
   // them the same way, or a single-AMRAP-block exercise classified as amrap_intervals silently
   // skips the duration entirely while the tag still reads "AMRAP".
   const isAmrap = exFmt === 'amrap' || exFmt === 'amrap_intervals';
-  const hasStationBlocks = sections.some((s) => s.rows.some((row) => row.stationRow && row.roundLabel && row.stationHeaderCap));
+  const hasStationBlocks = sections.some((s) => s.rows.some((row) => row.stationRow && row.roundLabel));
   const stationClock = hasStationBlocks ? formatAlternatingStationClock(page.exercise) : undefined;
 
   // This exercise's OWN prescribed AMRAP duration (never the workout-wide duration, which mixes
@@ -1104,7 +1226,7 @@ export function buildPosterWodFromPage(
   const teamSize = data.teamSize ?? 1;
   const totalsEstimated = !!data.activeBreakdown?.estimated;
   const builtRows: PosterRow[] = sections.length > 0
-    ? sectionsToRows(sections, mineMap, { title, type, format, sub })
+    ? sectionsToRows(sections, mineMap, { title, type, format, sub, hasScoreboard: !!heroScores?.length })
     : [];
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
   const strengthTopSet = page.isStrength && !isMaxPractice
@@ -1135,6 +1257,12 @@ export function buildPosterWodFromPage(
         default:       return isPartnerPage ? 'OUR SCORE' : 'MY SCORE';
       }
     }
+    // Same rule as buildResultLabel: a hero that names its own score outranks the format. A
+    // page whose block leaves one movement open is scored in that movement, not in rounds.
+    const openUnit = heroResult?.unit;
+    if (openUnit && !['MIN', 'ROUNDS', 'REPS', 'EP', 'CAL', 'KM', 'M', 'KG', 'KG PR'].includes(openUnit)) {
+      return isPartnerPage ? `OUR ${openUnit}` : openUnit;
+    }
     switch (exFmt) {
       case 'for_time': return isPartnerPage ? 'OUR TIME' : 'MY TIME';
       case 'amrap': case 'amrap_intervals': return isPartnerPage ? 'OUR ROUNDS' : 'ROUNDS';
@@ -1144,11 +1272,9 @@ export function buildPosterWodFromPage(
     }
   })();
   const resultValue = strengthTopSet ?? buildResultValue(heroResult, resultLabel);
-  // Station pages: the interval clock in the title already states the cap — no meta line.
-  const { meta: amrapMeta } = stationClock
-    ? { meta: undefined }
-    : buildAmrapResultMeta(isAmrap, heroResult);
-  const resultMeta = amrapMeta ?? aerobicHeroSubject(heroResult);
+  // Station pages: the interval clock in the title already states the cap, so the AMRAP note is
+  // suppressed — the sum/machine notes below still apply, as they always did.
+  const resultMeta = buildHeroResultMeta(isAmrap && !stationClock, heroResult);
 
   // Page-scoped, not session-scoped: a PR in one part (e.g. the deadlift) must never badge a
   // sibling part (e.g. the metcon) just because they share a session-level isPR flag.
@@ -1169,7 +1295,7 @@ export function buildPosterWodFromPage(
   return {
     type, title, date: formatSourceDate(data.sourceDate, date), format: dedupedFormat, sub, repsScheme,
     blocks: [],
-    result: { label: resultLabel, value: resultValue, meta: resultMeta, narrative: heroResult?.amrapNarrative },
+    result: { label: resultLabel, value: resultValue, meta: resultMeta, narrative: heroResult?.amrapNarrative, scores: heroScores },
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),
@@ -1228,11 +1354,14 @@ export function buildPosterWod(
   // practice logged on its own renders through THIS path, so it needs the identical treatment —
   // otherwise the wording depends on whether a metcon happened to be logged beside it.
   const soloMaxPractice = data.exercises.length === 1 && !!data.exercises[0]
-    && hasLoggedMaxEffort(data.exercises[0]);
+    && isMaxEffortPractice(data.exercises[0]);
+  // The part this poster speaks for. Every line below describes "the workout", and on a session
+  // that logged an accessory block first, exercises[0] is not it — see buildFormatLine.
+  const mainEx = data.posterMainExercises[0] ?? data.exercises[0];
   const type = soloMaxPractice ? 'SKILL' : mapFormatToType(data.workoutFormat);
   const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
   const amrapMinutes = isAmrap
-    ? (extractAmrapMinutes(data.exercises[0]) ?? (data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined))
+    ? (extractAmrapMinutes(mainEx) ?? (data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined))
     : undefined;
   if (!title && isAmrap && amrapMinutes) {
     title = `${amrapMinutes} MIN`;
@@ -1241,9 +1370,9 @@ export function buildPosterWod(
   // Pair-paced structure note outranks the generic sub-line — same rule as the page builder.
   const structureNote = data.artifactSections.find((s) => s.structureNote)?.structureNote;
   const sub = structureNote ?? (isAmrap && amrapMinutes ? '' : buildSubLine(data));
-  const isStrengthWod = data.workoutFormat === 'strength' || data.exercises[0]?.type === 'strength';
-  const repsScheme = isStrengthWod && data.exercises[0] && !soloMaxPractice
-    ? formatPosterStrengthRepsSequence(data.exercises[0])
+  const isStrengthWod = data.workoutFormat === 'strength' || mainEx?.type === 'strength';
+  const repsScheme = isStrengthWod && mainEx && !soloMaxPractice
+    ? formatPosterStrengthRepsSequence(mainEx)
     : undefined;
 
   // Clear title if it duplicates the format or type string
@@ -1269,10 +1398,9 @@ export function buildPosterWod(
     ? 'TOP SET'
     : soloMaxPractice
       ? (prescribesUnbrokenMax(data.exercises[0]) ? 'MAX UNBROKEN' : 'MAX REPS')
-      : buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit);
+      : buildResultLabel(data.workoutFormat, isPartnerConfirmed, data.heroResult?.unit, !!data.heroResult?.blockScores?.length);
   const resultValue = strengthTopSet ?? buildResultValue(data.heroResult, resultLabel);
-  const { meta: amrapMeta } = buildAmrapResultMeta(isAmrap, data.heroResult);
-  const resultMeta = amrapMeta ?? aerobicHeroSubject(data.heroResult);
+  const resultMeta = buildHeroResultMeta(isAmrap, data.heroResult);
 
   // RX badge
   const rx: string | null = data.isPR ? 'PR' : null;
@@ -1290,7 +1418,7 @@ export function buildPosterWod(
   // repeats the type pill verbatim ("EMOM" pill + "EMOM" sub-line), drop it. Unnamed posters
   // keep it: there the format IS the headline.
   const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
-  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub });
+  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub, hasScoreboard: !!data.heroResult?.blockScores?.length });
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
 
   const wod: PosterWodInternal = {
@@ -1301,7 +1429,7 @@ export function buildPosterWod(
     sub,
     repsScheme,
     blocks: [],
-    result: { label: resultLabel, value: resultValue, meta: resultMeta, narrative: data.heroResult?.amrapNarrative },
+    result: { label: resultLabel, value: resultValue, meta: resultMeta, narrative: data.heroResult?.amrapNarrative, scores: data.heroResult?.blockScores },
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),

@@ -587,6 +587,14 @@ export function getMovementCategory(name: string): MovementCategory {
 interface CanonicalLift {
   name: string;
   aliases: string[];
+  /**
+   * The bare root names a FAMILY, not a lift — see the note on `Squat` below. It stays a
+   * canonical name so the movement keeps its own identity on the board and the poster, but
+   * it can never hold a personal record: there is no lift to compare against, so an empty
+   * bucket turns any working load into a first-ever PR (a 40kg set of squats standing next
+   * to a 130kg back squat). Read through `isUnresolvedLiftName`.
+   */
+  unresolved?: true;
 }
 
 // Order matters for fallback matching: more specific lifts (e.g. "power clean")
@@ -637,9 +645,28 @@ const CANONICAL_LIFTS: CanonicalLift[] = [
   // (see MOVEMENT_ALIASES_SECTION in openai.ts). A table folding "squat" into "Back Squat" here
   // would overrule that reading silently: a front squat written as "squats" would be credited
   // to the back squat record with nothing on screen to correct. Unresolved is its own lift.
-  { name: 'Squat', aliases: ['squat'] },
-  { name: 'Press', aliases: ['press'] },
+  { name: 'Squat', aliases: ['squat'], unresolved: true },
+  { name: 'Press', aliases: ['press'], unresolved: true },
+  // A bare "row" is the erg far more often than it is a barbell row, and nothing in the name
+  // separates the two. Qualified rows ("Bent Over Row", "Pendlay Row") resolve to themselves
+  // and keep their records.
+  // "rows" survives singularizeWords (four letters), so the plural is spelled out here.
+  { name: 'Row', aliases: ['row', 'rows'], unresolved: true },
 ];
+
+const UNRESOLVED_LIFT_NAMES = new Set(
+  CANONICAL_LIFTS.filter(lift => lift.unresolved).map(lift => lift.name.toLowerCase())
+);
+
+/**
+ * True when a name says only which FAMILY was trained — "squats", "press", "row" — with
+ * nothing in it naming the lift. Which squat the board meant is a reading of the WHOLE
+ * board, and the parser makes that call (see MOVEMENT_ALIASES_SECTION in openai.ts); when
+ * it cannot, the name is not a lift and must not open a record bucket.
+ */
+export function isUnresolvedLiftName(name: string): boolean {
+  return UNRESOLVED_LIFT_NAMES.has(getCanonicalLiftName(name).toLowerCase());
+}
 
 // Trailing words/phrases that describe how a lift is being trained, not which
 // lift it is. Stripped before matching so "Deadlift Strength" === "Deadlift".

@@ -1,0 +1,315 @@
+{
+  "name": "real-interval-amrap-buyin-into-max-burpees-20260827",
+  "description": "ONE 2:00 AMRAP window repeated 4 times: a prescribed 2-round buy-in (8 push press + 8 box jumps) INTO max burpees over the bar. The burpee section is the piece's only score, so it is NOT an independent block: the poster must not print 'BLOCK 2 / AMRAP 2:00' over it, and the buy-in must keep its own '2 ROUNDS'. The page is a metcon, not a max practice - a metcon that ends in a max movement must keep its AMRAP identity (type pill, blueprint) and take the movement's own name as the hero label. The buy-in repeats twice inside each of the four windows, so its rows total 8 x 2 x 4 = 64 - a count no prescription-times-rounds sum can reach, so the row reads the breakdown. Real board, logged 2026-08-27.",
+  "workout": {
+    "title": "WOD",
+    "format": "amrap_intervals",
+    "timeCap": 960,
+    "rawText": "WEIGHTLIFTING\nEvery 01:15 min x 8 sets:\n1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk\n* Start at ~60% and build up weight\n✯ Cues of the day ✯\n• Fast & precised turnover\n• Stay upright on the dip & drive (Push Jerk)\n\nMETCON (Intervals)\n[02:00 min AMRAP , 02:00 min REST]\nx 4 rounds:\n2 rounds\n8 Push Press @35/50kg\n8 Box Jumps\nInto - Max Burpees Over the Bar\n* Work in pairs (two heats) - one work while the other rest",
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Burpees Over the Bar",
+          "exerciseIndex": 1,
+          "totalReps": 11,
+          "color": "magenta"
+        },
+        {
+          "name": "Power Clean",
+          "exerciseIndex": 0,
+          "totalReps": 8,
+          "weight": 45,
+          "weightProgression": [
+            40,
+            50
+          ],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Hang Squat Clean",
+          "exerciseIndex": 0,
+          "totalReps": 8,
+          "weight": 45,
+          "weightProgression": [
+            40,
+            50
+          ],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Push Jerk",
+          "exerciseIndex": 0,
+          "totalReps": 8,
+          "weight": 45,
+          "weightProgression": [
+            40,
+            50
+          ],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Push Press",
+          "exerciseIndex": 1,
+          "totalReps": 64,
+          "weight": 50,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Box Jump",
+          "exerciseIndex": 1,
+          "totalReps": 64,
+          "color": "magenta"
+        }
+      ]
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Barbell Complex",
+        "type": "strength",
+        "prescription": "Every 1:15 min x 8 sets: 1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk — Start at ~60% and build up weight",
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 3,
+            "weight": 40
+          },
+          {
+            "id": "set-1",
+            "setNumber": 2,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-2",
+            "setNumber": 3,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-3",
+            "setNumber": 4,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-4",
+            "setNumber": 5,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-5",
+            "setNumber": 6,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-6",
+            "setNumber": 7,
+            "completed": true,
+            "actualReps": 3
+          },
+          {
+            "id": "set-7",
+            "setNumber": 8,
+            "completed": true,
+            "actualReps": 3,
+            "weight": 50
+          }
+        ],
+        "movements": [
+          {
+            "name": "Power Clean",
+            "reps": 1,
+            "rxWeights": {
+              "male": 40,
+              "female": 40,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [
+              40,
+              50
+            ]
+          },
+          {
+            "name": "Hang Squat Clean",
+            "reps": 1,
+            "rxWeights": {
+              "male": 40,
+              "female": 40,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [
+              40,
+              50
+            ]
+          },
+          {
+            "name": "Push Jerk",
+            "reps": 1,
+            "rxWeights": {
+              "male": 40,
+              "female": 40,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [
+              40,
+              50
+            ]
+          }
+        ],
+        "rounds": 8,
+        "rawText": "Every 01:15 min x 8 sets:\n1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk\n* Start at ~60% and build up weight",
+        "partKind": "strength",
+        "loggingMode": "emom",
+        "complex": true,
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "intervalCount": 8,
+        "workDuration": 600,
+        "aiPartName": "TANK"
+      },
+      {
+        "id": "exercise-1",
+        "name": "2:00 AMRAP x 4",
+        "type": "wod",
+        "prescription": "[02:00 AMRAP / 02:00 REST] x 4: 2 rounds of 8 Push Press @35/50kg + 8 Box Jumps, then Max Burpees Over the Bar",
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 3,
+            "isMax": true
+          },
+          {
+            "id": "set-1",
+            "setNumber": 2,
+            "completed": true,
+            "actualReps": 3,
+            "isMax": true
+          },
+          {
+            "id": "set-2",
+            "setNumber": 3,
+            "completed": true,
+            "actualReps": 3,
+            "isMax": true
+          },
+          {
+            "id": "set-3",
+            "setNumber": 4,
+            "completed": true,
+            "actualReps": 2,
+            "isMax": true
+          }
+        ],
+        "rxWeights": {
+          "male": 50,
+          "female": 35,
+          "unit": "kg"
+        },
+        "movements": [
+          {
+            "name": "Buy-In: Push Press",
+            "reps": 8,
+            "rxWeights": {
+              "male": 50,
+              "female": 35,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "perRound": false,
+            "countingMode": "per_interval",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Buy-In: Box Jump",
+            "reps": 8,
+            "inputType": "none",
+            "perRound": false,
+            "countingMode": "per_interval",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Burpees Over The Bar",
+            "inputType": "none",
+            "isMaxReps": true,
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          }
+        ],
+        "sections": [
+          {
+            "sectionType": "buy_in",
+            "rounds": 2,
+            "movements": [
+              {
+                "name": "Push Press",
+                "reps": 8,
+                "rxWeights": {
+                  "male": 50,
+                  "female": 50,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "countingMode": "per_interval",
+                "scoreEntryMode": "per_round",
+                "loggedWeights": [
+                  50
+                ]
+              },
+              {
+                "name": "Box Jump",
+                "reps": 8,
+                "inputType": "none",
+                "countingMode": "per_interval",
+                "scoreEntryMode": "per_round"
+              }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              {
+                "name": "Burpees Over the Bar",
+                "inputType": "none",
+                "isMaxReps": true,
+                "countingMode": "per_round",
+                "scoreEntryMode": "total"
+              }
+            ],
+            "scoreType": "reps"
+          }
+        ],
+        "rawText": "METCON (Intervals)\n[02:00 min AMRAP , 02:00 min REST]\nx 4 rounds:\n2 rounds\n8 Push Press @35/50kg\n8 Box Jumps\nInto - Max Burpees Over the Bar\n* Work in pairs (two heats) - one work while the other rest",
+        "partKind": "metcon",
+        "loggingMode": "amrap_intervals",
+        "intervalCount": 4,
+        "workDuration": 480,
+        "restDuration": 480,
+        "aiPartName": "RIFT"
+      }
+    ]
+  }
+}

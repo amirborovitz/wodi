@@ -67,7 +67,12 @@ export function FeedCard({
         </button>
       </header>
 
-      <PosterPager payload={post.poster} />
+      <PosterPager payload={post.poster} photo={post.photo} />
+
+      {/* The athlete's own line, under the artifact rather than over it: the
+          poster says what they did, this says how it went, and neither has to
+          shout over the other. Absent on most posts, and that reads fine. */}
+      {post.caption && <p className={styles.caption}>{post.caption}</p>}
 
       <div className={styles.reactions}>
         <button

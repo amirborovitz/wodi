@@ -1,14 +1,21 @@
 .screen {
-  /* Records-local tokens. The screen runs one step brighter than the global dim so the
-     month/subtitle captions stay legible against the yellow record numbers. */
-  --rec-dim: rgba(242, 240, 235, 0.55);
-  --rec-hair: rgba(242, 240, 235, 0.09);
-  --rec-benchmark: #8fb3ff;
+  /* Records-local tokens, matching the redesign's palette. `panel` and `hair` are the two
+     surfaces the whole board is built from — a tile is a panel with a hairline, a fresh tile
+     swaps both for their yellow counterparts and nothing else changes. */
+  --rec-panel: rgba(255, 255, 255, 0.055);
+  --rec-hair: rgba(255, 255, 255, 0.09);
+  --rec-dim: rgba(243, 241, 234, 0.52);
+  --rec-dim2: rgba(243, 241, 234, 0.3);
+  --rec-sheet: #14171b;
+  --rec-danger: rgba(255, 120, 105, 0.75);
 
-  min-height: 100dvh;
+  /* `height`, not `min-height`: the latter is a floor, so this element grew to fit
+     its content and the `overflow-y` below never had anything to do — the document
+     scrolled in its place. */
+  height: 100dvh;
   background: var(--wodi-bg);
   overflow-y: auto;
-  padding-bottom: 40px;
+  padding-bottom: 60px;
   max-width: var(--app-column);
   margin-inline: auto;
 }
@@ -16,307 +23,272 @@
 /* ── Header ───────────────────────────────────────────────────── */
 .header {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 2px;
+  align-items: flex-start;
+  gap: 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 18px 0;
 }
 
-.backBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--rec-hair);
-  border-radius: 50%;
-  cursor: pointer;
-  flex-shrink: 0;
-  color: var(--wodi-white);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.backBtn svg {
-  width: 15px;
-  height: 15px;
+.headText {
+  flex: 1;
+  min-width: 0;
 }
 
 .pageTitle {
   font-family: var(--font-display);
-  font-size: 29px;
+  font-size: 34px;
   font-weight: 900;
   color: var(--wodi-white);
+  line-height: 0.95;
   letter-spacing: -0.01em;
-  line-height: 1;
+  text-transform: uppercase;
 }
 
 .pageSubtitle {
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   color: var(--rec-dim);
-  margin-top: 3px;
+  margin-top: 5px;
+  letter-spacing: 0.04em;
 }
 
-/* ── Content ──────────────────────────────────────────────────── */
-.content {
-  padding: 16px 16px 0;
+.freshCount {
+  color: var(--wodi-yellow);
 }
 
-/* ── Hero: the freshest record, promoted out of its section ───── */
-.heroCard {
-  position: relative;
+.glassBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--rec-hair);
+  color: var(--wodi-white);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glassBtn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.glassBtnOn {
+  background: var(--wodi-yellow);
+  border-color: transparent;
+  color: var(--wodi-bg);
+}
+
+.searchField {
+  display: block;
+  width: calc(100% - 36px);
+  margin: 14px 18px 0;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--rec-panel);
+  border: 1px solid var(--rec-hair);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wodi-white);
+  outline: none;
+}
+
+.searchField::placeholder {
+  color: var(--rec-dim2);
+}
+
+.searchField:focus {
+  border-color: rgba(245, 194, 0, 0.5);
+}
+
+/* ── Filter pills ─────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 7px;
+  padding: 18px 18px 0;
+}
+
+.pill {
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--rec-hair);
+  background: transparent;
+  color: var(--rec-dim);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pillOn {
+  background: var(--wodi-white);
+  border-color: transparent;
+  color: var(--wodi-bg);
+}
+
+/* ── Board ────────────────────────────────────────────────────── */
+/* minmax(0, 1fr), never a bare `1fr`: `1fr` floors each column at its content's min-content
+   width, and the movement name is `nowrap`, so a long one ("Back Rack Reverse Lunge") widened
+   its own column until the second ran off the side of the screen. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px 18px 0;
+}
+
+/* The animated wrapper is the grid ITEM, so it needs the same escape from automatic minimum
+   sizing the track just got — otherwise the floor only moves down one level. */
+.gridItem {
+  min-width: 0;
+}
+
+.card {
+  width: 100%;
+  height: 132px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  padding: 20px 20px 18px;
-  border-radius: 20px;
-  background: linear-gradient(160deg, rgba(245, 194, 0, 0.08), var(--wodi-card));
-  border: 1px solid rgba(245, 194, 0, 0.33);
-  overflow: hidden;
+  justify-content: space-between;
   text-align: left;
+  padding: 13px 14px 12px;
+  border-radius: 14px;
+  background: var(--rec-panel);
+  border: 1px solid var(--rec-hair);
+  overflow: hidden;
   cursor: pointer;
   transition: transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
 }
 
-.heroCard:active {
-  transform: scale(0.985);
+.card:active {
+  transform: scale(0.97);
 }
 
-.heroGlow {
-  position: absolute;
-  top: -30px;
-  right: -30px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(245, 194, 0, 0.1);
-  filter: blur(10px);
-  pointer-events: none;
+/* A record set this month. Warmth, not a rank — everything on this board is a best. */
+.cardFresh {
+  background: rgba(245, 194, 0, 0.07);
+  border-color: rgba(245, 194, 0, 0.35);
 }
 
-.heroBadge {
-  position: relative;
+.cardHead {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: var(--font-body);
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--wodi-yellow);
-}
-
-.starIcon {
-  width: 13px;
-  height: 13px;
-}
-
-.heroEyebrow {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rec-benchmark);
-  margin-top: 10px;
-}
-
-.heroMovement {
-  font-family: var(--font-display);
-  font-size: 21px;
-  font-weight: 900;
-  color: var(--wodi-white);
-  line-height: 1;
-  margin-top: 10px;
-}
-
-.heroEyebrow + .heroMovement {
-  margin-top: 6px;
-}
-
-.heroValueRow {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  gap: 5px;
   width: 100%;
-  gap: 12px;
-  margin-top: 8px;
 }
 
-.heroValue {
-  font-family: var(--font-display);
-  font-size: 52px;
-  font-weight: 900;
-  color: var(--wodi-yellow);
-  line-height: 0.85;
-  letter-spacing: -0.02em;
-}
-
-.heroSpark {
-  color: var(--wodi-yellow);
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.heroMonth {
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--rec-dim);
-  margin-top: 8px;
-}
-
-/* ── Section label ────────────────────────────────────────────── */
-.sectionLabel {
-  font-family: var(--font-body);
-  font-size: 11.5px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--rec-dim);
-  margin: 22px 4px 10px;
-}
-
-/* ── Record card grid ─────────────────────────────────────────── */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 11px;
-}
-
-.recordCard {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  padding: 14px 14px 13px;
-  border-radius: 16px;
-  background: var(--wodi-card);
-  border: 1px solid var(--rec-hair);
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.recordCard:active {
-  transform: scale(0.97);
-  border-color: rgba(245, 194, 0, 0.3);
-}
-
-.cardEyebrow {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rec-benchmark);
-}
-
-.cardMovement {
+.cardName {
+  flex: 1;
+  min-width: 0;
   font-family: var(--font-display);
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 800;
   color: var(--wodi-white);
-  line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cardEyebrow + .cardMovement {
-  margin-top: 6px;
+.cardStar {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--wodi-yellow);
 }
 
-.cardValueRow {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  width: 100%;
-  gap: 8px;
-  margin-top: 5px;
+.cardFoot {
+  display: block;
 }
 
 .cardValue {
+  display: block;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: 44px;
   font-weight: 900;
   color: var(--wodi-yellow);
-  line-height: 0.9;
-  letter-spacing: -0.02em;
+  line-height: 0.82;
+  letter-spacing: -0.025em;
 }
 
-.cardSpark {
-  color: var(--wodi-yellow);
-  opacity: 0.55;
-  flex-shrink: 0;
-}
-
-.cardMonth {
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--rec-dim);
-  margin-top: 6px;
-}
-
-/* ── Loading skeletons ────────────────────────────────────────── */
-.heroSkeleton {
-  height: 152px;
-  background: var(--wodi-card);
-  border-radius: 20px;
-  margin-bottom: 32px;
-  animation: pulse 1.5s ease-in-out infinite;
+.cardDate {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--rec-dim2);
+  margin-top: 8px;
+  letter-spacing: 0.05em;
 }
 
 .skeleton {
-  height: 106px;
-  background: var(--wodi-card);
-  border-radius: 16px;
-  animation: pulse 1.5s ease-in-out infinite;
+  height: 132px;
+  border-radius: 14px;
+  background: var(--rec-panel);
+  animation: pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.55; }
-  50%       { opacity: 0.25; }
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
 }
 
-/* ── Empty state ──────────────────────────────────────────────── */
+/* ── Empty ────────────────────────────────────────────────────── */
 .emptyState {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 60px 32px;
-  gap: 16px;
   text-align: center;
+  padding: 70px 34px;
 }
 
 .emptyIcon {
-  font-size: 36px;
-  color: rgba(245, 194, 0, 0.3);
+  font-size: 34px;
+  color: rgba(245, 194, 0, 0.4);
 }
 
 .emptyText {
+  margin-top: 14px;
   font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 600;
-  color: rgba(242, 240, 235, 0.4);
+  font-size: 14px;
+  font-weight: 500;
   line-height: 1.5;
-  max-width: 260px;
+  color: var(--rec-dim);
 }
 
-/* ── Detail sheet ─────────────────────────────────────────────── */
+.emptyAddBtn {
+  margin-top: 18px;
+  padding: 12px 20px;
+  background: rgba(245, 194, 0, 0.14);
+  border: 1px solid rgba(245, 194, 0, 0.35);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--wodi-yellow);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Sheet ────────────────────────────────────────────────────── */
 .backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
+  border: none;
+  padding: 0;
   z-index: 200;
   cursor: pointer;
-  border: none;
-  width: 100%;
-  height: 100%;
 }
 
 .sheet {
@@ -326,171 +298,484 @@
   right: 0;
   max-width: var(--app-column);
   margin-inline: auto;
-  background: var(--wodi-card);
-  border-radius: 20px 20px 0 0;
-  border-top: 1px solid var(--wodi-line2);
+  background: var(--rec-sheet);
+  border: 1px solid var(--rec-hair);
+  border-bottom: none;
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.6);
   z-index: 201;
-  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 28px);
-  max-height: 80dvh;
+  padding: 10px 20px calc(env(safe-area-inset-bottom, 0px) + 30px);
+  max-height: 88dvh;
   overflow-y: auto;
 }
 
 .sheetHandle {
-  width: 36px;
+  width: 38px;
   height: 4px;
-  background: rgba(242, 240, 235, 0.2);
   border-radius: 999px;
-  margin: 0 auto 20px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 auto 16px;
 }
 
 .sheetHeader {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 24px;
+  gap: 12px;
+}
+
+.sheetHeadText {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheetEyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .sheetEyebrow {
   font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  color: rgba(242, 240, 235, 0.4);
-  letter-spacing: 0.15em;
-  margin-bottom: 4px;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  color: var(--rec-dim);
+  text-transform: uppercase;
+}
+
+.newBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+  font-family: var(--font-body);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.newBadgeStar {
+  width: 8px;
+  height: 8px;
 }
 
 .sheetTitle {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 31px;
   font-weight: 900;
   color: var(--wodi-white);
-  letter-spacing: -0.02em;
-  line-height: 0.95;
   text-transform: uppercase;
+  line-height: 0.95;
+  margin-top: 6px;
+  letter-spacing: -0.005em;
 }
 
-.closeBtn {
-  width: 32px;
-  height: 32px;
-  background: rgba(242, 240, 235, 0.08);
-  border: none;
-  border-radius: 50%;
+/* Says out loud that several board spellings fold into this one record, so a number that
+   absorbed "DB snatch" and "Alt DB Snatch" doesn't read as a mistake. */
+.mergedNote {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--rec-dim2);
+  margin-top: 6px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Hero value / editor ──────────────────────────────────────── */
+.heroBlock {
+  margin-top: 22px;
+}
+
+.heroRow {
+  width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0 0 4px;
+  text-align: left;
   cursor: pointer;
-  flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
 }
 
-.closeBtn svg {
-  width: 16px;
-  height: 16px;
-  color: var(--wodi-white);
+.heroRow:disabled {
+  cursor: default;
 }
 
-.sheetBest {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 16px;
-  background: rgba(245, 194, 0, 0.08);
-  border: 1px solid rgba(245, 194, 0, 0.2);
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.sheetBestLabel {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  color: rgba(242, 240, 235, 0.45);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-.sheetBestRow {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.sheetBestValue {
+.heroValue {
   font-family: var(--font-display);
-  font-size: 48px;
+  font-size: 84px;
   font-weight: 900;
   color: var(--wodi-yellow);
-  letter-spacing: -0.02em;
-  line-height: 0.9;
+  line-height: 0.78;
+  letter-spacing: -0.035em;
 }
 
-.sheetSpark {
-  color: var(--wodi-yellow);
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.sheetBestDate {
+.heroDate {
+  flex: 1;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 500;
-  color: rgba(242, 240, 235, 0.45);
+  color: var(--rec-dim);
+  padding-bottom: 6px;
+  letter-spacing: 0.04em;
 }
 
-/* History */
-.sheetHistoryLabel {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  color: rgba(242, 240, 235, 0.4);
-  letter-spacing: 0.15em;
-  margin-bottom: 10px;
+.editPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rec-hair);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  flex: none;
 }
 
-.sheetHistoryList {
+.pencilIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.heroField {
   display: flex;
-  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  border-bottom: 2px solid var(--wodi-yellow);
+  padding-bottom: 6px;
 }
 
-.historyRow {
+.heroInput {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 84px;
+  font-weight: 900;
+  color: var(--wodi-yellow);
+  line-height: 0.8;
+  letter-spacing: -0.035em;
+  -moz-appearance: textfield;
+}
+
+.heroInput::-webkit-outer-spin-button,
+.heroInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.heroUnit {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 800;
+  color: rgba(245, 194, 0, 0.55);
+  padding-bottom: 6px;
+}
+
+.stepRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.stepBtn {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--rec-hair);
+  color: var(--wodi-white);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.setRow {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--wodi-line);
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rec-hair);
 }
 
-.historyRow:last-child {
-  border-bottom: none;
-}
-
-.historyValue {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--wodi-white);
-  letter-spacing: -0.02em;
-  line-height: 1;
-  min-width: 64px;
-}
-
-.historyDate {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(242, 240, 235, 0.4);
+.setLabel {
   flex: 1;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rec-dim);
 }
 
-.historyBestChip {
+.setSelect {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--wodi-white);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: right;
+  cursor: pointer;
+}
+
+.setSelect option {
+  color: #000;
+}
+
+/* ── Before this ──────────────────────────────────────────────── */
+/* A panel rather than a hairline-and-loose-text.
+   The design anchored the bottom of this sheet with a full-width yellow CTA, balancing the 84px
+   yellow number at the top. That button belonged to a feature that doesn't exist, so the weight
+   it carried has to come from somewhere: giving the climb its own defined block closes the sheet
+   deliberately instead of letting it trail off into grey text. */
+.beforeBlock {
+  margin-top: 22px;
+  padding: 14px 16px 15px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rec-hair);
+}
+
+.beforeLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rec-dim2);
+  margin-bottom: 9px;
+}
+
+.beforeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 9px;
+}
+
+.beforeItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.beforeArrow {
+  color: var(--rec-dim2);
+  font-size: 12px;
+}
+
+.beforeValue {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: rgba(243, 241, 234, 0.7);
+}
+
+.beforeDate {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--rec-dim2);
+}
+
+/* ── Edit actions ─────────────────────────────────────────────── */
+.editActions {
+  display: flex;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.cancelBtn {
+  flex: 0 0 108px;
+  height: 56px;
+  border-radius: 15px;
+  background: transparent;
+  border: 1px solid var(--rec-hair);
+  color: var(--rec-dim);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.saveBtn {
+  flex: 1;
+  height: 56px;
+  border-radius: 15px;
+  border: none;
   background: var(--wodi-yellow);
   color: var(--wodi-bg);
-  font-family: var(--font-body);
-  font-size: 8px;
+  font-family: var(--font-display);
+  font-size: 22px;
   font-weight: 900;
-  letter-spacing: 0.05em;
-  border-radius: 999px;
-  padding: 2px 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.saveBtn:disabled {
+  background: rgba(245, 194, 0, 0.18);
+  color: rgba(243, 241, 234, 0.35);
+  cursor: default;
+}
+
+.deleteRow {
+  text-align: center;
+  margin-top: 16px;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  padding: 6px;
+  color: var(--rec-danger);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+
+/* ── Delete choice sheet ──────────────────────────────────────── */
+/* Sits above the record sheet rather than replacing it: the number being deleted stays visible
+   behind the fork, so the choice is made with the record still in view. */
+.choiceBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  padding: 0;
+  z-index: 210;
+  cursor: pointer;
+}
+
+.choiceSheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--app-column);
+  margin-inline: auto;
+  background: var(--rec-sheet);
+  border: 1px solid var(--rec-hair);
+  border-bottom: none;
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.7);
+  z-index: 211;
+  padding: 10px 20px calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+.choiceEyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rec-dim);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.choiceOption {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  padding: 15px 16px;
+  margin-bottom: 9px;
+  border-radius: 14px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.22);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.choiceOption:active {
+  background: rgba(255, 107, 107, 0.18);
+}
+
+.choiceOption:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.choiceTitle {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 900;
+  color: #ff6b6b;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Names the consequence, not the button. */
+.choiceBody {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rec-dim);
+  line-height: 1.35;
+}
+
+.choiceCancel {
+  width: 100%;
+  height: 52px;
+  margin-top: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--rec-hair);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Most records are held by a single row, so this is the state the sheet is in most of the time —
+   it gets the weight of a real line, not the grey of an apology. */
+.beforeEmpty {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: rgba(243, 241, 234, 0.62);
   line-height: 1.4;
+}
+
+/* The app-wide focus ring (`:focus-visible` in variables.css) is wodi yellow. On a field that is
+   ALREADY outlined in yellow it stops reading as a focus cue and becomes a second, wrong border
+   boxing in the number. Same specificity as the base rule, so `:focus-visible` is what wins here
+   regardless of stylesheet order. Both fields keep a focus affordance of their own — the 2px
+   yellow rule under the number, and the search field's border going yellow — so the ring is
+   redundant rather than load-bearing on these two. Every other control keeps it. */
+.heroInput:focus-visible,
+.searchField:focus-visible {
+  outline: none;
 }
