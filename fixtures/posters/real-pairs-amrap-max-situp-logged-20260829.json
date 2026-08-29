@@ -1,6 +1,6 @@
 {
   "name": "real-pairs-amrap-max-situp-logged-20260829",
-  "description": "Same board as real-pairs-amrap-max-situp-20260829, but the athlete DID log the max sit-ups (20 across the piece). The board prescribed no count, so the row must read 'Max Sit-up' with 20 as the athlete's own total — never '20 Sit-ups', which prints the athlete's number as if the coach had written it.",
+  "description": "Same board, saved EXACTLY as production stored it: the save path baked the athlete's logged 20 into the Sit-up's prescription (reps: 20) beside isMaxReps/maxMetric. The row must still read 'Max Sit-up - 20 total'. maxMetric names the slot the board left open, so a number in that slot cannot be the coach's - it is our own bake, and the poster has to see through it. Hero stays ROUNDS.",
   "workout": {
     "title": "WOD (שבת / חג)",
     "format": "amrap",
@@ -15,7 +15,7 @@
         "prescription": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
         "rawText": "P1: 200m Run\nP2: AMRAP:\n6 Twin Kettlebell/Dumbbell Hang Power Clean\n6 Twin Kettlebell/Dumbbell Front Squat\n6 Twin Kettlebell/Dumbbell Push Press\n➔ Max Sit-up\n<WEIGHT: 12/20kg>",
         "workDuration": 840,
-        "rounds": 5,
+        "rounds": 7,
         "sets": [
           {
             "id": "set-0",
@@ -83,7 +83,8 @@
             "isMaxReps": true,
             "maxMetric": "reps",
             "countingMode": "per_round",
-            "scoreEntryMode": "total"
+            "scoreEntryMode": "total",
+            "reps": 20
           }
         ],
         "movementWeights": {

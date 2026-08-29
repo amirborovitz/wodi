@@ -126,10 +126,34 @@ export function earnsRoundCount(
  * count has a number to show, and showing "Max" instead would throw it away.
  */
 export function statesMaxEffort(movement: ParsedMovement): boolean {
-  return movement.isMaxReps === true
-    && movement.reps == null
-    && movement.calories == null
-    && movement.distance == null;
+  return openQuantitySlot(movement) !== undefined;
+}
+
+/**
+ * WHICH quantity slot the board left open — the one an athlete's logged count must never be
+ * written into, because its EMPTINESS is the prescription.
+ *
+ * `maxMetric` is decisive and outranks the slot's contents. The parser sets it only when the model
+ * wrote the literal string "max" into that slot, and a slot holding "max" holds no number — so a
+ * saved movement with `maxMetric: 'reps'` AND a numeric `reps` is not a board that prescribed 20.
+ * It is a board that prescribed nothing, with our own save-time bake sitting in the slot. Reading
+ * the stamp instead of the slot is what lets a poster tell those apart after the fact.
+ *
+ * That bake is the bug this exists for: "➔ Max Sit-up" was saved as `reps: 20` — the athlete's own
+ * number, stored where the coach's would go — and the poster then printed "20 Sit-ups", stating as
+ * prescription a number nobody had prescribed.
+ *
+ * Docs parsed before `maxMetric` existed carry only the boolean, and there `reps` is the slot it
+ * always meant. A stamped movement that DOES carry a prescribed count on one of those is left
+ * alone: without the stamp naming a slot there is no way to tell a real count from a baked one,
+ * and showing "Max" over a number the coach may truly have written is the worse error.
+ */
+export function openQuantitySlot(movement: ParsedMovement): 'reps' | 'calories' | 'distance' | undefined {
+  if (movement.isMaxReps !== true) return undefined;
+  if (movement.maxMetric) return movement.maxMetric;
+  return movement.reps == null && movement.calories == null && movement.distance == null
+    ? 'reps'
+    : undefined;
 }
 
 /**

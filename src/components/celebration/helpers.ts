@@ -3357,11 +3357,25 @@ export function buildPageArtifactSections(
           // A max-effort test ("test your max unbroken toes to bar") has no prescribed count by
           // definition — the logged reps ARE the score, so the row must say Max, not print the
           // athlete's own number back as if the coach had written it.
-          isMaxEffort: Boolean(prescribedMaxMap[key])
-            && !(prescribed.reps && prescribed.reps > 0)
-            && !(prescribed.distance && prescribed.distance > 0)
-            && !(prescribed.calories && prescribed.calories > 0)
-            && !(prescribed.time && prescribed.time > 0),
+          // Two ways to know, and the first one OUTRANKS the quantity guard below.
+          //
+          // `maxMetric` names the slot the board left open, and the parser sets it only when the
+          // model wrote the literal "max" there — so a number in that slot cannot be the coach's.
+          // It is our own save-time bake, and the guard must not let it veto the stamp. This is
+          // exactly how "➔ Max Sit-up" came to print as "20 Sit-ups": the athlete's 20 was baked
+          // into `reps`, the guard saw a prescribed count, and the row stated it as the board's.
+          //
+          // Without a named slot the stamp proves nothing about a count sitting beside it, so the
+          // guard stands: "4 Strict Chin Up" is stamped max AND prescribes 4, and printing "Max"
+          // over that would throw away a number the coach did write.
+          isMaxEffort: (parsedMovement?.isMaxReps === true && parsedMovement.maxMetric != null)
+            || (
+              Boolean(prescribedMaxMap[key])
+              && !(prescribed.reps && prescribed.reps > 0)
+              && !(prescribed.distance && prescribed.distance > 0)
+              && !(prescribed.calories && prescribed.calories > 0)
+              && !(prescribed.time && prescribed.time > 0)
+            ),
         });
 
         if (descSchemeGlobal && !prescribed.distance && !prescribed.calories) {

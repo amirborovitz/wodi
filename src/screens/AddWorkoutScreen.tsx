@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
+import { openQuantitySlot } from '../services/blockScore';
 import { assignMovementColors, getMovementMultiplier, getStationVisitCountsForExercise, movementBucketKey, movementForSectionCounting, scopeSectionMovements } from '../services/workloadCalculation';
 import type { SectionMovementScope } from '../services/workloadCalculation';
 import { exercisePartnerFactor } from '../services/partnerScope';
@@ -2999,6 +3000,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           );
           const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
           const loggedWeights = loggedLoadFor(mk, mov.name);
+          // The slot the board left OPEN is prescribed BY BEING EMPTY, so the logged-value bake
+          // below must not touch it. "➔ Max Sit-up" was saved as `reps: 20` — the athlete's own
+          // count sitting where the coach's would go — and every reader downstream then had to
+          // treat it as prescription: the poster printed "20 Sit-ups", stating as the board's
+          // number one that nobody had written. The count is not lost by skipping this; it is
+          // already in movementReps and in the workload breakdown, which is where a number the
+          // ATHLETE produced belongs.
+          const openSlot = openQuantitySlot(mov);
           return {
             ...mov,
             name: selectedName,
@@ -3006,11 +3015,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
             // edit un-baked, so going back to Rx has to CLEAR it here or the swap returns on the
             // next open. `undefined` never reaches Firestore — removeUndefined strips it.
             substitution: substitutionForSave(mk, mov),
-            ...(selectedReps !== undefined ? { reps: selectedReps } : {}),
+            ...(selectedReps !== undefined && openSlot !== 'reps' ? { reps: selectedReps } : {}),
             // Relay pacers keep their prescribed per-trip distance — the logged value is a TOTAL
             // (already in the breakdown), and detail mode needs the per-trip prescription to
             // reconstruct the "N×" trip count.
-            ...(selectedDistance !== undefined && mov.relay !== true ? { distance: selectedDistance } : {}),
+            ...(selectedDistance !== undefined && mov.relay !== true && openSlot !== 'distance'
+              ? { distance: selectedDistance } : {}),
             ...(loggedWeights ? { loggedWeights } : {}),
             ...(selectedWeight && selectedWeight > 0 ? {
               rxWeights: {

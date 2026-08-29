@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Exercise, MovementTotal, ParsedExercise, ParsedSection } from '../types';
-import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from './blockScore';
+import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount, openQuantitySlot } from './blockScore';
 import { computeHeroResult } from '../components/celebration/helpers';
 import { createBlankResult, getRowState, getMissingLabel } from '../components/logging/story/types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -448,5 +448,46 @@ describe('earnsRoundCount', () => {
   it('is false for anything that is not an open AMRAP clock', () => {
     expect(earnsRoundCount(amrap({ loggingMode: 'for_time' }))).toBe(false);
     expect(earnsRoundCount(amrap({ loggingMode: 'emom' }))).toBe(false);
+  });
+});
+
+/**
+ * The save path bakes logged values onto movements so consumers read the athlete's entry rather
+ * than the coach's Rx. For a movement the board left OPEN that bake is destructive: emptiness IS
+ * the prescription there, and overwriting it makes the athlete's own number indistinguishable
+ * from the coach's. "➔ Max Sit-up" reached Firestore as `reps: 20` and the poster then printed
+ * "20 Sit-ups" — stating as the board's a number nobody had written.
+ *
+ * maxMetric is what lets that be undone after the fact: the parser sets it only when the model
+ * wrote the literal "max" into that slot, so a number in the named slot is provably ours.
+ */
+describe('openQuantitySlot', () => {
+  it('names the slot the board left open', () => {
+    expect(openQuantitySlot({ name: 'Sit-up', isMaxReps: true, maxMetric: 'reps' })).toBe('reps');
+    expect(openQuantitySlot({ name: 'Echo Bike', isMaxReps: true, maxMetric: 'calories' })).toBe('calories');
+  });
+
+  it('sees through the save-time bake', () => {
+    // The real saved shape from 29/08/26. reps holds the athlete's 20; maxMetric says the slot
+    // was open, so the 20 cannot be a prescription.
+    const baked = { name: 'Sit-up', isMaxReps: true, maxMetric: 'reps' as const, reps: 20 };
+    expect(openQuantitySlot(baked)).toBe('reps');
+    expect(statesMaxEffort(baked)).toBe(true);
+  });
+
+  it('leaves a stamped movement that really does prescribe a count alone', () => {
+    // "4 Strict Chin Up" is stamped max AND written as 4, with no maxMetric to say which slot
+    // was open. Printing "Max" there would throw away a number the coach did write.
+    const chinUp = { name: 'Strict Chin Up', isMaxReps: true, reps: 4 };
+    expect(openQuantitySlot(chinUp)).toBeUndefined();
+    expect(statesMaxEffort(chinUp)).toBe(false);
+  });
+
+  it('falls back to reps for docs parsed before maxMetric existed', () => {
+    expect(openQuantitySlot({ name: 'Sit-up', isMaxReps: true })).toBe('reps');
+  });
+
+  it('is undefined for an ordinary movement', () => {
+    expect(openQuantitySlot({ name: 'Front Squat', reps: 6 })).toBeUndefined();
   });
 });
