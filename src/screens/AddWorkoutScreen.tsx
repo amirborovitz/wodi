@@ -7,6 +7,7 @@ import { assignMovementColors, getMovementMultiplier, getStationVisitCountsForEx
 import type { SectionMovementScope } from '../services/workloadCalculation';
 import { exercisePartnerFactor } from '../services/partnerScope';
 import { getMaxMetric } from '../utils/maxMetric';
+import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
 import { loggedBlockScores, sectionRoundsCompleted } from '../services/blockScore';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
@@ -3276,13 +3277,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         : 0;
 
       // Primary: use AI-returned workDuration/restDuration per exercise (reliable, no regex).
-      // Each exercise returns its own total work + rest seconds — just sum them.
+      // blockClock owns the arithmetic: N work intervals have N-1 rests BETWEEN them, so summing
+      // work + rest counted a final rest nobody ever stands through. See utils/blockClock.
       let perExerciseDuration = 0;
       for (const r of results) {
-        const ex = r.exercise;
-        if (ex.workDuration && ex.workDuration > 0) {
-          perExerciseDuration += ex.workDuration + (ex.restDuration || 0);
-        }
+        perExerciseDuration += blockClockSeconds(r.exercise);
       }
 
       // Fallback: regex extraction from exercise name/prescription (for older AI responses)
@@ -3304,7 +3303,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
             const workSecs = parseInt(intervalAmrap[1], 10) * 60 + parseInt(intervalAmrap[2], 10);
             const restSecs = parseInt(intervalAmrap[3], 10) * 60 + parseInt(intervalAmrap[4], 10);
             const rounds = parseInt(intervalAmrap[5], 10);
-            perExerciseDuration += (workSecs + restSecs) * rounds;
+            // Same rule as the primary path — the last rest is not on the clock. This branch
+            // reads PER-INTERVAL values off the board text, so multiply up before applying it.
+            perExerciseDuration += intervalChainSeconds(
+              workSecs * rounds,
+              restSecs * rounds,
+              rounds,
+              trailingRestIsOccupied(r.exercise),
+            );
             continue;
           }
           // "AMRAP 3:00", "03:00 min AMRAP" — MM:SS format
