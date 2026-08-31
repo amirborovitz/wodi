@@ -252,9 +252,13 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     return <SupersetInput result={result} onChange={onChange} />;
   }
 
-  // Detect if this is a KB/DB movement that needs implement toggle
+  // The 1x/2x question only exists for a hand-held implement you can carry one of or two of.
+  // A barbell has no pair, and the AI stamps implementCount: 1 on plenty of them — so the
+  // implement it named is the gate, not the count. Legacy rows with no equipment fall back to
+  // the count, where a 2 is unambiguous evidence of a pair.
   const hasImplement = result.exercise.movements?.some(
-    m => m.implementCount != null && m.implementCount > 0
+    m => m.equipment === 'dumbbell' || m.equipment === 'kettlebell'
+      || (m.equipment == null && (m.implementCount ?? 1) > 1)
   ) ?? false;
 
   switch (kind) {

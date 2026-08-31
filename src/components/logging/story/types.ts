@@ -800,17 +800,33 @@ export function createBlankResult(
   const containerKind = weightedKind === 'load' && isAllBodyweight ? 'reps' : weightedKind;
   // The AI's own answer outranks it. `scoreType` is the model telling us what the board is
   // scored IN, which is the only thing that can distinguish a clock from a score — it reads the
-  // whiteboard; the format map only knows a convention. Absent (every workout parsed before this
-  // field existed, and every board where clock and score agree) falls through to the guess, so
-  // this is purely additive.
-  const kind: ExerciseKind = scoredKindFromAI(exercise)
-    ?? (containerKind === 'score_rounds' && scoresOpenReps(exercise)
-      // Safety net for a parse that omitted scoreType: an open movement means the rounds are
-      // prescription, whatever the clock says. Scoped to score_rounds deliberately — a skill
-      // practice also carries an open max test, but it has prescribed sets to log alongside it
-      // and keeps its own input.
-      ? 'score_open_reps'
-      : containerKind);
+  // whiteboard; the format map only knows a convention.
+  //
+  // EXCEPT on a fixed-cadence block, which `scoreType` cannot describe. Its vocabulary is the
+  // four nouns a result is counted in — time, rounds, reps, load — and "this is a cadence, not a
+  // score" is not among them. An EMOM's time and rounds are fixed by the clock and its loads are
+  // already collected per movement on the interval screen, so those three answers can only move
+  // the block off a screen that was already right.
+  //
+  // A count the board leaves OPEN is the one real exception: a station rotation ("EMOM 25, five
+  // stations, max reps at each") earns a number at every station, and that is a score the
+  // interval screen has no way to take. So an open-reps answer still wins; the rest cannot.
+  //
+  // This was originally written as `scoredKindFromAI(exercise) ?? …` and called purely additive,
+  // which held only while the model kept leaving `scoreType` out — the clock still decided in
+  // practice. Making the parse a strict schema (parseSchema.ts) turned every field into one the
+  // model must answer, the fallback stopped running, and every EMOM silently changed screens.
+  const aiKind = scoredKindFromAI(exercise);
+  const kind: ExerciseKind = containerKind === 'intervals' && aiKind !== 'score_open_reps'
+    ? 'intervals'
+    : aiKind
+      ?? (containerKind === 'score_rounds' && scoresOpenReps(exercise)
+        // Safety net for a parse that omitted scoreType: an open movement means the rounds are
+        // prescription, whatever the clock says. Scoped to score_rounds deliberately — a skill
+        // practice also carries an open max test, but it has prescribed sets to log alongside it
+        // and keeps its own input.
+        ? 'score_open_reps'
+        : containerKind);
 
   // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
   const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;

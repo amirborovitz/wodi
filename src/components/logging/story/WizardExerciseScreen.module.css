@@ -201,6 +201,14 @@
   background: var(--wodi-card);
 }
 
+/* A scrolling flex column squeezes its children before it agrees to scroll. Any input that
+   sets its own min-height (LoadInput does) can be shrunk below its content, and the overflow
+   then paints straight over the notice underneath it. Children keep their height; the body
+   scrolls. */
+.body > * {
+  flex-shrink: 0;
+}
+
 /* ── Sticky footer: Done + skip link ── */
 .footer {
   position: sticky;
