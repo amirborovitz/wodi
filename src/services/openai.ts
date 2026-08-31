@@ -362,6 +362,8 @@ Every movement MUST include "inputType":
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
 - CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate/vest (e.g. any squat, lunge, split squat, step-up, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature.
+- CRITICAL: a movement the board ASKS TO LOAD is "weight", whatever it is by nature. When the coach writes a LOAD instruction against it — "build to a heavy 3", "work up to a heavy single", "heaviest possible", "3RM"/"5RM", a percentage ("@80%"), "climbing", "add weight each set", "weighted" — the athlete is being told to put weight on, so there IS a load to log. A bodyweight-by-nature movement under such an instruction becomes inputType "weight" with equipment "other" (belt, vest or a DB between the feet): "3 chin ups — build a heavy 3 rep" is a WEIGHTED chin-up, and returning "none" leaves the athlete no way to record the only number that piece was about.
+- The opposite instruction does NOT load anything: "max reps", "max unbroken", "as many as possible", "AMRAP" ask for REPS, not for load. "Max pull-ups" stays inputType "none". The test is whether the coach is asking the athlete to add WEIGHT or to do more REPS.
 
 ## MOVEMENT EQUIPMENT
 Every movement performed with an external load MUST also include "equipment" — the implement the load is on (include it even when the board writes no weight):
@@ -681,7 +683,25 @@ ALWAYS set "complex": true on a "+"-joined same-bar complex exercise (like this 
 
 WHAT "complex" MEANS: one implement picked up and carried through consecutive lifts WITHOUT setting it down, so there is physically one load. Nothing else is a complex.
 Do NOT set "complex" on: 4b's "Into:" blocks (separate sets); ordinary multi-movement metcons; or a STRENGTH CIRCUIT / SUPERSET — several DIFFERENT movements each done for their own reps inside a set, then on to the next movement ("4 sets: 5 Shoulder press (barbell) / 10/10 DB row / 8/8 single leg deadlift", "3 sets: 8 Back squat / 12 Walking lunge"). Those are separate stations at separate loads and must stay complex: false, so the app asks for each movement's own weight.
-Using the SAME equipment does NOT make a circuit a complex: "10/10 DB row / 8/8 single leg DB deadlift / 10 DB press" is still three stations at three loads. The test is whether the implement is put down between movements, not what the implement is. When unsure, leave "complex" unset — a missing flag costs an extra weight prompt; a wrong one asks for a single weight the athlete never used.`;
+Using the SAME equipment does NOT make a circuit a complex: "10/10 DB row / 8/8 single leg DB deadlift / 10 DB press" is still three stations at three loads. The test is whether the implement is put down between movements, not what the implement is. When unsure, leave "complex" unset — a missing flag costs an extra weight prompt; a wrong one asks for a single weight the athlete never used.
+
+### 4d. STRENGTH CIRCUIT where the board asks a BODYWEIGHT movement to carry load
+Input: "A. 5 sets / 3 chin ups @ Build a heavy 3 rep / 4 Deadlift @75->90% (climbing)"
+Output:
+{
+  "type": "strength", "format": "strength", "scoreType": "load",
+  "exercises": [{
+    "name": "Hinge & Pull", "type": "strength", "loggingMode": "strength",
+    "prescription": "5 sets: 3 Chin-up — build a heavy 3 rep, 4 Deadlift @ 75->90% (climbing)",
+    "suggestedSets": 5, "complex": false,
+    "movements": [
+      { "name": "Chin-up", "reps": 3, "inputType": "weight", "equipment": "other" },
+      { "name": "Deadlift", "reps": 4, "inputType": "weight", "equipment": "barbell" }
+    ]
+  }]
+}
+Why the chin-up is "weight": "build a heavy 3 rep" is a LOAD instruction — you cannot build a heavy triple on a chin-up bar without hanging weight on. A chin-up is bodyweight by nature, and that is exactly the case the rule above overrides. Equipment is "other" because the board names no implement (belt/vest/DB). Had it said "3 chin ups" alone, or "max chin ups", it would be inputType "none".
+Why complex: false — two different movements at two different loads, done one after the other inside a set. The athlete logs a weight for EACH. See 4c.`;
 
 const EXAMPLES_METCON_ADVANCED = `### 5. Intervals
 Input: "5 sets for time of 300m run + 10 shoulder to overhead 40/60 kg"

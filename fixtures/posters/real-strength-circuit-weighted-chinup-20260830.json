@@ -1,0 +1,81 @@
+{
+  "name": "real-strength-circuit-weighted-chinup-20260830",
+  "description": "Real board, 30 Aug 26. Two things this pins: (1) a strength circuit where a BODYWEIGHT-BY-NATURE movement carries load because the board asked it to ('3 chin ups @ build a heavy 3 rep') — the chin-up must print its own climb beside the deadlift's, not read as unloaded reps; (2) a substituted movement must say so — the board wrote Toes to Bar and the athlete did Knees-to-Elbows, which for years rendered as though the coach had written KTE.",
+  "workout": {
+    "title": "WOD",
+    "format": "amrap_intervals",
+    "timeCap": 960,
+    "partnerWorkout": false,
+    "rawText": "30/08/26 STRENGTH (Hinge & pull) A. 5 sets 3 chin ups @Build a heavy 3 rep 4 Deadlift @75->90% (climbing) METCON (Intervals) B. [02:00 min AMRAP , 02:00 min REST] x 4 rounds 15 Alternating Kettlebell Swing @16/24kg 10 Toes to Bar * Work in pairs (two heats) - one work while the other rest ** Continue from where you stopped",
+    "exercises": [
+      {
+        "aiPartName": "FORGE",
+        "id": "exercise-0",
+        "isSecondary": false,
+        "loggingMode": "strength",
+        "name": "Hinge & Pull",
+        "partKind": "strength",
+        "partnerWorkout": false,
+        "prescription": "5 sets: 3 Chin-up - build a heavy 3 rep, 4 Deadlift @ 75->90% (climbing)",
+        "rawText": "5 sets 3 chin ups @Build a heavy 3 rep 4 Deadlift @75->90% (climbing)",
+        "rounds": 5,
+        "type": "strength",
+        "movements": [
+          { "countingMode": "per_round", "equipment": "other", "inputType": "weight", "loggedWeights": [10, 15], "name": "Chin-up", "reps": 3 },
+          { "countingMode": "per_round", "equipment": "barbell", "inputType": "weight", "loggedWeights": [85, 105], "name": "Deadlift", "reps": 4, "rxWeights": { "female": 85, "male": 85, "unit": "kg" } }
+        ],
+        "sections": [
+          {
+            "label": "A",
+            "rounds": 5,
+            "scoreType": "load",
+            "sectionType": "rounds",
+            "movements": [
+              { "countingMode": "per_round", "equipment": "other", "inputType": "weight", "loggedWeights": [10, 15], "name": "Chin-up", "reps": 3 },
+              { "countingMode": "per_round", "equipment": "barbell", "inputType": "weight", "loggedWeights": [85, 105], "name": "Deadlift", "reps": 4, "rxWeights": { "female": 85, "male": 85, "unit": "kg" } }
+            ]
+          }
+        ],
+        "sets": [
+          { "actualReps": 7, "completed": true, "id": "set-0", "setNumber": 1, "weight": 85 },
+          { "actualReps": 7, "completed": true, "id": "set-1", "setNumber": 2 },
+          { "actualReps": 7, "completed": true, "id": "set-2", "setNumber": 3 },
+          { "actualReps": 7, "completed": true, "id": "set-3", "setNumber": 4 },
+          { "actualReps": 7, "completed": true, "id": "set-4", "setNumber": 5, "weight": 105 }
+        ]
+      },
+      {
+        "aiPartName": "SPARK",
+        "id": "exercise-1",
+        "intervalCount": 4,
+        "isSecondary": false,
+        "loggingMode": "amrap_intervals",
+        "name": "2:00 AMRAP x 4",
+        "partKind": "metcon",
+        "partnerWorkout": false,
+        "prescription": "15 Alternating Kettlebell Swing @16/24kg, 10 Toes to Bar",
+        "rawText": "15 Alternating Kettlebell Swing @16/24kg 10 Toes to Bar",
+        "restDuration": 480,
+        "rounds": 8,
+        "workDuration": 480,
+        "type": "wod",
+        "rxWeights": { "female": 16, "male": 24, "unit": "kg" },
+        "movements": [
+          { "countingMode": "per_round", "equipment": "kettlebell", "implementCount": 1, "inputType": "weight", "loggedWeights": [24], "name": "Alt American Kettlebell Swing", "reps": 15, "scoreEntryMode": "per_round", "rxWeights": { "female": 24, "male": 24, "unit": "kg" } },
+          { "countingMode": "per_round", "distance": 0, "equipment": "none", "inputType": "none", "name": "Knees-to-Elbows", "reps": 10, "scoreEntryMode": "per_round", "substitution": { "adjustedValue": 10, "originalName": "Toes to Bar", "originalPrescription": { "reps": 10 }, "originalValue": 10, "selectedName": "Knees-to-Elbows", "substitutionType": "easier", "targetUnit": "reps" } }
+        ],
+        "sets": [
+          { "actualReps": 200, "completed": true, "id": "set-summary", "setNumber": 1, "weight": 24 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "color": "yellow", "exerciseIndex": 1, "name": "Alt American Kettlebell Swing", "totalReps": 120, "unit": "kg", "weight": 24 },
+        { "color": "magenta", "exerciseIndex": 1, "name": "Knees-to-Elbows", "originalMovement": "Toes to Bar", "substitutionType": "easier", "totalReps": 80, "wasSubstituted": true },
+        { "color": "yellow", "exerciseIndex": 0, "name": "Deadlift", "totalReps": 20, "unit": "kg", "weight": 95, "weightProgression": [85, 105] },
+        { "color": "yellow", "exerciseIndex": 0, "name": "Chin-up", "totalReps": 15, "unit": "kg", "weight": 12.5, "weightProgression": [10, 15] }
+      ]
+    }
+  }
+}
