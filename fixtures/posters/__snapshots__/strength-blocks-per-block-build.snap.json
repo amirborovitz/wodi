@@ -11,7 +11,7 @@
           "totalNote": "8 total",
           "subNote": "8 total",
           "mineKey": "Clean and Jerk",
-          "mineOverride": "40-50kg",
+          "mineOverride": "40→50kg",
           "accent": "yellow",
           "repeatCount": 4
         },
@@ -21,7 +21,7 @@
           "totalNote": "4 total",
           "subNote": "4 total",
           "mineKey": "Clean and Jerk",
-          "mineOverride": "50-65kg",
+          "mineOverride": "50→65kg",
           "accent": "yellow",
           "repeatCount": 4
         }
@@ -43,7 +43,7 @@
             "totalNote": "8 total",
             "subNote": "8 total",
             "mineKey": "Clean and Jerk",
-            "mineOverride": "40-50kg",
+            "mineOverride": "40→50kg",
             "accent": "yellow",
             "repeatCount": 4
           },
@@ -53,7 +53,7 @@
             "totalNote": "4 total",
             "subNote": "4 total",
             "mineKey": "Clean and Jerk",
-            "mineOverride": "50-65kg",
+            "mineOverride": "50→65kg",
             "accent": "yellow",
             "repeatCount": 4
           }
@@ -115,7 +115,7 @@
         "kind": "line",
         "rx": "4 × 2 Clean and Jerk",
         "load": "",
-        "mine": "40-50kg",
+        "mine": "40→50kg",
         "team": "",
         "total": "8 total"
       },
@@ -123,7 +123,7 @@
         "kind": "line",
         "rx": "4 × 1 Clean and Jerk",
         "load": "",
-        "mine": "50-65kg",
+        "mine": "50→65kg",
         "team": "",
         "total": "4 total"
       }
@@ -134,7 +134,7 @@
           "kind": "line",
           "rx": "4 × 2 Clean and Jerk",
           "load": "",
-          "mine": "40-50kg",
+          "mine": "40→50kg",
           "team": "",
           "total": "8 total"
         },
@@ -142,7 +142,7 @@
           "kind": "line",
           "rx": "4 × 1 Clean and Jerk",
           "load": "",
-          "mine": "50-65kg",
+          "mine": "50→65kg",
           "team": "",
           "total": "4 total"
         }

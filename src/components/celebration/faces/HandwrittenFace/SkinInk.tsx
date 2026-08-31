@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -167,14 +167,14 @@ export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
               return (
                 <React.Fragment key={i}>
                   <div
-                    style={{
+                    style={stationRowChrome({
                       display: 'grid',
-                      gridTemplateColumns: 'auto 1fr max-content',
+                      gridTemplateColumns: 'auto minmax(0, 1fr) max-content',
                       alignItems: 'baseline',
                       gap: 9,
                       padding: '5px 0',
                       borderBottom: '1px solid rgba(23,24,20,0.1)',
-                    }}
+                    }, parts.isStation, null)}
                   >
                     {parts.roundLabel ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: 'rgba(23,24,20,1)', borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>

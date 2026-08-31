@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -162,16 +162,16 @@ export function SkinPress({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               }
               return (
                 <React.Fragment key={i}>
-                  <div style={{
+                  <div style={stationRowChrome({
                     display: 'grid',
-                    gridTemplateColumns: '1fr max-content',
+                    gridTemplateColumns: 'minmax(0, 1fr) max-content',
                     alignItems: 'center',
                     gap: 16,
                     padding: '5px 0',
                     borderBottom: '1px solid rgba(33,29,21,0.16)',
-                  }}>
+                  }, parts.isStation, null)}>
                     {parts.roundLabel ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {parts.roundLabel}
                         </span>

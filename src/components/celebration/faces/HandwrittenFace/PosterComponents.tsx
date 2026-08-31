@@ -26,7 +26,11 @@ export function parseRxLoad(rx: string): { name: string; load: string } {
 }
 
 export interface MovementValueParts {
-  movName: string;
+  // A NODE, not a string: a swapped movement renders its own name at full weight followed by the
+  // board's, quieter, behind a swap glyph. Every skin already drops this into its own styled
+  // span, so the swap inherits that skin's type and only the emphasis changes — which is why
+  // this lives here once instead of in eleven skins.
+  movName: React.ReactNode;
   isStrength: boolean;
   strengthValue: string | null;
   team: string | null;
@@ -34,6 +38,10 @@ export interface MovementValueParts {
   single: string | null;
   total: string | null;
   roundLabel?: string;
+  // See PosterLine.station — this row is one whole station of a rotation, drawn on a single
+  // baseline with a rule above it. Skins hand it to stationRowChrome rather than styling it
+  // themselves, so every skin's stations space and separate the same way.
+  isStation?: boolean;
   // True for a split:'rounds' partner row — skins must render this row at FULL WIDTH (no value
   // column at all), not merely with an empty value. Distinct from team===null && single===null
   // on a normal row (which can legitimately happen for a missing "—" row).
@@ -214,14 +222,36 @@ function formatTotalNote(note: string | undefined): string | null {
     .replace(/\breps\b/i, 'REPS');
 }
 
+/**
+ * "Knees-to-Elbows ⇄ Toes to Bar" — what the athlete did, then what the board wrote.
+ *
+ * No wording at all, by design: "scaled", "modified", "sub for" and "(RX: …)" every one of them
+ * measures the athlete against the prescription, and this app does not rank anyone. The glyph
+ * states a swap happened; the two names say which way; the reader decides nothing else.
+ *
+ * The board's movement is dimmed with OPACITY rather than a colour, so it stays correct on chalk,
+ * paper and foil alike without any skin having to hand over its palette.
+ */
+function withSwap(name: string, swapFrom: string | undefined): React.ReactNode {
+  if (!swapFrom) return name;
+  return (
+    <>
+      {name}
+      <span style={{ opacity: 0.5 }}>{` ⇄ ${swapFrom}`}</span>
+    </>
+  );
+}
+
 export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementValueParts {
   const { name: movName, load: embeddedLoad } = parseRxLoad(r.rx);
+  // Every branch below returns the same name, so the swap is attached once, here.
+  const movLabel = withSwap(movName, r.swapFrom);
   const isStrength = wod.type === 'STRENGTH';
   const total = formatTotalNote(r.total);
 
   if (isStrength) {
     return {
-      movName,
+      movName: movLabel,
       isStrength: true,
       strengthValue: r.mine || r.load || embeddedLoad || null,
       team: null,
@@ -229,12 +259,13 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       single: null,
       total,
       roundLabel: r.roundLabel,
+      isStation: r.station,
     };
   }
   if (wod.split === 'rounds') {
     const loadMatch = movName.match(/^(.*?)\s*(@\s*.+)$/);
     return {
-      movName: loadMatch ? loadMatch[1] : movName,
+      movName: withSwap(loadMatch ? loadMatch[1] : movName, r.swapFrom),
       isStrength: false,
       strengthValue: null,
       team: null,
@@ -242,6 +273,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       single: r.mine || null,
       total: null,
       roundLabel: r.roundLabel,
+      isStation: r.station,
       isRoundsSplit: true,
       loadTag: loadMatch ? loadMatch[2] : null,
     };
@@ -249,7 +281,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
 
   if (r.team) {
     return {
-      movName,
+      movName: movLabel,
       isStrength: false,
       strengthValue: null,
       team: r.team,
@@ -257,6 +289,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       single: null,
       total,
       roundLabel: r.roundLabel,
+      isStation: r.station,
     };
   }
 
@@ -268,7 +301,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   const mineIsWeight = !!r.mine && /(kg|lb)\b/i.test(r.mine);
   if (mineIsWeight && total) {
     return {
-      movName,
+      movName: movLabel,
       isStrength: false,
       strengthValue: null,
       team: total,
@@ -277,6 +310,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       single: null,
       total,
       roundLabel: r.roundLabel,
+      isStation: r.station,
     };
   }
 
@@ -286,7 +320,7 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
   const inlineLoad = !!(r.load && total && !r.mine);
   const single = r.mine || (inlineLoad ? total : r.load || total);
   return {
-    movName,
+    movName: movLabel,
     isStrength: false,
     strengthValue: null,
     team: null,
@@ -297,7 +331,39 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     singleIsLoad: !r.mine && !inlineLoad && !!r.load && single === r.load,
     total,
     roundLabel: r.roundLabel,
+    isStation: r.station,
     loadTag: inlineLoad ? r.load : null,
+  };
+}
+
+// ─── Station rows ───────────────────────────────────────────────────────────
+
+/**
+ * The rule and the breathing room that turn five stations into a scannable list.
+ *
+ * A station is ONE row — badge · name · tally on one baseline — and with no rule between them
+ * five of those read as an undifferentiated stack. `hairline` is null for skins that already
+ * draw a rule under every movement row: those are a list already, and a second line per row
+ * just turns it into a grid.
+ *
+ * NOTE the companion rule that lives in the skins, because the grid template does: every name
+ * column is `minmax(0, 1fr)`, never a plain `1fr`. A `1fr` track refuses to shrink past its
+ * longest word, so an over-long value column pushed its own tail clean off the right edge of
+ * the card instead of taking the space back from the name.
+ */
+export function stationRowChrome(
+  base: React.CSSProperties,
+  isStation: boolean | undefined,
+  hairline: string | null,
+  // Skins that shrink their rows on a crowded card pass their own tightened value — five
+  // stations at the roomy default is enough extra height to run a compact skin off the page.
+  padding = '7px 0 6px',
+): React.CSSProperties {
+  if (!isStation) return base;
+  return {
+    ...base,
+    padding,
+    ...(hairline ? { borderTop: `1px solid ${hairline}` } : {}),
   };
 }
 

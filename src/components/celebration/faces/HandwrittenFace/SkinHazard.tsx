@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -155,14 +155,14 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
               const parts = getMovementValueParts(wod, r);
               return (
                 <React.Fragment key={i}>
-                  <div style={{
+                  <div style={stationRowChrome({
                     display: 'grid',
-                    gridTemplateColumns: '1fr max-content',
+                    gridTemplateColumns: 'minmax(0, 1fr) max-content',
                     alignItems: 'center',
                     gap: 14,
                     padding: '5px 0',
                     borderBottom: i === rows.length - 1 ? 'none' : '1px solid rgba(243,241,234,0.11)',
-                  }}>
+                  }, parts.isStation, null)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
                       {parts.roundLabel && (
                         <span style={{

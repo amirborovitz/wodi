@@ -13,7 +13,7 @@
             "totalNote": "8 total",
             "subNote": "8 total",
             "mineKey": "Push Press",
-            "mineOverride": "50-65kg",
+            "mineOverride": "50→65kg",
             "accent": "yellow",
             "repeatCount": 4
           },
@@ -23,7 +23,7 @@
             "totalNote": "8 total",
             "subNote": "8 total",
             "mineKey": "Push Jerk",
-            "mineOverride": "65-80kg",
+            "mineOverride": "65→80kg",
             "accent": "yellow",
             "repeatCount": 4
           }
@@ -255,7 +255,7 @@
           "kind": "line",
           "rx": "4 × 2 Push Press",
           "load": "",
-          "mine": "50-65kg",
+          "mine": "50→65kg",
           "team": "",
           "total": "8 total"
         },
@@ -263,7 +263,7 @@
           "kind": "line",
           "rx": "4 × 2 Push Jerk",
           "load": "",
-          "mine": "65-80kg",
+          "mine": "65→80kg",
           "team": "",
           "total": "8 total"
         }

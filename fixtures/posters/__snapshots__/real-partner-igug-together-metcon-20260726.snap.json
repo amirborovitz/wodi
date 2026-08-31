@@ -9,6 +9,7 @@
           "primary": "1200m",
           "name": "Echo Bike (together)",
           "mineKey": "Echo Bike",
+          "substitutedFrom": "Run",
           "accent": "magenta",
           "repeatCount": 1,
           "partnerSplit": "reps",
@@ -83,6 +84,7 @@
             "primary": "1200m",
             "name": "Echo Bike (together)",
             "mineKey": "Echo Bike",
+            "substitutedFrom": "Run",
             "accent": "magenta",
             "repeatCount": 1,
             "partnerSplit": "reps",
@@ -224,6 +226,7 @@
       {
         "kind": "line",
         "rx": "1200m Echo Bike (together)",
+        "swapFrom": "Run",
         "load": "",
         "mine": "",
         "team": ""
@@ -281,6 +284,7 @@
         {
           "kind": "line",
           "rx": "1200m Echo Bike (together)",
+          "swapFrom": "Run",
           "load": "",
           "mine": "",
           "team": ""

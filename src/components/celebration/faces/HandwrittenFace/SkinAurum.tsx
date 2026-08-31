@@ -14,7 +14,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -205,7 +205,7 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               }
               return (
                 <React.Fragment key={i}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, padding: '3.5px 0', borderBottom: `1px solid ${AU_RULE}` }}>
+                  <div style={stationRowChrome({ display: 'flex', alignItems: 'baseline', gap: 8, padding: '3.5px 0', borderBottom: `1px solid ${AU_RULE}` }, parts.isStation, null)}>
                     <span style={{ width: 5, height: 5, transform: 'translateY(-2px) rotate(45deg)', background: BRAND.yellow, flexShrink: 0 }} />
                     {parts.roundLabel && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '2px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>

@@ -107,6 +107,14 @@ export interface PosterLine {
   // barbell weight as if they were the two athletes' numbers.
   isPartnerShare?: boolean;
   roundLabel?: string; // "R1", "R2", "BUY-IN" — rendered as a chip, not baked into rx
+  // This row IS a whole station of a rotation ("ST. 3") — one line that stands for a piece of
+  // equipment the athlete visited N times, not one movement inside a round. Skins draw it as a
+  // single baseline (badge · name · tally) with a rule above it, so five stations scan as a list.
+  // A round chip ("R1", "BUY-IN") is NOT this: those rows are movements within one round.
+  station?: boolean;
+  // The board's movement, when `rx` names the athlete's substitute for it. Kept OUT of `rx` so
+  // it can be drawn quieter than the movement that was actually done — see getMovementValueParts.
+  swapFrom?: string;
   // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
   // render the normal rx/load/mine row AND additionally render this chart right below it.
   ladderTrack?: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
@@ -725,6 +733,10 @@ export function sectionsToRows(
   headerContext: PosterHeaderContext = {},
 ): PosterRow[] {
   const rows: PosterRow[] = [];
+  // A swap is stated ONCE per poster. A round-by-round board lists the same movement on every
+  // tier ("600m Echo Bike" five times over), and a note repeated behind each of them stops being
+  // information and becomes wallpaper — the reader learned it on line one.
+  const swapsStated = new Set<string>();
 
   for (const section of sections) {
     const isDuplicateTitle =
@@ -792,7 +804,12 @@ export function sectionsToRows(
       // is one line of whiteboard ("ST. 1 — Max Echo Bike — 40 cal"), and giving each one a
       // full-width header block above its single line turned a five-station board into eleven
       // rows of mostly label.
-      rows.push(artifactRowToPosterLine(row, mineMap));
+      const swapKey = row.substitutedFrom
+        ? `${row.name}|${row.substitutedFrom}`.toLowerCase()
+        : undefined;
+      const repeatSwap = swapKey != null && swapsStated.has(swapKey);
+      if (swapKey != null) swapsStated.add(swapKey);
+      rows.push(artifactRowToPosterLine(repeatSwap ? { ...row, substitutedFrom: undefined } : row, mineMap));
     }
   }
 
@@ -947,6 +964,7 @@ function extractLoadSuffix(nameWithLoad: string | undefined): string {
 }
 
 function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>): PosterLine {
+
   // Round-trade partner row (IGUG): whoever's up does the WHOLE round, so there's no personal
   // "share" of this movement to compute — primary/relay/team-share logic below doesn't apply.
   // Full prescription, full-width, weight inline via nameWithLoad (e.g. "Clean & Jerk @ 45kg").
@@ -959,6 +977,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     return {
       kind: 'line',
       rx: rxLabel.trim(),
+      swapFrom: row.substitutedFrom,
       load: '',
       mine: '',
       team: '',
@@ -1069,12 +1088,14 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
   return {
     kind: 'line',
     rx: rxLabel.trim(),
+    swapFrom: row.substitutedFrom,
     load,
     mine,
     team,
     ...(row.teamShare ? { isPartnerShare: true } : {}),
     total,
     roundLabel: stationChip ?? row.roundLabel,
+    ...(stationChip ? { station: true } : {}),
     ladderTrack: row.ladderTrack,
   };
 }

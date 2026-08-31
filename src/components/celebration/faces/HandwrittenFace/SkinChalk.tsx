@@ -9,7 +9,7 @@ import { BRAND, fD, fB, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue, heroScoreScale } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue, heroScoreScale, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -117,9 +117,9 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
               const parts = getMovementValueParts(wod, r);
               return (
                 <React.Fragment key={i}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: compact ? 10 : 16, padding: compact ? '0.5px 0' : '1.5px 0' }}>
+                  <div style={stationRowChrome({ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) max-content', alignItems: 'center', gap: compact ? 10 : 16, padding: compact ? '0.5px 0' : '1.5px 0' }, parts.isStation, 'rgba(33,29,21,0.14)', compact ? '3.5px 0 3px' : '7px 0 6px')}>
                     {parts.roundLabel ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.paperInk, borderRadius: 3, padding: compact ? '1px 5px' : '2px 6px', fontFamily: fD, fontSize: compact ? 9 : 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {parts.roundLabel}
                         </span>

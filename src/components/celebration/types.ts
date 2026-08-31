@@ -85,6 +85,20 @@ export interface ArtifactRow {
   // value with an EXACT map lookup on this key — never fuzzy word matching. Rows without it
   // (whiteboard-verbatim lines) fall back to word matching by design.
   mineKey?: string;
+  /**
+   * The board's own movement, when this row is the athlete's substitute for it — the name ALONE,
+   * with no wording and no scale direction attached.
+   *
+   * The swap has always been SAVED (MovementTotal.wasSubstituted / originalMovement); the old
+   * recap printed it as "Substituted from Bar Muscle-up" and that display died with the legacy
+   * layout, so for a long time every swapped workout read as though the coach had written the
+   * substitute. It comes back as a swap GLYPH rather than a sentence: "scaled" / "modified" /
+   * "instead of" all measure the athlete against the prescription, and this app does not rank
+   * anyone. Two movements and an arrow between them state the fact and stop talking.
+   *
+   * Carried as data, never pre-formatted into `name` — that string is also a lookup handle.
+   */
+  substitutedFrom?: string;
   // This row's athlete value, resolved at row-build time and used INSTEAD of the mineKey lookup.
   // Only for rows the name-keyed mine map cannot answer: sequential strength blocks that repeat
   // one lift ("4×2 Clean & Jerk, then 4×1") share a single merged breakdown entry, so the map

@@ -7,7 +7,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -135,14 +135,14 @@ export function SkinBlueprint({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, o
               const parts = getMovementValueParts(wod, r);
               return (
                 <React.Fragment key={i}>
-                  <div style={{
+                  <div style={stationRowChrome({
                     display: 'grid',
-                    gridTemplateColumns: 'max-content 1fr max-content',
+                    gridTemplateColumns: 'max-content minmax(0, 1fr) max-content',
                     alignItems: 'center',
                     gap: 8,
                     padding: '5px 0',
                     borderBottom: `1px solid rgba(140,180,255,0.13)`,
-                  }}>
+                  }, parts.isStation, null)}>
                     {parts.roundLabel ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '1px 5px', fontFamily: fD, fontSize: 9, fontWeight: 900, letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
                         {parts.roundLabel}

@@ -11,6 +11,7 @@
           "subNote": "4.00 km total",
           "totalNote": "4.00 km total",
           "mineKey": "Echo Bike",
+          "substitutedFrom": "Run",
           "accent": "magenta",
           "repeatCount": 5
         },
@@ -43,6 +44,7 @@
             "subNote": "4.00 km total",
             "totalNote": "4.00 km total",
             "mineKey": "Echo Bike",
+            "substitutedFrom": "Run",
             "accent": "magenta",
             "repeatCount": 5
           },
@@ -105,6 +107,7 @@
       {
         "kind": "line",
         "rx": "800m Echo Bike",
+        "swapFrom": "Run",
         "load": "",
         "mine": "",
         "team": "",
@@ -129,6 +132,7 @@
         {
           "kind": "line",
           "rx": "800m Echo Bike",
+          "swapFrom": "Run",
           "load": "",
           "mine": "",
           "team": "",

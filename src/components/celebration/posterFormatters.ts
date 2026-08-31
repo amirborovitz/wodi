@@ -77,16 +77,20 @@ export function formatStampLoad(weight: number, unit?: string): string {
 
 /**
  * THE way a logged load reads on a poster. One weight prints as itself ("50kg"); a build prints
- * every rung the athlete actually stood on, in the order they climbed ("50-52.5-55-57.5-60kg").
+ * every rung the athlete actually stood on, in the order they climbed ("50→52.5→55→57.5→60kg").
  * Same function for a lone lift and for one block of a sequential piece, so a build never renders
  * as a single number just because of where the row came from.
  *
  * Every rung, not just the endpoints: the climb IS the story of a build-up day, and a poster that
- * says "50-65kg" hides whether that took three jumps or seven.
+ * says "50→65kg" hides whether that took three jumps or seven.
  *
  * Weights arrive PER IMPLEMENT. The "2×" prefix marks a pair the athlete held one in each hand,
  * and only fits a single figure — a pair that also climbed reads as its rungs alone, since
- * "2×45-55kg" parses as arithmetic rather than as a range.
+ * "2×45→55kg" reads as arithmetic on the pair rather than as a climb.
+ *
+ * The rungs are joined by an arrow, never a hyphen: a hyphen between two numbers is how the
+ * boards (and this app) write a RANGE, and a climb is a sequence — "80-90kg" reads as
+ * "somewhere between 80 and 90", "80→90kg" reads as "started at 80, finished at 90".
  */
 export function formatLoggedLoad(
   weights: readonly number[] | undefined,
@@ -95,7 +99,7 @@ export function formatLoggedLoad(
 ): string {
   const distinct = [...new Set((weights ?? []).filter((w) => w > 0))];
   if (distinct.length === 0) return '';
-  if (distinct.length > 1) return `${distinct.join('-')}${unit}`;
+  if (distinct.length > 1) return `${distinct.join('→')}${unit}`;
   return implementCount > 1 ? `${implementCount}×${distinct[0]}${unit}` : `${distinct[0]}${unit}`;
 }
 

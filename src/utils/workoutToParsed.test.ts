@@ -81,8 +81,16 @@ describe('workoutToParsedWorkout', () => {
     it('carries every structural field across untouched', () => {
       workout.exercises.forEach((saved, i) => {
         const out = parsed.exercises[i];
+        // The ONE field the adapter deliberately rewrites: a swapped movement comes back on the
+        // COACH's name and quantities so the wizard edits the board, not the athlete's scale
+        // (see "hands a swapped movement back on the board" below, which pins that directly).
+        // So a part carrying a substitution is exempt from the untouched check on its movement
+        // lists only — every other structural field must still survive it intact.
+        const hasSubstitution = !!saved.movements?.some((m) => m.substitution)
+          || !!saved.sections?.some((section) => section.movements?.some((m) => m.substitution));
         for (const key of PASSTHROUGH_KEYS) {
           if (saved[key] === undefined) continue;
+          if (hasSubstitution && (key === 'movements' || key === 'sections')) continue;
           // Empty arrays are dropped deliberately — an `exercise.sections: []` is the absence of
           // sections, and re-emitting it makes downstream `sections?.length` checks noisier.
           if (Array.isArray(saved[key]) && (saved[key] as unknown[]).length === 0) continue;

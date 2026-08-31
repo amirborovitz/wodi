@@ -10,6 +10,7 @@
           "name": "Echo Bikes",
           "totalNote": "5400m total",
           "mineKey": "Echo Bike",
+          "substitutedFrom": "Run",
           "accent": "magenta"
         },
         {
@@ -49,6 +50,7 @@
             "name": "Echo Bikes",
             "totalNote": "5400m total",
             "mineKey": "Echo Bike",
+            "substitutedFrom": "Run",
             "accent": "magenta"
           },
           {
@@ -220,6 +222,7 @@
       {
         "kind": "line",
         "rx": "2400-1800-1200m Echo Bikes",
+        "swapFrom": "Run",
         "load": "",
         "mine": "",
         "team": "",
@@ -260,6 +263,7 @@
         {
           "kind": "line",
           "rx": "2400-1800-1200m Echo Bikes",
+          "swapFrom": "Run",
           "load": "",
           "mine": "",
           "team": "",

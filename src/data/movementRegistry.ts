@@ -92,6 +92,21 @@ const CATEGORY_PRIORITY: Record<MovementCategory, number> = {
   cardio: 5,
 };
 
+/** The implements you load and pick up, as opposed to moving your own body. */
+const LOADED_IMPLEMENTS: readonly MovementImplement[] = ['barbell', 'dumbbell', 'kettlebell'];
+
+/**
+ * True when the work was done under an external load.
+ *
+ * The axis the category ladder can't see: the registry files Step-up, Wall Ball and
+ * a bodyweight Squat as `strength` alongside Clean and Deadlift — correctly, they
+ * ARE strength patterns — so within that rung this is what separates 96 barbell
+ * cleans from 150 step-ups.
+ */
+export function isLoadedImplement(implement: MovementImplement): boolean {
+  return LOADED_IMPLEMENTS.includes(implement);
+}
+
 /** Rank for sorting. Unplaced movements sort behind everything the registry knows. */
 export function getCategoryRank(category: MovementCategory | null): number {
   return category === null ? 99 : CATEGORY_PRIORITY[category];

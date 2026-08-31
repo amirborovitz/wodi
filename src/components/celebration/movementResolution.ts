@@ -28,6 +28,19 @@ export function prescribedMovementNames(target: Exercise[]): Set<string> {
   return names;
 }
 
+/**
+ * The movement the board wrote, when this entry is a substitute for it — read from the SAME
+ * joined entry every renderer already uses, so a poster can never disagree with the workload
+ * breakdown about what was performed.
+ *
+ * An entry flagged as substituted but carrying no original name has nothing worth showing, so
+ * it reads as no swap at all rather than as an arrow pointing at a blank.
+ */
+export function substitutedFromName(total: MovementTotal | undefined): string | undefined {
+  if (!total?.wasSubstituted) return undefined;
+  return total.originalMovement?.trim() || undefined;
+}
+
 /** Breakdown entries whose name (or pre-substitution original) is one of `names`. */
 export function movementsMatchingNames(all: MovementTotal[], names: Set<string>): MovementTotal[] {
   return all.filter((m) =>
@@ -91,7 +104,7 @@ export function findMovementTotal(
 /**
  * What the athlete loaded on ONE movement occurrence, as the list of weights they moved through.
  *
- * The poster has always shown builds ("45-55kg") by reading `MovementTotal.weightProgression` —
+ * The poster has always shown builds ("45→55kg") by reading `MovementTotal.weightProgression` —
  * but the breakdown is a TOTALS table keyed by movement NAME, so a piece that repeats a lift
  * ("4 sets: 2 C&J, Into: 4 sets: 1 C&J") holds one merged entry for both blocks and no
  * per-occurrence answer can be recovered from it. This resolves the occurrence instead, and is

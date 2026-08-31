@@ -13,6 +13,7 @@
 import React from 'react';
 import { fD, fB, fM } from '../../celebration/faces/HandwrittenFace/brand';
 import { Wordmark } from '../../celebration/faces/HandwrittenFace/PosterComponents';
+import type { RecapLift } from '../../../hooks/useRecapData';
 import type { WeekPosterMove, WeekPosterTile } from '../../../hooks/useWeekPosterData';
 
 /** The canvas every skin is drawn on — a 9:16 story frame at export resolution. */
@@ -42,39 +43,270 @@ export function WeekCanvas({ children, style }: WeekCanvasProps): React.JSX.Elem
   );
 }
 
+interface WeekBodyProps {
+  /** Exactly two: the masthead group, then the brag-and-tiles group. */
+  children: React.ReactNode;
+  style: React.CSSProperties;
+}
+
+/**
+ * The page between the masthead and the footer, split top group / bottom group.
+ *
+ * A poster that stacks everything from the top and pads the remainder trails a
+ * band of dead air above the footer, which is exactly where a story crop looks
+ * emptiest. Pushing the brag and the machine tiles to the bottom edge fills the
+ * frame at every content length instead of only at the longest one.
+ */
+export function WeekBody({ children, style }: WeekBodyProps): React.JSX.Element {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface WeekMastheadProps {
+  tag: string;
+  weekNo: string;
+  dates: string;
+  ink: string;
+  dim: string;
+  tagColor: string;
+  tagFill?: string;
+  /** A highlighter band behind the week number. Chalk only. */
+  tape?: string;
+}
+
+/**
+ * What this poster is, said before anything else.
+ *
+ * Without it a week reads as somebody's workout — the numbers are the same shape.
+ * The tag is the week's FOR TIME, and the week number is set big enough to survive
+ * a story thumbnail, where a mono date line disappears entirely. The dates stay
+ * quiet beside it: they're the caption, not the headline.
+ *
+ * No FELT stamp here, unlike the WOD poster. How a session felt is a read on THAT
+ * session; a single vibe stamped over seven days claims one mood for a week that
+ * had several.
+ */
+export function WeekMasthead({
+  tag, weekNo, dates, ink, dim, tagColor, tagFill = 'transparent', tape,
+}: WeekMastheadProps): React.JSX.Element {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            border: `3px solid ${tagColor}`,
+            background: tagFill,
+            color: tagColor,
+            borderRadius: 999,
+            padding: '14px 30px 11px',
+            fontFamily: fB,
+            fontWeight: 900,
+            fontSize: 32,
+            letterSpacing: '0.22em',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {tag}
+        </span>
+      </div>
+      <div style={{ marginTop: 26, display: 'flex', alignItems: 'baseline', gap: 26, flexWrap: 'wrap' }}>
+        {/* The tape highlights the week number only — the dates stay on the paper. */}
+        <span
+          style={{
+            position: 'relative',
+            display: 'inline-block',
+            fontFamily: fD,
+            fontWeight: 900,
+            fontSize: 108,
+            lineHeight: 0.9,
+            letterSpacing: '-0.01em',
+            color: ink,
+          }}
+        >
+          {tape && (
+            <span style={{ position: 'absolute', left: -10, right: -10, bottom: 8, height: '0.46em', background: tape, transform: 'rotate(-0.6deg)' }} />
+          )}
+          <span style={{ position: 'relative' }}>{weekNo}</span>
+        </span>
+        <span style={{ fontFamily: fM, fontSize: 30, letterSpacing: '0.14em', color: dim }}>{dates}</span>
+      </div>
+    </div>
+  );
+}
+
+interface WeekLiftBlockProps {
+  lifts: RecapLift[];
+  ink: string;
+  dim: string;
+  accent: string;
+  rule: string;
+  /** Background and text of the PR badge. */
+  prFill: string;
+  prColor: string;
+  /** Print a misregistered plate behind a PR's number. Chalk and Press. */
+  plate?: string;
+}
+
+/**
+ * The week's two heaviest barbell moments, ruled off top and bottom.
+ *
+ * The one place the poster says the week was HARD rather than long. A board ranked
+ * on reps structurally cannot: reps reward the movements you did most of, and the
+ * heaviest thing you touched all week is usually a handful of singles.
+ *
+ * Overhead and off-the-floor are separate rows because they are separate questions
+ * — a 75kg snatch and a 145kg deadlift are each the best of their kind, and one
+ * "heaviest" would bury whichever lost. The PR badge is detected, never chosen.
+ */
+export function WeekLiftBlock({ lifts, ink, dim, accent, rule, prFill, prColor, plate }: WeekLiftBlockProps): React.JSX.Element {
+  return (
+    <div style={{ borderTop: `1px solid ${rule}`, borderBottom: `1px solid ${rule}`, padding: '26px 0 24px', display: 'grid', gap: 30 }}>
+      {lifts.map((l) => (
+        <div key={l.label}>
+          <div style={{ fontFamily: fB, fontWeight: 800, fontSize: 21, letterSpacing: '0.24em', color: dim }}>{l.label}</div>
+          {/* Lift name and weight share ONE baseline row — the number belongs to the name. */}
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 22 }}>
+            <span style={{ fontFamily: fD, fontWeight: 900, fontSize: 54, lineHeight: 1, textTransform: 'uppercase', color: ink }}>{l.lift}</span>
+            {l.pr && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', background: prFill, color: prColor, borderRadius: 6, padding: '7px 13px 5px', fontFamily: fB, fontWeight: 900, fontSize: 22, letterSpacing: '0.2em' }}>
+                PR
+              </span>
+            )}
+            <span style={{ flex: 1 }} />
+            <span style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', alignItems: 'baseline', gap: 10 }}>
+              {plate && l.pr && (
+                <span style={{ position: 'absolute', left: -10, right: -10, top: -8, bottom: 6, background: plate, mixBlendMode: 'multiply', transform: 'rotate(-0.7deg)' }} />
+              )}
+              <span style={{ position: 'relative', fontFamily: fD, fontWeight: 900, fontSize: 96, lineHeight: 1, color: l.pr ? accent : ink }}>{l.kg}</span>
+              <span style={{ position: 'relative', fontFamily: fB, fontWeight: 800, fontSize: 26, letterSpacing: '0.14em', color: dim }}>KG</span>
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface WeekHeroPairProps {
+  hero: string;
+  heroUnit: string;
+  sessions: { count: number; unit: string } | null;
+  /** Colour of both numbers. */
+  num: string;
+  /** Colour of both labels. */
+  label: string;
+  /** The hairline that splits them. */
+  rule: string;
+  clock?: number;
+  count?: number;
+  labelSize?: number;
+  /** Extra paint on both numbers — Stadium's LED glow, Press's tighter tracking. */
+  numberStyle?: React.CSSProperties;
+  /** A second plate printed off-register under the numbers. Press only. */
+  overprint?: string;
+}
+
+/**
+ * The two numbers that carry the poster: time moving, and times you showed up.
+ *
+ * Both are set in the same weight class with one hairline between them. The
+ * session count used to be a phrase whispered under the clock ("FIVE SESSIONS"),
+ * which is the sort of thing you read only if you were already reading — as a
+ * digit it lands in the same glance as the clock.
+ *
+ * When the count IS the hero (a week with no logged durations and no movements)
+ * the right column and its hairline drop, rather than printing the same fact twice.
+ */
+export function WeekHeroPair({
+  hero, heroUnit, sessions, num, label, rule, clock = 250, count = 190, labelSize = 28, numberStyle, overprint,
+}: WeekHeroPairProps): React.JSX.Element {
+  const labelStyle: React.CSSProperties = {
+    fontFamily: fB, fontWeight: 900, fontSize: labelSize, letterSpacing: '0.3em', color: label,
+  };
+  const numStyle: React.CSSProperties = {
+    fontFamily: fD, fontWeight: 900, lineHeight: 0.8, letterSpacing: '-0.01em', color: num, ...numberStyle,
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 44 }}>
+      <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div style={labelStyle}>{heroUnit}</div>
+        <div style={{ marginTop: 10, position: 'relative' }}>
+          {overprint && (
+            <div style={{ ...numStyle, position: 'absolute', left: 11, top: 13, color: overprint, mixBlendMode: 'multiply', fontSize: clock }}>
+              {hero}
+            </div>
+          )}
+          <div style={{ ...numStyle, position: 'relative', fontSize: clock }}>{hero}</div>
+        </div>
+      </div>
+      {sessions && (
+        <>
+          <div style={{ width: 2, background: rule, flexShrink: 0 }} />
+          <div style={{ flexShrink: 0, textAlign: 'right' }}>
+            <div style={labelStyle}>{sessions.unit}</div>
+            {/* One glyph, so the plate goes BEHIND it: an offset duplicate of a
+                single digit reads as a two-digit count. */}
+            <div style={{ marginTop: 10, position: 'relative', display: 'inline-block' }}>
+              {overprint && (
+                <span style={{ position: 'absolute', left: -14, right: -10, top: 34, bottom: 22, background: overprint, mixBlendMode: 'multiply', transform: 'rotate(-0.7deg)' }} />
+              )}
+              <div style={{ ...numStyle, position: 'relative', fontSize: count }}>{sessions.count}</div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 interface WeekMoveListProps {
   moves: WeekPosterMove[];
-  maxReps: number;
   ink: string;
   dim: string;
   accent: string;
   rule: string;
   /** The ink, softened, for the rows that are not the leader. */
   inkSoft: string;
-  /** The accent, softened, for the bars that are not the leader. */
-  accentSoft: string;
 }
 
 /**
  * The week's movements, ranked.
  *
- * Typographic rather than a bar chart: the name is set at poster size and the
- * comparison lives in one hairline track underneath, so no row can clip mid-word
- * the way a name inside a bar does.
+ * A setlist, not a bar chart. Each row used to carry a track underneath sized as a
+ * share of the leader's reps, which asserted that a step-up rep and a clean rep are
+ * the same unit — the tiles below already refuse that comparison, and the board was
+ * making it in the loudest way available. Without the track the rows read as four
+ * separate facts, which is what they are, and the poster reads as a flyer rather
+ * than a report.
  *
- * The softened colours arrive as props rather than being derived with color-mix():
+ * The softened ink arrives as a prop rather than being derived with color-mix():
  * html2canvas 1.4.1 has its own colour parser and does not understand it, so a
  * derived shade would render on screen and vanish from the shared PNG.
  */
-export function WeekMoveList({ moves, maxReps, ink, dim, accent, rule, inkSoft, accentSoft }: WeekMoveListProps): React.JSX.Element {
+export function WeekMoveList({ moves, ink, dim, accent, rule, inkSoft }: WeekMoveListProps): React.JSX.Element {
   return (
     <div>
       {moves.map((m, i) => (
         <div
           key={m.name}
           style={{
-            paddingBottom: 20,
-            marginBottom: 20,
+            paddingBottom: 22,
+            marginBottom: 22,
             borderBottom: i < moves.length - 1 ? `1px solid ${rule}` : 'none',
           }}
         >
@@ -87,7 +319,7 @@ export function WeekMoveList({ moves, maxReps, ink, dim, accent, rule, inkSoft, 
                 flex: 1,
                 fontFamily: fD,
                 fontWeight: 900,
-                fontSize: i === 0 ? 74 : 55,
+                fontSize: i === 0 ? 82 : 62,
                 lineHeight: 0.98,
                 textTransform: 'uppercase',
                 color: i === 0 ? ink : inkSoft,
@@ -99,7 +331,7 @@ export function WeekMoveList({ moves, maxReps, ink, dim, accent, rule, inkSoft, 
               style={{
                 fontFamily: fD,
                 fontWeight: 900,
-                fontSize: i === 0 ? 82 : 60,
+                fontSize: i === 0 ? 90 : 68,
                 lineHeight: 0.9,
                 color: accent,
                 flexShrink: 0,
@@ -107,15 +339,6 @@ export function WeekMoveList({ moves, maxReps, ink, dim, accent, rule, inkSoft, 
             >
               {m.reps.toLocaleString()}
             </div>
-          </div>
-          <div style={{ height: 3, marginTop: 14, marginLeft: 56, background: rule }}>
-            <div
-              style={{
-                height: '100%',
-                width: `${Math.min(100, (m.reps / maxReps) * 100)}%`,
-                background: i === 0 ? accent : accentSoft,
-              }}
-            />
           </div>
         </div>
       ))}
@@ -182,7 +405,7 @@ export function WeekFooter({ ep, border, epColor, epBorder, wordColor, dot = '#f
       style={{
         position: 'relative',
         borderTop: border,
-        padding: '32px 76px 42px',
+        padding: '28px 76px 38px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',

@@ -11,7 +11,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue } from './PosterComponents';
+import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -104,9 +104,9 @@ export function SkinSlab({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
               const parts = getMovementValueParts(wod, r);
               return (
                 <React.Fragment key={i}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr max-content', alignItems: 'center', gap: 16, padding: '3px 0' }}>
+                  <div style={stationRowChrome({ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) max-content', alignItems: 'center', gap: 16, padding: '3px 0' }, parts.isStation, 'rgba(255,255,255,0.09)')}>
                     {parts.roundLabel ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', background: BRAND.yellow, color: BRAND.ink, borderRadius: 3, padding: '2px 6px', fontFamily: fD, fontSize: 10, fontWeight: 900, letterSpacing: '0.04em', flexShrink: 0, whiteSpace: 'nowrap' }}>
                           {parts.roundLabel}
                         </span>

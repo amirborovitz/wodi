@@ -8,7 +8,7 @@
         "blueprint": "8 sets",
         "rows": [
           {
-            "primary": "40->50KG",
+            "primary": "40→50KG",
             "name": "1 Squat Clean + 1 Front Squat + 1 Push Jerk",
             "subNote": "8 total",
             "mineKey": "Squat Clean",
@@ -153,9 +153,9 @@
         },
         {
           "kind": "line",
-          "rx": "40->50KG 1 Squat Clean + 1 Front Squat + 1 Push Jerk",
+          "rx": "40→50KG 1 Squat Clean + 1 Front Squat + 1 Push Jerk",
           "load": "",
-          "mine": "40-50kg",
+          "mine": "40→50kg",
           "team": "",
           "total": "8 total"
         }

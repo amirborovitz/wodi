@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getMaxMetric, formatMaxMetricValue, formatMaxMetricQuantity } from './maxMetric';
+import { getMaxMetric, formatMaxMetricValue } from './maxMetric';
 
 describe('getMaxMetric', () => {
   it('reads the slot the parser recorded', () => {
@@ -29,15 +29,9 @@ describe('formatting an earned max value', () => {
   it('names the unit on the total', () => {
     expect(formatMaxMetricValue(40, 'calories')).toBe('40 cal');
     expect(formatMaxMetricValue(24, 'reps')).toBe('24 reps');
+    expect(formatMaxMetricValue(1, 'reps')).toBe('1 rep');
     expect(formatMaxMetricValue(800, 'distance')).toBe('800m');
     expect(formatMaxMetricValue(2000, 'distance')).toBe('2km');
     expect(formatMaxMetricValue(1500, 'distance')).toBe('1.5km');
-  });
-
-  it('drops the bare rep word on the per-round half', () => {
-    // Reads "8 / round · 40 reps total" — the unit is stated once, at the end.
-    expect(formatMaxMetricQuantity(8, 'reps')).toBe('8');
-    expect(formatMaxMetricQuantity(8, 'calories')).toBe('8 cal');
-    expect(formatMaxMetricQuantity(400, 'distance')).toBe('400m');
   });
 });

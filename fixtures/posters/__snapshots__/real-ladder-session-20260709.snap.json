@@ -8,7 +8,7 @@
         "blueprint": "4 sets",
         "rows": [
           {
-            "primary": "35->45KG",
+            "primary": "35→45KG",
             "name": "Lunge",
             "subNote": "40 total",
             "totalNote": "40 total",
@@ -122,9 +122,9 @@
         },
         {
           "kind": "line",
-          "rx": "35->45KG Lunge",
+          "rx": "35→45KG Lunge",
           "load": "",
-          "mine": "35-45kg",
+          "mine": "35→45kg",
           "team": "",
           "total": "40 total"
         }

@@ -5,6 +5,7 @@ import {
   contributionsOf,
   getCategoryRank,
   getFamilyCategory,
+  isLoadedImplement,
   isCardioFamily,
   resolveMovement,
   MOVEMENT_FAMILIES,
@@ -15,6 +16,7 @@ import {
 } from '../data/movementRegistry';
 import { flagMovement } from '../services/movementRegistryService';
 import { getEffectiveWorkoutDate } from '../utils/workoutDate';
+import { toKg } from '../utils/loadUnits';
 import { computeWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 
 /** A variant sub-line under a family row — "Russian 335", "American 216". */
@@ -63,6 +65,22 @@ export interface RecapHighlight {
   subject: string;
   /** "603 reps" — always carries its unit. */
   detail: string;
+}
+
+/**
+ * One of the week's two heaviest barbell moments.
+ *
+ * The PR flag is detected, never chosen: it is set only when the period recorded a
+ * personal record for this lift AT this weight, so the badge can't appear over a
+ * number that wasn't the record.
+ */
+export interface RecapLift {
+  /** "HEAVIEST OVERHEAD" · "HEAVIEST OFF THE FLOOR" */
+  label: string;
+  /** "Snatch" — the lift itself, canonically named. */
+  lift: string;
+  kg: number;
+  pr: boolean;
 }
 
 /** A movement the registry couldn't place exactly, queued for triage. */
@@ -204,6 +222,19 @@ export interface RecapData {
    */
   moveMinutes: number;
   heaviest: { move: string; value: string } | null;
+  /**
+   * The week's heaviest barbell moments, asked the way a CrossFitter asks them:
+   * what went overhead, and what came off the floor.
+   *
+   * Two axes rather than one "heaviest", because they are different questions with
+   * different answers — a 75kg snatch and a 145kg deadlift are both the best of
+   * their kind, and picking one winner would bury the other. Either can be absent;
+   * a week that never went overhead prints one row, not a blank one.
+   *
+   * This is what says the week was HARD rather than long, which a board ranked on
+   * reps can never say.
+   */
+  lifts: RecapLift[];
   /**
    * "45kg" — the mark the PR beat, for the struck-through WAS line.
    *
@@ -400,6 +431,48 @@ function buildRecap(
 
   const prPrevious = previousBest !== null ? `${previousBest}kg` : null;
 
+  // The two heaviest barbell moments, read off the stored breakdown where every
+  // weight is one the athlete entered. `weightProgression` carries the per-set loads
+  // when they climbed, and the top of a climb is the whole point of climbing.
+  //
+  // Records first, so a lift can be checked against the weight it was set at: a PR
+  // badge over a number that wasn't the record would be the poster lying about the
+  // proudest thing on it.
+  const prByFamily = new Map<MovementFamilyId, number>();
+  for (const w of ws) {
+    for (const a of w.achievements ?? []) {
+      if (a.type !== 'pr' || !a.movement || typeof a.value !== 'number') continue;
+      const familyId = resolveMovement(a.movement).familyId;
+      if (!familyId) continue;
+      const kg = Math.round(a.value);
+      if (kg > (prByFamily.get(familyId) ?? 0)) prByFamily.set(familyId, kg);
+    }
+  }
+
+  const bestLift = new Map<LiftAxis, { lift: string; kg: number; familyId: MovementFamilyId }>();
+  for (const w of ws) {
+    for (const m of w.workloadBreakdown?.movements ?? []) {
+      if (!m.name) continue;
+      const resolved = resolveMovement(m.name);
+      const axis = resolved.familyId === null ? undefined : LIFT_AXIS[resolved.familyId];
+      if (!axis || resolved.familyId === null) continue;
+      const peak = Math.max(m.weight ?? 0, ...(m.weightProgression ?? []));
+      if (peak <= 0) continue;
+      const kg = Math.round(toKg(peak, m.unit === 'lb' ? 'lb' : 'kg'));
+      const best = bestLift.get(axis);
+      // The canonical name, not the ledger's family label: this row names the lift
+      // itself ("Push Press"), where the board's label would flatten it to
+      // "Shoulder to Overhead" and prefix an implement 75 KG has already implied.
+      if (!best || kg > best.kg) bestLift.set(axis, { lift: resolved.canonicalName, kg, familyId: resolved.familyId });
+    }
+  }
+
+  const lifts: RecapLift[] = LIFT_ROWS.flatMap(({ axis, label }) => {
+    const best = bestLift.get(axis);
+    if (!best) return [];
+    return [{ label, lift: best.lift, kg: best.kg, pr: prByFamily.get(best.familyId) === best.kg }];
+  });
+
   const workoutWord = ws.length === 1 ? 'workout' : 'workouts';
   // "Your week 33 in the box" reads like a filing reference; a week says "week".
   const periodPhrase = scope === 'week' ? 'week' : period.toLowerCase();
@@ -433,6 +506,7 @@ function buildRecap(
     epTotal: Math.round(epTotal),
     moveMinutes,
     heaviest,
+    lifts,
     prPrevious,
     moves,
     topMove,
@@ -586,19 +660,62 @@ const STAPLE_FAMILIES: readonly MovementFamilyId[] = [
   'shoulder_to_overhead', 'squat', 'clean', 'deadlift',
 ];
 
+type LiftAxis = 'overhead' | 'floor';
+
+/**
+ * Which of the two barbell questions each family answers.
+ *
+ * CrossFit vocabulary, not a taxonomy: "what did you get overhead" and "what did
+ * you pull off the floor" are the two things anyone asks about a heavy week. A
+ * clean & jerk is overhead even though it starts on the ground, because the finish
+ * is what the lift is named for. A back squat comes off a rack and answers neither,
+ * which is why it isn't here — this map is deliberately partial.
+ */
+const LIFT_AXIS: Partial<Record<MovementFamilyId, LiftAxis>> = {
+  snatch: 'overhead',
+  clean_and_jerk: 'overhead',
+  shoulder_to_overhead: 'overhead',
+  thruster: 'overhead',
+  deadlift: 'floor',
+  clean: 'floor',
+  sumo_deadlift_high_pull: 'floor',
+};
+
+/** Fixed order: overhead reads first, the way a board is written. */
+const LIFT_ROWS: readonly { axis: LiftAxis; label: string }[] = [
+  { axis: 'overhead', label: 'HEAVIEST OVERHEAD' },
+  { axis: 'floor', label: 'HEAVIEST OFF THE FLOOR' },
+];
+
 function isFeatured(m: RecapMoveStat): boolean {
   return m.category !== null && FEATURED_CATEGORIES.includes(m.category);
 }
 
+/** Loaded work sorts ahead of unloaded work inside a category. */
+function loadRank(implement: MovementImplement): number {
+  return isLoadedImplement(implement) ? 0 : 1;
+}
+
 /**
- * Category first, reps second — the ordering the whole recap turns on.
+ * Category first, then load, then reps — the ordering the whole recap turns on.
  *
  * Sorting by reps alone is what put 605 sit-ups above 603 barbell cleans and gave
- * Core the screen time the barbell earned. Rep count only decides a tie between
- * two families doing the same KIND of work.
+ * Core the screen time the barbell earned.
+ *
+ * The category rung alone wasn't enough, because it is coarser than it looks: the
+ * registry files Step-up, Wall Ball and a bodyweight Squat as `strength` alongside
+ * Clean and Deadlift. They belong there — they ARE strength patterns — but 150
+ * step-ups then outranked 96 barbell cleans on rep count, which is the same defect
+ * one rung down, and the thing an athlete means when they say the recap shows the
+ * easy movements.
+ *
+ * So load breaks the category tie before reps do: something you picked up outranks
+ * something you didn't. Reps only decide between two families doing the same KIND
+ * of work with the same KIND of implement.
  */
 function byCategoryThenReps(a: RecapMoveStat, b: RecapMoveStat): number {
   return getCategoryRank(a.category) - getCategoryRank(b.category)
+    || loadRank(a.implement) - loadRank(b.implement)
     || b.reps - a.reps
     || a.name.localeCompare(b.name);
 }

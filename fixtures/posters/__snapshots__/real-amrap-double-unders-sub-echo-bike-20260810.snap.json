@@ -71,6 +71,7 @@
             "subNote": "72 cal total",
             "totalNote": "72 cal total",
             "mineKey": "Echo Bike",
+            "substitutedFrom": "Double Under",
             "accent": "magenta",
             "repeatCount": 9
           }
@@ -205,6 +206,7 @@
         {
           "kind": "line",
           "rx": "8 CAL Echo Bike",
+          "swapFrom": "Double Under",
           "load": "",
           "mine": "",
           "team": "",

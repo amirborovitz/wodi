@@ -8,7 +8,7 @@
         {
           "primary": "Max Echo Bike",
           "name": "Echo Bike",
-          "totalNote": "8 cal / round · 40 cal total",
+          "totalNote": "5 × 8 cal",
           "accent": "yellow",
           "stationRow": true,
           "suppressMine": true,
@@ -26,7 +26,7 @@
         {
           "primary": "Max Box Jump",
           "name": "Box Jump",
-          "totalNote": "1 / round · 5 reps total",
+          "totalNote": "5 × 1 rep",
           "accent": "yellow",
           "stationRow": true,
           "suppressMine": true,
@@ -35,7 +35,7 @@
         {
           "primary": "Max Renegade Row",
           "name": "Renegade Row",
-          "totalNote": "8 / round · 40 reps total",
+          "totalNote": "5 × 8 reps",
           "accent": "yellow",
           "stationRow": true,
           "suppressMine": true,
@@ -65,7 +65,7 @@
           {
             "primary": "Max Echo Bike",
             "name": "Echo Bike",
-            "totalNote": "8 cal / round · 40 cal total",
+            "totalNote": "5 × 8 cal",
             "accent": "yellow",
             "stationRow": true,
             "suppressMine": true,
@@ -83,7 +83,7 @@
           {
             "primary": "Max Box Jump",
             "name": "Box Jump",
-            "totalNote": "1 / round · 5 reps total",
+            "totalNote": "5 × 1 rep",
             "accent": "yellow",
             "stationRow": true,
             "suppressMine": true,
@@ -92,7 +92,7 @@
           {
             "primary": "Max Renegade Row",
             "name": "Renegade Row",
-            "totalNote": "8 / round · 40 reps total",
+            "totalNote": "5 × 8 reps",
             "accent": "yellow",
             "stationRow": true,
             "suppressMine": true,
@@ -175,8 +175,9 @@
         "load": "",
         "mine": "",
         "team": "",
-        "total": "8 cal / round · 40 cal total",
-        "roundLabel": "ST. 1"
+        "total": "5 × 8 cal",
+        "roundLabel": "ST. 1",
+        "station": true
       },
       {
         "kind": "line",
@@ -185,7 +186,8 @@
         "mine": "",
         "team": "",
         "total": "4 reps",
-        "roundLabel": "ST. 2"
+        "roundLabel": "ST. 2",
+        "station": true
       },
       {
         "kind": "line",
@@ -193,8 +195,9 @@
         "load": "",
         "mine": "",
         "team": "",
-        "total": "1 / round · 5 reps total",
-        "roundLabel": "ST. 3"
+        "total": "5 × 1 rep",
+        "roundLabel": "ST. 3",
+        "station": true
       },
       {
         "kind": "line",
@@ -202,8 +205,9 @@
         "load": "",
         "mine": "",
         "team": "",
-        "total": "8 / round · 40 reps total",
-        "roundLabel": "ST. 4"
+        "total": "5 × 8 reps",
+        "roundLabel": "ST. 4",
+        "station": true
       },
       {
         "kind": "line",
@@ -212,7 +216,8 @@
         "mine": "",
         "team": "",
         "total": "6 reps",
-        "roundLabel": "ST. 5"
+        "roundLabel": "ST. 5",
+        "station": true
       }
     ],
     "pages": [
@@ -228,8 +233,9 @@
           "load": "",
           "mine": "",
           "team": "",
-          "total": "8 cal / round · 40 cal total",
-          "roundLabel": "ST. 1"
+          "total": "5 × 8 cal",
+          "roundLabel": "ST. 1",
+          "station": true
         },
         {
           "kind": "line",
@@ -238,7 +244,8 @@
           "mine": "",
           "team": "",
           "total": "4 reps",
-          "roundLabel": "ST. 2"
+          "roundLabel": "ST. 2",
+          "station": true
         },
         {
           "kind": "line",
@@ -246,8 +253,9 @@
           "load": "",
           "mine": "",
           "team": "",
-          "total": "1 / round · 5 reps total",
-          "roundLabel": "ST. 3"
+          "total": "5 × 1 rep",
+          "roundLabel": "ST. 3",
+          "station": true
         },
         {
           "kind": "line",
@@ -255,8 +263,9 @@
           "load": "",
           "mine": "",
           "team": "",
-          "total": "8 / round · 40 reps total",
-          "roundLabel": "ST. 4"
+          "total": "5 × 8 reps",
+          "roundLabel": "ST. 4",
+          "station": true
         },
         {
           "kind": "line",
@@ -265,7 +274,8 @@
           "mine": "",
           "team": "",
           "total": "6 reps",
-          "roundLabel": "ST. 5"
+          "roundLabel": "ST. 5",
+          "station": true
         }
       ]
     ]

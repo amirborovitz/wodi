@@ -30,7 +30,6 @@ import {
   statedOccurrenceCount,
 } from '../../services/workloadCalculation';
 import {
-  formatMaxMetricQuantity,
   formatMaxMetricValue,
   getMaxMetric,
   type MaxMetric,
@@ -53,7 +52,7 @@ import {
   type CelebrationStickerConfig,
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
-import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad } from './movementResolution';
+import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, substitutedFromName } from './movementResolution';
 import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { scaleEnteredToTier } from '../../utils/tierScaling';
 import { timeCapLabelFromText } from '../../utils/timeCap';
@@ -1579,7 +1578,7 @@ function buildCelebrationMovementRow(params: {
     if (actual?.weightProgression && actual.weightProgression.length > 1) {
       const min = Math.min(...actual.weightProgression);
       const max = Math.max(...actual.weightProgression);
-      primary = min === max ? `${max}${unitUpper}` : `${min}->${max}${unitUpper}`;
+      primary = min === max ? `${max}${unitUpper}` : `${min}→${max}${unitUpper}`;
     } else {
       primary = `${weight}${unitUpper}`;
     }
@@ -1640,6 +1639,9 @@ function buildCelebrationMovementRow(params: {
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
     totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
     mineKey: actual?.name ?? movementName,
+    // The board's movement when this row is a substitute for it. The row already DISPLAYS the
+    // substitute (baseDisplayName above); this is what says so out loud.
+    substitutedFrom: substitutedFromName(actual),
     accent,
     repeatCount,
     partnerSplit,
@@ -1911,6 +1913,7 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
       ...(hasWeight ? { subNote: implementCount > 1 ? `${implementCount}×${perImplementW}${unit}` : `${perImplementW}${unit}` } : {}),
       totalNote: total > 0 ? `${total}${totalUnitLabel} total` : undefined,
       mineKey: m0.name,
+      substitutedFrom: substitutedFromName(bd),
       accent: hasWeight ? 'yellow' : (bd?.color ?? 'magenta'),
     };
   });
@@ -2102,6 +2105,7 @@ function buildStrengthBlockRows(exercise: Exercise, movements: MovementTotal[]):
         totalNote: totalReps ? `${totalReps} total` : undefined,
         subNote: totalReps ? `${totalReps} total` : undefined,
         mineKey: actual?.name ?? displayName,
+        substitutedFrom: substitutedFromName(actual),
         // The name-keyed mine map holds ONE value per movement, so blocks sharing a lift would
         // all read the merged figure. This row already resolved its own occupant's load.
         ...(load ? { mineOverride: formatLoggedLoad(load.weights, load.unit, load.implementCount) } : {}),
@@ -3276,15 +3280,21 @@ export function buildPageArtifactSections(
               : 'reps';
             const earnedTotal = totalD > 0 ? totalD : totalC > 0 ? totalC : totalR;
             if (earnedTotal > 0) {
-              // A station done five times states both numbers: what one round cost and what the
-              // five added up to. One number alone can't say which it is, and the header's
-              // "5 rds" makes the ambiguity worse — the same "6" read as a round and as a total.
+              // A station done five times states a TALLY, not a sentence: "5 × 11 cal" is the
+              // round count and what one round cost, in the same shape a board writes a set
+              // scheme. One number alone can't say which it is — the header's "5 rds" makes the
+              // same "6" readable as a round and as a total.
+              //
+              // The sum is deliberately left for the reader to make. "11 cal / round · 55 cal
+              // total" printed it a second time, in a row sitting right above the hero that
+              // already IS that number, and the string was long enough to squeeze the movement
+              // name into a three-line stack and push its own tail off the edge of the card.
               const visits = getStationVisits(stationLabel);
               const perVisit = visits && visits > 1 && earnedTotal % visits === 0
                 ? earnedTotal / visits
                 : undefined;
               totalNote = perVisit
-                ? `${formatMaxMetricQuantity(perVisit, metric)} / round · ${formatMaxMetricValue(earnedTotal, metric)} total`
+                ? `${visits} × ${formatMaxMetricValue(perVisit, metric)}`
                 : formatMaxMetricValue(earnedTotal, metric);
             } else {
               totalNote = undefined;

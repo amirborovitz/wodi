@@ -19,7 +19,7 @@ export function getMaxMetric(movement: Pick<ParsedMovement, 'maxMetric' | 'input
   return 'reps';
 }
 
-/** Renders an earned max-effort value in its own unit — "40 cal", "800m", "24 reps". */
+/** Renders an earned max-effort value in its own unit — "40 cal", "800m", "24 reps", "1 rep". */
 export function formatMaxMetricValue(value: number, metric: MaxMetric): string {
   if (metric === 'calories') return `${value} cal`;
   if (metric === 'distance') {
@@ -27,16 +27,8 @@ export function formatMaxMetricValue(value: number, metric: MaxMetric): string {
       ? `${value % 1000 === 0 ? value / 1000 : (value / 1000).toFixed(1)}km`
       : `${value}m`;
   }
-  return `${value} reps`;
+  // A station tally reads "5 × 1 rep" — the unit belongs to the per-round figure beside it, so
+  // one bar muscle-up a round can't be printed as "1 reps".
+  return `${value} ${value === 1 ? 'rep' : 'reps'}`;
 }
 
-/** The same value with no unit word — for the per-round half of "8 / round · 40 total". */
-export function formatMaxMetricQuantity(value: number, metric: MaxMetric): string {
-  if (metric === 'calories') return `${value} cal`;
-  if (metric === 'distance') {
-    return value >= 1000
-      ? `${value % 1000 === 0 ? value / 1000 : (value / 1000).toFixed(1)}km`
-      : `${value}m`;
-  }
-  return `${value}`;
-}

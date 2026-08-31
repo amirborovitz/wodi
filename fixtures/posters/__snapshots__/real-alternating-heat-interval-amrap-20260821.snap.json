@@ -8,7 +8,7 @@
         "blueprint": "5 sets",
         "rows": [
           {
-            "primary": "50->70KG",
+            "primary": "50→70KG",
             "name": "Bench Press",
             "subNote": "23 total",
             "totalNote": "23 total",
@@ -139,9 +139,9 @@
         },
         {
           "kind": "line",
-          "rx": "50->70KG Bench Press",
+          "rx": "50→70KG Bench Press",
           "load": "",
-          "mine": "50-70kg",
+          "mine": "50→70kg",
           "team": "",
           "total": "23 total"
         }

@@ -118,7 +118,8 @@
         "mine": "",
         "team": "",
         "total": "36 total",
-        "roundLabel": "MIN 1"
+        "roundLabel": "MIN 1",
+        "station": true
       },
       {
         "kind": "line",
@@ -127,7 +128,8 @@
         "mine": "",
         "team": "",
         "total": "36 total",
-        "roundLabel": "MIN 2"
+        "roundLabel": "MIN 2",
+        "station": true
       },
       {
         "kind": "line",
@@ -136,7 +138,8 @@
         "mine": "",
         "team": "",
         "total": "3 min total",
-        "roundLabel": "MIN 3"
+        "roundLabel": "MIN 3",
+        "station": true
       }
     ],
     "pages": [
@@ -153,7 +156,8 @@
           "mine": "",
           "team": "",
           "total": "36 total",
-          "roundLabel": "MIN 1"
+          "roundLabel": "MIN 1",
+          "station": true
         },
         {
           "kind": "line",
@@ -162,7 +166,8 @@
           "mine": "",
           "team": "",
           "total": "36 total",
-          "roundLabel": "MIN 2"
+          "roundLabel": "MIN 2",
+          "station": true
         },
         {
           "kind": "line",
@@ -171,7 +176,8 @@
           "mine": "",
           "team": "",
           "total": "3 min total",
-          "roundLabel": "MIN 3"
+          "roundLabel": "MIN 3",
+          "station": true
         }
       ]
     ]

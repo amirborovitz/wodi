@@ -1,0 +1,197 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Hinge & Pull",
+        "blueprint": "5 sets",
+        "rows": [
+          {
+            "primary": "3",
+            "name": "Chin-up",
+            "subNote": "15 total",
+            "totalNote": "15 total",
+            "mineKey": "Chin-up",
+            "accent": "yellow",
+            "repeatCount": 5
+          },
+          {
+            "primary": "4",
+            "name": "Deadlift",
+            "subNote": "20 total",
+            "totalNote": "20 total",
+            "mineKey": "Deadlift",
+            "accent": "yellow",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "2:00 AMRAP x 4",
+        "blueprint": "2 min AMRAP · 2 min rest · 4 rounds",
+        "rows": [
+          {
+            "primary": "15",
+            "name": "Alt American Kettlebell Swings",
+            "nameWithLoad": "Alt American Kettlebell Swings @ 24kg",
+            "loadNote": "24kg",
+            "subNote": "120 total",
+            "totalNote": "120 total",
+            "mineKey": "Alt American Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 8
+          },
+          {
+            "primary": "10",
+            "name": "Knees-to-Elbows",
+            "subNote": "80 total",
+            "totalNote": "80 total",
+            "mineKey": "Knees-to-Elbows",
+            "substitutedFrom": "Toes to Bar",
+            "accent": "magenta",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "8",
+    "unit": "ROUNDS",
+    "formatLine": "4 × 2 MIN",
+    "storyLine": "120 alt american kettlebell swing · 80 knees-to-elbows · 20 deadlift · 15 chin-up",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · CHIN-UP",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Chin-up",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          10,
+          15
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 15
+      },
+      {
+        "perRound": "",
+        "name": "Deadlift",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          85,
+          105
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 20
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "2:00 AMRAP X 4",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "15",
+        "name": "Alt American Kettlebell Swing",
+        "total": "120 total",
+        "color": "yellow",
+        "weight": 24,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Knees-to-Elbows",
+        "total": "80 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "8",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "3 Chin-up",
+          "load": "",
+          "mine": "10→15kg",
+          "team": "",
+          "total": "15 total"
+        },
+        {
+          "kind": "line",
+          "rx": "4 Deadlift",
+          "load": "",
+          "mine": "85→105kg",
+          "team": "",
+          "total": "20 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2:00 AMRAP X 4",
+          "cap": "2 min AMRAP · 2 min rest · 4 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Alt American Kettlebell Swings",
+          "load": "",
+          "mine": "24kg",
+          "team": "",
+          "total": "120 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Knees-to-Elbows",
+          "swapFrom": "Toes to Bar",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "80 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ]
+}

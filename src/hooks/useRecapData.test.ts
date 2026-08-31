@@ -504,6 +504,123 @@ describe('buildRecaps — the PR reads as a jump', () => {
   });
 });
 
+describe('buildRecaps — load outranks reps inside a category', () => {
+  it('puts the barbell above the bodyweight movement that outnumbers it', () => {
+    // The registry files Step-up as `strength`, same rung as Clean, so the category
+    // ladder alone left 150 step-ups sitting above 96 barbell cleans — the exact
+    // thing an athlete means by "the recap only shows the easy movements".
+    const recap = july([
+      workout('a', IN_JULY, [
+        { name: 'Step-up', totalReps: 150 },
+        { name: 'Barbell Clean', totalReps: 96 },
+      ]),
+    ]);
+    expect(recap.families.map(m => m.name)).toEqual(['Barbell Clean', 'Step-up']);
+    expect(recap.topMove?.name).toBe('Barbell Clean');
+  });
+
+  it('still ranks on reps between two loaded movements', () => {
+    // Load breaks the tie, it does not replace reps: same rung, same kind of
+    // implement, so the bigger number leads.
+    const recap = july([
+      workout('a', IN_JULY, [
+        { name: 'Barbell Clean', totalReps: 40 },
+        { name: 'Deadlift', totalReps: 120 },
+      ]),
+    ]);
+    expect(recap.families.map(m => m.name)).toEqual(['Barbell Deadlift', 'Barbell Clean']);
+  });
+
+  it('still ranks on reps between two bodyweight movements', () => {
+    const recap = july([
+      workout('a', IN_JULY, [
+        { name: 'Step-up', totalReps: 60 },
+        { name: 'Air Squat', totalReps: 200 },
+      ]),
+    ]);
+    expect(recap.families.map(m => m.name)).toEqual(['Squat', 'Step-up']);
+  });
+});
+
+describe('buildRecaps — heaviest overhead, heaviest off the floor', () => {
+  it('answers both questions separately rather than picking one winner', () => {
+    // No PR fell, so `heaviest` is null — this is the only place the week gets to
+    // say it was HARD rather than long. A single "heaviest" would bury the snatch.
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Snatch', totalReps: 15, weight: 75, unit: 'kg' }]),
+      workout('b', IN_JULY, [{ name: 'Deadlift', totalReps: 10, weight: 145, unit: 'kg' }]),
+    ]);
+    expect(recap.heaviest).toBeNull();
+    expect(recap.lifts).toEqual([
+      { label: 'HEAVIEST OVERHEAD', lift: 'Snatch', kg: 75, pr: false },
+      { label: 'HEAVIEST OFF THE FLOOR', lift: 'Deadlift', kg: 145, pr: false },
+    ]);
+  });
+
+  it('files a clean & jerk overhead and a clean off the floor', () => {
+    // The finish is what the lift is named for: a clean & jerk starts on the ground
+    // and still answers "what did you get overhead".
+    const recap = july([
+      workout('a', IN_JULY, [
+        { name: 'Clean & Jerk', totalReps: 8, weight: 70, unit: 'kg' },
+        { name: 'Power Clean', totalReps: 12, weight: 80, unit: 'kg' },
+      ]),
+    ]);
+    expect(recap.lifts.map(l => [l.label, l.lift])).toEqual([
+      ['HEAVIEST OVERHEAD', 'Clean & Jerk'],
+      ['HEAVIEST OFF THE FLOOR', 'Power Clean'],
+    ]);
+  });
+
+  it('reaches the top of a climb rather than the set it was logged against', () => {
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Deadlift', totalReps: 15, weight: 60, weightProgression: [60, 75, 90], unit: 'kg' }]),
+    ]);
+    expect(recap.lifts[0]).toEqual({ label: 'HEAVIEST OFF THE FLOOR', lift: 'Deadlift', kg: 90, pr: false });
+  });
+
+  it('converts pounds, because the row always says KG', () => {
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Deadlift', totalReps: 5, weight: 225, unit: 'lb' }]),
+    ]);
+    expect(recap.lifts[0].kg).toBe(102);
+  });
+
+  it('flags the PR when the record was set at the weight being shown', () => {
+    const recap = july([{
+      ...workout('a', IN_JULY, [{ name: 'Snatch', totalReps: 5, weight: 75, unit: 'kg' }]),
+      isPR: true,
+      achievements: [{ type: 'pr', title: 'New PR!', subtitle: '', movement: 'Snatch', value: 75, icon: 'trophy' }],
+    } as unknown as WorkoutWithStats]);
+    expect(recap.lifts[0].pr).toBe(true);
+  });
+
+  it('does not flag a PR set at a different weight than the heaviest shown', () => {
+    // The record was 75, but the week's heaviest snatch reads 80. Badging that 80
+    // would put "PR" over a number that was never the record.
+    const recap = july([{
+      ...workout('a', IN_JULY, [{ name: 'Snatch', totalReps: 5, weight: 80, unit: 'kg' }]),
+      isPR: true,
+      achievements: [{ type: 'pr', title: 'New PR!', subtitle: '', movement: 'Snatch', value: 75, icon: 'trophy' }],
+    } as unknown as WorkoutWithStats]);
+    expect(recap.lifts[0]).toEqual({ label: 'HEAVIEST OVERHEAD', lift: 'Snatch', kg: 80, pr: false });
+  });
+
+  it('leaves out a lift that answers neither question', () => {
+    // A back squat comes off a rack: it is neither overhead nor off the floor, and
+    // the block would rather draw one row than invent a third question.
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Back Squat', totalReps: 15, weight: 100, unit: 'kg' }]),
+    ]);
+    expect(recap.lifts).toEqual([]);
+  });
+
+  it('has no lifts for a period that never touched a bar', () => {
+    const recap = july([workout('a', IN_JULY, [{ name: 'Burpee', totalReps: 120 }])]);
+    expect(recap.lifts).toEqual([]);
+  });
+});
+
 describe('buildRecaps — this-month highlights', () => {
   it('measures frequency as a different question from volume', () => {
     const recap = july([
@@ -533,17 +650,19 @@ describe('buildRecaps — this-month highlights', () => {
 
   it('reads the implement off the registry rather than a second taxonomy', () => {
     const recap = july([
-      // Wall balls headline, so the barbell and kettlebell facts are the only
-      // ones naming their movements — no dedupe collision to muddy the check.
+      // Dumbbells headline, so the barbell and kettlebell facts are the only ones
+      // naming their movements — no dedupe collision to muddy the check. The wall
+      // balls outnumber everything and still don't lead: see the load rule below.
       workout('a', IN_JULY, [
-        { name: 'Wall Ball', totalReps: 300 },
+        { name: 'Wall Ball', totalReps: 400 },
+        { name: 'Dumbbell Snatch', totalReps: 300 },
         { name: 'Deadlift', totalReps: 200 },
         { name: 'Russian Kettlebell Swing', totalReps: 120 },
       ]),
     ]);
 
     const byKind = new Map(recap.highlights.map(h => [h.kind, h]));
-    expect(recap.topMove?.name).toBe('Wall Ball');
+    expect(recap.topMove?.name).toBe('Dumbbell Snatch');
     expect(byKind.get('most_barbell')?.subject).toBe('Barbell Deadlift');
     expect(byKind.get('most_kettlebell')?.subject).toBe('Kettlebell Swing');
   });
