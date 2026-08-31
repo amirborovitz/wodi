@@ -67,6 +67,7 @@ function buildNewUserFromFirebase(fbUser: FirebaseUser): Omit<User, 'id'> {
     photoUrl: fbUser.photoURL || undefined,
     photoUpdatedAt: undefined,
     createdAt: new Date(),
+    lastLoginAt: new Date(),
     stats: DEFAULT_STATS,
   };
 }
@@ -94,6 +95,7 @@ function getCachedUser(): User | null {
     if (cached) {
       const parsed = JSON.parse(cached);
       parsed.createdAt = new Date(parsed.createdAt);
+      if (parsed.lastLoginAt) parsed.lastLoginAt = new Date(parsed.lastLoginAt);
       return parsed;
     }
   } catch {
@@ -162,7 +164,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!userSnap.exists()) {
       const newUser = buildNewUserFromFirebase(fbUser);
-      await withRetry(() => setDoc(userRef, removeUndefined({ ...newUser, createdAt: serverTimestamp() })));
+      await withRetry(() => setDoc(userRef, removeUndefined({
+        ...newUser,
+        createdAt: serverTimestamp(),
+        lastLoginAt: serverTimestamp(),
+      })));
       return { id: fbUser.uid, ...newUser };
     }
 
@@ -183,6 +189,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDoc(userRef, backfill, { merge: true }).catch(() => {});
     }
 
+    // Stamp the start of this session. Fire-and-forget on purpose: a failed
+    // stamp must never keep an athlete out of the app. This is the ONE place it
+    // happens — both the cold-start fetch and the background cache refresh come
+    // through here, so the two can't drift or double-write.
+    const loginAt = new Date();
+    setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true }).catch(() => {});
+
     return {
       id: fbUser.uid,
       email: data.email || fbUser.email || '',
@@ -190,6 +203,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       photoUrl: (cachedPhotoNewer ? cached?.photoUrl : data.photoUrl) || fbUser.photoURL || undefined,
       photoUpdatedAt: cachedPhotoNewer ? cached?.photoUpdatedAt : data.photoUpdatedAt || undefined,
       createdAt: data.createdAt?.toDate() || new Date('2026-01-01'),
+      // The value we just wrote, not the one we read: the doc and this object
+      // must agree on when the current session started.
+      lastLoginAt: loginAt,
       stats: { ...DEFAULT_STATS, ...data.stats },
       birthYear: data.birthYear ?? data.age,
       weight: data.weight,
@@ -210,22 +226,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await loadOrCreateUserDoc(fbUser);
       setUser(userData);
       setCachedUser(userData);
-
-      // Stamp last-active (fire-and-forget)
-      const userRef = doc(db, 'users', fbUser.uid);
-      setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error fetching user data:', error);
       // Still set basic user info even if Firestore fails
-      const fallbackUser: User = {
-        id: fbUser.uid,
-        email: fbUser.email || '',
-        displayName: fbUser.displayName || 'Athlete',
-        photoUrl: fbUser.photoURL || undefined,
-        photoUpdatedAt: undefined,
-        createdAt: new Date(),
-        stats: DEFAULT_STATS,
-      };
+      const fallbackUser: User = { id: fbUser.uid, ...buildNewUserFromFirebase(fbUser) };
       setUser(fallbackUser);
       setCachedUser(fallbackUser);
     }
@@ -236,10 +240,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await loadOrCreateUserDoc(fbUser);
       setUser(userData);
       setCachedUser(userData);
-
-      // Stamp last-active (fire-and-forget)
-      const userRef = doc(db, 'users', fbUser.uid);
-      setDoc(userRef, { _last_active: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (error) {
       console.error('Error refreshing user data:', error);
     }

@@ -6,6 +6,13 @@ export interface User {
   photoUrl?: string;
   photoUpdatedAt?: number;
   createdAt: Date;
+  /**
+   * Start of the athlete's most recent session — stamped by AuthContext every
+   * time Firebase resolves a signed-in user, so it tracks "last seen in the
+   * app" rather than the rarer moment they actually re-entered credentials.
+   * Undefined only for accounts that haven't opened the app since this shipped.
+   */
+  lastLoginAt?: Date;
   stats: UserStats;
   birthYear?: number;        // Year of birth, age calculated from this
   weight?: number;           // kg, important for calorie calculation
