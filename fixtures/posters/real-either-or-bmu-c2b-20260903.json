@@ -1,0 +1,122 @@
+{
+  "name": "real-either-or-bmu-c2b-20260903",
+  "description": "REAL saved doc: 8 RFT whose board offers a CHOICE — '4 Bar Muscle-up / 8 Chest to Bar Pull-up'. The AI read the choice correctly into `alternative` but ALSO echoed it into `repsDisplay` ('4 / 8'), which the flat per-round row printed as the movement's count while dropping the alternative's name entirely ('4 / 8 Bar Muscle-ups'). Guards both halves: the either/or renders on a non-station row, and the repsDisplay echo never becomes a rep range. The strength part's `repsDisplay: \"10 (alt')\"` is board notation with no alternative beside it, so it must survive untouched.",
+  "workout": {
+    "status": "completed",
+    "date": "2026-09-03T18:13:25.173Z",
+    "createdAt": "2026-09-03T18:13:23.734Z",
+    "updatedAt": "2026-09-03T18:13:23.734Z",
+    "title": "WOD",
+    "type": "for_time",
+    "format": "for_time",
+    "rawText": "Metcon\nA. STRENGTH (Lunge)\nBack rack reverse lunges\n3 sets x 10 reps (alt') @R.P.E 7-8\n\nB. METCON (Long)\n8 RFT:\n200m run\n4 Bar Muscle-up / 8 Chest to Bar Pull-up\n6 Front Squat @40/60kg\n< 25 minutes T.C. >",
+    "partnerFactor": 1,
+    "partnerWorkout": false,
+    "notes": null,
+    "sets": 8,
+    "rounds": 8,
+    "duration": 25,
+    "durationSeconds": 1500,
+    "timeCap": 1500,
+    "difficultyLevel": 6,
+    "isPR": false,
+    "achievements": [],
+    "heroAchievement": {
+      "type": "generic",
+      "icon": "star",
+      "title": "Keep Going!",
+      "subtitle": "You're building something great"
+    },
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Front Squat", "exerciseIndex": 1, "totalReps": 48, "weight": 60, "unit": "kg", "color": "yellow" },
+        { "name": "Bar Muscle-up", "exerciseIndex": 1, "totalReps": 32, "color": "cyan" },
+        { "name": "Back Rack Reverse Lunge", "exerciseIndex": 0, "totalReps": 30, "weight": 45, "weightProgression": [40, 50], "unit": "kg", "color": "yellow" },
+        { "name": "Run", "exerciseIndex": 1, "totalDistance": 1600, "unit": "m", "distancePerRep": 200, "color": "magenta" }
+      ],
+      "grandTotalReps": 110,
+      "grandTotalVolume": 4230,
+      "grandTotalDistance": 1600
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Rack Reverse Lunge",
+        "type": "strength",
+        "prescription": "3 sets x 10 reps (alt') @R.P.E 7-8",
+        "rawText": "A. STRENGTH (Lunge)\nBack rack reverse lunges\n3 sets x 10 reps (alt') @R.P.E 7-8",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "aiPartName": "FURNACE",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 10, "actualReps": 10, "weight": 40 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 10, "actualReps": 10 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 10, "actualReps": 10, "weight": 50 }
+        ],
+        "movements": [
+          {
+            "name": "Back Rack Reverse Lunge",
+            "reps": 10,
+            "repsDisplay": "10 (alt')",
+            "perSide": true,
+            "inputType": "weight",
+            "equipment": "barbell",
+            "implementCount": 1,
+            "countingMode": "per_round"
+          }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "8 Rounds For Time",
+        "type": "wod",
+        "prescription": "8 RFT: 200m Run, 4 Bar Muscle-up / 8 Chest to Bar Pull-up, 6 Front Squat @40/60kg",
+        "rawText": "8 RFT:\n200m run\n4 Bar Muscle-up / 8 Chest to Bar Pull-up\n6 Front Squat @40/60kg",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "aiPartName": "PULSE",
+        "rounds": 8,
+        "rxWeights": { "male": 60, "female": 40, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 80, "weight": 60, "time": 1140 }
+        ],
+        "movements": [
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "inputType": "distance",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Bar Muscle-up",
+            "reps": 4,
+            "repsDisplay": "4 / 8",
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "alternative": { "name": "Chest to Bar Pull-up", "reps": 8 }
+          },
+          {
+            "name": "Front Squat",
+            "reps": 6,
+            "rxWeights": { "male": 60, "female": 60, "unit": "kg" },
+            "inputType": "weight",
+            "equipment": "barbell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "loggedWeights": [60]
+          }
+        ]
+      }
+    ]
+  }
+}

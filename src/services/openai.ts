@@ -4,6 +4,7 @@ import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPo
 import { refuseGuessesOnUncertainFields, shiftUncertaintyPaths } from './parseUncertainty';
 import { resolveSourceDate } from './sourceDateResolution';
 import { PARSE_RESPONSE_SCHEMA } from './parseSchema';
+import { readRepsDisplay } from '../utils/repsDisplay';
 
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
 
@@ -165,10 +166,22 @@ Return ONLY valid JSON:
         }
       ],
       "loggingHints": { "sharedWeightMovements": ["Power Clean", "Squat Clean"] },
-      // intervalCount: how many repeating clock intervals this block has.
+      // intervalCount: how many WORK WINDOWS the clock has — how many times it starts, NOT how
+      // many rounds the athlete completes and NOT how many stations there are.
       // Examples: "AMRAP 3:00 x 4" → 4, "Every 4:00 x 3 AMRAP" → 3.
+      // "EMOM for 16 minutes (4 rounds), min 1..min 4" → 16 (sixteen minutes start), NEVER 4.
       // Omit for single-block pieces (a plain "AMRAP 12" has no intervals).
       "intervalCount": 4,
+      // intervalSeconds: how long ONE work window is, in SECONDS. THE CADENCE ITSELF.
+      // Boxes write this a dozen ways — normalise every one of them into this number:
+      //   "EMOM 16" / "on the minute" → 60      "E2MOM x 10" / "Q2M" → 120
+      //   "Every 01:15 minutes x 8" → 75        "Every 90 sec x 12" → 90
+      //   "1.50 MIN X 16 ROUNDS" → 90           "[3:00 AMRAP / 1:00 REST] x 5" → 180
+      // intervalRestSeconds is ONE rest window (the 1:00 above → 60); omit when no prescribed rest.
+      // These are PER WINDOW. workDuration/restDuration stay CUMULATIVE — both are needed and
+      // they answer different questions. Emit whenever the board states a cadence at all.
+      "intervalSeconds": 180,
+      "intervalRestSeconds": 60,
       // workDuration: programmed work time for THIS EXERCISE in SECONDS.
       // If the exercise represents one block: total work time for that block.
       // Examples: "AMRAP 12" (single block) → 720, "AMRAP 3:00 x 4" (single exercise, 4 intervals) → 720 (180*4),
@@ -339,6 +352,10 @@ When a movement prescribes a rep RANGE ("10-12 pull-ups", "16-20 KB swings"), se
 midpoint rounded to the nearest whole rep and "repsDisplay" to the range exactly as the coach
 wrote it: "10-12" → reps: 11, repsDisplay: "10-12". The midpoint exists only so computed totals
 are fair — every displayed prescription uses "repsDisplay". Omit "repsDisplay" for single rep counts.
+"repsDisplay" describes ONE movement's own rep notation. It is NEVER the board's either/or offer:
+when a slash gives a CHOICE of movements ("4 Bar Muscle-up / 8 Chest to Bar Pull-up", "40 DU / 60
+singles"), that belongs in "alternative" (rule 3 below) and "repsDisplay" MUST be null. Setting it
+to "4 / 8" states a rep range the coach never prescribed, and the poster prints it as the count.
 
 ## CARDIO MACHINES IN WODs (Echo Bike, Assault Bike, Row, Ski Erg, etc.)
 Cardio machines are NEVER measured in "reps". They use calories or distance:
@@ -659,7 +676,7 @@ Output:
   }]
 }
 Why sections: each lift is its OWN block at its OWN building weight — the athlete logs Push Press across its 4 sets, THEN Push Jerk across its 4 sets. One "rounds" section per block keeps the two progressions independent for logging and the poster. Generalizes to N blocks (3+ lifts chained by "Into:"/"then") and any per-block set count. This holds when the blocks repeat the SAME lift at a different rep count ("4 sets: 2 Clean & Jerk / Into: / 4 sets: 1 Clean & Jerk") — still TWO blocks, one section each, each with its own movement entry; never merge them into one.
-Why intervalCount + workDuration: the cadence is STRUCTURE, and the app must never have to re-read it off the board — boards write the same clock a dozen ways ("Every 01:30 minutes:", "E1:30", "every 90 sec", "EMOM x 8"). "intervalCount" is the TOTAL intervals across all blocks (4 + 4 = 8) and "workDuration" is CUMULATIVE seconds (8 x 90 = 720), so the per-interval cadence is workDuration / intervalCount. Always emit both when the board states a cadence, whatever notation it used.
+Why the clock fields: the cadence is STRUCTURE, and the app must never have to re-read it off the board — boards write the same clock a dozen ways ("Every 01:30 minutes:", "E1:30", "every 90 sec", "EMOM x 8"). YOU normalise it: "intervalSeconds" is ONE window (90) and "intervalCount" is how many windows there are across all blocks (4 + 4 = 8). "workDuration" is the CUMULATIVE seconds (8 x 90 = 720) and answers a different question — how long the piece occupies the clock. Emit all three when the board states a cadence, whatever notation it used. Do NOT expect the app to divide one by another: workDuration and intervalCount are both your own arithmetic, and dividing them printed "[4:00] x 4" on a board that said "EMOM for 16 minutes". State the window directly.
 NEVER set "stationRotation" on these blocks. They run one after another (all of block 1, THEN all of block 2) — nothing alternates. "stationRotation" means the blocks take turns under ONE clock, which would halve every block's set count.
 
 ### 4c. SIMULTANEOUS barbell complex ("+"-joined, done together each set) — ONE flat block, NO sections
@@ -1921,7 +1938,7 @@ function validateMovement(data: unknown): ParsedMovement | null {
   return {
     name: raw.name,
     reps: quantity(raw.reps),
-    repsDisplay: typeof raw.repsDisplay === 'string' && raw.repsDisplay.trim() ? raw.repsDisplay.trim() : undefined,
+    repsDisplay: readRepsDisplay({ repsDisplay: typeof raw.repsDisplay === 'string' ? raw.repsDisplay : undefined, alternative }),
     distance: quantity(raw.distance),
     time: typeof raw.time === 'number' ? raw.time : undefined,
     calories: quantity(raw.calories),
@@ -2203,6 +2220,8 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         intervalCount: typeof exercise.intervalCount === 'number' && exercise.intervalCount > 0 ? exercise.intervalCount : undefined,
         workDuration: typeof exercise.workDuration === 'number' && exercise.workDuration > 0 ? exercise.workDuration : undefined,
         restDuration: typeof exercise.restDuration === 'number' && exercise.restDuration > 0 ? exercise.restDuration : undefined,
+        intervalSeconds: typeof exercise.intervalSeconds === 'number' && exercise.intervalSeconds > 0 ? exercise.intervalSeconds : undefined,
+        intervalRestSeconds: typeof exercise.intervalRestSeconds === 'number' && exercise.intervalRestSeconds > 0 ? exercise.intervalRestSeconds : undefined,
         ...(ladderReps && { ladderReps }),
         ...(typeof exercise.rawText === 'string' && exercise.rawText.trim() && { rawText: exercise.rawText }),
         ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),

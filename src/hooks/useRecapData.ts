@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import type { PosterVibeKey } from '../types';
+import type { PosterVibeKey, WorkoutFormat } from '../types';
 import type { WorkoutWithStats } from './useWorkouts';
 import {
   contributionsOf,
@@ -139,6 +139,14 @@ export interface RecapEngineCell {
   value: string;
   /** "KM" · "M" · "CAL" */
   unit: string;
+  /**
+   * Workouts this one cell was measured across.
+   *
+   * Two cells can name the SAME machine in different units, because calories and
+   * metres cover disjoint sessions. Without this count that reads as the card
+   * printing one machine twice, or double-counting it.
+   */
+  sessions: number;
 }
 
 export interface RecapAerobicStat {
@@ -150,13 +158,53 @@ export interface RecapAerobicStat {
   unit: string;
   /** "2.2 marathons, back to back" — the outsider-legible comparison. */
   compare: string;
-  /** "+ Run 5.1 km · Echo Bike 707 cal". Null when the hero was the only figure. */
+  /**
+   * "across 10 sessions" — how many workouts the hero figure was gathered from.
+   *
+   * The hero is a period total, not one heroic effort, and the card never said so.
+   * It matters most when the runner-up line names the same machine again in the
+   * other unit: those are different days, and this is what says so.
+   */
+  heroNote: string;
+  /** "+ Run 5.1 km (5 sessions) · Echo Bike 707 cal (3 sessions)". Null when the hero was the only figure. */
   rest: string | null;
   /**
    * Every aerobic figure the period produced, hero first — the same numbers `rest`
    * names in prose, structured for pages that lay them out rather than read them.
    */
   cells: RecapEngineCell[];
+}
+
+/**
+ * Energy the athlete actually expended — ESTIMATED, and never to be confused with
+ * `RecapAerobicStat`.
+ *
+ * These are two different quantities that share a word, and conflating them is the
+ * bug this card exists to end. The engine card's calories are what one fan bike's
+ * display counted on the days it was set to calories: measured, one machine, a
+ * subset of the period's sessions. This is the whole body across every timed
+ * session, and for a real month it lands about TEN TIMES higher. A reader who
+ * takes the bike figure for this one concludes they burned a single dinner in a
+ * month of training.
+ *
+ * So it is always a range, never a point. There is no heart rate here — the same
+ * 20-minute AMRAP sandbagged and emptied score identically — and the honest
+ * response to that is a band wide enough to contain both, not a false precision
+ * a wrist strap would embarrass.
+ */
+export interface RecapEnergyStat {
+  /** Rounded low and high bounds, in kcal. */
+  low: number;
+  high: number;
+  /** "11,000–15,600" — the two bounds, formatted, because it is never one number. */
+  range: string;
+  /** "across 46 of 47 sessions · 18 hours on the clock" — what it was computed over. */
+  basis: string;
+  /** Minutes the estimate covers. Untimed sessions contribute none. */
+  minutes: number;
+  timedWorkouts: number;
+  /** Sessions with no duration logged. Their effort is missing, so the range is a floor. */
+  untimedWorkouts: number;
 }
 
 export interface RecapFeltStat {
@@ -268,6 +316,13 @@ export interface RecapData {
   conditioningNote: string | null;
   /** Cardio machines, busiest first. Empty when the period had no cardio. */
   cardio: RecapCardioStat[];
+  /**
+   * Estimated energy expended. Null when the period logged no durations at all.
+   *
+   * Deliberately NOT adjacent to `aerobic` on the card deck: the two carry the
+   * same word and differ by an order of magnitude.
+   */
+  energy: RecapEnergyStat | null;
   /** The engine card. Null when the period had no aerobic work at all. */
   aerobic: RecapAerobicStat | null;
   /** "This month" facts, each measured on its own axis. */
@@ -317,6 +372,9 @@ const SEASON_LABELS: Record<number, { name: string; sub: string }> = {
  * becomes a scoreboard again.
  */
 function tonnageComp(kg: number): string {
+  if (kg >= 200000) return 'the Statue of Liberty';
+  if (kg >= 100000) return 'a blue whale';
+  if (kg >= 40000) return 'a Boeing 737';
   if (kg >= 20000) return 'a loaded cement truck';
   if (kg >= 8000) return 'a T-rex off the floor';
   if (kg >= 3000) return 'a small car — fully loaded';
@@ -325,6 +383,105 @@ function tonnageComp(kg: number): string {
   if (kg >= 150) return 'a vending machine';
   if (kg > 0) return 'a washing machine';
   return 'every rep that counted';
+}
+
+/** A format's intensity band, in METs. Never a single value — see `RecapEnergyStat`. */
+interface MetBand {
+  low: number;
+  high: number;
+}
+
+/**
+ * How hard each format is, in METs — multiples of sitting still.
+ *
+ * Keyed by `WorkoutFormat` rather than by anything inferred, so the union stays
+ * exhaustive: adding a format to the type breaks this table until it is rated,
+ * which is the only way a new format can't silently inherit someone else's number.
+ *
+ * The spread within each band is the intensity we cannot see. Formats with rest
+ * written into them (EMOM, intervals) sit lower than formats that run continuously
+ * (for time, tabata); strength sits lowest because most of a strength session is
+ * spent standing next to a barbell rather than moving it.
+ */
+const FORMAT_MET: Record<WorkoutFormat, MetBand> = {
+  for_time: { low: 9, high: 13 },
+  tabata: { low: 9, high: 13 },
+  amrap: { low: 9, high: 12 },
+  intervals: { low: 8, high: 11 },
+  amrap_intervals: { low: 8, high: 11 },
+  emom: { low: 7, high: 10 },
+  strength: { low: 4, high: 6 },
+};
+
+/** Mixed training — for a session saved before `format` was stored, or without one. */
+const MIXED_MET: MetBand = { low: 8, high: 11 };
+
+/**
+ * The standard MET equation: one MET is 3.5 ml of oxygen per kg per minute, and
+ * 200 ml of oxygen is about one kilocalorie.
+ *
+ * The 3.5 baseline is a population average, so it runs slightly generous for
+ * smaller and for female athletes — one more reason the output is a band.
+ */
+function kcalPerMinute(met: number, bodyweight: number): number {
+  return (met * 3.5 * bodyweight) / 200;
+}
+
+/**
+ * Round to a precision the model can actually support.
+ *
+ * A four-significant-figure calorie estimate would be claiming to know something
+ * this model has no way of knowing.
+ */
+function roundEnergy(kcal: number): number {
+  return kcal >= 1000 ? Math.round(kcal / 100) * 100 : Math.round(kcal / 10) * 10;
+}
+
+/**
+ * The period's energy expenditure, as a range.
+ *
+ * Only timed sessions contribute — an untimed one has no minutes to rate, so it
+ * adds nothing and the total is a floor. `untimedWorkouts` is carried out so the
+ * card can say so rather than quietly reporting low.
+ */
+function buildEnergyStat(ws: WorkoutWithStats[], bodyweight: number): RecapEnergyStat | null {
+  let low = 0;
+  let high = 0;
+  let minutes = 0;
+  let timedWorkouts = 0;
+  let untimedWorkouts = 0;
+
+  for (const w of ws) {
+    const mins = w.duration ?? 0;
+    if (mins <= 0) {
+      untimedWorkouts += 1;
+      continue;
+    }
+    const band = w.format ? FORMAT_MET[w.format] : MIXED_MET;
+    low += kcalPerMinute(band.low, bodyweight) * mins;
+    high += kcalPerMinute(band.high, bodyweight) * mins;
+    minutes += mins;
+    timedWorkouts += 1;
+  }
+
+  if (timedWorkouts === 0) return null;
+
+  const lowRounded = roundEnergy(low);
+  const highRounded = roundEnergy(high);
+  const sessions = untimedWorkouts > 0
+    ? `${timedWorkouts} of ${timedWorkouts + untimedWorkouts}`
+    : String(timedWorkouts);
+  const hours = Math.round(minutes / 60);
+
+  return {
+    low: lowRounded,
+    high: highRounded,
+    range: `${lowRounded.toLocaleString()}–${highRounded.toLocaleString()}`,
+    basis: `across ${sessions} sessions · ${hours} ${hours === 1 ? 'hour' : 'hours'} on the clock`,
+    minutes: Math.round(minutes),
+    timedWorkouts,
+    untimedWorkouts,
+  };
 }
 
 function monthRecapId(year: number, month: number): string {
@@ -396,6 +553,7 @@ function buildRecap(
   const conditioning = moves.filter(m => m.category === 'conditioning');
   const cardio = buildCardioStats(ws);
   const aerobic = buildAerobicStat(cardio);
+  const energy = buildEnergyStat(ws, bodyweight);
   const highlights = buildHighlights(moves, topMove);
 
   // felt aggregation — count by posterVibe
@@ -514,6 +672,7 @@ function buildRecap(
     conditioning,
     conditioningNote: buildConditioningNote(conditioning),
     cardio,
+    energy,
     aerobic,
     highlights,
     felt,
@@ -917,6 +1076,13 @@ interface AerobicEntry {
   amount: number;
   value: string;
   label: string;
+  /** Workouts that measured THIS machine in THIS unit. */
+  sessions: number;
+}
+
+/** "3 sessions" · "1 session" — the count, never bare. */
+function sessionCount(n: number): string {
+  return `${n} ${n === 1 ? 'session' : 'sessions'}`;
 }
 
 /**
@@ -956,11 +1122,22 @@ function distanceComp(metres: number): string {
   return 'every metre earned';
 }
 
+/**
+ * The comparison under a calorie hero. Says something about the MACHINE — never
+ * about the athlete's body, their food, or the period as a whole.
+ *
+ * This figure is what one fan bike's display counted on the days it happened to be
+ * set to calories. It excludes every barbell rep, every run, and every session on
+ * that same machine logged in metres instead. An earlier ladder compared it to
+ * meals ("a full day's food, gone"), which quietly promised a scope it has never
+ * had: a reader takes the line at face value and concludes they burned a single
+ * dinner across a month of training. Energy actually expended is a different
+ * quantity, an order of magnitude larger, and it is not this number.
+ */
 function calorieComp(calories: number): string {
-  if (calories >= 10000) return 'a whole month, burned off the machine';
-  if (calories >= 5000) return 'two days of eating, given back';
-  if (calories >= 2000) return "a full day's food, gone";
-  if (calories >= 1000) return 'a proper night out, erased';
+  if (calories >= 5000) return 'the fan never cooled down';
+  if (calories >= 2000) return 'the fan earned its keep';
+  if (calories >= 500) return 'and the fan never forgave you';
   return 'every calorie earned';
 }
 
@@ -979,13 +1156,14 @@ function buildAerobicStat(cardio: RecapCardioStat[]): RecapAerobicStat | null {
       const { value, unit } = formatDistance(stat.distance);
       entries.push({
         machine: stat.name, unit: 'distance', amount: stat.distance,
-        value, label: unit,
+        value, label: unit, sessions: stat.distanceSessions,
       });
     }
     if (stat.calories > 0) {
       entries.push({
         machine: stat.name, unit: 'calories', amount: stat.calories,
         value: Math.round(stat.calories).toLocaleString(), label: 'CAL',
+        sessions: stat.calorieSessions,
       });
     }
   }
@@ -1006,10 +1184,11 @@ function buildAerobicStat(cardio: RecapCardioStat[]): RecapAerobicStat | null {
     // Each runner-up keeps its own machine and its own unit. Adding a calorie
     // total to a distance one, or converting between them, would turn measured
     // numbers into a guess — so the line lists them, it never totals them.
+    heroNote: `across ${sessionCount(hero.sessions)}`,
     rest: rest.length > 0
-      ? `+ ${rest.map(e => `${e.machine} ${e.value} ${e.label.toLowerCase()}`).join(' · ')}`
+      ? `+ ${rest.map(e => `${e.machine} ${e.value} ${e.label.toLowerCase()} (${sessionCount(e.sessions)})`).join(' · ')}`
       : null,
-    cells: entries.map(e => ({ machine: e.machine, value: e.value, unit: e.label })),
+    cells: entries.map(e => ({ machine: e.machine, value: e.value, unit: e.label, sessions: e.sessions })),
   };
 }
 

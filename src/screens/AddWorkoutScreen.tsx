@@ -35,7 +35,7 @@ import {
   getSavedWorkingStrengthSets,
   getSavedStrengthRepScheme,
 } from '../utils/workoutToParsed';
-import { findMovementTotal, movementsForParts } from '../components/celebration/movementResolution';
+import { findMovementTotal, movementsForParts, isBoardOfferedChoice } from '../components/celebration/movementResolution';
 import { scaleEnteredToTier } from '../utils/tierScaling';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
 import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
@@ -646,7 +646,14 @@ export function buildWorkloadBreakdownFromResults(
       const rawMovementName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
       const movementName = rawMovementName;
       const wasSubstituted = rawMovementName !== mov.name;
-      const substitutionType = wasSubstituted ? (getAlternativeType(mov.name, rawMovementName) ?? undefined) : undefined;
+      // Taking the option the BOARD itself offered ("4 Bar Muscle-up / 8 Chest to Bar Pull-up")
+      // is not scaling — both sides were prescribed, at the coach's own counts, so the athlete
+      // did the workout as written. Only an off-board change is a scale (400m Run → 1200m Echo
+      // Bike). The link itself is still recorded either way: `originalMovement` is how the
+      // breakdown joins back to the prescription.
+      const substitutionType = wasSubstituted && !isBoardOfferedChoice(mov.alternative, rawMovementName)
+        ? (getAlternativeType(mov.name, rawMovementName) ?? undefined)
+        : undefined;
       const originalMovement = wasSubstituted ? mov.name : undefined;
       const key = movementBucketKey(movementName, resultIndex);
 
@@ -2999,7 +3006,6 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           const selectedDistance = scaleEnteredToTier(
             movementLookup(result.movementDistances || {}, mk, mov.name), mov.distance, base?.distance,
           );
-          const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
           const loggedWeights = loggedLoadFor(mk, mov.name);
           // The slot the board left OPEN is prescribed BY BEING EMPTY, so the logged-value bake
           // below must not touch it. "➔ Max Sit-up" was saved as `reps: 20` — the athlete's own
@@ -3022,19 +3028,24 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
             // reconstruct the "N×" trip count.
             ...(selectedDistance !== undefined && mov.relay !== true && openSlot !== 'distance'
               ? { distance: selectedDistance } : {}),
+            // The athlete's load goes HERE and only here. `rxWeights` is the coach's, and stays.
+            //
+            // This used to overwrite rxWeights with the entered weight as well — the same
+            // logged-value bake the open-slot guard above exists to stop, just for load instead
+            // of reps. It destroyed the prescription: a board reading "8-10 Deadlift @60/85kg"
+            // came back from the save as 85/85 (and 90/90 for an athlete who went heavier), so
+            // the scaled Rx was gone from the record and the poster had nothing left to state
+            // the coach's number from. Nothing is lost by keeping them apart — `loggedWeights`
+            // is written from the SAME `movementWeights` entry under the same > 0 gate, and
+            // resolveOccurrenceLoad already reads it first, listing rxWeights last precisely
+            // because this bake was the only reason it ever held an athlete's number.
             ...(loggedWeights ? { loggedWeights } : {}),
-            ...(selectedWeight && selectedWeight > 0 ? {
-              rxWeights: {
-                male: selectedWeight,
-                female: selectedWeight,
-                unit: mov.rxWeights?.unit || 'kg',
-              },
-            } : {}),
           };
         });
-        // Sections get the same logged-value bake as the top-level movements: consumers read
-        // section movements when sections exist, so leaving them on the coach's Rx makes every
-        // downstream fallback show Rx instead of the athlete's entry.
+        // Sections record the athlete's load the same way the top-level movements do — in
+        // `loggedWeights`, never over the coach's `rxWeights`. Consumers read section movements
+        // when sections exist, so both lists must carry the entry; neither may erase the
+        // prescription to do it.
         //
         // Keyed by the SAME ::index sequence createBlankResult assigns when it flattens the
         // sections into one input per block — a bare-name lookup gave every block of a repeated
@@ -3051,20 +3062,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           movements: sec.movements.map((mov, movIdx) => {
             const mk = sectionKeys[sectionKeyOffsets[secIdx] + movIdx] ?? mov.name;
             const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
-            const selectedWeight = movementLookup(result.movementWeights || {}, mk, mov.name);
             const loggedWeights = loggedLoadFor(mk, mov.name);
             return {
               ...mov,
               name: selectedName,
               substitution: substitutionForSave(mk, mov),
               ...(loggedWeights ? { loggedWeights } : {}),
-              ...(selectedWeight && selectedWeight > 0 ? {
-                rxWeights: {
-                  male: selectedWeight,
-                  female: selectedWeight,
-                  unit: mov.rxWeights?.unit || 'kg',
-                },
-              } : {}),
             };
           }),
         }));
@@ -3249,6 +3252,10 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
           ...(result.exercise.workDuration != null && { workDuration: result.exercise.workDuration }),
           ...(result.exercise.restDuration != null && { restDuration: result.exercise.restDuration }),
+          // The cadence the board wrote. Persisted alongside the totals because the poster reads
+          // it directly — see utils/blockClock.ts on why it must never be divided back out.
+          ...(result.exercise.intervalSeconds != null && { intervalSeconds: result.exercise.intervalSeconds }),
+          ...(result.exercise.intervalRestSeconds != null && { intervalRestSeconds: result.exercise.intervalRestSeconds }),
           // User-entered WOD name during logging takes priority; AI-generated name is fallback
           ...((result.metconName || result.exercise.aiPartName) && {
             aiPartName: result.metconName || result.exercise.aiPartName,
@@ -3485,12 +3492,19 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           { id: workoutId, title: workoutTitle, exercises, date: workoutDate },
           fetchedPRs
         );
-        // Detect barbell complex: all PR-eligible weighted movements in one exercise
-        const isBarbellComplex = exercises.length === 1 &&
-          exercises[0].movements && exercises[0].movements.length > 1 &&
-          exercises[0].movements.every(m =>
-            (m.rxWeights?.male ?? m.rxWeights?.female ?? 0) > 0
-          );
+        // Is this one piece a barbell complex? The AI answers that directly — `complex` means
+        // "+"-joined movements done together on one bar, which is exactly the question.
+        //
+        // It used to be inferred from "every movement carries a weight", which only worked
+        // because the save overwrote rxWeights with the athlete's entry. With the prescription
+        // left intact, a complex the board never loaded ("1 Power Clean + 1 Hang Power Clean —
+        // start at ~60% and build up") carries no Rx at all and the inference goes quiet. The
+        // weight check stays as the fallback for docs parsed before `complex` existed.
+        const soleExercise = exercises.length === 1 ? exercises[0] : undefined;
+        const isBarbellComplex = !!soleExercise
+          && (soleExercise.movements?.length ?? 0) > 1
+          && (soleExercise.complex === true
+            || soleExercise.movements!.every(m => (m.rxWeights?.male ?? m.rxWeights?.female ?? 0) > 0));
         const prContext = isBarbellComplex ? 'Complex Training' : undefined;
 
         await syncRecordsForWorkout(user.id, workoutId, workoutRecords.map((pr) => ({

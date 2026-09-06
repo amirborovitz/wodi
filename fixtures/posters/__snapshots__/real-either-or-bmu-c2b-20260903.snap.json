@@ -1,0 +1,188 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Rack Reverse Lunge",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Back Rack Reverse Lunge",
+            "subNote": "30 total",
+            "totalNote": "30 total",
+            "mineKey": "Back Rack Reverse Lunge",
+            "accent": "yellow",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "8 Rounds For Time",
+        "blueprint": "8 rounds for time",
+        "rows": [
+          {
+            "primary": "200m",
+            "name": "Run",
+            "subNote": "1.60 km total",
+            "totalNote": "1.60 km total",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 8
+          },
+          {
+            "primary": "4",
+            "name": "Bar Muscle-ups",
+            "subNote": "32 total",
+            "totalNote": "32 total",
+            "mineKey": "Bar Muscle-up",
+            "accent": "cyan",
+            "repeatCount": 8
+          },
+          {
+            "primary": "6",
+            "name": "Front Squats",
+            "nameWithLoad": "Front Squats @ 60kg",
+            "loadNote": "60kg",
+            "subNote": "48 total",
+            "totalNote": "48 total",
+            "mineKey": "Front Squat",
+            "accent": "yellow",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "19:00",
+    "unit": "MIN",
+    "formatLine": "Strength + 8 RFT",
+    "storyLine": "48 front squat · 32 bar mu · 30 back rack reverse lunge · 1.6km run",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BACK RACK REVERSE LUNGE",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Back Rack Reverse Lunge",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 30
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "8 ROUNDS FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "200m",
+        "name": "Run",
+        "total": "1.6km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "4",
+        "name": "Bar Muscle-up",
+        "total": "32 total",
+        "color": "cyan"
+      },
+      {
+        "perRound": "6",
+        "name": "Front Squat",
+        "total": "48 total",
+        "color": "yellow",
+        "weight": 60,
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "19:00",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Back Rack Reverse Lunge",
+          "load": "",
+          "mine": "40→50kg",
+          "team": "",
+          "total": "30 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "8 ROUNDS FOR TIME",
+          "cap": "8 rounds for time"
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.60 km total"
+        },
+        {
+          "kind": "line",
+          "rx": "4 Bar Muscle-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "32 total"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Front Squats",
+          "load": "",
+          "mine": "60kg",
+          "team": "",
+          "total": "48 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "10-10-10 reps",
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ]
+}

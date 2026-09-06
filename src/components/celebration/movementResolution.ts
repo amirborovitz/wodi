@@ -1,4 +1,5 @@
 import type { Exercise, ParsedMovement, MovementTotal } from '../../types';
+import { sameMovementName } from '../../utils/movementNameMatch';
 
 // ─── Prescription ↔ logged-breakdown resolution ────────────────────────────────
 //
@@ -29,6 +30,24 @@ export function prescribedMovementNames(target: Exercise[]): Set<string> {
 }
 
 /**
+ * The athlete took an option the BOARD itself offered ("4 Bar Muscle-up / 8 Chest to Bar Pull-up"),
+ * rather than swapping in a movement of their own.
+ *
+ * Both sides were prescribed, at the coach's own counts, so doing one of them is simply doing the
+ * workout — not scaling out of it. Read from the prescription every time rather than stamped at
+ * save, so workouts logged before this distinction existed read correctly too.
+ */
+export function isBoardOfferedChoice(
+  alternative: { name: string } | null | undefined,
+  loggedName: string | undefined,
+): boolean {
+  // Names are compared as movement TOKENS, never raw strings: the board's "Chest to Bar Pull-up"
+  // and the logged "Chest-to-Bar Pull-ups" are one movement, and an exact compare misses it —
+  // which is precisely the row that was wearing a swap chip it hadn't earned.
+  return sameMovementName(alternative?.name, loggedName);
+}
+
+/**
  * The movement the board wrote, when this entry is a substitute for it — read from the SAME
  * joined entry every renderer already uses, so a poster can never disagree with the workload
  * breakdown about what was performed.
@@ -36,8 +55,17 @@ export function prescribedMovementNames(target: Exercise[]): Set<string> {
  * An entry flagged as substituted but carrying no original name has nothing worth showing, so
  * it reads as no swap at all rather than as an arrow pointing at a blank.
  */
-export function substitutedFromName(total: MovementTotal | undefined): string | undefined {
+export function substitutedFromName(
+  total: MovementTotal | undefined,
+  /** The board's offered option for this movement, when the prescription states one. */
+  prescribedAlternative?: { name: string } | null,
+): string | undefined {
   if (!total?.wasSubstituted) return undefined;
+  // Nothing to say "from" when the board wrote both movements — the athlete picked one of the two
+  // things they were told to do. The link stays stored (`originalMovement` is how the breakdown
+  // joins back to the prescription); it just isn't a story worth telling on the poster. A swap the
+  // athlete made on their own — an Echo Bike where the board wrote a run — still shows its origin.
+  if (isBoardOfferedChoice(prescribedAlternative, total.name)) return undefined;
   return total.originalMovement?.trim() || undefined;
 }
 

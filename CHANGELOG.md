@@ -1,5 +1,114 @@
 # Changelog
 
+## v0.1.31 — The board says what the board says
+
+Every fix here is the same sentence twice: a number the coach wrote and a number the athlete
+earned are two different facts, and the app kept storing them in one place, or printing one where
+the other belonged.
+
+It surfaced as two logs of the *same* board, minutes apart, producing two unrecognisable posters —
+one of which announced a four-minute EMOM that nobody ran, on a board reading "EMOM for 16 minutes".
+
+Most of this is also the second wave of v0.1.30's strict schema. When every field became one the
+model must answer, several `if (the AI mentioned X)` checks silently became always-true, and a
+few fields started carrying an echo of a fact that already lived somewhere better.
+
+---
+
+### A cadence is read, never divided
+
+The poster used to rebuild the interval as `workDuration / intervalCount`, in two places. Both of
+those numbers are the model's own arithmetic, and a station rotation makes them disagree: "EMOM for
+16 minutes (4 rounds)" over four minute slots is sixteen one-minute windows, but `intervalCount`
+held the round count. 960 ÷ 4 printed `[4:00] × 4` as the title and `EMOM 4:00` on every block —
+a prescription nobody wrote, on a poster whose whole standard is that only written numbers appear.
+
+It was wrong even when the parse was perfect, which is what made it a defect rather than parse
+noise. Dividing one estimate by another cannot be made safe by improving either.
+
+So the model now states the cadence directly — `intervalSeconds`, one work window, normalised out
+of whatever the box wrote ("EMOM 16", "E2MOM", "Every 90 sec x 12", "Q2M", "[3:00/1:00] x 5").
+`blockCadence` in `blockClock.ts` is the one owner, the station title and the block clock both ask
+it, and it can no longer manufacture a number the board never carried. A board it cannot read gets
+no clock line, which is the honest answer.
+
+The prompt was specifying the bug, incidentally: it said in as many words that "the per-interval
+cadence is workDuration / intervalCount". It now says the opposite.
+
+Docs saved before the field existed fall back to reading the board text. That path is legacy-only
+and is meant to be deleted once old workouts are backfilled — it must not grow into a notation
+library.
+
+### Your weight stops erasing the coach's
+
+The save path wrote the entered load over `rxWeights`. A board reading `8-10 Deadlift @60/85kg`
+came back as `85/85`, and the scaled prescription was gone from the record permanently. On a block
+the coach never loaded — "1 Power Clean + 1 Hang Power Clean, start at ~60% and build up" — the
+document ended up asserting a prescribed weight that nobody had written.
+
+The guard against exactly this already existed for *reps* (`openQuantitySlot`, after "➔ Max Sit-up"
+was saved as `reps: 20`). Load never got it.
+
+Now the entry lives in `loggedWeights` and `rxWeights` stays the coach's. Nothing was lost by
+separating them: `loggedWeights` was already written from the same entry under the same condition,
+and `resolveOccurrenceLoad` already read it first — its own comment noted that `rxWeights` came
+last "only because saves baked the logged weight into it".
+
+Two things were living off that bake and are now explicit:
+
+- **Re-opening a log to edit.** The prefill read `rxWeights` and got your weight only because the
+  save had put it there. With the prescription intact it would have offered the coach's number, and
+  since an edit rewrites `exercises[]` wholesale, saving straight through would have overwritten a
+  real logged load with it. `createBlankResult` now prefills from `loggedWeights`, and a build comes
+  back as a range instead of collapsing to one number.
+- **The barbell-complex PR label**, which asked "does every movement have a weight?" — true only
+  because of the bake. It reads the AI's `complex` flag now.
+
+### The poster shows both numbers
+
+Prescription on the left, exactly as the board wrote it; what the athlete did on the right.
+
+```
+8-10 Deadlift @ 60/85kg      70kg
+40KG 1 Power Clean + 1 Hang Squat Clean + 1 Push Jerk      40→50kg
+```
+
+Two builders were splicing the athlete's load into the coach's sentence. The station row preferred
+the logged weight and fell back to the Rx; the strength row put the athlete's *build* in the
+prescription slot and then printed it a second time in their own column — the same number twice on
+one line, one of them a claim the board never made.
+
+A board that prescribed no weight now shows none, and the movement name carries the line.
+
+### The strict schema's second wave
+
+- `repsDisplay` began echoing the board's either/or offer ("4 Bar Muscle-up / 8 Chest to Bar
+  Pull-up"), a fact `alternative` already models properly. The poster printed the copy as a rep
+  count — "4 / 8 Bar Muscle-ups", a range no coach wrote, with the alternative's name dropped.
+  `readRepsDisplay` drops the slash when the movement has an alternative, at the parse boundary and
+  again on read so existing docs render correctly.
+- `movementNameTokens` / `sameMovementName` give one comparable form for a movement name —
+  lowercased, split, singularized, abbreviations expanded. "Chest to Bar Pull-up" and
+  "Chest-to-Bar Pull-ups" are one movement, and anything comparing two names has to compare these.
+
+### Recap: calories are two different quantities
+
+The wrapped cards separated the machine figure from the body figure. A fan bike's calorie display
+is one machine on the subset of days it was set to calories; energy expended is the whole body
+across every timed session, and for a real month it lands about ten times higher. Sharing a word
+made the smaller number readable as the larger one.
+
+Aerobic stats now state how many sessions they were gathered from, which also explains the case
+that used to read as double-counting: the same machine appearing twice in different units is two
+disjoint sets of days.
+
+---
+
+Verified: `tsc -b` clean, 713 tests, 56 poster fixtures — including two new ones built from the
+real documents behind this report, one in the legacy shape and one in the shape a save now
+produces.
+
+
 ## v0.1.30 — The parse stops asking nicely, and the feed gets a face
 
 Two of this release's three big pieces are the same move made twice: stop asking the model to

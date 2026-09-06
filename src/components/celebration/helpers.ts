@@ -56,7 +56,9 @@ import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, g
 import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { scaleEnteredToTier } from '../../utils/tierScaling';
 import { timeCapLabelFromText } from '../../utils/timeCap';
+import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit } from '../../utils/loadUnits';
+import { readRepsDisplay } from '../../utils/repsDisplay';
 
 
 // Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
@@ -580,6 +582,7 @@ function buildDescendingLadderRows(
               weight: movement.rxWeights?.male ?? movement.rxWeights?.female,
               implementCount: movement.implementCount,
               relay: movement.relay,
+              alternative: movement.alternative,
             },
             // With a stated count, the totals are count × the coach's per-round quantity. The
             // stored breakdown was computed before that count was known and holds the tier-count
@@ -1441,7 +1444,7 @@ export function prescribesSingleMovement(exercise: Exercise): boolean {
 
 function buildCelebrationMovementRow(params: {
   movementName: string;
-  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; time?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean };
+  prescribed?: { reps?: number; repsDisplay?: string; distance?: number; calories?: number; time?: number; weight?: number; implementCount?: 1 | 2; relay?: boolean; alternative?: ParsedMovement['alternative'] };
   actual?: MovementTotal;
   repeatCount?: number;
   /** How many times this movement is written in the piece this row belongs to. */
@@ -1575,18 +1578,20 @@ function buildCelebrationMovementRow(params: {
     // deliberately suppressed (its per-set number is a meaningless sum), so the count has nowhere
     // else to live — the row falls through to the reps branch below and the load rides in the
     // load column like every other strength row.
-    if (actual?.weightProgression && actual.weightProgression.length > 1) {
-      const min = Math.min(...actual.weightProgression);
-      const max = Math.max(...actual.weightProgression);
-      primary = min === max ? `${max}${unitUpper}` : `${min}→${max}${unitUpper}`;
-    } else {
-      primary = `${weight}${unitUpper}`;
-    }
+    // ...but the load that goes in the PRESCRIPTION slot is the COACH'S. Reading the athlete's
+    // build here put "50→65KG" in front of the movement name AND again in their own column —
+    // the same number twice on one line, one of them asserting a prescription the board never
+    // made. This block's board reads "1 Power Clean + 1 Hang Power Clean — start at ~60% and
+    // build up": no weight at all, so the slot stays empty and the name carries the line.
+    const prescribedWeight = prescribed?.weight;
+    primary = (prescribedWeight ?? 0) > 0 ? `${prescribedWeight}${unitUpper}` : '';
     if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
     accent = 'yellow';
   } else if (perRoundReps && perRoundReps > 0) {
-    // A prescribed range ("10-12") is what the coach wrote — the midpoint only feeds totals.
-    primary = prescribed?.repsDisplay ?? `${perRoundReps}`;
+    // The coach's own notation ("10-12", "10 (alt')") is what the athlete was asked to do — the
+    // midpoint in `reps` only feeds totals. Read through readRepsDisplay so a doc saved before
+    // the parser validated the field can't print its either/or echo ("4 / 8") as a rep count.
+    primary = readRepsDisplay({ repsDisplay: prescribed?.repsDisplay, alternative: prescribed?.alternative }) ?? `${perRoundReps}`;
     if (hasWeight) {
       if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
       accent = 'yellow';
@@ -1608,6 +1613,10 @@ function buildCelebrationMovementRow(params: {
   // sees WHY there's no per-partner split — matching the sectioned builder's suffix. The word
   // is the board's own ("(each)" / "(sync)" / "(together)"), never a house rewrite.
   const isTogether = !!together;
+  // The board's either/or is NOT printed here. The athlete did one of the two, and this row is
+  // the record of what they did — a menu ("4 Bar Muscle-ups / 8 Chest to Bar Pull-ups") states a
+  // prescription nobody performed. The choice still matters upstream: it moves the row's number
+  // when the athlete takes it, and it keeps `repsDisplay` from echoing the slash as a rep count.
   const displayName = isTogether ? `${pluralName} ${sharedWorkSuffix(sharedLabel)}` : pluralName;
   const hasLoggedWeight = (actual?.weight || 0) > 0;
   const hasPrescribedDistForRelay = (prescribed?.distance ?? 0) > 0 && (perRoundDistance ?? 0) > 0;
@@ -1641,7 +1650,7 @@ function buildCelebrationMovementRow(params: {
     mineKey: actual?.name ?? movementName,
     // The board's movement when this row is a substitute for it. The row already DISPLAYS the
     // substitute (baseDisplayName above); this is what says so out loud.
-    substitutedFrom: substitutedFromName(actual),
+    substitutedFrom: substitutedFromName(actual, prescribed?.alternative),
     accent,
     repeatCount,
     partnerSplit,
@@ -1913,7 +1922,7 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
       ...(hasWeight ? { subNote: implementCount > 1 ? `${implementCount}×${perImplementW}${unit}` : `${perImplementW}${unit}` } : {}),
       totalNote: total > 0 ? `${total}${totalUnitLabel} total` : undefined,
       mineKey: m0.name,
-      substitutedFrom: substitutedFromName(bd),
+      substitutedFrom: substitutedFromName(bd, m0.alternative),
       accent: hasWeight ? 'yellow' : (bd?.color ?? 'magenta'),
     };
   });
@@ -1966,6 +1975,31 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
   return ` @ ${implementPrefix}${male ?? female}${unit}`;
 }
 
+/**
+ * The board's either/or option, written the way the coach wrote it: " / 8 Chest to Bar Pull-ups".
+ *
+ * Standard whiteboard notation offers a scaling choice on one line — "4 Bar Muscle-up / 8 Chest to
+ * Bar Pull-up", "40 DU / 60 singles". The parse keeps the choice in `alternative`, and every poster
+ * row that names a movement has to say it, or the line asserts a prescription the board did not
+ * make. The alt quantity is dropped when it equals the main movement's, because that is how boards
+ * write it ("10 dips / push ups").
+ *
+ * The ONE place this string is built. It used to be written twice — inline here and again into the
+ * station-row lookup — and the flat per-round row, which had neither, silently dropped the option.
+ */
+function formatMovementAlternativeSuffix(
+  movement: Pick<ParsedMovement, 'reps' | 'calories' | 'distance' | 'alternative'>,
+  multiplier = 1,
+): string {
+  const alt = movement.alternative;
+  if (!alt?.name) return '';
+  const altQty = alt.reps != null && alt.reps !== movement.reps ? `${alt.reps * multiplier}`
+    : alt.calories != null && alt.calories !== movement.calories ? `${alt.calories * multiplier} CAL`
+    : alt.distance != null && alt.distance !== movement.distance ? formatDistanceValue(alt.distance * multiplier).toUpperCase()
+    : '';
+  return ` / ${[altQty, formatRepMovementNameForPoster(alt.name, alt.reps ?? movement.reps)].filter(Boolean).join(' ')}`;
+}
+
 function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement, multiplier = 1): { text: string; hasWeight: boolean } {
   const qty = statesMaxEffort(movement)
     // The coach's own word, in the slot a quantity would occupy. Same rule the flat row builder
@@ -1987,18 +2021,7 @@ function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement,
         : '';
   const load = formatSectionRxLoad(exercise, movement);
   const together = movement.together ? ` ${sharedWorkSuffix(movement.sharedLabel)}` : '';
-  // "OR" option from the board ("10 dips / push ups") — same convention as station rows.
-  // The alt quantity is omitted when it matches the main movement's, as boards write it.
-  const alt = movement.alternative;
-  const altQty = alt
-    ? (alt.reps != null && alt.reps !== movement.reps ? `${alt.reps * multiplier}`
-      : alt.calories != null && alt.calories !== movement.calories ? `${alt.calories * multiplier} CAL`
-      : alt.distance != null && alt.distance !== movement.distance ? formatDistanceValue(alt.distance * multiplier).toUpperCase()
-      : '')
-    : '';
-  const altSuffix = alt
-    ? ` / ${[altQty, formatRepMovementNameForPoster(alt.name, alt.reps ?? movement.reps)].filter(Boolean).join(' ')}`
-    : '';
+  const altSuffix = formatMovementAlternativeSuffix(movement, multiplier);
   return {
     text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${altSuffix}${load}`].filter(Boolean).join(' '),
     hasWeight: load !== '',
@@ -2042,6 +2065,7 @@ function buildSequentialMovementRows(
         calories: movement.calories,
         weight: movement.rxWeights?.male || movement.rxWeights?.female,
         implementCount: movement.implementCount,
+        alternative: movement.alternative,
       },
       actual,
       repeatCount: options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount,
@@ -2105,7 +2129,7 @@ function buildStrengthBlockRows(exercise: Exercise, movements: MovementTotal[]):
         totalNote: totalReps ? `${totalReps} total` : undefined,
         subNote: totalReps ? `${totalReps} total` : undefined,
         mineKey: actual?.name ?? displayName,
-        substitutedFrom: substitutedFromName(actual),
+        substitutedFrom: substitutedFromName(actual, mov.alternative),
         // The name-keyed mine map holds ONE value per movement, so blocks sharing a lift would
         // all read the merged figure. This row already resolved its own occupant's load.
         ...(load ? { mineOverride: formatLoggedLoad(load.weights, load.unit, load.implementCount) } : {}),
@@ -2468,13 +2492,12 @@ function formatBlockLabel(exercise: Exercise, section: ParsedSection, index: num
  * separate 6-minute AMRAP rather than two halves of one.
  */
 function formatBlockClock(exercise: Exercise): string | undefined {
-  const count = exercise.intervalCount ?? 0;
-  const work = exercise.workDuration ?? 0;
-  if (count <= 0 || work <= 0) return undefined;
-  const perBlock = Math.round(work / count);
-  const mins = Math.floor(perBlock / 60);
-  const secs = perBlock % 60;
-  const clock = `${mins}:${secs.toString().padStart(2, '0')}`;
+  // The board's cadence, read — not `workDuration / intervalCount`. That division stamped
+  // "EMOM 4:00" on each minute of an EMOM 16, inventing a four-minute window nobody ran.
+  // No cadence on the board means no clock on the header. See utils/blockClock.ts.
+  const cadence = blockCadence(exercise);
+  if (!cadence) return undefined;
+  const clock = formatCadenceClock(cadence.workSeconds);
   const word =
     exercise.loggingMode === 'amrap' || exercise.loggingMode === 'amrap_intervals' ? 'AMRAP'
     : exercise.loggingMode === 'emom' ? 'EMOM'
@@ -2795,7 +2818,8 @@ export function buildPageArtifactSections(
   const prescribedImplementMap: Record<string, 1 | 2> = {};
   const prescribedMaxMap: Record<string, boolean> = {};
   const prescribedRxLabelMap: Record<string, string> = {};
-  const prescribedAltMap: Record<string, string> = {};
+  /** The board's either/or option per movement — formatted at each use by the one formatter. */
+  const prescribedAltMap: Record<string, ParsedMovement['alternative']> = {};
   const stationLabelsInOrder: string[] = [];
   const formatStationDistance = (meters: number): string => (
     meters >= 1000
@@ -2812,7 +2836,8 @@ export function buildPageArtifactSections(
       if (!stationLabelsInOrder.includes(m.stationLabel)) stationLabelsInOrder.push(m.stationLabel);
     }
     if (m.reps) prescribedRepsMap[key] = m.reps;
-    if (m.repsDisplay) prescribedRepsDisplayMap[key] = m.repsDisplay;
+    const repsText = readRepsDisplay(m);
+    if (repsText) prescribedRepsDisplayMap[key] = repsText;
     if (m.calories) prescribedCalsMap[key] = m.calories;
     if (m.distance) prescribedDistMap[key] = m.distance;
     if (m.time) prescribedTimeMap[key] = m.time;
@@ -2825,13 +2850,7 @@ export function buildPageArtifactSections(
         ? `${formatRxPairInBoardOrder(male, female, exercise.rawText?.trim() || exercise.prescription || '')}${rxUnit}`
         : `${male || female}${rxUnit}`;
     }
-    if (m.alternative?.name) {
-      const altQty = m.alternative.reps ? `${m.alternative.reps}`
-        : m.alternative.distance ? formatStationDistance(m.alternative.distance)
-        : m.alternative.calories ? `${m.alternative.calories} cal`
-        : '';
-      prescribedAltMap[key] = [altQty, m.alternative.name].filter(Boolean).join(' ');
-    }
+    if (m.alternative?.name) prescribedAltMap[key] = m.alternative;
     if (m.implementCount) prescribedImplementMap[key] = m.implementCount;
     if (m.isMaxReps || /\bmax\b/i.test(m.name)) prescribedMaxMap[key] = true;
   }
@@ -3263,6 +3282,10 @@ export function buildPageArtifactSections(
           let fullLine: string;
           let rxLoadTag: string | undefined;
           let totalNote: string | undefined;
+          // The two loads a weighted station row carries, kept apart on purpose: what the coach
+          // wrote, and what the athlete lifted. They go in different columns.
+          let boardLoad: string | undefined;
+          let loggedLoad: string | undefined;
 
           if (isMaxMovement) {
             // Max-effort movement: the prescription is just "Max <movement>"; the Rx load rides
@@ -3308,10 +3331,21 @@ export function buildPageArtifactSections(
               : prescDist && prescDist > 0 ? formatStationDistance(prescDist)
               : prescCals && prescCals > 0 ? `${prescCals} cal`
               : prescribedRepsDisplayMap[key] ?? `${prescReps}`;
-            const altSuffix = prescribedAltMap[key] ? ` / ${prescribedAltMap[key]}` : '';
-            const loadSuffix = (movement.weight || 0) > 0 ? ` @ ${movement.weight}${wUnit}`
-              : prescribedRxLabelMap[key] ? ` @ ${prescribedRxLabelMap[key]}` : '';
-            fullLine = `${qty} ${displayName}${altSuffix}${loadSuffix}`;
+            const altSuffix = formatMovementAlternativeSuffix({
+              reps: prescReps,
+              calories: prescCals,
+              distance: prescDist,
+              alternative: prescribedAltMap[key],
+            });
+            // The prescription line states the BOARD and only the board. What the athlete put on
+            // the bar goes in the right-hand column — splicing it into the coach's sentence is
+            // the same conflation the save path used to make, one layer up: the line came out
+            // "8-10 Deadlift @ 90kg", asserting as prescription a weight nobody prescribed, on a
+            // board that plainly reads "@60/85kg". The scaled pair prints in the coach's own
+            // order (see prescribedRxLabelMap), so a board writing 60/85 shows 60/85.
+            boardLoad = prescribedRxLabelMap[key];
+            loggedLoad = (movement.weight || 0) > 0 ? `${movement.weight}${wUnit}` : undefined;
+            fullLine = `${qty} ${displayName}${altSuffix}${boardLoad ? ` @ ${boardLoad}` : ''}`;
             totalNote = totalR > (prescReps || 0) ? `${totalR} total`
               : totalC > (prescCals || 0) ? `${totalC} cal total`
               : totalD > (prescDist || 0) ? `${formatStationDistance(totalD)} total`
@@ -3329,7 +3363,14 @@ export function buildPageArtifactSections(
             totalNote,
             accent: isMaxMovement ? 'yellow' : (movement.color || 'magenta'),
             stationRow: true,
-            suppressMine: true,
+            // The athlete's own load, beside the board's. Suppressed when there is nothing to
+            // say — no logged weight, or a logged weight IDENTICAL to the board's, where a
+            // second copy is noise rather than news. That equality case is also every doc saved
+            // before the prescription was protected: the save had overwritten rxWeights with the
+            // entry, so both columns would print the same number.
+            ...(loggedLoad && loggedLoad !== boardLoad
+              ? { mineOverride: loggedLoad }
+              : { suppressMine: true }),
           };
           if (stationLabel) {
             return { ...base, roundLabel: stationLabel.toUpperCase() };
@@ -3350,6 +3391,7 @@ export function buildPageArtifactSections(
           weight: prescribedWeightMap[key],
           implementCount: prescribedImplementMap[key],
           relay: parsedMovement?.relay,
+          alternative: prescribedAltMap[key],
         };
 
         const row = buildCelebrationMovementRow({

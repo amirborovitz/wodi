@@ -23,7 +23,7 @@
         "blueprint": "10 sets",
         "rows": [
           {
-            "primary": "50→65KG",
+            "primary": "",
             "name": "1 Power Clean + 1 Hang Power Clean",
             "subNote": "10 total",
             "mineKey": "Power Clean",
@@ -87,7 +87,7 @@
         },
         {
           "kind": "line",
-          "rx": "50→65KG 1 Power Clean + 1 Hang Power Clean",
+          "rx": "1 Power Clean + 1 Hang Power Clean",
           "load": "",
           "mine": "50→52.5→55→57.5→60→62.5→65kg",
           "team": "",

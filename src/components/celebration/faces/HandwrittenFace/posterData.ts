@@ -16,7 +16,9 @@ import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 import { shouldLogCelebrationDebug, prescribesSingleMovement } from '../../helpers';
 import { formatLoggedLoad } from '../../posterFormatters';
 import { getExercisePeakLoad } from '../../movementResolution';
+import { movementNameTokens } from '../../../../utils/movementNameMatch';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
+import { blockCadence, formatCadenceTitle } from '../../../../utils/blockClock';
 import { isMaxEffortPractice } from '../../mainPart';
 import { prescribesUnbrokenMax } from '../../../logging/story/types';
 
@@ -901,49 +903,18 @@ function sameLoadText(a: string, b: string): boolean {
   return normalize(a) === normalize(b);
 }
 
-// Pulls the logged weight out of `nameWithLoad` ("Hang Power Clean @ 40kg" → "40kg").
-// Poster prescriptions abbreviate and pluralize ("20 Alt DB Snatches") while breakdown names
-// are canonical singular ("Alt Dumbbell Snatch") — both sides must normalize to the same
-// tokens or the logged-weight lookup silently misses.
-const MOVEMENT_TOKEN_ALIASES: Record<string, string> = {
-  db: 'dumbbell',
-  kb: 'kettlebell',
-  bb: 'barbell',
-  alt: 'alternating',
-};
-
-function singularizeMovementToken(word: string): string {
-  if (word.length <= 2 || word.endsWith('ss')) return word;
-  if (/(sses|ches|shes|xes|zes)$/.test(word)) return word.slice(0, -2); // presses → press
-  return word.endsWith('s') ? word.slice(0, -1) : word;
-}
-
-function normalizeMovementKey(value: string): string[] {
-  const stop = new Set(['and', 'the', 'with', 'for', 'time', 'rounds', 'round']);
-  return value
-    .toLowerCase()
-    .replace(/&|\+/g, ' ')
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/[\s-]+/)
-    .filter((word) => word.length > 1 && !stop.has(word))
-    .map((word) => {
-      const singular = singularizeMovementToken(word);
-      return MOVEMENT_TOKEN_ALIASES[singular] ?? singular;
-    });
-}
-
 function lookupMineValue(mineMap: Map<string, string> | undefined, rowName: string, rxLabel: string): string {
   if (!mineMap) return '';
 
   const exact = mineMap.get(rowName.toLowerCase().trim());
   if (exact) return exact;
 
-  const rowWords = normalizeMovementKey(`${rowName} ${rxLabel}`);
+  const rowWords = movementNameTokens(`${rowName} ${rxLabel}`);
   if (rowWords.length === 0) return '';
 
   for (const [key, value] of mineMap.entries()) {
     if (!isWeightValue(value)) continue;
-    const keyWords = normalizeMovementKey(key);
+    const keyWords = movementNameTokens(key);
     if (keyWords.length === 0) continue;
 
     const shared = keyWords.filter((word) => rowWords.includes(word)).length;
@@ -957,6 +928,7 @@ function lookupMineValue(mineMap: Map<string, string> | undefined, rowName: stri
   return '';
 }
 
+// Pulls the logged weight out of `nameWithLoad` ("Hang Power Clean @ 40kg" → "40kg").
 function extractLoadSuffix(nameWithLoad: string | undefined): string {
   if (!nameWithLoad) return '';
   const match = nameWithLoad.match(/@\s*(.+)$/);
@@ -1102,25 +1074,11 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
 
 // ─── Per-page builder (carousel / multi-part workouts) ───────────────────
 
-function formatClockSeconds(seconds: number): string {
-  const rounded = Math.round(seconds);
-  const mins = Math.floor(rounded / 60);
-  const secs = rounded % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
 function formatAlternatingStationClock(exercise: Exercise): { title: string } | undefined {
-  // "02:00" → "2:00" — the clock reads cleaner without the whiteboard's leading zero.
-  const stripLeadingZero = (clock: string): string => clock.replace(/^0(?=\d:)/, '');
-  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-  const match = text.match(/(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*amrap\s*\/\s*(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*rest.*?(?:[xX*×]\s*)(\d+)/i);
-  if (match) return { title: `[${stripLeadingZero(match[1])}/${stripLeadingZero(match[2])}] × ${match[3]}` };
-
-  const count = exercise.intervalCount || exercise.rounds || exercise.sets?.length;
-  if (!count || !exercise.workDuration) return undefined;
-  const work = formatClockSeconds(exercise.workDuration / count);
-  const rest = exercise.restDuration ? formatClockSeconds(exercise.restDuration / count) : undefined;
-  return { title: rest ? `[${work}/${rest}] × ${count}` : `[${work}] × ${count}` };
+  // The board's own cadence, read — never `workDuration / intervalCount`, which printed
+  // "[4:00] × 4" on a board that said "EMOM for 16 minutes". blockCadence owns the question.
+  const cadence = blockCadence(exercise);
+  return cadence ? { title: formatCadenceTitle(cadence) } : undefined;
 }
 
 export function buildPosterWodFromPage(

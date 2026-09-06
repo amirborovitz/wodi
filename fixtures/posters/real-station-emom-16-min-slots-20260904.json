@@ -1,0 +1,93 @@
+{
+  "name": "real-station-emom-16-min-slots-20260904",
+  "description": "REAL saved doc IbWOneOnaJOMvuBur4uX (2026-09-04), a second athlete's log of the same board as the reporter's. 'EMOM for 16 minutes (4 rounds)' over four labelled minute slots. Pins the invented clock: the poster rebuilt the cadence as workDuration / intervalCount and, because the model writes the ROUND count (4) into intervalCount on a station rotation, 960 / 4 printed '[4:00] x 4' — a four-minute interval nobody ran, stated as the coach's prescription. The board says every 1:00, sixteen times. This doc carries no intervalSeconds (saved before the field existed), so it also pins the legacy text path reading 'EMOM for 16 minutes' back to 60s x 16.",
+  "workout": {
+    "title": "EMOM Challenge",
+    "type": "emom",
+    "format": "emom",
+    "timeCap": 960,
+    "duration": 26,
+    "durationSeconds": 1560,
+    "sets": 4,
+    "intervalTime": 240,
+    "stationRotation": true,
+    "partnerWorkout": false,
+    "partnerFactor": 1,
+    "difficultyLevel": 5,
+    "status": "completed",
+    "rawText": "BODY ARMOR - Hip\n1 sets\n5 Jefferson curls + 10 sec hold\n01:00 min dynamic frog stretch\n01:00 min/side box pigeon stretch\nWEIGHTLIFTING\nEvery 01:15 minutes x 8 sets\n1 Power Clean + 1 Hang Power Clean\n* Start at ~60% and build up weight\nMETCON (Medium)\nEMOM for 16 minutes (4 rounds)\nmin 1 : 8-10 Deadlift @60/85kg\nmin 2 : 12-15 Push-up\nmin 3 : 15 Box Jump\nmin 4 : 40 sec Hollow Hold",
+    "exercises": [
+      {
+        "id": "exercise-1",
+        "name": "Weightlifting Complex",
+        "type": "strength",
+        "partKind": "strength",
+        "loggingMode": "emom",
+        "prescription": "Every 01:15 minutes x 8 sets: 1 Power Clean + 1 Hang Power Clean — Start at ~60% and build up weight",
+        "rawText": "Every 01:15 minutes x 8 sets\n1 Power Clean + 1 Hang Power Clean\n* Start at ~60% and build up weight",
+        "complex": true,
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "rounds": 8,
+        "intervalCount": 8,
+        "workDuration": 600,
+        "aiPartName": "SLAB",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 2, "weight": 50 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 2 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 2 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 2 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 2 },
+          { "id": "set-5", "setNumber": 6, "completed": true, "actualReps": 2 },
+          { "id": "set-6", "setNumber": 7, "completed": true, "actualReps": 2 },
+          { "id": "set-7", "setNumber": 8, "completed": true, "actualReps": 2, "weight": 60 }
+        ],
+        "movements": [
+          { "name": "Power Clean", "reps": 1, "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round", "loggedWeights": [50, 60], "rxWeights": { "male": 50, "female": 50, "unit": "kg" } },
+          { "name": "Hang Power Clean", "reps": 1, "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round", "loggedWeights": [50, 60], "rxWeights": { "male": 50, "female": 50, "unit": "kg" } }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "name": "EMOM 16",
+        "type": "wod",
+        "partKind": "metcon",
+        "loggingMode": "emom",
+        "prescription": "EMOM for 16 minutes (4 rounds): min 1: 8-10 Deadlift @60/85kg min 2: 12-15 Push-up min 3: 15 Box Jump min 4: 40 sec Hollow Hold",
+        "rawText": "EMOM for 16 minutes (4 rounds)\nmin 1 : 8-10 Deadlift @60/85kg\nmin 2 : 12-15 Push-up\nmin 3 : 15 Box Jump\nmin 4 : 40 sec Hollow Hold",
+        "stationRotation": true,
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "rounds": 4,
+        "intervalCount": 4,
+        "workDuration": 960,
+        "aiPartName": "KILN",
+        "rxWeights": { "male": 85, "female": 60, "unit": "kg" },
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 35, "weight": 90 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 35, "weight": 90 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 35, "weight": 90 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 35, "weight": 90 }
+        ],
+        "movements": [
+          { "name": "Deadlift", "reps": 8, "repsDisplay": "8-10", "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 1", "stationIndex": 0, "loggedWeights": [90], "rxWeights": { "male": 90, "female": 90, "unit": "kg" } },
+          { "name": "Push-up", "reps": 12, "repsDisplay": "12-15", "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 2", "stationIndex": 1 },
+          { "name": "Box Jump", "reps": 15, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 3", "stationIndex": 2 },
+          { "name": "Hollow Hold", "time": 40, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 4", "stationIndex": 3 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "grandTotalReps": 156,
+      "grandTotalVolume": 3320,
+      "movements": [
+        { "name": "Box Jump", "exerciseIndex": 1, "totalReps": 60, "color": "magenta" },
+        { "name": "Push-up", "exerciseIndex": 1, "totalReps": 48, "color": "magenta" },
+        { "name": "Deadlift", "exerciseIndex": 1, "totalReps": 32, "weight": 90, "unit": "kg", "color": "yellow" },
+        { "name": "Power Clean", "exerciseIndex": 0, "totalReps": 8, "weight": 55, "weightProgression": [50, 60], "unit": "kg", "color": "yellow" },
+        { "name": "Hang Power Clean", "exerciseIndex": 0, "totalReps": 8, "weight": 55, "weightProgression": [50, 60], "unit": "kg", "color": "yellow" },
+        { "name": "Hollow Hold", "exerciseIndex": 1, "totalTime": 160, "color": "magenta" }
+      ]
+    }
+  }
+}

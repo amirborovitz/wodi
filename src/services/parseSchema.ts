@@ -150,6 +150,13 @@ const exercise = obj({
   workDuration: nullable(num),
   restDuration: nullable(num),
 
+  // The cadence itself, normalised by the model out of whatever the box wrote. The app used to
+  // rebuild it as workDuration / intervalCount and printed "[4:00] x 4" on a board that said
+  // "EMOM for 16 minutes" — a prescription nobody wrote. Reading it is one answer; deriving it
+  // divides one estimate by another. See utils/blockClock.ts.
+  intervalSeconds: nullable(num),
+  intervalRestSeconds: nullable(num),
+
   stationRotation: nullable(bool),
   isSecondary: nullable(bool),
   complex: nullable(bool),

@@ -989,6 +989,27 @@ export function createBlankResult(
         if (rxW) {
           mr.weight = isFemale ? (rxW.female ?? rxW.male) : (rxW.male ?? rxW.female);
         }
+        // Re-opening your own log: what YOU lifted outranks what the board asked for. Only a
+        // saved movement carries `loggedWeights`, so this can only fire on an edit — a fresh
+        // parse still prefills the coach's Rx.
+        //
+        // This used to work by accident: the save overwrote rxWeights with the entered weight,
+        // so the prescription and the entry were the same field. Keeping the coach's number
+        // intact means the entry needs its own way back, and an edit rewrites exercises[]
+        // wholesale — so without this the wizard would offer the Rx and a straight-through save
+        // would write it over the athlete's real load.
+        const logged = mov.loggedWeights?.filter((w) => w > 0) ?? [];
+        if (logged.length > 0) {
+          const first = logged[0];
+          const last = logged[logged.length - 1];
+          mr.weight = first;
+          if (last !== first) {
+            // A build ("50→60kg") is a range, and collapsing it to one number would silently
+            // flatten the progression on the way back out.
+            mr.loadMode = 'range';
+            mr.weightEnd = last;
+          }
+        }
         if (exercise.loggingMode === 'amrap_intervals' && mov.reps != null) {
           mr.reps = Math.round(mov.reps / shareDivisor);
         }

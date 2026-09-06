@@ -8,7 +8,7 @@
         "blueprint": "4 sets",
         "rows": [
           {
-            "primary": "50→65KG",
+            "primary": "",
             "name": "Back Squat",
             "subNote": "16 total",
             "totalNote": "16 total",
@@ -172,7 +172,7 @@
         },
         {
           "kind": "line",
-          "rx": "50→65KG Back Squat",
+          "rx": "Back Squat",
           "load": "",
           "mine": "50→65kg",
           "team": "",

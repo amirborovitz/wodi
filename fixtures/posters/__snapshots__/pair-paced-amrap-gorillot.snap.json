@@ -8,7 +8,7 @@
         "blueprint": "4 sets",
         "rows": [
           {
-            "primary": "40→50KG",
+            "primary": "",
             "name": "Front Squat",
             "subNote": "12 total",
             "totalNote": "12 total",
@@ -136,7 +136,7 @@
         },
         {
           "kind": "line",
-          "rx": "40→50KG Front Squat",
+          "rx": "Front Squat",
           "load": "",
           "mine": "40→45→50kg",
           "team": "",

@@ -153,6 +153,8 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
     ...(exercise.intervalCount != null && { intervalCount: exercise.intervalCount }),
     ...(exercise.workDuration != null && { workDuration: exercise.workDuration }),
     ...(exercise.restDuration != null && { restDuration: exercise.restDuration }),
+    ...(exercise.intervalSeconds != null && { intervalSeconds: exercise.intervalSeconds }),
+    ...(exercise.intervalRestSeconds != null && { intervalRestSeconds: exercise.intervalRestSeconds }),
     ...(partName && { aiPartName: partName }),
     ...(exercise.rawText && { rawText: exercise.rawText }),
     ...(exercise.partKind && { partKind: exercise.partKind }),
@@ -176,9 +178,15 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
  * `merge: true` does not deep-merge arrays), so anything this function fails to carry across is
  * destroyed on save, not merely absent from the wizard.
  *
- * Note the movements it returns carry the athlete's LOGGED values — the save path bakes entered
- * weights/reps onto `movements[].rxWeights` and `.reps`. That is what you want prefilled when
- * re-opening your own log; it is not the coach's original prescription.
+ * Note the movements it returns carry the athlete's LOGGED reps — the save path bakes an entered
+ * count onto `movements[].reps` (except in a slot the board left open). That is what you want
+ * prefilled when re-opening your own log; it is not the coach's original prescription.
+ *
+ * LOAD is the exception, and deliberately so. The entered weight lives in `loggedWeights` and
+ * `rxWeights` stays the coach's, because baking it destroyed the prescription outright: a board
+ * reading "8-10 Deadlift @60/85kg" came back as 90/90 with the scaled Rx gone from the record.
+ * `createBlankResult` prefills from `loggedWeights` first, so re-opening still offers what the
+ * athlete lifted — see the weight prefill there and `resolveOccurrenceLoad` for the poster side.
  *
  * The one bake this DOES reverse is a substitution: a swapped movement comes back on the coach's
  * name and quantities with `movements[].substitution` describing the swap, so the wizard can

@@ -8,7 +8,7 @@
         "blueprint": "4 sets",
         "rows": [
           {
-            "primary": "80→100KG",
+            "primary": "",
             "name": "Back Squat",
             "subNote": "12 total",
             "totalNote": "12 total",
@@ -33,7 +33,6 @@
             "subNote": "32 total",
             "totalNote": "32 total",
             "mineKey": "Chest-to-Bar Pull-ups",
-            "substitutedFrom": "Bar Muscle-up",
             "accent": "magenta",
             "repeatCount": 4
           },
@@ -132,7 +131,7 @@
         },
         {
           "kind": "line",
-          "rx": "80→100KG Back Squat",
+          "rx": "Back Squat",
           "load": "",
           "mine": "80→100kg",
           "team": "",
@@ -148,7 +147,6 @@
         {
           "kind": "line",
           "rx": "8 Chest-to-Bar Pull-ups",
-          "swapFrom": "Bar Muscle-up",
           "load": "",
           "mine": "",
           "team": "",

@@ -6,12 +6,12 @@
       "blueprint": "EMOM 12 MIN · 4 rounds",
       "rows": [
         {
-          "primary": "8-10 Thruster @ 40kg",
+          "primary": "8-10 Thruster @ 35/50kg",
           "name": "Thruster",
           "totalNote": "36 total",
           "accent": "yellow",
           "stationRow": true,
-          "suppressMine": true,
+          "mineOverride": "40kg",
           "roundLabel": "MIN 1"
         },
         {
@@ -45,12 +45,12 @@
         "blueprint": "EMOM 12 MIN · 4 rounds",
         "rows": [
           {
-            "primary": "8-10 Thruster @ 40kg",
+            "primary": "8-10 Thruster @ 35/50kg",
             "name": "Thruster",
             "totalNote": "36 total",
             "accent": "yellow",
             "stationRow": true,
-            "suppressMine": true,
+            "mineOverride": "40kg",
             "roundLabel": "MIN 1"
           },
           {
@@ -113,9 +113,9 @@
       },
       {
         "kind": "line",
-        "rx": "8-10 Thruster @ 40kg",
+        "rx": "8-10 Thruster @ 35/50kg",
         "load": "",
-        "mine": "",
+        "mine": "40kg",
         "team": "",
         "total": "36 total",
         "roundLabel": "MIN 1",
@@ -151,9 +151,9 @@
         },
         {
           "kind": "line",
-          "rx": "8-10 Thruster @ 40kg",
+          "rx": "8-10 Thruster @ 35/50kg",
           "load": "",
-          "mine": "",
+          "mine": "40kg",
           "team": "",
           "total": "36 total",
           "roundLabel": "MIN 1",

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildRecaps } from './useRecapData';
 import type { WorkoutWithStats } from './useWorkouts';
-import type { MovementTotal } from '../types';
+import type { MovementTotal, WorkoutFormat } from '../types';
 
 // A fixed "today" so period boundaries never depend on when the suite runs.
 const NOW = new Date(2026, 7, 12);          // 12 Aug 2026
@@ -384,6 +384,120 @@ describe('buildRecaps — the conditioning note', () => {
   });
 });
 
+describe('buildRecaps — estimated energy', () => {
+  // 70 kg, so one MET is 3.5 × 70 ÷ 200 = 1.225 kcal a minute.
+  const BW = 70;
+
+  function session(id: string, format: WorkoutFormat, minutes: number): WorkoutWithStats {
+    return { ...workout(id, IN_JULY, []), format, duration: minutes } as WorkoutWithStats;
+  }
+
+  function julyAt(ws: WorkoutWithStats[], bodyweight: number) {
+    const recap = buildRecaps(ws, NOW, bodyweight).recaps.find(r => r.id === JULY_ID);
+    if (!recap) throw new Error('expected a July recap');
+    return recap;
+  }
+
+  it('applies the MET equation to the format the session was logged in', () => {
+    // for_time is rated 9–13 MET. 100 min × 1.225 kcal/MET/min = 1,102 … 1,592.
+    const recap = julyAt([session('a', 'for_time', 100)], BW);
+    expect(recap.energy?.range).toBe('1,100–1,600');
+  });
+
+  it('rates a month the way it was actually trained, format by format', () => {
+    // The real shape of one logged month: 447 min for time, 334 EMOM, 159 interval
+    // AMRAPs, 151 straight AMRAPs.
+    const recap = julyAt([
+      session('a', 'for_time', 447),
+      session('b', 'emom', 334),
+      session('c', 'amrap_intervals', 159),
+      session('d', 'amrap', 151),
+    ], BW);
+
+    expect(recap.energy?.range).toBe('11,000–15,600');
+    expect(recap.energy?.minutes).toBe(1091);
+  });
+
+  it('costs less per minute for formats with rest written into them', () => {
+    const hard = julyAt([session('a', 'for_time', 200)], BW).energy;
+    const paced = julyAt([session('a', 'emom', 200)], BW).energy;
+    const heavy = julyAt([session('a', 'strength', 200)], BW).energy;
+
+    // Same 200 minutes, three different costs — which is the whole reason the
+    // model keys on format rather than blending one average across the month.
+    expect(hard!.low).toBeGreaterThan(paced!.low);
+    expect(paced!.low).toBeGreaterThan(heavy!.low);
+  });
+
+  it('scales with bodyweight', () => {
+    const light = julyAt([session('a', 'for_time', 100)], 55).energy;
+    const heavy = julyAt([session('a', 'for_time', 100)], 95).energy;
+    expect(heavy!.low).toBeGreaterThan(light!.low);
+  });
+
+  it('leaves untimed sessions out of the number and says so in the basis', () => {
+    const recap = julyAt([
+      session('a', 'for_time', 60),
+      workout('b', IN_JULY, []),   // logged, never timed
+    ], BW);
+
+    // The untimed session contributes nothing, so the range is a floor. The card
+    // has to be able to say that rather than quietly reporting low.
+    expect(recap.energy?.timedWorkouts).toBe(1);
+    expect(recap.energy?.untimedWorkouts).toBe(1);
+    expect(recap.energy?.basis).toBe('across 1 of 2 sessions · 1 hour on the clock');
+  });
+
+  it('has no energy card at all when nothing in the period was timed', () => {
+    expect(julyAt([workout('a', IN_JULY, [])], BW).energy).toBeNull();
+  });
+
+  it('lands an order of magnitude above the machine calories on the engine card', () => {
+    // The whole reason this stat exists. The engine card counts what one fan bike's
+    // display showed on the days it was set to calories; this counts the whole body
+    // across every timed session. Reading the first as the second is how an athlete
+    // concludes they burned one dinner across a month of training.
+    const ws = Array.from({ length: 20 }, (_, i) => session('w' + i, 'for_time', 55));
+    ws[0] = {
+      ...ws[0],
+      workloadBreakdown: {
+        movements: [{ name: 'Echo Bike', totalCalories: 1347 }],
+        grandTotalReps: 0,
+        grandTotalVolume: 0,
+      },
+    } as WorkoutWithStats;
+    const recap = julyAt(ws, BW);
+
+    expect(recap.aerobic?.unit).toBe('CAL');
+    expect(recap.aerobic?.value).toBe('1,347');
+    expect(recap.energy!.low).toBeGreaterThan(1347 * 5);
+  });
+});
+
+describe('buildRecaps — the tonnage comparison', () => {
+  function lifted(id: string, kg: number): WorkoutWithStats {
+    return { ...workout(id, IN_JULY, []), totalVolume: kg } as WorkoutWithStats;
+  }
+
+  // The ladder used to stop at 20 t, so every month from 20 t upward printed the
+  // same line — three consecutive 120 t months read identically on the card.
+  it.each([
+    [7_620, 'a small car — fully loaded'],
+    [34_435, 'a loaded cement truck'],
+    [45_000, 'a Boeing 737'],
+    [117_871, 'a blue whale'],
+    [125_112, 'a blue whale'],
+    [210_000, 'the Statue of Liberty'],
+  ])('describes %i kg as "%s"', (kg, expected) => {
+    expect(july([lifted('a', kg)]).tonnageComp).toBe(expected);
+  });
+
+  it('gives three big months three different lines', () => {
+    const lines = [117_871, 123_269, 210_000].map(kg => july([lifted('a', kg)]).tonnageComp);
+    expect(new Set(lines).size).toBeGreaterThan(1);
+  });
+});
+
 describe('buildRecaps — the engine card', () => {
   it('leads with kilometres and keeps every other aerobic figure in its own unit', () => {
     const recap = july([
@@ -397,7 +511,28 @@ describe('buildRecaps — the engine card', () => {
     expect(engine?.unit).toBe('KM');
     expect(engine?.machine).toBe('Echo Bike');
     // Nothing summed across machines, nothing converted between units.
-    expect(engine?.rest).toBe('+ Run 5.1 km · Echo Bike 707 cal');
+    expect(engine?.rest).toBe('+ Run 5.1 km (1 session) · Echo Bike 707 cal (1 session)');
+  });
+
+  it('counts the same machine separately in each unit, so it never reads as double-counted', () => {
+    const recap = july([
+      workout('a', IN_JULY, [{ name: 'Echo Bike', totalDistance: 91000 }]),
+      workout('b', IN_JULY, [{ name: 'Echo Bike', totalDistance: 8000 }]),
+      workout('c', IN_JULY, [{ name: 'Echo Bike', totalCalories: 707 }]),
+    ]);
+
+    // One machine, two rows, three workouts — and the card has to say which days
+    // are which, or 99 km sitting above 707 cal reads as the bike counted twice.
+    expect(recap.aerobic?.value).toBe('99');
+    expect(recap.aerobic?.heroNote).toBe('across 2 sessions');
+    expect(recap.aerobic?.rest).toBe('+ Echo Bike 707 cal (1 session)');
+    expect(recap.aerobic?.cells.map(c => [c.unit, c.sessions]))
+      .toEqual([['KM', 2], ['CAL', 1]]);
+  });
+
+  it('says "1 session", not "1 sessions"', () => {
+    const recap = july([workout('a', IN_JULY, [{ name: 'Row', totalDistance: 12000 }])]);
+    expect(recap.aerobic?.heroNote).toBe('across 1 session');
   });
 
   it('leads with calories when the period measured no real distance', () => {
@@ -410,7 +545,18 @@ describe('buildRecaps — the engine card', () => {
     // attached is. The 600 m is still named, just not as the headline.
     expect(recap.aerobic?.value).toBe('420');
     expect(recap.aerobic?.unit).toBe('CAL');
-    expect(recap.aerobic?.rest).toBe('+ Ski 600 m');
+    expect(recap.aerobic?.rest).toBe('+ Ski 600 m (1 session)');
+  });
+
+  it('never compares a machine calorie total to food', () => {
+    // 420 cal is one bike's display on the days it was set to calories — not the
+    // period's energy expenditure, which is an order of magnitude larger. A meal
+    // comparison claims the second while showing the first.
+    const recap = july([workout('a', IN_JULY, [{ name: 'Echo Bike', totalCalories: 707 }])]);
+
+    expect(recap.aerobic?.unit).toBe('CAL');
+    expect(recap.aerobic?.compare).toBe('and the fan never forgave you');
+    expect(recap.aerobic?.compare).not.toMatch(/food|eating|dinner|meal|night out|burn/i);
   });
 
   it('has no rest line when the hero was the only aerobic figure', () => {

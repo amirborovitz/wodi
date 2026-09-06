@@ -235,9 +235,14 @@ export interface Exercise {
   rounds?: number;         // Number of rounds (for multi-round WODs)
   suggestedRepsPerSet?: number[]; // Variable rep scheme (e.g., [40, 30, 20, 10])
   ladderReps?: number[];   // Ladder AMRAP rep scheme [4, 6, 8, 10, 12]
-  intervalCount?: number;  // Number of AMRAP intervals
+  intervalCount?: number;  // How many WORK WINDOWS the clock has (16 for "EMOM 16")
   workDuration?: number;   // AI-parsed programmed work time in seconds (e.g. 120 for "2:00 AMRAP")
   restDuration?: number;   // AI-parsed programmed rest time in seconds between rounds/intervals
+  // ONE work window in seconds, as the board writes it ("EMOM 16" -> 60, "Every 1:15" -> 75).
+  // The AI normalises the box's notation into this; nothing derives it. See utils/blockClock.ts
+  // for why a cadence must never be computed as workDuration / intervalCount.
+  intervalSeconds?: number;
+  intervalRestSeconds?: number; // ONE rest window in seconds, when the board writes work/rest
   ladderStep?: number;     // How many rungs completed (continuous across intervals)
   ladderPartial?: number;  // LEGACY: per-movement uniform reps into next rung (pre-checklist docs only; new docs use partialMovements/partialReps)
   partialReps?: number;        // Extra reps into the incomplete round — AMRAP or ladder (derived from partialMovements)
@@ -572,9 +577,13 @@ export interface ParsedExercise {
     sharedWeightMovements?: string[];  // movements sharing one barbell/implement
   };
   ladderReps?: number[];              // ascending rep ladder per interval [4, 6, 8, 10, 12]
-  intervalCount?: number;             // how many AMRAP intervals (e.g. 4 for "x4 rounds")
+  intervalCount?: number;             // how many WORK WINDOWS the clock has (16 for "EMOM 16")
   workDuration?: number;              // programmed work time in seconds (e.g. 180 for a 3-min AMRAP)
   restDuration?: number;              // programmed rest time in seconds between rounds/intervals
+  // ONE work window in seconds, normalised by the AI from whatever notation the box used.
+  // Never derived — see utils/blockClock.ts.
+  intervalSeconds?: number;
+  intervalRestSeconds?: number;       // ONE rest window in seconds, when the board writes work/rest
   aiPartName?: string;                // Generated poster wordmark for this workout part
   // This exercise's OWN slice of the whiteboard/source text — scoped to just this block,
   // not the whole photo. Use this (not the workout-level rawText) for any per-exercise text

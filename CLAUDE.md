@@ -16,6 +16,8 @@ WodBoard (codename **Wodi**) is a premium CrossFit workout logging app.
 
 - **Read the design system PDF** (`wodi · Design System.pdf`, project root) before any visual, layout, or component-design decision — not just the markdown summary.
 - **The user builds, deploys, and tests on production themselves.** Do not run `npm run build`, `npm run dev`, `firebase deploy`, or start dev servers unless explicitly asked. Do not block completion on "verify in browser" — finish the code change and let the user test it live.
+- **Never merge, and never commit, without being asked — `main` least of all.** On 2026-08-29 a branch was fast-forwarded onto `main` unasked; it carried a routing regression that broke EMOM logging for two days before the user found it in production. Committing when asked is fine. Merging to `main` is the user's decision, every time, and so is pushing. Do the work on a branch and say it is ready.
+- **A green suite is not evidence a behaviour survived.** That merge reported `tsc -b` clean and 607 tests passing, and its commit message called the change "purely additive" — while no test covered the path it changed. Before altering anything that *routes* (which screen, which builder, which save shape), find the test that pins the current routing. If there isn't one, write it FIRST, watch it pass, then make the change.
 - **Verification is cost-aware** — don't run `tsc -b` / `npm test` / `npm run posters` after every edit. Batch to once per completed unit; run only the relevant test file when narrow; skip for display-only changes (and say so); always run for calc/EP/workload/poster changes. See `memory/feedback_test_run_policy.md`.
 - **Testing/verification agents may use the browser directly** (Claude in Chrome tools) against the tab the user already has open — navigate, click, read state, screenshot — instead of asking the user to walk through a flow. One exception: **if a step needs a WOD photo uploaded, ask the user to do it** from the tab you're working in, then continue.
 - **Report in plain words. Every agent, every time.** Say what you did and what it means for the app, the way you'd tell a teammate. File paths, function names, symbol dumps and diffs are *evidence* — they go after the plain sentence, or not at all. "The app was asking 'how many rounds?' on workouts that don't have rounds. It doesn't any more" beats "gated `ScoreRoundsInput` on `resolveBlockScore`". Same rule for plans and status updates: lead with the thing a person can picture. If a sentence only makes sense to someone who has the file open, rewrite it.
@@ -44,9 +46,40 @@ The celebration screen is the canonical example: **all** computation is in `useC
 
 Before adding a second code path, delete the first one or unify them. One artifact builder, not two; one sticker system, not four; one layout per workout format, not five. If you feel the need to add a parallel path, stop and refactor the existing one instead.
 
+### 2b — Branch on what a thing IS, never on an incidental property
+
+A strength block is: a set count, a rep scheme, a load that is fixed or progressive, one or more movements, and optionally a clock. Those are **independent properties**. None of them may select a different component, save shape, or poster builder.
+
+If movement count, cadence, or "did the AI fill this field in" decides which code runs, **the model is wrong** — go fix the model. Do not add the branch.
+
+Concretely, all three of these were the same bug wearing different clothes:
+
+- *on a clock?* → `kind` became `intervals` → a whole different logging screen
+- *one movement or several?* → the prescription showed reps **or** the weight
+- *one movement or several?* → `LoadInput` vs `SupersetInput` → and then two different SAVE shapes
+
+One movement is not a different kind of training from two. Two paths for one concern always drift, and the one with less traffic rots unnoticed — see rule 2.
+
+**No exceptions, no plasters.** If a fix reads `X === 'foo' && Y !== 'bar' ? … : …` to keep one case out of a rule, you are patching a model defect. Say so and fix the model instead — a stopgap you label as a stopgap is still a stopgap, and it is what future sessions will copy.
+
+### 2c — Silence from the AI is not an answer
+
+`parseSchema.ts` sends the parse as an OpenAI **strict** structured output: `required: Object.keys(properties)`, optional expressed as nullable. The model therefore **answers every field, every time**.
+
+So `if (the AI mentioned X)` is not a test for "X is relevant" — it is always true. Read the **value**, never the presence.
+
+This shipped in v0.1.30 and broke two things at once, both of which had been correct for six months *because the model used to stay quiet*:
+
+- `scoredKindFromAI(ex) ?? <clock>` — the `??` stopped running, and every EMOM changed logging screens
+- `implementCount != null && > 0` — the strict schema stamps `1` on Run, Echo Bike, Box Jump and Front Squat, so a barbell got asked "1× or 2×"
+
+53 fields became always-answered. When you touch one, check what reads it.
+
 ### 3 — No dead code
 
 When you replace a code path, **delete the old one**. No unreachable fallback branches, no commented-out alternatives, no cascade CSS overrides that fight an earlier rule (update the base rule). Every function, hook, CSS class, and type must have a caller. If you can't find one, delete it.
+
+A path that is *reachable but starved* is worse than dead code, because nothing warns you. `SupersetInput`'s stylesheet went untouched from March to August while traffic quietly stopped reaching it — then one routing change pointed at it again and shipped a five-month-old screen. If a component only renders for a narrow case, it is a merge candidate, not a survivor.
 
 ### 4 — CSS: one rule wins, clearly
 

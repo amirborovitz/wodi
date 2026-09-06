@@ -1,5 +1,5 @@
 /**
- * The Wrapped deck — nine posters, in order.
+ * The Wrapped deck — ten posters, in order.
  *
  * A recap is not a stats screen. It is another poster, built to leave the app
  * and land in front of people who have never heard of wodi, so every number on
@@ -12,7 +12,8 @@
  *     drops the card; it never renders the frame around a dash.
  *
  * Rhythm is fixed and deliberate: black · YELLOW · black · black · YELLOW ·
- * black · black · vibe · black. Cards that drop out leave the order intact.
+ * black · black · vibe · YELLOW · black. Cards that drop out leave the order
+ * intact.
  */
 
 import React, { useLayoutEffect, useRef, useState } from 'react';
@@ -285,6 +286,7 @@ export function buildWrappedCards(data: RecapData): WrappedCard[] {
   const ledger = buildLedger(data);
   const top = data.topMove;
   const aerobic = data.aerobic;
+  const energy = data.energy;
   const pr = data.heaviest;
 
   // A ledger of one or two rows is not a screen. Those rows ride along on the
@@ -530,8 +532,9 @@ export function buildWrappedCards(data: RecapData): WrappedCard[] {
               <div style={{ fontFamily: fD, fontSize: V(11, 6.3), fontWeight: 900, color: W2_WHITE, lineHeight: 0.94, textTransform: 'uppercase', textWrap: 'balance' }}>
                 {aerobic.compare}
               </div>
+              <div style={{ fontFamily: fB, fontSize: V(4.2, 2.4), fontWeight: 700, color: W2_DIM, marginTop: V(2, 1.2) }}>{aerobic.heroNote}</div>
               {aerobic.rest && (
-                <div style={{ fontFamily: fB, fontSize: V(4.2, 2.4), fontWeight: 700, color: W2_DIM, marginTop: V(2, 1.2) }}>{aerobic.rest}</div>
+                <div style={{ fontFamily: fB, fontSize: V(4.2, 2.4), fontWeight: 700, color: W2_DIM, marginTop: V(0.8, 0.5) }}>{aerobic.rest}</div>
               )}
             </div>
           </W2Body>
@@ -599,7 +602,49 @@ export function buildWrappedCards(data: RecapData): WrappedCard[] {
       ),
     },
 
-    // ── 09 · FINALE ── the one card that leaves the app. Everything at a glance.
+    // ── 09 · ENERGY ── what the work cost the athlete, as a range that admits it
+    // is one.
+    //
+    // It sits here, after PERSONA, for one structural reason: this card and the
+    // ENGINE card both say "calories" while measuring entirely different things,
+    // and the engine's figure is roughly a TENTH of this one. Side by side they
+    // read as the deck contradicting itself.
+    //
+    // Ordering them by index alone would not hold — a sparse period drops the
+    // ledger and PR cards, and the two would collapse back together. PERSONA and
+    // FINALE are the only two cards that never drop, so putting this one behind
+    // PERSONA is what makes the separation a guarantee instead of a coincidence.
+    // Moving it earlier reintroduces the bug the whole card exists to end.
+    energy ? {
+      key: 'energy',
+      bg: YEL,
+      node: (
+        <W2Card bg={YEL} ink={W2_INK} glow="radial-gradient(120% 60% at 0% 0%, rgba(255,255,255,0.28), transparent 55%)">
+          <W2Eye color="rgba(0,0,0,0.6)">Roughly — and roughly is the point</W2Eye>
+          <W2Body>
+            <div style={{ fontFamily: fD, fontSize: V(9, 5), fontWeight: 900, color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', lineHeight: 1 }}>
+              you burned somewhere near
+            </div>
+            <div><FitText color={W2_INK} ls={-0.05}>{energy.range}</FitText></div>
+            <div>
+              <div style={{ fontFamily: fD, fontSize: V(13, 7.4), fontWeight: 900, color: W2_INK, lineHeight: 0.9, textTransform: 'uppercase' }}>
+                calories
+              </div>
+              <div style={{ fontFamily: fH, fontSize: V(8, 4.6), fontWeight: 700, color: 'rgba(0,0,0,0.66)', marginTop: V(1.5, 0.9) }}>
+                {energy.basis}
+              </div>
+              <div style={{ fontFamily: fB, fontSize: V(4.2, 2.4), fontWeight: 700, color: 'rgba(0,0,0,0.5)', marginTop: V(1.2, 0.7) }}>
+                estimated from time and format — no heart rate, so it stays a range.
+              </div>
+            </div>
+          </W2Body>
+          <W2Foot color={W2_INK} dot={W2_INK} />
+        </W2Card>
+      ),
+    } : null,
+
+
+    // ── 10 · FINALE ── the one card that leaves the app. Everything at a glance.
     { key: 'finale', bg: W2_INK, node: <WrappedFinaleCard data={data} /> },
   ];
 

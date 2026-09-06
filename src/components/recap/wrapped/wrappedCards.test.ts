@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildLedger, ledgerVoice } from './wrappedCards';
+import { buildLedger, buildWrappedCards, ledgerVoice } from './wrappedCards';
 import { buildRecaps } from '../../../hooks/useRecapData';
 import type { WorkoutWithStats } from '../../../hooks/useWorkouts';
 import type { MovementTotal } from '../../../types';
@@ -151,5 +151,27 @@ describe('ledgerVoice', () => {
 
   it('says nothing at all when there is no list', () => {
     expect(ledgerVoice([])).toBeNull();
+  });
+});
+
+describe('buildWrappedCards — the two calorie cards', () => {
+  it('never puts the estimated-energy card next to the measured engine card', () => {
+    // Both say "calories" and they differ by roughly a factor of ten. Adjacent,
+    // they read as the deck contradicting itself; apart, each is legible alone.
+    const timed = (id: string, movements: MovementTotal[]) =>
+      ({ ...workout(id, movements), duration: 45, format: 'for_time' }) as WorkoutWithStats;
+
+    const cards = buildWrappedCards(july([
+      timed('a', [{ name: 'Echo Bike', totalCalories: 707 }]),
+      timed('b', [{ name: 'Echo Bike', totalCalories: 640 }]),
+    ]));
+
+    const keys = cards.map(c => c.key);
+    const engine = keys.indexOf('engine');
+    const energy = keys.indexOf('energy');
+
+    expect(engine).toBeGreaterThan(-1);
+    expect(energy).toBeGreaterThan(-1);
+    expect(Math.abs(energy - engine)).toBeGreaterThan(1);
   });
 });

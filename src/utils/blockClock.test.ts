@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from './blockClock';
+import { blockCadence, blockClockSeconds, formatCadenceTitle, intervalChainSeconds, trailingRestIsOccupied } from './blockClock';
 import type { ParsedExercise } from '../types';
 
 /**
@@ -81,5 +81,104 @@ describe('intervalChainSeconds', () => {
 
   it('never returns a negative clock', () => {
     expect(intervalChainSeconds(0, 600, 4, false)).toBe(0);
+  });
+});
+
+// ─── Cadence: read the board, never divide two estimates ─────────────────────
+//
+// The regression these pin. The poster rebuilt the interval as workDuration / intervalCount in
+// two places, and a station EMOM makes those two numbers disagree: "EMOM for 16 minutes (4
+// rounds), min 1..min 4" is 16 one-minute windows, but the model writes 4 (the round count) into
+// intervalCount. 960 / 4 printed "[4:00] x 4" and "EMOM 4:00" — a four-minute interval nobody
+// ran, stated as the coach's prescription on a poster whose standard is that only written
+// numbers appear. It was wrong even when the parse was otherwise perfect.
+describe('blockCadence', () => {
+  it('takes the cadence the AI normalised, whatever notation the box used', () => {
+    expect(blockCadence({ intervalSeconds: 60, intervalCount: 16 }))
+      .toEqual({ workSeconds: 60, count: 16 });
+  });
+
+  it('carries a work/rest split as two windows, not one blended number', () => {
+    expect(blockCadence({ intervalSeconds: 180, intervalRestSeconds: 60, intervalCount: 5 }))
+      .toEqual({ workSeconds: 180, restSeconds: 60, count: 5 });
+  });
+
+  it('never divides workDuration by intervalCount — the board or nothing', () => {
+    // The exact shape that produced "[4:00] x 4": totals present, cadence absent, and the
+    // text deliberately silent so no legacy pattern can rescue it.
+    expect(blockCadence(block({ workDuration: 960, intervalCount: 4, name: 'Metcon', prescription: 'four stations' })))
+      .toBeUndefined();
+  });
+
+  it('ignores the round count when the AI stated the window', () => {
+    // intervalCount is the field that caused this; a stated window must not be re-derived from it.
+    expect(blockCadence(block({ intervalSeconds: 60, intervalCount: 16, workDuration: 960 }))?.workSeconds)
+      .toBe(60);
+  });
+
+  describe('legacy docs — read the notation, saved before intervalSeconds existed', () => {
+    const cadenceOf = (name: string, prescription = '') => blockCadence({ name, prescription });
+
+    it('reads "EMOM for 16 minutes" as sixteen one-minute windows', () => {
+      expect(cadenceOf('EMOM 16', 'EMOM for 16 minutes (4 rounds): min 1: 8-10 Deadlift'))
+        .toEqual({ workSeconds: 60, count: 16 });
+    });
+
+    it('reads a colon cadence with its set count', () => {
+      expect(cadenceOf('Weightlifting Complex', 'Every 01:15 minutes x 8 sets: 1 Power Clean'))
+        .toEqual({ workSeconds: 75, count: 8 });
+    });
+
+    // A board writing its clock with a dot. "2.00" is unambiguous; "1.50" is NOT — it means 1:50
+    // to one gym and 1.5 minutes to another, and no pattern can tell which. That ambiguity is
+    // the whole argument for the AI field: a model reading the board in context resolves it,
+    // a regex can only pick a side and be wrong half the time. The legacy path takes the literal
+    // reading and new parses never reach it.
+    it('reads a dot-written clock', () => {
+      expect(cadenceOf('2.00 Min x 10 Rounds')).toEqual({ workSeconds: 120, count: 10 });
+    });
+
+    it('reads a work/rest bracket', () => {
+      expect(cadenceOf('', '[02:00 min AMRAP , 02:00 min REST] x 4 rounds'))
+        .toEqual({ workSeconds: 120, restSeconds: 120, count: 4 });
+    });
+
+    it('reads a seconds cadence', () => {
+      expect(cadenceOf('', 'Every 90 sec x 12: 5 Burpees')).toEqual({ workSeconds: 90, count: 12 });
+    });
+
+    it('reads an acronym cadence', () => {
+      expect(cadenceOf('E2MOM x 10')).toEqual({ workSeconds: 120, count: 10 });
+    });
+
+    it('gives up rather than guess on a board that states no cadence', () => {
+      expect(cadenceOf('Metcon', '3 rounds for time: 400m Run, 21 KB Swings')).toBeUndefined();
+    });
+  });
+});
+
+describe('formatCadenceTitle — the line the poster actually prints', () => {
+  // The exact string the bug produced, and the one it should have. "EMOM for 16 minutes" is
+  // sixteen one-minute windows; "[4:00] x 4" was 960/4 dressed up as the coach's prescription.
+  it('states the EMOM 16 board as sixteen one-minute windows', () => {
+    const cadence = blockCadence(block({
+      name: 'EMOM 16',
+      prescription: 'EMOM for 16 minutes (4 rounds): min 1: 8-10 Deadlift @60/85kg',
+      intervalCount: 4,
+      workDuration: 960,
+      restDuration: undefined,
+    }))!;
+    expect(formatCadenceTitle(cadence)).toBe('[1:00] × 16');
+    expect(formatCadenceTitle(cadence)).not.toContain('4:00');
+  });
+
+  it('keeps a work/rest board as two windows', () => {
+    expect(formatCadenceTitle({ workSeconds: 120, restSeconds: 60, count: 6 })).toBe('[2:00/1:00] × 6');
+  });
+
+  it('prints the clock alone when the board never said how many times', () => {
+    // A legacy doc with no count must not borrow the round count to fill the gap — that is the
+    // substitution this whole change exists to stop.
+    expect(formatCadenceTitle({ workSeconds: 360 })).toBe('[6:00]');
   });
 });
