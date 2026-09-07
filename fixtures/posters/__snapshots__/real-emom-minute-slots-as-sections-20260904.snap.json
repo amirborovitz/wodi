@@ -1,0 +1,267 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "EMOM 16",
+      "blueprint": "EMOM 16 MIN · 4 rounds",
+      "rows": [
+        {
+          "primary": "8-10 Deadlift @ 60/85kg",
+          "name": "Deadlift",
+          "totalNote": "32 total",
+          "accent": "yellow",
+          "stationRow": true,
+          "mineOverride": "85kg",
+          "roundLabel": "MIN 1"
+        },
+        {
+          "primary": "12-15 Push-up",
+          "name": "Push-up",
+          "totalNote": "48 total",
+          "accent": "magenta",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 2"
+        },
+        {
+          "primary": "15 Box Jump",
+          "name": "Box Jump",
+          "totalNote": "60 total",
+          "accent": "magenta",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 3"
+        },
+        {
+          "primary": "40s Hollow Hold",
+          "name": "Hollow Hold",
+          "totalNote": "2:40 total",
+          "accent": "magenta",
+          "stationRow": true,
+          "suppressMine": true,
+          "roundLabel": "MIN 4"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "EMOM 16",
+        "blueprint": "EMOM 16 MIN · 4 rounds",
+        "rows": [
+          {
+            "primary": "8-10 Deadlift @ 60/85kg",
+            "name": "Deadlift",
+            "totalNote": "32 total",
+            "accent": "yellow",
+            "stationRow": true,
+            "mineOverride": "85kg",
+            "roundLabel": "MIN 1"
+          },
+          {
+            "primary": "12-15 Push-up",
+            "name": "Push-up",
+            "totalNote": "48 total",
+            "accent": "magenta",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 2"
+          },
+          {
+            "primary": "15 Box Jump",
+            "name": "Box Jump",
+            "totalNote": "60 total",
+            "accent": "magenta",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 3"
+          },
+          {
+            "primary": "40s Hollow Hold",
+            "name": "Hollow Hold",
+            "totalNote": "2:40 total",
+            "accent": "magenta",
+            "stationRow": true,
+            "suppressMine": true,
+            "roundLabel": "MIN 4"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "140",
+    "unit": "REPS",
+    "storyLine": "60 box jump · 48 push-up · 32 deadlift",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "8",
+        "name": "Deadlift",
+        "total": "",
+        "color": "yellow",
+        "weight": 85,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "12",
+        "name": "Push-up",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "15",
+        "name": "Box Jump",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "140",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "EMOM 16 MIN · 4 ROUNDS",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "8-10 Deadlift @ 60/85kg",
+        "load": "",
+        "mine": "85kg",
+        "team": "",
+        "total": "32 total",
+        "roundLabel": "MIN 1",
+        "station": true
+      },
+      {
+        "kind": "line",
+        "rx": "12-15 Push-up",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "48 total",
+        "roundLabel": "MIN 2",
+        "station": true
+      },
+      {
+        "kind": "line",
+        "rx": "15 Box Jump",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "60 total",
+        "roundLabel": "MIN 3",
+        "station": true
+      },
+      {
+        "kind": "line",
+        "rx": "40s Hollow Hold",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "2:40 total",
+        "roundLabel": "MIN 4",
+        "station": true
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "EMOM 16 MIN · 4 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "8-10 Deadlift @ 60/85kg",
+          "load": "",
+          "mine": "85kg",
+          "team": "",
+          "total": "32 total",
+          "roundLabel": "MIN 1",
+          "station": true
+        },
+        {
+          "kind": "line",
+          "rx": "12-15 Push-up",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "48 total",
+          "roundLabel": "MIN 2",
+          "station": true
+        },
+        {
+          "kind": "line",
+          "rx": "15 Box Jump",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 total",
+          "roundLabel": "MIN 3",
+          "station": true
+        },
+        {
+          "kind": "line",
+          "rx": "40s Hollow Hold",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "2:40 total",
+          "roundLabel": "MIN 4",
+          "station": true
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { Exercise, MovementTotal, ParsedExercise, ParsedSection } from '../types';
-import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount, openQuantitySlot } from './blockScore';
+import type { Exercise, MovementTotal, ParsedExercise, ParsedMovement, ParsedSection } from '../types';
+import { resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount, openQuantitySlot, independentlyScoredSections } from './blockScore';
 import { computeHeroResult } from '../components/celebration/helpers';
 import { createBlankResult, getRowState, getMissingLabel } from '../components/logging/story/types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -489,5 +489,112 @@ describe('openQuantitySlot', () => {
 
   it('is undefined for an ordinary movement', () => {
     expect(openQuantitySlot({ name: 'Front Squat', reps: 6 })).toBeUndefined();
+  });
+});
+
+// ─── Which blocks are independently scored ───────────────────────────────────
+//
+// THE REGRESSION THESE PIN. Three call sites asked "is this section separately scored?" by
+// testing `section.scoreType != null`. That was written as "did the model single this block out",
+// and v0.1.30's strict schema made it always-true: every section now carries an answer. A plain
+// minute-slot EMOM came back with `scoreType: 'reps'` on all four minutes, and the app believed
+// it — four separate logging pages ("MIN 3", "All 1 sets completed"), four poster block headers
+// each stamped with an invented clock, rep ranges and per-line totals gone.
+//
+// The same board parsed minutes later WITHOUT sections rendered correctly. One board, two apps.
+//
+// THE RULE, and it is the one `createBlankResult` already applies one layer up: an EMOM's windows
+// are prescribed work on a fixed clock. Its time and its rounds belong to the clock, and its loads
+// are collected per movement — so no answer `scoreType` can give describes a number the athlete
+// brings. The one exception is a count the board leaves OPEN (a max-effort station), which is a
+// real earned score.
+//
+// This must hold for EVERY EMOM shape, because they are one shape: N windows over K stations.
+// K = 1 is "the same movements every minute"; K > 1 is a rotation. The station count is not
+// allowed to select a different logging screen, save shape or poster.
+describe('independentlyScoredSections', () => {
+  const minuteSlot = (label: string, movements: ParsedMovement[]): ParsedSection => ({
+    sectionType: 'rounds',
+    rounds: 1,
+    label,
+    scoreType: 'reps',
+    movements,
+  });
+
+  // "EMOM for 16 minutes (4 rounds): min 1: 8-10 Deadlift, min 2: 12-15 Push-up, ..."
+  const rotatingEmom = {
+    name: 'EMOM 16',
+    loggingMode: 'emom' as const,
+    sections: [
+      minuteSlot('Min 1', [{ name: 'Deadlift', reps: 8 }]),
+      minuteSlot('Min 2', [{ name: 'Push-up', reps: 12 }]),
+      minuteSlot('Min 3', [{ name: 'Box Jump', reps: 15 }]),
+      minuteSlot('Min 4', [{ name: 'Hollow Hold', time: 40 }]),
+    ],
+  };
+
+  it('a rotating minute-slot EMOM has no separately scored block', () => {
+    expect(independentlyScoredSections(rotatingEmom)).toHaveLength(0);
+  });
+
+  it('an EMOM repeating ONE set of movements behaves identically', () => {
+    // K = 1. The same piece of training as above with one station instead of four; the station
+    // count must not change the answer.
+    const sameEveryMinute = {
+      name: 'EMOM 12',
+      loggingMode: 'emom' as const,
+      sections: [minuteSlot('Min 1', [{ name: 'Thruster', reps: 5 }, { name: 'Burpee', reps: 5 }])],
+    };
+    expect(independentlyScoredSections(sameEveryMinute)).toHaveLength(0);
+  });
+
+  it('holds whatever noun the model picks, because none of them fit a cadence', () => {
+    for (const scoreType of ['time', 'rounds', 'reps', 'load'] as const) {
+      const answered = {
+        ...rotatingEmom,
+        sections: rotatingEmom.sections.map((s) => ({ ...s, scoreType })),
+      };
+      expect(independentlyScoredSections(answered)).toHaveLength(0);
+    }
+  });
+
+  it('yields to a station the board left OPEN — that count IS earned', () => {
+    // "EMOM (50:10) for 25 minutes, 5 stations, max reps at each." The athlete brings a number
+    // per station and the interval screen has no way to take one.
+    const maxStations = {
+      name: 'EMOM 25',
+      loggingMode: 'emom' as const,
+      sections: [
+        minuteSlot('A', [{ name: 'Echo Bike', isMaxReps: true }]),
+        minuteSlot('B', [{ name: 'Bar Muscle-up', isMaxReps: true }]),
+      ],
+    };
+    expect(independentlyScoredSections(maxStations)).toHaveLength(2);
+  });
+
+  it('leaves a block-scored interval AMRAP alone — its rounds are genuinely earned', () => {
+    // "[10:00 AMRAP, 2:00 REST] x 3" over blocks A/B/C. The clock is fixed; how many times you
+    // get through each block is not. This is the shape section scoreType exists for.
+    const blockAmraps = {
+      name: '10:00 AMRAP x 3',
+      loggingMode: 'amrap_intervals' as const,
+      sections: [
+        { sectionType: 'rounds' as const, rounds: 1, label: 'A', scoreType: 'rounds' as const, movements: [{ name: 'Row', calories: 15 }] },
+        { sectionType: 'rounds' as const, rounds: 1, label: 'B', scoreType: 'rounds' as const, movements: [{ name: 'Wall Ball', reps: 10 }] },
+      ],
+    };
+    expect(independentlyScoredSections(blockAmraps)).toHaveLength(2);
+  });
+
+  it('ignores a section the model left unscored', () => {
+    const buyIn = {
+      name: 'For time',
+      loggingMode: 'for_time' as const,
+      sections: [
+        { sectionType: 'buy_in' as const, rounds: 1, movements: [{ name: 'Run', distance: 400 }] },
+        { sectionType: 'rounds' as const, rounds: 3, scoreType: 'time' as const, movements: [{ name: 'Thruster', reps: 10 }] },
+      ],
+    };
+    expect(independentlyScoredSections(buyIn)).toHaveLength(1);
   });
 });

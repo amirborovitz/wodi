@@ -1,4 +1,4 @@
-import type { Exercise, ParsedExercise, ParsedMovement, ParsedSection } from '../types';
+import type { Exercise, ExerciseLoggingMode, ParsedExercise, ParsedMovement, ParsedSection } from '../types';
 
 /**
  * What a block is actually scored by — read from the block, never from the format name.
@@ -255,9 +255,9 @@ export function sectionRoundsCompleted(section: ParsedSection): number {
  * the clock; two or more means each needs naming. Works for two blocks or ten.
  */
 export function hasIndependentBlocks(
-  exercise: { sections?: ParsedSection[] } | null | undefined,
+  exercise: { loggingMode?: ExerciseLoggingMode; sections?: ParsedSection[] } | null | undefined,
 ): boolean {
-  return (exercise?.sections ?? []).filter((section) => section.scoreType != null).length > 1;
+  return independentlyScoredSections(exercise).length > 1;
 }
 
 /**
@@ -270,9 +270,63 @@ export function hasIndependentBlocks(
  * inherits the lie. Callers that need "the score" of such a piece must render all of them.
  */
 export function loggedBlockScores(
-  exercise: { sections?: ParsedSection[] } | null | undefined,
+  exercise: { loggingMode?: ExerciseLoggingMode; sections?: ParsedSection[] } | null | undefined,
 ): { section: ParsedSection; index: number }[] {
+  return independentlyScoredSections(exercise)
+    .filter(({ section }) => section.result?.value != null);
+}
+
+/**
+ * The sections of this piece that carry a score the ATHLETE brings — one entry per independent
+ * clock, in board order. THE one owner of "is this block separately scored?".
+ *
+ * THE BUG THIS EXISTS FOR. Three call sites answered this by testing `section.scoreType != null`.
+ * That reads as "did the model single this block out", and v0.1.30's strict schema made it
+ * always-true: the model now answers every field on every section. A plain minute-slot EMOM came
+ * back with `scoreType: 'reps'` on all four minutes and the app believed it — four separate
+ * logging pages ("MIN 3", "All 1 sets completed", a rep count nobody earned), four poster block
+ * headers each stamped with an invented clock, the coach's rep ranges and the per-line totals
+ * gone. The same board parsed minutes later without sections rendered correctly. One board, two
+ * apps, decided by a coin flip inside the model.
+ *
+ * READ THE VALUE, NOT THE PRESENCE. A `scoreType` names the noun a result is counted in; it does
+ * not assert that a result exists. This asks the second question.
+ *
+ * A FIXED CADENCE HAS NOTHING PER-BLOCK TO EARN. An EMOM's windows are prescribed work on a clock
+ * the coach set: its time and its rounds belong to the clock, and its loads are collected per
+ * movement on the interval screen already. So no answer `scoreType` can give describes a number
+ * the athlete walks away with — exactly the rule `createBlankResult` applies one layer up, now
+ * stated once for both.
+ *
+ * THIS IS ONE SHAPE, AND IT MUST STAY ONE. An EMOM is N windows over K stations. K = 1 is "the
+ * same movements every minute"; K > 1 is a rotation; a board writing "min 1 … min 4" is just K = 4
+ * with the stations named. The station count is an incidental property of the board and is not
+ * allowed to select a different logging screen, save shape or poster.
+ *
+ * THE ONE EXCEPTION, and it is a real score: a count the board leaves OPEN. "EMOM (50:10) for 25
+ * minutes, five stations, max reps at each" earns a number at every station, and the interval
+ * screen has no way to take one. Ignoring `scoreType` wholesale reported a fully entered
+ * five-station EMOM as empty.
+ */
+export function independentlyScoredSections(
+  exercise: {
+    loggingMode?: ExerciseLoggingMode;
+    sections?: ParsedSection[];
+  } | null | undefined,
+): { section: ParsedSection; index: number }[] {
+  // Fixed cadence: the clock is the coach's and the work inside each window is written down.
+  // `intervals` ("5 sets every 2:30") is the same bargain as `emom` — only the notation differs.
+  const fixedCadence = exercise?.loggingMode === 'emom' || exercise?.loggingMode === 'intervals';
+
   return (exercise?.sections ?? [])
     .map((section, index) => ({ section, index }))
-    .filter(({ section }) => section.scoreType != null && section.result?.value != null);
+    .filter(({ section }) => {
+      if (section.scoreType == null) return false;
+      // A count the board left open is earned whatever the clock does.
+      if (findOpenMovements(section).length > 0) return true;
+      // "Scored in reps" with every rep written on the board is a contradiction: there is no
+      // count to bring. Holds on any clock, not just a cadence — the reps are the prescription.
+      if (section.scoreType === 'reps') return false;
+      return !fixedCadence;
+    });
 }

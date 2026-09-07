@@ -1,0 +1,85 @@
+{
+  "name": "real-emom-minute-slots-as-sections-20260904",
+  "description": "REAL saved doc VyNtvdyjx17ZZVPDysZC (2026-09-04) — the BAD half of the pair. The same board as real-station-emom-16-min-slots, logged two minutes apart, which the AI returned as four separately-scored sections ('Min 1'..'Min 4', each scoreType 'reps') instead of one station rotation. The app believed it: four logging pages asking 'All 1 sets completed', and a poster with four block headers each stamped 'EMOM 4:00' (workDuration 960 / 4 sections), the coach's rep ranges dropped and every per-line total gone. One board, two apps. This pins that a fixed-cadence block whose reps are all written on the board is NOT separately scored, whichever shape the parse arrives in — so this renders as one page, like its twin.",
+  "workout": {
+    "title": "Metcon",
+    "type": "emom",
+    "format": "emom",
+    "timeCap": 960,
+    "duration": 26,
+    "durationSeconds": 1560,
+    "sets": 4,
+    "intervalTime": 60,
+    "stationRotation": true,
+    "partnerWorkout": false,
+    "partnerFactor": 1,
+    "difficultyLevel": 5,
+    "status": "completed",
+    "rawText": "BODY ARMOR - Hip\n2 sets:\n5 Jefferson curls + 10 sec hold\n01:00 min dynamic frog stretch\n01:00 min/side box pigeon stretch\n\nWEIGHTLIFTING\nEvery 01:15 minutes x 8 sets:\n1 Power Clean + 1 Hang Power Clean\n* Start at ~60% and build up weight\n\nMETCON (Medium)\nEMOM for 16 minutes (4 rounds):\nmin 1 : 8-10 Deadlift @60/85kg\nmin 2 : 12-15 Push-up\nmin 3 : 15 Box Jump\nmin 4 : 40 sec Hollow Hold",
+    "exercises": [
+      {
+        "id": "exercise-2",
+        "name": "EMOM 16",
+        "type": "wod",
+        "partKind": "metcon",
+        "loggingMode": "emom",
+        "prescription": "EMOM for 16 minutes (4 rounds): min 1: 8-10 Deadlift @60/85kg, min 2: 12-15 Push-up, min 3: 15 Box Jump, min 4: 40 sec Hollow Hold",
+        "rawText": "EMOM for 16 minutes (4 rounds):\nmin 1 : 8-10 Deadlift @60/85kg\nmin 2 : 12-15 Push-up\nmin 3 : 15 Box Jump\nmin 4 : 40 sec Hollow Hold",
+        "stationRotation": true,
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "intervalCount": 4,
+        "workDuration": 960,
+        "aiPartName": "RIFT",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 35, "weight": 85 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 35, "weight": 85 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 35, "weight": 85 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 35, "weight": 85 }
+        ],
+        "movements": [
+          { "name": "Deadlift", "reps": 8, "repsDisplay": "8-10", "rxWeights": { "male": 85, "female": 60, "unit": "kg" }, "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 1", "stationIndex": 0, "loggedWeights": [85] },
+          { "name": "Push-up", "reps": 12, "repsDisplay": "12-15", "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 2", "stationIndex": 1 },
+          { "name": "Box Jump", "reps": 15, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 3", "stationIndex": 2 },
+          { "name": "Hollow Hold", "time": 40, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 4", "stationIndex": 3 }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds", "rounds": 1, "label": "Min 1", "scoreType": "reps",
+            "movements": [
+              { "name": "Deadlift", "reps": 8, "repsDisplay": "8-10", "rxWeights": { "male": 85, "female": 60, "unit": "kg" }, "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 1", "stationIndex": 0, "loggedWeights": [85] }
+            ]
+          },
+          {
+            "sectionType": "rounds", "rounds": 1, "label": "Min 2", "scoreType": "reps",
+            "movements": [
+              { "name": "Push-up", "reps": 12, "repsDisplay": "12-15", "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 2", "stationIndex": 1 }
+            ]
+          },
+          {
+            "sectionType": "rounds", "rounds": 1, "label": "Min 3", "scoreType": "reps",
+            "movements": [
+              { "name": "Box Jump", "reps": 15, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 3", "stationIndex": 2 }
+            ]
+          },
+          {
+            "sectionType": "rounds", "rounds": 1, "label": "Min 4", "scoreType": "reps",
+            "movements": [
+              { "name": "Hollow Hold", "time": 40, "inputType": "none", "equipment": "none", "countingMode": "per_station_visit", "scoreEntryMode": "per_round", "stationLabel": "Min 4", "stationIndex": 3 }
+            ]
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "grandTotalReps": 140,
+      "grandTotalVolume": 2720,
+      "movements": [
+        { "name": "Box Jump", "exerciseIndex": 0, "totalReps": 60, "color": "magenta" },
+        { "name": "Push-up", "exerciseIndex": 0, "totalReps": 48, "color": "magenta" },
+        { "name": "Deadlift", "exerciseIndex": 0, "totalReps": 32, "weight": 85, "unit": "kg", "color": "yellow" },
+        { "name": "Hollow Hold", "exerciseIndex": 0, "totalTime": 160, "color": "magenta" }
+      ]
+    }
+  }
+}

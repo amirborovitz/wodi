@@ -46,7 +46,7 @@ import {
 } from '../../services/partnerScope';
 // Block score — the ONE owner of "what does this piece count?", read from the block rather than
 // from its format name. A clock is not a score.
-import { hasIndependentBlocks, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from '../../services/blockScore';
+import { hasIndependentBlocks, independentlyScoredSections, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from '../../services/blockScore';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -2218,8 +2218,37 @@ function movementStructuralRole(movement: ParsedMovement): ParsedSectionType {
  * no structural break, so it keeps the flat renderer (and its round count stays on the poster's
  * format line, where it already reads correctly).
  */
+/**
+ * True when this piece's "sections" are really its minute slots — a station rotation the parse
+ * happened to write as blocks.
+ *
+ * An EMOM is ONE shape: N windows over K stations. K = 1 is the same movements every minute,
+ * K > 1 a rotation, and a board writing "min 1 … min 4" is K = 4 with the stations named. The
+ * parse returns that shape two ways at random — flat `movements[]` with `stationLabel`, or one
+ * section per minute — and the poster had a different builder behind each, so the SAME board
+ * rendered two ways: the flat one kept the coach's rep ranges, the "40s" on a hold and a total on
+ * every line; the sectioned one dropped all three and stamped an invented clock on each block.
+ *
+ * Sections are for blocks that are scored apart. When none of them is (see
+ * independentlyScoredSections), they are describing stations — which `movements[]` already
+ * models — so the station renderer takes it and the two shapes land on one path.
+ *
+ * Deliberately narrow: every section must be a single-pass `rounds` block, and the flat list must
+ * already hold the same movements, or dropping the sections would lose work.
+ */
+function sectionsAreStationSlots(exercise: Exercise): boolean {
+  const sections = exercise.sections ?? [];
+  if (sections.length < 2) return false;
+  if (exercise.loggingMode !== 'emom' && exercise.loggingMode !== 'intervals') return false;
+  if (independentlyScoredSections(exercise).length > 0) return false;
+  if (!sections.every((s) => s.sectionType === 'rounds' && (s.rounds ?? 1) <= 1)) return false;
+  const sectionMovements = sections.flatMap((s) => s.movements ?? []);
+  return sectionMovements.length > 0
+    && sectionMovements.length === (exercise.movements?.length ?? 0);
+}
+
 function deriveStructuralSections(exercise: Exercise): ParsedSection[] {
-  if (exercise.sections?.length) return exercise.sections;
+  if (exercise.sections?.length && !sectionsAreStationSlots(exercise)) return exercise.sections;
 
   const movements = exercise.movements ?? [];
   const buyIn = movements.filter((m) => movementStructuralRole(m) === 'buy_in');
@@ -2282,7 +2311,7 @@ function buildMultiSectionForTimeSections(
 
   // Whether this piece ran several independent clocks (b.1 / b.2) or one window with a scored
   // tail. Asked of the sections actually being rendered, so it can never disagree with them.
-  const hasMultipleClocks = hasIndependentBlocks({ sections: exerciseSections });
+  const hasMultipleClocks = hasIndependentBlocks({ loggingMode: exercise.loggingMode, sections: exerciseSections });
 
   // "THEN" exists to close a buy-in — it marks the boundary between the work done once and the
   // work that repeats, which is the one thing a flat list cannot say. Ladder tiers stacked on

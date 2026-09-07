@@ -250,7 +250,7 @@ function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
  * inherits the error. A piece with ONE scored block does have a single score, and that one is
  * still its `rounds`.
  */
-function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
+export function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const legacy = buildLegacyResult(r);
 
   // A part logged flat is SAVED flat. `loggingMode: 'free'` is the shape every downstream reader

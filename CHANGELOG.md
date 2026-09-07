@@ -1,5 +1,83 @@
 # Changelog
 
+## v0.1.32 — An EMOM is one shape
+
+An EMOM is N work windows over K stations. K = 1 is the same movements every minute; K > 1 is a
+rotation; a board writing "min 1 … min 4" is K = 4 with the stations named. The station count is
+a property of the board, and it was selecting a different logging screen, a different save shape
+and a different poster.
+
+That is how the same whiteboard, logged twice two minutes apart, produced two unrecognisable
+posters — the subject of v0.1.31. This release removes the fork itself rather than its symptoms.
+
+---
+
+### One owner for "is this block separately scored?"
+
+`independentlyScoredSections` in `blockScore.ts`. Three call sites used to answer it on their own
+by testing `section.scoreType != null` — written as "did the model single this block out", and
+made always-true by v0.1.30's strict schema, where the model answers every field on every section.
+
+A plain minute-slot EMOM came back with `scoreType: 'reps'` on all four minutes and the app
+believed it: four separate logging pages, each asking "All 1 sets completed" for a rep count
+nobody earned, and four poster block headers each stamped with an invented clock.
+
+The rule now reads the value rather than the presence:
+
+- a station the board left **open** (max reps) is scored — always, whatever the clock. That is a
+  real number the athlete brings.
+- `scoreType: 'reps'` with every rep written on the board is not. There is nothing to bring.
+- a **fixed cadence** (`emom`, `intervals`) is not. Its time and its rounds belong to the clock the
+  coach set, and its loads are already collected per movement.
+- everything else is unchanged, so block-scored interval AMRAPs (A/B/C) keep their own scores.
+
+This is the same rule `createBlankResult` has applied one layer up since v0.1.30's routing fix. It
+is now stated once and both layers read it.
+
+### Both parse shapes render the same poster
+
+Fixing the headers was not enough. When the parse arrived as sections, the poster took a different
+row builder — one that dropped the coach's rep ranges, the "40s" on a hold, and the total on every
+line. The two shapes of one board still produced two posters, just less obviously.
+
+A fixed-cadence piece whose sections earn nothing is now recognised for what it is — a station
+rotation, which `movements[]` already models — and routed to the station renderer. The sectioned
+parse and the flat parse of the same board now render line for line identically.
+
+### The prompt stops contradicting itself
+
+The parse had two instructions for this board and obeyed whichever it happened to pick:
+
+> "EMOM minute slots are stations. This is a display label only."
+> "Odd/even minutes with different movements → one sections entry per block, each with its own score."
+
+The second is gone. A section's `scoreType` now says explicitly that the athlete EARNS a number in
+that block, and a block whose every rep is written on the board must not carry one. Minute slots
+are stations, one station or four, with no sections either way.
+
+`rounds` is pinned too: it is trips through the rotation, never the window count.
+`rounds × stations = intervalCount`. On "EMOM for 16 minutes (4 rounds)" that is 4, not 16.
+
+### The save path leaves the screen
+
+`buildSavedExercises.ts` and `restoreStoryResults.ts` lift the save and the edit-restore out of
+`AddWorkoutScreen`, which loses 466 lines. `workoutRoundTrip.test.ts` then tests the loop the
+athlete actually walks: prescription → log → save → re-open → save again, asserting the second
+save matches the first. That round trip had no coverage at all, and it is exactly where a bake
+that survives one direction but not the other does its damage.
+
+---
+
+Verified: `tsc -b` clean, 724 tests, 57 poster fixtures — including a new one built from the real
+document behind the original report, the four-section parse, which now renders identically to its
+flat twin.
+
+**Known open:** a poster header can still read "16 ROUNDS" where the board says 4. The prompt rule
+above should settle it for new parses; existing docs are unconfirmed. Per-side movements are still
+halved by the save-time workload builder — three builders compute workload and only one applies
+`perSide`.
+
+
 ## v0.1.31 — The board says what the board says
 
 Every fix here is the same sentence twice: a number the coach wrote and a number the athlete

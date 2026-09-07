@@ -1,5 +1,6 @@
 import type { BlockResult, BlockScoreType, ParsedExercise, ParsedSection } from '../../../types';
 import type { ExerciseKind, StoryExerciseResult } from './types';
+import { independentlyScoredSections } from '../../../services/blockScore';
 
 /**
  * Block scoping — how a piece made of separately-scored blocks is logged.
@@ -56,15 +57,19 @@ function describeBlock(section: ParsedSection): string {
  * which is the signal to log it as a single page, exactly as before.
  */
 export function getScoredBlocks(exercise: ParsedExercise): ScoredBlock[] {
-  const sections = exercise.sections ?? [];
   const blocks: ScoredBlock[] = [];
-  sections.forEach((section, sectionIndex) => {
-    if (!section.scoreType) return;
+  // Which sections are separately scored is decided in ONE place — services/blockScore.ts. The
+  // presence of a `scoreType` is not that answer: under the strict schema the model stamps one on
+  // every section, and believing it gave a plain minute-slot EMOM four logging pages.
+  independentlyScoredSections(exercise).forEach(({ section, index: sectionIndex }) => {
+    // Guaranteed by the filter above; narrowed here because the section type keeps it optional.
+    const scoreType = section.scoreType;
+    if (!scoreType) return;
     const label = section.label?.trim();
     blocks.push({
       sectionIndex,
       section,
-      scoreType: section.scoreType,
+      scoreType,
       // The board's label is usually terse ("A", "AMRAP - C"). Prefix a bare letter/number so
       // the wizard header reads "BLOCK A" rather than a lone "A".
       displayName: label

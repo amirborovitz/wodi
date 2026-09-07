@@ -120,14 +120,16 @@ function formatFromType(workout: Workout): WorkoutFormat {
 
 function toParsedExercise(saved: Exercise): ParsedExercise {
   const exercise = unbakeSubstitutions(saved);
-  const workingSets = getSavedWorkingStrengthSets(exercise.sets);
-  const repScheme = getSavedStrengthRepScheme(exercise.sets);
+  // Only strength sets describe a rep scheme. A metcon summary is an earned total.
+  const isStrength = exercise.loggingMode === 'strength' || exercise.type === 'strength';
+  const workingSets = isStrength ? getSavedWorkingStrengthSets(exercise.sets) : [];
+  const repScheme = isStrength ? getSavedStrengthRepScheme(exercise.sets) : undefined;
 
   // "(N each)" partner rounds: the save path writes the pre-save `suggestedSets` out as
   // `personalRounds`, so that is where the per-athlete round count has to be read back from.
   const suggestedSets = exercise.partnerSplit === 'rounds' && exercise.personalRounds
     ? exercise.personalRounds
-    : exercise.sets.length || 3;
+    : exercise.rounds ?? (exercise.sets.length || 3);
 
   // The prescribed scheme if the doc kept one, otherwise what the athlete's own sets imply.
   const repsPerSet = exercise.suggestedRepsPerSet?.length ? exercise.suggestedRepsPerSet : repScheme;
