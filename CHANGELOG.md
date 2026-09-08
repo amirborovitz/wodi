@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.1.33 — One movement, three different numbers
+
+Daniel is 50 pull-ups, a 400m run, 21 thrusters, an 800m run, 21 thrusters, a 400m run, 50
+pull-ups. Three runs, three distances, one movement name. Every stage of the app collapsed them
+onto the first: the logging board offered one run to edit, the save wrote 400m three times, the
+workload total read 1200m instead of 1600m, and the poster printed the athlete's 800m as a 400m.
+
+The name of a movement is not its quantity. An occurrence is.
+
+---
+
+### Each occurrence carries its own number
+
+`useScorePrescription` builds the ordered board from the prescription as a list of occurrences,
+not a set of movements. A row knows which occurrence it is and what it opens, so the second run
+on the board edits the second run in the save.
+
+The round trip is pinned end to end in `danielRoundTrip.test.ts` — blank result → log → legacy
+result → saved exercises → workload breakdown → both poster builders — asserting `[400, 800, 400]`
+survives every hop, in the flat parse and inside a section wrapper. That path had no coverage, and
+it crosses five files that each had their own reason to key by name.
+
+### An edit carries at the athlete's ratio, not its raw number
+
+`useScoreMovementEdits` owns what happens when one occurrence changes. A swap or a typed-over
+distance applies to the occurrence the athlete opened; its siblings follow at their ratio, so
+scaling the 400m to 300m puts the 800m at 600m rather than 300m. A weight carries across untouched
+— a barbell is the same barbell every time, but a 400m and an 800m run are not.
+
+The bulk action only appears once an occurrence actually differs from its siblings, so a board
+nobody has edited offers nothing to undo.
+
+### Cardio rows print the distance they were
+
+A distance-scored machine row rendered as a rep multiplier: "20×" where the board said 600m, with
+a `nameWithLoad` claiming a load the movement never had. Cardio rows now print their own unit and
+suppress the mine-line they had nothing to fill. Eight existing poster snapshots move with it.
+
+tsc -b clean; 740 tests across 44 files; 58 poster fixtures including a new
+`daniel-distinct-run-occurrences`. The one flagged fixture is the pre-existing EMOM double-under
+drop, unchanged.
+
 ## v0.1.32 — An EMOM is one shape
 
 An EMOM is N work windows over K stations. K = 1 is the same movements every minute; K > 1 is a
