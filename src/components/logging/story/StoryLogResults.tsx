@@ -4,7 +4,7 @@ import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet, M
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
 import { resolveBlockScore } from '../../../services/blockScore';
 import { initStoryResults } from './WodStoryScreen';
-import { InputRouter } from './InputRouter';
+import { InputRouter, usesOrderedBoard } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
@@ -784,6 +784,7 @@ export function StoryLogResults({
             isLastBlock={isLastBlock}
             isEditing={isEditing}
             hideFooter={isSubstitutionOpen}
+            prescriptionInBody={usesOrderedBoard(currentResult)}
             // Nothing to offer on a part the PARSER already gave up on: it arrives as
             // 'free_score' with no structured reading parked behind it, so it is already the flat
             // log, and "log it flat instead" would point at where the athlete is standing.

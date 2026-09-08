@@ -1,0 +1,102 @@
+{
+  "name": "daniel-distinct-run-occurrences",
+  "description": "Daniel: three separate run occurrences must remain 400/800/400m. The 1600m aggregate is not a per-occurrence figure. No substitution was made.",
+  "workout": {
+    "title": "Daniel",
+    "format": "for_time",
+    "rawText": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Run, 21 Thrusters @42.5kg, 400m Run, 50 Pull-ups",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Daniel",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Run, 21 Thrusters @42.5kg, 400m Run, 50 Pull-ups",
+        "movements": [
+          {
+            "name": "Pull-up",
+            "reps": 50,
+            "inputType": "none"
+          },
+          {
+            "name": "Run",
+            "distance": 400,
+            "inputType": "distance"
+          },
+          {
+            "name": "Thruster",
+            "reps": 21,
+            "inputType": "weight",
+            "loggedWeights": [
+              42.5
+            ],
+            "rxWeights": {
+              "male": 42.5,
+              "female": 30,
+              "unit": "kg"
+            }
+          },
+          {
+            "name": "Run",
+            "distance": 800,
+            "inputType": "distance"
+          },
+          {
+            "name": "Thruster",
+            "reps": 21,
+            "inputType": "weight",
+            "loggedWeights": [
+              42.5
+            ],
+            "rxWeights": {
+              "male": 42.5,
+              "female": 30,
+              "unit": "kg"
+            }
+          },
+          {
+            "name": "Run",
+            "distance": 400,
+            "inputType": "distance"
+          },
+          {
+            "name": "Pull-up",
+            "reps": 50,
+            "inputType": "none"
+          }
+        ],
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 142,
+            "time": 1020
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Pull-up",
+          "totalReps": 100,
+          "exerciseIndex": 0
+        },
+        {
+          "name": "Run",
+          "totalDistance": 1600,
+          "distancePerRep": 400,
+          "exerciseIndex": 0
+        },
+        {
+          "name": "Thruster",
+          "totalReps": 42,
+          "weight": 42.5,
+          "totalVolume": 1785,
+          "exerciseIndex": 0
+        }
+      ]
+    }
+  }
+}

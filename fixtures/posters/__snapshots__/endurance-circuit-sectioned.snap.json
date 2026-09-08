@@ -10,7 +10,7 @@
       "title": "5 ROUNDS OF",
       "rows": [
         {
-          "primary": "10 CAL Echo Bike",
+          "primary": "Echo Bike",
           "name": "",
           "totalNote": "50 cal total",
           "mineKey": "Echo Bike",
@@ -77,7 +77,7 @@
         "title": "5 ROUNDS OF",
         "rows": [
           {
-            "primary": "10 CAL Echo Bike",
+            "primary": "Echo Bike",
             "name": "",
             "totalNote": "50 cal total",
             "mineKey": "Echo Bike",
@@ -150,8 +150,7 @@
         "total": "1.0km total",
         "color": "magenta",
         "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutedPerRound": "25 cal"
+        "originalMovement": "Run"
       },
       {
         "perRound": "10",
@@ -219,7 +218,7 @@
       },
       {
         "kind": "line",
-        "rx": "10 CAL Echo Bike",
+        "rx": "Echo Bike",
         "load": "",
         "mine": "",
         "team": "",
@@ -285,7 +284,7 @@
         },
         {
           "kind": "line",
-          "rx": "10 CAL Echo Bike",
+          "rx": "Echo Bike",
           "load": "",
           "mine": "",
           "team": "",

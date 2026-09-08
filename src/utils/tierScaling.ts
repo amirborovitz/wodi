@@ -1,8 +1,10 @@
+import type { ParsedMovement, MovementSubstitution } from '../types';
+
 // Scaling a single entered quantity across the tiers of a ladder.
 //
 // A per-movement ladder collapses to ONE input row per movement — one weight, one swap decision.
-// So whatever the athlete enters (or whatever a substitution converts to) answers for the tier
-// that row was built from: the first. The other tiers prescribe their OWN amounts.
+// A substitution entered on that shared row answers for its first tier. Separate entries
+// already answer for their own occurrences and must never be scaled again.
 //
 // Stamping the single entered value onto every tier is what turned an 800/600/400m run,
 // substituted to an Echo Bike, into 3 x 2400m: the sheet converted tier 1 (800 x 3 = 2400) and
@@ -33,4 +35,26 @@ export function scaleEnteredToTier(
   if (!basePrescribed || !tierPrescribed) return entered;
   if (tierPrescribed === basePrescribed) return entered;
   return Math.round(entered * (tierPrescribed / basePrescribed));
+}
+
+/** Resolve a logged occurrence. Only a shared substitution entry can imply a ratio.
+ * A value keyed to this occurrence is already final; an unchanged shared ladder uses its Rx.
+ * Called while preparing the log/save, never by poster readers.
+ */
+export function resolveLoggedQuantity(
+  entries: Record<string, number> | undefined,
+  key: string,
+  movement: ParsedMovement,
+  base: ParsedMovement | undefined,
+  substitutions: Record<string, MovementSubstitution> | undefined,
+  metric: 'reps' | 'distance' | 'calories',
+): number | undefined {
+  if (entries?.[key] != null) return entries[key];
+  const shared = entries?.[movement.name];
+  if (shared == null) return undefined;
+  const substitution = substitutions?.[movement.name];
+  if (!substitution) return movement[metric] ?? shared;
+  // The ratio belongs to the ORIGINAL metric, even for e.g. run metres → bike calories.
+  const sourceMetric = base?.distance != null ? 'distance' : base?.calories != null ? 'calories' : 'reps';
+  return scaleEnteredToTier(shared, movement[sourceMetric], base?.[sourceMetric]);
 }

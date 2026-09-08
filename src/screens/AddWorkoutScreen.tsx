@@ -34,7 +34,7 @@ import {
   workoutToParsedWorkout,
 } from '../utils/workoutToParsed';
 import { isBoardOfferedChoice } from '../components/celebration/movementResolution';
-import { scaleEnteredToTier } from '../utils/tierScaling';
+import { resolveLoggedQuantity } from '../utils/tierScaling';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
 import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
@@ -472,20 +472,16 @@ export function buildWorkloadBreakdownFromResults(
 
       // User-entered values are already personal — don't apply partner factor.
       // AI-prescribed values are team totals — apply partner factor.
-      const enteredReps = movementLookup(result.movementReps || {}, mk, mov.name);
-      const enteredDistance = movementLookup(result.movementDistances || {}, mk, mov.name);
-      const enteredCalories = movementLookup(result.movementCalories || {}, mk, mov.name);
       const userDistancePerRep = movementLookup(result.movementDistancesPerRep || {}, mk, mov.name);
 
-      // One entry answers for the tier it was made against; every other tier scales its own
-      // prescription by the same ratio. Without this a substituted ladder saved tier 1's
-      // converted value on all of them (800/600/400m run -> Echo Bike became 3 x 2400m).
+      // Keep occurrence-specific entries intact. A ratio is only meaningful for a shared
+      // substitution input; unchanged ladder tiers retain their prescribed quantities.
       const baseKey = mov.name.toLowerCase();
       if (!basePrescribed.has(baseKey)) basePrescribed.set(baseKey, mov);
       const base = basePrescribed.get(baseKey);
-      const userReps = scaleEnteredToTier(enteredReps, mov.reps, base?.reps);
-      const userDistance = scaleEnteredToTier(enteredDistance, mov.distance, base?.distance);
-      const userCalories = scaleEnteredToTier(enteredCalories, mov.calories, base?.calories);
+      const userReps = resolveLoggedQuantity(result.movementReps, mk, mov, base, result.movementSubstitutions, 'reps');
+      const userDistance = resolveLoggedQuantity(result.movementDistances, mk, mov, base, result.movementSubstitutions, 'distance');
+      const userCalories = resolveLoggedQuantity(result.movementCalories, mk, mov, base, result.movementSubstitutions, 'calories');
 
       // A max-effort test has NO prescribed count by definition — the number the athlete earned
       // lives on the max SET, not on the movement. Without this the movement reads as 0

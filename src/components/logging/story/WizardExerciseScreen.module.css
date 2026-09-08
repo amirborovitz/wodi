@@ -191,10 +191,16 @@
 /* ── Scrollable body: input goes here ── */
 .body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  /* A logging sheet scrolls one way. `overflow-y: auto` alone computes overflow-x to `auto`
+     too, so anything that overhangs by a pixel hands the athlete a sideways scroll on a screen
+     that has nothing to the side. `clip` (not `hidden`) keeps this from becoming an x-scroll
+     container, so the sticky score dock still sticks. */
+  overflow-x: clip;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 20px 20px calc(180px + var(--safe-bottom));
+  padding: 16px 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -369,15 +375,21 @@
   text-align: center;
 }
 
+/* Quiet, but still a control: it sits one thumb-width above the CTA, so it needs a real target
+   and enough contrast to be read rather than skipped as fine print. */
 .flatLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
   padding: 6px 12px;
   background: none;
   border: none;
-  color: var(--wodi-dim);
+  color: rgba(242, 240, 235, 0.62);
   font-family: var(--font-barlow);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-underline-offset: 3px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }

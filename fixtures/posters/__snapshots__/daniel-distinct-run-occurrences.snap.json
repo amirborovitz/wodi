@@ -1,0 +1,303 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Daniel",
+      "blueprint": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Ru…",
+      "rows": [
+        {
+          "primary": "50",
+          "name": "Pull-ups",
+          "mineKey": "Pull-up",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "suppressMine": true
+        },
+        {
+          "primary": "400m",
+          "name": "Run",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "suppressMine": true
+        },
+        {
+          "primary": "21",
+          "name": "Thrusters",
+          "nameWithLoad": "Thrusters @ 42.5kg",
+          "loadNote": "42.5kg",
+          "mineKey": "Thruster",
+          "accent": "yellow",
+          "repeatCount": 1
+        },
+        {
+          "primary": "800m",
+          "name": "Run",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "suppressMine": true
+        },
+        {
+          "primary": "21",
+          "name": "Thrusters",
+          "nameWithLoad": "Thrusters @ 42.5kg",
+          "loadNote": "42.5kg",
+          "mineKey": "Thruster",
+          "accent": "yellow",
+          "repeatCount": 1
+        },
+        {
+          "primary": "400m",
+          "name": "Run",
+          "mineKey": "Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "suppressMine": true
+        },
+        {
+          "primary": "50",
+          "name": "Pull-ups",
+          "mineKey": "Pull-up",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "suppressMine": true
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Daniel",
+        "blueprint": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Ru…",
+        "rows": [
+          {
+            "primary": "50",
+            "name": "Pull-ups",
+            "mineKey": "Pull-up",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "suppressMine": true
+          },
+          {
+            "primary": "400m",
+            "name": "Run",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "suppressMine": true
+          },
+          {
+            "primary": "21",
+            "name": "Thrusters",
+            "nameWithLoad": "Thrusters @ 42.5kg",
+            "loadNote": "42.5kg",
+            "mineKey": "Thruster",
+            "accent": "yellow",
+            "repeatCount": 1
+          },
+          {
+            "primary": "800m",
+            "name": "Run",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "suppressMine": true
+          },
+          {
+            "primary": "21",
+            "name": "Thrusters",
+            "nameWithLoad": "Thrusters @ 42.5kg",
+            "loadNote": "42.5kg",
+            "mineKey": "Thruster",
+            "accent": "yellow",
+            "repeatCount": 1
+          },
+          {
+            "primary": "400m",
+            "name": "Run",
+            "mineKey": "Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "suppressMine": true
+          },
+          {
+            "primary": "50",
+            "name": "Pull-ups",
+            "mineKey": "Pull-up",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "suppressMine": true
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "17:00",
+    "unit": "MIN",
+    "storyLine": "100 pull-up · 1.6km run · 42 thruster",
+    "storyMovements": [
+      {
+        "perRound": "100",
+        "name": "Pull-up",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "1.6km",
+        "name": "Run",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "42",
+        "name": "Thruster",
+        "total": "",
+        "color": "magenta",
+        "weight": 42.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "17:00",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Ru…"
+      },
+      {
+        "kind": "line",
+        "rx": "50 Pull-ups",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "400m Run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "21 Thrusters",
+        "load": "",
+        "mine": "42.5kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "800m Run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "21 Thrusters",
+        "load": "",
+        "mine": "42.5kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "400m Run",
+        "load": "",
+        "mine": "",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "50 Pull-ups",
+        "load": "",
+        "mine": "",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "50 Pull-ups, 400m Run, 21 Thrusters @42.5kg, 800m Ru…"
+        },
+        {
+          "kind": "line",
+          "rx": "50 Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "400m Run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "21 Thrusters",
+          "load": "",
+          "mine": "42.5kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "800m Run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "21 Thrusters",
+          "load": "",
+          "mine": "42.5kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "400m Run",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 Pull-ups",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

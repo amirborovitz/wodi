@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { MovementResult } from './types';
 import type { ParsedSectionType } from '../../../types';
 import { getWeightStep, getWeightMax } from './types';
@@ -16,12 +16,16 @@ import { CustomNumpadSheet } from './CustomNumpadSheet';
 import { hasAlternatives } from '../../../data/exerciseDefinitions';
 import { statesMaxEffort } from '../../../services/blockScore';
 import { buildSubstitutionPatch } from './substitutionPatch';
+import { useScoreMovementEdits, occurrenceDiffers } from './useScoreMovementEdits';
+import { useScorePrescription } from './useScorePrescription';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
 
 
 interface ScoreMovementInputsProps {
   movements: MovementResult[];
+  /** Prescribed work reads in order; its existing editors open only on demand. */
+  compact?: boolean;
   /**
    * Flat mode: the athlete turned down the structured reading, so nothing above these tiles is
    * multiplying anything. Every movement therefore has to be able to state its OWN total — a
@@ -318,8 +322,10 @@ function AiAlternativeToggle({ mr, onChange }: AiToggleProps) {
 // Returns the inline prescribed value (e.g. "10", "400m", "15 cal")
 // and its Trinity color class for display next to the movement name.
 
+type TileField = 'weight' | 'distance' | 'calories' | 'reps';
+
 interface TileConfig {
-  field: 'weight' | 'distance' | 'calories' | 'reps';
+  field: TileField;
   value: number | undefined;
   placeholder: string;
   unit?: string;
@@ -443,6 +449,49 @@ function uncountedRepsTileId(movementKey: string): string {
   return `${movementKey}::reps`;
 }
 
+/**
+ * What a closed prescription row opens, said on the row itself.
+ *
+ * A bare "+" claims the row ADDS something. It doesn't — it opens the one thing this movement
+ * lets you change, and that thing is different on every row: a weight on the thruster, a
+ * distance on the run, a swap on the pull-up. The row says which before you tap it.
+ */
+function editorHint(
+  field: TileField | undefined,
+  hasAlternates: boolean,
+  sharedWeight: boolean,
+): string {
+  const quantity = field === 'weight' ? 'Weight'
+    : field === 'distance' ? 'Distance'
+    : field === 'calories' ? 'Calories'
+    : field === 'reps' ? 'Reps'
+    // Its load was answered once, on the shared bar at the top. Say where, rather than
+    // promising a weight field this row doesn't have.
+    : sharedWeight ? 'Weight above'
+    : null;
+  // A run takes a distance AND swaps for a bike. Naming only the first hides the second behind
+  // a row that claims to be about metres — which is how a swap you can do reads as one you can't.
+  if (quantity && hasAlternates) return `${quantity} · swap`;
+  if (quantity) return quantity;
+  return hasAlternates ? 'Swap' : 'Edit';
+}
+
+// Chevron — the row opens, it does not add.
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path
+        d="M3 4.5 6 7.5 9 4.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // Swap icon (two-arrow cycle symbol)
 
 function SwapIcon() {
@@ -495,6 +544,7 @@ function groupBySections(mrs: MovementResult[]): SectionGroup[] | null {
  */
 export function ScoreMovementInputs({
   movements,
+  compact = false,
   flat = false,
   onChange,
   onBatch,
@@ -504,6 +554,7 @@ export function ScoreMovementInputs({
   distancePrescribedByStructure = false,
   perStation = false,
 }: ScoreMovementInputsProps) {
+  const disclosureGroup = useId();
   // Track which movements the user has manually edited weight on.
   // First weight edit propagates to all same-equipment load movements that haven't been touched.
   const manuallyEditedRef = useRef<Set<string>>(new Set());
@@ -522,6 +573,39 @@ export function ScoreMovementInputs({
     () => resolveLoadGroups(movements, getMovementEquipment),
     [movements, getMovementEquipment],
   );
+  const prescription = useScorePrescription(movements, loadGroups, getMovementCaptionName);
+  const movementEdits = useScoreMovementEdits(movements, compact ? 'occurrence' : 'movement', onChange, movementAlternateKey, onBatch);
+
+  /**
+   * Where each row sits among the times its movement comes up on this board.
+   *
+   * Daniel writes "50 Pull-up" twice and "400m Run" twice, and the ordered board edits ONE
+   * occurrence at a time — which is right, because the runs are 400/800/400 and a single number
+   * cannot be all three. But two identical-looking rows that quietly disagree about what an edit
+   * touches is the one thing an athlete is certain to get wrong, so every repeated row says which
+   * of the N it is, and its open editor offers to carry the change to the rest.
+   */
+  const occurrences = useMemo(() => {
+    const totals = new Map<string, number>();
+    movements.forEach(mr => {
+      const key = movementAlternateKey(mr);
+      totals.set(key, (totals.get(key) ?? 0) + 1);
+    });
+    const seen = new Map<string, number>();
+    return new Map(movements.map((mr) => {
+      const key = movementAlternateKey(mr);
+      const position = (seen.get(key) ?? 0) + 1;
+      seen.set(key, position);
+      return [mr.movementKey, { position, total: totals.get(key) ?? 1, key }];
+    }));
+  }, [movements]);
+
+  const siblingsOf = useCallback((mr: MovementResult): MovementResult[] => (
+    movements.filter(other => (
+      other.movementKey !== mr.movementKey
+      && movementAlternateKey(other) === movementAlternateKey(mr)
+    ))
+  ), [movements]);
 
   // Only the first (focused) load group uses the hero shared-weight screen.
   // Secondary groups (different equipment type) are rendered as individual tiles.
@@ -700,48 +784,10 @@ export function ScoreMovementInputs({
     ? movements.find(m => m.movementKey === swapOpenKey) ?? null
     : null;
 
-  // Handler: apply substitution to the correct movement
-  const handleSubstitution = (sub: MovementSubstitution | null) => {
+  const handleSubstitution = (sub: MovementSubstitution | null): void => {
     if (!swapMr) return;
-    const globalIndex = movements.indexOf(swapMr);
-    if (globalIndex < 0) return;
-
-    // Substituting and reverting are exact inverses — one shared builder owns both.
-    const patch = buildSubstitutionPatch(swapMr, sub);
-
-    const sameMovementIndices = movements
-      .map((mr, index) => ({ mr, index }))
-      .filter(({ mr }) => movementAlternateKey(mr) === movementAlternateKey(swapMr))
-      .map(({ index }) => index);
-
-    if (onBatch && sameMovementIndices.length > 1) {
-      const next = movements.map((mr, index) => (
-        sameMovementIndices.includes(index) ? { ...mr, ...patch } : mr
-      ));
-      onBatch(next);
-    } else {
-      onChange(globalIndex, patch);
-    }
+    movementEdits.substitute(swapMr, sub);
     closeSwap();
-  };
-
-  const handleAiAlternativeToggle = (mr: MovementResult, patch: Partial<MovementResult>) => {
-    const globalIndex = movements.indexOf(mr);
-    if (globalIndex < 0) return;
-    const sameMovementIndices = movements
-      .map((candidate, index) => ({ candidate, index }))
-      .filter(({ candidate }) => movementAlternateKey(candidate) === movementAlternateKey(mr))
-      .map(({ index }) => index);
-
-    if (onBatch && sameMovementIndices.length > 1) {
-      const next = movements.map((candidate, index) => (
-        sameMovementIndices.includes(index) ? { ...candidate, ...patch } : candidate
-      ));
-      onBatch(next);
-      return;
-    }
-
-    onChange(globalIndex, patch);
   };
 
   const editableTiles = useMemo(() => (
@@ -808,9 +854,12 @@ export function ScoreMovementInputs({
   }, [activeTileId, closeNumpad, editableTiles]);
 
   useEffect(() => {
-    if (activeTileId == null) return;
-    tileRefs.current[activeTileId]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [activeTileId]);
+    if (activeTileId == null || sharedWeightKeys.has(activeTileId)) return;
+    const tile = tileRefs.current[activeTileId];
+    const disclosure = tile?.closest('details');
+    if (disclosure) disclosure.open = true;
+    tile?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [activeTileId, sharedWeightKeys]);
 
   const commitTileValue = useCallback((tileId: string, rawValue: string) => {
     const tile = editableTiles.find((entry) => entry.tileId === tileId);
@@ -908,7 +957,7 @@ export function ScoreMovementInputs({
   // Arcade tile renderer
   const renderMovField = (mr: MovementResult) => {
     const globalIndex = movements.indexOf(mr);
-    if (focusedLoadStep && focusedLoadGroupKeys.has(mr.movementKey)) {
+    if (!compact && focusedLoadStep && focusedLoadGroupKeys.has(mr.movementKey)) {
       if (mr.movementKey !== focusedLoadFirstKey) return null;
       return (
         <React.Fragment key={`shared-${mr.movementKey}`}>
@@ -928,7 +977,7 @@ export function ScoreMovementInputs({
     // Strip AI-generated "Buy-In:"/"Cash-Out:" prefix from display; these labels can be
     // misparsed for the first movement of a numbered AMRAP block.
     const displayMovName = rawMovName.replace(/^(Buy-In|Cash-Out):\s*/i, '');
-    const hasAlts = canOpenAlternate(mr);
+    const hasAlts = compact ? movementHasAlternate(mr) : canOpenAlternate(mr);
     const tileName = (
       cleanTileLabel(displayMovName)
       || stripWeightFromName(displayMovName)
@@ -939,8 +988,13 @@ export function ScoreMovementInputs({
     const schemeLabel = prescribedSchemeLabel(mr);
     const isSharedWeight = sharedWeightKeys.has(mr.movementKey);
     const tileField = getTileConfig(mr, distancePrescribedByStructure, flat)?.field;
+    // What this row's own editor offers. A row on the shared bar has no weight field of its own —
+    // the hero screen above owns it — so it must not advertise one.
+    const rowField: TileField | undefined = isSharedWeight
+      ? (isUncountedLoad(mr, flat) ? 'reps' : undefined)
+      : tileField;
 
-    return (
+    const field = (
       <React.Fragment key={mr.movementKey}>
         {mr.movement.stationLabel && !perStation && (
           <div className={styles.stationDivider}>
@@ -959,6 +1013,14 @@ export function ScoreMovementInputs({
             className={styles.tileHeader}
             onClick={hasAlts ? () => openSwap(mr.movementKey) : undefined}
             role={hasAlts ? 'button' : undefined}
+            tabIndex={hasAlts ? 0 : undefined}
+            aria-label={hasAlts ? `Change ${displayMovName}` : undefined}
+            onKeyDown={hasAlts ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openSwap(mr.movementKey);
+              }
+            } : undefined}
             style={hasAlts ? { cursor: 'pointer' } : undefined}
           >
             {perStation && mr.movement.stationLabel && (
@@ -969,7 +1031,7 @@ export function ScoreMovementInputs({
             {sub.isSubstituted ? (
               <div className={styles.tileNameSubstituted}>
                 <span className={styles.tileNameOriginal}>
-                  {(cleanTileLabel(displayMovName) || stripWeightFromName(displayMovName) || displayMovName).toUpperCase()}
+                  {(cleanTileLabel(mr.movement.name) || mr.movement.name).toUpperCase()}
                 </span>
                 <span className={styles.tileName}>{tileName}</span>
               </div>
@@ -1004,7 +1066,7 @@ export function ScoreMovementInputs({
           )}
 
           {/* AI quick-toggle chip */}
-          {hasAlts && <AiAlternativeToggle mr={mr} onChange={(patch) => handleAiAlternativeToggle(mr, patch)} />}
+          {hasAlts && <AiAlternativeToggle mr={mr} onChange={(patch) => movementEdits.applyAlternative(mr, patch)} />}
 
           {/* A loaded station asks TWO things about one movement — what you held and how many you
               got. Paired side by side so it reads as the single question it is; stacked, one
@@ -1061,6 +1123,63 @@ export function ScoreMovementInputs({
         </div>
       </React.Fragment>
     );
+    if (!compact) return field;
+    const row = prescription.rows.get(mr.movementKey)!;
+    const occurrence = occurrences.get(mr.movementKey);
+    const repeats = (occurrence?.total ?? 1) > 1;
+    const summary = (
+      <span className={styles.prescriptionText}>
+        <span className={styles.prescriptionName}>{row.label}</span>
+        {row.load && <span className={styles.prescriptionLoad}>{row.load}</span>}
+        {repeats && (
+          <span className={styles.prescriptionOccurrence}>
+            {occurrence!.position} of {occurrence!.total}
+          </span>
+        )}
+        {row.personal && <span className={styles.prescriptionPersonal}>{row.personal}</span>}
+      </span>
+    );
+    if (!movementHasInput(mr, distancePrescribedByStructure, flat) && !hasAlts) {
+      return <div key={mr.movementKey} className={styles.prescriptionMove}>
+        <div className={styles.prescriptionReadOnly}>{summary}</div>
+      </div>;
+    }
+    const siblings = repeats ? siblingsOf(mr) : [];
+    const canEcho = siblings.some(sibling => occurrenceDiffers(mr, sibling));
+    return (
+      <details key={mr.movementKey} className={styles.prescriptionMove} name={disclosureGroup}>
+        <summary className={styles.prescriptionSummary}>
+          {summary}
+          <span className={styles.prescriptionAction}>
+            <span className={styles.prescriptionActionLabel}>
+              {editorHint(rowField, hasAlts, isSharedWeight)}
+            </span>
+            <ChevronIcon />
+          </span>
+        </summary>
+        <div className={styles.prescriptionEditor}>
+          {isSharedWeight && <p className={styles.prescriptionHelp}>Uses the weight above.</p>}
+          {field}
+          {repeats && (
+            <div className={styles.occurrenceScope}>
+              <p className={styles.occurrenceScopeText}>
+                This is {getMovementCaptionName(mr)} {occurrence!.position} of {occurrence!.total}.
+                {' '}The {occurrence!.total === 2 ? 'other one stays' : 'others stay'} as written.
+              </p>
+              {canEcho && (
+                <button
+                  type="button"
+                  className={styles.occurrenceScopeBtn}
+                  onClick={() => movementEdits.echoToSiblings(mr)}
+                >
+                  Same for all {occurrence!.total}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </details>
+    );
   };
 
   // See sharedWeightKeys: a per-station board has no focused group, so every station renders as
@@ -1081,7 +1200,7 @@ export function ScoreMovementInputs({
       ?? 0;
     const rx = getRxWeight(base);
     const step = getLegalWeightStep(base);
-    const caption = focusedLoadGroup.movements.map(getMovementCaptionName).join(' - ');
+    const caption = prescription.captions.get(focusedLoadGroup.movements[0].movementKey);
     const groupLabel = getEquipmentLabel(focusedLoadGroup.type);
     // Twin implement (two DBs/KBs held at once): the athlete logs the per-implement weight, so the
     // hero must read "2× 16 kg each" — not a bare "16" that hides the double.
@@ -1160,10 +1279,10 @@ export function ScoreMovementInputs({
     const isRx = rx != null && Math.abs(currentWeight - rx) < 0.001;
 
     return (
-      <div className={styles.implementWeightScreen}>
+      <div className={`${styles.implementWeightScreen} ${compact ? styles.compactWeight : ''}`}>
         <div className={styles.implementWeightHeader}>
           <span className={styles.implementEyebrow}>{groupLabel} WEIGHT</span>
-          <span className={styles.implementCaption}>Used for {caption}</span>
+          <span className={styles.implementCaption}>{caption}</span>
         </div>
 
         <div className={styles.heroWeightStepper} aria-label={`${groupLabel} weight`}>
@@ -1226,7 +1345,7 @@ export function ScoreMovementInputs({
           </button>
         )}
 
-        {alternateMovements.filter(mr => mr.kind === 'load').length > 0 && (
+        {!compact && alternateMovements.filter(mr => mr.kind === 'load').length > 0 && (
           <div className={styles.inlineAlternateList}>
             {alternateMovements.filter(mr => mr.kind === 'load').map((mr) => {
               const sub = getSubState(mr);
@@ -1263,7 +1382,7 @@ export function ScoreMovementInputs({
   // A ladder row earns its place even with nothing to enter: it carries the scheme (800-600-400m,
   // 40-30-20) that tells the athlete what the tier structure actually is. Dropping the no-input
   // rows told the story of a workout with one run in it.
-  const visibleMovements = movements.filter(mr =>
+  const visibleMovements = movements.filter(mr => compact ||
     movementHasInput(mr, distancePrescribedByStructure, flat)
     || canOpenAlternate(mr)
     || prescribedSchemeLabel(mr) != null);
@@ -1304,7 +1423,14 @@ export function ScoreMovementInputs({
           </span>
         </div>
       )}
-      {movementTileBlock}
+      {compact && focusedLoadStep}
+      {compact && (
+        <div className={styles.prescriptionIntro}>
+          <span className={styles.implementEyebrow}>THE WOD · IN ORDER</span>
+          <span className={styles.prescriptionHelp}>Made it your own? Tap a move.</span>
+        </div>
+      )}
+      <div className={compact ? styles.compactPrescription : undefined}>{movementTileBlock}</div>
 
       {/* Substitution sheet; single instance, driven by swapOpenKey */}
       {swapMr && (
@@ -1326,7 +1452,7 @@ export function ScoreMovementInputs({
         label={activeTile?.label ?? ''}
         value={numpadValue}
         unit={activeTile?.config.unit}
-        accentColor="#00F2FF"
+        accentColor="#f5c200"
         showDecimal={activeTile?.config.inputMode === 'decimal'}
         onDigit={handleNumpadDigit}
         onBackspace={handleNumpadBackspace}

@@ -54,7 +54,6 @@ import {
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
 import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, substitutedFromName } from './movementResolution';
 import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sequentialBlockSetCount } from '../../utils/sectionShape';
-import { scaleEnteredToTier } from '../../utils/tierScaling';
 import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit } from '../../utils/loadUnits';
@@ -1496,10 +1495,10 @@ function buildCelebrationMovementRow(params: {
   // would have shrunk an already-too-small number; with that fixed at the source, the exemption
   // printed the 9-round total as the per-round prescription ("72 CAL Echo Bike").
   // A relay leg still keeps its own per-trip figure through `distancePerRep`.
-  const perRoundDistance = actual?.distancePerRep
-    || prescribed?.distance
+  const perRoundDistance = prescribed?.distance
+    || (!isMergedAcrossOccurrences ? actual?.distancePerRep : undefined)
     || (
-      repeatCount && repeatCount > 1 && actual?.totalDistance
+      isMergedAcrossOccurrences ? undefined : repeatCount && repeatCount > 1 && actual?.totalDistance
         ? Math.round(actual.totalDistance / repeatCount)
         : actual?.totalDistance
     );
@@ -1528,10 +1527,10 @@ function buildCelebrationMovementRow(params: {
     ? undefined
     : actual?.totalReps
       || (repeatCount && repeatCount > 1 ? prescribedTotals.reps : undefined);
-  const totalDistance = actual?.totalDistance && actual.totalDistance > 0
+  const totalDistance = isMergedAcrossOccurrences ? undefined : actual?.totalDistance && actual.totalDistance > 0
     ? actual.totalDistance
     : (repeatCount && repeatCount > 1 ? prescribedTotals.distance : perRoundDistance);
-  const totalCalories = actual?.totalCalories
+  const totalCalories = isMergedAcrossOccurrences ? undefined : actual?.totalCalories
     || (repeatCount && repeatCount > 1 ? prescribedTotals.calories : undefined);
 
   let primary = '-';
@@ -1668,7 +1667,7 @@ function buildCelebrationMovementRow(params: {
       : undefined,
     // A (together) movement's full amount already shows in the value column via `primary`; a
     // second, identical "mine" readout is redundant noise. Weighted work keeps mine (the load).
-    ...(isTogether && !hasWeight ? { suppressMine: true } : {}),
+    ...((isTogether || isMergedAcrossOccurrences) && !hasWeight ? { suppressMine: true } : {}),
     // Pair-paced pacer rows get a SWAP chip: the run/bike is the swap task between AMRAP
     // turns, not a movement inside the round — the chip keeps the story readable.
     ...(prescribed?.relay ? { roundLabel: 'SWAP' } : {}),
@@ -1886,21 +1885,11 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     const isCal = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) > 0;
     const isDist = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) === 0 && (m?.distance ?? 0) > 0;
     const qtyOf = (m?: ParsedMovement) => m?.reps ?? m?.calories ?? m?.distance ?? 0;
-    // A substitution converts ONE prescribed amount — the resolver answers with that single
-    // converted figure (breakdown.distancePerRep) for every tier, which collapses an 800/600/400m
-    // run swapped for a bike into "2400m" three times over (and a 7200m total for 5400m ridden).
-    // The swap is a RATIO: each tier scales its OWN prescription by it. Only applied when the
-    // movement actually was substituted — otherwise the resolver already returns each tier's own
-    // number and scaling it again would invent one. The resolver reports the swap; a before/after
-    // name comparison does NOT, because the logging sheet writes the substituted name straight
-    // into the saved `sections[]` (leaving each tier's own prescribed amount beside it).
-    const prescribedSeq = tiers.map((tier) => qtyOf(tier[j]));
-    const seq = resolved[0].substituted
-      ? prescribedSeq.map((p) => scaleEnteredToTier(qtyOf(m0), p, prescribedSeq[0]) ?? qtyOf(m0))
-      : perRound.map(qtyOf);
+    // Saved tiers contain final logged quantities; no conversion belongs in the poster.
+    const seq = perRound.map(qtyOf);
     const allSame = seq.every((v) => v === seq[0]);
     const suffix = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
-    const schemeStr = allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`;
+    const schemeStr = seq.every(value => value > 0) ? (allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`) : '';
     const total = seq.reduce((sum, v) => sum + v, 0);
     const bd = breakdown.find((b) => b.name.toLowerCase() === m0.name.toLowerCase());
     // Load tag = the athlete's LOGGED weight when one exists (breakdown = movementWeights truth),
@@ -3681,16 +3670,6 @@ function buildSectionedStoryMovements(
   if (!sections || sections.length <= 1) return undefined;
   const lines: StoryMovementLine[] = [];
 
-  // The tier a substitution was converted against: the FIRST section that prescribes the
-  // movement. A swap converts that one amount; the later tiers scale their own by the ratio.
-  const basePrescribed = new Map<string, ParsedMovement>();
-  for (const section of sections) {
-    for (const mov of section.movements) {
-      const key = mov.name.toLowerCase();
-      if (!basePrescribed.has(key)) basePrescribed.set(key, mov);
-    }
-  }
-
   for (const section of sections) {
     const rounds = section.rounds ?? 1;
     const isPartnerSection = teamSize && teamSize > 1;
@@ -3724,14 +3703,9 @@ function buildSectionedStoryMovements(
 
       let substitutedPerRound: string | undefined;
       if (wasSubstituted && actual) {
-        // `distancePerRep` is the ONE converted figure the swap produced, against the first
-        // tier that prescribes this movement. Printing it under every section is what put
-        // "2.4km" beside the 600m and 400m rungs of an 800/600/400m ladder swapped to a bike.
-        const base = basePrescribed.get(mov.name.toLowerCase());
-        const subDist = actual.distancePerRep != null
-          ? (scaleEnteredToTier(actual.distancePerRep, mov.distance, base?.distance) ?? 0)
-          : (actual.totalDistance ? Math.round(actual.totalDistance / sections.length) : 0);
-        const subCals = actual.totalCalories ? Math.round(actual.totalCalories / sections.length) : 0;
+        // Only the saved occurrence can supply its substituted quantity.
+        const subDist = mov.substitution ? (mov.distance ?? 0) : 0;
+        const subCals = mov.substitution ? (mov.calories ?? 0) : 0;
         if (subDist > 0) {
           substitutedPerRound = subDist >= 1000 ? `${(subDist / 1000).toFixed(1)}km` : `${subDist}m`;
         } else if (subCals > 0) {

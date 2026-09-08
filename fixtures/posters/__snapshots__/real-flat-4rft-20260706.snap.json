@@ -6,13 +6,13 @@
       "blueprint": "4 rounds for time",
       "rows": [
         {
-          "primary": "20×",
+          "primary": "600m",
           "name": "Echo Bike",
-          "nameWithLoad": "600m Echo Bike",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta",
-          "repeatCount": 4
+          "repeatCount": 4,
+          "suppressMine": true
         },
         {
           "primary": "10",
@@ -26,13 +26,13 @@
           "repeatCount": 4
         },
         {
-          "primary": "20×",
+          "primary": "600m",
           "name": "Echo Bike",
-          "nameWithLoad": "600m Echo Bike",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta",
-          "repeatCount": 4
+          "repeatCount": 4,
+          "suppressMine": true
         },
         {
           "primary": "10",
@@ -46,13 +46,13 @@
           "repeatCount": 4
         },
         {
-          "primary": "20×",
+          "primary": "600m",
           "name": "Echo Bike",
-          "nameWithLoad": "600m Echo Bike",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta",
-          "repeatCount": 4
+          "repeatCount": 4,
+          "suppressMine": true
         },
         {
           "primary": "10",
@@ -66,13 +66,13 @@
           "repeatCount": 4
         },
         {
-          "primary": "20×",
+          "primary": "600m",
           "name": "Echo Bike",
-          "nameWithLoad": "600m Echo Bike",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta",
-          "repeatCount": 4
+          "repeatCount": 4,
+          "suppressMine": true
         },
         {
           "primary": "10",
@@ -86,13 +86,13 @@
           "repeatCount": 4
         },
         {
-          "primary": "20×",
+          "primary": "600m",
           "name": "Echo Bike",
-          "nameWithLoad": "600m Echo Bike",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta",
-          "repeatCount": 4
+          "repeatCount": 4,
+          "suppressMine": true
         },
         {
           "primary": "10",
@@ -116,13 +116,13 @@
         "blueprint": "4 rounds for time",
         "rows": [
           {
-            "primary": "20×",
+            "primary": "600m",
             "name": "Echo Bike",
-            "nameWithLoad": "600m Echo Bike",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta",
-            "repeatCount": 4
+            "repeatCount": 4,
+            "suppressMine": true
           },
           {
             "primary": "10",
@@ -136,13 +136,13 @@
             "repeatCount": 4
           },
           {
-            "primary": "20×",
+            "primary": "600m",
             "name": "Echo Bike",
-            "nameWithLoad": "600m Echo Bike",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta",
-            "repeatCount": 4
+            "repeatCount": 4,
+            "suppressMine": true
           },
           {
             "primary": "10",
@@ -156,13 +156,13 @@
             "repeatCount": 4
           },
           {
-            "primary": "20×",
+            "primary": "600m",
             "name": "Echo Bike",
-            "nameWithLoad": "600m Echo Bike",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta",
-            "repeatCount": 4
+            "repeatCount": 4,
+            "suppressMine": true
           },
           {
             "primary": "10",
@@ -176,13 +176,13 @@
             "repeatCount": 4
           },
           {
-            "primary": "20×",
+            "primary": "600m",
             "name": "Echo Bike",
-            "nameWithLoad": "600m Echo Bike",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta",
-            "repeatCount": 4
+            "repeatCount": 4,
+            "suppressMine": true
           },
           {
             "primary": "10",
@@ -196,13 +196,13 @@
             "repeatCount": 4
           },
           {
-            "primary": "20×",
+            "primary": "600m",
             "name": "Echo Bike",
-            "nameWithLoad": "600m Echo Bike",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta",
-            "repeatCount": 4
+            "repeatCount": 4,
+            "suppressMine": true
           },
           {
             "primary": "10",
@@ -290,7 +290,7 @@
         "rx": "600m Echo Bike",
         "swapFrom": "Run",
         "load": "",
-        "mine": "12.00km",
+        "mine": "",
         "team": ""
       },
       {
@@ -305,7 +305,7 @@
         "kind": "line",
         "rx": "600m Echo Bike",
         "load": "",
-        "mine": "12.00km",
+        "mine": "",
         "team": ""
       },
       {
@@ -320,7 +320,7 @@
         "kind": "line",
         "rx": "600m Echo Bike",
         "load": "",
-        "mine": "12.00km",
+        "mine": "",
         "team": ""
       },
       {
@@ -335,7 +335,7 @@
         "kind": "line",
         "rx": "600m Echo Bike",
         "load": "",
-        "mine": "12.00km",
+        "mine": "",
         "team": ""
       },
       {
@@ -350,7 +350,7 @@
         "kind": "line",
         "rx": "600m Echo Bike",
         "load": "",
-        "mine": "12.00km",
+        "mine": "",
         "team": ""
       },
       {
@@ -369,7 +369,7 @@
           "rx": "600m Echo Bike",
           "swapFrom": "Run",
           "load": "",
-          "mine": "12.00km",
+          "mine": "",
           "team": ""
         },
         {
@@ -384,7 +384,7 @@
           "kind": "line",
           "rx": "600m Echo Bike",
           "load": "",
-          "mine": "12.00km",
+          "mine": "",
           "team": ""
         },
         {
@@ -399,7 +399,7 @@
           "kind": "line",
           "rx": "600m Echo Bike",
           "load": "",
-          "mine": "12.00km",
+          "mine": "",
           "team": ""
         },
         {
@@ -414,7 +414,7 @@
           "kind": "line",
           "rx": "600m Echo Bike",
           "load": "",
-          "mine": "12.00km",
+          "mine": "",
           "team": ""
         },
         {
@@ -429,7 +429,7 @@
           "kind": "line",
           "rx": "600m Echo Bike",
           "load": "",
-          "mine": "12.00km",
+          "mine": "",
           "team": ""
         },
         {

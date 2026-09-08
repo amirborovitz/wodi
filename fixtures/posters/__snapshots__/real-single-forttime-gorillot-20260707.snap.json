@@ -209,8 +209,7 @@
         "color": "magenta",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "1.8km"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "20",
@@ -243,8 +242,7 @@
         "color": "magenta",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "1.8km"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "20",

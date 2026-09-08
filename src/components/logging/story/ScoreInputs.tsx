@@ -19,9 +19,18 @@ function selectAllInput(target: HTMLInputElement) {
 interface ScoreTimeInputProps {
   result: StoryExerciseResult;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
+  /**
+   * Pin the clock to the top of the scrolling body.
+   *
+   * On a board that reads its whole prescription back in order, seven movement rows push the
+   * clock off screen — and the clock IS the log on a for-time piece. Everything below it is
+   * optional; the athlete could scroll past all of it to "Done for today" without once seeing
+   * the number they came to enter.
+   */
+  docked?: boolean;
 }
 
-export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
+export function ScoreTimeInput({ result, onChange, docked = false }: ScoreTimeInputProps) {
   const totalSeconds = result.timeSeconds ?? 0;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -73,7 +82,7 @@ export function ScoreTimeInput({ result, onChange }: ScoreTimeInputProps) {
   }, [minuteText, setTime]);
 
   return (
-    <div className={styles.center}>
+    <div className={`${styles.center} ${docked ? styles.scoreDock : ''}`}>
       <div className={styles.timeDisplay}>
         <div className={styles.timeDrum}>
           <input

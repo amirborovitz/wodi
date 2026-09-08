@@ -22,6 +22,18 @@ interface InputRouterProps {
 }
 
 /**
+ * True for the board that reads its whole prescription back in order, one row per written
+ * movement, with the editors closed until tapped.
+ *
+ * One decision, three consumers: the movement list renders compact, the score docks above it so
+ * a long board can't push the clock out of reach, and the wizard header drops its own
+ * prescription line rather than printing the same board twice in two different shapes.
+ */
+export function usesOrderedBoard(result: StoryExerciseResult): boolean {
+  return result.kind === 'score_time';
+}
+
+/**
  * Routes an ExerciseKind to its corresponding input component.
  * Rendered by StoryLogResults inside WizardExerciseScreen, one part per page.
  *
@@ -34,6 +46,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
   const movements = result.movementResults ?? [];
   if (kind === 'score_time' || kind === 'score_rounds' || kind === 'score_open_reps') {
     const isLadder = !!(result.exercise.ladderReps && result.exercise.ladderReps.length > 0);
+    const orderedBoard = usesOrderedBoard(result);
 
     // What this block is actually scored by, read from the block rather than its format name.
     // A board can run on an AMRAP clock and still have no rounds to earn: "[2:00 AMRAP] x4 —
@@ -138,7 +151,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     return (
       <>
         {kind === 'score_time' && (
-          <ScoreTimeInput result={result} onChange={onChange} />
+          <ScoreTimeInput result={result} onChange={onChange} docked={orderedBoard} />
         )}
         {kind === 'score_rounds' && !useSimplifiedIntervalRounds && !isLadder && !isPureRelay && (
           <ScoreRoundsInput result={result} onChange={onChange} />
@@ -172,6 +185,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {showMovements && (
           <ScoreMovementInputs
             movements={displayMovements}
+            compact={orderedBoard}
             isRelayContext={hasRelay && kind === 'score_rounds'}
             // Prescribed distances are display-only on any scored-by-structure block: the board
             // states every metre, so there is nothing to type. Open-reps blocks are the same —

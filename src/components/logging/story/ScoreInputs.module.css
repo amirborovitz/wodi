@@ -11,6 +11,18 @@
   padding: var(--space-2) 0;
 }
 
+/* The score stays put while the board scrolls under it.
+   Stays strictly inside the scroll container's content box — every sibling spans that same
+   width, so there is nothing in the side gutters for a bleed to cover, and a child wider than
+   its container is what gives a vertical pane a horizontal scrollbar. */
+.scoreDock {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--wodi-card);
+  border-bottom: 1px solid var(--wodi-line);
+}
+
 /* ── Prompt text above an input (e.g. RoundsPerIntervalInput) ── */
 .prompt {
   margin: 0 0 12px;

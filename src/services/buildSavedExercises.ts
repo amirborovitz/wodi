@@ -1,7 +1,7 @@
 import type { Exercise, ExerciseSet, ParsedMovement, MovementSubstitution } from '../types';
 import type { LegacyExerciseResult } from '../components/logging/story/StoryLogResults';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
-import { scaleEnteredToTier } from '../utils/tierScaling';
+import { resolveLoggedQuantity } from '../utils/tierScaling';
 import { openQuantitySlot, sectionRoundsCompleted } from './blockScore';
 
 /** The production save conversion, shared with persistence round-trip regression tests. */
@@ -20,11 +20,8 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       const single = movementLookup(result.movementWeights || {}, mk, plainName);
       return single && single > 0 ? [single] : undefined;
     };
-    // The prescription an entry was made against: the movement's FIRST occurrence. A
-    // per-movement ladder collapses to one input row built from tier 1, so baking the raw
-    // entry onto every occurrence saved an 800/600/400m run swapped for a bike as 3 × 2400m.
-    // Later tiers scale their own prescription by the ratio that entry implies (tierScaling) —
-    // the same rule the breakdown above already follows, so both agree on 5400m.
+    // Shared ladder substitutions are resolved before persistence. Exact occurrence entries
+    // pass through unchanged; an unchanged ladder keeps each tier's own prescription.
     // The swap kept next to the prescription it replaced. Everything else in this block bakes
     // the SUBSTITUTE onto the movement — its name, its converted distance, its zeroed reps —
     // because that is what the poster and every totals consumer read. This is the only record
@@ -45,12 +42,9 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       if (!saveBasePrescribed.has(baseKey)) saveBasePrescribed.set(baseKey, mov);
       const base = saveBasePrescribed.get(baseKey);
       const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
-      const selectedReps = scaleEnteredToTier(
-        movementLookup(result.movementReps || {}, mk, mov.name), mov.reps, base?.reps,
-      );
-      const selectedDistance = scaleEnteredToTier(
-        movementLookup(result.movementDistances || {}, mk, mov.name), mov.distance, base?.distance,
-      );
+      const selectedReps = resolveLoggedQuantity(result.movementReps, mk, mov, base, result.movementSubstitutions, 'reps');
+      const selectedDistance = resolveLoggedQuantity(result.movementDistances, mk, mov, base, result.movementSubstitutions, 'distance');
+      const selectedCalories = resolveLoggedQuantity(result.movementCalories, mk, mov, base, result.movementSubstitutions, 'calories');
       const loggedWeights = loggedLoadFor(mk, mov.name);
       // The slot the board left OPEN is prescribed BY BEING EMPTY, so the logged-value bake
       // below must not touch it. "➔ Max Sit-up" was saved as `reps: 20` — the athlete's own
@@ -67,6 +61,7 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
         // edit un-baked, so going back to Rx has to CLEAR it here or the swap returns on the
         // next open. `undefined` never reaches Firestore — removeUndefined strips it.
         substitution: substitutionForSave(mk, mov),
+        ...(selectedCalories !== undefined && openSlot !== 'calories' ? { calories: selectedCalories } : {}),
         ...(selectedReps !== undefined && openSlot !== 'reps' ? { reps: selectedReps } : {}),
         // Relay pacers keep their prescribed per-trip distance — the logged value is a TOTAL
         // (already in the breakdown), and detail mode needs the per-trip prescription to
@@ -102,16 +97,26 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       sectionKeyOffsets.push(offset);
       return offset + sec.movements.length;
     }, 0);
+    const sectionBasePrescribed = new Map<string, ParsedMovement>();
     const sectionsForSave = result.exercise.sections?.map((sec, secIdx) => ({
       ...sec,
       movements: sec.movements.map((mov, movIdx) => {
         const mk = sectionKeys[sectionKeyOffsets[secIdx] + movIdx] ?? mov.name;
+        if (!sectionBasePrescribed.has(mov.name)) sectionBasePrescribed.set(mov.name, mov);
+        const base = sectionBasePrescribed.get(mov.name);
+        const reps = resolveLoggedQuantity(result.movementReps, mk, mov, base, result.movementSubstitutions, 'reps');
+        const distance = resolveLoggedQuantity(result.movementDistances, mk, mov, base, result.movementSubstitutions, 'distance');
+        const calories = resolveLoggedQuantity(result.movementCalories, mk, mov, base, result.movementSubstitutions, 'calories');
+        const openSlot = openQuantitySlot(mov);
         const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
         const loggedWeights = loggedLoadFor(mk, mov.name);
         return {
           ...mov,
           name: selectedName,
           substitution: substitutionForSave(mk, mov),
+          ...(reps !== undefined && openSlot !== 'reps' ? { reps } : {}),
+          ...(distance !== undefined && !mov.relay && openSlot !== 'distance' ? { distance } : {}),
+          ...(calories !== undefined && openSlot !== 'calories' ? { calories } : {}),
           ...(loggedWeights ? { loggedWeights } : {}),
         };
       }),

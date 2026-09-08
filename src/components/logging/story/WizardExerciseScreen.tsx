@@ -24,6 +24,12 @@ interface WizardExerciseScreenProps {
   isEditing?: boolean;
   hideFooter?: boolean;
   /**
+   * The body already prints the board, movement by movement, so the header must not print it
+   * again as a comma run-on. Two renderings of one prescription is the same information twice,
+   * and the all-caps summary is the harder of the two to read.
+   */
+  prescriptionInBody?: boolean;
+  /**
    * The way out of Wodi's reading of this board.
    *
    * Always offered, never asked. Asking up front ("should I guess?") makes the athlete decide
@@ -58,6 +64,7 @@ export function WizardExerciseScreen({
   isLastBlock,
   isEditing = false,
   hideFooter = false,
+  prescriptionInBody = false,
   flatten,
   onDone,
   onBack,
@@ -122,7 +129,7 @@ export function WizardExerciseScreen({
             </p>
           )}
           <h2 className={styles.exerciseName}>{result.exercise.name}</h2>
-          {result.exercise.prescription && (
+          {result.exercise.prescription && !prescriptionInBody && (
             <p className={styles.prescription}>{result.exercise.prescription}</p>
           )}
         </div>
@@ -131,24 +138,27 @@ export function WizardExerciseScreen({
           {children}
           {flatten && !hideFooter && (
             <div className={flatten.uncertain && !flatten.isFlat ? styles.flatNoticeFlagged : styles.flatNotice}>
+              {/* "Flat" is a word from inside the app. What the athlete needs to know is that
+                  they can enter every movement, weight and count themselves — so that is what
+                  the exit says. */}
               {flatten.isFlat ? (
                 <>
                   <p className={styles.flatNoticeText}>
-                    Logging this one flat — movements, weights and counts, nothing assumed.
+                    You&rsquo;re entering this one yourself — movements, weights and counts, nothing assumed.
                   </p>
                   <button type="button" className={styles.flatLink} onClick={flatten.onRestore}>
-                    Use Wodi&rsquo;s version
+                    Go back to Wodi&rsquo;s version
                   </button>
                 </>
               ) : (
                 <>
-                  {flatten.uncertain && (
-                    <p className={styles.flatNoticeText}>
-                      Wodi couldn&rsquo;t read part of this board, so some of this is its best reading.
-                    </p>
-                  )}
+                  <p className={styles.flatNoticeText}>
+                    {flatten.uncertain
+                      ? 'Wodi couldn’t read part of this board, so some of this is its best reading.'
+                      : 'Wodi read this board for you.'}
+                  </p>
                   <button type="button" className={styles.flatLink} onClick={flatten.onFlatten}>
-                    {flatten.uncertain ? 'Log it flat instead' : 'Not how it went? Log it flat'}
+                    Got it wrong? Enter it yourself
                   </button>
                 </>
               )}

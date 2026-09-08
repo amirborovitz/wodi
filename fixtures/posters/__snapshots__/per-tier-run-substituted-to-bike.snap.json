@@ -6,9 +6,8 @@
       "blueprint": "3 rounds for time · 35 MIN CAP",
       "rows": [
         {
-          "primary": "2400-1800-1200m",
+          "primary": "",
           "name": "Echo Bikes",
-          "totalNote": "5400m total",
           "mineKey": "Echo Bike",
           "substitutedFrom": "Run",
           "accent": "magenta"
@@ -46,9 +45,8 @@
         "blueprint": "3 rounds for time · 35 MIN CAP",
         "rows": [
           {
-            "primary": "2400-1800-1200m",
+            "primary": "",
             "name": "Echo Bikes",
-            "totalNote": "5400m total",
             "mineKey": "Echo Bike",
             "substitutedFrom": "Run",
             "accent": "magenta"
@@ -97,8 +95,7 @@
         "color": "magenta",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "2.4km"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "40",
@@ -138,8 +135,7 @@
         "color": "magenta",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "1.8km"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "30",
@@ -179,8 +175,7 @@
         "color": "magenta",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "1.2km"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "20",
@@ -221,12 +216,11 @@
       },
       {
         "kind": "line",
-        "rx": "2400-1800-1200m Echo Bikes",
+        "rx": "Echo Bikes",
         "swapFrom": "Run",
         "load": "",
-        "mine": "",
-        "team": "",
-        "total": "5400m total"
+        "mine": "5.40km",
+        "team": ""
       },
       {
         "kind": "line",
@@ -262,12 +256,11 @@
         },
         {
           "kind": "line",
-          "rx": "2400-1800-1200m Echo Bikes",
+          "rx": "Echo Bikes",
           "swapFrom": "Run",
           "load": "",
-          "mine": "",
-          "team": "",
-          "total": "5400m total"
+          "mine": "5.40km",
+          "team": ""
         },
         {
           "kind": "line",

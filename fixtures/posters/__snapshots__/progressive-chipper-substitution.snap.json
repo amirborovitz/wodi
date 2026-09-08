@@ -8,7 +8,7 @@
         {
           "roundLabel": "R1",
           "name": "round-1",
-          "primary": "10cal Ski Erg",
+          "primary": "Ski Erg",
           "accent": "magenta"
         },
         {
@@ -21,7 +21,7 @@
         {
           "roundLabel": "R3",
           "name": "round-3",
-          "primary": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+          "primary": "Ski Erg · 10 Wall Balls · 10 Burpees",
           "subNote": "9kg",
           "accent": "magenta"
         }
@@ -38,7 +38,7 @@
           {
             "roundLabel": "R1",
             "name": "round-1",
-            "primary": "10cal Ski Erg",
+            "primary": "Ski Erg",
             "accent": "magenta"
           },
           {
@@ -51,7 +51,7 @@
           {
             "roundLabel": "R3",
             "name": "round-3",
-            "primary": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+            "primary": "Ski Erg · 10 Wall Balls · 10 Burpees",
             "subNote": "9kg",
             "accent": "magenta"
           }
@@ -76,8 +76,7 @@
         "total": "",
         "color": "magenta",
         "wasSubstituted": true,
-        "originalMovement": "Row",
-        "substitutedPerRound": "10 cal"
+        "originalMovement": "Row"
       },
       {
         "perRound": "",
@@ -91,8 +90,7 @@
         "total": "",
         "color": "magenta",
         "wasSubstituted": true,
-        "originalMovement": "Row",
-        "substitutedPerRound": "10 cal"
+        "originalMovement": "Row"
       },
       {
         "perRound": "10",
@@ -115,8 +113,7 @@
         "total": "",
         "color": "magenta",
         "wasSubstituted": true,
-        "originalMovement": "Row",
-        "substitutedPerRound": "10 cal"
+        "originalMovement": "Row"
       },
       {
         "perRound": "10",
@@ -149,7 +146,7 @@
       },
       {
         "kind": "line",
-        "rx": "10cal Ski Erg",
+        "rx": "Ski Erg",
         "load": "",
         "mine": "",
         "team": "",
@@ -165,7 +162,7 @@
       },
       {
         "kind": "line",
-        "rx": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+        "rx": "Ski Erg · 10 Wall Balls · 10 Burpees",
         "load": "9kg",
         "mine": "9kg",
         "team": "",
@@ -181,7 +178,7 @@
         },
         {
           "kind": "line",
-          "rx": "10cal Ski Erg",
+          "rx": "Ski Erg",
           "load": "",
           "mine": "",
           "team": "",
@@ -197,7 +194,7 @@
         },
         {
           "kind": "line",
-          "rx": "10cal Ski Erg · 10 Wall Balls · 10 Burpees",
+          "rx": "Ski Erg · 10 Wall Balls · 10 Burpees",
           "load": "9kg",
           "mine": "9kg",
           "team": "",

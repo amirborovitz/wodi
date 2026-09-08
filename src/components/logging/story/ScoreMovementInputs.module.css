@@ -4,6 +4,183 @@
    ═══════════════════════════════════════════ */
 
 /* Single movement: centered weight field */
+.compactWeight {
+  --weight-layout: grid;
+  --weight-align: center;
+  --weight-button-width: 44px;
+  --weight-control-gap: 4px;
+  --weight-value-size: 32px;
+}
+
+.compactPrescription {
+  --movement-row-gap: 0px;
+}
+
+.prescriptionIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prescriptionHelp {
+  margin: 0;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.prescriptionMove {
+  border-bottom: 1px solid var(--wodi-line);
+}
+
+.prescriptionSummary,
+.prescriptionReadOnly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  gap: 12px;
+  padding: 8px 0;
+  color: var(--wodi-white);
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prescriptionSummary {
+  cursor: pointer;
+}
+
+.prescriptionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.prescriptionSummary:focus-visible {
+  outline: 2px solid var(--wodi-yellow);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.prescriptionSummary:active {
+  opacity: 0.7;
+}
+
+.prescriptionText {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.prescriptionName {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.prescriptionLoad {
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prescriptionPersonal {
+  flex-basis: 100%;
+  color: var(--wodi-yellow);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.prescriptionOccurrence {
+  padding: 1px 6px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: 999px;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.prescriptionAction {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 5px;
+  color: var(--wodi-yellow);
+}
+
+.prescriptionActionLabel {
+  font-family: var(--font-barlow);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.prescriptionAction svg {
+  transition: transform 150ms ease-out;
+}
+
+.prescriptionMove[open] .prescriptionAction svg {
+  transform: rotate(180deg);
+}
+
+.prescriptionEditor {
+  padding-bottom: 12px;
+}
+
+/* The ordered board edits ONE occurrence, and two identical-looking rows would never say so on
+   their own. The open editor states which one it is, and offers the bulk action rather than
+   making the athlete find and repeat the same edit further down the board. */
+.occurrenceScope {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: 10px;
+  background: var(--wodi-card2);
+}
+
+.occurrenceScopeText {
+  margin: 0;
+  flex: 1 1 140px;
+  color: var(--wodi-dim);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.occurrenceScopeBtn {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(245, 194, 0, 0.4);
+  border-radius: 999px;
+  background: rgba(245, 194, 0, 0.08);
+  color: var(--wodi-yellow);
+  font-family: var(--font-barlow);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.occurrenceScopeBtn:active {
+  opacity: 0.7;
+}
+
 .singleRow {
   display: flex;
   justify-content: center;
@@ -16,14 +193,16 @@
   z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--movement-row-gap, 10px);
   padding: 2px 0;
 }
 
 .implementWeightScreen {
   position: relative;
   z-index: 3;
-  display: flex;
+  display: var(--weight-layout, flex);
+  grid-template-columns: minmax(0, 1fr) minmax(164px, 1fr);
+  align-items: var(--weight-align, stretch);
   flex-direction: column;
   justify-content: flex-start;
   gap: 10px;
@@ -113,9 +292,9 @@
 
 .heroWeightStepper {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) 64px;
+  grid-template-columns: var(--weight-button-width, 64px) minmax(0, 1fr) var(--weight-button-width, 64px);
   align-items: center;
-  gap: 10px;
+  gap: var(--weight-control-gap, 10px);
   width: 100%;
   flex-shrink: 0;
   padding: 2px 0;
@@ -162,7 +341,7 @@
 .heroWeightValue {
   color: var(--wodi-white);
   font-family: var(--font-display);
-  font-size: clamp(44px, 13vw, 54px);
+  font-size: var(--weight-value-size, clamp(44px, 13vw, 54px));
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: 0;
@@ -200,6 +379,8 @@
 }
 
 .differentWeightsLink {
+  grid-column: 1 / -1;
+  min-height: 44px;
   justify-self: center;
   border: 0;
   background: transparent;
@@ -616,8 +797,7 @@
 .tile {
   position: relative;
   z-index: 1;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.04));
+  background: var(--wodi-card);
   border-radius: 22px;
   padding: 14px 14px 12px;
   display: flex;

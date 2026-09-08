@@ -32,7 +32,8 @@
           "accent": "magenta",
           "repeatCount": 1,
           "partnerSplit": "reps",
-          "teamShare": "30"
+          "teamShare": "30",
+          "suppressMine": true
         },
         {
           "primary": "40",
@@ -50,7 +51,8 @@
           "accent": "magenta",
           "repeatCount": 1,
           "partnerSplit": "reps",
-          "teamShare": "30"
+          "teamShare": "30",
+          "suppressMine": true
         },
         {
           "primary": "80",
@@ -111,7 +113,8 @@
             "accent": "magenta",
             "repeatCount": 1,
             "partnerSplit": "reps",
-            "teamShare": "30"
+            "teamShare": "30",
+            "suppressMine": true
           },
           {
             "primary": "40",
@@ -129,7 +132,8 @@
             "accent": "magenta",
             "repeatCount": 1,
             "partnerSplit": "reps",
-            "teamShare": "30"
+            "teamShare": "30",
+            "suppressMine": true
           },
           {
             "primary": "80",

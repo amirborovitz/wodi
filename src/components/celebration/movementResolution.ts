@@ -257,30 +257,26 @@ export interface ResolvedPrescribedMovement {
 }
 
 /**
- * Builds a resolver that applies logged substitutions to prescribed movements.
- *
- * Poster truth rules baked in:
- * - The substituted NAME always replaces the board's (the athlete didn't do the board's movement).
- * - Breakdown totals aggregate across ALL sections a movement appears in, so per-round
- *   quantities and exact totals are only derived when the section being rendered owns ALL of
- *   the movement's prescribed rounds — and per-round values only when they divide cleanly.
- * - When totals can't be attributed, the PRESCRIBED quantity carries over — but only if the
- *   substitute kept the same metric (10 dips → 10 push-ups stays "10"; 200m run → Echo Bike
- *   must not become "200m Echo Bike"). A metric change with unattributable totals shows no
- *   quantity rather than a guess.
- * - The original movement's Rx weights are dropped; the athlete's logged weight still reaches
- *   the poster via the breakdown/mine lookup, which already matches on the substituted name.
+ * Read the saved substitution, never apply a conversion in the poster.
+ * Each current saved occurrence carries its final quantities. Older documents without
+ * that record can still name the substitute, but aggregate totals cannot reconstruct it.
  */
 export function createSubstitutionResolver(
   exercise: Exercise,
   breakdown: MovementTotal[],
 ): (prescribed: ParsedMovement, sectionRounds: number) => ResolvedPrescribedMovement {
   const repeatsByName = new Map<string, number>();
+  const distancesByName = new Map<string, Set<number>>();
   for (const section of exercise.sections ?? []) {
     const repeats = section.sectionType === 'rounds' ? (section.rounds ?? 1) : 1;
     for (const mov of section.movements ?? []) {
       const key = mov.name.toLowerCase();
       repeatsByName.set(key, (repeatsByName.get(key) ?? 0) + repeats);
+      if (mov.distance != null) {
+        const distances = distancesByName.get(key) ?? new Set<number>();
+        distances.add(mov.distance);
+        distancesByName.set(key, distances);
+      }
     }
   }
 
@@ -290,14 +286,12 @@ export function createSubstitutionResolver(
 
     const rounds = Math.max(sectionRounds, 1);
     const ownsAllRounds = (repeatsByName.get(prescribed.name.toLowerCase()) ?? rounds) === rounds;
-    const perRound = (total?: number): number | undefined =>
-      ownsAllRounds && total && total > 0 && total % rounds === 0 ? total / rounds : undefined;
-    const keptMetric = {
-      reps: prescribed.reps != null && (actual.totalReps ?? 0) > 0,
-      distance: prescribed.distance != null
-        && ((actual.totalDistance ?? 0) > 0 || (actual.distancePerRep ?? 0) > 0),
-      calories: prescribed.calories != null && (actual.totalCalories ?? 0) > 0,
-    };
+    // Current saves keep the athlete's final quantity on each occurrence. For older
+    // substitutions with no occurrence record, retain the name but do not invent quantities.
+    const saved = prescribed.substitution != null;
+    // A legacy per-trip value is already logged, not a conversion. It may be shared only
+    // when the source occurrences all had the same distance; a ladder cannot reuse it.
+    const uniformDistance = distancesByName.get(prescribed.name.toLowerCase())?.size === 1;
 
     return {
       substituted: true,
@@ -306,11 +300,9 @@ export function createSubstitutionResolver(
         ...prescribed,
         name: actual.name,
         alternative: undefined, // the OR choice was made — don't re-render the option
-        reps: perRound(actual.totalReps) ?? (keptMetric.reps ? prescribed.reps : undefined),
-        distance: actual.distancePerRep
-          ?? perRound(actual.totalDistance)
-          ?? (keptMetric.distance ? prescribed.distance : undefined),
-        calories: perRound(actual.totalCalories) ?? (keptMetric.calories ? prescribed.calories : undefined),
+        reps: saved ? prescribed.reps || undefined : undefined,
+        distance: saved ? prescribed.distance : uniformDistance ? actual.distancePerRep : undefined,
+        calories: saved ? prescribed.calories || undefined : undefined,
         rxWeights: undefined,
       },
     };

@@ -208,8 +208,7 @@
         "partnerNote": "together",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "900m"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "100",
@@ -235,8 +234,7 @@
         "partnerNote": "together",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "900m"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "80",
@@ -262,8 +260,7 @@
         "partnerNote": "together",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "900m"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "60",
@@ -289,8 +286,7 @@
         "partnerNote": "together",
         "wasSubstituted": true,
         "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "900m"
+        "substitutionType": "equivalent"
       },
       {
         "perRound": "300m",
