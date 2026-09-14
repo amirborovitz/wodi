@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.1.34 — One workout, one number
+
+The weekly recap said 232 "kettlebell shoulder to overhead". The board was 58 thrusters, and the
+poster said 58. Both screens were reading the same workout.
+
+A workout's totals were answered twice: the save stored them, and the poster quietly corrected
+them on the way to the screen. The recap, stats and EP read the stored figure raw. So every save
+bug the poster covered for looked right where the athlete checks — and was wrong everywhere else.
+
+Now there is one number, written at save, and every screen reads it.
+
+---
+
+### The poster prints what was saved
+
+The poster's repair pass is gone, and its rows print the saved total wherever a movement has one
+row. A lift split across blocks ("4 × 2", then "4 × 1") still shows each block, and those rows must
+add up to what was saved — `npm run posters` fails when they don't. A wrong total is now fixed
+where it is made, never on the way to the screen.
+
+Two things look different: block C of an A/B/C interval AMRAP counts the partial round the
+athlete finished (105 swings, not 90), and two story lines now match their rows.
+
+### Two save bugs the poster had been hiding
+
+- A board that writes out its windows ("00:00-03:00: 19 … 03:00-06:00: 16 …") was multiplied by
+  its own window count again: 58 thrusters saved as 232.
+- A run swapped to the bike on a ladder AMRAP saved the run's distance under the bike's name:
+  5 × 600m of bike stored as 1000m.
+
+### No more accidental copies
+
+Save → Edit → back → Save wrote the workout a second time. It now updates the one already saved.
+And logging a board you already logged in the last two days asks first: **Replace that log**, or
+**Keep both**.
+
+### Home counts your whole history
+
+The home screen's recap cards and milestone line only saw your newest 100 workouts — a Spring
+season card counted 33 workouts where the same recap on Me counted 59. Both now read everything.
+
+### Old workouts corrected
+
+Every account's saved totals were brought to the same single truth by a one-off, reviewed
+backfill: 44 workouts across three athletes, most of them old saves that had kept only one
+round's work. Every overwritten value was backed up first.
+
+Also in this release: team relay totals survive an edit; the "one in each hand or one between
+them?" question asks only about hand-held implements; the home milestone line; an open-count
+movement is no longer asked for twice; interval titles say their scheme once.
+
+tsc -b clean; 812 tests across 51 files; 61 poster fixtures, each one's rows adding up to its
+saved totals. Posters for 207 real workouts: none prints a total its saved numbers don't hold.
+
 ## v0.1.33 — One movement, three different numbers
 
 Daniel is 50 pull-ups, a 400m run, 21 thrusters, an 800m run, 21 thrusters, a 400m run, 50
