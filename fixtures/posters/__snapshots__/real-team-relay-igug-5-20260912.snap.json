@@ -1,0 +1,259 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Romanian Deadlift",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Romanian Deadlift",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Romanian Deadlift",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "descLadderScheme": [
+          6,
+          6,
+          6,
+          6
+        ],
+        "descLadderCompleted": 4,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Strict Chest to Bar Pull-up",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Strict Chest To Bar Pull-up",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Strict Chest To Bar Pull-up",
+            "accent": "cyan",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "RELAY",
+        "title": "Team Relay 30 RFT",
+        "blueprint": "30 rounds for time",
+        "rows": [
+          {
+            "primary": "10 CAL",
+            "name": "Echo Bike",
+            "subNote": "60 cal total",
+            "totalNote": "60 cal total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 6,
+            "partnerSplit": "rounds"
+          },
+          {
+            "primary": "12",
+            "name": "Alt American Kettlebell Swings",
+            "nameWithLoad": "Alt American Kettlebell Swings @ 20kg",
+            "loadNote": "20kg",
+            "subNote": "72 total",
+            "totalNote": "72 total",
+            "mineKey": "Alt American Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 6,
+            "partnerSplit": "rounds"
+          }
+        ],
+        "hiddenCount": 0,
+        "roundLedger": {
+          "totalRounds": 30,
+          "personalRounds": 6,
+          "rounds": [
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner",
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner",
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner",
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner",
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner",
+            "me",
+            "partner",
+            "partner",
+            "partner",
+            "partner"
+          ]
+        },
+        "isPartnerConfirmed": true
+      }
+    ]
+  ],
+  "hero": {
+    "value": "15:15",
+    "unit": "MIN",
+    "formatLine": "Strength + 30 RFT · Team of 5",
+    "storyLine": "72 alt american kettlebell swing · 24 romanian deadlift · 24 strict c2b pull-up · 60 echo bike cals",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · ROMANIAN DEADLIFT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Romanian Deadlift",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          70,
+          80
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 24
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · STRICT CHEST TO BAR PULL-UP",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "6",
+        "name": "Strict Chest To Bar Pull-up",
+        "total": "24 total",
+        "color": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "TEAM RELAY 30 RFT",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "10 cal",
+        "name": "Echo Bike",
+        "total": "60 cal total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "12",
+        "name": "Alt American Kettlebell Swing",
+        "total": "72 total",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "15:15",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Romanian Deadlift",
+          "load": "",
+          "mine": "70→80kg",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "STRICT CHEST TO BAR PULL-UP",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Strict Chest To Bar Pull-up",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "TEAM RELAY 30 RFT",
+          "cap": "30 rounds for time"
+        },
+        {
+          "kind": "line",
+          "rx": "10 CAL Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "12 Alt American Kettlebell Swings @ 20kg",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "6-6-6-6 reps",
+    "6-6-6-6 reps",
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false,
+    false
+  ]
+}

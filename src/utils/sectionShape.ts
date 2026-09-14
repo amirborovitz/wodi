@@ -133,3 +133,31 @@ export function sequentialBlockSetCount(exercise: { sections?: SectionLike[] } |
     .filter((s) => s.sectionType === 'rounds')
     .reduce((sum, s) => sum + (s.rounds ?? 1), 0);
 }
+
+/**
+ * Do these sections write out the piece's windows one by one?
+ *
+ * A board can describe four 3-minute windows two ways: state one window and say "× 4", or write
+ * all four out. When it writes them out, the sections ARE the windows — so their work is not
+ * multiplied by the interval count (the workload calculator's rule), and the poster can say the
+ * round once instead of printing it four times.
+ *
+ * The test is that there are exactly as many round-tiers as the clock has windows. Both halves
+ * matter, and each rules out a shape that looks similar:
+ *
+ *  - A buy-in plus a rounds tier is TWO sections describing the inside of ONE window, not two
+ *    windows. A mixed set of section types is never an enumeration.
+ *  - Two blocks alternating across four windows is a rotation: each block runs twice, and the
+ *    count mismatch says so.
+ *
+ * Deliberately not read off the labels. Boards write their windows a dozen ways ("00:00-03:00",
+ * "MIN 1-3", "Round 1") and a pattern that fits one fails the next; the shape does not.
+ */
+export function sectionsEnumerateIntervals(
+  sections: SectionLike[] | undefined,
+  intervalCount: number | undefined,
+): boolean {
+  if (!intervalCount || intervalCount < 2) return false;
+  if (!sections || sections.length !== intervalCount) return false;
+  return sections.every((section) => section.sectionType === 'rounds');
+}

@@ -144,6 +144,8 @@
 /* ── Input inside value panel ── */
 .ovalInput {
   width: 100%;
+  min-width: 0;
+  flex: 1;
   height: 100%;
   background: transparent;
   border: none;
@@ -171,6 +173,19 @@
 .ovalInput::placeholder {
   color: rgba(245, 194, 0, 0.18);
   font-weight: 900;
+}
+
+/* "2×" before a weight typed for ONE of a pair — the same half-size yellow multiplier the
+   metcon hero stepper uses (ScoreMovementInputs .heroWeightMultiplier). */
+.ovalMultiplier {
+  flex: none;
+  padding-left: 10px;
+  font-family: var(--font-display, 'Barlow Condensed', sans-serif);
+  font-size: 23px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--wodi-yellow, #f5c200);
+  pointer-events: none;
 }
 
 .ovalInput::-webkit-inner-spin-button,

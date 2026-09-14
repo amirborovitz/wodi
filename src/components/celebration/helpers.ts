@@ -10,7 +10,6 @@ import type {
   Exercise,
   MovementTotal,
   SharedWorkLabel,
-  WorkloadBreakdown,
   WorkoutFormat,
   ParsedSection,
   ParsedSectionType,
@@ -25,7 +24,6 @@ import type {
 } from './types';
 import {
   isBwVolumeMovement,
-  movementBucketKey,
   sectionRepeatCount,
   statedOccurrenceCount,
 } from '../../services/workloadCalculation';
@@ -37,7 +35,6 @@ import {
 // Partner scope — the ONE owner of what a team's number means for one athlete. Nothing in this
 // file multiplies a per-round quantity by a round count without going through it.
 import {
-  exercisePartnerFactor,
   movementTotals,
   perRoundQuantity,
   prescribesOwnRest,
@@ -52,8 +49,8 @@ import {
   type CelebrationStickerConfig,
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
-import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, substitutedFromName } from './movementResolution';
-import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sequentialBlockSetCount } from '../../utils/sectionShape';
+import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, formatPeakLoadValue, substitutedFromName } from './movementResolution';
+import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sectionsEnumerateIntervals, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit } from '../../utils/loadUnits';
@@ -391,16 +388,21 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
   const cadence = ladderReps.length >= 2 ? ladderReps[1] - ladderReps[0] : undefined;
   const cadenceLabel = cadence != null ? `+${cadence} REPS EVERY ROUND` : undefined;
 
+  // How often an add-on happened is the AI's `countingMode`, read for its VALUE: once per
+  // interval, or once per rung CLIMBED — the athlete's own logged number. The total itself is the
+  // saved one (buildLadderAddOnRow); what's asked here is only whether a count stands behind it.
+  // A per-interval add-on on a doc that never recorded its interval count has no count at all,
+  // and prints no total rather than a guessed one.
+  const rungsClimbed = step > 0 ? step : undefined;
   const fixedRows: ArtifactRow[] = fixedMovements.map((mov) => {
-    const actual = findMovementTotal(movements, mov.name);
-    const perRound = mov.reps ?? mov.calories ?? mov.distance ?? undefined;
-    const unitLabel = mov.reps != null ? '' : mov.calories != null ? ' CAL' : mov.distance != null ? 'M' : '';
-    return {
-      primary: '',
-      name: formatRepMovementNameForPoster(mov.name, mov.reps),
-      loadNote: perRound != null ? `${perRound}${unitLabel} EVERY ROUND` : undefined,
-      accent: (actual?.color ?? 'magenta') as ArtifactRow['accent'],
-    };
+    const perInterval = mov.countingMode === 'per_interval';
+    const count = statedOccurrenceCount(mov, rungsClimbed)
+      ?? (perInterval ? exercise.intervalCount : rungsClimbed);
+    return buildLadderAddOnRow(mov, movements, {
+      suppressTotal: count == null || count <= 0,
+      placementLabel: mov.placement === 'between_sets' ? 'between sets'
+        : perInterval ? 'every interval' : 'every round',
+    });
   });
 
   const trackRow: ArtifactRow = {
@@ -459,35 +461,67 @@ function boardStatedFacts(
 }
 
 /**
- * Rebuild a movement's totals from a count the BOARD stated, leaving everything else about the
- * breakdown entry (weight, colour, substitution) alone.
- *
- * A saved breakdown was computed with whatever multiplier was available at save time. Once the
- * coach's own count is known, count × per-round quantity is simply the better number, and the
- * poster must not print the older one beside a line that states the count.
+ * A movement that rides ALONGSIDE a ladder instead of climbing it — the run between tiers, the
+ * burpees after every rung. One builder for both ladder directions, going through the same
+ * buildCelebrationMovementRow every other page path uses; each direction only answers whether
+ * the count behind the saved total is one the poster can stand behind.
  */
-function correctTotalsForStatedCount(
-  actual: MovementTotal | undefined,
+function buildLadderAddOnRow(
   movement: ParsedMovement,
-  statedCount: number | null | undefined,
-): MovementTotal | undefined {
-  if (statedCount == null || statedCount <= 0) return actual;
-  const corrected: MovementTotal = { ...(actual ?? { name: movement.name }) };
-  if (movement.distance != null && movement.distance > 0) {
-    corrected.totalDistance = movement.distance * statedCount;
-    corrected.distancePerRep = movement.distance;
-  }
-  if (movement.calories != null && movement.calories > 0) {
-    corrected.totalCalories = movement.calories * statedCount;
-  }
-  if (movement.reps != null && movement.reps > 0) {
-    corrected.totalReps = movement.reps * statedCount;
-  } else {
-    // A run has no reps. A stored rep count on one is the ladder's rep sum glued to a movement
-    // that never contributed a single rep — it must not survive onto the row.
-    delete corrected.totalReps;
-  }
-  return corrected;
+  movements: MovementTotal[],
+  options: {
+    /** The count behind the total is unknown, so the total is a guess — print none. */
+    suppressTotal: boolean;
+    placementLabel: string | undefined;
+  },
+): ArtifactRow {
+  const { suppressTotal, placementLabel } = options;
+  // The SAVED total, never one counted here: the breakdown is the single truth the recap, stats
+  // and EP read, and a poster that recounted would print one number while they printed another.
+  // (It did — every ladder saved before 13 Sep 2026 stored its add-on × the board's rung count,
+  // and the poster's own recount hid that until the backfill of 14 Sep 2026 corrected them.)
+  const stored = findMovementTotal(movements, movement.name);
+  // A run has no reps: a stored rep count on one is the ladder's rep sum glued to a movement that
+  // never contributed a single rep. With no count to stand behind, no total may print in any
+  // unit — "25 total" burpees is as much a guess as 1.20km of running.
+  const actual = stored && (suppressTotal || !(movement.reps != null && movement.reps > 0))
+    ? {
+        ...stored,
+        totalReps: undefined,
+        ...(suppressTotal ? { totalDistance: undefined, totalCalories: undefined } : {}),
+      }
+    : stored;
+  const row = buildCelebrationMovementRow({
+    movementName: movement.name,
+    prescribed: {
+      reps: movement.reps,
+      repsDisplay: movement.repsDisplay,
+      distance: movement.distance,
+      calories: movement.calories,
+      time: movement.time,
+      weight: movement.rxWeights?.male ?? movement.rxWeights?.female,
+      implementCount: movement.implementCount,
+      relay: movement.relay,
+      alternative: movement.alternative,
+    },
+    actual,
+  });
+  // Suppressing the total is only half the job: the poster layer resolves this row's "mine"
+  // value from the SAME breakdown entry via mineKey, so the number we just declined to print
+  // reappeared on the right of the line ("200m Runs … 1.20km"). A figure we won't stand behind
+  // must not reach the poster by either route — the board's own footnote carries the story instead.
+  const guarded = suppressTotal ? { ...row, suppressMine: true } : row;
+  // WHERE this sits in the workout, carried on the row's own line — "200m Run · between sets".
+  // Without it the line is a bare quantity floating under the ladder and an outside viewer cannot
+  // tell whether the run is done once, every round, or between them, which is the whole point of
+  // the prescription layer.
+  //
+  // It rides on the NAME rather than the subNote because the poster layer keeps only the
+  // "… total" half of a subNote and drops the rest — the qualifier would never have reached the
+  // card. `mineKey` is a separate field, so the athlete-value lookup is unaffected by the longer
+  // label. The label is derived from the structural value, never prose stored beside it, so the
+  // words can never drift from the number the math used.
+  return placementLabel ? { ...guarded, name: `${guarded.name} · ${placementLabel}` } : guarded;
 }
 
 function buildDescendingLadderRows(
@@ -527,9 +561,13 @@ function buildDescendingLadderRows(
   // them (a combined figure belongs to no single movement on the line).
   const allFollowScheme = rowMovements.length > 0
     && rowMovements.every((movement) => movement.reps === reps[0]);
-  const schemeSum = reps.reduce((sum, rung) => sum + rung, 0);
-  const totalNote = allFollowScheme && schemeSum > 0
-    ? `${schemeSum} ${rowMovements.length > 1 ? 'each' : 'total'}`
+  // The figure is the SAVED one — the single truth the recap and EP read — and "each" is only
+  // claimed when every movement on the line saved the same count. Never the scheme's own sum,
+  // which would keep printing 54 over a breakdown that said something else.
+  const savedCounts = rowMovements.map((movement) => findMovementTotal(movements, movement.name)?.totalReps ?? 0);
+  const savedCount = savedCounts[0];
+  const totalNote = allFollowScheme && savedCount > 0 && savedCounts.every((count) => count === savedCount)
+    ? `${savedCount} ${rowMovements.length > 1 ? 'each' : 'total'}`
     : undefined;
 
   const trackRow: ArtifactRow = {
@@ -564,55 +602,15 @@ function buildDescendingLadderRows(
             placement: prescribed.placement ?? recovered.placement,
           };
           // Once the board has answered the count — a written total, or a placement the count
-          // follows from — the total is trustworthy and prints like any other written number.
+          // follows from — the saved total stands on it and prints like any other written number.
           // Without either, `per_interval` falls back to the tier count, which overcounts every
           // between-tiers movement by exactly one (6 × 200m for 5 runs), so the total is omitted
           // rather than asserted. Poster truth standard: never a number we can't stand behind.
           const statedCount = statedOccurrenceCount(movement, reps.length);
-          const suppressTotal = statedCount == null && movement.countingMode === 'per_interval';
-          const row = buildCelebrationMovementRow({
-            movementName: movement.name,
-            prescribed: {
-              reps: movement.reps,
-              repsDisplay: movement.repsDisplay,
-              distance: movement.distance,
-              calories: movement.calories,
-              time: movement.time,
-              weight: movement.rxWeights?.male ?? movement.rxWeights?.female,
-              implementCount: movement.implementCount,
-              relay: movement.relay,
-              alternative: movement.alternative,
-            },
-            // With a stated count, the totals are count × the coach's per-round quantity. The
-            // stored breakdown was computed before that count was known and holds the tier-count
-            // guess (1200m for 1000m of running), so it must not speak for this row.
-            actual: correctTotalsForStatedCount(
-              findMovementTotal(movements, movement.name),
-              movement,
-              statedCount,
-            ),
-            suppressDistanceTotal: suppressTotal,
-            suppressCalorieTotal: suppressTotal,
+          return buildLadderAddOnRow(movement, movements, {
+            suppressTotal: statedCount == null && movement.countingMode === 'per_interval',
+            placementLabel: movement.placement === 'between_sets' ? 'between sets' : undefined,
           });
-          // Suppressing the total is only half the job: the poster layer resolves this row's
-          // "mine" value from the SAME breakdown entry via mineKey, so the number we just
-          // declined to print reappeared on the right of the line ("200m Runs … 1.20km"). A
-          // figure we won't stand behind must not reach the poster by either route — the board's
-          // own footnote carries the story instead.
-          if (suppressTotal) return { ...row, suppressMine: true };
-          // WHERE this sits in the workout, carried on the row's own line — "200m Run · between
-          // sets". Without it the line is a bare quantity floating under the ladder and an
-          // outside viewer cannot tell whether the run is done once, every round, or between
-          // them, which is the whole point of the prescription layer.
-          //
-          // It rides on the NAME rather than the subNote because the poster layer keeps only the
-          // "… total" half of a subNote and drops the rest — the qualifier would never have
-          // reached the card. `mineKey` is a separate field, so the athlete-value lookup is
-          // unaffected by the longer label. The label is derived from the structural value, never
-          // prose stored beside it, so the words can never drift from the number the math used.
-          const placementLabel = movement.placement === 'between_sets' ? 'between sets' : undefined;
-          if (!placementLabel) return row;
-          return { ...row, name: `${row.name} · ${placementLabel}` };
         })
     : [];
 
@@ -726,166 +724,6 @@ export function detectBarbellComplex(movements: MovementTotal[], rounds: number)
     unit: movements[0].unit === 'lb' ? 'lb' : 'kg',
     repsPerRound: perRoundReps[0],
     totalRounds: rounds > 1 ? rounds : (movements[0].totalReps || rounds),
-  };
-}
-
-// ─── Repair undercounted breakdown ───────────────────────────────────────────
-
-export function repairUndercountedBreakdown(
-  breakdown: WorkloadBreakdown,
-  exercises: Exercise[],
-  teamSize?: number,
-): WorkloadBreakdown {
-  const debug = shouldLogCelebrationDebug();
-  const movements = breakdown.movements.map((movement) => ({ ...movement }));
-  // Keyed per PART. The breakdown holds one entry per movement PER PART, so a lift trained twice
-  // in a session has two rows; a name-only map keeps whichever arrived last and then repairs it
-  // against the OTHER part's round count — that turned the complex's 8 front squats into the
-  // metcon's 40. Entries from docs saved before exerciseIndex stamping have no part to key on
-  // and fall back to the name, which is safe there: those breakdowns hold one row per name.
-  const byPart = new Map<string, MovementTotal>();
-  const byName = new Map<string, MovementTotal>();
-  movements.forEach((movement) => {
-    if (movement.exerciseIndex != null) {
-      byPart.set(movementBucketKey(movement.name, movement.exerciseIndex), movement);
-    } else {
-      byName.set(movement.name.toLowerCase(), movement);
-    }
-  });
-  let changed = false;
-
-  const partnerFactor = teamSize && teamSize > 1 ? 1 / teamSize : 1;
-
-  for (const [exerciseIndex, exercise] of exercises.entries()) {
-    if (exercise.sections && exercise.sections.length > 0) continue;
-    const repeats = getEffectiveMovementRepeatCount(exercise, getPrescriptionRepeatCount(exercise));
-    if (!repeats || repeats <= 1 || !exercise.movements || exercise.movements.length === 0) continue;
-    const repScheme = exercise.suggestedRepsPerSet && exercise.suggestedRepsPerSet.length > 1
-      ? exercise.suggestedRepsPerSet
-      : undefined;
-
-    // reps × rounds is the TEAM's work on a partner block. The save path already stored this
-    // athlete's half (14 rounds × 5 = 70 team → 35 mine), and without this the "undercount"
-    // repair reads that correct 35 as a miss and restores the team number — inflating every
-    // partner row and the grand totals with it.
-    const exerciseFactor = exercisePartnerFactor(exercise, partnerFactor, exercises.length === 1);
-
-    for (const movement of exercise.movements) {
-      const target = byPart.get(movementBucketKey(movement.name, exerciseIndex))
-        ?? byName.get(movement.name.toLowerCase());
-      if (!target) continue;
-
-      const isBuyInCashOut = movement.role === 'buy_in'
-        || movement.role === 'cash_out'
-        || movement.perRound === false
-        || movement.countingMode === 'once'
-        || /^(cash[-\s]?out|buy[-\s]?in)\s*:/i.test(movement.name);
-      if (isBuyInCashOut) continue;
-
-      // A max-effort count is the athlete's own number — there is no "reps × rounds" for it,
-      // because the board prescribed no reps. This repair exists to restore work the save path
-      // undercounted; applied to an open quantity it FABRICATES work instead. A logged 10
-      // burpees printed as 20, because `repeats` here came from the prescription's inner
-      // "2 rounds of" (the fixed work's own count, never this movement's).
-      if (movement.isMaxReps === true) continue;
-
-      // Station-rotation movements run on only a subset of the intervals (3 of 6 in an
-      // alternating two-station AMRAP), so reps × prescription-round-count over-counts them —
-      // their breakdown totals already carry the correct per-visit multiplier from save time.
-      // Gate on STRUCTURAL markers only, never countingMode: a post-processor bug (fixed
-      // 2026-07-06) stamped per_station_visit onto plain-AMRAP movements in multi-part
-      // sessions, collapsing their save-time totals to one round — exactly the undercount
-      // this repair exists to heal.
-      if (movement.stationLabel != null || movement.stationIndex != null) continue;
-
-      // Relay pacers (pair-paced AMRAPs): the logged total is trips × per-trip and the trip
-      // count is independent of the AMRAP round count — rounds × prescription would fabricate
-      // distance that was never run (8 rounds × 200m = 1.6km when the athlete ran 5 × 200m).
-      if (movement.relay === true) continue;
-
-      // The board answered this movement's count itself — a stated total, or a placement whose
-      // count follows from the structure ("in between sets" → one fewer than the tier count). The
-      // save-time total is therefore already right, and this pass's rounds × prescription is a
-      // different, wronger number (6 × 200m = 1.2km against the 1km actually run). Asking the
-      // same owner as the save path is what keeps the two from disagreeing.
-      if (statedOccurrenceCount(movement, repeats) != null) continue;
-
-      // What this athlete should have, per partnerScope — the breakdown is per-athlete, so the
-      // floor the repair compares against has to be too.
-      const isVariableSchemeMovement = !!(
-        repScheme
-        && movement.reps
-        && movement.reps === repScheme[0]
-      );
-      // A descending scheme (21-15-9) states every round's reps itself, so its own sum IS the
-      // round count's job — collapse the rounds to 1 and let the scheme be the per-round figure.
-      const schemeTotal = isVariableSchemeMovement
-        ? repScheme.reduce((sum, reps) => sum + reps, 0)
-        : undefined;
-      const expected = movementTotals({
-        perRound: {
-          reps: schemeTotal ?? movement.reps,
-          distance: movement.distance,
-          calories: movement.calories,
-        },
-        rounds: splitRounds(schemeTotal ? 1 : repeats, exerciseFactor),
-        together: movement.together,
-      }).mine;
-      const { reps: expectedReps, distance: expectedDistance, calories: expectedCalories } = expected;
-
-      const before = {
-        totalReps: target.totalReps,
-        totalDistance: target.totalDistance,
-        totalCalories: target.totalCalories,
-      };
-
-      if (expectedReps && (!target.totalReps || target.totalReps < expectedReps)) {
-        target.totalReps = expectedReps;
-        changed = true;
-      }
-      if (expectedDistance && (!target.totalDistance || target.totalDistance < expectedDistance)) {
-        target.totalDistance = expectedDistance;
-        changed = true;
-      }
-      if (expectedCalories && (!target.totalCalories || target.totalCalories < expectedCalories)) {
-        target.totalCalories = expectedCalories;
-        changed = true;
-      }
-
-      if (debug && (
-        before.totalReps !== target.totalReps
-        || before.totalDistance !== target.totalDistance
-        || before.totalCalories !== target.totalCalories
-      )) {
-        console.log('[CelebrationDebug] repaired undercounted movement', {
-          exercise: exercise.name,
-          movement: movement.name,
-          repeats,
-          before,
-          after: { totalReps: target.totalReps, totalDistance: target.totalDistance, totalCalories: target.totalCalories },
-        });
-      }
-    }
-  }
-
-  if (!changed) return breakdown;
-
-  const grandTotalReps = movements.reduce((sum, movement) => sum + (movement.totalReps || 0), 0);
-  const grandTotalVolume = movements.reduce((sum, movement) => (
-    movement.weight && movement.weight > 0 && movement.totalReps && movement.totalReps > 0
-      ? sum + movement.weight * movement.totalReps
-      : sum
-  ), 0);
-  const grandTotalDistance = movements.reduce((sum, movement) => sum + (movement.totalDistance || 0), 0);
-  const grandTotalCalories = movements.reduce((sum, movement) => sum + (movement.totalCalories || 0), 0);
-
-  return {
-    ...breakdown,
-    movements,
-    grandTotalReps: Math.round(grandTotalReps),
-    grandTotalVolume: Math.round(grandTotalVolume),
-    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : breakdown.grandTotalDistance,
-    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : breakdown.grandTotalCalories,
   };
 }
 
@@ -1767,7 +1605,7 @@ function isPyramidChipper(exercise: Exercise | null | undefined): boolean {
   });
 }
 
-function abbreviateMovementForPoster(name: string): string {
+export function abbreviateMovementForPoster(name: string): string {
   return name
     .replace(/\bDumbbell\b/gi, 'DB')
     .replace(/\bKettlebell\b/gi, 'KB')
@@ -1867,6 +1705,20 @@ function buildProgressiveChipperRows(
   return rows;
 }
 
+/**
+ * "In each 3:00 window, in order" — the one line that says the round template is a template.
+ *
+ * Without it the collapsed rows read as a single pass through the movements, and the four windows
+ * the athlete actually worked disappear from the card entirely.
+ */
+function windowScheduleLabel(exercise: Exercise): string {
+  const scheme = resolveIntervalScheme(exercise);
+  const window = scheme ? formatIntervalDuration(scheme.workSeconds) : undefined;
+  return window
+    ? `in each ${window} window, in order`
+    : 'each round, in order';
+}
+
 // Board-faithful render for a ladder where the same movements recur each round with their OWN rep
 // scheme: ONE row per movement showing its scheme exactly as the coach wrote it (air squats
 // 50-40-30, DB push press 30-20-10, box jumps a flat 15) — NOT expanded into Round 1/2/3, NOT
@@ -1889,9 +1741,21 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     const seq = perRound.map(qtyOf);
     const allSame = seq.every((v) => v === seq[0]);
     const suffix = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
-    const schemeStr = seq.every(value => value > 0) ? (allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`) : '';
-    const total = seq.reduce((sum, v) => sum + v, 0);
+    // A movement the board leaves OPEN has no scheme to print — its emptiness IS the
+    // prescription ("max V-ups in the time remaining"), and its total is the athlete's own count,
+    // never a sum of prescribed reps. Printed as a blank row with no number before this.
+    const isOpen = statesMaxEffort(m0);
+    const schemeStr = isOpen ? 'Max'
+      : seq.every(value => value > 0) ? (allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`)
+      : '';
     const bd = breakdown.find((b) => b.name.toLowerCase() === m0.name.toLowerCase());
+    // The SAVED total — the single truth the recap and EP read — in the unit the row counts. Never
+    // the scheme's own sum: that is what hid 232 stored thrusters behind a poster reading 58.
+    // An open (max) movement is the athlete's own count, and lands here the same way.
+    const total = isCal(m0) ? (bd?.totalCalories ?? 0)
+      : isDist(m0) ? (bd?.totalDistance ?? 0)
+      : isOpen ? (bd?.totalReps ?? bd?.totalCalories ?? bd?.totalDistance ?? 0)
+      : (bd?.totalReps ?? 0);
     // Load tag = the athlete's LOGGED weight when one exists (breakdown = movementWeights truth),
     // Rx only as fallback (poster-truth standard). Shown per-implement — un-double a twin DB/KB
     // breakdown total so a twin-DB press logged at 15 reads "15kg ea", never the doubled "30kg"
@@ -1977,7 +1841,7 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
  * station-row lookup — and the flat per-round row, which had neither, silently dropped the option.
  */
 function formatMovementAlternativeSuffix(
-  movement: Pick<ParsedMovement, 'reps' | 'calories' | 'distance' | 'alternative'>,
+  movement: Pick<ParsedMovement, 'name' | 'reps' | 'calories' | 'distance' | 'alternative'>,
   multiplier = 1,
 ): string {
   const alt = movement.alternative;
@@ -1986,6 +1850,14 @@ function formatMovementAlternativeSuffix(
     : alt.calories != null && alt.calories !== movement.calories ? `${alt.calories * multiplier} CAL`
     : alt.distance != null && alt.distance !== movement.distance ? formatDistanceValue(alt.distance * multiplier).toUpperCase()
     : '';
+  // The parser often writes the either/or into the NAME as well as the alternative field — a
+  // board reading "19 Dumbbell / Kettlebell Thruster" comes back named that, with "Kettlebell
+  // Thruster" as its alternative. Appending it again printed "19 DB / KB Thrusters / Kettlebell
+  // Thrusters" on every row of the poster, and "Max V-up / Sit-up / Sit-up" beside it. An
+  // alternative the name already states adds nothing — unless it carries a quantity of its own
+  // ("40 Double Unders / 60 Singles"), which the name cannot.
+  const bare = (value: string): string => value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  if (!altQty && movement.name && bare(movement.name).includes(bare(alt.name))) return '';
   return ` / ${[altQty, formatRepMovementNameForPoster(alt.name, alt.reps ?? movement.reps)].filter(Boolean).join(' ')}`;
 }
 
@@ -2109,7 +1981,11 @@ function buildStrengthBlockRows(exercise: Exercise, movements: MovementTotal[]):
       const actual = findMovementTotal(movements, mov.name);
       const displayName = actual?.wasSubstituted ? actual.name : mov.name;
       const load = resolveOccurrenceLoad(mov, movements, occurrences.get(key) ?? 1, twin);
-      const totalReps = mov.reps != null && mov.reps > 0 ? mov.reps * rounds : undefined;
+      // A lift in ONE block owns its breakdown entry, so the row prints the saved total — the
+      // figure the recap reads. A lift split across blocks ("4 × 2" then "4 × 1") has one merged
+      // entry, so each block states its own share and the rows add up to it.
+      const blockReps = mov.reps != null && mov.reps > 0 ? mov.reps * rounds : undefined;
+      const totalReps = (occurrences.get(key) ?? 1) === 1 ? (actual?.totalReps ?? blockReps) : blockReps;
 
       return {
         // The block's prescription as the board wrote it: "4 × 2".
@@ -2415,18 +2291,20 @@ function buildMultiSectionForTimeSections(
         if (!(completedRounds > 1 || repeatsWithinPass > 1 || hasMultiRoundTier)) return undefined;
         // A substituted row's truth is the breakdown — the resolver already joined the two.
         if (logged && !splitInfo) return totalNoteFor(logged);
-        // One layer only: prescription × rounds is exact, and stays the default.
-        if (repeatsWithinPass <= 1) return formatSectionRowTotal(movement, completedRounds);
-        // BOTH layers in play. Prescription math can count one of them and no more — 8 × 1 for
-        // work done 64 times — so the poster stops deriving and reads the figure the workload
-        // owner already computed from the same section scope.
-        //
-        // Only for a movement this piece states ONCE: the breakdown merges a movement appearing
-        // in several sections into a single number, which would read wrong repeated on each of
-        // their rows (the reason formatSectionRowTotal is prescription math in the first place).
-        // And never on a partner row, where the value column means something else entirely.
-        if (splitInfo || countSectionsStating(exerciseSections, movement.name) !== 1) return undefined;
-        return totalNoteFor(findMovementTotal(movements, movement.name));
+        // A movement this piece states ONCE owns its breakdown entry outright, so the row prints
+        // the SAVED total — the one figure the recap, stats and EP read. Prescription × rounds
+        // can only count what the prescription says: it missed a partial round (15 swings
+        // finished after the 6th round of block C printed 90 where 105 were done) and a block
+        // repeated inside one pass (8 × 1 for work done 64 times).
+        // Never on a partner row, where the value column means something else entirely.
+        if (!splitInfo && countSectionsStating(exerciseSections, movement.name) === 1) {
+          const saved = totalNoteFor(findMovementTotal(movements, movement.name));
+          if (saved) return saved;
+        }
+        // Stated in several sections, the breakdown holds ONE merged number that would read
+        // wrong repeated on each row — so each row states its own section's share, which the
+        // prescription answers exactly when only the round count is in play.
+        return repeatsWithinPass <= 1 ? formatSectionRowTotal(movement, completedRounds) : undefined;
       })();
       // WHOSE total this is decides where it goes. On a solo row it is the athlete's own number,
       // so it belongs in the value column. On a partner row it is the PAIR's — and the value
@@ -2696,10 +2574,14 @@ function clockTokenToSeconds(token: string): number | undefined {
 
 const TIME_TOKEN_PATTERN = String.raw`(\d{1,2}:\d{2}|\d+(?:\.\d+)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?))`;
 
+// One clock notation, everywhere a prescribed window is stated. A whole-minute window used to
+// print "2 min" while its 2:30 sibling printed "2:30", so a single card could carry both
+// spellings of the same fact ("4 × 2 MIN" over "2:00 AMRAP · 2:00 REST"). Every number on the
+// poster carries its unit, and mm:ss is the one a whiteboard writes.
 function formatIntervalDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return secs > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${mins} min`;
+  return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
 /**
@@ -2753,6 +2635,63 @@ function resolvePerIntervalSeconds(
 ): number | undefined {
   if (!cumulative || !count || count <= 0) return undefined;
   return cumulative === explicitSeconds ? explicitSeconds : Math.round(cumulative / count);
+}
+
+/**
+ * The prescribed work/rest scheme of an interval piece — resolved ONCE.
+ *
+ * "How long on, how long off, how many times" is the whole identity of an interval workout, and
+ * three places used to answer it independently (the title, the format line, the blueprint), so a
+ * single card printed the same fact in three notations before it reached a movement: "2:00 AMRAP
+ * X 4" over "4 × 2 MIN" over "2 MIN AMRAP · 2 MIN REST · 4 ROUNDS". This is the one answer they
+ * all read.
+ *
+ * AI fields first (intervalCount + the cumulative work/rest contract), coach text as fallback —
+ * the same order every other structure reader here uses.
+ */
+export interface IntervalScheme {
+  workSeconds: number;
+  restSeconds?: number;
+  count?: number;
+}
+
+export function resolveIntervalScheme(
+  exercise: Exercise | undefined,
+  scopedText?: string,
+): IntervalScheme | undefined {
+  if (!exercise) return undefined;
+  const ownText = scopedText ?? `${exercise.name || ''} ${exercise.prescription || ''}`;
+  const timingText = `${exercise.rawText || ''} ${ownText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+  const explicitWork = parseExplicitWorkSeconds(timingText);
+  const parsedCount = exercise.intervalCount ?? parsePrescribedIntervalCount(timingText);
+  const count = parsedCount && parsedCount > 0 ? parsedCount : undefined;
+  const workSeconds = resolvePerIntervalSeconds(exercise.workDuration, explicitWork, count) ?? explicitWork;
+  if (!workSeconds) return undefined;
+  const explicitRest = parseExplicitRestSeconds(timingText);
+  const restSeconds = resolvePerIntervalSeconds(exercise.restDuration, explicitRest, count) ?? explicitRest;
+  return { workSeconds, restSeconds: restSeconds || undefined, count };
+}
+
+/**
+ * The ONE notation for an interval scheme: "2:00 ON / 2:00 OFF × 4".
+ *
+ * The rest clock is part of the scheme, not a footnote — a piece that rests half its clock is a
+ * different workout from one that doesn't, and the coach's own "2:00 AMRAP X 4" never said so.
+ * The format word stays off this line: the FormatTag pill already carries it.
+ *
+ * Composed at render time from the scheme fields, never stored, so EMOMs, intervals and
+ * AMRAP-×-N all speak it and no existing poster has to be migrated to pick it up.
+ */
+export function buildIntervalSchemeLine(
+  exercise: Exercise | undefined,
+  scopedText?: string,
+): string | undefined {
+  const scheme = resolveIntervalScheme(exercise, scopedText);
+  if (!scheme) return undefined;
+  const window = scheme.restSeconds
+    ? `${formatIntervalDuration(scheme.workSeconds)} ON / ${formatIntervalDuration(scheme.restSeconds)} OFF`
+    : formatIntervalDuration(scheme.workSeconds);
+  return scheme.count && scheme.count > 1 ? `${window} × ${scheme.count}` : window;
 }
 
 function parseExplicitRestSeconds(text: string): number | undefined {
@@ -3038,35 +2977,24 @@ export function buildPageArtifactSections(
     const forTime = /for\s*time|\brft\b/i.test(exerciseOnlyText);
     const descScheme = forTime ? parseForTimeRepScheme(exercise, rawText) : undefined;
     const pageCadence = !forTime ? extractEveryXCadence(exerciseOnlyText) : undefined;
-    // AMRAP interval structure: AI fields first (intervalCount + cumulative work/rest — no
-    // text parsing), coach text as fallback via the mm:ss-aware token parser. A bare
-    // (\d+) min regex captured the "00" of "[03:00 min AMRAP …]" and silently dropped the
-    // whole structure line. Rest is coach-written structure, so it renders alongside.
+    // An interval AMRAP says its scheme in the title line ("2:00 ON / 2:00 OFF × 4"), so this
+    // block stays silent about it — the work window, the rest and the count are all in there.
+    // It used to restate the lot here, which is how one card came to print the same scheme
+    // three times (title, format line, blueprint) before naming a single movement. The cap, if
+    // the coach wrote one, is the only structure fact the scheme line can't carry.
     const amrapTimingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-    const isIntervalAmrap = !forTime && !pageCadence && /amrap/i.test(amrapTimingText);
-    const amrapExplicitWork = isIntervalAmrap ? parseExplicitWorkSeconds(amrapTimingText) : undefined;
-    const amrapCount = isIntervalAmrap
-      ? (exercise.intervalCount ?? parsePrescribedIntervalCount(amrapTimingText))
-      : undefined;
-    const amrapWorkSeconds = isIntervalAmrap
-      ? (resolvePerIntervalSeconds(exercise.workDuration, amrapExplicitWork, amrapCount) ?? amrapExplicitWork)
-      : undefined;
-    const amrapExplicitRest = amrapWorkSeconds ? parseExplicitRestSeconds(amrapTimingText) : undefined;
-    const amrapRestSeconds = amrapWorkSeconds
-      ? (resolvePerIntervalSeconds(exercise.restDuration, amrapExplicitRest, amrapCount) ?? amrapExplicitRest)
-      : undefined;
-    blueprint = [
-      descScheme ? `[${descScheme.join('-')}] for time`
-        : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
-        : amrapWorkSeconds ? [
-            `${formatIntervalDuration(amrapWorkSeconds)} AMRAP`,
-            amrapRestSeconds ? `${formatIntervalDuration(amrapRestSeconds)} rest` : null,
-            amrapCount && amrapCount > 1 ? `${amrapCount} rounds` : null,
-          ].filter(Boolean).join(' · ')
-        : pageCadence ? formatNestedRoundBlueprint(`${pageCadence} · ${repeatCount} rounds`, exercise)
-        : `${repeatCount} rounds`,
+    const isIntervalAmrap = !forTime && !pageCadence && /amrap/i.test(amrapTimingText)
+      && !!buildIntervalSchemeLine(exercise, exerciseOnlyText);
+    const blueprintStructure = descScheme ? `[${descScheme.join('-')}] for time`
+      : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
+      : isIntervalAmrap ? null
+      : pageCadence ? formatNestedRoundBlueprint(`${pageCadence} · ${repeatCount} rounds`, exercise)
+      : `${repeatCount} rounds`;
+    const blueprintParts = [
+      blueprintStructure,
       timeCapLabel ? `(${timeCapLabel})` : null,
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean);
+    blueprint = blueprintParts.length > 0 ? blueprintParts.join(' ') : undefined;
   } else if (isStrength) {
     // Sequential blocks state their set counts on their own rows ("4 × 2", then "4 × 1"), so the
     // header carries the structure those rows can't: the coach's cadence. A summed "8 sets" here
@@ -3107,6 +3035,25 @@ export function buildPageArtifactSections(
       title: 'Blueprint',
       blueprint,
       rows: buildProgressiveChipperRows(exercise, movements),
+    }];
+  }
+  // SAY THE ROUND ONCE. A board that writes its windows out one by one ("00:00-03:00: … 03:00-
+  // 06:00: …") printed every window in full, so a four-window triplet took twelve rows to say
+  // three things and the reader had to add up the reps themselves. The round is one template —
+  // the same movements in the same order, with their own descending scheme — so it is stated
+  // once, in board order, and each movement carries its own total. (Design: movement totals,
+  // direction A.)
+  if (!isStrength && !splitInfo
+    && sectionsEnumerateIntervals(exercise.sections, exercise.intervalCount)
+    && hasSameMovementsEveryRound(exercise)) {
+    return [{
+      eyebrow: 'WOD',
+      title: 'Blueprint',
+      blueprint: normalizeBlueprint([
+        windowScheduleLabel(exercise),
+        timeCapLabel ? `· ${timeCapLabel}` : null,
+      ].filter(Boolean).join(' ')),
+      rows: buildPerMovementLadderRows(exercise, movements),
     }];
   }
   if (!isStrength && !splitInfo && isPyramidChipper(exercise)) {
@@ -3350,6 +3297,7 @@ export function buildPageArtifactSections(
               : prescCals && prescCals > 0 ? `${prescCals} cal`
               : prescribedRepsDisplayMap[key] ?? `${prescReps}`;
             const altSuffix = formatMovementAlternativeSuffix({
+              name: displayName,
               reps: prescReps,
               calories: prescCals,
               distance: prescDist,
@@ -3600,12 +3548,12 @@ function buildStoryMovements(
     const unit = m.unit === 'lb' ? 'lb' : 'kg';
 
     if (m.weightProgression && m.weightProgression.length > 0) {
-      lines.push({ perRound: '', name, total: '', color, weightProgression: m.weightProgression, unit });
+      lines.push({ perRound: '', name, total: '', color, weightProgression: m.weightProgression, unit, implementCount: m.implementCount });
       continue;
     }
 
     if (m.weight && m.weight > 0 && !m.totalReps && !m.totalCalories && !m.totalDistance) {
-      lines.push({ perRound: `${m.weight}`, name, total: '', color: color ?? 'yellow', weight: m.weight, unit });
+      lines.push({ perRound: `${m.weight}`, name, total: '', color: color ?? 'yellow', weight: m.weight, unit, implementCount: m.implementCount });
       continue;
     }
 
@@ -3654,7 +3602,7 @@ function buildStoryMovements(
       const total = (rounds > 1 || repScheme) ? `${workoutTotalReps} total` : '';
       const isBodyweight = isBwVolumeMovement(name);
       const partnerNote = showPartnerNote ? `your part ${personalReps}` : undefined;
-      lines.push({ perRound, name, total, color: color ?? 'magenta', weight: m.weight, unit: !isBodyweight ? unit : undefined, partnerNote, wasSubstituted, originalMovement, substitutionType, substitutedPerRound });
+      lines.push({ perRound, name, total, color: color ?? 'magenta', weight: m.weight, unit: !isBodyweight ? unit : undefined, implementCount: m.implementCount, partnerNote, wasSubstituted, originalMovement, substitutionType, substitutedPerRound });
     }
   }
 
@@ -3689,7 +3637,7 @@ function buildSectionedStoryMovements(
       const color = actual?.color;
 
       if (actual?.weightProgression && actual.weightProgression.length > 0) {
-        lines.push({ perRound: '', name, total: '', color, weightProgression: actual.weightProgression, unit });
+        lines.push({ perRound: '', name, total: '', color, weightProgression: actual.weightProgression, unit, implementCount: actual.implementCount });
         continue;
       }
 
@@ -3798,15 +3746,18 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
     // the structure must come from that exercise, never from counting session parts
     // (which rendered "2 INTERVALS" for a strength + 4×3:00-AMRAP session).
     const ex = exercises.find((e) => /amrap/i.test(`${e.name} ${e.prescription || ''}`)) ?? exercises[0];
-    const timingText = `${ex?.rawText || ''} ${ex?.name || ''} ${ex?.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-    const explicitWork = parseExplicitWorkSeconds(timingText);
-    const count = ex?.intervalCount ?? parsePrescribedIntervalCount(timingText) ?? 0;
-    const workSeconds = resolvePerIntervalSeconds(ex?.workDuration, explicitWork, count) ?? explicitWork;
-    if (count > 0 && workSeconds) base = `${count} × ${formatIntervalDuration(workSeconds).toUpperCase()}`;
-    // Unknown interval length: a dangling "2 ×" reads as a typo — state the
-    // interval count in full instead (the AMRAP word lives on the format pill).
-    else if (count > 0) base = `${count} INTERVALS`;
-    else return undefined;
+    // The scheme in the one notation the whole card uses — rest clock included, which the old
+    // "4 × 2 MIN" dropped entirely, leaving the poster to claim eight unbroken minutes of work.
+    const schemeLine = buildIntervalSchemeLine(ex);
+    if (schemeLine) base = schemeLine.toUpperCase();
+    else {
+      // Unknown interval length: a dangling "2 ×" reads as a typo — state the
+      // interval count in full instead (the AMRAP word lives on the format pill).
+      const timingText = `${ex?.rawText || ''} ${ex?.name || ''} ${ex?.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+      const count = ex?.intervalCount ?? parsePrescribedIntervalCount(timingText) ?? 0;
+      if (count > 0) base = `${count} INTERVALS`;
+      else return undefined;
+    }
   } else if (format === 'amrap') {
     return undefined;
   } else if (format === 'emom') {
@@ -3871,10 +3822,10 @@ function buildLadderStoryMovements(exercise: Exercise, movements: MovementTotal[
     const totalReps = m.totalReps || 0;
     const isLadderMov = totalReps > 0 && totalReps === expectedLadderSum;
     if (isLadderMov) {
-      lines.push({ perRound: `${firstRung}→${lastRung}`, name: displayName, total: `${totalReps} reps total`, color: color ?? 'magenta', weight: m.weight });
+      lines.push({ perRound: `${firstRung}→${lastRung}`, name: displayName, total: `${totalReps} reps total`, color: color ?? 'magenta', weight: m.weight, implementCount: m.implementCount });
     } else {
       const perRound = ladderStep > 0 && totalReps > 0 ? Math.round(totalReps / ladderStep) : totalReps;
-      lines.push({ perRound: `${perRound}`, name: displayName, total: ladderStep > 1 && totalReps > 0 ? `×${ladderStep} = ${totalReps}` : '', color: color ?? 'magenta', weight: m.weight });
+      lines.push({ perRound: `${perRound}`, name: displayName, total: ladderStep > 1 && totalReps > 0 ? `×${ladderStep} = ${totalReps}` : '', color: color ?? 'magenta', weight: m.weight, implementCount: m.implementCount });
     }
   }
   return lines.length > 0 ? lines : undefined;
@@ -4249,10 +4200,10 @@ export function computeHeroResult(
     const peakWeight = peak?.weight ?? 0;
     const peakMovement = peak?.movementName
       ?? (peakWeight > 0 ? strengthWorkEx.movements?.[0]?.name ?? strengthWorkEx.name : '');
-    if (peakWeight > 0) {
+    if (peak && peakWeight > 0) {
       const unit = movements.find((m) => m.unit === 'lb') ? 'LB' : 'KG';
       return {
-        value: `${peakWeight}`,
+        value: formatPeakLoadValue(peak),
         unit,
         ...(peakMovement ? { subtitle: peakMovement.toUpperCase() } : {}),
         formatLine,

@@ -23,14 +23,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  abbreviateMovementForPoster,
   buildRewardArtifactSections,
   buildPageArtifactSections,
   computeHeroResult,
   isStrengthPagePart,
   inferTeamSizeFromText,
   inferWorkoutFormatForExercise,
-  repairUndercountedBreakdown,
 } from '../src/components/celebration/helpers';
+import { checkRowTotals, sameQuantity } from './lib/rowTotals';
 import {
   sectionsToRows,
   buildMineMapFromBreakdown,
@@ -40,6 +41,7 @@ import {
   buildResultValue,
   buildHeroResultMeta,
   formatPosterStrengthRepsSequence,
+  composedSchemeTitle,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
 import { isMainPart, isMaxEffortPractice } from '../src/components/celebration/mainPart';
@@ -68,6 +70,10 @@ interface PosterFixture {
   // holding the whole corpus red. An unlisted drop is always a failure, and a listed movement
   // that starts rendering is also a failure — the entry must be removed when it gets fixed.
   knownDroppedMovements?: string[];
+  // Movements whose poster rows are KNOWN to print a total the saved breakdown doesn't hold, with
+  // the reason in `description`. Same contract as knownDroppedMovements: listed ones warn, an
+  // unlisted one fails, and a listed one that starts agreeing fails until it is removed.
+  knownTotalMismatches?: string[];
 }
 
 const FIXTURE_DIR = path.resolve(process.cwd(), 'fixtures', 'posters');
@@ -155,14 +161,16 @@ function findDroppedMovements(
       // carries that role on the section header (BUY-OUT) and renders the bare movement, so
       // match the stripped name too — the role is relocated, not lost.
       const roleStripped = movement.name.replace(/^\s*(buy[-\s]?in|cash[-\s]?out|buy[-\s]?out)\s*:\s*/i, '');
-      const candidates = [movement.name, roleStripped, movement.alternative?.name, ...substitutes]
+      // A long name renders in the poster's own short form ("Single Dumbbell Alt Devil Press" →
+      // "Single DB Alt Devil Presses"), which is the movement, shortened — not a drop.
+      const candidates = [movement.name, roleStripped, abbreviateMovementForPoster(movement.name), movement.alternative?.name, ...substitutes]
         .filter((name): name is string => !!name);
       return !candidates.some((name) => haystack.includes(normalizeForMatch(name)));
     })
     .map((movement) => movement.name);
 }
 
-function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: string[] } {
+function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: string[]; totalMismatches: string[] } {
   const { title, rawText, format } = fixture.workout;
   // Mirrors useCelebrationData's correction fallback: a structural "AI got it wrong?" flag
   // downgrades every part carrying its own board text to 'free' (whiteboard-verbatim rendering).
@@ -175,16 +183,8 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     ?? (fixture.workout.partnerWorkout === false
       ? undefined
       : inferTeamSizeFromText([title, rawText].filter(Boolean).join('\n')));
-  // Mirrors useCelebrationData.activeBreakdown: the stored breakdown passes through
-  // repairUndercountedBreakdown before ANY builder sees it — teamSize included, so a partner
-  // block's already-halved totals aren't "repaired" back up to the team's numbers.
-  const movements = fixture.workout.workloadBreakdown
-    ? repairUndercountedBreakdown(
-        { grandTotalReps: 0, grandTotalVolume: 0, ...fixture.workout.workloadBreakdown },
-        exercises,
-        teamSize,
-      ).movements
-    : [];
+  // Mirrors useCelebrationData.activeBreakdown: the stored breakdown, exactly as saved.
+  const movements = fixture.workout.workloadBreakdown?.movements ?? [];
   const scopedRawText = exercises.length === 1 ? rawText : undefined;
   // Mirrors useCelebrationData: the whole-workout artifact and every display decision follow
   // the MAIN part(s) — one main part owns the artifact even when secondary siblings exist,
@@ -238,8 +238,13 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     ...buildMineMapFromBreakdown(movements),
     ...(hero.storyMovements ? buildMineMapFromStory(hero.storyMovements) : new Map<string, string>()),
   ]);
+  const rawSectionName = sectionExercises[0]?.name?.toUpperCase() ?? null;
   const headerContext = {
-    title: sectionExercises[0]?.name?.toUpperCase() ?? null,
+    // The SAME composer the poster builders use: an interval piece titles itself with the app's
+    // one scheme notation, not the coach's spelling of it, and the block-header dedup below runs
+    // against THAT. Passing the raw name here left the harness deduping a header against a title
+    // production never shows.
+    title: composedSchemeTitle(sectionExercises[0], rawSectionName) ?? rawSectionName,
     type: (displayFormat ?? 'wod').replace('_', ' ').toUpperCase(),
     // Mirror the poster's format badge (buildFormatLine's dominant path is heroResult.formatLine)
     // so the format-badge dedup — e.g. suppressing a redundant "8 ROUNDS FOR TIME" block header
@@ -305,9 +310,17 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
       .map((name) => `${exercise.name}: ${name}`),
   );
 
+  // ─── Invariant: the poster prints the saved totals, never its own ───────────
+  // Rows may split a movement ("4 × 2" and "4 × 1" of one stored 12) but must add up to what the
+  // breakdown holds — the figure the recap, stats and EP read. See scripts/lib/rowTotals.ts.
+  const totalMismatches = checkRowTotals({ ...fixture.workout, exercises }).checked
+    .filter((c) => !sameQuantity(c.stored, c.rows))
+    .map((c) => `${c.entry.name}: saved ${c.stored ? `${c.stored.value} ${c.stored.unit}` : 'nothing'}, rows print ${c.rows.value} ${c.rows.unit}`);
+
   return {
     snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes, pageMaxPractices },
     dropped,
+    totalMismatches,
   };
 }
 
@@ -372,10 +385,12 @@ function main(): void {
 
     let actual: unknown;
     let dropped: string[];
+    let totalMismatches: string[];
     try {
       const built = buildSnapshot(fixture);
       actual = normalize(built.snapshot);
       dropped = built.dropped;
+      totalMismatches = built.totalMismatches;
     } catch (error) {
       failures += 1;
       console.error(`✗ ${fixture.name} — builder threw: ${(error as Error).message}`);
@@ -399,6 +414,26 @@ function main(): void {
     }
     if (unexpectedDrops.length === 0 && dropped.length > 0) {
       console.warn(`! ${fixture.name} — known open drop: ${dropped.join(', ')}`);
+    }
+
+    // A total the poster prints but the saved breakdown doesn't hold fails like a dropped movement:
+    // re-blessing a snapshot must never be able to launder a second truth back onto the poster.
+    const knownMismatch = new Set(fixture.knownTotalMismatches ?? []);
+    const mismatchName = (line: string): string => line.slice(0, line.indexOf(':'));
+    const unexpectedMismatches = totalMismatches.filter((line) => !knownMismatch.has(mismatchName(line)));
+    const fixedMismatches = [...knownMismatch].filter((name) => !totalMismatches.some((line) => mismatchName(line) === name));
+    if (unexpectedMismatches.length > 0) {
+      failures += 1;
+      console.error(`✗ ${fixture.name} — poster prints total(s) the saved breakdown doesn't hold:`);
+      unexpectedMismatches.forEach((line) => console.error(`    ${line}`));
+    }
+    if (fixedMismatches.length > 0) {
+      failures += 1;
+      console.error(`✗ ${fixture.name} — knownTotalMismatches lists movement(s) that now agree:`);
+      fixedMismatches.forEach((name) => console.error(`    ${name} — remove it from the fixture`));
+    }
+    if (unexpectedMismatches.length === 0 && totalMismatches.length > 0) {
+      console.warn(`! ${fixture.name} — known total mismatch: ${totalMismatches.join('; ')}`);
     }
 
     if (update || !fs.existsSync(snapshotPath)) {

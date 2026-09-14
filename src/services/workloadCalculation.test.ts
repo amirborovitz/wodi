@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { calculateWorkloadBreakdown } from './workloadCalculation';
 import {
-  calculateWorkloadBreakdown,
   calculateWorkloadFromExercises,
   getStationVisitCountsForExercise,
   isTeamPrescribedExercise,
@@ -454,6 +454,61 @@ describe('a buy-in that repeats inside each interval', () => {
     // that say nothing must keep reading exactly as they did.
     const wb = calculateWorkloadBreakdown(fixedWorkIntoMax(undefined));
     expect(wb.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(32);
+  });
+});
+
+// The real board of 2026-09-11, logged and stored 4× too high:
+//
+//   With a running clock:
+//   00:00-03:00: 19 DB/KB Thruster, 19 Burpee, Max V-up / Sit-up
+//   03:00-06:00: 16 …   06:00-09:00: 13 …   09:00-12:00: 10 …
+//
+// The four windows are WRITTEN OUT, one section each — 19+16+13+10 = 58 of each movement. But
+// v0.1.30's strict schema also stamps `countingMode: 'per_interval'` on every movement inside
+// them, which says "multiply me by the interval count" — so the four windows were counted once
+// by being listed and again by the multiplier: 58 × 4 = 232 thrusters and 232 burpees stored.
+//
+// A movement inside a window the board already wrote out happens as many times as THAT window
+// says. The guard that used to catch this only fires for a movement that stated no counting mode
+// at all, and since the strict schema none ever does.
+describe('an interval board that writes its windows out one by one', () => {
+  const runningClock = (windowRounds?: number): ParsedWorkout => ({
+    title: 'WOD',
+    format: 'amrap_intervals',
+    sets: 4,
+    exercises: [{
+      name: 'Running Clock Intervals',
+      type: 'wod',
+      loggingMode: 'amrap_intervals',
+      prescription: '00:00-03:00: 19 Thrusters, 19 Burpees, Max V-up …',
+      intervalCount: 4,
+      workDuration: 720,
+      sections: [19, 16, 13, 10].map((reps, i) => ({
+        sectionType: 'rounds',
+        rounds: windowRounds ?? 1,
+        label: `0${i * 3}:00-${i * 3 + 3}:00`,
+        scoreType: 'reps',
+        movements: [
+          { name: 'Dumbbell / Kettlebell Thruster', reps, inputType: 'weight', equipment: 'dumbbell', countingMode: 'per_interval' },
+          { name: 'Burpee', reps, inputType: 'none', countingMode: 'per_interval' },
+          { name: 'V-up / Sit-up', inputType: 'none', isMaxReps: true, countingMode: 'per_interval' },
+        ],
+      })),
+    }],
+  } as unknown as ParsedWorkout);
+
+  it('counts each written window once, not once per interval', () => {
+    // Was 232 — the windows multiplied by their own count.
+    const wb = calculateWorkloadBreakdown(runningClock());
+    expect(wb.movements.find((m) => m.name === 'Dumbbell / Kettlebell Thruster')?.totalReps).toBe(58);
+    expect(wb.movements.find((m) => m.name === 'Burpee')?.totalReps).toBe(58);
+  });
+
+  it("still honours a window's own round count", () => {
+    // "00:00-03:00: 2 rounds of 19 Thrusters …" — the window repeats its contents twice, which is
+    // the section's own number and has nothing to do with how many windows there are.
+    const wb = calculateWorkloadBreakdown(runningClock(2));
+    expect(wb.movements.find((m) => m.name === 'Dumbbell / Kettlebell Thruster')?.totalReps).toBe(116);
   });
 });
 

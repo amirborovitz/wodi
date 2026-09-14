@@ -188,6 +188,29 @@ describe('postProcessParsedWorkout — interleaved rebuild', () => {
     expect(postProcessParsedWorkout(ambiguous).exercises[0].movements?.map((m) => m.name))
       .toEqual(['Run', 'Bar Muscle-up', 'Up']);
   });
+
+  it("never counts a coach's note that mentions a movement as another occurrence of it", () => {
+    // 12 Sep 2026, the first board parsed on gpt-5.5, which keeps a part's footnote in its text
+    // (gpt-4o dropped it). The note names the bike, so the rebuild read it as a second bike line
+    // and every round came out as bike, swings, bike.
+    const relay = {
+      title: 'WOD', type: 'for_time', format: 'for_time', scoreType: 'time',
+      exercises: [{
+        name: '30 Rounds For Time (6 each)', type: 'wod', loggingMode: 'for_time',
+        prescription: '30 RFT (6 each): 8/10 cal Echo Bike, 12 American Kettlebell Swing @20/28kg',
+        rawText: 'In teams of 5, I go you go:\n30 RFT (6 each):\n8/10 calories echo bike (30 sec time limit)\n'
+          + '12 American Kettlebell Swing @20/28kg\n< 22 minutes T.C. >\n'
+          + '* Once a team member gets off the bike, the other may start.',
+        movements: [
+          { name: 'Echo Bike', calories: 10 },
+          { name: 'American Kettlebell Swing', reps: 12 },
+        ],
+      }],
+    } as unknown as ParsedWorkout;
+
+    expect(postProcessParsedWorkout(relay).exercises[0].movements?.map((m) => m.name))
+      .toEqual(['Echo Bike', 'American Kettlebell Swing']);
+  });
 });
 
 // The real board that surfaced this (04/08/26): a 3-tier descending ladder, each tier opening

@@ -29,7 +29,7 @@ const GLOW_SOFT = `0 0 8px ${BRAND.yellow}40`;
 const DOT = 10;
 const GAP = 2;
 
-// 5×7 dot-matrix patterns for digits 0-9, colon, plus, dash, space.
+// 5×7 dot-matrix patterns for digits 0-9, colon, plus, dash, times, space.
 // Each row is a string of '1' (lit) or '0' (dim). Colon/dash are 1 col wide.
 const DOT_PATTERNS: Record<string, string[]> = {
   '0': ['01110','10001','10001','10001','10001','10001','01110'],
@@ -46,6 +46,8 @@ const DOT_PATTERNS: Record<string, string[]> = {
   '.': ['0','0','0','0','0','0','1'],
   '-': ['0','0','0','1','0','0','0'],
   '+': ['00000','00100','00100','11111','00100','00100','00000'],
+  // A pair's top set — "2×35" — keeps its multiplier in the scoreboard's own dots.
+  '×': ['00000','10001','01010','00100','01010','10001','00000'],
   ' ': ['00000','00000','00000','00000','00000','00000','00000'],
 };
 
@@ -245,7 +247,7 @@ export function SkinStadium({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onV
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, textShadow: GLOW_SOFT, display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, textShadow: GLOW_SOFT, display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

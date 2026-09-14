@@ -5,6 +5,8 @@ import { getWeightStep, getWeightMax } from './types';
 import { exerciseLoadUnit } from '../../../utils/loadUnits';
 import { StepperInput } from './StepperInput';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
+import { ImplementToggle } from './ImplementToggle';
+import { perImplementUnit } from './implementQuestion';
 import styles from './LoadInput.module.css';
 
 interface LoadInputProps {
@@ -41,6 +43,9 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   const unit = exerciseLoadUnit(result.exercise);
   const weightStep = getWeightStep(movName, firstMovement?.equipment, unit);
   const weightMax = getWeightMax(unit);
+  // A pair: every weight box on this screen is ONE implement's weight, and says so.
+  const pairCount = showImplement ? result.implementCount : undefined;
+  const weightUnit = perImplementUnit(unit, pairCount);
   const showBodyweightToggle = mode === 'bodyweight' || canUseBodyweightMode(movName);
 
   // Detect max set pattern (e.g., [8-6-4-2-max] → repsPerSet has 4 items, setsTotal=5)
@@ -143,6 +148,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               repsPerSet={result.exercise.suggestedReps}
               step={weightStep}
               unit={unit}
+              implementCount={pairCount}
               onChange={handleProgressiveChange}
               label={movName || result.exercise.name}
               footer={hasMaxSet ? (
@@ -165,7 +171,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
                     min={0}
                     max={weightMax}
                     placeholder={topVal ? String(Math.round(topVal * 0.6 / weightStep) * weightStep) : '0'}
-                    unit={unit}
+                    unit={weightUnit}
                     color="var(--color-volume)"
                     inputMode="decimal"
                   />
@@ -189,6 +195,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               setsTotal={result.setsTotal}
               step={weightStep}
               unit={unit}
+              implementCount={pairCount}
               onChange={handleSingleChange}
             />
           </motion.div>
@@ -209,7 +216,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               min={0}
               max={weightMax}
               placeholder="0"
-              unit={unit}
+              unit={weightUnit}
               label="Start"
               color="var(--color-volume)"
               inputMode="decimal"
@@ -237,7 +244,7 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
               min={0}
               max={weightMax}
               placeholder="0"
-              unit={unit}
+              unit={weightUnit}
               label="Top"
               color="var(--color-volume)"
               inputMode="decimal"
@@ -252,23 +259,12 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
         </button>
       )}
 
-      {/* Implement count (KB/DB) */}
+      {/* Implement count (KB/DB) — the same control the movement tiles use. */}
       {showImplement && mode !== 'bodyweight' && (
-        <div className={styles.implementRow}>
-          <span className={styles.implementLabel}>Implements</span>
-          <div className={styles.implementToggle}>
-            {([1, 2] as const).map((count) => (
-              <button
-                key={count}
-                type="button"
-                className={`${styles.implementBtn} ${(result.implementCount ?? 1) === count ? styles.implementBtnActive : ''}`}
-                onClick={() => onChange({ implementCount: count })}
-              >
-                {count}x
-              </button>
-            ))}
-          </div>
-        </div>
+        <ImplementToggle
+          value={result.implementCount}
+          onChange={(implementCount) => onChange({ implementCount })}
+        />
       )}
 
     </div>

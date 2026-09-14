@@ -13,6 +13,7 @@ import { findOpenMovement, findOpenMovements, scoresOpenReps } from '../../../se
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
 import { matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
+import { asksImplementCount } from './implementQuestion';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
 // Universal classification: every exercise maps to exactly ONE kind.
@@ -857,6 +858,12 @@ export function createBlankResult(
       movementCount: exercise.movements?.length ?? 0,
     });
   }
+
+  // A single lift on a hand-held implement opens on the AI's pair, exactly as a movement tile
+  // does (movementResults below). Left blank, the screen showed 1× on "10 Dumbbell Bench Press"
+  // while the saved movement still said 2× — the poster and the totals disagreeing about one lift.
+  const pairedLift = kind === 'load' ? allMovements.find(asksImplementCount) : undefined;
+  if (pairedLift?.implementCount) base.implementCount = pairedLift.implementCount;
 
   // Ladder AMRAP: start at the bottom of the ladder
   if (exercise.ladderReps && exercise.ladderReps.length > 0 && kind === 'score_rounds') {

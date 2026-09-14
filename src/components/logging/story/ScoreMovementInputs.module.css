@@ -3,13 +3,16 @@
    for weight/distance in scored exercises
    ═══════════════════════════════════════════ */
 
-/* Single movement: centered weight field */
+/* Single movement: centered weight field.
+   On an ordered board the weight is a detail, not the score — the clock above it is. So the
+   value drops to the stepper size used everywhere else in the flow (StepperInput .inputField,
+   ScoreInputs .windowInput) rather than the hero size the dedicated weight screen uses. */
 .compactWeight {
   --weight-layout: grid;
   --weight-align: center;
   --weight-button-width: 44px;
   --weight-control-gap: 4px;
-  --weight-value-size: 32px;
+  --weight-value-size: 28px;
 }
 
 .compactPrescription {
@@ -73,11 +76,14 @@
   min-width: 0;
 }
 
+/* A board row is the same object as a row on the overview list, so it takes the same size
+   (ExerciseRow .movementName). At 24px a real movement name — "12 Alt American Kettlebell
+   Swing" — wrapped to two lines next to its action label and swamped the score above it. */
 .prescriptionName {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: var(--text-base);
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
@@ -199,7 +205,12 @@
 
 .implementWeightScreen {
   position: relative;
-  z-index: 3;
+  /* Above the movement rows (z 1), BELOW the docked score clock (ScoreInputs .scoreDock, z 3).
+     On an ordered board this block is a direct sibling of that sticky clock and comes after it
+     in the DOM, so an equal z-index let it scroll OVER the pinned clock instead of under it —
+     the stepper drew on top of the mm:ss labels. Anything that shares the body with the dock
+     stays under 3. */
+  z-index: 2;
   display: var(--weight-layout, flex);
   grid-template-columns: minmax(0, 1fr) minmax(164px, 1fr);
   align-items: var(--weight-align, stretch);

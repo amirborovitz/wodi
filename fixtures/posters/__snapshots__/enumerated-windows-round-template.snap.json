@@ -1,0 +1,248 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Blueprint",
+      "blueprint": "in each 3:00 window, in order",
+      "rows": [
+        {
+          "primary": "19-16-13-10",
+          "name": "DB / KB Thrusters",
+          "subNote": "2×22.5KG",
+          "totalNote": "58 total",
+          "mineKey": "Dumbbell / Kettlebell Thruster",
+          "accent": "yellow"
+        },
+        {
+          "primary": "19-16-13-10",
+          "name": "Burpees",
+          "totalNote": "58 total",
+          "mineKey": "Burpee",
+          "accent": "magenta"
+        },
+        {
+          "primary": "Max",
+          "name": "V-up / Sit-ups",
+          "totalNote": "348 total",
+          "mineKey": "V-up / Sit-up",
+          "accent": "magenta"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Blueprint",
+        "blueprint": "in each 3:00 window, in order",
+        "rows": [
+          {
+            "primary": "19-16-13-10",
+            "name": "DB / KB Thrusters",
+            "subNote": "2×22.5KG",
+            "totalNote": "58 total",
+            "mineKey": "Dumbbell / Kettlebell Thruster",
+            "accent": "yellow"
+          },
+          {
+            "primary": "19-16-13-10",
+            "name": "Burpees",
+            "totalNote": "58 total",
+            "mineKey": "Burpee",
+            "accent": "magenta"
+          },
+          {
+            "primary": "Max",
+            "name": "V-up / Sit-ups",
+            "totalNote": "348 total",
+            "mineKey": "V-up / Sit-up",
+            "accent": "magenta"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "348",
+    "unit": "V-UP / SIT-UP",
+    "formatLine": "3:00 × 4",
+    "storyLine": "58 dumbbell / kettlebell thruster · 58 burpee · 348 v-up / sit-up",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "19",
+        "name": "Dumbbell / Kettlebell Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "19",
+        "name": "Burpee",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "16",
+        "name": "Dumbbell / Kettlebell Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "16",
+        "name": "Burpee",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "13",
+        "name": "Dumbbell / Kettlebell Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "13",
+        "name": "Burpee",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "10",
+        "name": "Dumbbell / Kettlebell Thruster",
+        "total": "",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "10",
+        "name": "Burpee",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta",
+    "approximate": false
+  },
+  "resultLabel": "V-UP / SIT-UP",
+  "resultValue": "348",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "IN EACH 3:00 WINDOW, IN ORDER",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "19-16-13-10 DB / KB Thrusters",
+        "load": "2×22.5KG",
+        "mine": "45kg",
+        "team": "",
+        "total": "58 total"
+      },
+      {
+        "kind": "line",
+        "rx": "19-16-13-10 Burpees",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "58 total"
+      },
+      {
+        "kind": "line",
+        "rx": "Max V-up / Sit-ups",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "348 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "IN EACH 3:00 WINDOW, IN ORDER",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "19-16-13-10 DB / KB Thrusters",
+          "load": "2×22.5KG",
+          "mine": "45kg",
+          "team": "",
+          "total": "58 total"
+        },
+        {
+          "kind": "line",
+          "rx": "19-16-13-10 Burpees",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "58 total"
+        },
+        {
+          "kind": "line",
+          "rx": "Max V-up / Sit-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "348 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

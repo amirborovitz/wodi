@@ -2,7 +2,7 @@
   "reward": [
     {
       "title": "Blueprint",
-      "blueprint": "2 min rest between",
+      "blueprint": "2:00 rest between",
       "rows": [],
       "isPartnerConfirmed": false
     },
@@ -81,14 +81,14 @@
         {
           "primary": "15 Russian KB Swings @ 28/20kg",
           "name": "",
-          "totalNote": "90 total",
+          "totalNote": "105 total",
           "mineKey": "Russian Kettlebell Swing",
           "accent": "yellow"
         },
         {
           "primary": "12 Goblet Squats @ 28/20kg",
           "name": "",
-          "totalNote": "72 total",
+          "totalNote": "84 total",
           "mineKey": "Goblet Squat",
           "accent": "yellow"
         },
@@ -112,7 +112,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "2 min rest between",
+        "blueprint": "2:00 rest between",
         "rows": [],
         "isPartnerConfirmed": false
       },
@@ -191,14 +191,14 @@
           {
             "primary": "15 Russian KB Swings @ 28/20kg",
             "name": "",
-            "totalNote": "90 total",
+            "totalNote": "105 total",
             "mineKey": "Russian Kettlebell Swing",
             "accent": "yellow"
           },
           {
             "primary": "12 Goblet Squats @ 28/20kg",
             "name": "",
-            "totalNote": "72 total",
+            "totalNote": "84 total",
             "mineKey": "Goblet Squat",
             "accent": "yellow"
           },
@@ -239,7 +239,7 @@
         "unit": "rds"
       }
     ],
-    "formatLine": "3 × 10 MIN",
+    "formatLine": "10:00 ON / 2:00 OFF × 3",
     "storyLine": "35 echo bike cals · 50 alt single dumbbell devil press · 150 bicycle crunch · 250 du · 50 alt weighted box step up · 50 ttb · 105 russian kettlebell swing · 84 goblet squat · 54 push-up",
     "storyMovements": [
       {
@@ -344,7 +344,7 @@
     "reward": [
       {
         "kind": "block",
-        "label": "2 MIN REST BETWEEN",
+        "label": "2:00 REST BETWEEN",
         "cap": ""
       },
       {
@@ -419,7 +419,7 @@
         "load": "",
         "mine": "20kg",
         "team": "",
-        "total": "90 total"
+        "total": "105 total"
       },
       {
         "kind": "line",
@@ -427,7 +427,7 @@
         "load": "",
         "mine": "20kg",
         "team": "",
-        "total": "72 total"
+        "total": "84 total"
       },
       {
         "kind": "line",
@@ -442,7 +442,7 @@
       [
         {
           "kind": "block",
-          "label": "2 MIN REST BETWEEN",
+          "label": "2:00 REST BETWEEN",
           "cap": ""
         },
         {
@@ -517,7 +517,7 @@
           "load": "",
           "mine": "20kg",
           "team": "",
-          "total": "90 total"
+          "total": "105 total"
         },
         {
           "kind": "line",
@@ -525,7 +525,7 @@
           "load": "",
           "mine": "20kg",
           "team": "",
-          "total": "72 total"
+          "total": "84 total"
         },
         {
           "kind": "line",

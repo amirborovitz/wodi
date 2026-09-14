@@ -30,6 +30,10 @@ dist-ssr
 # Firebase deploy cache (regenerated on every deploy)
 .firebase/
 
+# Service-account keys bypass every Firestore rule — they belong outside the repo. Backstop only.
+*adminsdk*.json
+*service-account*.json
+
 # Store / merch launch assets (74MB of print files — kept out of git)
 wodi_store_launch_pack/
 

@@ -245,7 +245,7 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(74,56,10,0.62)') : { ...gold, fontFamily: fD, fontSize: 18, fontWeight: 900, display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(74,56,10,0.62)') : { ...gold, fontFamily: fD, fontSize: 18, fontWeight: 900, display: 'inline-block', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {parts.single}
                       </span>
                     ) : <span />}

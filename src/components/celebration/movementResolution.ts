@@ -206,10 +206,18 @@ export function resolveOccurrenceLoad(
  * "50-65kg". Ties keep the earliest source's lift name, so a piece whose blocks are distinct
  * still names the lift the peak actually belongs to.
  */
+export interface PeakLoad {
+  /** ONE implement's weight — what the athlete typed and what the poster prints. */
+  weight: number;
+  /** 2 = a pair, one in each hand: the load actually moved is weight × 2. */
+  implementCount: number;
+  movementName?: string;
+}
+
 export function getExercisePeakLoad(
   exercise: Pick<Exercise, 'sets' | 'sections' | 'movements' | 'name'>,
   breakdown: MovementTotal[],
-): { weight: number; movementName?: string } | null {
+): PeakLoad | null {
   const occurrenceMovements = exercise.sections?.length
     ? exercise.sections.flatMap((section) => section.movements ?? [])
     : (exercise.movements ?? []);
@@ -219,27 +227,41 @@ export function getExercisePeakLoad(
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
 
-  const candidates: Array<{ weight: number; movementName?: string }> = [
-    ...breakdown.flatMap((movement) =>
-      (movement.weightProgression?.length
+  // Every candidate in ONE unit: per implement, with its implement count beside it. The sources
+  // disagree on their own — the breakdown's `weight` is both dumbbells, its progression and the
+  // logged weights are one — and comparing them raw made a 2×35kg bench's top set "70kg".
+  const candidates: PeakLoad[] = [
+    ...breakdown.flatMap((movement) => {
+      const pair = Math.max(1, movement.implementCount ?? 1);
+      const perImplement = movement.weightProgression?.length
         ? movement.weightProgression
-        : (movement.weight ?? 0) > 0 ? [movement.weight ?? 0] : []
-      ).map((weight) => ({ weight, movementName: movement.name })),
-    ),
-    ...occurrenceMovements.flatMap((mov) =>
-      (resolveOccurrenceLoad(mov, breakdown, occurrences.get(mov.name.toLowerCase()) ?? 1)?.weights ?? [])
-        .map((weight) => ({ weight, movementName: mov.name })),
-    ),
+        : (movement.weight ?? 0) > 0 ? [Math.round(((movement.weight ?? 0) / pair) * 10) / 10] : [];
+      return perImplement.map((weight) => ({ weight, implementCount: pair, movementName: movement.name }));
+    }),
+    ...occurrenceMovements.flatMap((mov) => {
+      const load = resolveOccurrenceLoad(mov, breakdown, occurrences.get(mov.name.toLowerCase()) ?? 1);
+      return (load?.weights ?? []).map((weight) => ({
+        weight, implementCount: load?.implementCount ?? 1, movementName: mov.name,
+      }));
+    }),
     ...(exercise.sets ?? [])
       .filter((set) => set.completed && (set.weight ?? 0) > 0)
-      .map((set) => ({ weight: set.weight ?? 0, movementName: undefined })),
+      .map((set) => ({ weight: set.weight ?? 0, implementCount: 1, movementName: undefined })),
   ];
 
-  let best: { weight: number; movementName?: string } | null = null;
+  // The heaviest LOAD MOVED wins — a pair of 35s outranks a 60kg bar, as it did before — and it
+  // is reported per implement, the way every other line on the poster states it.
+  let best: PeakLoad | null = null;
   for (const candidate of candidates) {
-    if (candidate.weight > 0 && candidate.weight > (best?.weight ?? 0)) best = candidate;
+    const moved = candidate.weight * candidate.implementCount;
+    if (candidate.weight > 0 && moved > (best ? best.weight * best.implementCount : 0)) best = candidate;
   }
   return best;
+}
+
+/** A top set as the hero prints it: "2×35" for a pair, "80" for a bar. */
+export function formatPeakLoadValue(peak: PeakLoad): string {
+  return peak.implementCount > 1 ? `${peak.implementCount}×${peak.weight}` : `${peak.weight}`;
 }
 
 export interface ResolvedPrescribedMovement {

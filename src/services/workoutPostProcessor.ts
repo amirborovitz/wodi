@@ -1060,6 +1060,11 @@ function normalizeInterleavedMovements(workout: ParsedWorkout): ParsedWorkout {
     // Walk the board lines in order; map each to the single best-overlapping movement.
     const sequence: ParsedMovement[] = [];
     for (const line of text.split(/[\n,]/).map((l) => l.trim()).filter(Boolean)) {
+      // An occurrence is a line that PRESCRIBES the movement, and a prescription states an amount
+      // — "400m run", "100 swings", "8/10 cal echo bike". A line that only names one is a note:
+      // "* Once a team member gets off the bike, the other may start" doubled the bike in every
+      // round of a 30-round relay.
+      if (!/\d/.test(line)) continue;
       const lineTokens = movementIdentityTokens(line);
       if (lineTokens.size === 0) continue;
       let best = -1;

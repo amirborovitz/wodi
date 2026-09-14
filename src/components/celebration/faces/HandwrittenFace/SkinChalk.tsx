@@ -154,7 +154,7 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                         )}
                       </div>
                     ) : parts.single ? (
-                      parts.singleIsLoad ? (
+                      parts.singleVoice === 'load' ? (
                         <span style={loadVoice('rgba(33,29,21,0.5)')}>{parts.single}</span>
                       ) : (
                       <span style={{ fontFamily: fH, fontSize: compact ? 20 : 23, fontWeight: 700, color: BRAND.paperInk, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>

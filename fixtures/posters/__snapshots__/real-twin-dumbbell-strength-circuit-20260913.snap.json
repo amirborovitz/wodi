@@ -1,0 +1,193 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "4 Sets Strength",
+      "blueprint": "4 sets",
+      "rows": [
+        {
+          "primary": "10",
+          "name": "Dumbbell Bench Press",
+          "subNote": "40 total",
+          "totalNote": "40 total",
+          "mineKey": "Dumbbell Bench Press",
+          "accent": "yellow",
+          "repeatCount": 4
+        },
+        {
+          "primary": "15m",
+          "name": "Kettlebell Front Rack Carry",
+          "subNote": "60 m total",
+          "totalNote": "60 m total",
+          "mineKey": "Kettlebell Front Rack Carry",
+          "accent": "magenta",
+          "repeatCount": 4
+        },
+        {
+          "primary": "8",
+          "name": "Strict Toes to Bar",
+          "subNote": "32 total",
+          "totalNote": "32 total",
+          "mineKey": "Strict Toes to Bar",
+          "accent": "cyan",
+          "repeatCount": 4
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "4 Sets Strength",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "10",
+            "name": "Dumbbell Bench Press",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Dumbbell Bench Press",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "15m",
+            "name": "Kettlebell Front Rack Carry",
+            "subNote": "60 m total",
+            "totalNote": "60 m total",
+            "mineKey": "Kettlebell Front Rack Carry",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "8",
+            "name": "Strict Toes to Bar",
+            "subNote": "32 total",
+            "totalNote": "32 total",
+            "mineKey": "Strict Toes to Bar",
+            "accent": "cyan",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "72",
+    "unit": "REPS",
+    "storyLine": "40 dumbbell bench press · 32 strict ttb · 60m kettlebell front rack carry",
+    "storyMovements": [
+      {
+        "perRound": "10",
+        "name": "Dumbbell Bench Press",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 70,
+        "unit": "kg",
+        "implementCount": 2,
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "15m",
+        "name": "Kettlebell Front Rack Carry",
+        "total": "60m total",
+        "color": "yellow",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Strict Toes to Bar",
+        "total": "32 total",
+        "color": "cyan",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "72",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "4 sets"
+      },
+      {
+        "kind": "line",
+        "rx": "10 Dumbbell Bench Press",
+        "load": "",
+        "mine": "2×35kg",
+        "team": "",
+        "total": "40 total"
+      },
+      {
+        "kind": "line",
+        "rx": "15m Kettlebell Front Rack Carry",
+        "load": "",
+        "mine": "2×16kg",
+        "team": "",
+        "total": "60 m total"
+      },
+      {
+        "kind": "line",
+        "rx": "8 Strict Toes to Bar",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "32 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Dumbbell Bench Press",
+          "load": "",
+          "mine": "2×35kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15m Kettlebell Front Rack Carry",
+          "load": "",
+          "mine": "2×16kg",
+          "team": "",
+          "total": "60 m total"
+        },
+        {
+          "kind": "line",
+          "rx": "8 Strict Toes to Bar",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "32 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

@@ -104,7 +104,7 @@ Never write two rules for the same selector fighting via cascade order. To chang
 
 ## AI Parser — Trust Rules
 
-**The AI (GPT-4o Vision) is the authority.** The post-processor and UI only **backfill missing fields**, never override what the AI returned. CrossFit has too many formats for heuristics to win.
+**The AI (gpt-5.5 since 2026-09-12 — one constant, `PARSE_MODEL` in `openai.ts`) is the authority.** The post-processor and UI only **backfill missing fields**, never override what the AI returned. CrossFit has too many formats for heuristics to win.
 
 - Pattern: `if (!aiProvidedValue) { /* regex fallback */ }` — never the reverse.
 - Applies to `loggingMode` (per exercise), `suggestedSets`/`suggestedReps`, `format`, `timeCap`, `inputType`, etc.

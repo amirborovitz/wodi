@@ -13,9 +13,10 @@ import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult } from
 import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 // Value import from helpers directly (not the useCelebrationData re-export): the hook module
 // transitively initializes Firebase, which the Node poster-corpus harness must never load.
-import { shouldLogCelebrationDebug, prescribesSingleMovement } from '../../helpers';
+import { shouldLogCelebrationDebug, prescribesSingleMovement, buildIntervalSchemeLine } from '../../helpers';
 import { formatLoggedLoad } from '../../posterFormatters';
-import { getExercisePeakLoad } from '../../movementResolution';
+import { formatPeakLoadValue, getExercisePeakLoad } from '../../movementResolution';
+import type { PeakLoad } from '../../movementResolution';
 import { movementNameTokens } from '../../../../utils/movementNameMatch';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
 import { blockCadence, formatCadenceTitle } from '../../../../utils/blockClock';
@@ -175,6 +176,42 @@ function isGenericTitle(title: string): boolean {
   const t = title.trim();
   return GENERIC_TITLE_PATTERNS.some((p) => p.test(t))
     || CADENCE_TITLE_PATTERNS.some((p) => p.test(t));
+}
+
+// The words a coach uses to write a scheme rather than name a workout.
+const SCHEME_TITLE_VOCAB = /\b(?:amrap|emom|tabata|intervals?|rounds?|sets?|min(?:ute)?s?|sec(?:ond)?s?|rest|work|on|off|cap|for|time|each|alt(?:ernating)?|x)\b/gi;
+
+/**
+ * Is this "title" just the scheme in the coach's own spelling?
+ *
+ * A board headed "2:00 AMRAP X 4" or "[02:00 AMRAP, 02:00 REST] x 4 rounds" has not named the
+ * workout — it has written the clock. Strip the scheme vocabulary and the numbers; if nothing
+ * is left, there was no name. Deliberately a subtraction, not a list of notations: coaches
+ * write this a dozen ways and an enumeration only ever covers the ones already seen.
+ */
+/** Does this line state a clock — "2:00", "3 min", "45 sec"? */
+function statesAClock(text: string): boolean {
+  return /\d{1,3}\s*:\s*\d{2}|\b\d+\s*(?:min(?:ute)?s?|sec(?:ond)?s?)\b/i.test(text);
+}
+
+function isSchemeTitle(title: string): boolean {
+  return title
+    .replace(SCHEME_TITLE_VOCAB, ' ')
+    .replace(/[\d:.,/×x[\]()+&·—–-]/g, ' ')
+    .trim().length === 0;
+}
+
+/**
+ * The card's title for an interval piece: the app's one notation ("2:00 ON / 2:00 OFF × 4").
+ *
+ * Applied only when the coach's title was the scheme anyway (or absent) — a workout with a real
+ * name keeps it. The scheme is composed from the exercise's fields at render time, never stored,
+ * so every existing poster picks up the notation on its next render and none is retitled in place.
+ */
+export function composedSchemeTitle(exercise: Exercise | undefined, currentTitle: string | null): string | null {
+  const schemeLine = buildIntervalSchemeLine(exercise);
+  if (!schemeLine) return null;
+  return !currentTitle || isSchemeTitle(currentTitle) ? schemeLine.toUpperCase() : null;
 }
 
 // Suppress section headers that are just describing the workout format — but NOT round/section
@@ -389,8 +426,12 @@ export function buildFormatLine(data: CelebrationData): string {
   // doc's hierarchy explicitly forbids repeating it here ("NEVER: Repeat the workout name in
   // the title AND subtitle"). This line's job is to add the structure detail the pill can't
   // carry (duration, set count, rounds), not restate the format.
-  if ((fmt === 'amrap' || fmt === 'amrap_intervals') && data.durationMinutes > 0) {
-    return `${data.durationMinutes} MIN`;
+  if (fmt === 'amrap' || fmt === 'amrap_intervals') {
+    // The scheme in the card's one notation, rest clock included. The summed clock ("16 MIN")
+    // describes neither a window nor the rest, and reads as one unbroken sixteen-minute AMRAP.
+    const schemeLine = buildIntervalSchemeLine(ex0);
+    if (schemeLine) return schemeLine.toUpperCase();
+    if (data.durationMinutes > 0) return `${data.durationMinutes} MIN`;
   }
   if (fmt === 'emom' && ex0) {
     // A station EMOM's interval count is not a set count an athlete recognises — 25 intervals is
@@ -492,6 +533,10 @@ function dedupeAmrapFormat(
   isAmrap: boolean,
   amrapMinutes: number | undefined,
 ): string {
+  // Say it once. When the title is already the scheme in the app's notation, the format line
+  // below it would be the identical string — the middle of the three copies this card used to
+  // print before naming a movement.
+  if (title && format && title.toUpperCase() === format.toUpperCase()) return '';
   if (isAmrap && amrapMinutes) {
     const titleCarriesClock = !!title && title.toUpperCase().includes(`${amrapMinutes} MIN`);
     return titleCarriesClock ? '' : format;
@@ -620,11 +665,6 @@ export function aerobicHeroSubject(hero: HeroResult | null | undefined): string 
   return isAerobic ? hero?.subtitle : undefined;
 }
 
-function formatPosterWeightValue(weight: number, unit = 'kg'): string {
-  const value = Number.isInteger(weight) ? `${weight}` : `${weight}`;
-  return `${value}${unit}`;
-}
-
 function normalizeAchievementMovementName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
@@ -661,17 +701,19 @@ function loadUnitOf(movements: MovementTotal[]): 'kg' | 'lb' {
 // lift's peak is invisible there.
 function getTopSetValue(exercise: Exercise, movements: MovementTotal[] = []): string | null {
   const peak = getExercisePeakLoad(exercise, movements);
-  return peak ? formatPosterWeightValue(peak.weight, loadUnitOf(movements)) : null;
+  return peak ? `${formatPeakLoadValue(peak)}${loadUnitOf(movements)}` : null;
 }
 
 function getSingleStrengthTopSetValue(data: CelebrationData): string | null {
   if (data.workoutFormat !== 'strength') return null;
   const movements = data.activeBreakdown?.movements ?? [];
-  const peak = Math.max(
-    ...data.exercises.map((exercise) => getExercisePeakLoad(exercise, movements)?.weight ?? 0),
-    0,
-  );
-  return peak > 0 ? formatPosterWeightValue(peak, loadUnitOf(movements)) : null;
+  // Heaviest load MOVED across the parts, printed per implement — same rule as within one part.
+  const peak = data.exercises
+    .map((exercise) => getExercisePeakLoad(exercise, movements))
+    .reduce<PeakLoad | null>((best, next) => (
+      next && next.weight * next.implementCount > (best ? best.weight * best.implementCount : 0) ? next : best
+    ), null);
+  return peak ? `${formatPeakLoadValue(peak)}${loadUnitOf(movements)}` : null;
 }
 
 /**
@@ -743,7 +785,17 @@ export function sectionsToRows(
   for (const section of sections) {
     const isDuplicateTitle =
       isDuplicatePosterHeader(section.title, { title: headerContext.title })
-      || isRoundCountForTimeCoveredByFormat(section.title, headerContext);
+      || isRoundCountForTimeCoveredByFormat(section.title, headerContext)
+      // A block header written as the scheme ("2:00 AMRAP X 4") is the card's own scheme in the
+      // coach's spelling — the title or the format line above already states it in the app's.
+      // Matching them verbatim can't catch this, which is exactly how one card ended up with
+      // "3:00 × 4" as its title and "3:00 MIN AMRAP X 4" as the header underneath.
+      //
+      // It must state a CLOCK to qualify: that is what the composed scheme line replaces. A
+      // round-count header ("6 ROUNDS FOR TIME") is scheme vocabulary too, but nothing above
+      // restates it, and isRoundCountForTimeCoveredByFormat already rules on those.
+      || (!!section.title?.trim() && !!(headerContext.title || headerContext.format)
+        && statesAClock(section.title) && isSchemeTitle(section.title));
     // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and in the
     // blueprint cap below — a section-level block on top would restate both.
     const hasStationRows = section.rows.some((row) => row.stationRow && row.roundLabel);
@@ -752,7 +804,11 @@ export function sectionsToRows(
       section.title &&
       section.title !== '' &&
       !isFormatHeader(section.title);
-    const cap = section.blueprint ?? section.eyebrow ?? '';
+    // The eyebrow stands in for a missing blueprint — but only when it says something. A bare
+    // "WOD" or "AMRAP" is the format word the FormatTag pill already carries, and it surfaced
+    // here the moment the interval blueprint stopped restating the scheme.
+    const eyebrowCap = section.eyebrow && !isFormatHeader(section.eyebrow) ? section.eyebrow : '';
+    const cap = section.blueprint ?? eyebrowCap;
 
     const isCadenceTitle = !hasStationRows
       && CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
@@ -826,17 +882,30 @@ function formatStationBlockLabel(label: string): string {
   return label.toUpperCase();
 }
 
+/**
+ * A logged load as the poster prints it — the ONE rule both mine-map sources go through.
+ *
+ * `weight` is the breakdown's EFFECTIVE figure (per implement × implementCount, for volume);
+ * progressions are stored per implement already. Display stays per implement — "2×35kg" for a
+ * pair of dumbbells, never the summed "70kg" nobody lifted on one implement. The story source
+ * used to skip the division, and since it overrides the breakdown source, the bench press read
+ * "70kg" directly above a carry reading "2×16kg".
+ */
+function formatPosterLoad(load: Pick<StoryMovementLine, 'weight' | 'weightProgression' | 'unit' | 'implementCount'>): string {
+  const unit = load.unit === 'lb' ? 'lb' : 'kg';
+  const pair = (load.implementCount ?? 1) > 1 ? load.implementCount! : 1;
+  if (load.weightProgression?.length) return formatLoggedLoad(load.weightProgression, unit, pair);
+  if (!load.weight || load.weight <= 0) return '';
+  const perImplement = pair > 1 ? Math.round((load.weight / pair) * 10) / 10 : load.weight;
+  return formatLoggedLoad([perImplement], unit, pair);
+}
+
 // Build a name→weight map from storyMovements (includes progression strings).
 export function buildMineMapFromStory(storyMovements: StoryMovementLine[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const sm of storyMovements) {
-    const key = sm.name.toLowerCase().trim();
-    const unit = sm.unit === 'lb' ? 'lb' : 'kg';
-    const value = formatLoggedLoad(
-      sm.weightProgression?.length ? sm.weightProgression : sm.weight ? [sm.weight] : [],
-      unit,
-    );
-    if (value) map.set(key, value);
+    const value = formatPosterLoad(sm);
+    if (value) map.set(sm.name.toLowerCase().trim(), value);
   }
   return map;
 }
@@ -849,13 +918,7 @@ export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<strin
     let value = '';
 
     if (m.weight && m.weight > 0) {
-      const unit = m.unit === 'lb' ? 'lb' : 'kg';
-      // Breakdown weight is the effective total (per-implement × implementCount, for volume).
-      // Display must stay per-implement — "2×15kg" for twin DBs, never the summed "30kg" the
-      // athlete didn't lift on one implement. Progressions are stored per-implement already.
-      const impl = (m.implementCount ?? 1) > 1 ? m.implementCount! : 1;
-      const perImpl = impl > 1 ? Math.round((m.weight / impl) * 10) / 10 : m.weight;
-      value = formatLoggedLoad(m.weightProgression?.length ? m.weightProgression : [perImpl], unit, impl);
+      value = formatPosterLoad(m);
     } else if ((m.totalDistance ?? 0) > 0) {
       const dist = m.totalDistance!;
       value = dist >= 1000 ? `${(dist / 1000).toFixed(2)}km` : `${Math.round(dist)}m`;
@@ -1136,6 +1199,10 @@ export function buildPosterWodFromPage(
 
   const exName = page.exercise.name?.trim().toUpperCase() ?? null;
   let title = stationClock?.title ?? (exName && !isGenericTitle(exName) ? exName : null);
+  // Station pages compose their own clock title; every other interval piece speaks the app's
+  // one notation, so the card can't say the same scheme in two spellings.
+  const schemeTitle = stationClock ? null : composedSchemeTitle(page.exercise, title);
+  if (schemeTitle) title = schemeTitle;
   if (!title && isAmrap && amrapMinutes) {
     title = `${amrapMinutes} MIN`;
   }
@@ -1158,8 +1225,13 @@ export function buildPosterWodFromPage(
       const fl = heroResult.formatLine.toUpperCase();
       if (fl && fl !== 'WORKOUT' && fl !== type) return fl;
     }
-    // FormatTag pill already reads "AMRAP" — state the duration only, not the format word again.
-    if (isAmrap && amrapMinutes) return `${amrapMinutes} MIN`;
+    // FormatTag pill already reads "AMRAP" — state the clock only, not the format word again,
+    // and in the card's one notation (see buildIntervalSchemeLine).
+    if (isAmrap) {
+      const schemeLine = buildIntervalSchemeLine(page.exercise);
+      if (schemeLine) return schemeLine.toUpperCase();
+      if (amrapMinutes) return `${amrapMinutes} MIN`;
+    }
     // The strength scheme counts sets that logged reps — on a max practice that is the ONE tested
     // set, so it printed "1 SETS" directly above the block's own "5 SETS" blueprint.
     if (page.isStrength && !isMaxPractice) {
@@ -1171,8 +1243,11 @@ export function buildPosterWodFromPage(
   })();
 
   // Never let the title repeat the format/type string verbatim (e.g. a title that resolved to
-  // bare "AMRAP") — matches the de-dup rule already enforced in buildPosterWod.
-  if (title && (title.toUpperCase() === format.toUpperCase() || title.toUpperCase() === type.toUpperCase())) {
+  // bare "AMRAP") — matches the de-dup rule already enforced in buildPosterWod. A composed
+  // scheme title is exempt: there the two lines match because the title IS the scheme, and it
+  // is the format line that stands down (see dedupeAmrapFormat).
+  if (title && title !== schemeTitle
+    && (title.toUpperCase() === format.toUpperCase() || title.toUpperCase() === type.toUpperCase())) {
     title = null;
   }
   if (!title && isPartnerPage) {
@@ -1342,6 +1417,9 @@ export function buildPosterWod(
   const amrapMinutes = isAmrap
     ? (extractAmrapMinutes(mainEx) ?? (data.durationMinutes > 0 ? Math.round(data.durationMinutes) : undefined))
     : undefined;
+  // Same rule as the page builder: one notation for the scheme, carried by the title.
+  const schemeTitle = composedSchemeTitle(mainEx, title);
+  if (schemeTitle) title = schemeTitle;
   if (!title && isAmrap && amrapMinutes) {
     title = `${amrapMinutes} MIN`;
   }
@@ -1354,8 +1432,9 @@ export function buildPosterWod(
     ? formatPosterStrengthRepsSequence(mainEx)
     : undefined;
 
-  // Clear title if it duplicates the format or type string
-  if (title && (
+  // Clear title if it duplicates the format or type string — except a composed scheme title,
+  // where the format line is the one that stands down (see dedupeAmrapFormat).
+  if (title && title !== schemeTitle && (
     title.toUpperCase() === format.toUpperCase() ||
     title.toUpperCase() === type.toUpperCase()
   )) {

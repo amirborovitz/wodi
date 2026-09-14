@@ -24,7 +24,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "2 min rest between",
+        "blueprint": "2:00 rest between",
         "rows": [],
         "isPartnerConfirmed": false
       },
@@ -97,7 +97,7 @@
         "unit": "rds"
       }
     ],
-    "formatLine": "2 × 6 MIN",
+    "formatLine": "6:00 ON / 2:00 OFF × 2",
     "storyLine": "16 back squat · 40 ttb · 40 alt weighted box step up · 40 american kettlebell swing · 160 du",
     "storyMovements": [
       {
@@ -182,7 +182,7 @@
       [
         {
           "kind": "block",
-          "label": "2 MIN REST BETWEEN",
+          "label": "2:00 REST BETWEEN",
           "cap": ""
         },
         {

@@ -213,7 +213,7 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, letterSpacing: '0.02em', color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

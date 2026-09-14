@@ -1,6 +1,6 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
-import { hasSequentialBlocks } from '../utils/sectionShape';
+import { hasSequentialBlocks, sectionsEnumerateIntervals } from '../utils/sectionShape';
 import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 
 /**
@@ -150,7 +150,7 @@ function inferColorFromName(name: string, weight?: number): 'cyan' | 'magenta' |
  * Get multiplier for nested workout structures
  * e.g., "7 rounds of Cindy" = 7 (container) × 1 (inner) = 7
  */
-function getContainerMultiplier(workout: ParsedWorkout, exercise: ParsedExercise): number {
+export function getContainerMultiplier(workout: ParsedWorkout, exercise: ParsedExercise): number {
   // Use containerRounds if specified (e.g., "7 rounds of Cindy")
   if (workout.containerRounds && workout.containerRounds > 0) {
     return workout.containerRounds;
@@ -395,9 +395,10 @@ export interface MovementMultiplierResult {
  * to decide.
  *
  * THE single owner of this question. Two separate places used to compute a movement's multiplier
- * (this file at save time, repairUndercountedBreakdown at display time), and they disagreed: the
+ * (this file at save time, a display-time repair pass on the poster), and they disagreed: the
  * save path was corrected to 5 runs while the repair pass independently recomputed 6 from the
- * tier count and inflated it straight back. Both now ask here.
+ * tier count and inflated it straight back. The repair pass is gone (2026-09-14) — the poster
+ * prints the saved total — and the poster asks here only whether a count stands behind it.
  */
 export function statedOccurrenceCount(
   movement: Pick<ParsedMovement, 'occurrences' | 'placement'>,
@@ -490,9 +491,18 @@ export function getMovementMultiplier(
   // Legacy fallback for old workouts
   const hasSections = !!(exercise.sections && exercise.sections.length > 0);
   const isBuyInCashOut = hasSections && movement.perRound === false;
+  // A station-visit count of ZERO is not an answer, it is an absence: the array is sized to the
+  // exercise's own movement list, and a section-expanded row index runs off the end of it on any
+  // board whose windows are written out. `??` only rescues null, so that 0 beat the section's own
+  // count and every window after the first contributed nothing — 19 stored where the athlete did
+  // 19+16+13+10. Nothing reached this line while `per_interval` was short-circuiting above it.
+  const stationVisits = stationVisitCounts?.[movementIndex];
   return isBuyInCashOut
     ? { multiplier: 1, estimated: false }
-    : { multiplier: stationVisitCounts?.[movementIndex] ?? fallbackMultiplier, estimated: false };
+    : {
+        multiplier: stationVisits != null && stationVisits > 0 ? stationVisits : fallbackMultiplier,
+        estimated: false,
+      };
 }
 
 /**
@@ -537,6 +547,15 @@ export interface SectionMovementScope {
    * section was type 'rounds', which is how the ×2 went missing.
    */
   sectionRepeat: number;
+  /**
+   * This section IS one of the piece's windows, written out in full — the board enumerated them
+   * ("00:00-03:00: …  03:00-06:00: …") instead of describing one and saying "× 4".
+   *
+   * When it does, a movement inside can only happen as many times as THAT window says, and a
+   * `per_interval` claim on it is the piece's window count arriving a second time. Counting both
+   * stored 232 thrusters for a board prescribing 58.
+   */
+  enumeratesInterval: boolean;
 }
 
 /**
@@ -550,7 +569,11 @@ export function sectionRepeatCount(section: ParsedSection): number {
   return section.sectionType === 'rounds' ? 1 : Math.max(1, section.rounds ?? 1);
 }
 
-export function scopeSectionMovements(sections: ParsedSection[]): SectionMovementScope[] {
+export function scopeSectionMovements(
+  sections: ParsedSection[],
+  intervalCount?: number,
+): SectionMovementScope[] {
+  const enumeratesInterval = sectionsEnumerateIntervals(sections, intervalCount);
   return sections.flatMap((section) => {
     // A separately-scored block (an A/B/C interval AMRAP) repeats as many times as the athlete
     // MANAGED, not as many as the board prescribed — see sectionRoundsCompleted.
@@ -565,6 +588,7 @@ export function scopeSectionMovements(sections: ParsedSection[]): SectionMovemen
       fallbackMultiplier: sectionMultiplier + (partialNames.has(movement.name) ? 1 : 0),
       forceOnce: section.sectionType !== 'rounds',
       sectionRepeat,
+      enumeratesInterval,
     }));
   });
 }
@@ -575,6 +599,15 @@ export function scopeSectionMovements(sections: ParsedSection[]): SectionMovemen
  * once", so overwriting a stated mode here would halve real work.
  */
 export function movementForSectionCounting(scope: SectionMovementScope): ParsedMovement {
+  // The window is already written out, so "once per window" is the piece's window count arriving
+  // a second time — drop it and let the section's own round count answer, which is the only layer
+  // left that knows how often this movement happened.
+  //
+  // Dropped rather than forced to 'once': a window that repeats its contents ("2 rounds of 19
+  // Thrusters") still owes that ×2, and only the structural path reads it.
+  if (scope.enumeratesInterval && scope.movement.countingMode === 'per_interval') {
+    return { ...scope.movement, countingMode: undefined };
+  }
   return scope.forceOnce && !scope.movement.countingMode
     ? { ...scope.movement, countingMode: 'once' as const }
     : scope.movement;
@@ -629,12 +662,15 @@ export function calculateWorkloadBreakdown(
     // scope from the single AI parse: buy-in/cash-out sections are once,
     // rounds sections use their explicit section round count.
     const movementEntries: SectionMovementScope[] = exercise.sections && exercise.sections.length > 0
-      ? scopeSectionMovements(exercise.sections)
+      ? scopeSectionMovements(exercise.sections, exercise.intervalCount)
       : (exercise.movements || []).map((movement) => ({
           movement,
           fallbackMultiplier: multiplier,
           forceOnce: false,
           sectionRepeat: 1,
+          // The flat list IS one window's worth of work — 'once per interval' is exactly what it
+          // means here, and the multiplier is the only thing that knows how many windows there are.
+          enumeratesInterval: false,
         }));
 
     // If exercise has movement structure, use it

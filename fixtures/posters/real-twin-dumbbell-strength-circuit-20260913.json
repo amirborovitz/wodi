@@ -1,0 +1,66 @@
+{
+  "name": "real-twin-dumbbell-strength-circuit-20260913",
+  "description": "REAL saved doc (13 Sep 2026), strength part only. A 4-set circuit of 10 Dumbbell Bench Press (two dumbbells, 35kg each), a 15m twin Kettlebell Front Rack Carry (16kg each) and 8 Toes to Bar. Every twin lift must print per implement ('2×35kg', '2×16kg') and the top set must read '2×35kg' — never the summed 70kg the breakdown stores for volume. Before the fix the bench line read '70kg' directly above a carry reading '2×16kg', under a 'TOP SET 70kg' hero.",
+  "workout": {
+    "title": "WOD",
+    "format": "strength",
+    "rawText": "A. STRENGTH\n4 sets:\n• 10 Dumbbell Bench Press @R.P.E ~8\n• ~15/15m twin Kettlebell Front Rack Carry\n• 8 strict Toes to Bar",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "4 Sets Strength",
+        "type": "strength",
+        "partKind": "strength",
+        "aiPartName": "FURNACE",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "loggingMode": "strength",
+        "rounds": 4,
+        "prescription": "4 sets: 10 Dumbbell Bench Press @R.P.E ~8, ~15/15m twin Kettlebell Front Rack Carry, 8 strict Toes to Bar",
+        "rawText": "A. STRENGTH\n4 sets:\n• 10 Dumbbell Bench Press @R.P.E ~8\n• ~15/15m twin Kettlebell Front Rack Carry\n• 8 strict Toes to Bar",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 18 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 18 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 18 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 18 }
+        ],
+        "movements": [
+          {
+            "name": "Dumbbell Bench Press",
+            "reps": 10,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "loggedWeights": [35]
+          },
+          {
+            "name": "Kettlebell Front Rack Carry",
+            "distance": 15,
+            "unit": "m",
+            "perSide": true,
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "loggedWeights": [16]
+          },
+          {
+            "name": "Strict Toes to Bar",
+            "reps": 8,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Dumbbell Bench Press", "exerciseIndex": 0, "totalReps": 40, "weight": 70, "implementCount": 2, "unit": "kg", "color": "yellow" },
+        { "name": "Strict Toes to Bar", "exerciseIndex": 0, "totalReps": 32, "color": "cyan" },
+        { "name": "Kettlebell Front Rack Carry", "exerciseIndex": 0, "totalDistance": 60, "distancePerRep": 15, "weight": 32, "implementCount": 2, "unit": "m", "color": "yellow" }
+      ]
+    }
+  }
+}

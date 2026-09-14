@@ -586,6 +586,80 @@ describe('independentlyScoredSections', () => {
     expect(independentlyScoredSections(blockAmraps)).toHaveLength(2);
   });
 
+  // The board of 2026-09-11, and the reason this rule needed a second half:
+  //
+  //   With a running clock:
+  //   00:00-03:00: 19 DB/KB Thruster, 19 Burpee, Max V-up / Sit-up
+  //   03:00-06:00: 16 … 06:00-09:00: 13 … 09:00-12:00: 10 …
+  //   Score is total V-ups / sit-ups completed
+  //
+  // Every window leaves the SAME movement open, and the board says outright that the score is
+  // their TOTAL. That is one number collected four times — the per-window grid — not four
+  // separately scored blocks. Split into blocks, each window became its own logging page whose
+  // score had nowhere to go, and the workout saved with no V-ups at all.
+  it('four windows all leaving the SAME movement open are ONE score, not four', () => {
+    const runningClock = {
+      name: 'Running Clock Intervals',
+      loggingMode: 'amrap_intervals' as const,
+      sections: [19, 16, 13, 10].map((reps, i) => minuteSlot(`0${i * 3}:00-${i * 3 + 3}:00`, [
+        { name: 'Dumbbell / Kettlebell Thruster', reps },
+        { name: 'Burpee', reps },
+        { name: 'V-up / Sit-up', isMaxReps: true },
+      ])),
+    };
+    expect(independentlyScoredSections(runningClock)).toHaveLength(0);
+  });
+
+  it('still splits when each window opens a DIFFERENT movement', () => {
+    // The station case above, restated on an AMRAP clock: five stations, max reps at each, and
+    // five genuinely separate numbers. Only sameness of the open movement collapses the pages.
+    const differentOpens = {
+      name: 'Intervals',
+      loggingMode: 'amrap_intervals' as const,
+      sections: [
+        minuteSlot('A', [{ name: 'Thruster', reps: 10 }, { name: 'Echo Bike', isMaxReps: true }]),
+        minuteSlot('B', [{ name: 'Thruster', reps: 10 }, { name: 'Bar Muscle-up', isMaxReps: true }]),
+      ],
+    };
+    expect(independentlyScoredSections(differentOpens)).toHaveLength(2);
+  });
+
+  // The real board of 2026-09-11:
+  //
+  //   Strict Press
+  //   4 sets x 5 reps @80-85%
+  //   1 set x max reps @~60%
+  //
+  // ONE lift with a set scheme — four working sets and a back-off set — not two pieces of
+  // training. The app has always logged it on one screen: a progressive weight row for the
+  // working sets, with the max set's reps AND its weight underneath, prefilled at 60% of the
+  // top set. Splitting it into two block pages sent the max set to a screen with no weight
+  // field at all, so the load it was performed at could not be logged.
+  it('a lift and its own back-off set are one piece, not two blocks', () => {
+    const strictPress = {
+      name: 'Strict Press',
+      loggingMode: 'strength' as const,
+      sections: [
+        { sectionType: 'rounds' as const, rounds: 4, scoreType: 'load' as const, movements: [{ name: 'Strict Press', reps: 5 }] },
+        { sectionType: 'rounds' as const, rounds: 1, scoreType: 'reps' as const, movements: [{ name: 'Strict Press', isMaxReps: true }] },
+      ],
+    };
+    expect(independentlyScoredSections(strictPress)).toHaveLength(0);
+  });
+
+  it('still splits blocks that train different movements', () => {
+    // "[10:00 AMRAP, 2:00 REST] x 2 — A: Row, B: Wall Ball". Two blocks, two scores.
+    const differentWork = {
+      name: '10:00 AMRAP x 2',
+      loggingMode: 'amrap_intervals' as const,
+      sections: [
+        { sectionType: 'rounds' as const, rounds: 1, label: 'A', scoreType: 'rounds' as const, movements: [{ name: 'Row', calories: 15 }] },
+        { sectionType: 'rounds' as const, rounds: 1, label: 'B', scoreType: 'rounds' as const, movements: [{ name: 'Wall Ball', reps: 10 }] },
+      ],
+    };
+    expect(independentlyScoredSections(differentWork)).toHaveLength(2);
+  });
+
   it('ignores a section the model left unscored', () => {
     const buyIn = {
       name: 'For time',

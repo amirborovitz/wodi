@@ -1,0 +1,71 @@
+{
+  "name": "enumerated-windows-round-template",
+  "description": "Real board of 2026-09-11. A running clock writes its four 3:00 windows out one by one, descending 19-16-13-10 thrusters and burpees with max V-ups in whatever time is left. The windows are a template, not twelve separate lines: the poster says the round ONCE, in board order, and each movement carries its own total (58 / 58 / 348). The V-up total is the athlete's own count, never a sum of prescribed reps.",
+  "workout": {
+    "rawText": "With a running clock:\n00:00-03:00:\n19 Dumbbell / Kettlebell Thruster\n19 Burpee\nMax V-up / Sit-up\n03:00-06:00:\n16 Dumbbell / Kettlebell Thruster\n16 Burpee\nMax V-up / Sit-up\n06:00-09:00:\n13 Dumbbell / Kettlebell Thruster\n13 Burpee\nMax V-up / Sit-up\n09:00-12:00:\n10 Dumbbell / Kettlebell Thruster\n10 Burpee\nMax V-up / Sit-up\nScore is total V-ups / sit-ups completed",
+    "format": "amrap_intervals",
+    "timeCap": 720,
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "Clockwork Thrusters",
+        "type": "wod",
+        "loggingMode": "amrap_intervals",
+        "prescription": "00:00-03:00: 19 Thrusters, 19 Burpees, Max V-up/Sit-up; 03:00-06:00: 16; 06:00-09:00: 13; 09:00-12:00: 10",
+        "rawText": "With a running clock, four 3:00 windows. Score is total V-ups / sit-ups completed",
+        "intervalCount": 4,
+        "workDuration": 720,
+        "intervalSeconds": 180,
+        "maxReps": 348,
+        "maxRepsPerInterval": [92, 88, 86, 82],
+        "sets": [{ "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 116 }],
+        "sections": [
+          {
+            "label": "00:00-03:00", "sectionType": "rounds", "rounds": 1, "scoreType": "reps",
+            "movements": [
+              { "name": "Dumbbell / Kettlebell Thruster", "reps": 19, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_interval", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" } },
+              { "name": "Burpee", "reps": 19, "inputType": "none", "equipment": "none", "countingMode": "per_interval" },
+              { "name": "V-up / Sit-up", "isMaxReps": true, "maxMetric": "reps", "inputType": "none", "equipment": "none", "countingMode": "per_interval" }
+            ]
+          },
+          {
+            "label": "03:00-06:00", "sectionType": "rounds", "rounds": 1, "scoreType": "reps",
+            "movements": [
+              { "name": "Dumbbell / Kettlebell Thruster", "reps": 16, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_interval", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" } },
+              { "name": "Burpee", "reps": 16, "inputType": "none", "equipment": "none", "countingMode": "per_interval" },
+              { "name": "V-up / Sit-up", "isMaxReps": true, "maxMetric": "reps", "inputType": "none", "equipment": "none", "countingMode": "per_interval" }
+            ]
+          },
+          {
+            "label": "06:00-09:00", "sectionType": "rounds", "rounds": 1, "scoreType": "reps",
+            "movements": [
+              { "name": "Dumbbell / Kettlebell Thruster", "reps": 13, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_interval", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" } },
+              { "name": "Burpee", "reps": 13, "inputType": "none", "equipment": "none", "countingMode": "per_interval" },
+              { "name": "V-up / Sit-up", "isMaxReps": true, "maxMetric": "reps", "inputType": "none", "equipment": "none", "countingMode": "per_interval" }
+            ]
+          },
+          {
+            "label": "09:00-12:00", "sectionType": "rounds", "rounds": 1, "scoreType": "reps",
+            "movements": [
+              { "name": "Dumbbell / Kettlebell Thruster", "reps": 10, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_interval", "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" } },
+              { "name": "Burpee", "reps": 10, "inputType": "none", "equipment": "none", "countingMode": "per_interval" },
+              { "name": "V-up / Sit-up", "isMaxReps": true, "maxMetric": "reps", "inputType": "none", "equipment": "none", "countingMode": "per_interval" }
+            ]
+          }
+        ],
+        "movements": [
+          { "name": "Dumbbell / Kettlebell Thruster", "reps": 19, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_interval" },
+          { "name": "Burpee", "reps": 19, "inputType": "none", "equipment": "none", "countingMode": "per_interval" },
+          { "name": "V-up / Sit-up", "isMaxReps": true, "maxMetric": "reps", "inputType": "none", "equipment": "none", "countingMode": "per_interval" }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Dumbbell / Kettlebell Thruster", "totalReps": 58, "weight": 45, "implementCount": 2, "unit": "kg", "color": "yellow", "exerciseIndex": 0 },
+        { "name": "Burpee", "totalReps": 58, "color": "magenta", "exerciseIndex": 0 },
+        { "name": "V-up / Sit-up", "totalReps": 348, "color": "magenta", "exerciseIndex": 0 }
+      ]
+    }
+  }
+}

@@ -125,6 +125,54 @@ describe('mergeBlockPatch', () => {
   });
 });
 
+// A genuinely two-block piece whose second block is scored by an open count:
+//
+//   [6:00 AMRAP, 2:00 REST] x 2
+//   B.1  15 cal Row                      → scored in rounds
+//   B.2  8 Wall Ball, into max burpees   → scored in reps
+//
+// A 'reps' block routes to the max-reps input, which writes `maxReps`, while the merge below
+// only ever read `repsTotal`. Every tap on + and every digit typed was computed, handed up and
+// dropped: the stepper sat at 0 no matter what the athlete did, and the block saved empty.
+describe('a block scored by a max-effort set', () => {
+  const twoBlocks = {
+    name: '6:00 AMRAP x 2',
+    type: 'wod',
+    loggingMode: 'amrap_intervals',
+    intervalCount: 2,
+    sections: [
+      { sectionType: 'rounds', rounds: 1, label: 'B.1', scoreType: 'rounds', movements: [{ name: 'Row', calories: 15 }] },
+      { sectionType: 'rounds', rounds: 1, label: 'B.2', scoreType: 'reps', movements: [{ name: 'Wall Ball', reps: 8 }, { name: 'Burpee', isMaxReps: true }] },
+    ],
+  } as unknown as ParsedExercise;
+
+  const pressResult = {
+    exercise: twoBlocks,
+    kind: 'score_rounds',
+    setsTotal: 2,
+    movementResults: [],
+  } as unknown as StoryExerciseResult;
+
+  const maxBlock = () => getScoredBlocks(twoBlocks)[1];
+
+  it('accepts the number the max-reps input actually writes', () => {
+    // Was {} — the patch carried maxReps, the merge looked for repsTotal, and the score vanished.
+    const merged = mergeBlockPatch(pressResult, maxBlock(), { maxReps: 12 });
+    expect(merged.blockScores?.[1]).toEqual({ value: 12, partialReps: undefined, partialMovements: undefined });
+  });
+
+  it('shows the entered number again when the block is reopened', () => {
+    // The read side had the same mismatch: the stored value was handed back as repsTotal, which
+    // the max input does not read, so a block the athlete had filled in reopened blank.
+    const withScore = { ...pressResult, blockScores: [undefined, { value: 12 }] } as unknown as StoryExerciseResult;
+    expect(scopeResultToBlock(withScore, maxBlock()).maxReps).toBe(12);
+  });
+
+  it('still takes a plain rep total from an input that writes one', () => {
+    expect(mergeBlockPatch(pressResult, maxBlock(), { repsTotal: 9 }).blockScores?.[1]?.value).toBe(9);
+  });
+});
+
 describe('applyBlockScoresToSections', () => {
   it('lands each score on its own section for the poster to read', () => {
     const sections = applyBlockScoresToSections(exercise, [{ value: 5 }, { value: 6, partialReps: 12 }]);

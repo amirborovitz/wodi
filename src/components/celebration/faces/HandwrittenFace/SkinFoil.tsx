@@ -10,7 +10,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
+import { AchievementBadge, loadVoice, computedVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -240,7 +240,7 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                        <span style={{ ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={parts.teamVoice === 'computed' ? { ...computedVoice('inherit'), ...silver } : { ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                           {parts.team}
                         </span>
                         {parts.me && (
@@ -250,7 +250,11 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(232,231,239,0.45)') : { ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(232,231,239,0.45)')
+                        // silver last: the foil clip owns color/fill, and computedVoice's own
+                        // color would paint over the gradient it masks.
+                        : parts.singleVoice === 'computed' ? { ...computedVoice('inherit'), ...silver }
+                        : { ...silver, fontFamily: fH, fontSize: 22, fontWeight: 700, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

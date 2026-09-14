@@ -1,6 +1,7 @@
 {
   "name": "real-station-emom-5010-20260828",
-  "description": "REAL saved doc 9bc8EZwbW87BXTAnDjsG (2026-08-28). A. Core & Stability 3 sets (accessory) + B. station EMOM (50:10) for 25 min, 5 stations x 5 rounds, every station max-effort. Reproduces four reported bugs: (1) Burpee shows 6 reps the athlete never logged, (2) per-station totals are the single per-visit value, not multiplied by the 5 visits, (3) Echo Bike and Renegade Row BOTH inherit the exercise-level 8-rep sets (40 each), (4) the metcon page shows '3 sets' leaked from part A and never shows the board's 50:10 work/rest.",
+  "description": "REAL saved doc 9bc8EZwbW87BXTAnDjsG (2026-08-28). A. Core & Stability 3 sets (accessory) + B. station EMOM (50:10) for 25 min, 5 stations x 5 rounds, every station max-effort. Reproduces four reported bugs: (1) Burpee shows 6 reps the athlete never logged, (2) per-station totals are the single per-visit value, not multiplied by the 5 visits, (3) Echo Bike and Renegade Row BOTH inherit the exercise-level 8-rep sets (40 each), (4) the metcon page shows '3 sets' leaked from part A and never shows the board's 50:10 work/rest. Known total mismatch (Echo Bike): this doc stores the bike as 40 REPS it never logged (bug 3), and the max-station row prints the stored figure in the machine’s own unit, \"40 cal\". The corrected-save twin (station-emom-5010-corrected-save) holds no bike total at all.",
+  "knownTotalMismatches": ["Echo Bike"],
   "workout": {
     "title": "WOD",
     "format": "emom",

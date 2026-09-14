@@ -33,7 +33,6 @@
       {
         "eyebrow": "WOD",
         "title": "2:30 AMRAP x 4",
-        "blueprint": "2:30 AMRAP · 2:30 rest · 4 rounds",
         "rows": [
           {
             "primary": "6",
@@ -73,7 +72,7 @@
   "hero": {
     "value": "8",
     "unit": "ROUNDS",
-    "formatLine": "4 × 2:30 · In Pairs",
+    "formatLine": "2:30 ON / 2:30 OFF × 4 · In Pairs",
     "storyLine": "240 du · 36 banded shoulder external rotation · 48 c2b pull-up · 48 twin kb thruster · 23 bench press",
     "storyMovements": [
       {
@@ -147,11 +146,6 @@
         }
       ],
       [
-        {
-          "kind": "block",
-          "label": "2:30 AMRAP X 4",
-          "cap": "2:30 AMRAP · 2:30 rest · 4 rounds"
-        },
         {
           "kind": "line",
           "rx": "6 Chest To Bar Pull-ups",

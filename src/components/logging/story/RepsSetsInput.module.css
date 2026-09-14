@@ -28,13 +28,22 @@
 }
 
 /* Section eyebrow: Barlow (body font, NOT condensed), 11px/800, wide tracking, dim. */
+/* The question, asked the way the metcon's open-count screen asks its own ("How many v-up /
+   sit-up each window?") — same pill, same voice. A screen whose whole job is collecting one
+   number should say which number in words; "MAX SET" as a bare eyebrow named a category and
+   left the athlete to guess the movement, the set count and what it was for. */
 .maxLabel {
-  font-family: var(--font-family);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--wodi-dim);
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(245, 194, 0, 0.18);
+  border-radius: 14px;
+  background: rgba(245, 194, 0, 0.04);
+  color: rgba(242, 240, 235, 0.60);
+  font-family: var(--font-barlow);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
 }
 
 .maxHint {

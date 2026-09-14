@@ -181,7 +181,7 @@ export function SkinBlueprint({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, o
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 19, fontWeight: 900, color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fD, fontSize: 19, fontWeight: 900, color: BRAND.yellow, display: 'inline-block', whiteSpace: 'nowrap', textAlign: 'right' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

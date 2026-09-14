@@ -4,7 +4,7 @@ import { createBlankResult } from '../components/logging/story/types';
 import { toLegacyResult } from '../components/logging/story/StoryLogResults';
 import { buildSubstitutionPatch } from '../components/logging/story/substitutionPatch';
 import { buildSavedExercises } from './buildSavedExercises';
-import { buildWorkloadBreakdownFromResults } from '../screens/AddWorkoutScreen';
+import { buildWorkloadBreakdownFromResults } from './workloadFromResults';
 import { removeUndefined } from '../utils/firestoreUtils';
 import { workoutToParsedWorkout } from '../utils/workoutToParsed';
 import { restoreStoryResults } from '../utils/restoreStoryResults';
@@ -94,5 +94,83 @@ describe('logging → save → history → edit → save', () => {
       workloadBreakdown: buildWorkloadBreakdownFromResults(editedLegacy, editParsed, 1),
     };
     expect(poster(resaved)).toEqual(poster(reopened));
+  });
+});
+
+// The 14 Sep 2026 board: 5 × [2:00 AMRAP, 1:00 rest], continuing where you stopped. Five whole
+// rounds, nothing left over — and the edit screen reopened it as "5 rounds +125 reps".
+const amrapText = '[02:00 min AMRAP , 01:00 min REST] x 5 rounds:\n8 Twin Dumbbell Front Squat @12/20kg\n12 Sit-up\n5 Pull-up';
+function amrapBoard(): ParsedWorkout {
+  return {
+    title: 'WOD', type: 'metcon', format: 'amrap_intervals', scoreType: 'rounds_reps', sets: 5, timeCap: 900,
+    rawText: amrapText,
+    exercises: [{ name: '2:00 AMRAP x 5', type: 'wod', loggingMode: 'amrap_intervals',
+      prescription: amrapText, rawText: amrapText, suggestedSets: 5,
+      movements: [
+        { name: 'Twin Dumbbell Front Squat', reps: 8, inputType: 'weight', equipment: 'dumbbell', implementCount: 2,
+          rxWeights: { male: 20, female: 12, unit: 'kg' }, countingMode: 'per_round', scoreEntryMode: 'per_round' },
+        { name: 'Sit-up', reps: 12, inputType: 'none', countingMode: 'per_round', scoreEntryMode: 'per_round' },
+        { name: 'Pull-up', reps: 5, inputType: 'none', countingMode: 'per_round', scoreEntryMode: 'per_round' },
+      ],
+    }],
+  };
+}
+
+function saveAmrap(results: ReturnType<typeof toLegacyResult>[], parsed: ParsedWorkout): Workout {
+  const workout: Workout = {
+    id: 'amrap', userId: 'test', title: 'WOD', type: 'amrap', status: 'completed',
+    date: new Date('2026-09-14'), createdAt: new Date('2026-09-14'), updatedAt: new Date('2026-09-14'),
+    format: 'amrap_intervals', rawText: amrapText, timeCap: 900, sets: 5,
+    exercises: buildSavedExercises(results).builtExercises,
+    workloadBreakdown: buildWorkloadBreakdownFromResults(results, parsed, 1),
+  };
+  return structuredClone(removeUndefined(workout));
+}
+
+function logAmrap(rounds: number, partialMovements?: string[]): Workout {
+  const parsed = amrapBoard();
+  const story = createBlankResult(parsed.exercises[0], 0, 'amrap_intervals', 'male');
+  expect(story.kind).toBe('score_rounds');
+  story.rounds = rounds;
+  if (partialMovements) {
+    story.partialMovements = partialMovements;
+    story.partialReps = parsed.exercises[0].movements!
+      .filter(m => partialMovements.includes(m.name))
+      .reduce((sum, m) => sum + (m.reps ?? 0), 0);
+  }
+  return saveAmrap([toLegacyResult(story)], parsed);
+}
+
+function reopenAmrap(workout: Workout) {
+  const parsed = workoutToParsedWorkout(workout);
+  const [restored] = restoreStoryResults(workout, parsed, 'male');
+  return { restored, resaved: saveAmrap([toLegacyResult(restored)], parsed) };
+}
+
+describe('an AMRAP re-opened for edit keeps the score the athlete logged', () => {
+  it('comes back as the rounds logged, with no partial round added', () => {
+    const logged = logAmrap(5);
+    const { restored, resaved } = reopenAmrap(logged);
+    expect(restored.rounds).toBe(5);
+    expect(restored.partialReps).toBeUndefined();
+    expect(restored.partialMovements).toBeUndefined();
+    expect(resaved.exercises).toEqual(logged.exercises);
+    expect(resaved.workloadBreakdown!.grandTotalReps).toBe(125);
+  });
+
+  it('comes back with the partial round the athlete checked off', () => {
+    const logged = logAmrap(5, ['Twin Dumbbell Front Squat']);
+    const { restored, resaved } = reopenAmrap(logged);
+    expect(restored.rounds).toBe(5);
+    expect(restored.partialMovements).toEqual(['Twin Dumbbell Front Squat']);
+    expect(restored.partialReps).toBe(8);
+    expect(resaved.exercises).toEqual(logged.exercises);
+  });
+
+  it('still reads a partial round from a spring doc that kept it on the first set', () => {
+    // March–July saves wrote the partial reps as the first set's reps, with no field of its own.
+    const logged = logAmrap(5);
+    logged.exercises[0].sets = [{ id: 'set-0', setNumber: 1, completed: true, actualReps: 7 }];
+    expect(reopenAmrap(logged).restored.partialReps).toBe(7);
   });
 });

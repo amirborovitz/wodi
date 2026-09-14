@@ -10,6 +10,8 @@ import {
   type LoadEquipment,
 } from './loadGroups';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
+import { ImplementToggle } from './ImplementToggle';
+import { asksImplementCount, perImplementUnit } from './implementQuestion';
 import { StepperInput } from './StepperInput';
 import { SubstitutionSheet } from './SubstitutionSheet';
 import { hasAlternatives } from '../../../data/exerciseDefinitions';
@@ -106,6 +108,16 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
         : mr
     ));
     onChange({ movementResults: next });
+  }, [result.movementResults, onChange]);
+
+  // One dumbbell or two, for every movement this input's weight covers.
+  const applyImplementCount = useCallback((target: MovementResult[], implementCount: 1 | 2) => {
+    const keys = new Set(target.map((mr) => mr.movementKey));
+    onChange({
+      movementResults: (result.movementResults ?? []).map((mr) => (
+        keys.has(mr.movementKey) ? { ...mr, implementCount } : mr
+      )),
+    });
   }, [result.movementResults, onChange]);
 
   const [swapOpenKey, setSwapOpenKey] = useState<string | null>(null);
@@ -245,6 +257,7 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
             // takes them apart. That is what makes trusting the AI's `complex` call safe — a
             // wrong call costs a tap, instead of leaving a lift with nowhere to be entered.
             const merged = input.movements.length > 1;
+            const asksPair = input.movements.some((mr) => asksImplementCount(mr.movement));
             return (
               <div key={input.key} className={styles.loadBlock}>
                 <ProgressiveWeightRow
@@ -256,12 +269,20 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
                   repsPerSet={inputReps(input)}
                   step={getWeightStep(anchor.movement.name, anchor.movement.equipment, loadUnit)}
                   unit={loadUnit}
+                  implementCount={asksPair ? anchor.implementCount : undefined}
                   onChange={(start, peak) => applyLoad(input.movements, start, peak)}
                   label={merged
                     ? `${ONE_LOAD_NOUN[input.type]} · ${input.movements.length} lifts`
                     : showProgress && num ? `${num} · ${inputLabel(input)}` : inputLabel(input)}
                   subLabel={merged ? inputLabel(input) : undefined}
                 />
+                {asksPair && (
+                  <ImplementToggle
+                    value={anchor.implementCount}
+                    onChange={(count) => applyImplementCount(input.movements, count)}
+                    dense
+                  />
+                )}
                 {merged && (
                   <button
                     type="button"
@@ -405,22 +426,30 @@ function SwapIcon() {
 
 function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Partial<MovementResult>) => void }) {
   const loadUnit = movementLoadUnit(mr.movement);
-  const unitLabel = mr.implementCount === 2 ? `2× ${loadUnit}` : loadUnit;
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
 
   return (
-    <StepperInput
-      value={mr.weight}
-      onChange={(v) => onUpdate({ weight: v != null ? Math.max(0, v) : undefined })}
-      step={getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit)}
-      min={0}
-      max={getWeightMax(loadUnit)}
-      placeholder={placeholder}
-      unit={unitLabel}
-      color={kindToTrinityColor('load')}
-      inputMode="decimal"
-      size="sm"
-    />
+    <>
+      <StepperInput
+        value={mr.weight}
+        onChange={(v) => onUpdate({ weight: v != null ? Math.max(0, v) : undefined })}
+        step={getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit)}
+        min={0}
+        max={getWeightMax(loadUnit)}
+        placeholder={placeholder}
+        unit={perImplementUnit(loadUnit, mr.implementCount)}
+        color={kindToTrinityColor('load')}
+        inputMode="decimal"
+        size="sm"
+      />
+      {asksImplementCount(mr.movement) && (
+        <ImplementToggle
+          value={mr.implementCount}
+          onChange={(implementCount) => onUpdate({ implementCount })}
+          dense
+        />
+      )}
+    </>
   );
 }
 

@@ -119,6 +119,7 @@
         "color": "yellow",
         "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "partnerNote": "your part 35",
         "wasSubstituted": false
       },
@@ -129,6 +130,7 @@
         "color": "yellow",
         "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "partnerNote": "your part 35",
         "wasSubstituted": false
       },
@@ -170,7 +172,7 @@
         "kind": "line",
         "rx": "5 Twin KB Snatches @ 2x20kg · 70 total",
         "load": "",
-        "mine": "40kg",
+        "mine": "2×20kg",
         "team": "35",
         "isPartnerShare": true
       },
@@ -178,7 +180,7 @@
         "kind": "line",
         "rx": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
         "load": "",
-        "mine": "40kg",
+        "mine": "2×20kg",
         "team": "35",
         "isPartnerShare": true
       },
@@ -220,7 +222,7 @@
           "kind": "line",
           "rx": "5 Twin KB Snatches @ 2x20kg · 70 total",
           "load": "",
-          "mine": "40kg",
+          "mine": "2×20kg",
           "team": "35",
           "isPartnerShare": true
         },
@@ -228,7 +230,7 @@
           "kind": "line",
           "rx": "5 Twin KB Shoulder to Overheads @ 2x20kg · 70 total",
           "load": "",
-          "mine": "40kg",
+          "mine": "2×20kg",
           "team": "35",
           "isPartnerShare": true
         },

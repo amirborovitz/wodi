@@ -98,7 +98,7 @@
     "value": "20:00",
     "unit": "MIN",
     "formatLine": "Strength + 6 RFT",
-    "storyLine": "60 band pull apart · 54 front squat · 54 burpees · 1.2km run · 24 kettlebell windmill · 16 strict chin up",
+    "storyLine": "60 band pull apart · 54 front squat · 54 burpees · 1.0km run · 24 kettlebell windmill · 16 strict chin up",
     "storyMovements": [
       {
         "perRound": "",
@@ -157,7 +157,7 @@
       {
         "perRound": "200m",
         "name": "Run",
-        "total": "1.2km total",
+        "total": "1.0km total",
         "color": "magenta"
       }
     ],

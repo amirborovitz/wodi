@@ -7,9 +7,9 @@ import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
-import { DEFAULT_BW } from '../utils/xpCalculations';
-import { aggregateStats } from '../utils/statsAggregation';
+import { useMilestone } from '../hooks/useMilestone';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
+import { MilestoneLine } from '../components/home/MilestoneLine';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { FeedPulse } from '../components/home/FeedPulse';
@@ -47,11 +47,6 @@ function getStartOfWeek(): Date {
   return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
 }
 
-function getStartOfMonth(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-}
-
 function getSavedTitle(saved: PlannedWorkout): string {
   return saved.parsedWorkout?.title?.trim()
     || saved.parsedWorkout?.exercises?.find((exercise) => exercise.name?.trim())?.name
@@ -68,9 +63,16 @@ export function HomeScreen({
   onOpenFeed,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
-  const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(100);
+  // EVERY workout, not a recent window: the recap cards and the milestone below are totals over
+  // whole periods and a whole history. Capped at 100, the Spring card counted 33 workouts where
+  // the same recap on Me counted 59 — one recap, two answers. The query fetches the full list
+  // either way (the cap only ever sliced it); the rail trims to what it shows (GALLERY_MAX).
+  const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
   const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
+  // A journey marker, not a goal — see useMilestone. Null when there is nothing
+  // worth saying yet, and the line simply does not render.
+  const milestone = useMilestone(workouts);
   const profile = useProfileCompleteness();
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
@@ -152,19 +154,10 @@ export function HomeScreen({
   };
 
   const weekStart = useMemo(() => getStartOfWeek(), []);
-  const monthStart = useMemo(() => getStartOfMonth(), []);
 
   const weekCount = useMemo(
     () => workouts.filter(w => w.date >= weekStart).length,
     [workouts, weekStart],
-  );
-
-  const monthlyEP = useMemo(
-    () => aggregateStats(
-      workouts.filter(w => w.date >= monthStart),
-      { bodyweight: user?.weight ?? DEFAULT_BW },
-    ).totalEP,
-    [workouts, monthStart, user?.weight],
   );
 
   const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
@@ -354,16 +347,15 @@ export function HomeScreen({
           </div>
         </motion.button>
 
-        {/* ── Monthly EP ── */}
-        {!loading && monthlyEP > 0 && (
-          <motion.p
-            className={styles.epLine}
+        {/* ── Milestone ── */}
+        {!loading && milestone && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.25 }}
+            transition={{ delay: 0.08, duration: 0.25 }}
           >
-            +{Math.round(monthlyEP).toLocaleString()} <span className={styles.epUnit}>EP this month</span>
-          </motion.p>
+            <MilestoneLine milestone={milestone} />
+          </motion.div>
         )}
 
         {/* ── For Later ── */}

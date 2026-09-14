@@ -16,7 +16,10 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "corpus:record": "tsx scripts/wod-corpus.ts --record",
-    "occurrences": "tsx scripts/occurrence-audit.ts"
+    "occurrences": "tsx scripts/occurrence-audit.ts",
+    "totals:audit": "node --import tsx --import ./scripts/lib/offline-env.mjs scripts/totals-audit.ts",
+    "totals:dump": "node --import tsx scripts/admin-dump-workouts.ts",
+    "totals:apply": "tsx scripts/backfill-apply.ts"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.16",
@@ -38,6 +41,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
+    "firebase-admin": "^14.4.0",
     "globals": "^16.5.0",
     "tsx": "^4.22.4",
     "typescript": "~5.9.3",

@@ -318,15 +318,60 @@ export function independentlyScoredSections(
   // `intervals` ("5 sets every 2:30") is the same bargain as `emom` — only the notation differs.
   const fixedCadence = exercise?.loggingMode === 'emom' || exercise?.loggingMode === 'intervals';
 
-  return (exercise?.sections ?? [])
+  const candidates = (exercise?.sections ?? [])
     .map((section, index) => ({ section, index }))
-    .filter(({ section }) => {
-      if (section.scoreType == null) return false;
-      // A count the board left open is earned whatever the clock does.
-      if (findOpenMovements(section).length > 0) return true;
-      // "Scored in reps" with every rep written on the board is a contradiction: there is no
-      // count to bring. Holds on any clock, not just a cadence — the reps are the prescription.
-      if (section.scoreType === 'reps') return false;
-      return !fixedCadence;
-    });
+    .filter(({ section }) => section.scoreType != null);
+
+  // Which single movement each candidate leaves open, if exactly one. Several open movements in
+  // one window is a station rotation, which is its own answer and never collapses.
+  const openName = candidates.map(({ section }) => {
+    const open = findOpenMovements(section);
+    return open.length === 1 ? open[0].name.trim().toLowerCase() : null;
+  });
+
+  // SAME MOVEMENTS = ONE PIECE OF TRAINING, however many set schemes it carries.
+  //
+  // "Strict Press — 4 sets x 5 @80-85%, then 1 set x max reps @~60%" is one lift with a back-off
+  // set, and the app logs it on one screen: a progressive weight row for the working sets with
+  // the max set's reps AND weight underneath. Believing the two schemes were two blocks sent the
+  // max set to a screen that cannot take a weight at all, so the load it was done at was
+  // unloggable. A set scheme is a property of a lift, never a different kind of training.
+  //
+  // Compared on letters and digits alone, so the parser's own spellings of one movement inside a
+  // single exercise ("V-up / Sit-up" and "V-up/Sit-up") read as the same work — while movements
+  // that differ only by a trailing number stay different, which the token-based matcher cannot
+  // see (it drops one-character tokens, making "Movement 1" and "Movement 2" identical).
+  const bareName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const blockWork = candidates.map(({ section }) =>
+    (section.movements ?? []).map((movement) => bareName(movement.name)).join('|'));
+  const sameWorkThroughout = candidates.length > 1
+    && blockWork[0].length > 0
+    && blockWork.every((work) => work === blockWork[0]);
+  if (sameWorkThroughout) return [];
+
+  // ONE SCORE, COLLECTED SEVERAL TIMES — not several scores.
+  //
+  // "00:00-03:00: 19 Thruster, 19 Burpee, Max V-up … 03:00-06:00: 16 … Score is total V-ups"
+  // leaves the SAME movement open in every window. That is one number asked four times and
+  // summed, which is what the per-window grid exists for. Split into blocks instead, each window
+  // became a separate logging page holding a fragment of a score the board never asks for
+  // separately — and the fragments had nowhere to go, so the board's own stated score saved as
+  // nothing at all.
+  //
+  // The station case is the opposite and must keep splitting: five stations, max reps at EACH,
+  // is five different movements and five numbers the athlete really does walk away with.
+  const oneScoreAcrossWindows = candidates.length > 1
+    && openName[0] != null
+    && openName.every((name) => name === openName[0]);
+
+  return candidates.filter(({ section }, i) => {
+    // A count the board left open is earned whatever the clock does — unless every window opens
+    // the same one, in which case the windows are collecting a single score between them.
+    if (openName[i] != null && !oneScoreAcrossWindows) return true;
+    if (findOpenMovements(section).length > 1) return true;
+    // "Scored in reps" with every rep written on the board is a contradiction: there is no
+    // count to bring. Holds on any clock, not just a cadence — the reps are the prescription.
+    if (section.scoreType === 'reps') return false;
+    return !fixedCadence;
+  });
 }

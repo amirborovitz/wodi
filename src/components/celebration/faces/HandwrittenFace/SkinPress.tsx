@@ -206,7 +206,7 @@ export function SkinPress({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(33,29,21,0.55)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, color: BRAND.paperInk, background: BRAND.yellow, padding: '0 5px', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(33,29,21,0.55)') : { fontFamily: fD, fontSize: 21, fontWeight: 900, color: BRAND.paperInk, background: BRAND.yellow, padding: '0 5px', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

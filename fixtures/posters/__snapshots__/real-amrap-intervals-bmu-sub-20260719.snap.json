@@ -25,7 +25,6 @@
       {
         "eyebrow": "WOD",
         "title": "03:00 min AMRAP x 4",
-        "blueprint": "3 min AMRAP · 1 min rest · 4 rounds",
         "rows": [
           {
             "primary": "8",
@@ -65,7 +64,7 @@
   "hero": {
     "value": "4",
     "unit": "ROUNDS",
-    "formatLine": "4 × 3 MIN",
+    "formatLine": "3:00 ON / 1:00 OFF × 4",
     "storyLine": "64 alt db snatch · 32 c2b pull-ups · 32 box jump · 24 max height squat jump · 12 back squat",
     "storyMovements": [
       {
@@ -139,11 +138,6 @@
         }
       ],
       [
-        {
-          "kind": "block",
-          "label": "03:00 MIN AMRAP X 4",
-          "cap": "3 min AMRAP · 1 min rest · 4 rounds"
-        },
         {
           "kind": "line",
           "rx": "8 Chest-to-Bar Pull-ups",

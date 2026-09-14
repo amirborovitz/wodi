@@ -1,6 +1,6 @@
 {
   "name": "real-pairs-amrap-max-situp-20260829",
-  "description": "In-pairs 14-min AMRAP: P1 runs 200m while P2 works 6/6/6 twin-KB then MAX SIT-UPS until the swap. The AI reads it right (isMaxReps + maxMetric on Sit-up), but the sit-up carries no logged count, and on a non-station board the poster's prescription rows are built from the BREAKDOWN, so the movement the board wrote vanishes. The line must read 'Max Sit-up' whether or not a number was entered — layer 1 of the poster is what the coach wrote.",
+  "description": "In-pairs 14-min AMRAP: P1 runs 200m while P2 works 6/6/6 twin-KB then MAX SIT-UPS until the swap. The AI reads it right (isMaxReps + maxMetric on Sit-up), but the sit-up carries no logged count, and on a non-station board the poster's prescription rows are built from the BREAKDOWN, so the movement the board wrote vanishes. The line must read 'Max Sit-up' whether or not a number was entered — layer 1 of the poster is what the coach wrote. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen.",
   "workout": {
     "title": "WOD (שבת / חג)",
     "format": "amrap",
@@ -104,28 +104,28 @@
         },
         {
           "name": "Twin Kettlebell Hang Power Clean",
-          "totalReps": 18,
+          "totalReps": 30,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
         },
         {
           "name": "Twin Kettlebell Front Squat",
-          "totalReps": 18,
+          "totalReps": 30,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
         },
         {
           "name": "Twin Kettlebell Push Press",
-          "totalReps": 18,
+          "totalReps": 30,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
         }
       ],
-      "grandTotalReps": 54,
-      "grandTotalVolume": 1080,
+      "grandTotalReps": 90,
+      "grandTotalVolume": 1800,
       "grandTotalDistance": 600
     },
     "partnerWorkout": false

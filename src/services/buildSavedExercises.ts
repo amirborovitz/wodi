@@ -20,6 +20,14 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       const single = movementLookup(result.movementWeights || {}, mk, plainName);
       return single && single > 0 ? [single] : undefined;
     };
+    // One dumbbell or two, as the ATHLETE answered it — the same answer the totals multiply by.
+    // Baked over the AI's guess, which the strict schema stamps on every movement: left in
+    // place, the poster printed "2×" over a lift the athlete logged as one dumbbell, and an edit
+    // reopened it on the AI's pair again. A movement whose screen never asked keeps the AI's.
+    const implementCountFor = (mk: string, mov: ParsedMovement): Pick<ParsedMovement, 'implementCount'> => {
+      const answered = movementLookup(result.implementCounts || {}, mk, mov.name);
+      return answered != null ? { implementCount: answered > 1 ? 2 : 1 } : {};
+    };
     // Shared ladder substitutions are resolved before persistence. Exact occurrence entries
     // pass through unchanged; an unchanged ladder keeps each tier's own prescription.
     // The swap kept next to the prescription it replaced. Everything else in this block bakes
@@ -80,6 +88,7 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
         // resolveOccurrenceLoad already reads it first, listing rxWeights last precisely
         // because this bake was the only reason it ever held an athlete's number.
         ...(loggedWeights ? { loggedWeights } : {}),
+        ...implementCountFor(mk, mov),
       };
     });
     // Sections record the athlete's load the same way the top-level movements do — in
@@ -118,6 +127,7 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
           ...(distance !== undefined && !mov.relay && openSlot !== 'distance' ? { distance } : {}),
           ...(calories !== undefined && openSlot !== 'calories' ? { calories } : {}),
           ...(loggedWeights ? { loggedWeights } : {}),
+          ...implementCountFor(mk, mov),
         };
       }),
     }));

@@ -5,7 +5,7 @@ import type { ParsedExercise } from '../types';
 import { createBlankResult } from '../components/logging/story/types';
 import { toLegacyResult } from '../components/logging/story/StoryLogResults';
 import { buildSavedExercises } from './buildSavedExercises';
-import { buildWorkloadBreakdownFromResults } from '../screens/AddWorkoutScreen';
+import { buildWorkloadBreakdownFromResults } from './workloadFromResults';
 import { buildPageArtifactSections, buildRewardArtifactSections } from '../components/celebration/helpers';
 
 function daniel(): ParsedExercise {

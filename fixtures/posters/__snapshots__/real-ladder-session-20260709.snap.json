@@ -44,15 +44,19 @@
             }
           },
           {
-            "primary": "",
-            "name": "KB Snatch",
-            "accent": "magenta"
+            "primary": "20KG",
+            "name": "KB Snatch · every interval",
+            "loadNote": "20kg",
+            "mineKey": "KB Snatch",
+            "accent": "yellow",
+            "suppressMine": true
           },
           {
-            "primary": "",
-            "name": "Burpees",
-            "loadNote": "5 EVERY ROUND",
-            "accent": "magenta"
+            "primary": "5",
+            "name": "Burpees · every interval",
+            "mineKey": "Burpee",
+            "accent": "magenta",
+            "suppressMine": true
           }
         ],
         "hiddenCount": 0
@@ -62,7 +66,7 @@
   "hero": {
     "value": "88",
     "unit": "REPS",
-    "formatLine": "4 × 3 MIN",
+    "formatLine": "3:00 ON / 1:00 OFF × 4",
     "storyLine": "88 weighted box step up · 40 lunge · 30 seated shoulder external rotation · 25 burpee",
     "storyMovements": [
       {
@@ -131,11 +135,6 @@
       ],
       [
         {
-          "kind": "block",
-          "label": "03:00 MIN AMRAP X 4",
-          "cap": "WOD"
-        },
-        {
           "kind": "line",
           "rx": "Weighted Box Step Ups",
           "load": "",
@@ -155,16 +154,16 @@
         },
         {
           "kind": "line",
-          "rx": "KB Snatch",
+          "rx": "20KG KB Snatch · every interval",
           "load": "",
           "mine": "",
           "team": ""
         },
         {
           "kind": "line",
-          "rx": "Burpees",
+          "rx": "5 Burpees · every interval",
           "load": "",
-          "mine": "5 EVERY ROUND",
+          "mine": "",
           "team": ""
         }
       ]

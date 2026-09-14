@@ -23,7 +23,7 @@
     [
       {
         "title": "Blueprint",
-        "blueprint": "2 min rest between",
+        "blueprint": "2:00 rest between",
         "rows": [],
         "isPartnerConfirmed": false
       },
@@ -67,7 +67,7 @@
   "hero": {
     "value": "11",
     "unit": "BURPEES OVER THE BAR",
-    "formatLine": "4 × 2 MIN · In Pairs",
+    "formatLine": "2:00 ON / 2:00 OFF × 4 · In Pairs",
     "storyLine": "11 burpees over the bar · 8 power clean · 8 hang squat clean · 8 push jerk · 64 push press · 64 box jump",
     "storyMovements": [
       {
@@ -171,7 +171,7 @@
       [
         {
           "kind": "block",
-          "label": "2 MIN REST BETWEEN",
+          "label": "2:00 REST BETWEEN",
           "cap": ""
         },
         {

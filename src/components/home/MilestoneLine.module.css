@@ -1,0 +1,48 @@
+/* Its own statement, not a subtitle to the CTA above it — the extra top margin
+   is what stops it reading as part of the button. */
+.line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 6px 0 18px;
+}
+
+.value {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #f5c200;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.72);
+}
+
+/* The remainder is context, never a demand — it sits back from the number it
+   follows and carries no arrow, chevron or progress track. */
+.next {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: rgba(243, 241, 234, 0.4);
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+
+.crossed {
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: #0b0c0e;
+  background: #f5c200;
+  border-radius: 4px;
+  padding: 3px 6px;
+  line-height: 1;
+}

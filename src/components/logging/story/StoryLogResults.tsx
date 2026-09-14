@@ -305,7 +305,9 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       if (m.distance != null && m.distance > 0) md[n] = m.distance;
       if (m.reps != null && m.reps > 0) mr[n] = m.reps;
       if (m.calories != null && m.calories > 0) mc[n] = m.calories;
-      if (m.implementCount && m.implementCount > 1) ic[n] = m.implementCount;
+      // Every answer, 1 included: a missing entry has to mean "never asked", or a lift switched
+      // down to one dumbbell is indistinguishable from one nobody asked about.
+      if (m.implementCount) ic[n] = m.implementCount;
       if (m.substitution) {
         ma[n] = m.substitution.selectedName;
         // Keep the swap whole, next to the prescription it replaced. The lines below are about
@@ -463,7 +465,7 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: rps?.[i] ?? r.exercise.suggestedReps, actualReps: sr, weight, completed: true });
       }
       if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, isMax: true, completed: true });
-      return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount && r.implementCount > 1 ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
+      return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
     }
     case 'reps': {
       for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: r.exercise.suggestedReps, actualReps: r.repsPerSet ?? r.repsTotal ?? r.exercise.suggestedReps, completed: true });

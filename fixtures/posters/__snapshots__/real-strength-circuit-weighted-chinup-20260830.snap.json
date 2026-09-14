@@ -34,7 +34,6 @@
       {
         "eyebrow": "WOD",
         "title": "2:00 AMRAP x 4",
-        "blueprint": "2 min AMRAP · 2 min rest · 4 rounds",
         "rows": [
           {
             "primary": "15",
@@ -66,7 +65,7 @@
   "hero": {
     "value": "8",
     "unit": "ROUNDS",
-    "formatLine": "4 × 2 MIN",
+    "formatLine": "2:00 ON / 2:00 OFF × 4",
     "storyLine": "120 alt american kettlebell swing · 80 knees-to-elbows · 20 deadlift · 15 chin-up",
     "storyMovements": [
       {
@@ -154,11 +153,6 @@
         }
       ],
       [
-        {
-          "kind": "block",
-          "label": "2:00 AMRAP X 4",
-          "cap": "2 min AMRAP · 2 min rest · 4 rounds"
-        },
         {
           "kind": "line",
           "rx": "15 Alt American Kettlebell Swings",

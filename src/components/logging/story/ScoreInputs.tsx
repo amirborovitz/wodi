@@ -367,6 +367,35 @@ export function asksPerWindow(intervals: number): boolean {
   return (intervals > 0 ? intervals : 1) <= MAX_RECALLED_WINDOWS;
 }
 
+/**
+ * One edit to the per-window grid.
+ *
+ * Window 1 seeds every window the athlete hasn't typed into themselves — six windows of the same
+ * movement land in the same neighbourhood, so this is one entry plus adjustments instead of six
+ * entries. `touched` is what makes that safe: a keystroke is not a finished number, and "12"
+ * reaches this function twice, as 1 and then as 12. Deciding "untouched" from the values on
+ * screen instead would freeze the seed at the first digit.
+ *
+ * Exported for tests — there is no DOM test setup here, so this is the only place the rule can
+ * be pinned.
+ */
+export function applyWindowEdit(
+  values: (number | undefined)[],
+  index: number,
+  raw: number,
+  touched: ReadonlySet<number>,
+): (number | undefined)[] {
+  const value = Math.max(0, Math.min(999, raw));
+  const next = [...values];
+  next[index] = value;
+  if (index === 0) {
+    for (let i = 1; i < next.length; i += 1) {
+      if (!touched.has(i)) next[i] = value;
+    }
+  }
+  return next;
+}
+
 interface OpenRepsPerIntervalInputProps {
   result: StoryExerciseResult;
   /** The open movement's name, for the prompt — "burpees over the bar", not "reps". */
@@ -402,20 +431,28 @@ export function OpenRepsPerIntervalInput({
     });
   }, [onChange]);
 
+  // Which windows the athlete has typed into themselves. The stored values can't tell us —
+  // commit() writes a number into every window, so "nobody has touched this one" stops being
+  // visible the moment the first digit lands, and a two-digit count arrives as two edits
+  // ("1", then "12").
+  const seedTrack = useRef<{ key: string; touched: Set<number> } | null>(null);
+  const trackKey = `${movementName}|${windowCount}`;
+  if (seedTrack.current?.key !== trackKey) {
+    // Re-opening a block the athlete already filled in: those per-window numbers are theirs,
+    // so editing window 1 adjusts window 1 alone.
+    const stored = result.maxRepsPerInterval ?? [];
+    seedTrack.current = {
+      key: trackKey,
+      touched: new Set(stored.map((_, i) => i).filter((i) => i > 0)),
+    };
+  }
+  const touched = seedTrack.current.touched;
+
   const setWindow = useCallback((index: number, raw: number) => {
-    const value = Math.max(0, Math.min(999, raw));
-    const next = [...values];
-    next[index] = value;
-    // First entry seeds the rest: four windows of the same movement land in the same
-    // neighbourhood, so copying forward turns this into one entry plus adjustments. Only ever
-    // fills windows the athlete hasn't touched.
-    if (index === 0) {
-      for (let i = 1; i < windowCount; i += 1) {
-        if (next[i] == null) next[i] = value;
-      }
-    }
+    const next = applyWindowEdit(values, index, raw, touched);
+    if (index > 0) touched.add(index);
     commit(next);
-  }, [values, windowCount, commit]);
+  }, [values, commit, touched]);
 
   const total = values.reduce((sum: number, v) => sum + (v ?? 0), 0);
 

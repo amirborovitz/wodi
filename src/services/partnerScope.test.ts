@@ -6,6 +6,7 @@ import {
   prescribesOwnRest,
   splitRounds,
   movementTotals,
+  enteredQuantityFactor,
 } from './partnerScope';
 
 describe('sessionPartnerFactor', () => {
@@ -118,6 +119,24 @@ describe('splitRounds', () => {
   });
 });
 
+describe('enteredQuantityFactor', () => {
+  it("never divides an athlete's per-round entry on a shared total — it is already their slice", () => {
+    // "100 wall balls between you": the prefill hands each partner 50 a round.
+    expect(enteredQuantityFactor(0.5, 'reps', false)).toBe(1);
+  });
+
+  it('splits a per-round entry by rounds when the team trades whole rounds', () => {
+    // 12 Sep: "teams of 5, 30 RFT (6 each), 10 cal Echo Bike". The athlete's 10 cal is one
+    // round's work; they own 6 of the 30 rounds, so 60 — the save stored the team's 300.
+    expect(enteredQuantityFactor(0.2, 'rounds', false)).toBe(0.2);
+  });
+
+  it("never divides a whole-block total — that is the athlete's own in either shape", () => {
+    expect(enteredQuantityFactor(0.2, 'rounds', true)).toBe(1);
+    expect(enteredQuantityFactor(0.5, 'reps', true)).toBe(1);
+  });
+});
+
 describe('movementTotals', () => {
   const fiveSnatches = { reps: 5 };
 
@@ -134,11 +153,6 @@ describe('movementTotals', () => {
   it('never divides (together) work — both athletes do the full amount', () => {
     expect(movementTotals({ perRound: { distance: 600 }, rounds: splitRounds(1, 0.5), together: true }))
       .toEqual({ team: { distance: 600 }, mine: { distance: 600 } });
-  });
-
-  it('never divides a number the athlete typed themselves', () => {
-    expect(movementTotals({ perRound: { calories: 40 }, rounds: splitRounds(1, 0.5), athleteEntered: true }))
-      .toEqual({ team: { calories: 40 }, mine: { calories: 40 } });
   });
 
   it('carries every metric a movement states, and only those', () => {

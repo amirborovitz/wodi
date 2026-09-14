@@ -1,0 +1,173 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "16 Minutes AMRAP",
+      "rows": [
+        {
+          "primary": "",
+          "name": "Single DB Alt Devil Presses + Alt Box Step Ups",
+          "loadNote": "15kg",
+          "accent": "yellow",
+          "ladderTrack": {
+            "reps": [
+              4,
+              8,
+              12,
+              16,
+              20
+            ],
+            "step": 5,
+            "cadence": "+4 REPS EVERY ROUND"
+          }
+        },
+        {
+          "primary": "200m",
+          "name": "Run · every round",
+          "subNote": "1.00 km total",
+          "totalNote": "1.00 km total",
+          "mineKey": "Run",
+          "accent": "magenta"
+        }
+      ],
+      "hiddenCount": 0
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "16 Minutes AMRAP",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Single DB Alt Devil Presses + Alt Box Step Ups",
+            "loadNote": "15kg",
+            "accent": "yellow",
+            "ladderTrack": {
+              "reps": [
+                4,
+                8,
+                12,
+                16,
+                20
+              ],
+              "step": 5,
+              "cadence": "+4 REPS EVERY ROUND"
+            }
+          },
+          {
+            "primary": "200m",
+            "name": "Run · every round",
+            "subNote": "1.00 km total",
+            "totalNote": "1.00 km total",
+            "mineKey": "Run",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
+  ],
+  "hero": {
+    "value": "120",
+    "unit": "REPS",
+    "storyLine": "60 single dumbbell alt devil press · 60 alt box step up · 1.0km run",
+    "storyMovements": [
+      {
+        "perRound": "4→20",
+        "name": "Single Dumbbell Alt Devil Press @15kg",
+        "total": "60 reps total",
+        "color": "yellow",
+        "weight": 15
+      },
+      {
+        "perRound": "4→20",
+        "name": "Alt Box Step Up",
+        "total": "60 reps total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "0",
+        "name": "Run",
+        "total": "",
+        "color": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "120",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "Single DB Alt Devil Presses + Alt Box Step Ups",
+        "load": "",
+        "mine": "15kg",
+        "team": "",
+        "ladderTrack": {
+          "reps": [
+            4,
+            8,
+            12,
+            16,
+            20
+          ],
+          "step": 5,
+          "cadence": "+4 REPS EVERY ROUND"
+        }
+      },
+      {
+        "kind": "line",
+        "rx": "200m Run · every round",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "1.00 km total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "Single DB Alt Devil Presses + Alt Box Step Ups",
+          "load": "",
+          "mine": "15kg",
+          "team": "",
+          "ladderTrack": {
+            "reps": [
+              4,
+              8,
+              12,
+              16,
+              20
+            ],
+            "step": 5,
+            "cadence": "+4 REPS EVERY ROUND"
+          }
+        },
+        {
+          "kind": "line",
+          "rx": "200m Run · every round",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "1.00 km total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ]
+}

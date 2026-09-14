@@ -1,9 +1,11 @@
-import type { ParsedWorkout, Workout, User } from '../types';
+import type { ParsedMovement, ParsedWorkout, Workout, User } from '../types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult } from '../components/logging/story/types';
 import { getSavedMaxStrengthSet, getSavedWorkingStrengthSets, getSavedStrengthRepScheme } from './workoutToParsed';
 import { movementsForParts, findMovementTotal } from '../components/celebration/movementResolution';
 import { buildSubstitutionPatch } from '../components/logging/story/substitutionPatch';
+import { enteredQuantityFactor, exercisePartnerFactor, sessionPartnerFactor } from '../services/partnerScope';
+import { entersTotalValue } from '../services/workloadFromResults';
 
 /** Restore the actual logging inputs when a saved workout is opened for editing. */
 export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: ParsedWorkout, userSex?: User['sex']): StoryExerciseResult[] {
@@ -104,8 +106,12 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
             result.partialReps = savedEx.ladderPartial * mc;
           }
         } else if (savedEx.partialMovements == null) {
-          const partialReps = savedEx.sets[0]?.actualReps;
-          if (partialReps != null) result.partialReps = partialReps;
+          // Spring docs (March–July) kept the partial round as the first set's reps. Every save
+          // since writes it to `partialReps`, and fills a round-only score's first set with the
+          // WHOLE workout's reps as its summary — read as a partial, 5 rounds reopened as
+          // "5 rounds +125 reps", and the next save counted the 125 again.
+          const first = savedEx.sets[0];
+          if (first && first.id !== 'set-summary' && first.actualReps != null) result.partialReps = first.actualReps;
         }
         if (savedEx.ladderStep != null) result.ladderStep = savedEx.ladderStep;
         break;
@@ -122,20 +128,65 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
     // Restore per-movement data from workloadBreakdown — scoped to THIS part. The breakdown
     // holds one row per movement per part, so an unscoped lookup handed a 3-part session
     // every part's movements and let a sibling's load overwrite this one's.
+    //
+    // The breakdown holds TOTALS, and a total is only an entry when the entry was a total. A
+    // per-round number the save baked onto the movement is read back off the movement itself;
+    // re-deriving it from a total needs the exact round count the save multiplied by, and getting
+    // that wrong is self-feeding. The 12 Sep team relay divided its 72 swings by the TEAM's 30
+    // rounds, restored "2 a round", and wrote 2 over the coach's 12; its 300-cal total came back
+    // as "300 a round", and the next save made it 9000. Each edit multiplied again.
     const breakdownMovements = movementsForParts(allBreakdownMovements, [savedEx], [i]);
     if (result.movementResults && breakdownMovements.length > 0) {
+      // Only an entry the save did NOT bake (a slot the board left open, a swap into a unit the
+      // board never used) is divided back out of its total — by the rounds that entry counted
+      // for, which in a round-trading team are the athlete's share of them.
+      const blockFactor = exercisePartnerFactor(savedEx, sessionPartnerFactor(editWorkout), isSoleExercise);
+      const entryRounds = (savedEx.rounds || savedEx.sets.length || 1)
+        * enteredQuantityFactor(blockFactor, savedEx.partnerSplit, false);
+      const perRoundFrom = (total: number): number => Math.round(total / entryRounds);
+      // A number already on the movement IS the entry — the board's, or the athlete's baked over
+      // it — so it comes back exactly as saved; only an empty slot is rebuilt from the total.
+      // Decided by the slot, never by `scoreEntryMode`: the strict schema answers that for every
+      // movement, including a run nobody types into, and its "total" there turned the 13 Sep
+      // ladder's 200m-a-round into the 1000m it summed to — "1000M EVERY ROUND".
+      const restoreQuantity = (mov: ParsedMovement, onMovement: number | undefined, total: number): number => (
+        onMovement != null && onMovement > 0
+          ? onMovement
+          : entersTotalValue(mov, true) ? total : perRoundFrom(total)
+      );
       result.movementResults = result.movementResults.map(mr => {
         const bm = findMovementTotal(breakdownMovements, mr.movement.name, i);
         if (!bm) return mr;
         const patched = { ...mr };
-        if (bm.weight && bm.weight > 0) patched.weight = bm.weight;
-        if (bm.totalCalories && bm.totalCalories > 0) patched.calories = bm.totalCalories;
-        // Fixed per-round quantities are already restored from the saved movement.
-        if (bm.totalDistance && bm.totalDistance > 0
-          && (mr.movement.scoreEntryMode === 'total' || mr.movement.relay === true || mr.movement.distance == null)) patched.distance = bm.totalDistance;
-        if (bm.totalReps && bm.totalReps > 0) {
-          const rounds = savedEx.rounds || savedEx.sets.length || 1;
-          patched.reps = Math.round(bm.totalReps / rounds);
+        const mov = mr.movement;
+        // The load the athlete typed, as they typed it: one dumbbell's weight, start → peak.
+        // The breakdown's `weight` is the EFFECTIVE load (both dumbbells, averaged across a
+        // build) — reading it back as the entry doubled a pair on every edit, 35 → 70 → 140.
+        const typed = mov.loggedWeights?.length ? mov.loggedWeights
+          : bm.weightProgression?.length ? bm.weightProgression
+          : bm.weight && bm.weight > 0 ? [Math.round((bm.weight / Math.max(1, bm.implementCount ?? 1)) * 10) / 10]
+          : [];
+        if (typed.length > 0) {
+          const start = typed[0];
+          const peak = typed[typed.length - 1];
+          patched.weight = start;
+          if (peak !== start) {
+            patched.weightEnd = peak;
+            patched.loadMode = 'range';
+          }
+        }
+        if (bm.totalCalories && bm.totalCalories > 0) {
+          patched.calories = restoreQuantity(mov, mov.calories, bm.totalCalories);
+        }
+        // A relay pacer's logged figure is its trips × per-trip — a total, whatever sits on the
+        // movement (which keeps the per-trip prescription).
+        if (bm.totalDistance && bm.totalDistance > 0) {
+          patched.distance = mov.relay === true ? bm.totalDistance : restoreQuantity(mov, mov.distance, bm.totalDistance);
+        }
+        // A count on the movement is the board's (or the athlete's, baked) and has no input to
+        // restore; only an open count comes back from the total.
+        if (bm.totalReps && bm.totalReps > 0 && mov.reps == null) {
+          patched.reps = mov.scoreEntryMode === 'total' ? bm.totalReps : perRoundFrom(bm.totalReps);
         }
         return patched;
       });

@@ -71,13 +71,28 @@ export function RepsSetsInput({ result, onChange, lastMaxReps }: RepsSetsInputPr
   const showSetsSection = !maxMovement || total > 1;
   const showConfirmedPanel = !maxMovement;
 
+  // "Unbroken" is the board's word or nobody's. The hint asserted it on every max block, so a
+  // board reading "1 set x max reps @~60%" — which asks for a set, not an unbroken one — told
+  // the athlete to log something it had never prescribed.
+  const asksUnbroken = prescribesUnbrokenMax(result.exercise);
+
+  // Ask for the number in words, naming the movement — the same question the metcon's open-count
+  // screen asks. "MAX SET" over a bare stepper named a category and nothing else: which movement,
+  // how many sets, and what the number was even for were all left to the athlete to infer from a
+  // header two lines up. A screen that exists to collect ONE number has to say which one.
+  const maxPrompt = maxMovement
+    ? (asksUnbroken
+        ? `How many unbroken ${maxMovement.name.toLowerCase()}?`
+        : `How many ${maxMovement.name.toLowerCase()} in one set?`)
+    : '';
+
   return (
     <div className={styles.container}>
       {/* Max-effort test — the one number this practice actually scores */}
       {maxMovement && (
         <div className={styles.maxBlock}>
           <span className={styles.maxLabel}>
-            {prescribesUnbrokenMax(result.exercise) ? 'MAX UNBROKEN' : 'MAX SET'}
+            {maxPrompt}
           </span>
           <StepperInput
             value={result.maxReps}
@@ -100,7 +115,11 @@ export function RepsSetsInput({ result, onChange, lastMaxReps }: RepsSetsInputPr
             active={numpadOpen}
           />
           <span className={styles.maxHint}>
-            {lastMax != null ? `Last time ${lastMax}` : 'Your best unbroken set'}
+            {/* The note adds what the question above cannot: where you were last time, or what
+                counts as the end of the set. Never a restatement of the question. */}
+            {lastMax != null
+              ? `Last time ${lastMax}`
+              : asksUnbroken ? 'Stop counting at your first break' : 'One all-out set'}
           </span>
         </div>
       )}
@@ -191,7 +210,7 @@ export function RepsSetsInput({ result, onChange, lastMaxReps }: RepsSetsInputPr
       {maxMovement && (
         <CustomNumpadSheet
           open={numpadOpen}
-          label={prescribesUnbrokenMax(result.exercise) ? 'Max unbroken' : 'Max set'}
+          label={asksUnbroken ? 'Max unbroken' : 'Max set'}
           value={numpadDraft}
           unit="reps"
           accentColor={ACCENT}

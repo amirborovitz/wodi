@@ -83,7 +83,6 @@ import {
   getSectionedForTimeLabel,
   findMovementTotal,
   parseDescLadderScheme,
-  repairUndercountedBreakdown,
   getEngineThresholdStamp,
   BARBELL_PATTERNS,
 } from '../components/celebration/helpers';
@@ -117,7 +116,6 @@ export {
   getSectionedForTimeLabel,
   findMovementTotal,
   parseDescLadderScheme,
-  repairUndercountedBreakdown,
   getEngineThresholdStamp,
   BARBELL_PATTERNS,
 };
@@ -400,48 +398,26 @@ export function useCelebrationData(
 
   // ── Workload breakdown ────────────────────────────────────────────────────
 
-  // Single source of truth: for reward mode, use the breakdown computed at save time (fresh,
-  // built by this same code). For detail mode (viewing a saved workout), ALWAYS recompute from
-  // workout.exercises via calculateWorkloadFromExercises — never trust+patch the persisted
-  // workout.workloadBreakdown snapshot, which can go stale relative to the current calculation
-  // logic (e.g. weightProgression) and was previously "enriched" via fragile per-exercise name
-  // matching that silently no-op'd for many real shapes, leaving the row's value stale while the
-  // hero (which always re-scans exercise.sets directly) stayed correct. One computation, one
-  // result, for both.
-  // Single source of truth PER PART: the stored workout.workloadBreakdown was built at save
-  // time by calculateWorkloadBreakdown, which correctly expands each exercise's own
-  // movements[]/sections[] (strength vs metcon parts are handled independently there — one
-  // part's structure never leaks into another's). calculateWorkloadFromExercises is a much
-  // narrower fallback: it only aggregates by exercise.name + exercise.sets and has no concept
-  // of a movements[] sub-structure at all, so using it as the PRIMARY source (as a previous
-  // pass here did) silently collapsed every multi-movement metcon exercise into one garbage
-  // row keyed off the exercise's own name. Trust the stored breakdown when it exists; only
-  // recompute from raw exercises when there's truly nothing stored to fall back to.
+  // THE totals, exactly as saved. The stored workloadBreakdown is the single truth for how much
+  // work a workout holds: the weekly recap, stats, EP and milestones read it raw, and so does the
+  // poster. The poster used to "repair" it on the way to the screen (repairUndercountedBreakdown,
+  // removed 2026-09-14) — so every save bug it papered over looked right here and lived on
+  // everywhere else: 232 thrusters on a weekly recap for a board of 58. A wrong total is now
+  // fixed where it is made, at save, and shows here the moment it happens.
+  //
+  // Recomputed only when nothing is stored at all (no saved workout lacks one today).
   const activeBreakdown = useMemo((): WorkloadBreakdown | null => {
-    if (isReward) {
-      const rewardBreakdown = rewardData?.workloadBreakdown;
-      return rewardBreakdown && rewardData?.exercises
-        ? repairUndercountedBreakdown(rewardBreakdown, rewardData.exercises, sessionTeamSize)
-        : rewardBreakdown ?? null;
-    }
-    if (workout?.workloadBreakdown) {
-      const stored = workout.workloadBreakdown;
-      return workout.exercises
-        ? repairUndercountedBreakdown(stored, workout.exercises, sessionTeamSize)
-        : stored;
-    }
+    if (isReward) return rewardData?.workloadBreakdown ?? null;
+    if (workout?.workloadBreakdown) return workout.workloadBreakdown;
     if (workout?.exercises && workout.exercises.length > 0) {
-      const partnerFactor = sessionPartnerFactor(workout);
-      const breakdown = calculateWorkloadFromExercises(workout.exercises, undefined, partnerFactor);
+      const breakdown = calculateWorkloadFromExercises(workout.exercises, undefined, sessionPartnerFactor(workout));
       breakdown.movements = assignMovementColors(breakdown.movements);
-      return repairUndercountedBreakdown(breakdown, workout.exercises, sessionTeamSize);
+      return breakdown;
     }
     return null;
   }, [
     isReward,
     rewardData?.workloadBreakdown,
-    rewardData?.exercises,
-    sessionTeamSize,
     workout?.exercises,
     workout?.partnerWorkout,
     workout?.partnerFactor,

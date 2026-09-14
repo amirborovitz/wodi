@@ -1,0 +1,69 @@
+{
+  "name": "real-ladder-amrap-run-after-each-set-20260913",
+  "description": "REAL saved doc (13 Sep 2026), metcon part only, with the run repaired to the board's 200m. A 16-min ascending ladder AMRAP (4-8-12-16-20…) with a fixed '200m run after each set'; 5 rungs climbed. The run line must state its per-round distance, WHERE it sits ('every round'), and its total counted from the rungs climbed — 5 × 200m. Before the fix the line read '200M EVERY ROUND' with no total, and an edit rewrote the run as '1000M EVERY ROUND'.",
+  "workout": {
+    "title": "WOD",
+    "format": "amrap",
+    "timeCap": 960,
+    "rawText": "B. METCON (Medium)\n16 minutes AMRAP:\n[4-8-12-16-20- - ➡\nSingle Dumbbell Alt' Devil Press @15/22.5kg\nAlt' Box Step Up @B.W.\n\n* 200m run after each set",
+    "exercises": [
+      {
+        "id": "exercise-1",
+        "name": "16 Minutes AMRAP",
+        "type": "wod",
+        "partKind": "metcon",
+        "aiPartName": "PULSE",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "loggingMode": "amrap",
+        "prescription": "16 minutes AMRAP: ascending ladder [4-8-12-16-20-...] of Single Dumbbell Alt Devil Press @15/22.5kg and Alt Box Step Up @bodyweight, with 200m Run after each set",
+        "rawText": "B. METCON (Medium)\n16 minutes AMRAP:\n[4-8-12-16-20- - ➡\nSingle Dumbbell Alt' Devil Press @15/22.5kg\nAlt' Box Step Up @B.W.\n\n* 200m run after each set",
+        "workDuration": 960,
+        "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" },
+        "rounds": 5,
+        "ladderStep": 5,
+        "ladderReps": [4, 8, 12, 16, 20],
+        "suggestedRepsPerSet": [4, 8, 12, 16, 20],
+        "sets": [{ "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 120, "weight": 15 }],
+        "movements": [
+          {
+            "name": "Single Dumbbell Alt Devil Press",
+            "reps": 4,
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "rxWeights": { "male": 22.5, "female": 15, "unit": "kg" },
+            "countingMode": "per_round",
+            "scoreEntryMode": "total",
+            "loggedWeights": [15]
+          },
+          {
+            "name": "Alt Box Step Up",
+            "reps": 4,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          },
+          {
+            "name": "Run",
+            "distance": 200,
+            "unit": "m",
+            "perRound": false,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "total"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Single Dumbbell Alt Devil Press", "exerciseIndex": 0, "totalReps": 60, "weight": 15, "unit": "kg", "color": "yellow" },
+        { "name": "Alt Box Step Up", "exerciseIndex": 0, "totalReps": 60, "color": "magenta" },
+        { "name": "Run", "exerciseIndex": 0, "totalDistance": 1000, "unit": "m", "color": "magenta" }
+      ]
+    }
+  }
+}

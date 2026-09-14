@@ -22,9 +22,11 @@
           }
         },
         {
-          "primary": "",
-          "name": "Burpees",
-          "loadNote": "5 EVERY ROUND",
+          "primary": "5",
+          "name": "Burpees · every round",
+          "subNote": "40 total",
+          "totalNote": "40 total",
+          "mineKey": "Burpees",
           "accent": "magenta"
         }
       ],
@@ -55,9 +57,11 @@
             }
           },
           {
-            "primary": "",
-            "name": "Burpees",
-            "loadNote": "5 EVERY ROUND",
+            "primary": "5",
+            "name": "Burpees · every round",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Burpees",
             "accent": "magenta"
           }
         ],
@@ -68,7 +72,7 @@
   "hero": {
     "value": "176",
     "unit": "REPS",
-    "formatLine": "4 × 3 MIN",
+    "formatLine": "3:00 × 4",
     "storyLine": "88 kb snatch · 88 weighted box step up · 40 burpees",
     "storyMovements": [
       {
@@ -99,11 +103,6 @@
   "posterRows": {
     "reward": [
       {
-        "kind": "block",
-        "label": "",
-        "cap": "WOD"
-      },
-      {
         "kind": "line",
         "rx": "KB Snatches + Weighted Box Step Ups",
         "load": "",
@@ -123,19 +122,15 @@
       },
       {
         "kind": "line",
-        "rx": "Burpees",
+        "rx": "5 Burpees · every round",
         "load": "",
-        "mine": "5 EVERY ROUND",
-        "team": ""
+        "mine": "",
+        "team": "",
+        "total": "40 total"
       }
     ],
     "pages": [
       [
-        {
-          "kind": "block",
-          "label": "",
-          "cap": "WOD"
-        },
         {
           "kind": "line",
           "rx": "KB Snatches + Weighted Box Step Ups",
@@ -156,10 +151,11 @@
         },
         {
           "kind": "line",
-          "rx": "Burpees",
+          "rx": "5 Burpees · every round",
           "load": "",
-          "mine": "5 EVERY ROUND",
-          "team": ""
+          "mine": "",
+          "team": "",
+          "total": "40 total"
         }
       ]
     ]

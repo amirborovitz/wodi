@@ -68,7 +68,7 @@
     "unit": "KG",
     "subtitle": "CLEAN AND JERK",
     "formatLine": "8 × every 1:30",
-    "storyLine": "6 clean and jerk",
+    "storyLine": "12 clean and jerk",
     "storyMovements": [
       {
         "perRound": "",
@@ -85,7 +85,8 @@
           40,
           50
         ],
-        "unit": "kg"
+        "unit": "kg",
+        "implementCount": 1
       },
       {
         "perRound": "",
@@ -102,7 +103,8 @@
           40,
           50
         ],
-        "unit": "kg"
+        "unit": "kg",
+        "implementCount": 1
       }
     ],
     "accentClass": "accentGold"

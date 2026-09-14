@@ -180,6 +180,7 @@
         "color": "yellow",
         "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "partnerNote": "your part 160",
         "wasSubstituted": false
       },
@@ -189,6 +190,7 @@
         "total": "",
         "color": "magenta",
         "unit": "kg",
+        "implementCount": 1,
         "partnerNote": "your part 120",
         "wasSubstituted": false
       },

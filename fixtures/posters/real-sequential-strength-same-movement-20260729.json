@@ -1,6 +1,6 @@
 {
   "name": "real-sequential-strength-same-movement-20260729",
-  "description": "REAL saved doc (LvwftFAdQITQtyhMZmh8), verbatim — including the pre-fix section weights (both blocks stamped 40 by the old bare-name bake) alongside the correct per-block weights on movements[] (40 / 50). Sequential weightlifting build where BOTH blocks are the SAME movement at different rep counts ('4 sets E1:30: 2 Clean and Jerks, Into: 4 sets E1:30: 1 Clean and Jerk'). Each block must keep its own row — its own set count, its own rep count, its own logged load, recovered from movements[] by position for docs saved before the section fix. Collapsing them to one 'Clean and Jerk 40-50kg' row erases the whole story of the piece; the name-keyed breakdown entry (merged across both blocks) must never supply either block's load.",
+  "description": "REAL saved doc (LvwftFAdQITQtyhMZmh8), verbatim — including the pre-fix section weights (both blocks stamped 40 by the old bare-name bake) alongside the correct per-block weights on movements[] (40 / 50). Sequential weightlifting build where BOTH blocks are the SAME movement at different rep counts ('4 sets E1:30: 2 Clean and Jerks, Into: 4 sets E1:30: 1 Clean and Jerk'). Each block must keep its own row — its own set count, its own rep count, its own logged load, recovered from movements[] by position for docs saved before the section fix. Collapsing them to one 'Clean and Jerk 40-50kg' row erases the whole story of the piece; the name-keyed breakdown entry (merged across both blocks) must never supply either block's load. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen.",
   "workout": {
     "title": "Today Workout",
     "format": "emom",
@@ -35,7 +35,7 @@
     ],
     "workloadBreakdown": {
       "movements": [
-        { "name": "Clean and Jerk", "totalReps": 6, "weight": 40, "weightProgression": [40, 50], "unit": "kg", "color": "yellow", "implementCount": 1, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "wasSubstituted": false }
+        { "name": "Clean and Jerk", "totalReps": 12, "weight": 40, "weightProgression": [40, 50], "unit": "kg", "color": "yellow", "implementCount": 1, "totalDistance": 0, "totalCalories": 0, "totalTime": 0, "wasSubstituted": false }
       ]
     }
   }

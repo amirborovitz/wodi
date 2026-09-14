@@ -49,9 +49,12 @@ export interface StoryMovementLine {
   name: string;
   total: string;
   color?: 'cyan' | 'magenta' | 'yellow';
+  /** The breakdown's EFFECTIVE load — both implements of a pair. Printed per implement. */
   weight?: number;
   weightProgression?: number[];
   unit?: string;
+  /** 2 = one in each hand; the poster prints "2×35kg", never the summed weight. */
+  implementCount?: number;
   sectionHeader?: string;
   sectionColor?: 'yellow' | 'magenta' | 'cyan';
   burnout?: { reps: number; weight: number };

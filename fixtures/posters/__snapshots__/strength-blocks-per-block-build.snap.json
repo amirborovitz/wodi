@@ -85,7 +85,8 @@
           40,
           50
         ],
-        "unit": "kg"
+        "unit": "kg",
+        "implementCount": 1
       },
       {
         "perRound": "",
@@ -102,7 +103,8 @@
           40,
           50
         ],
-        "unit": "kg"
+        "unit": "kg",
+        "implementCount": 1
       }
     ],
     "accentClass": "accentGold"

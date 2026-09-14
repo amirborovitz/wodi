@@ -14,6 +14,20 @@ const openai = new OpenAI({
 });
 
 /**
+ * The model that reads every workout — the photo, then each part's structure. One place, so a
+ * swap or a rollback is a one-line change.
+ *
+ * gpt-4o (2024) until 12 Sep 2026, when it read a board's "AK swing" as "Alternating Kettlebell
+ * Swing" — shorthand a current model reads as American. gpt-5.5 is a reasoning model and takes
+ * different request settings: `max_completion_tokens` instead of `max_tokens`, and temperature 0
+ * only with reasoning off. Reasoning stays OFF so the same board keeps giving the same answer
+ * (see the temperature note on the structuring call); turning it up is the first thing to measure
+ * once there is a photo corpus to measure it against.
+ */
+const PARSE_MODEL = 'gpt-5.5';
+const PARSE_REASONING_EFFORT = 'none' as const;
+
+/**
  * The parse hit OpenAI's rate limit (429), not a workout the parser couldn't read.
  * Thrown so the UI can say "wait a couple of minutes" instead of blaming the board —
  * a rate limit clears on its own, so re-shooting or rewording the WOD does nothing.
@@ -1328,7 +1342,8 @@ export async function parseWorkoutText(
 ): Promise<{ raw: string; parsed: ParsedWorkout }> {
   const startedAt = performance.now();
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: PARSE_MODEL,
+    reasoning_effort: PARSE_REASONING_EFFORT,
     messages: [
       {
         role: 'user',
@@ -1339,7 +1354,7 @@ export async function parseWorkoutText(
         ],
       },
     ],
-    max_tokens: 4000,
+    max_completion_tokens: 4000,
     // Reading a board has exactly one right answer, so sampling buys nothing and costs
     // reproducibility: at 0.2 the same board parsed correctly on one log and invented
     // "reps": 1 on the next, which is unfixable because it will not reproduce.
@@ -1549,9 +1564,10 @@ async function requestSegmentation(
   content: OpenAI.Chat.Completions.ChatCompletionContentPart[],
 ): Promise<SegmentationOutcome> {
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: PARSE_MODEL,
+    reasoning_effort: PARSE_REASONING_EFFORT,
     messages: [{ role: 'user', content }],
-    max_tokens: 1500,
+    max_completion_tokens: 1500,
     temperature: 0,
     response_format: { type: 'json_object' },
   });

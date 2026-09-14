@@ -1,0 +1,95 @@
+{
+  "name": "real-team-relay-igug-5-20260912",
+  "description": "Real 12 Sep doc, as a fresh log now saves it. Teams of 5 trade whole rounds: 30 RFT (6 each) of 10 cal Echo Bike + 12 Alt KB Swings, 22 min cap, in a session with two solo strength parts. Regression guard: the poster states the board's per-round 10 cal and 12 swings (the edit bug rewrote them as 300 and 2), and the athlete's totals are their own 6 rounds (60 cal, 72 swings), never the team's 300 cal.",
+  "workout": {
+    "title": "WOD",
+    "format": "for_time",
+    "teamSize": 5,
+    "partnerWorkout": true,
+    "timeCap": 1320,
+    "rawText": "STRENGTH (hinge & pull)\nRomanian Deadlift\n4 sets x 6 reps @65-75%\nStrict Chest to Bar Pull-up\n4 sets x 6 reps @0-1 R.I.R\n\nMETCON (Intervals)\nIn teams of 5, I go you go:\n30 RFT (6 each):\n8/10 calories echo bike (30 sec time limit)\n12 Alternating Kettlebell Swing @20/28kg\n< 22 minutes T.C. >\n* Once a team member gets off the bike, the other may start.",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Romanian Deadlift",
+        "type": "strength",
+        "prescription": "4 sets x 6 reps @65-75%",
+        "rawText": "Romanian Deadlift\n4 sets x 6 reps @65-75%",
+        "loggingMode": "strength",
+        "partKind": "strength",
+        "partnerWorkout": false,
+        "isSecondary": false,
+        "aiPartName": "TANK",
+        "suggestedRepsPerSet": [6, 6, 6, 6],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 6, "actualReps": 6, "weight": 70 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 6, "actualReps": 6, "weight": 80 }
+        ],
+        "movements": [
+          { "name": "Romanian Deadlift", "reps": 6, "inputType": "weight", "equipment": "barbell", "countingMode": "per_round" }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "Strict Chest to Bar Pull-up",
+        "type": "strength",
+        "prescription": "4 sets x 6 reps @0-1 R.I.R",
+        "rawText": "Strict Chest to Bar Pull-up\n4 sets x 6 reps @0-1 R.I.R",
+        "loggingMode": "strength",
+        "partKind": "strength",
+        "partnerWorkout": false,
+        "isSecondary": false,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 6, "actualReps": 6 }
+        ],
+        "movements": [
+          { "name": "Strict Chest To Bar Pull-up", "reps": 6, "inputType": "none", "isBodyweight": true, "countingMode": "per_round" }
+        ]
+      },
+      {
+        "id": "exercise-2",
+        "name": "Team Relay 30 RFT",
+        "type": "wod",
+        "prescription": "In teams of 5, I go you go: 30 RFT (6 each): 8/10 calories Echo Bike (30 sec time limit), 12 Alternating Kettlebell Swing @20/28kg",
+        "rawText": "In teams of 5, I go you go:\n30 RFT (6 each):\n8/10 calories echo bike (30 sec time limit)\n12 Alternating Kettlebell Swing @20/28kg",
+        "loggingMode": "for_time",
+        "partKind": "metcon",
+        "partnerWorkout": true,
+        "partnerSplit": "rounds",
+        "personalRounds": 6,
+        "rounds": 30,
+        "isSecondary": false,
+        "aiPartName": "GRIND",
+        "rxWeights": { "male": 28, "female": 20, "unit": "kg" },
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 360, "weight": 20, "time": 915 }
+        ],
+        "movements": [
+          {
+            "name": "Echo Bike", "calories": 10, "rxCalories": { "male": 10, "female": 8 },
+            "inputType": "none", "equipment": "none", "countingMode": "per_round", "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Alt American Kettlebell Swing", "reps": 12, "loggedWeights": [20],
+            "rxWeights": { "male": 28, "female": 20, "unit": "kg" },
+            "inputType": "weight", "equipment": "kettlebell", "implementCount": 1,
+            "countingMode": "per_round", "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Alt American Kettlebell Swing", "exerciseIndex": 2, "totalReps": 72, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Romanian Deadlift", "exerciseIndex": 0, "totalReps": 24, "weight": 75, "weightProgression": [70, 80], "unit": "kg", "color": "yellow" },
+        { "name": "Strict Chest To Bar Pull-up", "exerciseIndex": 1, "totalReps": 24, "color": "cyan" },
+        { "name": "Echo Bike", "exerciseIndex": 2, "totalCalories": 60, "unit": "cal", "color": "magenta" }
+      ]
+    }
+  }
+}

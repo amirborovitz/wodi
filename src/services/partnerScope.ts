@@ -152,6 +152,29 @@ export function splitRounds(
   return { team: teamRounds, mine: teamRounds * factor };
 }
 
+/**
+ * The partner factor a number the ATHLETE entered still takes — `blockFactor` or 1.
+ *
+ * "It's your own number, never divide it" is only true of a number that describes your own WHOLE
+ * share. Whether a per-round entry does depends on how the team splits the work:
+ *
+ * - Shared total ('reps' split, "100 wall balls between you"): every round's work is divided, so
+ *   the athlete's per-round entry is already their slice of it. Never divided again.
+ * - Traded rounds ('rounds' split, "30 RFT, 6 each"): each round belongs whole to one athlete, so
+ *   the split lands on the round COUNT (see {@link splitRounds}). "10 cal a round" describes one
+ *   athlete's round whoever typed it — typing it does not make the team's 30 rounds yours. It
+ *   takes the block's factor exactly as the prescription does: 10 × 30 × 1/5 = your 60, not 300.
+ *
+ * A value entered as the whole block's total is the athlete's own in both shapes.
+ */
+export function enteredQuantityFactor(
+  blockFactor: number,
+  split: 'reps' | 'rounds' | undefined,
+  enteredAsTotal: boolean,
+): number {
+  return split === 'rounds' && !enteredAsTotal ? blockFactor : 1;
+}
+
 // ─── Quantities ───────────────────────────────────────────────────────────────
 
 /** One scope's amount of one movement. Absent metrics stay absent — never zero. */
@@ -175,21 +198,16 @@ export interface MovementTotalsParams {
    * by side, so there is nothing to divide — `mine` equals `team`.
    */
   together?: boolean;
-  /**
-   * The athlete typed this number themselves. It is already their own work, whatever the board
-   * prescribed for the team, so it is never divided.
-   */
-  athleteEntered?: boolean;
 }
 
 /**
  * The single quantity derivation. Every total, poster value, share and expectation in the app
- * comes from here.
+ * comes from here. A number the athlete entered is not this function's business — see
+ * {@link enteredQuantityFactor}, which says whether it still takes the team's split.
  */
 export function movementTotals(params: MovementTotalsParams): MovementScopes {
-  const { perRound, rounds, together, athleteEntered } = params;
-  const undivided = together || athleteEntered;
-  const myRounds = undivided ? rounds.team : rounds.mine;
+  const { perRound, rounds, together } = params;
+  const myRounds = together ? rounds.team : rounds.mine;
   return {
     team: scale(perRound, rounds.team),
     mine: scale(perRound, myRounds),

@@ -1,6 +1,6 @@
 {
   "name": "real-pairs-amrap-max-situp-logged-20260829",
-  "description": "Same board, saved EXACTLY as production stored it: the save path baked the athlete's logged 20 into the Sit-up's prescription (reps: 20) beside isMaxReps/maxMetric. The row must still read 'Max Sit-up - 20 total'. maxMetric names the slot the board left open, so a number in that slot cannot be the coach's - it is our own bake, and the poster has to see through it. Hero stays ROUNDS.",
+  "description": "Same board, saved EXACTLY as production stored it: the save path baked the athlete's logged 20 into the Sit-up's prescription (reps: 20) beside isMaxReps/maxMetric. The row must still read 'Max Sit-up - 20 total'. maxMetric names the slot the board left open, so a number in that slot cannot be the coach's - it is our own bake, and the poster has to see through it. Hero stays ROUNDS. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen.",
   "workout": {
     "title": "WOD (שבת / חג)",
     "format": "amrap",
@@ -108,21 +108,21 @@
         },
         {
           "name": "Twin Kettlebell Hang Power Clean",
-          "totalReps": 18,
+          "totalReps": 42,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
         },
         {
           "name": "Twin Kettlebell Front Squat",
-          "totalReps": 18,
+          "totalReps": 42,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
         },
         {
           "name": "Twin Kettlebell Push Press",
-          "totalReps": 18,
+          "totalReps": 42,
           "weight": 20,
           "unit": "kg",
           "color": "yellow"
@@ -133,8 +133,8 @@
           "color": "magenta"
         }
       ],
-      "grandTotalReps": 74,
-      "grandTotalVolume": 1080,
+      "grandTotalReps": 146,
+      "grandTotalVolume": 2520,
       "grandTotalDistance": 600
     },
     "partnerWorkout": false

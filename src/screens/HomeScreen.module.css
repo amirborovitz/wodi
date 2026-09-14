@@ -209,21 +209,6 @@
   line-height: 1.2;
 }
 
-/* ── Monthly EP line ──────────────────────────────────────────── */
-.epLine {
-  font-family: 'Barlow', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #f5c200;
-  /* fix #4: tighter gap before the "For Later" shelf */
-  margin-bottom: 14px;
-}
-
-.epUnit {
-  font-weight: 500;
-  color: rgba(243, 241, 234, 0.5);
-}
-
 /* ── Admin button ─────────────────────────────────────────────── */
 .adminBtn {
   align-self: flex-start;

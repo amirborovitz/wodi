@@ -5,11 +5,28 @@ import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput, OpenRepsPerIn
 import { RepsSetsInput } from './RepsSetsInput';
 import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
+import { asksImplementCount } from './implementQuestion';
 import { ScoreMovementInputs } from './ScoreMovementInputs';
 import { LadderInput } from './LadderInput';
 import { DescendingSetTrack } from './DescendingSetTrack';
 import { FreeScoreInput } from './FreeScoreInput';
 import { hasSameMovementsEveryRound } from '../../../utils/sectionShape';
+import { sameMovementName } from '../../../utils/movementNameMatch';
+
+/**
+ * Is this row the movement whose count IS the block's score?
+ *
+ * Compared as movement NAMES, never as raw strings. One parse of the same board spelled it
+ * "V-up / Sit-up" in the exercise's movement list and "V-up/Sit-up" inside its sections, so an
+ * exact match missed — and the athlete was handed a second, empty stepper for the very number
+ * they had just entered window by window, with nothing to say which one counted.
+ *
+ * Exported for tests: the router has no DOM setup here, so this is the only place the rule can
+ * be pinned.
+ */
+export function isOpenCountMovement(rowName: string, openMovementName: string | null): boolean {
+  return !!openMovementName && sameMovementName(rowName, openMovementName);
+}
 import { resolveBlockScore } from '../../../services/blockScore';
 
 interface InputRouterProps {
@@ -64,7 +81,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     const scoresOpenCount = kind === 'score_open_reps'
       && blockScore.type === 'open_reps'
       && !isPerStationBoard;
-    const openMovementKey = scoresOpenCount ? openMovements[0].name.toLowerCase() : null;
+    const openMovementName = scoresOpenCount ? openMovements[0].name : null;
 
     // For ladder AMRAP, bodyweight reps movements are determined by the rung —
     // only weighted/distance movements need user input.
@@ -76,7 +93,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     const visibleMovements = (isLadder
       ? movements.filter(mr => mr.kind === 'load' || mr.kind === 'distance')
       : movements
-    ).filter(mr => !openMovementKey || mr.movement.name.toLowerCase() !== openMovementKey);
+    ).filter(mr => !isOpenCountMovement(mr.movement.name, openMovementName));
     const inputMovements = visibleMovements.filter(
       mr => mr.kind === 'load' || mr.kind === 'distance'
     );
@@ -266,14 +283,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
     return <SupersetInput result={result} onChange={onChange} />;
   }
 
-  // The 1x/2x question only exists for a hand-held implement you can carry one of or two of.
-  // A barbell has no pair, and the AI stamps implementCount: 1 on plenty of them — so the
-  // implement it named is the gate, not the count. Legacy rows with no equipment fall back to
-  // the count, where a 2 is unambiguous evidence of a pair.
-  const hasImplement = result.exercise.movements?.some(
-    m => m.equipment === 'dumbbell' || m.equipment === 'kettlebell'
-      || (m.equipment == null && (m.implementCount ?? 1) > 1)
-  ) ?? false;
+  const hasImplement = result.exercise.movements?.some(asksImplementCount) ?? false;
 
   switch (kind) {
     case 'load':

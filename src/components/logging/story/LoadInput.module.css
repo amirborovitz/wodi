@@ -82,48 +82,6 @@
 }
 
 /* ── Implement count toggle (1x / 2x) ── */
-.implementRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  justify-content: center;
-}
-
-.implementLabel {
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-}
-
-.implementToggle {
-  display: flex;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  padding: 3px;
-}
-
-.implementBtn {
-  height: 36px;
-  padding: 0 20px;
-  border-radius: calc(var(--radius-sm) - 2px);
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: var(--font-bold);
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out);
-  -webkit-tap-highlight-color: transparent;
-}
-
-.implementBtnActive {
-  background: rgba(255, 214, 0, 0.16);
-  color: var(--color-volume);
-  box-shadow: 0 0 8px rgba(255, 214, 0, 0.15);
-}
-
 /* ── Max reps section ── */
 .maxSection {
   width: 100%;
@@ -152,9 +110,3 @@
   padding: 0 var(--space-2);
 }
 
-/* ── Reduced motion ── */
-@media (prefers-reduced-motion: reduce) {
-  .implementBtn {
-    transition: none;
-  }
-}

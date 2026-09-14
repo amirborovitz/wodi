@@ -11,7 +11,7 @@ import { BRAND, fD, fB, fM, fH } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod } from './posterData';
 import { rowsOf } from './posterData';
-import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
+import { AchievementBadge, loadVoice, computedVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
 import type { PosterVibeOffset } from '../../../../types';
@@ -133,7 +133,7 @@ export function SkinSlab({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                       ) : <span />
                     ) : parts.team ? (
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.05 }}>
-                        <span style={{ fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                        <span style={parts.teamVoice === 'computed' ? computedVoice(BRAND.yellow) : { fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                           {parts.team}
                         </span>
                         {parts.me && (
@@ -143,7 +143,9 @@ export function SkinSlab({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(243,241,234,0.42)') : { fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(243,241,234,0.42)')
+                        : parts.singleVoice === 'computed' ? computedVoice(BRAND.yellow)
+                        : { fontFamily: fH, fontSize: 20, fontWeight: 700, color: BRAND.yellow, transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
                         {parts.single}
                       </span>
                     ) : <span />}

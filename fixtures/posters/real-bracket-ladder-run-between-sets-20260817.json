@@ -1,6 +1,6 @@
 {
   "name": "real-bracket-ladder-run-between-sets-20260817",
-  "description": "Real board (17/08/26): bracket-notation descending ladder [14-12-10-8-6-4] with a distance movement written as a footnote BETWEEN tiers ('* 200m run in between sets (5 total)'). Trap: buildDescendingLadderRows filters the movement list down to the ones that climb the scheme (reps, no distance/calories) and used to return ONLY that single track row — so the run was parsed, saved and counted in the breakdown, then silently vanished from the poster. The Run must get its own row below the track. Its total is deliberately NOT printed: countingMode 'per_interval' resolved the multiplier to the tier count (6 x 200m = 1200m) while the board says 5 runs = 1000m, so the per-round '200m' is shown and the untrustworthy total omitted.",
+  "description": "Real board (17/08/26): bracket-notation descending ladder [14-12-10-8-6-4] with a distance movement written as a footnote BETWEEN tiers ('* 200m run in between sets (5 total)'). Trap: buildDescendingLadderRows filters the movement list down to the ones that climb the scheme (reps, no distance/calories) and used to return ONLY that single track row — so the run was parsed, saved and counted in the breakdown, then silently vanished from the poster. The Run must get its own row below the track. Its total is deliberately NOT printed: countingMode 'per_interval' resolved the multiplier to the tier count (6 x 200m = 1200m) while the board says 5 runs = 1000m, so the per-round '200m' is shown and the untrustworthy total omitted. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen.",
   "workout": {
     "title": "WOD",
     "format": "for_time",
@@ -95,7 +95,7 @@
           "name": "Run",
           "exerciseIndex": 1,
           "totalReps": 54,
-          "totalDistance": 1200,
+          "totalDistance": 1000,
           "unit": "m",
           "distancePerRep": 200,
           "color": "magenta"
@@ -114,7 +114,7 @@
       ],
       "grandTotalReps": 262,
       "grandTotalVolume": 3345,
-      "grandTotalDistance": 1200
+      "grandTotalDistance": 1000
     }
   }
 }

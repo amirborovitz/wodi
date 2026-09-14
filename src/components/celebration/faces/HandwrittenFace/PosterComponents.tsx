@@ -19,6 +19,17 @@ export function loadVoice(color: string): React.CSSProperties {
   return { fontFamily: fM, fontSize: 10.5, fontWeight: 500, color, whiteSpace: 'nowrap' };
 }
 
+/**
+ * A number the app derived, not one the athlete entered — a per-movement total.
+ *
+ * DM Mono, the meta voice, so it can never be mistaken for the handwriting that means "I logged
+ * this". Bigger than loadVoice and in the skin's accent, because a total is still something to
+ * be proud of: 48 chest-to-bars is the flex, it just isn't a signature.
+ */
+export function computedVoice(color: string): React.CSSProperties {
+  return { fontFamily: fM, fontSize: 13, fontWeight: 500, color, whiteSpace: 'nowrap', letterSpacing: '0.01em' };
+}
+
 export function parseRxLoad(rx: string): { name: string; load: string } {
   const match = rx.match(/^(\d+(?:\.\d+)?(?:\s*->\s*\d+(?:\.\d+)?)?\s*(?:kg|lb))\s+(.+)$/i);
   if (!match) return { name: rx, load: '' };
@@ -58,7 +69,20 @@ export interface MovementValueParts {
    * weight is prescription the athlete matched; the score is the only thing they earned.
    */
   meIsLoad?: boolean;
-  singleIsLoad?: boolean;
+  /**
+   * Which voice the value column speaks in — one field, because a row's value is exactly one
+   * of three things and two booleans would let it claim to be two.
+   *
+   * undefined  the athlete's own entry — the skin's hero voice (a hand, where the skin has one)
+   * 'load'     the board's prescribed weight — quiet mono; the coach's words, not handwriting
+   * 'computed' a total the app worked out — quiet mono, highlighted. Handwriting means "I
+   *            logged this", so a derived number wearing it makes arithmetic look entered,
+   *            which is precisely why "48 TOTAL" beside "6 Chest to Bar" read as a wrong count
+   *            rather than as 7 rounds plus a partial.
+   */
+  singleVoice?: 'load' | 'computed';
+  /** Same rule as {@link singleVoice}, for the big slot of the value/caption pair. */
+  teamVoice?: 'computed';
 }
 
 // Any unit buildResultValue appended — not just weights. Naming kg/lb explicitly left "2.4km"
@@ -69,8 +93,11 @@ export interface MovementValueParts {
 // The "~" an estimated hero wears is part of the NUMBER, not a reason to stop splitting: without
 // it here, "~11burpees" failed the match and printed whole at the 90px hero size, one unbroken
 // word running off the edge of the card.
+//
+// A pair's "2×" is part of the number too: a dumbbell top set reads "2×35kg" (one in each hand),
+// never the summed 70, and the multiplier has to stay beside the figure it multiplies.
 export function splitResultValue(value: string): { primary: string; unit: string } {
-  const match = value.match(/^(~?-?\d+(?:\.\d+)?)\s*([a-z]+)$/i);
+  const match = value.match(/^(~?-?(?:\d+×)?\d+(?:\.\d+)?)\s*([a-z]+)$/i);
   if (!match) return { primary: value, unit: '' };
   return { primary: match[1], unit: match[2].toLowerCase() };
 }
@@ -305,6 +332,11 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
       isStrength: false,
       strengthValue: null,
       team: total,
+      // The big slot here holds a TOTAL, not a partner's number — the two share this pair
+      // because a loaded movement needs the same value/caption shape. It is still arithmetic,
+      // so it speaks in the computed voice: handwriting means "I logged this", and a total
+      // wearing it is exactly what made "58 TOTAL" read as a number the athlete wrote down.
+      teamVoice: 'computed',
       me: r.mine,
       meIsLoad: true,
       single: null,
@@ -327,8 +359,11 @@ export function getMovementValueParts(wod: PosterWod, r: PosterLine): MovementVa
     me: null,
     single,
     // Prescription with nothing logged against it and no total to report: the board's own load
-    // is all this row has, and the board's words are not the athlete's handwriting.
-    singleIsLoad: !r.mine && !inlineLoad && !!r.load && single === r.load,
+    // is all this row has, and the board's words are not the athlete's handwriting. A total is
+    // not the athlete's handwriting either — the app worked it out.
+    singleVoice: !r.mine && !inlineLoad && !!r.load && single === r.load ? 'load'
+      : !r.mine && !!total && single === total ? 'computed'
+      : undefined,
     total,
     roundLabel: r.roundLabel,
     isStation: r.station,

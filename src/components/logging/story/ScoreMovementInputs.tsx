@@ -18,6 +18,8 @@ import { statesMaxEffort } from '../../../services/blockScore';
 import { buildSubstitutionPatch } from './substitutionPatch';
 import { useScoreMovementEdits, occurrenceDiffers } from './useScoreMovementEdits';
 import { useScorePrescription } from './useScorePrescription';
+import { ImplementToggle } from './ImplementToggle';
+import { asksImplementCount, perImplementUnit } from './implementQuestion';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
 
@@ -1244,7 +1246,7 @@ export function ScoreMovementInputs({
                     </button>
                     <span className={styles.separateWeightValue}>
                       {value}
-                      <span>{mr.implementCount === 2 ? `${movementUnit} each` : movementUnit}</span>
+                      <span>{perImplementUnit(movementUnit, mr.implementCount)}</span>
                     </span>
                     <button
                       type="button"
@@ -1308,7 +1310,7 @@ export function ScoreMovementInputs({
               {isTwin && <span className={styles.heroWeightMultiplier}>2×</span>}
               {currentWeight}
             </span>
-            <span className={styles.heroWeightUnit}>{isTwin ? `${groupUnit} each` : groupUnit}</span>
+            <span className={styles.heroWeightUnit}>{perImplementUnit(groupUnit, isTwin ? 2 : 1)}</span>
             {rx != null && (
               <span className={`${styles.rxHint} ${isRx ? styles.rxHit : ''}`}>
                 {isRx ? 'Rx ✓' : `Rx is ${rx}${groupUnit}`}
@@ -1478,25 +1480,34 @@ function WeightField({
 }) {
   const placeholder = mr.movement.rxWeights?.male ? String(mr.movement.rxWeights.male) : '0';
   const loadUnit = movementLoadUnit(mr.movement);
-  const unitLabel = mr.implementCount === 2 ? `2x ${loadUnit}` : loadUnit;
+  const unitLabel = perImplementUnit(loadUnit, mr.implementCount);
   const step = getWeightStep(mr.movement.name, mr.movement.equipment, loadUnit);
 
   return (
-    <StepperInput
-      value={mr.weight}
-      onChange={(v) => onChange({ weight: v != null ? Math.max(0, v) : undefined })}
-      step={step}
-      min={0}
-      max={getWeightMax(loadUnit)}
-      placeholder={placeholder}
-      unit={unitLabel}
-      color={LOAD_TILE_COLOR}
-      inputMode="decimal"
-      size="arcade"
-      dense={dense}
-      onCenterPress={onCenterPress}
-      active={active}
-    />
+    <>
+      <StepperInput
+        value={mr.weight}
+        onChange={(v) => onChange({ weight: v != null ? Math.max(0, v) : undefined })}
+        step={step}
+        min={0}
+        max={getWeightMax(loadUnit)}
+        placeholder={placeholder}
+        unit={unitLabel}
+        color={LOAD_TILE_COLOR}
+        inputMode="decimal"
+        size="arcade"
+        dense={dense}
+        onCenterPress={onCenterPress}
+        active={active}
+      />
+      {asksImplementCount(mr.movement) && (
+        <ImplementToggle
+          value={mr.implementCount}
+          onChange={(implementCount) => onChange({ implementCount })}
+          dense
+        />
+      )}
+    </>
   );
 }
 

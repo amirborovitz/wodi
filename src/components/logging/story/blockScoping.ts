@@ -36,8 +36,12 @@ const SCORE_TYPE_TO_KIND: Record<BlockScoreType, ExerciseKind> = {
 function describeBlock(section: ParsedSection): string {
   return section.movements
     .map((mov) => {
+      // A count the board left OPEN is the one quantity that reads wrong as a blank: the line
+      // came out "Strict Press", which is a movement name, not a prescription, and the screen
+      // above the stepper said nothing about what was being asked for.
       const qty =
-        mov.reps != null ? `${mov.reps} `
+        mov.isMaxReps ? 'Max '
+        : mov.reps != null ? `${mov.reps} `
         : mov.calories != null ? `${mov.calories} cal `
         : mov.distance != null ? `${mov.distance}m `
         : '';
@@ -124,6 +128,10 @@ export function scopeResultToBlock(
     rounds: block.scoreType === 'rounds' ? stored?.value : undefined,
     timeSeconds: block.scoreType === 'time' ? stored?.value : undefined,
     repsTotal: block.scoreType === 'reps' ? stored?.value : undefined,
+    // The same number under the name the max-reps input reads it by. A 'reps' block routes to
+    // that input whenever the board leaves the count open ("1 set x max reps"), and seeding only
+    // `repsTotal` meant a block the athlete had filled in reopened showing 0.
+    maxReps: block.scoreType === 'reps' ? stored?.value : undefined,
     weight: block.scoreType === 'load' ? stored?.value : undefined,
     partialReps: stored?.partialReps,
     partialMovements: stored?.partialMovements,
@@ -152,10 +160,15 @@ export function mergeBlockPatch(
     merged.movementResults = next;
   }
 
+  // A block's score, under every name an input writes it by. `maxReps` is the max-effort input's
+  // name for it — "1 set x max reps @~60%" is scored in reps like any other 'reps' block, and it
+  // is the only input a block whose count the board left open ever gets. Listing only `repsTotal`
+  // meant that input's number was computed, handed up here and silently discarded: the stepper
+  // would not move, the numpad would not take, and the block saved empty.
   const scoreValue =
     block.scoreType === 'rounds' ? patch.rounds
     : block.scoreType === 'time' ? patch.timeSeconds
-    : block.scoreType === 'reps' ? patch.repsTotal
+    : block.scoreType === 'reps' ? (patch.repsTotal ?? patch.maxReps)
     : patch.weight;
 
   const touchesScore =

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWorkloadBreakdownFromResults } from './AddWorkoutScreen';
+import { buildWorkloadBreakdownFromResults } from '../services/workloadFromResults';
 import type { ParsedExercise, ParsedMovement, ParsedWorkout } from '../types';
 import { calculateWorkloadBreakdown } from '../services/workloadCalculation';
 
@@ -469,5 +469,63 @@ describe('buildWorkloadBreakdownFromResults — the board states the count', () 
     expect(saved.movements.find((m) => m.name === 'Run')?.totalDistance)
       .toBe(parsed.movements.find((m) => m.name === 'Run')?.totalDistance);
     expect(saved.grandTotalDistance).toBe(parsed.grandTotalDistance);
+  });
+});
+
+// The real board of 2026-09-11, saved from the app and stored WRONG in two ways at once.
+//
+//   With a running clock, four 3:00 windows written out one by one:
+//   19 / 16 / 13 / 10 DB/KB Thruster, same Burpees, Max V-up / Sit-up in what's left
+//
+// Firestore got 232 thrusters (58 × the four windows counted a second time) and NO V-up row at
+// all — the board's own stated score, missing entirely.
+//
+// This is the save-time breakdown: the copy that reaches the athlete's data. It shares
+// `scopeSectionMovements` with the parse-time one, and only the parse-time call site had been
+// given the interval count. Underneath that sat a second fault: with `per_interval` no longer
+// short-circuiting, every row fell through to a station-visit count of 0 — an absence, not an
+// answer — which beat the section's own count, so every window after the first counted nothing.
+describe('buildWorkloadBreakdownFromResults — a board that writes its windows out', () => {
+  const win = (label: string, movs: ParsedMovement[]) => ({
+    sectionType: 'rounds' as const,
+    rounds: 1,
+    label,
+    scoreType: 'reps' as const,
+    movements: movs,
+  });
+  const prescribed = (reps: number) => [
+    movement({ name: 'Dumbbell/Kettlebell Thruster', reps, countingMode: 'per_interval' }),
+    movement({ name: 'Burpee', reps, countingMode: 'per_interval' }),
+    movement({ name: 'V-up/Sit-up', isMaxReps: true, reps: undefined, countingMode: 'per_interval' }),
+  ];
+  const clockwork = (sets: unknown[]) => buildWorkloadBreakdownFromResults([
+    {
+      exercise: exercise({
+        name: 'Clockwork Thrusters',
+        type: 'wod',
+        loggingMode: 'amrap_intervals',
+        intervalCount: 4,
+        sections: [19, 16, 13, 10].map((r, i) => win(`w${i}`, prescribed(r))),
+        movements: prescribed(19),
+      }),
+      sets,
+    },
+  ] as never);
+
+  it('counts each written window once, not once per interval', () => {
+    const breakdown = clockwork([{ id: 'set-summary', setNumber: 1, completed: true }]);
+    const reps = (name: string) => breakdown.movements.find((m) => m.name === name)?.totalReps;
+
+    expect(reps('Dumbbell/Kettlebell Thruster')).toBe(58);
+    expect(reps('Burpee')).toBe(58);
+  });
+
+  it("gives the open movement the athlete's own per-window counts", () => {
+    // The per-window input writes one isMax set per window (8 · 7 · 7 · 8); the movement the
+    // board left open owns their sum. It was reaching Firestore as nothing at all.
+    const breakdown = clockwork([8, 7, 7, 8].map((r, i) => ({
+      id: `set-${i}`, setNumber: i + 1, actualReps: r, isMax: true, completed: true,
+    })));
+    expect(breakdown.movements.find((m) => m.name === 'V-up/Sit-up')?.totalReps).toBe(30);
   });
 });

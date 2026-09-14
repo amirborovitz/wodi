@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadUnit } from '../../../utils/loadUnits';
+import { perImplementUnit } from './implementQuestion';
 import styles from './ProgressiveWeightRow.module.css';
 
 function selectAllInput(target: HTMLInputElement | null) {
@@ -66,6 +67,9 @@ interface ProgressiveWeightRowProps {
   /** No number entered yet, in a piece that is asking for several loads at once — the card
    *  renders as an open slot so it can't be mistaken for one already filled in. */
   pending?: boolean;
+  /** 2 = a pair, one in each hand: the number is ONE implement's weight, and the card says so
+   *  ("2× 35 KG EACH") instead of leaving the athlete to guess whether to sum them. */
+  implementCount?: number;
 }
 
 // ─── Component ───────────────────────────────────────────────────
@@ -85,8 +89,11 @@ export function ProgressiveWeightRow({
   singleColumn = false,
   columnLabel = 'Weight',
   pending = false,
+  implementCount,
 }: ProgressiveWeightRowProps) {
-  const unitLabel = unit.toUpperCase();
+  const isPair = (implementCount ?? 1) > 1;
+  const unitLabel = perImplementUnit(unit, implementCount).toUpperCase();
+  const multiplier = isPair ? <span className={styles.ovalMultiplier}>{implementCount}×</span> : null;
   const peakTouched = useRef(false);
   const peakRef = useRef<number | undefined>(peakWeight);
   const weightRef = useRef<number | undefined>(weight);
@@ -294,6 +301,7 @@ export function ProgressiveWeightRow({
             onPointerMove={onOvalMove}
             onPointerUp={(e) => onOvalUp(e, 'start')}
             onPointerCancel={() => { dragRef.current = null; }}>
+            {multiplier}
             <input
               ref={startInputRef}
               type="text" inputMode="decimal"
@@ -338,6 +346,7 @@ export function ProgressiveWeightRow({
               onPointerMove={onOvalMove}
               onPointerUp={(e) => onOvalUp(e, 'peak')}
               onPointerCancel={() => { dragRef.current = null; }}>
+              {multiplier}
               <input
                 ref={peakInputRef}
                 type="text" inputMode="decimal"

@@ -208,7 +208,7 @@ export function SkinInk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
                         )}
                       </div>
                     ) : parts.single ? (
-                      <span style={parts.singleIsLoad ? loadVoice('rgba(23,24,20,0.5)') : { fontFamily: fH, fontSize: 22, fontWeight: 700, color: '#171814', transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.single}</span>
+                      <span style={parts.singleVoice === 'load' ? loadVoice('rgba(23,24,20,0.5)') : { fontFamily: fH, fontSize: 22, fontWeight: 700, color: '#171814', transform: 'rotate(-2deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>{parts.single}</span>
                     ) : <span />}
                   </div>
                   {r.ladderTrack && (
