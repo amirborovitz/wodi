@@ -92,7 +92,12 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
     }
   };
 
-  const flip = (): void => goToSkin((idx + 1) % WEEK_SKINS.length);
+  // Left half steps back, right half steps forward — the WOD poster's gesture.
+  const flipFromTap = (e: React.MouseEvent<HTMLDivElement>): void => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const direction = e.clientX < rect.left + rect.width / 2 ? -1 : 1;
+    goToSkin((idx + direction + WEEK_SKINS.length) % WEEK_SKINS.length);
+  };
 
   // Keep the active chip in view when the poster is flipped by tapping it — the
   // chip row is the only thing that says which surface you're now on.
@@ -140,7 +145,7 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
         {/* Tap to flip — the same gesture, on the same artifact, as the WOD poster. */}
         <div
           className={styles.frame}
-          onClick={flip}
+          onClick={flipFromTap}
           style={{
             width: WEEK_POSTER_WIDTH * scale,
             height: WEEK_POSTER_HEIGHT * scale,
@@ -167,7 +172,7 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
 
       <div className={styles.skinLabel} style={{ fontFamily: fB }}>
         <span className={styles.skinName}>{WEEK_SKINS[idx].name}</span>
-        {showHint && <span className={styles.hint}>tap the poster to flip</span>}
+        {showHint && <span className={styles.hint}>tap left/right to change style</span>}
       </div>
 
       <div className={styles.chipRow} ref={chipRowRef}>

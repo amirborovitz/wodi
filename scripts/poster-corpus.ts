@@ -205,7 +205,9 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     : null;
   // Mirrors useCelebrationData.carouselPageData, which maps posterMainExercises — NOT every
   // exercise. Building a page here for a part the app filters away is how a secondary block
-  // could vanish from the real poster while its fixture stayed green.
+  // could vanish from the real poster while its fixture stayed green. Pages stay in board order
+  // here: each is a standalone poster, so deck order (orderPosterParts, pinned by its own test)
+  // never changes what a page prints.
   const pages = sectionExercises.map((exercise) =>
     buildPageArtifactSections(
       exercise,

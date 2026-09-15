@@ -319,18 +319,6 @@ function mapFormatToType(format: string | undefined): string {
   }
 }
 
-export function getPrimaryCarouselPageIndex(data: CelebrationData): number {
-  const pages = data.carouselPageData;
-  if (!pages || pages.length === 0) return 0;
-  const forTimeIndex = pages.findIndex((page) => {
-    const ex = page.exercise as unknown as Record<string, unknown>;
-    return !page.isStrength && ex['loggingMode'] === 'for_time';
-  });
-  if (forTimeIndex >= 0) return forTimeIndex;
-  const metconIndex = pages.findIndex((page) => !page.isStrength);
-  return metconIndex >= 0 ? metconIndex : 0;
-}
-
 function formatWorkoutDate(date: Date): string {
   // "5 JUN 26"
   return date
@@ -1367,33 +1355,24 @@ export function buildPosterWodFromPage(
  * Every poster page of a session, in reading order — the single definition of
  * "what this workout looks like as posters".
  *
- * The lead page is the primary part (the metcon, via getPrimaryCarouselPageIndex),
- * followed by the remaining parts in board order. Everything that shows a whole
- * workout — the celebration carousel, a feed post — reads this, so a feed card
- * can never disagree with the deck the athlete swiped through. Surfaces that
- * show exactly one poster (the thumbnails) take index 0.
+ * One poster per part, in the order `carouselPageData` already holds (orderPosterParts —
+ * the posters never reorder themselves). Everything that shows a whole workout — the
+ * celebration carousel, a feed post — reads this, so a feed card can never disagree with
+ * the deck the athlete swiped through. Surfaces that show exactly one poster (the
+ * thumbnails) take index 0.
  */
 export function buildPosterWodPages(data: CelebrationData): PosterWod[] {
   const pages = data.carouselPageData;
   if (!data.isCarousel || !pages || pages.length <= 1) return [buildPosterWod(data)];
-
-  const primary = getPrimaryCarouselPageIndex(data);
-  return [
-    // Identical to buildPosterWodFromPage(data, primary) — buildPosterWod routes
-    // there for a carousel — so the lead page and the thumbnail stay one thing.
-    buildPosterWod(data),
-    ...pages
-      .map((_, i) => i)
-      .filter((i) => i !== primary)
-      .map((i) => buildPosterWodFromPage(data, i)),
-  ];
+  return pages.map((_, i) => buildPosterWodFromPage(data, i));
 }
 
 export function buildPosterWod(
   data: CelebrationData,
 ): PosterWod {
+  // A carousel's single poster is its lead page — the same one the deck opens on.
   if (data.isCarousel && data.carouselPageData?.length) {
-    return buildPosterWodFromPage(data, getPrimaryCarouselPageIndex(data));
+    return buildPosterWodFromPage(data, 0);
   }
 
   const date = data.workoutDate;

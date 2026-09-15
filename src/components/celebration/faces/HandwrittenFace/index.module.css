@@ -140,10 +140,8 @@
   align-items: center;
   justify-content: center;
   padding: 18px 26px 6px;
-  cursor: pointer;
   position: relative;
   overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .cardAreaPanelOpen {
@@ -504,8 +502,11 @@
 }
 
 /* Positioning context for the draggable TextSticker / photo overlays on the card */
+/* The poster itself — the only surface a tap flips the style on. */
 .stickerLayer {
   position: relative;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Feed post result ───────────────────────────────────────────────────── */

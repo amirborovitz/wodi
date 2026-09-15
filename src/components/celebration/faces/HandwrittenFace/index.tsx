@@ -11,7 +11,7 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'f
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
-import { buildPosterWod, buildPosterWodPages, getPrimaryCarouselPageIndex, formatIsoPosterDate } from './posterData';
+import { buildPosterWod, buildPosterWodPages, formatIsoPosterDate } from './posterData';
 import { useFitScale } from './useFitScale';
 import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { CorrectionSheet } from '../../CorrectionSheet';
@@ -197,10 +197,6 @@ export function HandwrittenFace({
     () => isCarousel ? buildPosterWodPages(data) : null,
     [data, isCarousel],
   );
-  const primaryCarouselPage = useMemo(
-    () => isCarousel ? getPrimaryCarouselPageIndex(data) : 0,
-    [data, isCarousel],
-  );
 
   // Single-page wod (used when not a carousel, or as a fallback title). On the
   // carousel path it IS the lead page, so the two can't drift.
@@ -209,16 +205,8 @@ export function HandwrittenFace({
     [pageWods, data],
   );
 
-  // Slide that holds the PR's part. `pageWods` puts the summary (= the primary page) at
-  // slide 0 and drops that page from the tail, so the tail index has to skip it.
-  const prSlideIndex = useMemo((): number | null => {
-    const pageIndex = data.prCelebration?.pageIndex;
-    if (pageIndex == null || !isCarousel) return null;
-    if (pageIndex === primaryCarouselPage) return 0;
-    let slide = 1;
-    for (let i = 0; i < pageIndex; i++) if (i !== primaryCarouselPage) slide++;
-    return slide;
-  }, [data.prCelebration?.pageIndex, isCarousel, primaryCarouselPage]);
+  // Slide that holds the PR's part — pages are already in deck order, so it's the page index.
+  const prSlideIndex = isCarousel ? data.prCelebration?.pageIndex ?? null : null;
 
   const Skin = SKINS[skinIdx].Comp;
   const currentFelt = VIBE[vibe];
@@ -497,9 +485,11 @@ export function HandwrittenFace({
     const vel = (dx / dt) * 1000;
     dragRef.current = null;
 
-    // Small movement = tap: left half previous style, right half next style.
+    // Small movement = tap ON THE POSTER: left half previous style, right half next style. The
+    // empty deck around it is swipe-only — a tap there changes nothing.
     if (Math.abs(dx) < 8) {
-      stepSkinFromTap(e.changedTouches[0].clientX, carouselViewportRef.current);
+      const poster = shareCardRef.current;
+      if (poster?.contains(e.target as Node)) stepSkinFromTap(e.changedTouches[0].clientX, poster);
       return;
     }
 
@@ -904,9 +894,6 @@ export function HandwrittenFace({
           activePanel ? styles.cardAreaPanelOpen : '',
           cardNeedsFit ? styles.cardAreaFitTop : '',
         ].filter(Boolean).join(' ')}
-        onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
-        role="button"
-        aria-label="Tap left for previous style, right for next style"
       >
         <div
           key={pulse}
@@ -914,7 +901,14 @@ export function HandwrittenFace({
           className={`${styles.cardWrapper} ${cardNeedsFit ? styles.cardWrapperFitTop : ''}`}
           style={{ transform: `scale(${cardScale})` }}
         >
-          <div ref={shareCardRef} className={styles.stickerLayer}>
+          {/* Only the poster itself flips the style — not the empty space around it. */}
+          <div
+            ref={shareCardRef}
+            className={styles.stickerLayer}
+            onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
+            role="button"
+            aria-label="Tap left for previous style, right for next style"
+          >
             <Skin
               wod={shownWod}
               vibe={vibeConfirmed ? vibe : null}

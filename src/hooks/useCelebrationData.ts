@@ -87,7 +87,7 @@ import {
   BARBELL_PATTERNS,
 } from '../components/celebration/helpers';
 import { achievementMatchesMovementList } from '../components/celebration/faces/HandwrittenFace/posterData';
-import { isMainPart } from '../components/celebration/mainPart';
+import { isMainPart, orderPosterParts } from '../components/celebration/mainPart';
 
 // Re-export helpers for callers that need them directly
 export {
@@ -122,7 +122,7 @@ export {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** One page of a multi-part carousel */
+/** One page of a multi-part carousel. `carouselPageData` is already in deck order (orderPosterParts). */
 export interface CarouselPage {
   exercise: Exercise;
   movements: MovementTotal[];
@@ -134,8 +134,7 @@ export interface CarouselPage {
  * workout from history must not replay the celebration. Resolved here rather than in
  * the face so `isReward` never becomes a rendering condition downstream.
  *
- * `pageIndex` indexes `carouselPageData` (the part the PR belongs to), not the poster's
- * slide order — the face owns that mapping.
+ * `pageIndex` indexes `carouselPageData` — the part the PR belongs to, which is also its slide.
  */
 export interface PRCelebration {
   movement: string;
@@ -778,7 +777,7 @@ export function useCelebrationData(
     if (posterLayout !== 'multi-part') return null;
     const allMovements = activeBreakdown?.movements ?? [];
 
-    return posterMainExercises.map((ex): CarouselPage => {
+    return orderPosterParts(posterMainExercises).map((ex): CarouselPage => {
       const isStrength = isStrengthPagePart(ex);
       const fromBreakdown = movementsForParts(allMovements, [ex], [exercises.indexOf(ex)]);
 
@@ -1133,7 +1132,7 @@ export function useCelebrationData(
   ]);
 
   // ── PR celebration (transient, reward mode only) ──────────────────────────
-  // The landing slide is deliberately the metcon (getPrimaryCarouselPageIndex), and the
+  // The landing slide is deliberately the metcon (orderPosterParts), and the
   // poster's PR badge is page-scoped, so a strength PR is otherwise unreachable in the
   // moment it happens. This drives a session-level overlay above the poster.
 

@@ -25,7 +25,7 @@ export interface PosterPayload {
    * the sticker and photo, and the ONLY one a single-poster surface (the Home
    * and Gallery thumbnails) renders. A feed post puts the card the athlete
    * posted from there — swiping to a part before tapping Post is a choice about
-   * what leads. Everywhere else it's buildPosterWodPages' order, which starts
+   * what leads. Everywhere else it's orderPosterParts' order, which starts
    * with the metcon: the part that reads as "the workout" to a passing scroller.
    */
   wods: PosterWod[];
