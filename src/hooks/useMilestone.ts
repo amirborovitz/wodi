@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
+import type { Workout } from '../types';
 import type { WorkoutWithStats } from './useWorkouts';
 import { resolveMovement, isCardioFamily, MOVEMENT_FAMILIES } from '../data/movementRegistry';
-import { getEffectiveWorkoutDate } from '../utils/workoutDate';
+import { getEffectiveWorkoutDate, toIsoDate } from '../utils/workoutDate';
 
 /**
  * The milestone line — "4,382 pull-ups · 618 to 5,000".
@@ -63,6 +64,14 @@ export interface Milestone {
    * can say, because it is an event rather than an approach.
    */
   justCrossed: number | null;
+  /**
+   * The day the crossing happened, `YYYY-MM-DD`, and null whenever `justCrossed` is.
+   *
+   * The line itself keeps a crossing up for a fortnight, which is right for a celebration.
+   * Anything COMPETING for that slot needs to know how fresh the news actually is — Today
+   * hands the slot to Chase once the crossing is no longer the day's event.
+   */
+  crossedOn: string | null;
 }
 
 interface FamilyTotal {
@@ -73,6 +82,18 @@ interface FamilyTotal {
   recent: number;
   /** Total as it stood before the recent window — for spotting a crossing. */
   totalBefore: number;
+  /** Each contribution inside the celebration window, for dating that crossing. */
+  since: { at: number; amount: number }[];
+}
+
+/** The day a running total first reached `step`, walking the window forward from `totalBefore`. */
+function crossingDay(family: FamilyTotal, step: number): string | null {
+  let running = family.totalBefore;
+  for (const { at, amount } of [...family.since].sort((a, b) => a.at - b.at)) {
+    running += amount;
+    if (running >= step) return toIsoDate(new Date(at));
+  }
+  return null;
 }
 
 function nextOnLadder(ladder: readonly number[], total: number): number | null {
@@ -88,7 +109,7 @@ function crossedBetween(ladder: readonly number[], before: number, after: number
   return crossed;
 }
 
-function collect(workouts: readonly WorkoutWithStats[], now: number): Map<string, FamilyTotal> {
+function collect(workouts: readonly Workout[], now: number): Map<string, FamilyTotal> {
   const map = new Map<string, FamilyTotal>();
   const celebrationCutoff = now - CELEBRATION_DAYS * DAY_MS;
   const rateCutoff = now - RATE_WEEKS * 7 * DAY_MS;
@@ -120,10 +141,12 @@ function collect(workouts: readonly WorkoutWithStats[], now: number): Map<string
         total: 0,
         recent: 0,
         totalBefore: 0,
+        since: [],
       };
       entry.total += amount;
       if (at >= rateCutoff) entry.recent += amount;
       if (at < celebrationCutoff) entry.totalBefore += amount;
+      else entry.since.push({ at, amount });
       map.set(resolved.familyId, entry);
     }
   }
@@ -139,7 +162,7 @@ function collect(workouts: readonly WorkoutWithStats[], now: number): Map<string
  * there; "0 of 100 pull-ups" is a progress bar wearing a sentence.
  */
 export function buildMilestone(
-  workouts: readonly WorkoutWithStats[],
+  workouts: readonly Workout[],
   now: number = Date.now(),
 ): Milestone | null {
   const totals = collect(workouts, now);
@@ -162,6 +185,7 @@ export function buildMilestone(
       next,
       remaining,
       justCrossed,
+      crossedOn: justCrossed === null ? null : crossingDay(family, justCrossed),
     };
 
     // An event beats an approach, every time. Biggest recent crossing wins.
@@ -211,6 +235,7 @@ export function buildMilestone(
     next: null,
     remaining: null,
     justCrossed: null,
+    crossedOn: null,
   };
 }
 

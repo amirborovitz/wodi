@@ -32,6 +32,12 @@ export interface User {
   location?: string;
   /** Instagram username, lowercase and without the leading "@". */
   instagram?: string;
+  /**
+   * Has opened wodi from the home-screen icon at least once. Stamped by AuthContext from
+   * inside the home-screen app: iOS gives that app storage separate from Safari's, so this
+   * doc is the only way Safari learns the athlete already has the icon.
+   */
+  addedToHomeScreen?: boolean;
 }
 
 export interface UserStats {
@@ -655,7 +661,8 @@ export type Screen =
   | 'profile'
   | 'records'
   | 'recap'
-  | 'feed';
+  | 'feed'
+  | 'chase';
 
 // Common component props
 export interface BaseProps {

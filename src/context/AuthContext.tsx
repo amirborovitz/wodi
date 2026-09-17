@@ -17,6 +17,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { auth, googleProvider, appleProvider, db, storage } from '../services/firebase';
 import { removeUndefined } from '../utils/firestoreUtils';
+import { isHomeScreenApp } from '../utils/homeScreenApp';
 import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
 import { toPublicProfile } from '../services/feed/types';
 import type { User, UserStats } from '../types';
@@ -69,6 +70,7 @@ function buildNewUserFromFirebase(fbUser: FirebaseUser): Omit<User, 'id'> {
     createdAt: new Date(),
     lastLoginAt: new Date(),
     stats: DEFAULT_STATS,
+    addedToHomeScreen: isHomeScreenApp() || undefined,
   };
 }
 
@@ -193,8 +195,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // stamp must never keep an athlete out of the app. This is the ONE place it
     // happens — both the cold-start fetch and the background cache refresh come
     // through here, so the two can't drift or double-write.
+    // The home-screen stamp rides along: it only ever flips false → true, and only from
+    // inside the home-screen app, so it is one extra field on a write that happens anyway.
     const loginAt = new Date();
-    setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true }).catch(() => {});
+    const fromHomeScreen = isHomeScreenApp();
+    setDoc(userRef, {
+      lastLoginAt: serverTimestamp(),
+      ...(fromHomeScreen ? { addedToHomeScreen: true } : {}),
+    }, { merge: true }).catch(() => {});
 
     return {
       id: fbUser.uid,
@@ -218,6 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       gym: data.gym,
       location: data.location,
       instagram: data.instagram,
+      addedToHomeScreen: data.addedToHomeScreen === true || fromHomeScreen,
     };
   };
 

@@ -1,11 +1,16 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { usePRCount } from '../hooks/usePRCount';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
+import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
+import { useWorkoutExport } from '../hooks/useWorkoutExport';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
+import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
+import { ActionMenuSheet } from '../components/ui/ActionMenuSheet';
+import { Toast, useToast } from '../components/ui/Toast';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
 import { computeWeekStreak } from '../utils/weekStreak';
@@ -25,6 +30,10 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
   const { prCount } = usePRCount();
   const { recaps, newRecapIds } = useRecapData(workouts, user?.id, user?.weight);
   const profile = useProfileCompleteness();
+  const homeScreenInstall = useHomeScreenInstall(workouts.length > 0);
+  const workoutExport = useWorkoutExport(workouts);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const toast = useToast();
 
   const totalWorkouts = workouts.length;
   const totalEP = useMemo(
@@ -130,7 +139,78 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
           <span className={styles.navRowChevron}>›</span>
         </button>
 
+        {/* The athlete's whole log, theirs to take elsewhere. It lives here rather than on
+            Today because it needs a name and a sentence to be understood at all — and
+            because it is a thing you do once in a while, not a thing you do after training. */}
+        {workoutExport.available && (
+          <button
+            type="button"
+            className={styles.navRow}
+            onClick={() => setExportMenuOpen(true)}
+          >
+            <span className={styles.navRowIcon}>↗</span>
+            <div className={styles.navRowText}>
+              <span className={styles.navRowLabel}>Take your log to an AI</span>
+              <span className={styles.navRowSub}>
+                {totalWorkouts} workouts — copy them for ChatGPT, Claude or Gemini
+              </span>
+            </div>
+            <span className={styles.navRowChevron}>›</span>
+          </button>
+        )}
+
+        {/* The permanent way back to the home-screen steps, for anyone who waved the Today
+            card away. Gone for good once wodi has been opened from the icon. */}
+        {homeScreenInstall.available && (
+          <button
+            type="button"
+            className={styles.navRow}
+            onClick={homeScreenInstall.openSheet}
+          >
+            <img src="/wodi-icon-180.png" alt="" className={styles.navRowAppIcon} />
+            <div className={styles.navRowText}>
+              <span className={styles.navRowLabel}>Add to home screen</span>
+              <span className={styles.navRowSub}>Open wodi like an app</span>
+            </div>
+            <span className={styles.navRowChevron}>›</span>
+          </button>
+        )}
       </div>
+
+      {/* Both routes are local: one fills the clipboard, one writes a file. Nothing is
+          uploaded, so the athlete decides where their log actually goes. */}
+      <ActionMenuSheet
+        title={exportMenuOpen ? 'Your whole log' : null}
+        onClose={() => setExportMenuOpen(false)}
+        items={[
+          {
+            label: 'Copy it for my AI',
+            onClick: () => {
+              void workoutExport.copyForAgent().then((result) => {
+                toast.say(result === 'copied'
+                  ? `Copied — ${totalWorkouts} workouts, ready to paste`
+                  : 'Clipboard blocked — saved as a file instead');
+              });
+            },
+          },
+          // A saved file on a phone lands in Files and is never seen again.
+          ...(workoutExport.canDownload ? [{
+            label: 'Download as a file',
+            onClick: () => {
+              const result = workoutExport.downloadJson();
+              toast.say(result === 'downloaded' ? 'Saved to your downloads' : 'Could not save the file');
+            },
+          }] : []),
+        ]}
+      />
+
+      <Toast message={toast.message} />
+
+      <AddToHomeScreenSheet
+        open={homeScreenInstall.sheetOpen}
+        shareLocation={homeScreenInstall.shareLocation}
+        onClose={homeScreenInstall.closeSheet}
+      />
 
       {/* Your Wrapped \u2014 the only period-scoped thing on Me.
           The Week/Month/All-Time toggle and its three tiles are gone: Wrapped

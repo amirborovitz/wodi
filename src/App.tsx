@@ -12,6 +12,7 @@ import { AddWorkoutScreen } from './screens/AddWorkoutScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
+import { ChaseScreen } from './screens/ChaseScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen } from './components/settings';
 import { BottomNav, UpdatePill } from './components/ui';
@@ -66,7 +67,7 @@ function AppContent() {
   // A repaired workout goes straight back to its own poster. Home and Gallery unmount during the
   // edit and refetch on return, so only the two lists this screen owns need the fresh doc — the
   // swipe order comes from `workoutList`, and re-sorting is unnecessary since a repair can't
-  // change the trained date (that's the poster's DATE tab).
+  // change the trained date (that's edited on the poster itself).
   const handleWorkoutUpdated = (workout: WorkoutWithStats) => {
     setSelectedWorkout(workout);
     setWorkoutList((prev) => prev.map((w) => (w.id === workout.id ? workout : w)));
@@ -240,6 +241,8 @@ function AppContent() {
             onBack={() => setCurrentScreen('profile')}
           />
         );
+      case 'chase':
+        return <ChaseScreen onBack={() => setCurrentScreen('home')} />;
       case 'recap': {
         if (!pendingRecapData) return null;
         const closeRecap = () => { setPendingRecapData(null); setCurrentScreen('home'); };
@@ -274,6 +277,7 @@ function AppContent() {
             onLogPlannedWorkout={handleLogPlannedWorkout}
             onOpenRecap={handleOpenRecap}
             onOpenFeed={() => setCurrentScreen('feed')}
+            onOpenChase={() => setCurrentScreen('chase')}
             ringsKey={homeRingsKey}
           />
         );

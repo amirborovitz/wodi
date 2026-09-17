@@ -1,0 +1,246 @@
+/* Square corners and ruled hairlines throughout: a poster is earned and gets radius and a
+   vibe stamp, a chase is owed and gets neither. */
+.screen {
+  height: 100dvh;
+  background: #0b0c0e;
+  overflow-y: auto;
+  overscroll-behavior-y: none;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+
+.layout {
+  max-width: var(--app-column);
+  margin-inline: auto;
+  padding: 0 18px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.back {
+  background: transparent;
+  border: 0;
+  padding: 4px 0;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(243, 241, 234, 0.34);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.title {
+  margin: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: -0.015em;
+  color: #f3f1ea;
+}
+
+.dot {
+  color: #f5c200;
+}
+
+.subtitle {
+  max-width: 230px;
+  margin: 6px 0 0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(243, 241, 234, 0.56);
+  text-wrap: pretty;
+}
+
+/* ── Count rule ── */
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: rgba(243, 241, 234, 0.34);
+}
+
+.ruleLine {
+  flex: 1;
+  height: 1px;
+  background: rgba(243, 241, 234, 0.12);
+}
+
+/* ── Cards ── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding-bottom: 26px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 14px 12px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tag {
+  padding: 4px 7px 3px;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  font-family: 'Barlow', sans-serif;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  color: rgba(243, 241, 234, 0.66);
+}
+
+.subject {
+  padding-top: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(243, 241, 234, 0.66);
+  text-align: right;
+}
+
+.claim {
+  margin: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20.5px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #f3f1ea;
+  text-wrap: pretty;
+}
+
+.facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fact {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: rgba(243, 241, 234, 0.66);
+}
+
+.bullet {
+  flex: 0 0 3px;
+  width: 3px;
+  height: 3px;
+  background: #f5c200;
+}
+
+/* ── Actions ── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.put,
+.saved {
+  flex: 1;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.put {
+  border: 0;
+  background: #f5c200;
+  color: #0a0c0f;
+}
+
+.put:active {
+  filter: brightness(0.94);
+}
+
+.saved {
+  background: transparent;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  color: rgba(243, 241, 234, 0.56);
+  cursor: default;
+}
+
+.notNow {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  color: rgba(243, 241, 234, 0.34);
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Empty & footer ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 34px 18px;
+  border: 1px dashed rgba(243, 241, 234, 0.12);
+  text-align: center;
+}
+
+.emptyTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #f3f1ea;
+}
+
+.emptyNote {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: rgba(243, 241, 234, 0.34);
+}
+
+.footnote {
+  margin: 4px 0 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px;
+  line-height: 1.7;
+  color: rgba(243, 241, 234, 0.66);
+  text-align: center;
+}

@@ -84,6 +84,26 @@ describe('an event outranks an approach', () => {
     expect(d?.justCrossed).toBe(1_000);
     expect(d?.total).toBe(1_020);
   });
+
+  it('dates the crossing, so Today knows whether it is still the day\'s news', () => {
+    // The same history, crossed by a session two days ago. Home hands the slot to Chase once
+    // the crossing stops being today's event — without this date it could hold it a fortnight.
+    const d = buildMilestone([
+      ...series(8, 7, () => ({ name: 'Pull-up', totalReps: 120 })).map(w => ({
+        ...w, date: new Date(NOW - (30 + (NOW - w.date.getTime()) / DAY) * DAY),
+      })) as WorkoutWithStats[],
+      workout(2, [{ name: 'Pull-up', totalReps: 60 }]),
+    ], NOW);
+
+    expect(d?.crossedOn).toBe('2026-09-07');
+  });
+
+  it('leaves the crossing date empty when nothing was crossed', () => {
+    const d = buildMilestone(series(8, 7, () => ({ name: 'Pull-up', totalReps: 120 })), NOW);
+
+    expect(d?.justCrossed).toBeNull();
+    expect(d?.crossedOn).toBeNull();
+  });
 });
 
 describe('cardio is counted in its own unit', () => {

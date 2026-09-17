@@ -195,6 +195,17 @@ export function resolveOccurrenceLoad(
 }
 
 /**
+ * The weights ONE implement carried across a breakdown entry's sets. The entry's `weight` is the
+ * effective load (both dumbbells, for volume) while its progression is already per implement —
+ * so only the single-weight branch divides. Empty when the entry carries no load.
+ */
+export function breakdownPerImplementWeights(total: MovementTotal): number[] {
+  if (total.weightProgression?.length) return total.weightProgression;
+  const pair = Math.max(1, total.implementCount ?? 1);
+  return (total.weight ?? 0) > 0 ? [Math.round(((total.weight ?? 0) / pair) * 10) / 10] : [];
+}
+
+/**
  * THE top set: the heaviest load an exercise put on the bar, and which lift it belonged to.
  * One definition, so the hero number and the rows beneath it cannot disagree.
  *
@@ -233,10 +244,8 @@ export function getExercisePeakLoad(
   const candidates: PeakLoad[] = [
     ...breakdown.flatMap((movement) => {
       const pair = Math.max(1, movement.implementCount ?? 1);
-      const perImplement = movement.weightProgression?.length
-        ? movement.weightProgression
-        : (movement.weight ?? 0) > 0 ? [Math.round(((movement.weight ?? 0) / pair) * 10) / 10] : [];
-      return perImplement.map((weight) => ({ weight, implementCount: pair, movementName: movement.name }));
+      return breakdownPerImplementWeights(movement)
+        .map((weight) => ({ weight, implementCount: pair, movementName: movement.name }));
     }),
     ...occurrenceMovements.flatMap((mov) => {
       const load = resolveOccurrenceLoad(mov, breakdown, occurrences.get(mov.name.toLowerCase()) ?? 1);

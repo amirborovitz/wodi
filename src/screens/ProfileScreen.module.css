@@ -227,6 +227,14 @@
   color: #f2f0eb;
 }
 
+/* The home-screen row shows the real icon it's about to put there, in the icon slot's size. */
+.navRowAppIcon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
 .navRowIconAccent {
   background: #f5c200;
   color: #0c0d0f;

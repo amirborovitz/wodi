@@ -360,6 +360,12 @@
   margin-top: 0;
 }
 
+/* `overflow: hidden` so the collapse on dismiss clips the card instead of spilling it. */
+.installSlot {
+  margin-top: 16px;
+  overflow: hidden;
+}
+
 .galleryHeader {
   display: flex;
   align-items: baseline;

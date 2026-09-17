@@ -1,0 +1,66 @@
+/* The slot under the "Add a workout" hero — same rhythm as the milestone line it shares
+   that slot with, so swapping one for the other never moves the screen. */
+.line {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 13px 0 10px;
+  padding: 0 0 0 4px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tag {
+  flex: 0 0 auto;
+  padding: 4px 7px 3px;
+  background: #f5c200;
+  color: #0a0c0f;
+  font-family: 'Barlow', sans-serif;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+}
+
+.value {
+  flex: 0 0 auto;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.015em;
+  color: #f5c200;
+}
+
+.word {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #f3f1ea;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more {
+  flex: 0 0 auto;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  color: rgba(243, 241, 234, 0.66);
+  white-space: nowrap;
+}
+
+.arrow {
+  flex: 0 0 auto;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #f5c200;
+}

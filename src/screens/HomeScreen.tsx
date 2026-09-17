@@ -8,13 +8,19 @@ import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { useMilestone } from '../hooks/useMilestone';
+import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
+import { useChase } from '../hooks/useChase';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { MilestoneLine } from '../components/home/MilestoneLine';
+import { ChaseLine } from '../components/home/ChaseLine';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { FeedPulse } from '../components/home/FeedPulse';
+import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
+import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
 import { isAdminEmail } from '../utils/admin';
+import { toIsoDate } from '../utils/workoutDate';
 import type { PlannedWorkout } from '../types';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
@@ -30,6 +36,7 @@ interface HomeScreenProps {
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   onOpenRecap?: (data: RecapData) => void;
   onOpenFeed?: () => void;
+  onOpenChase?: () => void;
   ringsKey?: number; // kept for API compatibility — unused
 }
 
@@ -61,6 +68,7 @@ export function HomeScreen({
   onLogPlannedWorkout,
   onOpenRecap,
   onOpenFeed,
+  onOpenChase,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
   // EVERY workout, not a recent window: the recap cards and the milestone below are totals over
@@ -74,6 +82,14 @@ export function HomeScreen({
   // worth saying yet, and the line simply does not render.
   const milestone = useMilestone(workouts);
   const profile = useProfileCompleteness();
+  // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
+  const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
+  const chase = useChase(workouts);
+  // A crossing is the day's event and wins the slot ON THAT DAY. The milestone line itself
+  // keeps a crossing up for a fortnight, which is right for a line with nothing to compete
+  // with — but handing Chase nothing for two weeks is how a whole feature goes unseen.
+  const crossingIsTodaysNews = milestone?.crossedOn === toIsoDate(new Date());
+  const showChaseLine = Boolean(onOpenChase) && !crossingIsTodaysNews;
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
@@ -347,8 +363,24 @@ export function HomeScreen({
           </div>
         </motion.button>
 
-        {/* ── Milestone ── */}
-        {!loading && milestone && (
+        {/* ── The observation slot ──
+            One line under the hero, carrying whichever of the two computed observations is
+            worth more today. A milestone the athlete has JUST CROSSED is an event and wins
+            outright; otherwise the slot points forward at the top chase. Both are the app's
+            own arithmetic over the log — see useMilestone and chaseFacts. */}
+        {!loading && (showChaseLine && chase.top ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.08, duration: 0.25 }}
+          >
+            <ChaseLine
+              fact={chase.top}
+              more={chase.facts.length - 1}
+              onOpen={() => onOpenChase?.()}
+            />
+          </motion.div>
+        ) : milestone && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -356,7 +388,7 @@ export function HomeScreen({
           >
             <MilestoneLine milestone={milestone} />
           </motion.div>
-        )}
+        ))}
 
         {/* ── For Later ── */}
         {planned.length > 0 && (
@@ -448,6 +480,26 @@ export function HomeScreen({
           </motion.div>
         )}
 
+        {/* Home-screen nudge. Below the athlete's own work and any recap drop — it is the
+            one thing on Today that isn't about their training. */}
+        <AnimatePresence initial={false}>
+          {homeScreenInstall.teaserVisible && (
+            <motion.div
+              key="add-to-home-screen"
+              className={styles.installSlot}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              <AddToHomeScreenCard
+                onOpen={homeScreenInstall.openSheet}
+                onDismiss={homeScreenInstall.dismissTeaser}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* The gym's heartbeat, last so it never competes with the athlete's own work
             above it or with a recap drop. It renders nothing when the 24h window holds
             no one else, so a quiet day costs no space. */}
@@ -482,6 +534,12 @@ export function HomeScreen({
         onCancel={savedDeleteSheet.close}
         busy={savedDeleteSheet.busy}
         error={savedDeleteSheet.error}
+      />
+
+      <AddToHomeScreenSheet
+        open={homeScreenInstall.sheetOpen}
+        shareLocation={homeScreenInstall.shareLocation}
+        onClose={homeScreenInstall.closeSheet}
       />
 
       <AnimatePresence>
@@ -547,3 +605,4 @@ export function HomeScreen({
     </div>
   );
 }
+

@@ -1,0 +1,29 @@
+/* Centred by auto margins, not by a translate — framer-motion owns `transform` while it
+   animates the toast in and out, and a translateX here would be overwritten mid-flight. */
+.toast {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  width: max-content;
+  max-width: calc(100% - 40px);
+  margin-inline: auto;
+  z-index: 1000;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: rgba(20, 22, 26, 0.95);
+  border: 1px solid rgba(243, 241, 234, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+}
+
+.mark {
+  color: #f5c200;
+}
