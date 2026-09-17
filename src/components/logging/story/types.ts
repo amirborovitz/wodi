@@ -11,7 +11,7 @@ import type { LoadUnit } from '../../../utils/loadUnits';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
 import { findOpenMovement, findOpenMovements, scoresOpenReps } from '../../../services/blockScore';
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
-import { matchesNamePattern } from '../../../utils/movementNameMatch';
+import { isRowErgName, matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
 import { asksImplementCount } from './implementQuestion';
 
@@ -207,9 +207,10 @@ const BODYWEIGHT_NAME_PATTERNS = [
   'chest to bar', 'c2b', 'ctb',
 ];
 
+// The rower is not listed: isRowErgName owns what "row" means.
 const CARDIO_MACHINE_PATTERNS = [
   'echo bike', 'assault bike', 'air bike', 'airbike', 'airdyne',
-  'ski erg', 'skierg', 'rower', 'rowing', 'row erg', 'bike erg', 'bikeerg',
+  'ski erg', 'skierg', 'bike erg', 'bikeerg',
   'bike',  // plain "Bike" = cardio machine (Echo/Assault/Air)
 ];
 
@@ -220,12 +221,7 @@ const DISTANCE_CARDIO_PATTERNS = [
 
 function classifyMovementName(name: string): 'weight' | 'bodyweight' | 'cardio_machine' | 'distance_cardio' | 'unknown' {
   const n = name.toLowerCase();
-  if (matchesNamePattern(n, CARDIO_MACHINE_PATTERNS)) return 'cardio_machine';
-  // Standalone "Row" = Concept2 rower (cardio machine). Weighted rows (Renegade Row,
-  // Bent-over Row, DB Row, etc.) are distinguished by their qualifier words.
-  if (/\brow\b/.test(n) && !/renegade|bent[-\s]over|pendlay|dumbbell|\bdb\b|kettlebell|\bkb\b|barbell/.test(n)) {
-    return 'cardio_machine';
-  }
+  if (matchesNamePattern(n, CARDIO_MACHINE_PATTERNS) || isRowErgName(n)) return 'cardio_machine';
   // Implement prefix (dumbbell/db/kettlebell/kb) means always weighted — even if the movement
   // name also contains a bodyweight word (e.g., "Dumbbell Burpee to Deadlift").
   if (/\b(dumbbell|dumbell|db|kettlebell|kb)\s+\w/i.test(n)) return 'weight';

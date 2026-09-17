@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { postProcessParsedWorkout } from './workoutPostProcessor';
+import { parseMovementsFromPrescription, postProcessParsedWorkout } from './workoutPostProcessor';
 import type { ParsedWorkout, ParsedSection } from '../types';
 
 // The real board that surfaced this (31/07/26): a partner for-time chipper written as a
@@ -333,6 +333,99 @@ function carryWod(movement: Record<string, unknown>): ParsedWorkout {
 }
 
 const carryOf = (w: ParsedWorkout) => w.exercises[0].movements!.at(-1)!;
+
+function roundsWod(prescription: string, movements: ParsedWorkout['exercises'][number]['movements']): ParsedWorkout {
+  return {
+    title: 'WOD',
+    type: 'for_time',
+    format: 'for_time',
+    scoreType: 'time',
+    rawText: prescription,
+    exercises: [{
+      name: '5 Rounds For Time',
+      type: 'wod',
+      loggingMode: 'for_time',
+      prescription,
+      suggestedSets: 5,
+      movements,
+    }],
+  } as unknown as ParsedWorkout;
+}
+
+describe('postProcessParsedWorkout — only the rowing machine borrows a clock from the board', () => {
+  it('never lends a Ring Row the minutes of a neighbouring line', () => {
+    // The board of 15/09/26, exactly as the AI returned it. "Ring Row" was taken for the erg,
+    // the erg went looking for a time near its name, and found the 400m run's "m" — read as
+    // MINUTES. The poster printed "400 min Pull-ups".
+    const out = postProcessParsedWorkout(roundsWod(
+      '5 RFT: 400m Run, 10 Pull-up / Ring Row, 10 Front Squat @35/50kg, 10 Burpee',
+      [
+        { name: 'Run', distance: 400, unit: 'm', inputType: 'none', equipment: 'none' },
+        { name: 'Ring Row', reps: 10, inputType: 'none', equipment: 'none', alternative: { name: 'Pull-up', reps: 10 } },
+        { name: 'Front Squat', reps: 10, inputType: 'weight', equipment: 'barbell', rxWeights: { male: 50, female: 35, unit: 'kg' } },
+        { name: 'Burpee', reps: 10, inputType: 'none', equipment: 'none' },
+      ],
+    ));
+    const ringRow = out.exercises[0].movements![1];
+    expect(ringRow.time).toBeUndefined();
+    expect(ringRow.distance).toBeUndefined();
+  });
+
+  it('still reads a time for an erg the AI left unmeasured', () => {
+    const out = postProcessParsedWorkout(roundsWod('3 min Row, 10 Burpees', [
+      { name: 'Row', inputType: 'none' },
+      { name: 'Burpee', reps: 10, inputType: 'none' },
+    ]));
+    expect(out.exercises[0].movements![0].time).toBe(180);
+  });
+
+  it('reads metres as metres, never as minutes', () => {
+    const out = postProcessParsedWorkout(roundsWod('500m Row, 10 Burpees', [
+      { name: 'Row', inputType: 'none' },
+      { name: 'Burpee', reps: 10, inputType: 'none' },
+    ]));
+    const row = out.exercises[0].movements![0];
+    expect(row.time).toBeUndefined();
+    expect(row.distance).toBe(500);
+  });
+});
+
+describe('postProcessParsedWorkout — a scaling pair defaults to the Rx movement', () => {
+  it('merges a pair the AI listed separately with the harder movement as the one logged', () => {
+    const out = postProcessParsedWorkout(roundsWod('40 Double Unders / 60 Single Unders, 10 Burpees', [
+      { name: 'Single Under', reps: 60, inputType: 'none' },
+      { name: 'Double Under', reps: 40, inputType: 'none' },
+      { name: 'Burpee', reps: 10, inputType: 'none' },
+    ]));
+    const [skip] = out.exercises[0].movements!;
+    expect(skip.name).toBe('Double Under');
+    expect(skip.reps).toBe(40);
+    expect(skip.alternative).toMatchObject({ name: 'Single Under', reps: 60 });
+  });
+
+  it('never reorders a pair the AI already stated', () => {
+    const out = postProcessParsedWorkout(roundsWod('10 Pull-up / Ring Row', [
+      { name: 'Pull-up', reps: 10, inputType: 'none', alternative: { name: 'Ring Row', reps: 10 } },
+    ]));
+    expect(out.exercises[0].movements![0].name).toBe('Pull-up');
+    expect(out.exercises[0].movements![0].alternative?.name).toBe('Ring Row');
+  });
+});
+
+describe('parseMovementsFromPrescription — the text fallback defaults a scaling pair to Rx', () => {
+  it('keeps the harder side as the movement, whichever side the board wrote first', () => {
+    const rx = { name: 'Pull-ups', reps: 10, alternative: { name: 'Ring Rows', reps: 10 } };
+    expect(parseMovementsFromPrescription('10 Ring Rows / 10 Pull-ups, 10 Burpees', '5 Rounds For Time')?.[0])
+      .toMatchObject(rx);
+    expect(parseMovementsFromPrescription('10 Pull-ups / 10 Ring Rows, 10 Burpees', '5 Rounds For Time')?.[0])
+      .toMatchObject(rx);
+  });
+
+  it('with no known relation, the side with fewer reps is the harder one', () => {
+    expect(parseMovementsFromPrescription('4 Bar Muscle-ups / 8 Chest to Bar, 10 Burpees', '5 Rounds For Time')?.[0])
+      .toMatchObject({ reps: 4, alternative: { reps: 8 } });
+  });
+});
 
 describe('backfillCarryLoadInput — a prescribed-distance carry logs its load', () => {
   it("turns the stale 'none' on a distance carry into a weight input", () => {

@@ -6,7 +6,7 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSectionType, RxWeights, ExerciseLoggingMode } from '../types';
 import { getAlternativeType } from '../data/exerciseDefinitions';
 import { hasSameMovementsEveryRound } from '../utils/sectionShape';
-import { matchesNamePattern } from '../utils/movementNameMatch';
+import { isRowErgName, matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 import { prescribesOwnRest } from './partnerScope';
 import { isWeightedCarry } from '../utils/xpCalculations';
@@ -29,7 +29,8 @@ function normalizeWeightUnit(raw: string): 'kg' | 'lb' {
  * Time-based cardio patterns: "30 sec", "30s", "1 min", "1:30"
  */
 const TIME_SEC_PATTERN = /(\d+)\s*(?:sec(?:onds?)?|s\b)/i;
-const TIME_MIN_PATTERN = /(\d+)\s*(?:min(?:utes?)?|m\b)/i;
+// No bare "m": on a board it is metres. "400m run" read as 400 MINUTES.
+const TIME_MIN_PATTERN = /(\d+)\s*min(?:utes?)?\b/i;
 const TIME_MMSS_PATTERN = /(\d+):(\d{2})/;
 
 /**
@@ -43,12 +44,13 @@ const FIXED_MOVEMENT_STOPWORDS = new Set([
 ]);
 
 /**
- * Cardio machine names that should have time/distance/calories
+ * Cardio machine names that should have time/distance/calories.
+ * The rower is not listed: isRowErgName owns what "row" means.
  */
 const CARDIO_MACHINES = [
   'bike', 'echo bike', 'assault bike', 'air bike', 'airbike', 'airdyne',
   'bike erg', 'bikeerg',
-  'row', 'rower', 'rowing', 'row erg', 'rowerg', 'ski erg', 'skierg',
+  'ski erg', 'skierg',
   'run', 'running', 'treadmill', 'airrunner',
 ];
 
@@ -1659,35 +1661,16 @@ function parseMovementFromText(text: string): ParsedMovement | null {
     const nameA = normalizeMovementName(slashRepsMatch[2].trim());
     const nameB = normalizeMovementName(slashRepsMatch[4].trim());
 
-    let baseName = nameA;
-    let baseReps = repsA;
-    let altName = nameB;
-    let altReps = repsB;
-
+    // The Rx side is the movement; the scaled side is the alternative. With no known relation,
+    // the side prescribed fewer reps is the harder one ("4 BMU / 8 C2B").
     const altType = getAlternativeType(nameA, nameB);
-    if (altType === 'easier') {
-      baseName = nameB;
-      baseReps = repsB;
-      altName = nameA;
-      altReps = repsA;
-    } else if (altType === 'harder') {
-      baseName = nameA;
-      baseReps = repsA;
-      altName = nameB;
-      altReps = repsB;
-    } else if (repsB > repsA) {
-      baseName = nameB;
-      baseReps = repsB;
-      altName = nameA;
-      altReps = repsA;
-    }
-
+    const bIsRx = altType === 'harder' || (altType == null && repsB < repsA);
     return {
-      name: baseName,
-      reps: baseReps,
+      name: bIsRx ? nameB : nameA,
+      reps: bIsRx ? repsB : repsA,
       alternative: {
-        name: altName,
-        reps: altReps,
+        name: bIsRx ? nameA : nameB,
+        reps: bIsRx ? repsA : repsB,
       },
     };
   }
@@ -1696,22 +1679,12 @@ function parseMovementFromText(text: string): ParsedMovement | null {
   if (slashNameMatch) {
     const nameA = normalizeMovementName(slashNameMatch[1].trim());
     const nameB = normalizeMovementName(slashNameMatch[2].trim());
-    let baseName = nameA;
-    let altName = nameB;
-
-    const altType = getAlternativeType(nameA, nameB);
-    if (altType === 'easier') {
-      baseName = nameB;
-      altName = nameA;
-    } else if (altType === 'harder') {
-      baseName = nameA;
-      altName = nameB;
-    }
-
+    // Rx side first; with no known relation, the board's own order stands.
+    const bIsRx = getAlternativeType(nameA, nameB) === 'harder';
     return {
-      name: baseName,
+      name: bIsRx ? nameB : nameA,
       alternative: {
-        name: altName,
+        name: bIsRx ? nameA : nameB,
       },
     };
   }
@@ -2321,7 +2294,7 @@ function extractDistanceFromText(
  */
 function isCardioMachine(name: string): boolean {
   const lower = name.toLowerCase();
-  return matchesNamePattern(lower, CARDIO_MACHINES);
+  return matchesNamePattern(lower, CARDIO_MACHINES) || isRowErgName(lower);
 }
 
 /**
@@ -2336,15 +2309,16 @@ function cleanWeightFromName(name: string): string {
 }
 
 /**
- * Known alternative movement pairs (primary -> alternatives)
- * Primary is the easier/scaled movement; alternatives are harder/Rx
+ * Known scaling pairs: the easier movement, and the Rx movements it scales. When a board lists
+ * both, the Rx movement is the one logged and the scaled one is its alternative — the athlete
+ * steps down with one tap, never has to step up.
  */
-const KNOWN_ALTERNATIVE_PAIRS: Array<{ primary: string; alternatives: string[] }> = [
-  { primary: 'Single Under', alternatives: ['Double Under'] },
-  { primary: 'Pull-up', alternatives: ['Chest to Bar Pull-up', 'Muscle-up', 'Bar Muscle-up'] },
-  { primary: 'Push-up', alternatives: ['Handstand Push-up'] },
-  { primary: 'Air Squat', alternatives: ['Pistol'] },
-  { primary: 'Knees to Elbow', alternatives: ['Toes to Bar'] },
+const KNOWN_ALTERNATIVE_PAIRS: Array<{ scaled: string; rx: string[] }> = [
+  { scaled: 'Single Under', rx: ['Double Under'] },
+  { scaled: 'Pull-up', rx: ['Chest to Bar Pull-up', 'Muscle-up', 'Bar Muscle-up'] },
+  { scaled: 'Push-up', rx: ['Handstand Push-up'] },
+  { scaled: 'Air Squat', rx: ['Pistol'] },
+  { scaled: 'Knees to Elbow', rx: ['Toes to Bar'] },
 ];
 
 // Partner/team detection patterns — shared by detectAndAdjustPartnerWorkout (workout-level) and
@@ -2470,10 +2444,9 @@ function mergeAlternativeMovements(movements: ParsedMovement[]): ParsedMovement[
 
       if (pair) {
         consumed.add(i + 1);
-        // Determine which is primary
-        const isPrimaryFirst = normalizeForComparison(current.name) === normalizeForComparison(pair.primary);
-        const primary = isPrimaryFirst ? current : next;
-        const alt = isPrimaryFirst ? next : current;
+        const isRxFirst = normalizeForComparison(current.name) !== normalizeForComparison(pair.scaled);
+        const primary = isRxFirst ? current : next;
+        const alt = isRxFirst ? next : current;
 
         result.push({
           ...primary,
@@ -2502,10 +2475,10 @@ function findAlternativePair(name1: string, name2: string): typeof KNOWN_ALTERNA
   const n2 = normalizeForComparison(name2);
 
   for (const pair of KNOWN_ALTERNATIVE_PAIRS) {
-    const primary = normalizeForComparison(pair.primary);
-    const alts = pair.alternatives.map(normalizeForComparison);
+    const scaled = normalizeForComparison(pair.scaled);
+    const rx = pair.rx.map(normalizeForComparison);
 
-    if ((n1 === primary && alts.includes(n2)) || (n2 === primary && alts.includes(n1))) {
+    if ((n1 === scaled && rx.includes(n2)) || (n2 === scaled && rx.includes(n1))) {
       return pair;
     }
   }
@@ -2562,7 +2535,6 @@ function detectVariableRepScheme(exercise: ParsedExercise): number[] | undefined
 const BACKFILL_CARDIO_MACHINES = [
   'echo bike', 'ecobike', 'assault bike', 'air bike', 'airbike', 'airdyne',
   'ski erg', 'skierg', 'ski-erg',
-  'rower', 'rowing', 'row erg', 'rowerg', 'row',
   'bike erg', 'bikeerg',
 ];
 
@@ -2587,7 +2559,7 @@ const BACKFILL_BODYWEIGHT = [
   'pistol', 'pistols',
   'box jump', 'box step',
   'double under', 'du', 'single under', 'su',
-  'rope climb', 'ring dip', 'dip',
+  'rope climb', 'ring dip', 'dip', 'ring row',
   'wall walk', 'strict toes to bar', 'strict ttb',
   'hollow rock', 'plank', 'l-sit',
 ];
@@ -2595,7 +2567,7 @@ const BACKFILL_BODYWEIGHT = [
 function inferInputType(mov: ParsedMovement): ParsedMovement['inputType'] {
   const name = mov.name.toLowerCase();
 
-  if (matchesNamePattern(name, BACKFILL_CARDIO_MACHINES)) return 'calories';
+  if (matchesNamePattern(name, BACKFILL_CARDIO_MACHINES) || isRowErgName(name)) return 'calories';
   if (/cal\b|calorie/i.test(name)) return 'calories';
   if (matchesNamePattern(name, BACKFILL_DISTANCE_CARDIO)) return mov.distance ? 'none' : 'distance';
   if (matchesNamePattern(name, BACKFILL_BODYWEIGHT)) return 'none';

@@ -30,6 +30,32 @@ export function matchesNamePattern(name: string, patterns: readonly string[]): b
   return patterns.some(p => patternToRegex(p).test(name));
 }
 
+/** Words that say which machine, or how much of it — never which movement. */
+const ROW_ERG_WORDS = new Set([
+  'row', 'rows', 'rowing', 'rower', 'rowerg', 'erg', 'machine', 'concept', 'concept2', 'c2',
+  'cal', 'cals', 'calorie', 'calories', 'm', 'meter', 'meters', 'metre', 'metres', 'km', 'max',
+]);
+
+/**
+ * True when a name is the rowing MACHINE. "Row" names the erg only when nothing else in the name
+ * says which row: Ring Row, Renegade Row, Gorilla Row, Upright Row are rows of a body or a
+ * weight. A whole-word match on "row" filed every one of them as the erg — so a ring row was
+ * handed the shared barbell weight and a "400m" off the next line read as 400 minutes.
+ *
+ * The ONE place that decides it. Pattern lists must not carry a bare 'row'.
+ */
+export function isRowErgName(name: string): boolean {
+  const words = name
+    .toLowerCase()
+    .replace(/^\s*(?:buy[\s-]?in|cash[\s-]?out)\s*:\s*/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    // Quantities ("500m", "20", "2") say how much, not what.
+    .filter((word) => word && !/^\d+[a-z]*$/.test(word));
+  return words.some((word) => /^row(?:s|ing|er|erg)?$/.test(word))
+    && words.every((word) => ROW_ERG_WORDS.has(word));
+}
+
 const MOVEMENT_TOKEN_ALIASES: Record<string, string> = {
   db: 'dumbbell',
   kb: 'kettlebell',

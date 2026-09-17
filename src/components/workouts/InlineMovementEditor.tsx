@@ -298,7 +298,8 @@ export function InlineMovementEditor({
   const alternatives = hasParsedAlt
     ? [{
         name: parsedAlt.name,
-        type: (parsedAltType || 'harder') as 'easier' | 'equivalent' | 'harder',
+        // The board's own alternative is its scaled option: the parse keeps the Rx side primary.
+        type: (parsedAltType || 'easier') as 'easier' | 'equivalent' | 'harder',
       }, ...definedAlternatives]
     : definedAlternatives;
   const hasAlternatives = alternatives.length > 0;
