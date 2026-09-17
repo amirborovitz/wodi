@@ -6,7 +6,15 @@
         "eyebrow": "WOD",
         "title": "EMOM 8 Double Under Practice",
         "blueprint": "EMOM 8 MIN · 8 rounds",
-        "rows": [],
+        "rows": [
+          {
+            "primary": "Max",
+            "name": "Double Under",
+            "mineKey": "Double Under",
+            "accent": "magenta",
+            "repeatCount": 8
+          }
+        ],
         "hiddenCount": 0,
         "isPartnerConfirmed": false
       }
@@ -175,6 +183,13 @@
           "kind": "block",
           "label": "",
           "cap": "EMOM 8 MIN · 8 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Double Under",
+          "load": "",
+          "mine": "",
+          "team": ""
         }
       ],
       [

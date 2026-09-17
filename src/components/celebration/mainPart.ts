@@ -3,7 +3,8 @@ import { getMaxRepsMovement } from '../logging/story/types';
 import { isStrengthPagePart } from './helpers';
 
 /**
- * Which parts of a session the poster is about, and the order their posters are shown in.
+ * The order a session's posters are shown in. Every part gets a poster — an accessory block is
+ * work the athlete did and logged, so it gets its page; it just never leads the deck.
  *
  * THE one definition. It used to exist twice — once in `useCelebrationData` and once re-typed
  * inside the poster harness (`scripts/poster-corpus.ts`) — so the harness could render pages the
@@ -18,7 +19,7 @@ import { isStrengthPagePart } from './helpers';
  * count — a practice whose max was never entered has nothing to print, and giving it a page would
  * put an empty result on the poster (poster truth standard).
  */
-export function hasLoggedMaxEffort(ex: Exercise): boolean {
+function hasLoggedMaxEffort(ex: Exercise): boolean {
   if (!getMaxRepsMovement(ex)) return false;
   return (ex.sets ?? []).some((s) => s.isMax === true && (s.actualReps ?? 0) > 0);
 }
@@ -44,23 +45,6 @@ export function hasLoggedMaxEffort(ex: Exercise): boolean {
  */
 export function isMaxEffortPractice(ex: Exercise): boolean {
   return isStrengthPagePart(ex) && hasLoggedMaxEffort(ex);
-}
-
-/**
- * Is this exercise one of the session's main parts (vs. a secondary/auxiliary block like a
- * warm-up or body-armor circuit)? Trusts the AI's explicit `isSecondary` when present; for older
- * data that predates the field, falls back to the `type !== 'skill'` proxy.
- *
- * A secondary block that recorded a max earns a page anyway — the same rule the logging wizard
- * applies in `needsLoggingStep`. "Secondary" means the block wasn't the session's main effort; it
- * does not mean the number the athlete earned should vanish. Without this, a max the app asked
- * for, stored, and had a poster row ready for ("Max Toes to Bar … 18 total") was filtered out one
- * step earlier and never rendered at all.
- */
-export function isMainPart(ex: Exercise): boolean {
-  if (hasLoggedMaxEffort(ex)) return true;
-  if (typeof ex.isSecondary === 'boolean') return !ex.isSecondary;
-  return ex.type !== 'skill';
 }
 
 /**

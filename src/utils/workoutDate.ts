@@ -3,7 +3,7 @@
  *
  * `workout.date` is the logging timestamp: when the photo was uploaded and the doc
  * written. `workout.sourceDate` is the day the workout was actually trained — read
- * off the board by the parser, and editable by the athlete on the poster's DATE tab.
+ * off the board by the parser, and editable by the athlete by tapping the poster's date.
  *
  * They differ constantly: log Sunday's session on Monday morning, catch up on a
  * week of boards in one sitting, or post a photo of a board dated three days ago.
@@ -43,6 +43,28 @@ export function parseSourceDate(sourceDate: string | undefined): Date | null {
     return null;
   }
   return date;
+}
+
+/** A LOCAL calendar day as `YYYY-MM-DD` — the shape `sourceDate` is stored in. */
+export function toIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Walk a trained date by whole days, never past `latestIso` — today, because a workout can't
+ * have happened in the future. A date that already sits past it lands ON it rather than
+ * staying out of range.
+ *
+ * Built from calendar parts, not by adding 86 400 000 ms: a day that crosses a DST change is
+ * 23 or 25 hours long, and millisecond arithmetic lands on the wrong day at local midnight.
+ *
+ * Null for a malformed start date.
+ */
+export function stepIsoDate(iso: string, days: number, latestIso: string): string | null {
+  const start = parseSourceDate(iso);
+  if (!start) return null;
+  const next = toIsoDate(new Date(start.getFullYear(), start.getMonth(), start.getDate() + days));
+  return next > latestIso ? latestIso : next;
 }
 
 /**

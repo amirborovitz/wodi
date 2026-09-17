@@ -8,6 +8,7 @@
 
 import type {
   Exercise,
+  ExerciseSet,
   MovementTotal,
   SharedWorkLabel,
   WorkoutFormat,
@@ -900,7 +901,12 @@ function orderMovementTotalsByPrescription(exercise: Exercise | null | undefined
     .map((movement) => ({ movement, key: normalizeStampMovementName(movement.name) }))
     .filter((entry) => Boolean(entry.key));
   const prescribedOrder = prescribed.map((entry) => entry.key);
-  if (prescribedOrder.length <= 1 || movements.length <= 1) return movements;
+  if (prescribedOrder.length === 0) return movements;
+  // Nothing logged against the part at all — a practice done as written, a hold with no clock on
+  // it. The board is the whole page then, by name, exactly as the fill-in below does for one
+  // unlogged movement among logged ones.
+  if (movements.length === 0) return prescribed.map((entry) => ({ name: entry.movement.name } as MovementTotal));
+  if (prescribedOrder.length === 1) return movements;
 
   const withOrder = movements.map((movement, index) => ({
     movement,
@@ -1906,6 +1912,27 @@ function buildSequentialMovementRows(
     descLadderScheme?: number[];
     partnerSplit?: 'reps' | 'rounds';
     teamSize?: number;
+    /**
+     * The set the athlete earned, when the block ends on one ("+ max reps @60%"). A max is one
+     * SET, so its reps and its lighter bar live in `sets[]` — the breakdown is keyed by movement
+     * NAME and has already blended them into the block's averages (34 reps at "80kg", a load
+     * nobody lifted). The row that states the max is therefore given this set's own numbers and
+     * nothing else's; without it the line reads as a second copy of the working set.
+     */
+    maxSet?: ExerciseSet;
+    /**
+     * Reps across the sets the coach DID write, when the block ends on a max set. The two rows
+     * split one stored breakdown entry between them, and the single-truth rule says they must add
+     * back up to it — so the working row states its own share rather than going blank.
+     */
+    writtenSetReps?: number;
+    /**
+     * The loads those written sets were done at. The breakdown stores one weightProgression for
+     * the whole block, so a block that worked at 100 and dropped to 60 for the max printed
+     * "100→60kg" against the working sets — a climb down nobody did. Each row states the bar its
+     * own sets were on.
+     */
+    writtenSetWeights?: number[];
   } = {},
 ): ArtifactRow[] {
   const occurrences = new Map<string, number>();
@@ -1913,10 +1940,26 @@ function buildSequentialMovementRows(
     const key = movement.name.toLowerCase();
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
+  const maxMovementKey = options.maxSet
+    ? prescribedMovements.find(statesMaxEffort)?.name.toLowerCase()
+    : undefined;
   return prescribedMovements.map((movement): ArtifactRow => {
     const actual = findMovementTotal(actualMovements, movement.name);
-    return buildCelebrationMovementRow({
-      occurrenceCount: occurrences.get(movement.name.toLowerCase()),
+    // statesMaxEffort is THE owner of "does this movement say Max" — the same answer the logging
+    // screen used to decide it had a number to ask for.
+    const statesMax = statesMaxEffort(movement);
+    const maxSet = statesMax ? options.maxSet : undefined;
+    const maxWeight = maxSet?.weight;
+    // The written half of a block whose other half is a max: same lift, same stored entry, and
+    // its share is the sets that carry a coach-written rep count.
+    const isWrittenHalfOfMaxBlock = !statesMax
+      && maxMovementKey != null
+      && movement.name.toLowerCase() === maxMovementKey
+      && (options.writtenSetReps ?? 0) > 0;
+    const row = buildCelebrationMovementRow({
+      // A max row is its own occurrence and carries its own count, so the merge guard that blanks
+      // a name-shared total must not blank it too — and neither may it blank the written half.
+      occurrenceCount: maxSet || isWrittenHalfOfMaxBlock ? 1 : occurrences.get(movement.name.toLowerCase()),
       // A logged substitution replaces the board's movement — the athlete didn't do the Rx one.
       movementName: actual?.wasSubstituted ? actual.name : movement.name,
       prescribed: {
@@ -1928,8 +1971,12 @@ function buildSequentialMovementRows(
         implementCount: movement.implementCount,
         alternative: movement.alternative,
       },
-      actual,
-      repeatCount: options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount,
+      actual: maxSet
+        ? { name: actual?.name ?? movement.name, totalReps: maxSet.actualReps, weight: maxWeight, unit: actual?.unit }
+        : isWrittenHalfOfMaxBlock
+        ? { ...(actual ?? { name: movement.name }), totalReps: options.writtenSetReps }
+        : actual,
+      repeatCount: maxSet ? 1 : (options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount),
       suppressDistanceTotal: true,
       suppressCalorieTotal: true,
       isStrength: options.isStrength,
@@ -1939,7 +1986,17 @@ function buildSequentialMovementRows(
       teamSize: options.teamSize,
       together: movement.together ?? actual?.together,
       sharedLabel: movement.sharedLabel ?? actual?.sharedLabel,
+      isMaxEffort: statesMax,
     });
+    // The poster resolves a row's right-hand value from the breakdown through mineKey, and the
+    // breakdown holds ONE progression for the whole block. Left alone, both rows of a max block
+    // print the same "100→60kg" — a climb the working sets never made and the max set never made
+    // either. Each row states the bar its own sets were on, or says nothing.
+    if (!maxSet && !isWrittenHalfOfMaxBlock) return row;
+    const unit = actual?.unit === 'lb' ? 'lb' : 'kg';
+    const ownWeights = maxSet ? (maxWeight != null ? [maxWeight] : []) : (options.writtenSetWeights ?? []);
+    const ownLoad = formatLoggedLoad(ownWeights, unit, movement.implementCount);
+    return ownLoad ? { ...row, mineOverride: ownLoad } : { ...row, suppressMine: true };
   });
 }
 
@@ -3004,10 +3061,16 @@ export function buildPageArtifactSections(
     if (blockCadence) {
       blueprint = blockCadence;
     } else {
+      // A block that ends on a max set counts its sets from what was LOGGED, not from the board's
+      // words. "4 sets x 5 reps @~80% + max reps @60%" is five sets, and every text reading of it
+      // returns four — the earned set is the one the coach never wrote a number for, so the
+      // prescription it would have to be read out of does not mention it.
+      const loggedSets = exercise.sets?.filter((set) => set.completed).length || exercise.sets?.length;
+      const endsOnMaxSet = exercise.sets?.some((set) => set.isMax) ?? false;
       const setCount = (isStrengthBlocks ? sequentialBlockSetCount(exercise) : 0)
+        || (endsOnMaxSet ? loggedSets : 0)
         || repeatCount
-        || exercise.sets?.filter((set) => set.completed).length
-        || exercise.sets?.length
+        || loggedSets
         || exercise.rounds;
       blueprint = setCount && setCount > 1 ? `${setCount} sets` : 'Strength';
     }
@@ -3210,6 +3273,13 @@ export function buildPageArtifactSections(
     ? buildStrengthBlockRows(exercise, movements)
     : isFlatOccurrenceList
     ? buildSequentialMovementRows(prescribedMovements, movements, {
+        maxSet: exercise.sets?.find((set) => set.isMax),
+        writtenSetReps: exercise.sets?.some((set) => set.isMax)
+          ? exercise.sets.reduce((sum, set) => sum + (set.isMax ? 0 : (set.actualReps ?? 0)), 0)
+          : undefined,
+        writtenSetWeights: exercise.sets?.some((set) => set.isMax)
+          ? exercise.sets.filter((set) => !set.isMax).map((set) => set.weight ?? 0)
+          : undefined,
         repeatCount: rowRepeatCount,
         // Each row IS one occurrence, so the per-movement occurrence counts must not double as
         // a repeat multiplier — that would re-apply the ×2 this list already spells out.

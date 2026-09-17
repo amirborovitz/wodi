@@ -44,7 +44,7 @@ import {
   composedSchemeTitle,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
-import { isMainPart, isMaxEffortPractice } from '../src/components/celebration/mainPart';
+import { isMaxEffortPractice } from '../src/components/celebration/mainPart';
 import { movementsForParts } from '../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal, WorkoutFormat } from '../src/types';
 import type { ArtifactSection } from '../src/components/celebration/types';
@@ -89,18 +89,6 @@ function scopePageMovements(
   allExercises: Exercise[],
 ): MovementTotal[] {
   return movementsForParts(allMovements, [exercise], [allExercises.indexOf(exercise)]);
-}
-
-// Mirrors useCelebrationData.artifactSections: same scoping, but an empty match falls back to
-// the unscoped list rather than rendering nothing.
-function scopeRewardMovements(
-  target: Exercise[],
-  allMovements: MovementTotal[],
-  allExercises: Exercise[],
-): MovementTotal[] {
-  const indices = target.map((ex) => allExercises.indexOf(ex)).filter((i) => i >= 0);
-  const scoped = movementsForParts(allMovements, target, indices);
-  return scoped.length > 0 ? scoped : allMovements;
 }
 
 // ─── Invariant: no prescribed movement may silently vanish ──────────────────
@@ -186,29 +174,19 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   // Mirrors useCelebrationData.activeBreakdown: the stored breakdown, exactly as saved.
   const movements = fixture.workout.workloadBreakdown?.movements ?? [];
   const scopedRawText = exercises.length === 1 ? rawText : undefined;
-  // Mirrors useCelebrationData: the whole-workout artifact and every display decision follow
-  // the MAIN part(s) — one main part owns the artifact even when secondary siblings exist,
-  // and its own format (loggingMode-first) outranks the persisted session format.
-  const mainExercises = exercises.filter(isMainPart);
-  const sectionExercises = mainExercises.length > 0 ? mainExercises : exercises;
-  const displayFormat = mainExercises.length === 1
-    ? inferWorkoutFormatForExercise(mainExercises[0], format)
+  // Mirrors useCelebrationData: every part gets a poster, accessory blocks included. A one-part
+  // session is the whole-workout artifact, and its own format (loggingMode-first) outranks the
+  // persisted session format.
+  const displayFormat = exercises.length === 1
+    ? inferWorkoutFormatForExercise(exercises[0], format)
     : format;
-  const reward = sectionExercises.length === 1
-    ? buildRewardArtifactSections(
-        sectionExercises,
-        exercises.length > sectionExercises.length ? scopeRewardMovements(sectionExercises, movements, exercises) : movements,
-        rawText,
-        teamSize,
-        title,
-      )
+  const reward = exercises.length === 1
+    ? buildRewardArtifactSections(exercises, movements, rawText, teamSize, title)
     : null;
-  // Mirrors useCelebrationData.carouselPageData, which maps posterMainExercises — NOT every
-  // exercise. Building a page here for a part the app filters away is how a secondary block
-  // could vanish from the real poster while its fixture stayed green. Pages stay in board order
+  // Mirrors useCelebrationData.carouselPageData: one page per part. Pages stay in board order
   // here: each is a standalone poster, so deck order (orderPosterParts, pinned by its own test)
   // never changes what a page prints.
-  const pages = sectionExercises.map((exercise) =>
+  const pages = exercises.map((exercise) =>
     buildPageArtifactSections(
       exercise,
       scopePageMovements(exercise, movements, exercises),
@@ -225,28 +203,43 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     0,
     ...exercises.flatMap((ex) => ex.sets ?? []).map((s) => ((s.time ?? 0) as number) / 60),
   );
-  // Mirrors useCelebrationData.heroResult: the hero speaks for the poster's MAIN part(s) with
-  // the display format, and a lone main part's movements are scoped away from its siblings'.
-  const heroMovements = exercises.length > sectionExercises.length && sectionExercises.length === 1
-    ? scopePageMovements(sectionExercises[0], movements, exercises)
-    : movements;
+  // Mirrors useCelebrationData.heroResult: every part, with the display format.
   const hero = computeHeroResult(
-    sectionExercises,
-    displayFormat, 0, 0, durationMinutes, false, heroMovements,
+    exercises,
+    displayFormat, 0, 0, durationMinutes, false, movements,
     fixture.workout.timeCap, undefined, undefined, teamSize, rawText,
-    sectionExercises.map((ex) => exercises.indexOf(ex)),
+    exercises.map((_, index) => index),
   );
-  const mineMap = new Map([
+  const mineMapFor = (storyHero: typeof hero): Map<string, string> => new Map([
     ...buildMineMapFromBreakdown(movements),
-    ...(hero.storyMovements ? buildMineMapFromStory(hero.storyMovements) : new Map<string, string>()),
+    ...(storyHero.storyMovements ? buildMineMapFromStory(storyHero.storyMovements) : new Map<string, string>()),
   ]);
-  const rawSectionName = sectionExercises[0]?.name?.toUpperCase() ?? null;
+  // Mirrors useCelebrationData.perPageHeroResults: a carousel page's mine column reads ITS OWN
+  // page hero (posterData.buildPosterWodFromPage), never the session hero spanning every part.
+  const pageMineMaps = exercises.length > 1
+    ? exercises.map((exercise, index) => {
+        const pageMovements = scopePageMovements(exercise, movements, exercises);
+        const pageDurationMinutes = Math.max(
+          0,
+          ...(exercise.sets ?? []).map((s) => (s.time ?? 0) as number).filter((t) => t > 0).map((t) => t / 60),
+        );
+        const pageVolume = pageMovements.reduce((sum, m) => sum + ((m.weight ?? 0) * (m.totalReps ?? 0)), 0);
+        const pageTeamSize = pages[index]?.[0]?.isPartnerConfirmed ? teamSize : undefined;
+        return mineMapFor(computeHeroResult(
+          [exercise], inferWorkoutFormatForExercise(exercise, format), pageVolume, 0, pageDurationMinutes, false,
+          pageMovements, undefined, undefined, undefined, pageTeamSize,
+          `${exercise.name ?? ''}\n${exercise.prescription ?? ''}`,
+        ));
+      })
+    : null;
+  const mineMap = mineMapFor(hero);
+  const rawSectionName = exercises[0]?.name?.toUpperCase() ?? null;
   const headerContext = {
     // The SAME composer the poster builders use: an interval piece titles itself with the app's
     // one scheme notation, not the coach's spelling of it, and the block-header dedup below runs
     // against THAT. Passing the raw name here left the harness deduping a header against a title
     // production never shows.
-    title: composedSchemeTitle(sectionExercises[0], rawSectionName) ?? rawSectionName,
+    title: composedSchemeTitle(exercises[0], rawSectionName) ?? rawSectionName,
     type: (displayFormat ?? 'wod').replace('_', ' ').toUpperCase(),
     // Mirror the poster's format badge (buildFormatLine's dominant path is heroResult.formatLine)
     // so the format-badge dedup — e.g. suppressing a redundant "8 ROUNDS FOR TIME" block header
@@ -260,7 +253,7 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   };
   const posterRows = {
     reward: reward ? sectionsToRows(reward, mineMap, headerContext) : null,
-    pages: pages.map((sections) => sectionsToRows(sections, mineMap, headerContext)),
+    pages: pages.map((sections, index) => sectionsToRows(sections, pageMineMaps?.[index] ?? mineMap, headerContext)),
   };
 
   // Poster header sub-line for sectioned partner artifacts ("you & your partner - N blocks") —
@@ -292,7 +285,7 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   // The quiet per-set reps sub-line under a strength page's movement row ("6-6-5-4-3 reps").
   // Same gate buildPosterWodFromPage applies — it must never print a SUM across a complex's or
   // a circuit's movements, and it must never stop printing on a real single-lift build-up.
-  const pageRepsSchemes = sectionExercises.map((exercise) => (
+  const pageRepsSchemes = exercises.map((exercise) => (
     isStrengthPagePart(exercise) && !isMaxEffortPractice(exercise)
       ? formatPosterStrengthRepsSequence(exercise)
       : undefined
@@ -303,11 +296,11 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   // (both blanked), and the hero's caption ("MAX REPS") — and none of them were pinned here.
   // That is how a 4-window interval metcon shipped tagged SKILL with a hero reading
   // "MAX REPS · ~11burpees".
-  const pageMaxPractices = sectionExercises.map((exercise) => isMaxEffortPractice(exercise));
+  const pageMaxPractices = exercises.map((exercise) => isMaxEffortPractice(exercise));
 
   // Checked against the PAGE sections (the per-part artifact), which is where a part's full
-  // movement list is meant to land. Each page maps 1:1 to sectionExercises by index.
-  const dropped = sectionExercises.flatMap((exercise, index) =>
+  // movement list is meant to land. Each page maps 1:1 to exercises by index.
+  const dropped = exercises.flatMap((exercise, index) =>
     findDroppedMovements(exercise, pages[index] ?? [], movements)
       .map((name) => `${exercise.name}: ${name}`),
   );

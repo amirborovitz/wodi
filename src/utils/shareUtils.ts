@@ -17,6 +17,9 @@ export async function elementToCanvas(
     allowTaint: true,
     backgroundColor: '#0c0d0f',
     logging: false,
+    // Editing chrome (the poster date's dotted underline, its hidden calendar input) belongs to
+    // the screen, never to the image the athlete shares.
+    ignoreElements: (el) => el.hasAttribute('data-editor-only'),
   });
 
   return canvas;

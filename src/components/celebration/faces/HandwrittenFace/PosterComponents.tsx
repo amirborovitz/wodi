@@ -2,10 +2,11 @@
  * Shared poster components used by all handwritten skins.
  */
 
-import React from 'react';
+import React, { useContext } from 'react';
 import { BRAND, VIBE, LIGHT_VIBE, fD, fB, fH, fM } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod, PosterLine, PosterRow, PosterHeroScore } from './posterData';
+import { PosterDateContext } from './posterDateContext';
 
 /**
  * The quiet voice a LOAD is printed in.
@@ -684,11 +685,22 @@ export function EffortMeta({ ep, color, font = fM, size = 10.5, weight = 800 }: 
  * default leading pads dead space under the glyphs; the row centers that padded box and the text
  * ends up riding ~1px above the FormatTag label beside it. Hugging the glyphs makes the box's
  * geometric center land on the text's optical center.
+ *
+ * While the athlete is stepping the date (poster editor only), the EP steps aside: the ‹ date ›
+ * stepper is ~140px, and beside a long FormatTag plus EP it would run off the card on a phone.
+ * The stepper takes the whole group's slot and the EP returns the moment it closes.
  */
-export function HeaderMeta({ children }: { children: React.ReactNode }): React.JSX.Element {
+interface HeaderMetaProps {
+  effort: React.ReactNode;
+  date: React.ReactNode;
+}
+
+export function HeaderMeta({ effort, date }: HeaderMetaProps): React.JSX.Element {
+  const editingDate = useContext(PosterDateContext)?.editing ?? false;
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, lineHeight: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
-      {children}
+      {!editingDate && effort}
+      {date}
     </div>
   );
 }

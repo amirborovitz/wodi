@@ -11,7 +11,8 @@ import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'f
 import type { CelebrationFaceProps } from '../types';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
-import { buildPosterWod, buildPosterWodPages, formatIsoPosterDate } from './posterData';
+import { buildPosterWod, buildPosterWodPages } from './posterData';
+import { PosterDateContext } from './posterDateContext';
 import { useFitScale } from './useFitScale';
 import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { CorrectionSheet } from '../../CorrectionSheet';
@@ -25,6 +26,7 @@ import type { PosterPhoto, PosterSticker, PosterVibeOffset } from '../../../../t
 import type { PosterPayload } from './posterPayload';
 import { usePostToFeed, type FeedDraft } from '../../../../hooks/usePostToFeed';
 import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
+import { usePosterDate } from '../../../../hooks/usePosterDate';
 import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
 import styles from './index.module.css';
 
@@ -42,16 +44,6 @@ function FeltIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2c1 3-1 4-2 6-1 1.6-1 3 .2 4 .8.7.7-1 .5-2 2 1 3 2.6 3 4.4A4.7 4.7 0 0 1 12 22a4.7 4.7 0 0 1-4.7-4.7c0-3 2.2-4.6 2.5-7 .2 1.4 1 2.2 2 2.6-.7-2 .6-3.4 1.4-4.6C14.4 6 13.6 3.6 12 2z" />
-    </svg>
-  );
-}
-
-function DateIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="5" width="18" height="16" rx="2.5" />
-      <path d="M3 10h18" />
-      <path d="M8 3v4M16 3v4" />
     </svg>
   );
 }
@@ -130,18 +122,6 @@ function DownloadIcon(): React.JSX.Element {
   );
 }
 
-// ─── Date helpers ────────────────────────────────────────────────────────────
-
-function toIsoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function isoYesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return toIsoDate(d);
-}
-
 // ─── Text sticker (TEXT tab) ────────────────────────────────────────────────
 
 const STICKER_MAX = 24;
@@ -164,10 +144,8 @@ export function HandwrittenFace({
   const [pulse, setPulse]             = useState<number>(0);
   const [showHint, setShowHint]       = useState<boolean>(true);
   const [carouselPage, setCarouselPage] = useState<number>(0);
-  const [activePanel, setActivePanel] = useState<'style' | 'felt' | 'date' | 'sticker' | 'photo' | null>(null);
+  const [activePanel, setActivePanel] = useState<'style' | 'felt' | 'sticker' | 'photo' | null>(null);
   const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
-  const [dateOverride, setDateOverride] = useState<string | null>(null);
-  const [dateDraft, setDateDraft]     = useState<string>(() => data.sourceDate ?? toIsoDate(data.workoutDate));
   const [showCorrection, setShowCorrection] = useState<boolean>(false);
   const [showMenu, setShowMenu]       = useState<boolean>(false);
   const [showShare, setShowShare]     = useState<boolean>(false);
@@ -181,6 +159,11 @@ export function HandwrittenFace({
 
   const photoUpload = usePosterPhotoUpload();
   const feedPost = usePostToFeed();
+  // Edited in place on the poster's header; every step persists to workout.sourceDate.
+  const posterDate = usePosterDate(data.sourceDate, data.workoutDate, (iso) => {
+    onPosterCustomizationChange?.({ sourceDate: iso });
+  });
+  const displayDate = posterDate.label;
 
   const carouselViewportRef = useRef<HTMLDivElement>(null);
   const skinChipRowRef    = useRef<HTMLDivElement>(null);
@@ -231,6 +214,8 @@ export function HandwrittenFace({
   };
 
   const stepSkinFromTap = (clientX: number, target: HTMLElement | null): void => {
+    // The tap that closed the date stepper was spent closing it.
+    if (posterDate.takeClosingTap()) return;
     const rect = target?.getBoundingClientRect();
     const midpoint = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
     stepSkin(clientX < midpoint ? -1 : 1);
@@ -241,18 +226,6 @@ export function HandwrittenFace({
     setPulse((p) => p + 1);
     setShowHint(false);
     onPosterCustomizationChange?.({ posterSkin: SKINS[i].id });
-  };
-
-  // ── Date override (persists to workout.sourceDate) ─────────────────────
-
-  const displayDate = dateOverride ? formatIsoPosterDate(dateOverride) : null;
-
-  const applyDate = (iso: string): void => {
-    if (!formatIsoPosterDate(iso)) return;
-    setDateOverride(iso);
-    setDateDraft(iso);
-    setPulse((p) => p + 1);
-    onPosterCustomizationChange?.({ sourceDate: iso });
   };
 
   // ── Text sticker (persists to workout.posterSticker) ───────────────────
@@ -441,7 +414,6 @@ export function HandwrittenFace({
 
   const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
-  const toggleDatePanel = (): void => setActivePanel((p) => (p === 'date' ? null : 'date'));
   const toggleStickerPanel = (): void => setActivePanel((p) => (p === 'sticker' ? null : 'sticker'));
   const togglePhotoPanel = (): void => setActivePanel((p) => (p === 'photo' ? null : 'photo'));
   const toggleVibe = (nextVibe: VibeKey): void => {
@@ -538,30 +510,6 @@ export function HandwrittenFace({
             </div>
           </motion.div>
         )}
-        {activePanel === 'date' && (
-          <motion.div key="date-panel" className={styles.panel}
-            initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
-            <div className={styles.dateRow}>
-              <button className={styles.dateQuickChip}
-                onClick={(e) => { e.stopPropagation(); applyDate(isoYesterday()); setActivePanel(null); }}>
-                Yesterday
-              </button>
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={dateDraft}
-                onChange={(e) => setDateDraft(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Workout date"
-              />
-              <button className={styles.dateSetBtn} disabled={!dateDraft}
-                onClick={(e) => { e.stopPropagation(); applyDate(dateDraft); setActivePanel(null); }}>
-                Set
-              </button>
-            </div>
-          </motion.div>
-        )}
         {activePanel === 'sticker' && (
           <motion.div key="sticker-panel" className={styles.panel}
             initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
@@ -577,7 +525,7 @@ export function HandwrittenFace({
                 onClick={(e) => e.stopPropagation()}
                 aria-label="Poster note text"
               />
-              <button className={styles.dateSetBtn} disabled={!stickerDraft.trim()}
+              <button className={styles.stickerSetBtn} disabled={!stickerDraft.trim()}
                 onClick={(e) => { e.stopPropagation(); applySticker(); }}>
                 {sticker ? 'Update' : 'Add'}
               </button>
@@ -639,11 +587,6 @@ export function HandwrittenFace({
           onClick={toggleFeltPanel} aria-pressed={activePanel === 'felt'} aria-label="Change how it felt">
           <FeltIcon />
           <span className={styles.tabLabel}>Felt</span>
-        </button>
-        <button className={`${styles.tabBtn} ${activePanel === 'date' ? styles.tabBtnActive : ''}`}
-          onClick={toggleDatePanel} aria-pressed={activePanel === 'date'} aria-label="Change workout date">
-          <DateIcon />
-          <span className={styles.tabLabel}>Date</span>
         </button>
         <button className={`${styles.tabBtn} ${activePanel === 'sticker' ? styles.tabBtnActive : ''}`}
           onClick={toggleStickerPanel} aria-pressed={activePanel === 'sticker'} aria-label="Add a note to the poster">
@@ -719,9 +662,9 @@ export function HandwrittenFace({
   );
 
   // ─── Overflow menu ("⋯", top right) ───────────────────────────────────
-  // Everything that isn't the poster's look. The style/felt/date/text/photo tabs stay on the
-  // bottom bar because those ARE the poster; these are "this log is wrong" — one fixable by the
-  // athlete, one only reportable.
+  // Everything that isn't the poster's look. The style/felt/text/photo tabs stay on the bottom
+  // bar (and the date on the poster itself) because those ARE the poster; these are "this log is
+  // wrong" — one fixable by the athlete, one only reportable.
 
   const menuItems: ActionMenuItem[] = [
     ...(onEdit ? [{ label: 'Edit workout', icon: <PencilIcon />, onClick: onEdit }] : []),
@@ -774,7 +717,7 @@ export function HandwrittenFace({
     const shownPageWods = displayDate ? pageWods.map((w) => ({ ...w, date: displayDate })) : pageWods;
 
     return (
-      <div className={styles.root}>
+      <div className={styles.root} onPointerDownCapture={posterDate.onScreenPointerDown}>
         {storyBg}
         <div className={styles.nav}>
           <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
@@ -823,14 +766,16 @@ export function HandwrittenFace({
                   }}
                 >
                   <div ref={i === carouselPage ? shareCardRef : undefined} className={styles.stickerLayer}>
-                    <Skin
-                      wod={pageWod}
-                      vibe={vibeConfirmed ? vibe : null}
-                      vibeOffset={vibeOffset}
-                      onVibeMove={i === carouselPage ? moveVibe : undefined}
-                      onVibeDrop={i === carouselPage ? dropVibe : undefined}
-                      onVibeLongPress={i === carouselPage ? () => setPendingDelete('vibe') : undefined}
-                    />
+                    <PosterDateContext.Provider value={i === carouselPage ? posterDate.editor : null}>
+                      <Skin
+                        wod={pageWod}
+                        vibe={vibeConfirmed ? vibe : null}
+                        vibeOffset={vibeOffset}
+                        onVibeMove={i === carouselPage ? moveVibe : undefined}
+                        onVibeDrop={i === carouselPage ? dropVibe : undefined}
+                        onVibeLongPress={i === carouselPage ? () => setPendingDelete('vibe') : undefined}
+                      />
+                    </PosterDateContext.Provider>
                     {sticker && i === carouselPage && (
                       <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
                     )}
@@ -879,7 +824,7 @@ export function HandwrittenFace({
   const shownWod = displayDate ? { ...singleWod, date: displayDate } : singleWod;
 
   return (
-    <div className={styles.root}>
+    <div className={styles.root} onPointerDownCapture={posterDate.onScreenPointerDown}>
       {storyBg}
       <div className={styles.nav}>
         <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
@@ -909,14 +854,16 @@ export function HandwrittenFace({
             role="button"
             aria-label="Tap left for previous style, right for next style"
           >
-            <Skin
-              wod={shownWod}
-              vibe={vibeConfirmed ? vibe : null}
-              vibeOffset={vibeOffset}
-              onVibeMove={moveVibe}
-              onVibeDrop={dropVibe}
-              onVibeLongPress={() => setPendingDelete('vibe')}
-            />
+            <PosterDateContext.Provider value={posterDate.editor}>
+              <Skin
+                wod={shownWod}
+                vibe={vibeConfirmed ? vibe : null}
+                vibeOffset={vibeOffset}
+                onVibeMove={moveVibe}
+                onVibeDrop={dropVibe}
+                onVibeLongPress={() => setPendingDelete('vibe')}
+              />
+            </PosterDateContext.Provider>
             {sticker && (
               <TextSticker sticker={sticker} onMove={moveSticker} onDrop={dropSticker} onLongPress={() => setPendingDelete('text')} />
             )}

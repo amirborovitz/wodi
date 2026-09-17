@@ -11,6 +11,7 @@ import { rowsOf } from './posterData';
 import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue, heroScoreScale, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
+import { PosterDate } from './PosterDate';
 import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinStadiumProps {
@@ -145,10 +146,10 @@ export function SkinStadium({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onV
             </span>
           </span>
           <span style={{ flex: 1 }} />
-          <HeaderMeta>
-            <EffortMeta ep={wod.ep} color={BRAND.yellow} />
-            <span style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }}>{wod.date}</span>
-          </HeaderMeta>
+          <HeaderMeta
+            effort={<EffortMeta ep={wod.ep} color={BRAND.yellow} />}
+            date={<PosterDate date={wod.date} style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }} />}
+          />
         </div>
 
         {/* Identity */}

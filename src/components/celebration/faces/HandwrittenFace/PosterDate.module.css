@@ -1,0 +1,182 @@
+/* The date's slot in the header meta row. At rest it sits on the row's shared baseline like the
+   plain date always did; while editing it centres, because the stepper has no text baseline
+   worth sharing with the EP it replaces. */
+.slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.slot[data-editing] {
+  align-self: center;
+}
+
+/* ── Resting: the date, touchable ───────────────────────────────────────── */
+
+/* Inherits the skin's type (passed inline) — nothing about the resting date changes but the
+   underline. */
+.trigger {
+  position: relative;
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 10px mono is a sliver to aim at — the touch target is taller than the glyphs. */
+.trigger::after {
+  content: '';
+  position: absolute;
+  inset: -14px -8px;
+}
+
+.trigger:focus-visible {
+  outline: 1.5px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+/* The only resting affordance: a 1px dotted rule in the date's own dim ink. A separate element
+   (not text-decoration) so the share capture can drop it and print the bare date. */
+.underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  border-bottom: 1px dotted currentColor;
+  pointer-events: none;
+}
+
+/* ── Editing: ‹ date › in the same slot ─────────────────────────────────── */
+
+.pill {
+  --pill-ink: #f5c200;
+  --pill-fill: rgba(245, 194, 0, 0.12);
+  --arrow-fill: rgba(245, 194, 0, 0.16);
+  --arrow-dead-ink: rgba(245, 194, 0, 0.3);
+  --arrow-dead-fill: rgba(245, 194, 0, 0.05);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1.5px solid var(--pill-ink);
+  border-radius: 999px;
+  background: var(--pill-fill);
+  color: var(--pill-ink);
+  white-space: nowrap;
+  /* Kept out of the row's height: 33px is the drawn pill (26 arrow + 2×2 padding + 2×1.5
+     border) and 1em is the resting date's line (the header runs line-height 1). The pill
+     overhangs the header's padding instead of pushing the header taller, so the poster body
+     below never moves. */
+  margin-block: calc((1em - 33px) / 2);
+  animation: pillIn 0.16s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* Cream paper and the yellow flare: warm ink, the same way the felt stamp darkens there. */
+.pill[data-surface='light'] {
+  --pill-ink: #211d15;
+  --pill-fill: rgba(33, 29, 21, 0.07);
+  --arrow-fill: rgba(33, 29, 21, 0.1);
+  --arrow-dead-ink: rgba(33, 29, 21, 0.28);
+  --arrow-dead-fill: rgba(33, 29, 21, 0.04);
+}
+
+@keyframes pillIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: none; }
+}
+
+.label {
+  padding: 0 7px;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.arrow {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  /* The guillemet rides high in Barlow; lift the box so the glyph reads centred. */
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--arrow-fill);
+  color: var(--pill-ink);
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease-out;
+}
+
+.arrow:not(:disabled):active {
+  transform: scale(0.88);
+}
+
+.arrow:focus-visible {
+  outline: 1.5px solid var(--pill-ink);
+  outline-offset: 2px;
+}
+
+/* Today: a workout cannot be in the future. Dead, not hidden — the slot keeps its shape. */
+.arrow:disabled {
+  color: var(--arrow-dead-ink);
+  background: var(--arrow-dead-fill);
+  cursor: default;
+}
+
+/* A 44×44 touch target around the 28×26 drawing, grown AWAY from the label so neither arrow
+   ever eats into the label's hold-for-calendar target. */
+.arrow::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  bottom: -9px;
+}
+
+.arrowBack::after {
+  left: -16px;
+  right: 0;
+}
+
+.arrowForward::after {
+  left: 0;
+  right: -16px;
+}
+
+/* ── The calendar (hold) ────────────────────────────────────────────────── */
+
+/* Never seen or touched: it exists to be opened by the hold gesture, anchored under the date. */
+.calendar {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  /* 16px minimum — anything smaller makes iOS Safari zoom the poster when it focuses. */
+  font-size: 16px;
+}

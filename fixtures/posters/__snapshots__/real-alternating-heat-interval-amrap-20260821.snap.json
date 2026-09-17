@@ -32,6 +32,26 @@
     [
       {
         "eyebrow": "WOD",
+        "title": "Banded Shoulder External Rotations",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "12",
+            "name": "Banded Shoulder External Rotation",
+            "subNote": "36 total",
+            "totalNote": "36 total",
+            "mineKey": "Banded Shoulder External Rotation",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
         "title": "2:30 AMRAP x 4",
         "rows": [
           {
@@ -98,6 +118,20 @@
         "perRound": "",
         "name": "",
         "total": "",
+        "sectionHeader": "STRENGTH · BANDED SHOULDER EXTERNAL ROTATION",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "12",
+        "name": "Banded Shoulder External Rotation",
+        "total": "36 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
         "sectionHeader": "2:30 AMRAP X 4",
         "sectionColor": "magenta"
       },
@@ -147,6 +181,21 @@
       ],
       [
         {
+          "kind": "block",
+          "label": "BANDED SHOULDER EXTERNAL ROTATIONS",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "12 Banded Shoulder External Rotation",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        }
+      ],
+      [
+        {
           "kind": "line",
           "rx": "6 Chest To Bar Pull-ups",
           "load": "",
@@ -177,14 +226,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     "8-6-4-3-2 reps",
+    "36 reps",
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

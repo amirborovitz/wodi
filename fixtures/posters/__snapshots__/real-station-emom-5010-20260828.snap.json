@@ -1,61 +1,42 @@
 {
-  "reward": [
-    {
-      "eyebrow": "WOD",
-      "title": "EMOM 25",
-      "blueprint": "EMOM 25 MIN · 5 rounds · 0:50 work / 0:10 rest",
-      "rows": [
-        {
-          "primary": "Max Echo Bike",
-          "name": "Echo Bike",
-          "totalNote": "5 × 8 cal",
-          "accent": "yellow",
-          "stationRow": true,
-          "suppressMine": true,
-          "roundLabel": "STATION 1"
-        },
-        {
-          "primary": "Max Bar Muscle-up",
-          "name": "Bar Muscle-up",
-          "totalNote": "4 reps",
-          "accent": "yellow",
-          "stationRow": true,
-          "suppressMine": true,
-          "roundLabel": "STATION 2"
-        },
-        {
-          "primary": "Max Box Jump",
-          "name": "Box Jump",
-          "totalNote": "5 × 1 rep",
-          "accent": "yellow",
-          "stationRow": true,
-          "suppressMine": true,
-          "roundLabel": "STATION 3"
-        },
-        {
-          "primary": "Max Renegade Row",
-          "name": "Renegade Row",
-          "totalNote": "5 × 8 reps",
-          "accent": "yellow",
-          "stationRow": true,
-          "suppressMine": true,
-          "roundLabel": "STATION 4"
-        },
-        {
-          "primary": "Max Burpee",
-          "name": "Burpee",
-          "totalNote": "6 reps",
-          "accent": "yellow",
-          "stationRow": true,
-          "suppressMine": true,
-          "roundLabel": "STATION 5"
-        }
-      ],
-      "hiddenCount": 0,
-      "isPartnerConfirmed": false
-    }
-  ],
+  "reward": null,
   "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Core & Stability",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "6/6",
+            "name": "Kettlebell Windmill",
+            "subNote": "18 total",
+            "totalNote": "18 total",
+            "mineKey": "Kettlebell Windmill",
+            "accent": "yellow",
+            "repeatCount": 3
+          },
+          {
+            "primary": "20m",
+            "name": "Suitcase Carry",
+            "subNote": "60 m total",
+            "totalNote": "60 m total",
+            "mineKey": "Suitcase Carry",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "40s",
+            "name": "Weighted Plank Hold",
+            "mineKey": "Weighted Plank Hold",
+            "accent": "cyan",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
     [
       {
         "eyebrow": "WOD",
@@ -114,113 +95,145 @@
     ]
   ],
   "hero": {
-    "value": "95",
+    "value": "113",
     "unit": "REPS",
-    "storyLine": "40 echo bike · 40 renegade row · 6 burpee · 5 box jump · 4 bar mu",
+    "formatLine": "Strength + 25 min EMOM",
+    "storyLine": "40 echo bike · 40 renegade row · 18 kettlebell windmill · 6 burpee · 5 box jump · 4 bar mu · 60m suitcase carry",
     "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · KETTLEBELL WINDMILL",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "6",
+        "name": "Kettlebell Windmill",
+        "total": "18 total",
+        "color": "yellow",
+        "unit": "kg"
+      },
+      {
+        "perRound": "20m",
+        "name": "Suitcase Carry",
+        "total": "60m total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "EMOM × 5",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STATION 1",
+        "sectionColor": "magenta"
+      },
       {
         "perRound": "8",
         "name": "Echo Bike",
         "total": "40 total",
         "color": "magenta",
-        "unit": "kg",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "1",
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STATION 2",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "4",
         "name": "Bar Muscle-up",
         "total": "4 total",
-        "color": "cyan",
-        "wasSubstituted": false
+        "color": "cyan"
       },
       {
-        "perRound": "1",
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STATION 3",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "5",
         "name": "Box Jump",
         "total": "5 total",
         "color": "magenta",
-        "unit": "kg",
-        "wasSubstituted": false
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STATION 4",
+        "sectionColor": "magenta"
       },
       {
         "perRound": "8",
         "name": "Renegade Row",
         "total": "40 total",
         "color": "yellow",
-        "unit": "kg",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "1",
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STATION 5",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "6",
         "name": "Burpee",
         "total": "6 total",
         "color": "magenta",
-        "unit": "kg",
-        "wasSubstituted": false
+        "unit": "kg"
       }
     ],
     "accentClass": "accentMagenta"
   },
   "resultLabel": "TOTAL REPS",
-  "resultValue": "95",
+  "resultValue": "113",
   "posterRows": {
-    "reward": [
-      {
-        "kind": "block",
-        "label": "EMOM 25 MIN · 5 ROUNDS · 0:50 WORK / 0:10 REST",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "Max Echo Bike",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "5 × 8 cal",
-        "roundLabel": "ST. 1",
-        "station": true
-      },
-      {
-        "kind": "line",
-        "rx": "Max Bar Muscle-up",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "4 reps",
-        "roundLabel": "ST. 2",
-        "station": true
-      },
-      {
-        "kind": "line",
-        "rx": "Max Box Jump",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "5 × 1 rep",
-        "roundLabel": "ST. 3",
-        "station": true
-      },
-      {
-        "kind": "line",
-        "rx": "Max Renegade Row",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "5 × 8 reps",
-        "roundLabel": "ST. 4",
-        "station": true
-      },
-      {
-        "kind": "line",
-        "rx": "Max Burpee",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "6 reps",
-        "roundLabel": "ST. 5",
-        "station": true
-      }
-    ],
+    "reward": null,
     "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "6/6 Kettlebell Windmill",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "18 total"
+        },
+        {
+          "kind": "line",
+          "rx": "20m Suitcase Carry",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 m total"
+        },
+        {
+          "kind": "line",
+          "rx": "40s Weighted Plank Hold",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ],
       [
         {
           "kind": "block",
@@ -283,13 +296,16 @@
   "partnerSubs": {
     "reward": null,
     "pages": [
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false
   ]
 }

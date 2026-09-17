@@ -24,6 +24,26 @@
     [
       {
         "eyebrow": "WOD",
+        "title": "Max Height Squat Jumps",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "6",
+            "name": "Max Height Squat Jump",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Max Height Squat Jump",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
         "title": "03:00 min AMRAP x 4",
         "rows": [
           {
@@ -90,6 +110,20 @@
         "perRound": "",
         "name": "",
         "total": "",
+        "sectionHeader": "MAX HEIGHT SQUAT JUMPS",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "6",
+        "name": "Max Height Squat Jump",
+        "total": "24 total",
+        "color": "yellow",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
         "sectionHeader": "03:00 MIN AMRAP X 4",
         "sectionColor": "magenta"
       },
@@ -139,6 +173,21 @@
       ],
       [
         {
+          "kind": "block",
+          "label": "MAX HEIGHT SQUAT JUMPS",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "6 Max Height Squat Jump",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
           "kind": "line",
           "rx": "8 Chest-to-Bar Pull-ups",
           "load": "",
@@ -169,14 +218,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     "3-3-3-3 reps",
+    "6-6-6-6 reps",
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

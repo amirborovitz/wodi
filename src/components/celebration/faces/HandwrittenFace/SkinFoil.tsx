@@ -13,6 +13,7 @@ import { rowsOf } from './posterData';
 import { AchievementBadge, loadVoice, computedVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
+import { PosterDate } from './PosterDate';
 import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinFoilProps {
@@ -104,10 +105,10 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={FOIL_WHITE} />
           <span style={{ flex: 1 }} />
-          <HeaderMeta>
-            <EffortMeta ep={wod.ep} color={FOIL_WHITE} />
-            <span style={{ fontFamily: fM, fontSize: 10, color: FOIL_DIM, letterSpacing: '0.06em' }}>{wod.date}</span>
-          </HeaderMeta>
+          <HeaderMeta
+            effort={<EffortMeta ep={wod.ep} color={FOIL_WHITE} />}
+            date={<PosterDate date={wod.date} style={{ fontFamily: fM, fontSize: 10, color: FOIL_DIM, letterSpacing: '0.06em' }} />}
+          />
         </div>
 
         <div style={{ marginTop: 13 }}>

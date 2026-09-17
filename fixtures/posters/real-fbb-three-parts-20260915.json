@@ -1,0 +1,91 @@
+{
+  "name": "real-fbb-three-parts-20260915",
+  "description": "REAL saved doc (15 Sep 2026, FBB): Strict Press 4x6, a 3-set accessory circuit (hip thrust / lateral raise / hamstring curl) and 'Every 3:00 x 4 sets (for quality)' of KB deadlift, KB swing and push-ups. The parse called both later parts accessory, and the app used to hide accessory parts: no logging screen, no poster page. The athlete could log only the strict press and the poster showed only the strict press. Every part must render its own page. Saved before the fix, so the two accessory parts carry no entered weights.",
+  "workout": {
+    "title": "FBB",
+    "format": "strength",
+    "partnerWorkout": false,
+    "rawText": "Strict Press\n4 sets x 6 reps @75-80%\n\n3 sets:\n10/10 Single Leg Hip Thrust\n10 Shoulder Lateral Raise\n15 Prone Banded Hamstring Curl\n\nEvery 03:00 minutes x 4 sets (for quality):\n10 Kettlebell Deadlift\n10 R.Kettlebell Swing (explosive)\n8-10 Push-up",
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Prone Banded Hamstring Curl", "exerciseIndex": 1, "totalReps": 45, "color": "cyan" },
+        { "name": "KB Deadlift", "exerciseIndex": 2, "totalReps": 40, "color": "yellow" },
+        { "name": "Russian Kettlebell Swing", "exerciseIndex": 2, "totalReps": 40, "color": "yellow" },
+        { "name": "Push-up", "exerciseIndex": 2, "totalReps": 36, "color": "magenta" },
+        { "name": "Single Leg Hip Thrust", "exerciseIndex": 1, "totalReps": 30, "color": "magenta" },
+        { "name": "Shoulder Lateral Raise", "exerciseIndex": 1, "totalReps": 30, "implementCount": 2, "color": "magenta" },
+        { "name": "Strict Press", "exerciseIndex": 0, "totalReps": 24, "weight": 45, "weightProgression": [40, 50], "unit": "kg", "color": "yellow" }
+      ]
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Strict Press",
+        "type": "strength",
+        "prescription": "4 sets x 6 reps @75-80%",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 6, "actualReps": 6, "weight": 40 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 6, "actualReps": 6 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 6, "actualReps": 6, "weight": 50 }
+        ],
+        "movements": [
+          { "name": "Strict Press", "reps": 6, "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_round" }
+        ],
+        "rawText": "Strict Press\n4 sets x 6 reps @75-80%",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "partnerWorkout": false
+      },
+      {
+        "id": "exercise-1",
+        "name": "3 Sets Accessory",
+        "type": "strength",
+        "prescription": "3 sets: 10/10 Single Leg Hip Thrust, 10 Shoulder Lateral Raise, 15 Prone Banded Hamstring Curl",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 35, "actualReps": 35 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 35, "actualReps": 35 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 35, "actualReps": 35 }
+        ],
+        "movements": [
+          { "name": "Single Leg Hip Thrust", "reps": 10, "perSide": true, "inputType": "weight", "equipment": "other", "countingMode": "per_round" },
+          { "name": "Shoulder Lateral Raise", "reps": 10, "inputType": "weight", "equipment": "dumbbell", "implementCount": 2, "countingMode": "per_round" },
+          { "name": "Prone Banded Hamstring Curl", "reps": 15, "inputType": "weight", "equipment": "other", "countingMode": "per_round" }
+        ],
+        "rounds": 3,
+        "rawText": "3 sets:\n10/10 Single Leg Hip Thrust\n10 Shoulder Lateral Raise\n15 Prone Banded Hamstring Curl",
+        "partKind": "accessory",
+        "loggingMode": "strength",
+        "isSecondary": true,
+        "partnerWorkout": false
+      },
+      {
+        "id": "exercise-2",
+        "name": "4 Sets Every 3:00",
+        "type": "skill",
+        "prescription": "Every 03:00 minutes x 4 sets, for quality: 10 Kettlebell Deadlift, 10 Russian Kettlebell Swing (explosive), 8-10 Push-up",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 29, "actualReps": 29 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 29, "actualReps": 29 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 29, "actualReps": 29 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 29, "actualReps": 29 }
+        ],
+        "movements": [
+          { "name": "KB Deadlift", "reps": 10, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Russian Kettlebell Swing", "reps": 10, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Push-up", "reps": 9, "repsDisplay": "8-10", "inputType": "none", "equipment": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" }
+        ],
+        "rounds": 4,
+        "rawText": "Every 03:00 minutes x 4 sets (for quality):\n10 Kettlebell Deadlift\n10 R.Kettlebell Swing (explosive)\n8-10 Push-up",
+        "partKind": "accessory",
+        "loggingMode": "emom",
+        "isSecondary": true,
+        "partnerWorkout": false,
+        "intervalCount": 4,
+        "workDuration": 720,
+        "intervalSeconds": 180
+      }
+    ]
+  }
+}

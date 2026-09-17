@@ -72,12 +72,35 @@
         "hiddenCount": 0,
         "isPartnerConfirmed": false
       }
+    ],
+    [
+      {
+        "title": "2 sets:",
+        "rows": [
+          {
+            "primary": "",
+            "name": "2 sets:",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "30-45 sec Passive Hang",
+            "accent": "magenta"
+          },
+          {
+            "primary": "",
+            "name": "~01:00 min/side Pigeon Stretch",
+            "accent": "magenta"
+          }
+        ],
+        "hiddenCount": 0
+      }
     ]
   ],
   "hero": {
     "value": "13½",
     "unit": "ROUNDS",
-    "formatLine": "E1:30MOM × 8 + 16 min AMRAP",
+    "formatLine": "E1:30MOM × 8 + 16 min AMRAP + AMRAP",
     "storyLine": "203 air squat · 135 push-up · 68 deadlift · 16 power clean · 8 squat clean",
     "storyMovements": [
       {
@@ -139,6 +162,13 @@
         "total": "203 total",
         "color": "yellow",
         "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "2 SETS:",
+        "sectionColor": "magenta"
       }
     ],
     "accentClass": "accentMagenta"
@@ -196,6 +226,34 @@
           "team": "",
           "total": "203 total"
         }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "2 SETS:",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "2 sets:",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "30-45 sec Passive Hang",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "~01:00 min/side Pigeon Stretch",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
       ]
     ]
   },
@@ -203,14 +261,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     null,
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

@@ -24,6 +24,26 @@
     [
       {
         "eyebrow": "WOD",
+        "title": "Seated Shoulder External Rotations",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "10",
+            "name": "Seated Shoulder External Rotation",
+            "subNote": "30 total",
+            "totalNote": "30 total",
+            "mineKey": "Seated Shoulder External Rotation",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
         "title": "03:00 min AMRAP x 4",
         "rows": [
           {
@@ -92,6 +112,20 @@
         "perRound": "",
         "name": "",
         "total": "",
+        "sectionHeader": "SEATED SHOULDER EXTERNAL ROTATIONS",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Seated Shoulder External Rotation",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
         "sectionHeader": "03:00 MIN AMRAP X 4",
         "sectionColor": "magenta"
       },
@@ -135,6 +169,21 @@
       ],
       [
         {
+          "kind": "block",
+          "label": "SEATED SHOULDER EXTERNAL ROTATIONS",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Seated Shoulder External Rotation",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        }
+      ],
+      [
+        {
           "kind": "line",
           "rx": "Weighted Box Step Ups",
           "load": "",
@@ -173,14 +222,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     "10-10-10-10 reps",
+    "10 reps",
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

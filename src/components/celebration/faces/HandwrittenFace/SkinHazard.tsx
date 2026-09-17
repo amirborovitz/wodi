@@ -10,6 +10,7 @@ import { rowsOf } from './posterData';
 import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
+import { PosterDate } from './PosterDate';
 import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinHazardProps {
@@ -62,10 +63,10 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={BRAND.yellow} />
           <span style={{ flex: 1, height: 2, background: BRAND.yellow, opacity: 0.68 }} />
-          <HeaderMeta>
-            <EffortMeta ep={wod.ep} color={BRAND.yellow} />
-            <span style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }}>{wod.date}</span>
-          </HeaderMeta>
+          <HeaderMeta
+            effort={<EffortMeta ep={wod.ep} color={BRAND.yellow} />}
+            date={<PosterDate date={wod.date} style={{ fontFamily: fM, fontSize: 10, color: BRAND.dim, letterSpacing: '0.04em' }} />}
+          />
         </div>
 
         <div style={{ marginTop: 12 }}>

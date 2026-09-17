@@ -12,6 +12,7 @@ import { rowsOf } from './posterData';
 import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, splitResultValue, heroScoreScale, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
+import { PosterDate } from './PosterDate';
 import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinChalkProps {
@@ -66,10 +67,10 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
           <FormatTag label={wod.type} color={BRAND.paperInk} />
           {/* Chalk writes its header by hand — the effort reads as a margin note, not a readout,
               so it keeps Caveat's 700 ceiling and earns its rank from ink weight instead. */}
-          <HeaderMeta>
-            <EffortMeta ep={wod.ep} color="#5a4628" font={fH} size={compact ? 16 : 18} weight={700} />
-            <span style={{ fontFamily: fH, fontSize: compact ? 20 : 22, fontWeight: 700, color: 'rgba(90,70,40,0.62)' }}>{wod.date}</span>
-          </HeaderMeta>
+          <HeaderMeta
+            effort={<EffortMeta ep={wod.ep} color="#5a4628" font={fH} size={compact ? 16 : 18} weight={700} />}
+            date={<PosterDate date={wod.date} surface="light" style={{ fontFamily: fH, fontSize: compact ? 20 : 22, fontWeight: 700, color: 'rgba(90,70,40,0.62)' }} />}
+          />
         </div>
 
         {/* Title — yellow highlighter swipe if named */}

@@ -62,12 +62,39 @@
         "hiddenCount": 0,
         "isPartnerConfirmed": false
       }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Cash Out",
+        "blueprint": "2 sets",
+        "rows": [
+          {
+            "primary": "15-20",
+            "name": "Tibialis Raise",
+            "subNote": "36 total",
+            "totalNote": "36 total",
+            "mineKey": "Tibialis Raise",
+            "accent": "cyan",
+            "repeatCount": 2
+          },
+          {
+            "primary": "-",
+            "name": "Single Arm Plank Hold",
+            "mineKey": "Single Arm Plank Hold",
+            "accent": "magenta",
+            "repeatCount": 2
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
     ]
   ],
   "hero": {
     "value": "8",
     "unit": "ROUNDS",
-    "formatLine": "Strength + 12 min AMRAP",
+    "formatLine": "Strength + 12 min AMRAP + AMRAP",
     "storyLine": "12 front squat · 48 thruster · 48 burpee · 1.0km run · 36 tibialis raise",
     "storyMovements": [
       {
@@ -117,6 +144,20 @@
         "name": "Burpee",
         "total": "48 total",
         "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CASH OUT",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "18",
+        "name": "Tibialis Raise",
+        "total": "36 total",
+        "color": "cyan",
         "unit": "kg"
       }
     ],
@@ -168,6 +209,28 @@
           "total": "1.00 km total",
           "roundLabel": "SWAP"
         }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "CASH OUT",
+          "cap": "2 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "15-20 Tibialis Raise",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        },
+        {
+          "kind": "line",
+          "rx": "- Single Arm Plank Hold",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
       ]
     ]
   },
@@ -175,14 +238,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     "3-3-3-3 reps",
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

@@ -1,99 +1,24 @@
 {
-  "reward": [
-    {
-      "title": "Blueprint",
-      "blueprint": "4-round pyramid for time",
-      "rows": [],
-      "isPartnerConfirmed": true,
-      "partnerDisplayMode": "sections"
-    },
-    {
-      "title": "",
-      "rows": [
-        {
-          "primary": "900 M Echo Bike (together)",
-          "name": "",
-          "mineKey": "Echo Bike",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "100 Power Cleans @ 35/50kg",
-          "name": "",
-          "mineKey": "Power Clean",
-          "teamShare": "50",
-          "accent": "yellow"
-        }
-      ],
-      "isPartnerConfirmed": true,
-      "partnerDisplayMode": "sections"
-    },
-    {
-      "title": "",
-      "rows": [
-        {
-          "primary": "900 M Echo Bike (together)",
-          "name": "",
-          "mineKey": "Echo Bike",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "80 Shoulder to Overheads @ 35/50kg",
-          "name": "",
-          "mineKey": "Shoulder to Overhead",
-          "teamShare": "40",
-          "accent": "yellow"
-        }
-      ],
-      "isPartnerConfirmed": true,
-      "partnerDisplayMode": "sections"
-    },
-    {
-      "title": "",
-      "rows": [
-        {
-          "primary": "900 M Echo Bike (together)",
-          "name": "",
-          "mineKey": "Echo Bike",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "60 Thrusters @ 35/50kg",
-          "name": "",
-          "mineKey": "Thruster",
-          "teamShare": "30",
-          "accent": "yellow"
-        }
-      ],
-      "isPartnerConfirmed": true,
-      "partnerDisplayMode": "sections"
-    },
-    {
-      "title": "",
-      "rows": [
-        {
-          "primary": "900 M Echo Bike (together)",
-          "name": "",
-          "mineKey": "Echo Bike",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "300 M Farmer Carry",
-          "name": "",
-          "mineKey": "Farmer Carry",
-          "suppressMine": true,
-          "teamShare": "150m",
-          "accent": "magenta"
-        }
-      ],
-      "isPartnerConfirmed": true,
-      "partnerDisplayMode": "sections"
-    }
-  ],
+  "reward": null,
   "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "EMOM 8 Double Unders",
+        "blueprint": "EMOM 8 MIN · 8 rounds",
+        "rows": [
+          {
+            "primary": "Max",
+            "name": "Double Under",
+            "mineKey": "Double Under",
+            "accent": "magenta",
+            "repeatCount": 8
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
     [
       {
         "title": "Blueprint",
@@ -190,25 +115,30 @@
     ]
   ],
   "hero": {
-    "value": "24:30",
-    "unit": "MIN",
+    "value": "240",
+    "unit": "REPS",
+    "formatLine": "8 min EMOM + For Time · In Pairs",
     "storyLine": "100 power clean · 80 shoulder to overhead · 60 thruster · 3.6km echo bike · 300m farmer carry",
     "storyMovements": [
       {
         "perRound": "",
         "name": "",
         "total": "",
-        "sectionHeader": "×1 ROUNDS"
+        "sectionHeader": "EMOM × 8",
+        "sectionColor": "cyan"
       },
       {
-        "perRound": "300m",
-        "name": "Echo Bike",
+        "perRound": "",
+        "name": "",
         "total": "",
-        "color": "magenta",
-        "partnerNote": "together",
-        "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutionType": "equivalent"
+        "sectionHeader": "ENDURANCE RELAY FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "900m",
+        "name": "Echo Bike",
+        "total": "3.6km total",
+        "color": "magenta"
       },
       {
         "perRound": "100",
@@ -216,25 +146,7 @@
         "total": "",
         "color": "yellow",
         "weight": 40,
-        "unit": "kg",
-        "partnerNote": "your part 50",
-        "wasSubstituted": false
-      },
-      {
-        "perRound": "",
-        "name": "",
-        "total": "",
-        "sectionHeader": "×1 ROUNDS"
-      },
-      {
-        "perRound": "300m",
-        "name": "Echo Bike",
-        "total": "",
-        "color": "magenta",
-        "partnerNote": "together",
-        "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutionType": "equivalent"
+        "unit": "kg"
       },
       {
         "perRound": "80",
@@ -242,25 +154,7 @@
         "total": "",
         "color": "yellow",
         "weight": 40,
-        "unit": "kg",
-        "partnerNote": "your part 40",
-        "wasSubstituted": false
-      },
-      {
-        "perRound": "",
-        "name": "",
-        "total": "",
-        "sectionHeader": "×1 ROUNDS"
-      },
-      {
-        "perRound": "300m",
-        "name": "Echo Bike",
-        "total": "",
-        "color": "magenta",
-        "partnerNote": "together",
-        "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutionType": "equivalent"
+        "unit": "kg"
       },
       {
         "perRound": "60",
@@ -268,108 +162,36 @@
         "total": "",
         "color": "yellow",
         "weight": 40,
-        "unit": "kg",
-        "partnerNote": "your part 30",
-        "wasSubstituted": false
-      },
-      {
-        "perRound": "",
-        "name": "",
-        "total": "",
-        "sectionHeader": "×1 ROUNDS"
-      },
-      {
-        "perRound": "300m",
-        "name": "Echo Bike",
-        "total": "",
-        "color": "magenta",
-        "partnerNote": "together",
-        "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutionType": "equivalent"
+        "unit": "kg"
       },
       {
         "perRound": "300m",
         "name": "Farmer Carry",
-        "total": "",
-        "color": "magenta",
-        "partnerNote": "your part 150m",
-        "wasSubstituted": false
+        "total": "300m total",
+        "color": "magenta"
       }
     ],
     "accentClass": "accentMagenta"
   },
-  "resultLabel": "OUR TIME",
-  "resultValue": "24:30",
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "240",
   "posterRows": {
-    "reward": [
-      {
-        "kind": "block",
-        "label": "4-ROUND PYRAMID FOR TIME",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "900 M Echo Bike (together)",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "line",
-        "rx": "100 Power Cleans @ 35/50kg",
-        "load": "",
-        "mine": "40kg",
-        "team": "50",
-        "isPartnerShare": true
-      },
-      {
-        "kind": "line",
-        "rx": "900 M Echo Bike (together)",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "line",
-        "rx": "80 Shoulder to Overheads @ 35/50kg",
-        "load": "",
-        "mine": "40kg",
-        "team": "40",
-        "isPartnerShare": true
-      },
-      {
-        "kind": "line",
-        "rx": "900 M Echo Bike (together)",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "line",
-        "rx": "60 Thrusters @ 35/50kg",
-        "load": "",
-        "mine": "40kg",
-        "team": "30",
-        "isPartnerShare": true
-      },
-      {
-        "kind": "line",
-        "rx": "900 M Echo Bike (together)",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "line",
-        "rx": "300 M Farmer Carry",
-        "load": "",
-        "mine": "",
-        "team": "150m",
-        "isPartnerShare": true
-      }
-    ],
+    "reward": null,
     "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "EMOM 8 MIN · 8 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "Max Double Under",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ],
       [
         {
           "kind": "block",
@@ -440,15 +262,18 @@
     ]
   },
   "partnerSubs": {
-    "reward": "you & your partner - four blocks",
+    "reward": null,
     "pages": [
+      null,
       "you & your partner - four blocks"
     ]
   },
   "pageRepsSchemes": [
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false
   ]
 }

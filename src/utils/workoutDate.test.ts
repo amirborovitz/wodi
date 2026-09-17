@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSourceDate, getEffectiveWorkoutDate, byNewestTrained } from './workoutDate';
+import { parseSourceDate, getEffectiveWorkoutDate, byNewestTrained, stepIsoDate, toIsoDate } from './workoutDate';
 
 describe('parseSourceDate', () => {
   it('parses an ISO date as a LOCAL calendar day, not UTC midnight', () => {
@@ -24,6 +24,49 @@ describe('parseSourceDate', () => {
   it('accepts a real leap day but not a fake one', () => {
     expect(parseSourceDate('2028-02-29')).not.toBeNull();
     expect(parseSourceDate('2027-02-29')).toBeNull();
+  });
+});
+
+describe('toIsoDate', () => {
+  it('writes the LOCAL calendar day, zero-padded', () => {
+    expect(toIsoDate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+    expect(toIsoDate(new Date(2026, 11, 31, 0, 0))).toBe('2026-12-31');
+  });
+});
+
+describe('stepIsoDate', () => {
+  const TODAY = '2026-09-15';
+
+  it('steps back and forward one day at a time', () => {
+    expect(stepIsoDate('2026-09-15', -1, TODAY)).toBe('2026-09-14');
+    expect(stepIsoDate('2026-09-13', 1, TODAY)).toBe('2026-09-14');
+  });
+
+  it('crosses month, year and leap-day boundaries by the calendar', () => {
+    expect(stepIsoDate('2026-09-01', -1, TODAY)).toBe('2026-08-31');
+    expect(stepIsoDate('2026-01-01', -1, TODAY)).toBe('2025-12-31');
+    expect(stepIsoDate('2024-03-01', -1, TODAY)).toBe('2024-02-29');
+    expect(stepIsoDate('2025-03-01', -1, TODAY)).toBe('2025-02-28');
+  });
+
+  it('lands on the right day across a DST change', () => {
+    // US and EU clocks change at the end of March / start of November; a 23- or 25-hour
+    // day must still step exactly one calendar day.
+    expect(stepIsoDate('2026-03-30', -1, TODAY)).toBe('2026-03-29');
+    expect(stepIsoDate('2026-03-29', -1, TODAY)).toBe('2026-03-28');
+    expect(stepIsoDate('2025-11-02', 1, TODAY)).toBe('2025-11-03');
+  });
+
+  it('never walks past today — a workout cannot be in the future', () => {
+    expect(stepIsoDate(TODAY, 1, TODAY)).toBe(TODAY);
+    // A board dated ahead (a coach writing the week's plan) comes back to today, not a day
+    // further into the future.
+    expect(stepIsoDate('2026-09-20', -1, TODAY)).toBe(TODAY);
+  });
+
+  it('refuses a malformed start date', () => {
+    expect(stepIsoDate('nonsense', -1, TODAY)).toBeNull();
+    expect(stepIsoDate('2026-02-30', -1, TODAY)).toBeNull();
   });
 });
 

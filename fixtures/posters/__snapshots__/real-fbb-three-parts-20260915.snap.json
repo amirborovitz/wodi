@@ -1,0 +1,288 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Strict Press",
+        "blueprint": "4 sets",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Strict Press",
+            "subNote": "24 total",
+            "totalNote": "24 total",
+            "mineKey": "Strict Press",
+            "accent": "yellow",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "3 Sets Accessory",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "10",
+            "name": "Single Leg Hip Thrust",
+            "subNote": "30 total",
+            "totalNote": "30 total",
+            "mineKey": "Single Leg Hip Thrust",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "10",
+            "name": "Shoulder Lateral Raise",
+            "subNote": "30 total",
+            "totalNote": "30 total",
+            "mineKey": "Shoulder Lateral Raise",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "15",
+            "name": "Prone Banded Hamstring Curl",
+            "subNote": "45 total",
+            "totalNote": "45 total",
+            "mineKey": "Prone Banded Hamstring Curl",
+            "accent": "cyan",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "4 Sets Every 3:00",
+        "blueprint": "EVERY 3 MIN · 4 rounds",
+        "rows": [
+          {
+            "primary": "10",
+            "name": "KB Deadlifts",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "KB Deadlift",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "10",
+            "name": "Russian Kettlebell Swings",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Russian Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 4
+          },
+          {
+            "primary": "8-10",
+            "name": "Push-ups",
+            "subNote": "36 total",
+            "totalNote": "36 total",
+            "mineKey": "Push-up",
+            "accent": "magenta",
+            "repeatCount": 4
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "50",
+    "unit": "KG",
+    "subtitle": "STRICT PRESS",
+    "formatLine": "Strength + E3MOM × 4",
+    "storyLine": "45 prone banded hamstring curl · 40 kb deadlift · 40 russian kettlebell swing · 36 push-up · 30 single leg hip thrust · 30 shoulder lateral raise · 24 strict press",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · STRICT PRESS",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Strict Press",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          40,
+          50
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 24
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · SINGLE LEG HIP THRUST",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "10",
+        "name": "Single Leg Hip Thrust",
+        "total": "30 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Shoulder Lateral Raise",
+        "total": "30 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "15",
+        "name": "Prone Banded Hamstring Curl",
+        "total": "45 total",
+        "color": "cyan",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "E3MOM × 4",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "10",
+        "name": "KB Deadlift",
+        "total": "40 total",
+        "color": "yellow",
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Russian Kettlebell Swing",
+        "total": "40 total",
+        "color": "yellow",
+        "unit": "kg"
+      },
+      {
+        "perRound": "9",
+        "name": "Push-up",
+        "total": "36 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentGold"
+  },
+  "resultLabel": "TOP SET",
+  "resultValue": "50kg",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "4 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Strict Press",
+          "load": "",
+          "mine": "40→50kg",
+          "team": "",
+          "total": "24 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "3 SETS ACCESSORY",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Single Leg Hip Thrust",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Shoulder Lateral Raise",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        },
+        {
+          "kind": "line",
+          "rx": "15 Prone Banded Hamstring Curl",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "45 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "4 SETS EVERY 3:00",
+          "cap": "EVERY 3 MIN · 4 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "10 KB Deadlifts",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "10 Russian Kettlebell Swings",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "8-10 Push-ups",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "36 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "6-6-6-6 reps",
+    null,
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false,
+    false
+  ]
+}

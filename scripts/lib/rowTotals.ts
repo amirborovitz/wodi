@@ -11,7 +11,6 @@
  * Used by the poster harness (every fixture must agree) and the audit (a real-data export).
  */
 import { abbreviateMovementForPoster, buildPageArtifactSections, inferTeamSizeFromText, isStrengthPagePart } from '../../src/components/celebration/helpers';
-import { isMainPart } from '../../src/components/celebration/mainPart';
 import { movementsForParts } from '../../src/components/celebration/movementResolution';
 import type { Exercise, MovementTotal } from '../../src/types';
 
@@ -112,13 +111,12 @@ export interface WorkoutRowCheck {
 export function checkRowTotals(workout: RowCheckInput): WorkoutRowCheck {
   const stored = workout.workloadBreakdown?.movements ?? [];
   const exercises: Exercise[] = workout.exercises ?? [];
-  const mains = exercises.filter(isMainPart);
-  const parts = mains.length > 0 ? mains : exercises;
   const rawText = exercises.length === 1 ? workout.rawText : undefined;
   const teamSize = sessionTeamSize(workout);
   const sums = new Map<MovementTotal, Quantity>();
   const unmatched: string[] = [];
-  for (const exercise of parts) {
+  // Every part has a poster page, so every part's rows are checked.
+  for (const exercise of exercises) {
     const index = exercises.indexOf(exercise);
     const scoped = movementsForParts(stored, [exercise], [index]);
     const sections = buildPageArtifactSections(exercise, scoped, isStrengthPagePart(exercise), rawText, teamSize);

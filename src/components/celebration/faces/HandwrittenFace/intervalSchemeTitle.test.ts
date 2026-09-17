@@ -35,7 +35,6 @@ const NAMED_INTERVAL_AMRAP: Exercise = {
 
 const data = (exercise: Exercise, rewardDisplayTitle: string | null): CelebrationData => ({
   exercises: [exercise],
-  posterMainExercises: [exercise],
   workoutFormat: 'amrap_intervals',
   artifactSections: [],
   heroResult: null,

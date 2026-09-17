@@ -10,6 +10,7 @@ import { rowsOf } from './posterData';
 import { AchievementBadge, loadVoice, BlockHeaderRule, EffortMeta, FormatTag, HeaderMeta, VibeStamp, Wordmark, getMovementValueParts, LadderTrackChart, PairsLegend, shouldShowPairsLegend, ResultValue, stationRowChrome } from './PosterComponents';
 import { RoundLedger } from './RoundLedger';
 import { DraggableVibeStamp } from './DraggableVibeStamp';
+import { PosterDate } from './PosterDate';
 import type { PosterVibeOffset } from '../../../../types';
 
 interface SkinPressProps {
@@ -50,10 +51,10 @@ export function SkinPress({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <FormatTag label={wod.type} color={BRAND.paperInk} fill="rgba(245,194,0,0.18)" />
           <span style={{ flex: 1, height: 2, background: BRAND.paperInk, opacity: 0.18 }} />
-          <HeaderMeta>
-            <EffortMeta ep={wod.ep} color="rgba(20,18,16,0.92)" />
-            <span style={{ fontFamily: fM, fontSize: 10, color: 'rgba(33,29,21,0.54)', letterSpacing: '0.04em' }}>{wod.date}</span>
-          </HeaderMeta>
+          <HeaderMeta
+            effort={<EffortMeta ep={wod.ep} color="rgba(20,18,16,0.92)" />}
+            date={<PosterDate date={wod.date} surface="light" style={{ fontFamily: fM, fontSize: 10, color: 'rgba(33,29,21,0.54)', letterSpacing: '0.04em' }} />}
+          />
         </div>
 
         <div style={{ marginTop: 12 }}>

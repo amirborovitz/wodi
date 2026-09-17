@@ -21,6 +21,7 @@ import { movementNameTokens } from '../../../../utils/movementNameMatch';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
 import { blockCadence, formatCadenceTitle } from '../../../../utils/blockClock';
 import { isMaxEffortPractice } from '../../mainPart';
+import { parseSourceDate } from '../../../../utils/workoutDate';
 import { prescribesUnbrokenMax } from '../../../logging/story/types';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ export interface PosterTotal {
 export interface PosterWod {
   type: string;         // 'FOR TIME', 'AMRAP', 'STRENGTH', …
   title: string | null; // Named WOD title (CINDY, FRAN…) or null
-  date: string;         // '14 MAY 26'
+  date: string;         // 'MAY 14 26'
   format: string;       // '12 ROUNDS', '4 SETS', '12-MIN AMRAP'
   sub: string;          // '30 MIN CAP', 'build to heavy', …
   // Strength only: every completed set's reps spelled out in full ("6-6-5-4-3 reps"), never
@@ -319,29 +320,28 @@ function mapFormatToType(format: string | undefined): string {
   }
 }
 
-function formatWorkoutDate(date: Date): string {
-  // "5 JUN 26"
-  return date
-    .toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' })
-    .toUpperCase()
-    .replace(',', '');
+const POSTER_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+/**
+ * "SEP 05 26" — the ONE way a poster writes a date, whether it came off the board, the logging
+ * timestamp, or the athlete stepping it. There used to be two ("15 SEP 26" for a board date,
+ * "SEP 15 26" for the logging date), so the first tap on the date stepper flipped the format.
+ *
+ * The day is zero-padded so the label keeps its width as the stepper walks past the 10th —
+ * otherwise the › arrow shifts under the athlete's thumb.
+ */
+function formatPosterDate(date: Date): string {
+  return `${POSTER_MONTHS[date.getMonth()]} ${String(date.getDate()).padStart(2, '0')} ${String(date.getFullYear()).slice(-2)}`;
 }
 
-/** "2026-06-11" → "11 JUN 26"; null when the string isn't a valid ISO date. */
+/** "2026-06-11" → "JUN 11 26"; null when the string isn't a real calendar date. */
 export function formatIsoPosterDate(iso: string): string | null {
-  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-  const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  const monthLabel = monthNames[month - 1];
-  if (!monthLabel || day < 1 || day > 31) return null;
-  return `${day} ${monthLabel} ${String(year).slice(-2)}`;
+  const date = parseSourceDate(iso);
+  return date ? formatPosterDate(date) : null;
 }
 
 function formatSourceDate(sourceDate: string | undefined, fallbackDate: Date): string {
-  return (sourceDate ? formatIsoPosterDate(sourceDate) : null) ?? formatWorkoutDate(fallbackDate);
+  return (sourceDate ? formatIsoPosterDate(sourceDate) : null) ?? formatPosterDate(fallbackDate);
 }
 
 function getPosterCompletedStrengthSets(exercise: Exercise): NonNullable<Exercise['sets']> {
@@ -403,12 +403,9 @@ export function buildFormatLine(data: CelebrationData): string {
   }
 
   const fmt = data.workoutFormat;
-  // The part the format line is DESCRIBING, not the session's first exercise. `fmt` is already
-  // the main part's own format, so pairing it with exercises[0] mixed two different blocks: a
-  // metcon EMOM read its set count off the 3-set core accessory logged before it and the poster
-  // announced "3 SETS". Falls back to the raw list for a session with no main part flagged.
-  const exercises = data.posterMainExercises.length > 0 ? data.posterMainExercises : data.exercises;
-  const ex0 = exercises[0];
+  // Only a one-part session reaches this line — several parts make a carousel, and each page
+  // builds its own — so the part `fmt` describes is the only one there is.
+  const ex0 = data.exercises[0];
 
   // The FormatTag pill already states the format word (AMRAP/EMOM/FOR TIME/etc) — the design
   // doc's hierarchy explicitly forbids repeating it here ("NEVER: Repeat the workout name in
@@ -923,10 +920,16 @@ export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<strin
 }
 
 // Merged mine map: breakdown (always present) + storyMovements (richer data when available).
-function buildMineMap(data: CelebrationData): Map<string, string> {
+/**
+ * The "mine" column's values, from the breakdown plus the story of the hero THIS poster prints.
+ * A carousel page passes its own page hero: the session hero's story spans every part, so reading
+ * it put a sibling part's reading of a movement on this page (a twin-kettlebell metcon printed
+ * "40kg" instead of "2×20kg" once a warm-up joined the deck).
+ */
+function buildMineMap(data: CelebrationData, hero: HeroResult | null): Map<string, string> {
   const base = buildMineMapFromBreakdown(data.activeBreakdown?.movements ?? []);
-  const story = data.heroResult?.storyMovements
-    ? buildMineMapFromStory(data.heroResult.storyMovements)
+  const story = hero?.storyMovements
+    ? buildMineMapFromStory(hero.storyMovements)
     : new Map<string, string>();
   // Story data takes priority (has progression info); breakdown fills gaps.
   return new Map([...base, ...story]);
@@ -1264,7 +1267,7 @@ export function buildPosterWodFromPage(
     return '';
   })();
 
-  const mineMap = buildMineMap(data);
+  const mineMap = buildMineMap(data, heroResult);
   const teamSize = data.teamSize ?? 1;
   const totalsEstimated = !!data.activeBreakdown?.estimated;
   const builtRows: PosterRow[] = sections.length > 0
@@ -1388,9 +1391,8 @@ export function buildPosterWod(
   // otherwise the wording depends on whether a metcon happened to be logged beside it.
   const soloMaxPractice = data.exercises.length === 1 && !!data.exercises[0]
     && isMaxEffortPractice(data.exercises[0]);
-  // The part this poster speaks for. Every line below describes "the workout", and on a session
-  // that logged an accessory block first, exercises[0] is not it — see buildFormatLine.
-  const mainEx = data.posterMainExercises[0] ?? data.exercises[0];
+  // The session's one part — a session of several is a carousel and returned above.
+  const mainEx = data.exercises[0];
   const type = soloMaxPractice ? 'SKILL' : mapFormatToType(data.workoutFormat);
   const isAmrap = data.workoutFormat === 'amrap' || data.workoutFormat === 'amrap_intervals';
   const amrapMinutes = isAmrap
@@ -1447,7 +1449,7 @@ export function buildPosterWod(
   const totals = totalsEstimated ? [] : buildTotals(data, resultValue);
 
   // Build mine map: breakdown movements + storyMovements merged
-  const mineMap = buildMineMap(data);
+  const mineMap = buildMineMap(data, data.heroResult);
   const teamSize = data.teamSize ?? 1;
 
   // Flatten artifact sections into rows

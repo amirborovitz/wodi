@@ -4,6 +4,24 @@
     [
       {
         "eyebrow": "WOD",
+        "title": "Tall Clean Practice",
+        "blueprint": "3 sets",
+        "rows": [
+          {
+            "primary": "-",
+            "name": "Tall Clean",
+            "mineKey": "Tall Clean",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
         "title": "Barbell Complex",
         "blueprint": "8 sets",
         "rows": [
@@ -64,9 +82,16 @@
   "hero": {
     "value": "14:00",
     "unit": "MIN",
-    "formatLine": "E1:30MOM × 8 + 5 RFT",
+    "formatLine": "For Time + E1:30MOM × 8 + 5 RFT",
     "storyLine": "40 front squat · 40 c2b pull-up · 8 front squat · 8 squat clean · 8 push jerk · 1.0km run",
     "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "TALL CLEAN PRACTICE",
+        "sectionColor": "magenta"
+      },
       {
         "perRound": "",
         "name": "",
@@ -149,6 +174,20 @@
         {
           "kind": "block",
           "label": "",
+          "cap": "3 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "- Tall Clean",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "BARBELL COMPLEX",
           "cap": "8 sets"
         },
         {
@@ -197,14 +236,17 @@
     "reward": null,
     "pages": [
       null,
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
     null,
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false,
     false
   ]

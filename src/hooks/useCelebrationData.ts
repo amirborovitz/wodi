@@ -87,7 +87,7 @@ import {
   BARBELL_PATTERNS,
 } from '../components/celebration/helpers';
 import { achievementMatchesMovementList } from '../components/celebration/faces/HandwrittenFace/posterData';
-import { isMainPart, orderPosterParts } from '../components/celebration/mainPart';
+import { orderPosterParts } from '../components/celebration/mainPart';
 
 // Re-export helpers for callers that need them directly
 export {
@@ -150,14 +150,9 @@ export interface PRCelebration {
 export interface CelebrationData {
   // Raw inputs normalised from both modes
   exercises: Exercise[];
-  // The part(s) the poster is actually ABOUT — `exercises` minus the secondary ones. Session
-  // order is not poster order: `exercises[0]` on an accessory-then-metcon board is the warm-up,
-  // so anything describing "the workout" must read THIS. Reading exercises[0] beside the session
-  // format is how a metcon poster came to be titled "3 SETS" off its sibling core block.
-  posterMainExercises: Exercise[];
-  // DISPLAY format: when the poster leads with exactly one main part, this is that part's own
-  // format (loggingMode-first) — NOT necessarily the persisted session `format`, which is only
-  // authoritative for EP/aggregate math and can describe a different (secondary) part.
+  // DISPLAY format: on a one-part session, that part's own format (loggingMode-first) — NOT
+  // necessarily the persisted session `format`, which is only authoritative for EP/aggregate
+  // math. A session of several parts is a carousel, and each page reads its own part's format.
   workoutFormat: WorkoutFormat | undefined;
   rawText: string | undefined;
   durationMinutes: number;
@@ -266,24 +261,6 @@ function inferPosterDifficultyLevel(params: {
 }
 
 
-/**
- * Movements from the workload breakdown that belong to the given exercises. Parts are standalone
- * practices: a poster section rendering one part must never receive a sibling part's movements.
- * `allExercises` is the full saved list — a part's POSITION in it is what the breakdown stamped,
- * and the only thing that separates the same lift done in two parts.
- */
-function movementsForExercises(
-  target: Exercise[],
-  all: MovementTotal[],
-  allExercises: Exercise[],
-): MovementTotal[] {
-  const indices = target.map((ex) => allExercises.indexOf(ex)).filter((i) => i >= 0);
-  const scoped = movementsForParts(all, target, indices);
-  // Scoping failed entirely (a pre-stamping doc whose names were aliased or renamed) — a
-  // wrongly-empty poster is worse than the unscoped list, so fall back rather than render nothing.
-  return scoped.length > 0 ? scoped : all;
-}
-
 // ─── The hook ─────────────────────────────────────────────────────────────────
 
 export function useCelebrationData(
@@ -359,7 +336,7 @@ export function useCelebrationData(
   const workoutDate: Date = (isReward ? rewardData?.date : workout?.date) ?? new Date();
   const storedSourceDate: string | undefined = isReward ? rewardData?.sourceDate : workout?.sourceDate;
   // The stored date is the authority: either what the parser resolved at save time, or what the
-  // athlete typed on the poster's DATE tab. rawText only BACKFILLS a missing one — letting it
+  // athlete set by tapping the poster's date. rawText only BACKFILLS a missing one — letting it
   // compete would let a board date that sits closer to the logging day outvote the athlete's own
   // correction, so the poster snapped back to the old date every time it was reopened.
   const sourceDate = resolveSourceDate(storedSourceDate, undefined, workoutDate)
@@ -743,26 +720,25 @@ export function useCelebrationData(
 
   // Multi-part wins over the single-exercise special layouts (chipper/complex/ladder) — those
   // are shaping concerns for ONE exercise's own page, not a reason to collapse a session with
-  // multiple main parts (e.g. strength + metcon) into one combined poster. The carousel's
-  // per-page builders already handle ladder/chipper/complex shaping for whichever page needs it.
+  // several parts (e.g. strength + metcon) into one combined poster. The carousel's per-page
+  // builders already handle ladder/chipper/complex shaping for whichever page needs it.
   // One exercise = one part, decided once at segmentation (the unit of a part is the SCORE).
-  // No poster-layer regrouping: a session with several main parts renders one page per part.
-  const posterMainExercises = useMemo((): Exercise[] => exercises.filter(isMainPart), [exercises]);
+  // No poster-layer regrouping, and no part left out: every part renders its own page, an
+  // accessory block included — it is work the athlete did and logged (orderPosterParts puts it
+  // at the back of the deck).
 
   // ── Display format — parts are standalone practices ────────────────────────
-  // When the poster leads with exactly ONE main part, that part's own format (loggingMode
-  // first, then its own text — see inferWorkoutFormatForExercise) IS the workout's display
-  // format. The persisted session `format` describes the merge's primary part and can disagree
-  // with the part the poster is actually about (e.g. a secondary skill EMOM stamping 'emom'
-  // over a for_time metcon). Every DISPLAY decision (hero, poster pill, footer, vibe label)
-  // reads THIS value; the session format remains authoritative only for EP/aggregate math
-  // (session-scoped by design) and as the fallback inside the inference for legacy docs.
-  const mainFormat: WorkoutFormat | undefined = posterMainExercises.length === 1
-    ? inferWorkoutFormatForExercise(posterMainExercises[0], workoutFormat)
+  // On a one-part session, that part's own format (loggingMode first, then its own text — see
+  // inferWorkoutFormatForExercise) IS the workout's display format. Every DISPLAY decision
+  // (hero, poster pill, footer, vibe label) reads THIS value; the session format remains
+  // authoritative only for EP/aggregate math (session-scoped by design) and as the fallback
+  // inside the inference for legacy docs.
+  const mainFormat: WorkoutFormat | undefined = exercises.length === 1
+    ? inferWorkoutFormatForExercise(exercises[0], workoutFormat)
     : workoutFormat;
 
   const posterLayout: PosterLayout = (() => {
-    if (posterMainExercises.length > 1) return 'multi-part';
+    if (exercises.length > 1) return 'multi-part';
     if (isChipper) return 'chipper';
     if (barbellComplex) return 'complex';
     if (ladderData) return 'ladder';
@@ -777,7 +753,7 @@ export function useCelebrationData(
     if (posterLayout !== 'multi-part') return null;
     const allMovements = activeBreakdown?.movements ?? [];
 
-    return orderPosterParts(posterMainExercises).map((ex): CarouselPage => {
+    return orderPosterParts(exercises).map((ex): CarouselPage => {
       const isStrength = isStrengthPagePart(ex);
       const fromBreakdown = movementsForParts(allMovements, [ex], [exercises.indexOf(ex)]);
 
@@ -813,7 +789,7 @@ export function useCelebrationData(
       // renders from its prescription alone rather than borrowing a sibling's numbers.
       return { exercise: ex, movements: [], isStrength };
     });
-  }, [posterLayout, posterMainExercises, exercises, activeBreakdown?.movements]);
+  }, [posterLayout, exercises, activeBreakdown?.movements]);
 
   // ── Hero result ───────────────────────────────────────────────────────────
 
@@ -824,38 +800,27 @@ export function useCelebrationData(
     const teamSize = sessionTeamSize;
     const movements = activeBreakdown?.movements ?? [];
     const heroRawText = isReward ? rewardData?.workoutRawText : workout?.rawText;
-    // Only reached when there's at most 1 main part — exclude any secondary exercise (e.g. a
-    // warm-up) so it can never be mistaken for "the metcon" just because it comes first and
-    // isn't type:'strength'.
-    const mainExercises = posterMainExercises;
-    // The hero speaks for the part the poster renders — summing a sibling accessory block's
-    // reps into it produces a number traceable to nothing on the poster (same scoping rule
-    // as artifactSections).
-    const heroMovements = exercises.length > mainExercises.length && mainExercises.length > 0
-      ? movementsForExercises(mainExercises, movements, exercises)
-      : movements;
 
     return computeHeroResult(
-      mainExercises.length > 0 ? mainExercises : exercises,
+      exercises,
       mainFormat,
       totalVolume,
       totalEP,
       durationMinutes,
       isPR ?? false,
-      heroMovements,
+      movements,
       undefined,
       prMovementName,
       prWeight,
       teamSize,
       heroRawText,
-      (mainExercises.length > 0 ? mainExercises : exercises).map((ex) => exercises.indexOf(ex)),
+      exercises.map((_, index) => index),
     );
   }, [
     isReward,
     rewardData,
     workout,
     exercises,
-    posterMainExercises,
     totalVolume,
     totalEP,
     durationMinutes,
@@ -1013,33 +978,19 @@ export function useCelebrationData(
 
   const artifactSections = useMemo(
     () => {
-      // Only reached when there's at most 1 main part — but a secondary exercise (e.g. a
-      // warm-up) could still be exercises[0] if it comes first in the array. Exclude it so
-      // buildRewardArtifactSections' mainExercise is always the actual main part, not whichever
-      // exercise happens to be listed first.
-      const mainExercises = posterMainExercises;
       // sessionTeamSize is the single partner gate shared with posterTeamSize below — the old
       // AI-field-only rule existed so this memo could never disagree with the visible gate;
       // sharing one (title-aware) value preserves that invariant while letting title-only
       // partner boards ("Partner WOD") render as partner workouts.
-      const teamSize = sessionTeamSize;
-      const sectionExercises = mainExercises.length > 0 ? mainExercises : exercises;
-      const allMovements = activeBreakdown?.movements ?? [];
-      // The breakdown spans the whole session — when sibling parts exist (e.g. a secondary
-      // accessory block), scope the movements to the exercises this artifact actually renders,
-      // or the sibling's movements leak into this part's prescription list.
-      const scopedMovements = exercises.length > sectionExercises.length
-        ? movementsForExercises(sectionExercises, allMovements, exercises)
-        : allMovements;
       return buildRewardArtifactSections(
-        sectionExercises,
-        scopedMovements,
+        exercises,
+        activeBreakdown?.movements ?? [],
         rawText,
-        teamSize,
+        sessionTeamSize,
         workoutTitleText,
       );
     },
-    [exercises, posterMainExercises, activeBreakdown?.movements, rawText, workoutFormat, sessionTeamSize, workoutTitleText],
+    [exercises, activeBreakdown?.movements, rawText, sessionTeamSize, workoutTitleText],
   );
 
   // ── Per-page carousel data ────────────────────────────────────────────────
@@ -1217,7 +1168,6 @@ export function useCelebrationData(
 
   return {
     exercises,
-    posterMainExercises,
     workoutFormat: mainFormat,
     rawText,
     durationMinutes,

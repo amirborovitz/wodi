@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isMainPart, orderPosterParts } from './mainPart';
+import { orderPosterParts } from './mainPart';
 import type { Exercise } from '../../types';
 
-// The deck exactly as useCelebrationData builds it: the parts that get a poster, in poster order.
+// The deck exactly as useCelebrationData builds it: every part gets a poster, in poster order.
 // The first three cases were pinned against the old in-poster ordering before it moved here.
 function posterOrder(exercises: Exercise[]): string[] {
-  return orderPosterParts(exercises.filter(isMainPart)).map((ex) => ex.name);
+  return orderPosterParts(exercises).map((ex) => ex.name);
 }
 
 const part = (fields: Partial<Exercise>): Exercise => ({ sets: [], movements: [], ...fields } as unknown as Exercise);
@@ -94,5 +94,32 @@ describe('poster order — which part leads, and what follows', () => {
       movements: [{ name: 'Row', inputType: 'calories' }] as Exercise['movements'],
     });
     expect(posterOrder([duPractice, relay])).toEqual(['Endurance Relay For Time', 'EMOM 8 Double Under Practice']);
+  });
+
+  it('gives every part of an FBB session a page — accessory parts follow the lift (2026-09-15)', () => {
+    // Its two accessory parts used to be filtered off the deck, so the poster showed only the
+    // strict press.
+    const strictPress = part({
+      name: 'Strict Press', type: 'strength', loggingMode: 'strength', partKind: 'strength', isSecondary: false,
+      movements: [{ name: 'Strict Press', inputType: 'weight' }] as Exercise['movements'],
+    });
+    const circuit = part({
+      name: '3 Sets Accessory', type: 'strength', loggingMode: 'strength', partKind: 'accessory', isSecondary: true,
+      movements: [{ name: 'Shoulder Lateral Raise', inputType: 'weight' }] as Exercise['movements'],
+    });
+    const kettlebells = part({
+      name: '4 Sets Every 3:00', type: 'skill', loggingMode: 'emom', partKind: 'accessory', isSecondary: true,
+      movements: [{ name: 'KB Deadlift', inputType: 'weight' }] as Exercise['movements'],
+    });
+    expect(posterOrder([strictPress, circuit, kettlebells]))
+      .toEqual(['Strict Press', '3 Sets Accessory', '4 Sets Every 3:00']);
+  });
+
+  it('gives a warm-up a page too, at the back of the deck', () => {
+    const warmUp = part({
+      name: 'Band Pull Apart', type: 'skill', loggingMode: 'bodyweight', partKind: 'accessory', isSecondary: true,
+      movements: [{ name: 'Band Pull Apart' }] as Exercise['movements'],
+    });
+    expect(posterOrder([warmUp, AMRAP])).toEqual(['16 Minutes AMRAP', 'Band Pull Apart']);
   });
 });

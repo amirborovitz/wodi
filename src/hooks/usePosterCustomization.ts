@@ -8,7 +8,7 @@ export const POSTER_CUSTOMIZATION_EVENT = 'wodi:poster-customization';
 export interface PosterCustomizationUpdate {
   posterSkin?: PosterSkinId;
   posterVibe?: PosterVibeKey | null;
-  sourceDate?: string;  // YYYY-MM-DD — the date shown on the poster (DATE tab)
+  sourceDate?: string;  // YYYY-MM-DD — the date shown on the poster (tap it to step it)
   posterSticker?: PosterSticker | null;  // free-text note on the poster (TEXT tab); null removes it
   posterVibeOffset?: PosterVibeOffset | null;  // manual drag nudge of the "FELT" stamp; null resets it
   posterPhoto?: PosterPhoto | null;  // photo clipped to the poster (PHOTO tab); null removes it

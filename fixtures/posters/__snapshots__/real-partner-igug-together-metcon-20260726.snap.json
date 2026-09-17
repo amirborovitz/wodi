@@ -1,78 +1,5 @@
 {
-  "reward": [
-    {
-      "eyebrow": "PARTNER AMRAP",
-      "title": "Dynamic Duo For Time",
-      "blueprint": "For time (35 MIN CAP)",
-      "rows": [
-        {
-          "primary": "1200m",
-          "name": "Echo Bike (together)",
-          "mineKey": "Echo Bike",
-          "substitutedFrom": "Run",
-          "accent": "magenta",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "suppressMine": true
-        },
-        {
-          "primary": "100",
-          "name": "Alt American Kettlebell Swings",
-          "nameWithLoad": "Alt American Kettlebell Swings @ 20kg",
-          "loadNote": "20kg",
-          "subNote": "100 total",
-          "totalNote": "100 total",
-          "mineKey": "Alt American Kettlebell Swing",
-          "accent": "yellow",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "teamShare": "50"
-        },
-        {
-          "primary": "100",
-          "name": "Push-ups",
-          "mineKey": "Push-up",
-          "accent": "magenta",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "teamShare": "50"
-        },
-        {
-          "primary": "100",
-          "name": "Toes to Bars",
-          "mineKey": "Toes to Bar",
-          "accent": "cyan",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "teamShare": "50"
-        },
-        {
-          "primary": "100",
-          "name": "Goblet Lunges",
-          "nameWithLoad": "Goblet Lunges @ 20kg",
-          "loadNote": "20kg",
-          "subNote": "100 total",
-          "totalNote": "100 total",
-          "mineKey": "Goblet Lunge",
-          "accent": "yellow",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "teamShare": "50"
-        },
-        {
-          "primary": "400",
-          "name": "Double Unders",
-          "mineKey": "Double Under",
-          "accent": "magenta",
-          "repeatCount": 1,
-          "partnerSplit": "reps",
-          "teamShare": "200"
-        }
-      ],
-      "hiddenCount": 0,
-      "isPartnerConfirmed": true
-    }
-  ],
+  "reward": null,
   "pages": [
     [
       {
@@ -147,133 +74,112 @@
         "hiddenCount": 0,
         "isPartnerConfirmed": true
       }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Core Cash Out",
+        "blueprint": "2 rounds",
+        "rows": [
+          {
+            "primary": "-",
+            "name": "Side Plank Hold",
+            "mineKey": "Side Plank Hold",
+            "accent": "magenta",
+            "repeatCount": 2
+          },
+          {
+            "primary": "50",
+            "name": "KB Russian Twists",
+            "subNote": "100 total",
+            "totalNote": "100 total",
+            "mineKey": "Russian Twist",
+            "accent": "magenta",
+            "repeatCount": 2
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
     ]
   ],
   "hero": {
     "value": "32:00",
     "unit": "MIN",
-    "storyLine": "400 du · 100 alt american kettlebell swing · 100 push-up · 100 ttb · 100 goblet lunge · 1.2km echo bike",
+    "formatLine": "For Time · In Pairs",
+    "storyLine": "400 du · 100 alt american kettlebell swing · 100 push-up · 100 ttb · 100 goblet lunge · 100 russian twist · 1.2km echo bike",
     "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "DYNAMIC DUO FOR TIME",
+        "sectionColor": "magenta"
+      },
       {
         "perRound": "1.2km",
         "name": "Echo Bike",
-        "total": "",
-        "color": "magenta",
-        "wasSubstituted": true,
-        "originalMovement": "Run",
-        "substitutionType": "equivalent",
-        "substitutedPerRound": "1.2km"
+        "total": "1.2km total",
+        "color": "magenta"
       },
       {
-        "perRound": "200",
+        "perRound": "100",
         "name": "Alt American Kettlebell Swing",
         "total": "",
         "color": "yellow",
         "weight": 20,
-        "unit": "kg",
-        "partnerNote": "your part 100",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "200",
+        "perRound": "100",
         "name": "Push-up",
         "total": "",
         "color": "magenta",
-        "unit": "kg",
-        "partnerNote": "your part 100",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "200",
+        "perRound": "100",
         "name": "Toes to Bar",
         "total": "",
         "color": "cyan",
-        "unit": "kg",
-        "partnerNote": "your part 100",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "200",
+        "perRound": "100",
         "name": "Goblet Lunge",
         "total": "",
         "color": "yellow",
         "weight": 20,
-        "unit": "kg",
-        "partnerNote": "your part 100",
-        "wasSubstituted": false
+        "unit": "kg"
       },
       {
-        "perRound": "800",
+        "perRound": "400",
         "name": "Double Under",
         "total": "",
         "color": "magenta",
-        "unit": "kg",
-        "partnerNote": "your part 400",
-        "wasSubstituted": false
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CORE CASH OUT",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "50",
+        "name": "Russian Twist",
+        "total": "100 total",
+        "color": "magenta",
+        "unit": "kg"
       }
     ],
     "accentClass": "accentMagenta"
   },
-  "resultLabel": "OUR TIME",
+  "resultLabel": "MY TIME",
   "resultValue": "32:00",
   "posterRows": {
-    "reward": [
-      {
-        "kind": "block",
-        "label": "",
-        "cap": "For time (35 MIN CAP)"
-      },
-      {
-        "kind": "line",
-        "rx": "1200m Echo Bike (together)",
-        "swapFrom": "Run",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "line",
-        "rx": "100 Alt American Kettlebell Swings",
-        "load": "",
-        "mine": "20kg",
-        "team": "50",
-        "isPartnerShare": true,
-        "total": "100 total"
-      },
-      {
-        "kind": "line",
-        "rx": "100 Push-ups",
-        "load": "",
-        "mine": "",
-        "team": "50",
-        "isPartnerShare": true
-      },
-      {
-        "kind": "line",
-        "rx": "100 Toes to Bars",
-        "load": "",
-        "mine": "",
-        "team": "50",
-        "isPartnerShare": true
-      },
-      {
-        "kind": "line",
-        "rx": "100 Goblet Lunges",
-        "load": "",
-        "mine": "20kg",
-        "team": "50",
-        "isPartnerShare": true,
-        "total": "100 total"
-      },
-      {
-        "kind": "line",
-        "rx": "400 Double Unders",
-        "load": "",
-        "mine": "",
-        "team": "200",
-        "isPartnerShare": true
-      }
-    ],
+    "reward": null,
     "pages": [
       [
         {
@@ -331,19 +237,44 @@
           "team": "200",
           "isPartnerShare": true
         }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "CORE CASH OUT",
+          "cap": "2 rounds"
+        },
+        {
+          "kind": "line",
+          "rx": "- Side Plank Hold",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 KB Russian Twists",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "100 total"
+        }
       ]
     ]
   },
   "partnerSubs": {
     "reward": null,
     "pages": [
+      null,
       null
     ]
   },
   "pageRepsSchemes": [
+    null,
     null
   ],
   "pageMaxPractices": [
+    false,
     false
   ]
 }
