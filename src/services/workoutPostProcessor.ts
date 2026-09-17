@@ -9,6 +9,7 @@ import { hasSameMovementsEveryRound } from '../utils/sectionShape';
 import { isRowErgName, matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 import { prescribesOwnRest } from './partnerScope';
+import { hasMaxSet } from './blockScore';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { auditPostProcess } from './parseAudit';
 
@@ -1596,6 +1597,16 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
       const fromPrescription = parseInt(setsMatch[1], 10);
       if (fromPrescription > 0) finalSuggestedSets = fromPrescription;
     }
+  }
+
+  // ...but neither source can SEE a max set. "4 sets x 5 reps @~80% + max reps @60%" is five
+  // sets: the fifth has no written rep count, so it is absent from the rep array and absent from
+  // "4 sets". Both then read 4 and overruled the AI's correct 5, and the set carrying the only
+  // earned number on the board stopped existing. A floor, never an increase — this can only stop
+  // the override shrinking the count, it never invents a set the AI did not report.
+  if (hasMaxSet({ ...exercise, suggestedRepsPerSet })) {
+    const aiCount = exercise.suggestedSets ?? 0;
+    if (aiCount > (finalSuggestedSets ?? 0)) finalSuggestedSets = aiCount;
   }
 
   return {

@@ -229,8 +229,9 @@ You usually receive ONE part of a session (a strength piece OR a metcon OR acces
 the session was already split upstream. Parse what you're given; never force extra blocks.
 - "isSecondary": true for support work (warm-up, "body armor", mobility/prehab, activation,
   "in between sets" accessories, cool-down) and for skill/technique practice ("practice",
-  "movement focus", "for quality", "quality sets"); false for the piece the athlete trains for
-  (the main lift or the metcon). At most 2 non-secondary exercises.
+  "movement focus"); false for the piece the athlete trains for (the main lift or the metcon).
+  At most 2 non-secondary exercises. A pace cue ("for quality", "quality sets", "controlled")
+  says how to move, never what the block is — it does not make a block practice.
   A skill/practice block is ALWAYS "isSecondary": true — it is drilling, not a scored effort, so
   it never becomes the main piece just because it is the only block in the text you were handed.
   Judge the block on what it IS, never on what else happens to be in this call.
@@ -605,19 +606,20 @@ When P1 and P2 do DIFFERENT activities simultaneously and swap ("In pairs: P1 20
 Only treat such a piece as a true partner workout when the board explicitly makes the score one shared team total that both athletes build together.`;
 
 const RULES_SKILL_TIMECAP = `## SKILL / PRACTICE BLOCKS
-"Practice", "build weight", "movement focus", "for quality", "quality sets" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
-Example: "A. 3 sets, for quality: 10 ring rows, 15 prone T-raises" → exercise type: "skill", suggestedSets: 3.
+"Practice", "build weight", "movement focus" → type: "skill", suggestedSets: N (number of stated sets), NO suggestedReps, NO movements from other blocks.
+Example: "A. Movement focus, 3 sets: 10 kip swings, 3 ring muscle-up transitions" → exercise type: "skill", suggestedSets: 3.
+A pace cue ("for quality", "quality sets", "controlled", "not for time") says HOW to move and can sit on any block — it never makes a block practice. Read what the block is from its work.
 type: "skill" says WHY the block exists, never HOW it is logged — pick loggingMode from the WORK, exactly as for any other block: bodyweight reps → "bodyweight", loaded sets → "strength", a timed piece → its timed mode. A practice block is a normal shape, so it must NOT fall back to "free" just because it is skill work or carries coaching cues ("focus on kipping", "max unbroken test, then 4 sets at 40-60%") — those cues belong in prescription, they do not change the mode.
 Example: "A. Movement focus: Toes to Bar, 8 minutes practice. Advanced: test max unbroken reps, then 4 more sets of 40-60%" → type: "skill", loggingMode: "bodyweight", suggestedSets: 5.
 
-A practice block is secondary, so it is logged as "did the sets" — UNLESS the athlete EARNS a number
+A practice block's counts are prescription, so it is logged as "did the sets" — UNLESS the athlete EARNS a number
 in it that the board does not prescribe. You decide whether it does: stamp "isMaxReps": true on the
 movement that carries that number, and stamp nothing when the block has none. Do not stamp a
 movement whose count the coach already wrote — that is prescription, and asking the athlete to
 re-enter it logs the board back to itself.
 - "test your max unbroken Toes to Bar, then 4 sets at 40-60%" → the Toes to Bar movement gets "isMaxReps": true
 - "8 minutes practice: work on your kipping rhythm" → nothing stamped (a cue, not a result)
-- "3 sets, for quality: 10 ring rows, 15 prone T-raises" → nothing stamped (both counts prescribed)
+- "Movement focus, 3 sets: 10 kip swings, 3 ring muscle-up transitions" → nothing stamped (both counts prescribed)
 
 ## TIME CAP
 "T.C." / "TC" / "time cap" → timeCap in seconds. "16 min T.C." → timeCap: 960.`;
@@ -1513,7 +1515,7 @@ SEGMENTATION:
 - The unit of a part is the SCORE, never the label. Before splitting on A./B./C. labels, check what governs the labeled blocks: a format/scoring header written ONCE above them ("For time:", "AMRAP 25", "Chipper") and/or a single time cap written once below covering all of them means the blocks run on ONE clock toward ONE score — they are ONE part, with the internal labels kept inside its text. The same holds for blocks joined by connectors ("Into:", "then", "A+B+C for time") and for a partner piece with one finish time. Example: "For time: / A. 10 rounds: [...] / B. 10 rounds: [...] / C. 10 rounds: [...] / 40 min T.C." is ONE metcon part.
 - Labels split into separate parts only when each labeled block is SEPARATELY LETTERED (its own A./B./C.) AND scored on its own — it carries its own format/scoring line ("A. Every 1:30 x 8: ...", "B. 16 min AMRAP: ..."), its own clock or time cap, or is a different kind of training. Blocks scored independently are separate parts even when unlabeled.
 - A per-block cadence/scheme line alone does NOT promote a sub-block to its own part. What binds sub-blocks into ONE part is a SHARED GOVERNING SCOPE: they sit under a single top-level label (one "A."), or under one scoring header / one time cap. Sub-bullets or lines within that scope stay ONE part even when each repeats its own cadence/scheme line — and whether or not a connector ("Into:", "then", "immediately into") joins them. The connector is a hint, not the trigger; the trigger is the shared scope. Contrast: "A. 4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" is ONE strength part (both bullets share the single label A.) — do NOT split it into Push Press and Push Jerk parts; whereas "A. Every 1:30 x 8: [...] / B. 16 min AMRAP: [...]" is TWO parts (two separate top-level letters, each with its own scoring).
-- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", and skill/technique practice ("movement focus of the day", "8 minutes practice", "for quality", "quality sets"). A practice block is "accessory" even when it opens the session, headlines a movement, or drills something the metcon later uses — practising a movement is not the same as being scored on it.
+- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", and skill/technique practice ("movement focus of the day", "8 minutes practice"). A practice block is "accessory" even when it opens the session, headlines a movement, or drills something the metcon later uses — practising a movement is not the same as being scored on it. A pace cue ("for quality", "quality sets", "not for time") says how to move and can sit on any part — it never makes a part practice. Judge the part by its work: a loaded multi-movement piece on a clock ("Every 3:00 x 4 sets (for quality): 10 KB deadlifts, 10 KB swings, 10 push-ups") is a "metcon".
 - A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
 - A date written on the board goes into the FIRST part's text (a later step reads it from there).
 - Single-part boards return one part. Never invent parts that are not on the board.
