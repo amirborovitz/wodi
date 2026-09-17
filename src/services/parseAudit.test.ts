@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { diffParse } from './parseAudit';
+import { auditSeverity, diffParse, isLoudEntry, type ParseAuditEntry } from './parseAudit';
 import type { ParsedWorkout } from '../types';
 
 /**
- * The audit's only job is telling a BACKFILL apart from an OVERRIDE, because that distinction is
- * the whole rule: filling a field the AI left empty is sanctioned, replacing one it filled is a
- * defect. Everything else here — paths, array handling — exists to make the resulting list
- * readable enough to triage.
+ * The audit's job is saying what our passes did to the model's answer, and how loudly it should
+ * read. Replacing an answer is a defect. So is filling a blank in a field the MODEL owns — under
+ * the strict schema a blank is an answer ("there is none"), which is the distinction the 15/09
+ * board was lost to. Only plumbing the model has no opinion about is sanctioned.
+ *
+ * Everything else here — paths, array handling — exists to make the list readable enough to
+ * triage, in `fixtures/parse-baseline.json` and in the `parseFlags` queue.
  */
 
 const workout = (over: Partial<ParsedWorkout> = {}): ParsedWorkout => ({
@@ -43,6 +46,33 @@ describe('parseAudit — backfill vs override', () => {
     // Deleting the AI's answer is still overruling it — the direction doesn't matter.
     const entries = diffParse(workout({ timeCap: 600 }), workout({ timeCap: undefined }));
     expect(entries).toEqual([{ path: 'timeCap', kind: 'override', from: 600, to: undefined }]);
+  });
+});
+
+describe('parseAudit — how loudly an entry reads', () => {
+  const entry = (path: string, kind: 'backfill' | 'override'): ParseAuditEntry => (
+    { path, kind, from: kind === 'backfill' ? undefined : 'x', to: 'y' }
+  );
+
+  it('treats filling a blank the MODEL owns as loudly as replacing its answer', () => {
+    // The 15/09 board: `time` was blank on a ring row because there was no time. A pass filled it
+    // from the next line's "400m" and the poster printed "400 min Pull-ups" — while this audit
+    // counted it as sanctioned and printed a quiet number.
+    expect(auditSeverity(entry('exercises[0].movements[1].time', 'backfill'))).toBe('quantity-backfill');
+    expect(auditSeverity(entry('exercises[0].movements[1].reps', 'backfill'))).toBe('quantity-backfill');
+    expect(auditSeverity(entry('exercises[0].rxWeights', 'backfill'))).toBe('quantity-backfill');
+    expect(isLoudEntry(entry('exercises[0].movements[1].time', 'backfill'))).toBe(true);
+  });
+
+  it('leaves plumbing the model has no opinion about quiet', () => {
+    expect(auditSeverity(entry('exercises[0].movements[1].countingMode', 'backfill'))).toBe('structural-backfill');
+    expect(auditSeverity(entry('exercises[0].movements[1].stationIndex', 'backfill'))).toBe('structural-backfill');
+    expect(isLoudEntry(entry('exercises[0].movements[1].scoreEntryMode', 'backfill'))).toBe(false);
+  });
+
+  it('calls an override an override wherever it lands', () => {
+    expect(auditSeverity(entry('exercises[0].movements[1].countingMode', 'override'))).toBe('override');
+    expect(auditSeverity(entry('type', 'override'))).toBe('override');
   });
 });
 

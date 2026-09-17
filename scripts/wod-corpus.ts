@@ -12,6 +12,7 @@ import {
   type PipelineResult,
 } from './check-wod';
 import { installRecorder, installReplay, restoreOpenAI, type RecordedResponses } from './aiReplay';
+import { auditSeverity, isLoudEntry, type ParseAuditEntry } from '../src/services/parseAudit';
 
 interface WodFixture {
   name: string;
@@ -29,6 +30,8 @@ interface CorpusOptions {
   live: boolean;
   add: boolean;
   record: boolean;
+  /** Rewrite the over-parse baseline instead of checking against it. */
+  baseline: boolean;
   fixture?: string;
   file?: string;
   name?: string;
@@ -41,9 +44,26 @@ interface FixtureRunResult {
   cachedPipeline?: PipelineResult;
   failures: string[];
   error?: string;
+  /** Every field this board's parse overruled or filled on the model's behalf. */
+  audit: ParseAuditEntry[];
 }
 
+/**
+ * How often each board makes us overrule the model, as a committed file.
+ *
+ * WHY A BASELINE AND NOT A BAN. Every entry here is a pass second-guessing the parse, which the
+ * trust rule says should not happen — but some are load-bearing today and removing them is its own
+ * piece of work. Freezing the list keeps the debt visible and, more importantly, stops it growing:
+ * the corpus fails on an entry that is not in the file, so the next heuristic someone reaches for
+ * has to be argued for in a diff rather than discovered months later on a poster.
+ *
+ * `npm run corpus:baseline` rewrites it. Do that deliberately, and say in the commit why the new
+ * entry earns its place.
+ */
+type ParseBaseline = Record<string, Record<string, number>>;
+
 const FIXTURE_DIR = path.resolve(process.cwd(), 'fixtures', 'wods');
+const BASELINE_FILE = path.resolve(process.cwd(), 'fixtures', 'parse-baseline.json');
 const STARTER_EXPECT_PATHS = [
   'format',
   'loggingModes',
@@ -68,11 +88,12 @@ Usage:
   npm run corpus -- --live --fixture plain-for-time-control
   npm run corpus:add -- --file wod.txt --name my-wod
   npm run corpus:record -- --fixture plain-for-time-control   (re-capture cached AI answers)
+  npm run corpus:baseline                                     (bank a change to the AI-trust baseline)
 `);
 }
 
 function parseArgs(argv: string[]): CorpusOptions {
-  const options: CorpusOptions = { live: false, add: false, record: false };
+  const options: CorpusOptions = { live: false, add: false, record: false, baseline: false };
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -86,6 +107,7 @@ function parseArgs(argv: string[]): CorpusOptions {
     if (arg === '--live') options.live = true;
     else if (arg === '--add') options.add = true;
     else if (arg === '--record') options.record = true;
+    else if (arg === '--baseline') options.baseline = true;
     else if (arg === '--fixture') options.fixture = next();
     else if (arg === '--file') options.file = next();
     else if (arg === '--name') options.name = next();
@@ -101,6 +123,7 @@ function parseArgs(argv: string[]): CorpusOptions {
 
   options.live = options.live || process.env.npm_config_live === 'true';
   options.record = options.record || process.env.npm_config_record === 'true';
+  options.baseline = options.baseline || process.env.npm_config_baseline === 'true';
   options.fixture = options.fixture ?? npmConfigValue('fixture');
   options.file = options.file ?? npmConfigValue('file');
   options.name = options.name ?? npmConfigValue('name');
@@ -188,11 +211,18 @@ function formatDiffForFailedPaths(
   });
 }
 
-/** Replay the fixture's cached answers through the real pipeline. */
-async function runCached(fixture: WodFixture): Promise<PipelineResult> {
+/**
+ * Replay the fixture's cached answers through the real pipeline, and keep what the post-processor
+ * did to them. The audit is read from the cached run only: a live run answers a different question
+ * (has the prompt drifted), and mixing the two would double-count every entry.
+ */
+async function runCached(fixture: WodFixture): Promise<{ pipeline: PipelineResult; audit: ParseAuditEntry[] }> {
   installReplay(fixture.aiResponses ?? {});
+  const from = globalThis.wodiParseAudit?.all.length ?? 0;
   try {
-    return await runSessionPipeline(fixture.rawText);
+    const pipeline = await runSessionPipeline(fixture.rawText);
+    const audit = (globalThis.wodiParseAudit?.all ?? []).slice(from).flat().filter(isLoudEntry);
+    return { pipeline, audit };
   } finally {
     restoreOpenAI();
   }
@@ -200,15 +230,16 @@ async function runCached(fixture: WodFixture): Promise<PipelineResult> {
 
 async function runFixture(fixture: WodFixture, live: boolean): Promise<FixtureRunResult> {
   try {
-    const cachedPipeline = await runCached(fixture);
+    const cached = await runCached(fixture);
     const pipeline = live
       ? await runSessionPipeline(fixture.rawText)
-      : cachedPipeline;
+      : cached.pipeline;
     return {
       fixture,
       mode: live ? 'live' : 'offline',
       pipeline,
-      cachedPipeline,
+      cachedPipeline: cached.pipeline,
+      audit: cached.audit,
       failures: evaluateExpectations(pipeline.context, fixture),
     };
   } catch (error) {
@@ -216,6 +247,7 @@ async function runFixture(fixture: WodFixture, live: boolean): Promise<FixtureRu
       fixture,
       mode: live ? 'live' : 'offline',
       failures: [],
+      audit: [],
       error: (error as Error).message,
     };
   }
@@ -258,6 +290,82 @@ function printSummary(results: FixtureRunResult[]): void {
     console.log(`${result.fixture.name.padEnd(30)}  ${result.mode.padEnd(7)}  ${status}`);
   }
   console.log(`\n${passCount} passed, ${failCount} failed`);
+}
+
+/** `[override] exercises[].movements[].name` — indices collapsed, so the key names the FIELD. */
+function auditKey(entry: ParseAuditEntry): string {
+  return `[${auditSeverity(entry)}] ${entry.path.replace(/\[\d+\]/g, '[]').replace(/^\./, '')}`;
+}
+
+function tallyAudit(results: FixtureRunResult[]): ParseBaseline {
+  const tally: ParseBaseline = {};
+  for (const result of results) {
+    if (result.audit.length === 0) continue;
+    const counts: Record<string, number> = {};
+    for (const entry of result.audit) {
+      const key = auditKey(entry);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    tally[result.fixture.name] = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
+  }
+  return Object.fromEntries(Object.entries(tally).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function readBaseline(): ParseBaseline {
+  if (!fs.existsSync(BASELINE_FILE)) return {};
+  return JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8')) as ParseBaseline;
+}
+
+function writeBaseline(tally: ParseBaseline): void {
+  fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(tally, null, 2)}\n`, 'utf8');
+}
+
+/**
+ * Compare this run's over-parsing against the committed baseline.
+ *
+ * Only GROWTH fails. A count that shrank is a heuristic someone deleted — good news, and it says
+ * so, but failing on it would mean a green run requires updating a file after every improvement.
+ */
+function checkBaseline(results: FixtureRunResult[]): string[] {
+  const current = tallyAudit(results);
+  const baseline = readBaseline();
+  const ran = new Set(results.map((result) => result.fixture.name));
+  const failures: string[] = [];
+  const improvements: string[] = [];
+
+  for (const [name, counts] of Object.entries(current)) {
+    for (const [key, count] of Object.entries(counts)) {
+      const allowed = baseline[name]?.[key] ?? 0;
+      if (count > allowed) {
+        failures.push(allowed === 0
+          ? `${name}: NEW ${key}`
+          : `${name}: ${key} x${count} (baseline allows ${allowed})`);
+      }
+    }
+  }
+  for (const [name, counts] of Object.entries(baseline)) {
+    if (!ran.has(name)) continue;
+    for (const [key, allowed] of Object.entries(counts)) {
+      const count = current[name]?.[key] ?? 0;
+      if (count < allowed) improvements.push(`${name}: ${key} x${count} (was ${allowed})`);
+    }
+  }
+
+  console.log('\nAI TRUST');
+  const total = Object.values(current).reduce(
+    (sum, counts) => sum + Object.values(counts).reduce((a, b) => a + b, 0), 0);
+  console.log(`${total} field(s) overruled or filled on the model's behalf across ${Object.keys(current).length} board(s).`);
+  if (improvements.length > 0) {
+    console.log('\nFewer than the baseline (run corpus:baseline to bank it):');
+    improvements.forEach((line) => console.log(`  - ${line}`));
+  }
+  if (failures.length > 0) {
+    console.log('\nNOT IN THE BASELINE — the parse is being second-guessed in a new place:');
+    failures.forEach((line) => console.log(`  x ${line}`));
+    console.log('\n  Fix the pass, or the prompt. If the entry truly earns its place:');
+    console.log('    npm run corpus:baseline    (and say why in the commit)');
+  }
+  return failures;
 }
 
 function starterExpect(context: Record<string, unknown>): Record<string, string> {
@@ -327,6 +435,17 @@ async function runCorpus(options: CorpusOptions): Promise<void> {
     results.push(result);
   }
   printSummary(results);
+
+  // Only a full offline run may touch the baseline: one fixture can't speak for the others, and a
+  // live run's numbers describe today's prompt rather than the recorded answers the file is about.
+  const wholeCorpus = !options.fixture && !options.live;
+  if (options.baseline && wholeCorpus) {
+    writeBaseline(tallyAudit(results));
+    console.log(`\nWrote ${path.relative(process.cwd(), BASELINE_FILE)}.`);
+  } else if (wholeCorpus) {
+    if (checkBaseline(results).length > 0) process.exitCode = 1;
+  }
+
   if (results.some((result) => result.error || result.failures.length > 0)) {
     process.exitCode = 1;
   }
@@ -337,6 +456,7 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (scriptName === 'corpus:add') options.add = true;
   if (scriptName === 'corpus:record') options.record = true;
+  if (scriptName === 'corpus:baseline') options.baseline = true;
   if (options.add) await addFixture(options);
   else if (options.record) await recordCorpus(options);
   else await runCorpus(options);

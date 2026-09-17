@@ -8,6 +8,7 @@ import { assignMovementColors } from '../services/workloadCalculation';
 import { buildWorkloadBreakdownFromResults } from '../services/workloadFromResults';
 import type { ExerciseResult } from '../services/workloadFromResults';
 import { resolveSaveTarget } from '../services/saveTarget';
+import { flagParseOverrides } from '../services/parseFlagService';
 import { findRecentSameBoard } from '../services/sameBoard';
 import { parseSourceDate } from '../utils/workoutDate';
 import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
@@ -2307,6 +2308,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       });
       // A save ends the edit pass; "Edit" on the reward screen starts the next one.
       setIsEditingAfterSave(false);
+
+      // What this board's parse made us overrule, for triage. Fire-and-forget on purpose: the
+      // athlete is looking at their poster, and telemetry must never delay that or queue in front
+      // of their next write. A test log is excluded like every other counter.
+      if (!isTestWorkout) {
+        void flagParseOverrides({
+          userId: user.id,
+          workoutId: persistedWorkoutId,
+          title: workoutTitle,
+        });
+      }
 
       // Compute final EP using the same formula WorkoutScreen will use (PRs now known)
       const finalHasPR = reward.achievements?.some(a => a.type === 'pr') || reward.heroAchievement?.type === 'pr';

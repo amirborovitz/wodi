@@ -46,6 +46,16 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
     }
 
+    // Parse flag queue — telemetry for fields where our post-processing overruled
+    // the parse AI, or filled a blank the model owns. Same shape as movementFlags:
+    // any signed-in client appends (merge write, keyed by field path), only triage
+    // reads the ranked list back or clears it. Carries no board text — a field
+    // path, counters, and a short from/to sample.
+    match /parseFlags/{fieldId} {
+      allow create, update: if request.auth != null;
+      allow read, delete: if isAdmin();
+    }
+
     // ── Feed ────────────────────────────────────────────────────────────────
     // The feed is global and no-follow, which means /workouts can never be the
     // read source: that doc carries rawText (raw whiteboard OCR), corrections,

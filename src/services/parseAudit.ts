@@ -9,18 +9,24 @@ import type { ParsedWorkout } from '../types';
  * model. But nothing ever checked. The post-processor is ~2,800 lines across dozens of passes, and
  * "we probably over-parse" was a feeling with no list behind it.
  *
- * This produces the list. It diffs the parse as it arrived against the parse as it left, and puts
- * every leaf difference in one of two buckets:
+ * This produces the list. It diffs the parse as it arrived against the parse as it left, and reads
+ * every leaf difference at one of three volumes (see `auditSeverity`):
  *
- *   backfill — the AI left it empty and we filled it. Sanctioned; logged quietly.
- *   override — the AI gave an answer and we replaced it. Each one is either a bug in a pass or a
- *              gap in the prompt, and there is no third option.
+ *   override            — the AI gave an answer and we replaced it. A bug in a pass or a gap in
+ *                         the prompt; there is no third option.
+ *   quantity-backfill   — the AI left a field IT OWNS empty and we filled it. The same thing: a
+ *                         strict structured output answers every field, so a blank means THERE IS
+ *                         NONE. This bucket was invented on 16/09 because the previous rule filed
+ *                         it under "sanctioned" and a poster printed "400 min Pull-ups".
+ *   structural-backfill — plumbing the model has no opinion about. Sanctioned; logged quietly.
  *
  * ONE OBSERVER, NOT 200 CALL SITES. Instrumenting every assignment would mean touching every pass
  * and would go stale the moment someone adds one. Diffing the boundary catches every pass that
  * exists and every pass that ever will, and it cannot drift from what actually happened.
  *
- * It only observes. Nothing here changes a value, and removing it changes no behaviour.
+ * It only observes. Nothing here changes a value, and removing it changes no behaviour. What acts
+ * on the list lives elsewhere: `fixtures/parse-baseline.json` fails the corpus when a new entry
+ * appears, and `parseFlagService` ranks what real boards trip.
  */
 
 export type ParseAuditKind = 'backfill' | 'override';
@@ -33,6 +39,44 @@ export interface ParseAuditEntry {
   from: unknown;
   /** What post-processing left in its place. */
   to: unknown;
+}
+
+/**
+ * Fields the MODEL owns: what the board prescribed, and what the athlete will therefore be asked.
+ *
+ * The distinction this file was built on — "we only filled a blank" — stopped being true when the
+ * parse became a strict structured output. Every field is now answered on every movement, so a
+ * blank is not silence, it is the model saying THERE IS NONE. Filling one is overruling it with
+ * extra steps, and the 15/09 board proves the cost: `time` was blank on a ring row because there
+ * was no time, a pass filled it from the next line's "400m", and the poster printed "400 min
+ * Pull-ups" while this audit counted it as sanctioned.
+ *
+ * Everything not listed here is plumbing the model has no opinion about (`countingMode`,
+ * `stationIndex`, `scoreEntryMode`) — filling those is the sanctioned path and stays quiet.
+ */
+const MODEL_OWNED_FIELDS: ReadonlySet<string> = new Set([
+  'name', 'reps', 'repsDisplay', 'distance', 'calories', 'time', 'unit',
+  'rxWeights', 'rxCalories', 'inputType', 'equipment', 'implementCount',
+  'isMaxReps', 'maxMetric', 'alternative', 'together', 'teamSize', 'timeCap',
+]);
+
+/**
+ * How loudly an entry should be read.
+ *   override            — the model answered and we replaced it.
+ *   quantity-backfill   — the model left a field IT OWNS blank and we filled it. Same thing.
+ *   structural-backfill — plumbing the model doesn't own. Sanctioned.
+ */
+export type ParseAuditSeverity = 'override' | 'quantity-backfill' | 'structural-backfill';
+
+export function auditSeverity(entry: ParseAuditEntry): ParseAuditSeverity {
+  if (entry.kind === 'override') return 'override';
+  const leaf = entry.path.split('.').pop()?.replace(/\[\d+\]$/, '') ?? '';
+  return MODEL_OWNED_FIELDS.has(leaf) ? 'quantity-backfill' : 'structural-backfill';
+}
+
+/** Loud entries are the ones that need a reason: an override, or a blank the model owns. */
+export function isLoudEntry(entry: ParseAuditEntry): boolean {
+  return auditSeverity(entry) !== 'structural-backfill';
 }
 
 /** An "empty" value is one the AI declined to fill — filling it is a backfill, not an override. */
@@ -91,21 +135,42 @@ export function diffParse(before: ParsedWorkout, after: ParsedWorkout): ParseAud
  */
 const auditLog: ParseAuditEntry[][] = [];
 
+export interface ParseAuditView {
+  /** Every parse this session, newest last. */
+  all: ParseAuditEntry[][];
+  /** Every override across every parse — the list this whole module exists to produce. */
+  overrides: () => ParseAuditEntry[];
+  /** Override counts by field path, worst first: which passes to look at, in order. */
+  byField: () => Array<{ path: string; count: number }>;
+}
+
 declare global {
+  // eslint-disable-next-line no-var
+  var wodiParseAudit: ParseAuditView | undefined;
   interface Window {
-    wodiParseAudit?: {
-      /** Every parse this session, newest last. */
-      all: ParseAuditEntry[][];
-      /** Every override across every parse — the list this whole module exists to produce. */
-      overrides: () => ParseAuditEntry[];
-      /** Override counts by field path, worst first: which passes to look at, in order. */
-      byField: () => Array<{ path: string; count: number }>;
-    };
+    wodiParseAudit?: ParseAuditView;
   }
 }
 
+/**
+ * Loud entries not yet handed to telemetry, drained by the save path (see parseFlagService).
+ *
+ * A queue rather than "the last parse" because a segmented board parses once per PART, so the
+ * entries for one workout arrive as several audits. Capped: a pathological board must not grow
+ * this without bound, and the tail of a 200-entry parse says nothing the first 50 didn't.
+ */
+const MAX_PENDING = 50;
+let pending: ParseAuditEntry[] = [];
+
+/** Takes the queue and empties it. Safe to call when nothing parsed — returns []. */
+export function takePendingAudit(): ParseAuditEntry[] {
+  const taken = pending;
+  pending = [];
+  return taken;
+}
+
 function overrides(): ParseAuditEntry[] {
-  return auditLog.flat().filter((entry) => entry.kind === 'override');
+  return auditLog.flat().filter(isLoudEntry);
 }
 
 function byField(): Array<{ path: string; count: number }> {
@@ -132,22 +197,23 @@ export function auditPostProcess(before: ParsedWorkout, after: ParsedWorkout): P
   const entries = diffParse(before, after);
   auditLog.push(entries);
 
-  if (typeof window !== 'undefined') {
-    window.wodiParseAudit = { all: auditLog, overrides, byField };
-  }
+  // On globalThis, not just window, so the corpus scripts can read the same tally in Node.
+  globalThis.wodiParseAudit = { all: auditLog, overrides, byField };
 
-  const overridden = entries.filter((entry) => entry.kind === 'override');
-  const backfilled = entries.length - overridden.length;
+  const loud = entries.filter(isLoudEntry);
+  const structural = entries.length - loud.length;
+  pending = [...pending, ...loud].slice(0, MAX_PENDING);
 
-  if (overridden.length === 0) {
-    console.info(`🤝 AI-OVERRIDE · none — ${backfilled} field(s) backfilled, nothing overruled`);
+  if (loud.length === 0) {
+    console.info(`🤝 AI-OVERRIDE · none — ${structural} structural field(s) filled, nothing overruled`);
     return entries;
   }
 
   console.warn(
-    `⚠️ AI-OVERRIDE · ${overridden.length} field(s) overruled (${backfilled} backfilled)\n`
-    + overridden
-      .map((entry) => `  ${entry.path}: ${JSON.stringify(entry.from)} → ${JSON.stringify(entry.to)}`)
+    `⚠️ AI-OVERRIDE · ${loud.length} field(s) overruled (${structural} structural)\n`
+    + loud
+      .map((entry) => `  [${auditSeverity(entry)}] ${entry.path}: `
+        + `${JSON.stringify(entry.from)} → ${JSON.stringify(entry.to)}`)
       .join('\n')
     + '\n  (window.wodiParseAudit.byField() for the running tally)'
   );
