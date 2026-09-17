@@ -14,6 +14,12 @@ function selectAllInput(target: HTMLInputElement | null) {
 const DRAG_THRESHOLD = 6;   // px before drag mode activates
 const PX_PER_STEP = 16;     // px of drag per weight step
 
+/** The work one weight covers: the piece's total reps when every set states them, else its sets. */
+export function workLabel(setsTotal: number, repsPerSet: number | undefined): string | undefined {
+  if (repsPerSet && repsPerSet > 0 && setsTotal > 0) return `${setsTotal * repsPerSet} reps`;
+  return setsTotal > 0 ? `${setsTotal} sets` : undefined;
+}
+
 /** Round down to nearest multiple of 5 */
 function suggestPeak(start: number | undefined): number | undefined {
   if (!start || start <= 0) return undefined;
@@ -52,15 +58,14 @@ interface ProgressiveWeightRowProps {
   /** The unit the board prescribed this load in — what the athlete is typing. */
   unit?: LoadUnit;
   onChange: (start: number | undefined, peak: number | undefined) => void;
+  /** Card title. Omitted when something outside already names the lift — a single-column
+   *  attempt under its exercise name, or a board row that opened to this card — and the card
+   *  then draws no header. */
   label?: string;
-  /** Names every movement this one weight covers. A shared input must say what it buys —
-   *  an unexplained single card is how a merged group hides the movements inside it. */
-  subLabel?: string;
   footer?: ReactNode;
   /** One column only (no Start/Peak split) — for a single attempt with exactly one
    * meaningful number (e.g. "build a heavy Clean & Jerk for the day"). Peak always
-   * mirrors the single value; no header/badge (the exercise name above already
-   * carries that context). */
+   * mirrors the single value. */
   singleColumn?: boolean;
   /** Column label in single-column mode. Defaults to "Weight". */
   columnLabel?: string;
@@ -83,8 +88,7 @@ export function ProgressiveWeightRow({
   step = 2.5,
   unit = 'kg',
   onChange,
-  label = 'Barbell',
-  subLabel,
+  label,
   footer,
   singleColumn = false,
   columnLabel = 'Weight',
@@ -172,8 +176,6 @@ export function ProgressiveWeightRow({
     handlePeakChange(peakDraft);
     setPeakDraft(null);
   }, [handlePeakChange, peakDraft]);
-
-  const totalReps = repsPerSet && setsTotal > 0 ? setsTotal * repsPerSet : undefined;
 
   // ── Chevron steppers (with long-press) ──
   const stepStart = useCallback((delta: number) => {
@@ -269,18 +271,14 @@ export function ProgressiveWeightRow({
     }
   }, [handlePeakFocus]);
 
-  const badge = totalReps != null && totalReps > 0
-    ? `${totalReps} REPS`
-    : setsTotal > 0 ? `${setsTotal} SETS` : null;
+  const badge = workLabel(setsTotal, repsPerSet)?.toUpperCase();
 
   return (
     <div className={`${styles.card} ${pending ? styles.cardPending : ''}`}>
-      {/* Header — omitted in single-column mode; the exercise name above already carries it */}
-      {!singleColumn && (
+      {label && (
         <div className={styles.header}>
           <span className={styles.label}>{label.toUpperCase()}</span>
           {badge && <span className={styles.totalBadge}>{badge}</span>}
-          {subLabel && <p className={styles.subLabel}>{subLabel}</p>}
         </div>
       )}
 

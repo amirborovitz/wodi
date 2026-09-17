@@ -2,13 +2,13 @@ import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet, MovementSubstitution } from '../../../types';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
-import { resolveBlockScore } from '../../../services/blockScore';
+import { resolveBlockScore, hasMaxSet, writtenSetCount } from '../../../services/blockScore';
 import { initStoryResults } from './WodStoryScreen';
 import { InputRouter, usesOrderedBoard } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
 import type { StoryExerciseResult } from './types';
-import { getPrescribedSetCount, getMaxRepsMovement, hasOpenStationEntry, flattenResult, unflattenResult, isFlattened } from './types';
+import { getPrescribedSetCount, hasOpenStationEntry, flattenResult, unflattenResult, isFlattened } from './types';
 import { uncertaintyForExercise } from '../../../services/parseUncertainty';
 import type { ScoredBlock } from './blockScoping';
 import { applyBlockScoresToSections, getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from './blockScoping';
@@ -75,8 +75,6 @@ export interface LegacyExerciseResult {
 
 const PART_PATTERN = /^(?:part\s+)?([A-Z])[).:\s-]/i;
 
-const NON_PRIMARY_PATTERN = /\b(warm[\s-]?up|cool[\s-]?down|accessor(?:y|ies)|mobility|stretch|primer|activation|skill\s*work|practice)\b/i;
-
 function getModeForExercise(
   workout: ParsedWorkout,
   loggingModes: ExerciseLoggingMode[],
@@ -86,49 +84,15 @@ function getModeForExercise(
 }
 
 /**
- * Does this exercise need a screen in the logging wizard?
+ * The wizard's screens: EVERY part of the session gets one.
  *
- * Main parts always do. A SECONDARY part normally does not — a warm-up, a cash-out tabata, a
- * mobility block has nothing the athlete must supply, so it lands in the saved workout as
- * prescribed/completed via its auto-built result and never interrupts the flow.
- *
- * The exception is a secondary block that earns a number the board doesn't prescribe: a practice
- * whose max the AI flagged (`isMaxReps`). Being secondary says the block isn't the session's main
- * effort — it does NOT say the max the athlete just tested is worth throwing away. Without this,
- * "test your max unbroken toes to bar" was classified secondary, skipped here, and the max input
- * built for it could never render because its screen was never created.
+ * An accessory part is still work the athlete did. Its loads are theirs to enter, a swapped
+ * movement is theirs to record, and a warm-up done as written costs one "mark done" tap. Skipping
+ * secondary parts saved them as "done as prescribed" behind the athlete's back — an FBB session
+ * (2026-09-15) let them log only the strict press, and its two loaded accessory parts reached the
+ * poster with no weights at all.
  */
-function needsLoggingStep(
-  workout: ParsedWorkout,
-  loggingModes: ExerciseLoggingMode[],
-  index: number,
-): boolean {
-  const ex = workout.exercises[index];
-  if (!ex) return false;
-  // Something obvious to track outranks "secondary" — that IS the reason to stop and ask.
-  if (getMaxRepsMovement(ex)) return true;
-  // Otherwise the AI's own main/secondary verdict is authoritative — the same verdict the poster
-  // reads (posterMainExercises). The text/type checks below are the fallback for legacy parses
-  // without the flag.
-  if (ex.isSecondary != null) return !ex.isSecondary;
-  const text = `${ex.name || ''} ${ex.prescription || ''}`.toLowerCase();
-  if (NON_PRIMARY_PATTERN.test(text)) return false;
-
-  const mode = getModeForExercise(workout, loggingModes, index);
-  return (
-    ex.type === 'strength' ||
-    ex.type === 'wod' ||
-    mode === 'strength' ||
-    mode === 'sets' ||
-    mode === 'for_time' ||
-    mode === 'amrap' ||
-    mode === 'amrap_intervals' ||
-    mode === 'emom' ||
-    mode === 'intervals'
-  );
-}
-
-function computeWizardBlocks(
+export function computeWizardBlocks(
   workout: ParsedWorkout,
   loggingModes: ExerciseLoggingMode[],
 ): WizardBlock[] {
@@ -139,8 +103,6 @@ function computeWizardBlocks(
   let currentIndices: number[] = [];
 
   workout.exercises.forEach((ex, i) => {
-    if (!needsLoggingStep(workout, loggingModes, i)) return;
-
     const match = ex.name.match(PART_PATTERN);
     const label = match ? match[1].toUpperCase() : null;
     // Only merge consecutive exercises into one wizard block when they share an EXPLICIT part
@@ -450,8 +412,10 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   switch (r.kind) {
     case 'load': {
       const rps = r.exercise.suggestedRepsPerSet;
-      const hasMax = rps && effectiveSetsTotal > rps.length;
-      const pc = hasMax ? rps.length : setsCount;
+      const hasMax = hasMaxSet(r.exercise);
+      // The written sets, max set excluded — counted off the set total rather than off the rep
+      // array, so a board that states its max on its own line ("+ max reps @60%") saves it too.
+      const pc = hasMax ? writtenSetCount(r.exercise, setsCount) : setsCount;
       for (let i = 0; i < pc; i++) {
         let weight: number | undefined;
         if (r.loadMode === 'bodyweight') weight = undefined;

@@ -9,7 +9,7 @@ import type {
 } from '../../../types';
 import type { LoadUnit } from '../../../utils/loadUnits';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
-import { findOpenMovement, findOpenMovements, scoresOpenReps } from '../../../services/blockScore';
+import { findOpenMovement, findOpenMovements, scoresOpenReps, hasMaxSet } from '../../../services/blockScore';
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
 import { isRowErgName, matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
@@ -548,10 +548,8 @@ export function getRowState(result: StoryExerciseResult): RowState {
   switch (result.kind) {
     case 'load':
       if (result.weight != null && result.weight > 0) {
-        // If this exercise has a max set, check if max reps are entered too
-        const rps = result.exercise?.suggestedRepsPerSet;
-        const hasMax = rps && result.setsTotal > rps.length;
-        if (hasMax && !result.maxReps) return 'partial';
+        // A weight alone is not a finished max-set block — the earned reps are still missing.
+        if (hasMaxSet(result.exercise) && !result.maxReps) return 'partial';
         return 'filled';
       }
       if (result.loadMode === 'bodyweight') return 'filled';
@@ -825,14 +823,14 @@ export function createBlankResult(
         ? 'score_open_reps'
         : containerKind);
 
-  // Detect "max" in prescription/name: [8-6-4-2-max], "max reps", etc.
-  const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
-  const hasMaxInText = /\bmax\b/i.test(prescriptionText);
   const rps = exercise.suggestedRepsPerSet;
-  // If prescription mentions "max" and repsPerSet exists but doesn't cover all sets, add 1 for the max set
   let setsTotal = getPrescribedSetCount(exercise, kind) ?? exercise.suggestedSets ?? 1;
-  if (hasMaxInText && rps && rps.length > 0 && setsTotal <= rps.length) {
-    setsTotal = rps.length + 1; // extra set for "max"
+  // Both sources getPrescribedSetCount reads — the rep array and the words "4 sets" — describe
+  // the sets the coach WROTE, and a max set is precisely the one they cannot describe. So floor
+  // the total: the AI's own count, and a rep array that is one short by construction.
+  if (kind === 'load' && hasMaxSet(exercise)) {
+    const fromScheme = rps && rps.length > 0 ? rps.length + 1 : 0;
+    setsTotal = Math.max(setsTotal, exercise.suggestedSets ?? 0, fromScheme);
   }
 
   const base: StoryExerciseResult = {

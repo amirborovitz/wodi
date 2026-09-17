@@ -1,0 +1,67 @@
+{
+  "name": "strength-max-set-back-squat",
+  "description": "A strength block that finishes on a max-rep set at a lighter load ('Back Squat — 4 sets x 5 reps @~80%, + max reps @60%'). The board writes four sets and the athlete earns the fifth, so gpt-5.5 leaves suggestedRepsPerSet null and stamps isMaxReps on a SECOND Back Squat row. Three of the four places that asked 'does this block have a max set' keyed off that rep array, so the screen collected the max and the save path dropped it. The doc below is what logging writes now: four written sets, then set 5 carrying isMax with the athlete's own count and the lighter bar — captured by running the real save path, breakdown included. KNOWN GAP, deliberately snapshotted as-is: the poster does NOT yet print that set. Its prescription maps are keyed by movement NAME, so the board's two Back Squat lines collapse onto one key — the max row loses its stamp to the working row and prints as a duplicate. Rendering 'Max Back Squat — 14 @ 60kg' off sets[].isMax is the open half of this fix.",
+  "workout": {
+    "title": "IRON",
+    "format": "strength",
+    "rawText": "A. STRENGTH (squat)\nBack Squat\n4 sets x 5 reps @~80%\n+ max reps @60%",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Squat",
+        "type": "strength",
+        "loggingMode": "strength",
+        "prescription": "4 sets x 5 reps @~80% + max reps @60%",
+        "rawText": "STRENGTH (squat)\nBack Squat\n4 sets x 5 reps @~80%\n+ max reps @60%",
+        "isSecondary": false,
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "targetReps": 5, "actualReps": 5, "weight": 100 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "targetReps": 5, "actualReps": 5, "weight": 100 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "targetReps": 5, "actualReps": 5, "weight": 100 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "targetReps": 5, "actualReps": 5, "weight": 100 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 14, "weight": 60, "isMax": true }
+        ],
+        "movements": [
+          {
+            "name": "Back Squat",
+            "reps": 5,
+            "inputType": "weight",
+            "equipment": "barbell",
+            "implementCount": 1,
+            "countingMode": "per_round"
+          },
+          {
+            "name": "Back Squat",
+            "repsDisplay": "max reps",
+            "inputType": "weight",
+            "equipment": "barbell",
+            "implementCount": 1,
+            "isMaxReps": true,
+            "maxMetric": "reps",
+            "countingMode": "per_round"
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Back Squat",
+          "exerciseIndex": 0,
+          "totalReps": 34,
+          "totalDistance": 0,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "weight": 80,
+          "weightProgression": [100, 60],
+          "unit": "kg",
+          "wasSubstituted": false,
+          "implementCount": 1,
+          "color": "yellow"
+        }
+      ],
+      "grandTotalReps": 34,
+      "grandTotalVolume": 2720
+    }
+  }
+}

@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import type { StoryExerciseResult, MovementResult } from './types';
 import { kindToTrinityColor, getWeightStep, getWeightMax } from './types';
-import { movementLoadUnit } from '../../../utils/loadUnits';
+import { movementLoadUnit, type LoadUnit } from '../../../utils/loadUnits';
 import {
   getMovementEquipmentType,
   resolveLoadBlocks,
@@ -9,7 +9,8 @@ import {
   type LoadBlock,
   type LoadEquipment,
 } from './loadGroups';
-import { ProgressiveWeightRow } from './ProgressiveWeightRow';
+import { ProgressiveWeightRow, workLabel } from './ProgressiveWeightRow';
+import { BoardRow, boardRowAction } from './BoardRow';
 import { ImplementToggle } from './ImplementToggle';
 import { asksImplementCount, perImplementUnit } from './implementQuestion';
 import { StepperInput } from './StepperInput';
@@ -204,6 +205,14 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
     .filter(({ input }) => !isInputFilled(input))
     .map(({ input }) => inputLabel(input));
 
+  // The first load still owed opens on arrival — the lift the athlete came for, ready for a
+  // number — and every other row waits closed. Read once: after that the athlete decides what's
+  // open, and a finished edit lands on a board of closed rows that reads back what was logged.
+  const boardGroup = useId();
+  const [arrivalOpenKey] = useState<string | null>(
+    () => weightItems.find(({ input }) => !isInputFilled(input))?.input.key ?? null,
+  );
+
   const loadNumberOf = useMemo(() => {
     const nums = new Map<string, number>();
     weightItems.forEach(({ input }, i) => nums.set(input.key, i + 1));
@@ -245,69 +254,83 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
           </div>
         )}
 
-        {renderPlan.map((item) => {
-          if (item.type === 'weight') {
-            const { input } = item;
-            const anchor = input.movements.find((mr) => mr.weight != null) ?? input.movements[0];
-            const loadUnit = movementLoadUnit(anchor.movement);
-            const num = loadNumberOf.get(input.key);
-            const filled = isInputFilled(input);
-            // A card covering several movements must account for all of them: the title states
-            // the claim ("One bar · 3 lifts"), the sub-line names them, and the split button
-            // takes them apart. That is what makes trusting the AI's `complex` call safe — a
-            // wrong call costs a tap, instead of leaving a lift with nowhere to be entered.
-            const merged = input.movements.length > 1;
-            const asksPair = input.movements.some((mr) => asksImplementCount(mr.movement));
-            return (
-              <div key={input.key} className={styles.loadBlock}>
-                <ProgressiveWeightRow
-                  pending={showProgress && !filled}
-                  weight={anchor.weight}
-                  peakWeight={anchor.weightEnd}
-                  placeholder={anchor.movement.rxWeights?.male}
-                  setsTotal={inputSetsTotal(input)}
-                  repsPerSet={inputReps(input)}
-                  step={getWeightStep(anchor.movement.name, anchor.movement.equipment, loadUnit)}
-                  unit={loadUnit}
-                  implementCount={asksPair ? anchor.implementCount : undefined}
-                  onChange={(start, peak) => applyLoad(input.movements, start, peak)}
-                  label={merged
+        {/* The board: one line per load and per movement, each editor closed until tapped — the
+            same row the ordered for-time board uses. A circuit of full-height weight cards made
+            the athlete scroll past every station to reach Next. */}
+        <div className={styles.board}>
+          {renderPlan.map((item) => {
+            if (item.type === 'weight') {
+              const { input } = item;
+              const anchor = input.movements.find((mr) => mr.weight != null) ?? input.movements[0];
+              const loadUnit = movementLoadUnit(anchor.movement);
+              const num = loadNumberOf.get(input.key);
+              const filled = isInputFilled(input);
+              // A row covering several movements must account for all of them: the name states
+              // the claim ("One bar · 3 lifts"), the line beside it names them, and the split
+              // button takes them apart. That is what makes trusting the AI's `complex` call safe —
+              // a wrong call costs a tap, instead of leaving a lift with nowhere to be entered.
+              const merged = input.movements.length > 1;
+              const asksPair = input.movements.some((mr) => asksImplementCount(mr.movement));
+              const work = workLabel(inputSetsTotal(input), inputReps(input));
+              return (
+                <BoardRow
+                  key={input.key}
+                  group={boardGroup}
+                  name={merged
                     ? `${ONE_LOAD_NOUN[input.type]} · ${input.movements.length} lifts`
                     : showProgress && num ? `${num} · ${inputLabel(input)}` : inputLabel(input)}
-                  subLabel={merged ? inputLabel(input) : undefined}
-                />
-                {asksPair && (
-                  <ImplementToggle
-                    value={anchor.implementCount}
-                    onChange={(count) => applyImplementCount(input.movements, count)}
-                    dense
-                  />
-                )}
-                {merged && (
-                  <button
-                    type="button"
-                    className={styles.splitLink}
-                    onClick={() => setSplitBlockKeys((prev) => new Set(prev).add(input.key))}
-                  >
-                    Log these separately {'->'}
-                  </button>
-                )}
-              </div>
-            );
-          }
+                  load={[merged ? inputLabel(input) : undefined, work].filter(Boolean).join(' · ') || undefined}
+                  personal={filled ? `You: ${enteredLoad(anchor, loadUnit)}` : undefined}
+                  action="Weight"
+                  defaultOpen={input.key === arrivalOpenKey}
+                >
+                  <div className={styles.loadBlock}>
+                    <ProgressiveWeightRow
+                      pending={showProgress && !filled}
+                      weight={anchor.weight}
+                      peakWeight={anchor.weightEnd}
+                      placeholder={anchor.movement.rxWeights?.male}
+                      setsTotal={inputSetsTotal(input)}
+                      step={getWeightStep(anchor.movement.name, anchor.movement.equipment, loadUnit)}
+                      unit={loadUnit}
+                      implementCount={asksPair ? anchor.implementCount : undefined}
+                      onChange={(start, peak) => applyLoad(input.movements, start, peak)}
+                    />
+                    {asksPair && (
+                      <ImplementToggle
+                        value={anchor.implementCount}
+                        onChange={(count) => applyImplementCount(input.movements, count)}
+                        dense
+                      />
+                    )}
+                    {merged && (
+                      <button
+                        type="button"
+                        className={styles.editorAction}
+                        onClick={() => setSplitBlockKeys((prev) => new Set(prev).add(input.key))}
+                      >
+                        Log these separately {'->'}
+                      </button>
+                    )}
+                  </div>
+                </BoardRow>
+              );
+            }
 
-          const { mr, index } = item;
-          return (
-            <MovementRow
-              key={mr.movementKey}
-              mr={mr}
-              onUpdate={(patch) => updateMovement(index, patch)}
-              onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
-                ? () => setSwapOpenKey(mr.movementKey)
-                : undefined}
-            />
-          );
-        })}
+            const { mr, index } = item;
+            return (
+              <MovementRow
+                key={mr.movementKey}
+                mr={mr}
+                group={boardGroup}
+                onUpdate={(patch) => updateMovement(index, patch)}
+                onSwapTap={hasAlternatives(mr.movement.name) || !!mr.movement.alternative
+                  ? () => setSwapOpenKey(mr.movementKey)
+                  : undefined}
+              />
+            );
+          })}
+        </div>
 
         {missingNames.length > 0 && showProgress && (
           <div className={styles.loadFooter}>
@@ -347,78 +370,50 @@ export function SupersetInput({ result, onChange }: SupersetInputProps) {
 
 interface MovementRowProps {
   mr: MovementResult;
+  group: string;
   onUpdate: (patch: Partial<MovementResult>) => void;
   onSwapTap?: () => void;
 }
 
-function MovementRow({ mr, onUpdate, onSwapTap }: MovementRowProps) {
-  const color = kindToTrinityColor(mr.kind);
-  const isFilled = isMovementRowFilled(mr);
-  const isSubstituted = mr.substitution != null;
+const SWAP_TAG: Record<MovementSubstitution['substitutionType'], string> = {
+  easier: 'Scaled',
+  harder: 'Rx+',
+  equivalent: 'Swap',
+};
 
-  // Build prescription hint
-  const hint = buildHint(mr);
-
-  const displayName = isSubstituted ? mr.substitution!.selectedName : mr.movement.name;
+/**
+ * A movement that doesn't take a build-up weight, as a board row: the board's line, what the
+ * athlete changed, and — only when there is something to change — an editor behind a tap.
+ */
+function MovementRow({ mr, group, onUpdate, onSwapTap }: MovementRowProps) {
+  const swap = mr.substitution;
+  const quantity = editableQuantity(mr);
+  const entered = enteredValue(mr);
+  const personal = [swap?.selectedName, entered].filter(Boolean).join(' · ');
+  const hasEditor = quantity != null || onSwapTap != null;
 
   return (
-    <div
-      className={`${styles.movRow} ${isFilled ? styles.movRowFilled : ''}`}
-      style={{ '--mov-color': color } as React.CSSProperties}
+    <BoardRow
+      group={group}
+      name={mr.movement.name}
+      load={buildHint(mr) || undefined}
+      tag={swap ? SWAP_TAG[swap.substitutionType] : undefined}
+      personal={personal ? `You: ${personal}` : undefined}
+      action={hasEditor ? boardRowAction(quantity, onSwapTap != null) : undefined}
     >
-      <div className={styles.movHeader}>
-        <div className={styles.movNameGroup}>
-          {isSubstituted && (
-            <span className={styles.movNameOriginalStruck}>{mr.movement.name}</span>
-          )}
-          <span className={`${styles.movName} ${isSubstituted ? styles.movNameSubstituted : ''}`}>
-            {displayName}
-          </span>
-          {isSubstituted && (
-            <span className={`${styles.supBadge} ${
-              mr.substitution!.substitutionType === 'easier' ? styles.supBadgeScaled :
-              mr.substitution!.substitutionType === 'harder' ? styles.supBadgeRxPlus :
-              styles.supBadgeEqual
-            }`}>
-              {mr.substitution!.substitutionType === 'easier' ? 'SCALED' :
-               mr.substitution!.substitutionType === 'harder' ? 'RX+' : 'EQUAL'}
-            </span>
+      {hasEditor ? (
+        <div className={styles.rowEditor}>
+          {mr.kind === 'load' && <WeightInline mr={mr} onUpdate={onUpdate} />}
+          {mr.kind === 'duration' && <DurationInline mr={mr} onUpdate={onUpdate} />}
+          {mr.kind === 'distance' && <DistanceInline mr={mr} onUpdate={onUpdate} />}
+          {onSwapTap && (
+            <button type="button" className={styles.editorAction} onClick={onSwapTap}>
+              {swap ? 'Change the swap' : `Swap ${mr.movement.name}`} {'->'}
+            </button>
           )}
         </div>
-        {onSwapTap && (
-          <button
-            type="button"
-            className={styles.swapBtn}
-            onClick={onSwapTap}
-            aria-label={`Scale ${mr.movement.name}`}
-          >
-            <SwapIcon />
-          </button>
-        )}
-        {hint && <span className={styles.movHint}>{hint}</span>}
-      </div>
-
-      <div className={styles.movInputRow}>
-        {mr.kind === 'load' && <WeightInline mr={mr} onUpdate={onUpdate} />}
-        {mr.kind === 'reps' && <BwConfirmed mr={mr} />}
-        {mr.kind === 'duration' && <DurationInline mr={mr} onUpdate={onUpdate} />}
-        {mr.kind === 'distance' && <DistanceInline mr={mr} onUpdate={onUpdate} />}
-      </div>
-    </div>
-  );
-}
-
-function SwapIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <path
-        d="M2 4.5h8M8 2.5l2 2-2 2M12 9.5H4M4 7.5l-2 2 2 2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      ) : undefined}
+    </BoardRow>
   );
 }
 
@@ -453,15 +448,6 @@ function WeightInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Part
   );
 }
 
-function BwConfirmed({ mr }: { mr: MovementResult }) {
-  const reps = mr.movement.reps;
-  return (
-    <span className={styles.bwConfirmed}>
-      {reps ? `${reps} reps` : 'Bodyweight'}
-    </span>
-  );
-}
-
 function DurationInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Partial<MovementResult>) => void }) {
   const sec = mr.durationSeconds ?? 0;
   // Generate chips from movement's prescribed time
@@ -491,7 +477,7 @@ function DurationInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Pa
 }
 
 function DistanceInline({ mr, onUpdate }: { mr: MovementResult; onUpdate: (p: Partial<MovementResult>) => void }) {
-  const isCalorie = mr.movement.inputType === 'calories' || (mr.movement.calories != null && mr.movement.calories > 0);
+  const isCalorie = isCalorieMovement(mr);
   const unit = isCalorie ? 'cal' : (mr.distanceUnit ?? mr.movement.unit ?? 'm');
   const color = kindToTrinityColor('distance');
 
@@ -533,13 +519,39 @@ function isInputFilled(input: WeightInput): boolean {
   return input.movements.some((mr) => mr.weight != null && mr.weight > 0);
 }
 
-function isMovementRowFilled(mr: MovementResult): boolean {
+/** "30 → 35 kg", "2× 22 kg" — what a weight row reads back once a number is in. */
+function enteredLoad(mr: MovementResult, unit: LoadUnit): string {
+  const pair = (mr.implementCount ?? 1) > 1 ? `${mr.implementCount}× ` : '';
+  const build = mr.weightEnd != null && mr.weightEnd !== mr.weight ? ` → ${mr.weightEnd}` : '';
+  return `${pair}${mr.weight}${build} ${unit}`;
+}
+
+function isCalorieMovement(mr: MovementResult): boolean {
+  return mr.movement.inputType === 'calories' || (mr.movement.calories != null && mr.movement.calories > 0);
+}
+
+/** The one number a movement row's editor takes, named for its action label. */
+function editableQuantity(mr: MovementResult): string | undefined {
   switch (mr.kind) {
-    case 'load': return (mr.weight != null && mr.weight > 0) || mr.loadMode === 'bodyweight';
-    case 'reps': return true;
-    case 'duration': return mr.durationSeconds != null && mr.durationSeconds > 0;
-    case 'distance': return (mr.distance != null && mr.distance > 0) || (mr.calories != null && mr.calories > 0);
-    default: return true;
+    case 'load': return 'Weight';
+    case 'duration': return 'Time';
+    case 'distance': return isCalorieMovement(mr) ? 'Calories' : 'Distance';
+    default: return undefined;
+  }
+}
+
+/** What the athlete entered on a movement row, read back on the closed row. */
+function enteredValue(mr: MovementResult): string | undefined {
+  switch (mr.kind) {
+    case 'load':
+      return mr.weight != null && mr.weight > 0 ? enteredLoad(mr, movementLoadUnit(mr.movement)) : undefined;
+    case 'duration':
+      return mr.durationSeconds != null && mr.durationSeconds > 0 ? `${mr.durationSeconds}s` : undefined;
+    case 'distance':
+      if (isCalorieMovement(mr)) return mr.calories != null && mr.calories > 0 ? `${mr.calories} cal` : undefined;
+      return mr.distance != null && mr.distance > 0 ? `${mr.distance}${mr.distanceUnit ?? mr.movement.unit ?? 'm'}` : undefined;
+    default:
+      return undefined;
   }
 }
 

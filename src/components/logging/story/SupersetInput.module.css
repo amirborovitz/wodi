@@ -64,21 +64,33 @@
   font-weight: 800;
 }
 
-/* ── Load block: one weight input + its escape hatch ──
-   A strength circuit stacks several of these, so each carries its own bottom spacing — the
-   container runs gap: 0 for the receipt-style movement rows and their hairline separators. */
+/* ── The board: one BoardRow per load and per movement, hairline-separated ── */
+.board {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+/* ── Load block: an opened weight row's editor — the card + its escape hatch ── */
 .loadBlock {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
 }
 
-/* "Log these separately →" — takes a merged card apart into one input per movement.
-   Reads as a real control, not a footnote: it is the only way back when the AI's `complex`
-   call is wrong, and a faint link is one nobody finds. */
-.splitLink {
+/* ── An opened movement row's editor: its one input, then its swap ── */
+.rowEditor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A row's second action — "Log these separately →" takes a merged card apart, "Swap →" opens
+   the substitutions. Reads as a real control, not a footnote: splitting is the only way back
+   when the AI's `complex` call is wrong, and a faint link is one nobody finds. */
+.editorAction {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   background: transparent;
@@ -95,7 +107,7 @@
               border-color var(--duration-fast) var(--ease-out);
 }
 
-.splitLink:active {
+.editorAction:active {
   color: var(--wodi-yellow);
   border-color: rgba(245, 194, 0, 0.35);
 }
@@ -135,7 +147,7 @@
   color: rgba(242, 240, 235, 0.38);
 }
 
-/* Inverse of .splitLink — several stations that turned out to be one pick-up after all. */
+/* Inverse of "Log these separately" — several stations that turned out to be one pick-up. */
 .sameWeightLink {
   border: 0;
   background: transparent;
@@ -151,159 +163,6 @@
 
 .sameWeightLink:active {
   color: var(--wodi-yellow);
-}
-
-/* ── Movement row: receipt-style ── */
-/* No card background — these are supporting cast, not hero elements.
-   A hairline top separator and left-rail color dot are all the structure
-   they need. */
-.movRow {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: transparent;
-  position: relative;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-/* Left-rail accent — a 2px strip flush left, only when filled */
-.movRow::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 12px;
-  bottom: 12px;
-  width: 2px;
-  border-radius: 0 1px 1px 0;
-  background: var(--mov-color, transparent);
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-
-.movRowFilled::before {
-  opacity: 1;
-}
-
-/* ── Header: name group + swap icon + prescription hint ── */
-.movHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 20px;
-}
-
-/* Name group: original (struck) + selected, inline */
-.movNameGroup {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.movName {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-text-secondary);
-  line-height: var(--leading-tight);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* When substituted, selected name is fully white */
-.movNameSubstituted {
-  color: var(--color-text);
-  font-weight: var(--font-semibold);
-}
-
-/* Original struck name: smaller, muted */
-.movNameOriginalStruck {
-  font-size: 11px;
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-  text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.15);
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-
-/* ── Scaling badges ── */
-.supBadge {
-  font-size: 9px;
-  font-weight: var(--font-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: var(--radius-full);
-  line-height: 1.4;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.supBadgeScaled {
-  background: rgba(255, 0, 229, 0.10);
-  color: var(--neon-magenta);
-}
-
-.supBadgeRxPlus {
-  background: rgba(255, 214, 0, 0.10);
-  color: var(--neon-yellow);
-}
-
-.supBadgeEqual {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--color-text-secondary);
-}
-
-/* Prescription hint — right-aligned, small, muted */
-.movHint {
-  font-size: 11px;
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-  font-family: var(--font-mono);
-  white-space: nowrap;
-  flex-shrink: 0;
-  letter-spacing: 0.01em;
-  margin-left: auto;
-}
-
-/* Swap icon button — ghost, 44px tap target */
-.swapBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* Visual: 28px; tap target extended via margin trick */
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  border: none;
-  background: none;
-  color: var(--color-text-tertiary);
-  cursor: pointer;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-  margin: -8px -8px -8px 0;
-  transition: color var(--duration-fast) var(--ease-out),
-              background var(--duration-fast) var(--ease-out);
-}
-
-.swapBtn:active {
-  color: var(--neon-magenta);
-  background: rgba(255, 0, 229, 0.10);
-  border-radius: var(--radius-full);
-}
-
-/* ── Inline input area ── */
-.movInputRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
 }
 
 /* ── Duration chips — compact pill row ── */
@@ -342,25 +201,11 @@
   color: var(--wodi-yellow);
 }
 
-/* ── Bodyweight confirmed state ── */
-.bwConfirmed {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--font-mono);
-  letter-spacing: 0.01em;
-}
-
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
-  .movRow::before,
-  .swapBtn,
   .inlineChip,
   .loadPip,
-  .splitLink {
+  .editorAction {
     transition: none;
   }
   .inlineChip:active {

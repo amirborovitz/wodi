@@ -7,6 +7,7 @@ import { StepperInput } from './StepperInput';
 import { ProgressiveWeightRow } from './ProgressiveWeightRow';
 import { ImplementToggle } from './ImplementToggle';
 import { perImplementUnit } from './implementQuestion';
+import { hasMaxSet as blockHasMaxSet } from '../../../services/blockScore';
 import styles from './LoadInput.module.css';
 
 interface LoadInputProps {
@@ -48,11 +49,9 @@ export function LoadInput({ result, onChange, showImplement = false }: LoadInput
   const weightUnit = perImplementUnit(unit, pairCount);
   const showBodyweightToggle = mode === 'bodyweight' || canUseBodyweightMode(movName);
 
-  // Detect max set pattern (e.g., [8-6-4-2-max] → repsPerSet has 4 items, setsTotal=5)
-  // Also check prescription text for "max" when suggestedRepsPerSet is null (AI may omit it)
-  const repsPerSet = result.exercise?.suggestedRepsPerSet;
-  const prescriptionText = `${result.exercise?.name ?? ''} ${result.exercise?.prescription ?? ''}`;
-  const hasMaxSet = /\bmax\b/i.test(prescriptionText) || !!(repsPerSet && result.setsTotal > repsPerSet.length);
+  // Whether the block ends on a set the athlete earns — asked in one place, so the steppers this
+  // screen shows and the sets the save path writes can never disagree again.
+  const hasMaxSet = blockHasMaxSet(result.exercise);
   const shouldUseProgressive = result.setsTotal > 1;
   // A single attempt (e.g. "15 min to build a heavy Clean & Jerk for the day") has exactly one
   // number worth logging — the weight reached. Start/Top only means something across multiple

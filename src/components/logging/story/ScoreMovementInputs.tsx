@@ -20,6 +20,7 @@ import { useScoreMovementEdits, occurrenceDiffers } from './useScoreMovementEdit
 import { useScorePrescription } from './useScorePrescription';
 import { ImplementToggle } from './ImplementToggle';
 import { asksImplementCount, perImplementUnit } from './implementQuestion';
+import { BoardRow, boardRowAction } from './BoardRow';
 import type { MovementSubstitution } from '../../../types';
 import styles from './ScoreMovementInputs.module.css';
 
@@ -451,13 +452,7 @@ function uncountedRepsTileId(movementKey: string): string {
   return `${movementKey}::reps`;
 }
 
-/**
- * What a closed prescription row opens, said on the row itself.
- *
- * A bare "+" claims the row ADDS something. It doesn't — it opens the one thing this movement
- * lets you change, and that thing is different on every row: a weight on the thruster, a
- * distance on the run, a swap on the pull-up. The row says which before you tap it.
- */
+/** What a closed board row edits, named from the tile field it opens — see boardRowAction. */
 function editorHint(
   field: TileField | undefined,
   hasAlternates: boolean,
@@ -470,28 +465,8 @@ function editorHint(
     // Its load was answered once, on the shared bar at the top. Say where, rather than
     // promising a weight field this row doesn't have.
     : sharedWeight ? 'Weight above'
-    : null;
-  // A run takes a distance AND swaps for a bike. Naming only the first hides the second behind
-  // a row that claims to be about metres — which is how a swap you can do reads as one you can't.
-  if (quantity && hasAlternates) return `${quantity} · swap`;
-  if (quantity) return quantity;
-  return hasAlternates ? 'Swap' : 'Edit';
-}
-
-// Chevron — the row opens, it does not add.
-
-function ChevronIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-      <path
-        d="M3 4.5 6 7.5 9 4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+    : undefined;
+  return boardRowAction(quantity, hasAlternates);
 }
 
 // Swap icon (two-arrow cycle symbol)
@@ -1129,58 +1104,40 @@ export function ScoreMovementInputs({
     const row = prescription.rows.get(mr.movementKey)!;
     const occurrence = occurrences.get(mr.movementKey);
     const repeats = (occurrence?.total ?? 1) > 1;
-    const summary = (
-      <span className={styles.prescriptionText}>
-        <span className={styles.prescriptionName}>{row.label}</span>
-        {row.load && <span className={styles.prescriptionLoad}>{row.load}</span>}
-        {repeats && (
-          <span className={styles.prescriptionOccurrence}>
-            {occurrence!.position} of {occurrence!.total}
-          </span>
-        )}
-        {row.personal && <span className={styles.prescriptionPersonal}>{row.personal}</span>}
-      </span>
-    );
+    const rowText = {
+      name: row.label,
+      load: row.load || undefined,
+      tag: repeats ? `${occurrence!.position} of ${occurrence!.total}` : undefined,
+      personal: row.personal || undefined,
+      group: disclosureGroup,
+    };
     if (!movementHasInput(mr, distancePrescribedByStructure, flat) && !hasAlts) {
-      return <div key={mr.movementKey} className={styles.prescriptionMove}>
-        <div className={styles.prescriptionReadOnly}>{summary}</div>
-      </div>;
+      return <BoardRow key={mr.movementKey} {...rowText} />;
     }
     const siblings = repeats ? siblingsOf(mr) : [];
     const canEcho = siblings.some(sibling => occurrenceDiffers(mr, sibling));
     return (
-      <details key={mr.movementKey} className={styles.prescriptionMove} name={disclosureGroup}>
-        <summary className={styles.prescriptionSummary}>
-          {summary}
-          <span className={styles.prescriptionAction}>
-            <span className={styles.prescriptionActionLabel}>
-              {editorHint(rowField, hasAlts, isSharedWeight)}
-            </span>
-            <ChevronIcon />
-          </span>
-        </summary>
-        <div className={styles.prescriptionEditor}>
-          {isSharedWeight && <p className={styles.prescriptionHelp}>Uses the weight above.</p>}
-          {field}
-          {repeats && (
-            <div className={styles.occurrenceScope}>
-              <p className={styles.occurrenceScopeText}>
-                This is {getMovementCaptionName(mr)} {occurrence!.position} of {occurrence!.total}.
-                {' '}The {occurrence!.total === 2 ? 'other one stays' : 'others stay'} as written.
-              </p>
-              {canEcho && (
-                <button
-                  type="button"
-                  className={styles.occurrenceScopeBtn}
-                  onClick={() => movementEdits.echoToSiblings(mr)}
-                >
-                  Same for all {occurrence!.total}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </details>
+      <BoardRow key={mr.movementKey} {...rowText} action={editorHint(rowField, hasAlts, isSharedWeight)}>
+        {isSharedWeight && <p className={styles.prescriptionHelp}>Uses the weight above.</p>}
+        {field}
+        {repeats && (
+          <div className={styles.occurrenceScope}>
+            <p className={styles.occurrenceScopeText}>
+              This is {getMovementCaptionName(mr)} {occurrence!.position} of {occurrence!.total}.
+              {' '}The {occurrence!.total === 2 ? 'other one stays' : 'others stay'} as written.
+            </p>
+            {canEcho && (
+              <button
+                type="button"
+                className={styles.occurrenceScopeBtn}
+                onClick={() => movementEdits.echoToSiblings(mr)}
+              >
+                Same for all {occurrence!.total}
+              </button>
+            )}
+          </div>
+        )}
+      </BoardRow>
     );
   };
 

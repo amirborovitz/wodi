@@ -157,8 +157,72 @@ export function openQuantitySlot(movement: ParsedMovement): 'reps' | 'calories' 
 }
 
 /**
+ * The two logging modes that record a block as a series of loaded SETS — the 'load' pair in
+ * LOGGING_MODE_TO_KIND (components/logging/story/types.ts), which cannot be imported here without
+ * a cycle. Anything else counts rounds, intervals or a clock, and has no "last set" to speak of.
+ */
+const LOAD_LOGGED_MODES = new Set<ExerciseLoggingMode>(['strength', 'sets']);
+
+/**
+ * Does this loaded block finish on a set whose reps the athlete EARNS?
+ *
+ * "Back Squat — 4 sets x 5 reps @~80%, + max reps @60%." A set count, a rep scheme, a load, one
+ * movement. Only the last set's reps are open. That is a property of a SET, so it must not change
+ * which screen the block gets or what shape it saves in (CLAUDE.md rule 2b).
+ *
+ * THE ONE OWNER of that question. Four places used to answer it independently and three of them
+ * asked the same wrong thing — "is `suggestedRepsPerSet` shorter than the set count?":
+ *
+ *   - `createBlankResult` bumped `setsTotal` back up for the missing set
+ *   - the fill-state check decided whether a weight alone counted as done
+ *   - `LoadInput` decided whether to render the max-reps and max-weight steppers
+ *   - `buildLegacyResult` decided whether to SAVE the max set at all
+ *
+ * `LoadInput` was the odd one out: it also accepted the word "max" in the prescription. So when
+ * the board wrote the max on its own line — which makes gpt-5.5 leave `suggestedRepsPerSet` null,
+ * because a set with no written rep count cannot go in an array of numbers — the screen asked the
+ * athlete for their max and the save path silently dropped it. The one number on the page that
+ * nobody prescribed was the one number the app threw away.
+ *
+ * Read from the AI's own stamp first ({@link statesMaxEffort}); the rep-scheme gap and the word
+ * "max" are backfill for docs parsed before the schema could say it. Never the reverse.
+ */
+export function hasMaxSet(
+  // Structural, like findOpenMovements: the logging screen asks a ParsedExercise and the save
+  // path asks the same block on its way out. They must never disagree.
+  exercise: (ParsedExercise | Exercise) & { suggestedRepsPerSet?: number[]; suggestedSets?: number },
+): boolean {
+  // Sets are what this question is about, so it is only asked of a block logged in sets. An AMRAP
+  // that ends in max burpees also leaves a quantity open, but nothing there is a "last set" —
+  // its open count is the block's SCORE and resolveBlockScore already owns it.
+  if (!LOAD_LOGGED_MODES.has(exercise.loggingMode as ExerciseLoggingMode)) return false;
+
+  const sectionMovements = exercise.sections?.flatMap((s: ParsedSection) => s.movements) ?? [];
+  if ([...(exercise.movements ?? []), ...sectionMovements].some(statesMaxEffort)) return true;
+
+  // A rep scheme that runs out before the sets do IS the max set: "[8-6-4-2-max]" writes four
+  // numbers across five sets. This is the shape the app has always read correctly.
+  const scheme = exercise.suggestedRepsPerSet;
+  if (scheme && scheme.length > 0 && (exercise.suggestedSets ?? 0) > scheme.length) return true;
+
+  return /\bmax\b/i.test(`${exercise.name ?? ''} ${exercise.prescription ?? ''}`);
+}
+
+/**
+ * How many of a block's sets have reps the COACH wrote. The max set is never one of them, so it
+ * is the count to prescribe against — and `setsTotal - 1` says that without needing a rep array,
+ * which is exactly what the old `rps.length` could not do.
+ */
+export function writtenSetCount(
+  exercise: (ParsedExercise | Exercise) & { suggestedRepsPerSet?: number[]; suggestedSets?: number },
+  setsTotal: number,
+): number {
+  return hasMaxSet(exercise) ? Math.max(1, setsTotal - 1) : setsTotal;
+}
+
+/**
  * The FIRST open movement, for callers asking only whether the block has one at all
- * (`isMainPart`, the logging-kind switch). Delegates so the predicate has one owner — a caller
+ * (the max-effort practice check, the logging-kind switch). Delegates so the predicate has one owner — a caller
  * that needs to ask the athlete for numbers must use {@link findOpenMovements} instead.
  */
 export function findOpenMovement(
