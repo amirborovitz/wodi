@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.1.35 — A row is not a rowing machine
+
+The board said `10 Pull-up / Ring Row`. Wodi asked what weight you used for your pull-ups, saved
+35kg onto them, and printed **"400 min Pull-ups"** on the poster.
+
+Wodi had read the board correctly. Every step after it did not.
+
+### Any movement with "row" in its name was the erg
+
+Four separate lists treated the word "row" as the rowing machine, so a ring row became a Concept2.
+A rowing machine holding a rep count reads as a loaded row — which is how bodyweight pull-ups
+joined the barbell and added 1,750kg of volume that was never lifted. And a rowing machine with no
+distance goes looking for a time near its name: it found the `400m` on the run line above and read
+the "m" as minutes.
+
+One check now decides what "row" means. Row, Rower, Row Erg and Cal Row are the machine. Ring Row,
+Gorilla Row, Upright Row and Renegade Row are rows of a body or a weight. A bare "m" on a
+whiteboard is metres.
+
+### A scaling pair defaults to Rx
+
+`40 DU / 60 singles`, `10 Pull-up / Ring Row` — Wodi used to pre-pick the easier side, then badge
+your pull-up as SCALED when you chose it. The prescribed movement is the one you log now, and the
+scaled option is one tap away. It will stay that way until Wodi can remember how you actually
+scale.
+
+### Wodi stops arguing with itself
+
+Wodi's parse has been checked against our own corrections since August: every field where our code
+overruled it was written to a console line on your phone, where nobody could read it. Both bugs
+above were named there, correctly, for weeks.
+
+That list now has teeth. A blank the parser deliberately left empty counts as an answer, not an
+invitation to guess. The 33 places our code still second-guesses Wodi across ten recorded boards
+are written down, and the test suite fails the moment a new one appears. Boards nobody recorded
+report themselves too, so the next unfamiliar whiteboard becomes a test instead of a bug on a
+poster.
+
+Also in this release: one command, `npm run release:check`, runs everything above before a version
+goes out.
+
+tsc -b clean; 836 tests across 52 files; 12 parse boards; 61 poster fixtures.
+
 ## v0.1.34 — One workout, one number
 
 The weekly recap said 232 "kettlebell shoulder to overhead". The board was 58 thrusters, and the
