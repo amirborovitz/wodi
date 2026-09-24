@@ -129,9 +129,16 @@ function movementText(movement: ExportedMovement): string {
  * The header says where the numbers come from, because whatever reads this next has no other
  * way of knowing which of them are the athlete's and which the board's.
  */
-export function toAgentText(data: WorkoutExport): string {
+export function toAgentText(
+  data: WorkoutExport,
+  // A span and a unit, when the caller handed over a SLICE of the log rather than all of it.
+  // Without it a scoped paste looks like a complete one, and a model reading "12 workouts" has
+  // no way to know it is holding a season rather than a career.
+  options?: { scopeLabel?: string },
+): string {
   const header = [
-    `# ${data.athlete ? `${data.athlete}'s ` : ''}training log · ${data.workoutCount} workouts · exported ${data.exportedAt}`,
+    `# ${data.athlete ? `${data.athlete}'s ` : ''}training log · ${data.workoutCount} workouts`
+      + `${options?.scopeLabel ? ` · ${options.scopeLabel}` : ''} · exported ${data.exportedAt}`,
     '# One line per workout, oldest first. DATE | TITLE | format | time | flags | PARTS: what the board prescribed | DID: what was logged.',
     '# Weights are per implement ("x2" = one in each hand) in the unit the board wrote. Reps are omitted where the app could not count them exactly.',
     '',

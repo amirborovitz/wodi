@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts } from '../hooks/useWorkouts';
@@ -6,10 +6,9 @@ import { usePRCount } from '../hooks/usePRCount';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
-import { useWorkoutExport } from '../hooks/useWorkoutExport';
+import { HANDOFF_MIN_WORKOUTS } from '../services/export/coachHandoff';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
 import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
-import { ActionMenuSheet } from '../components/ui/ActionMenuSheet';
 import { Toast, useToast } from '../components/ui/Toast';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
@@ -22,20 +21,20 @@ interface ProfileScreenProps {
   onNavigateToSettings?: () => void;
   onNavigateToProfile?: () => void;
   onOpenRecap?: (data: RecapData) => void;
+  onOpenHandoff?: () => void;
 }
 
-export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap, onOpenHandoff }: ProfileScreenProps) {
   const { user } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
   const { recaps, newRecapIds } = useRecapData(workouts, user?.id, user?.weight);
   const profile = useProfileCompleteness();
   const homeScreenInstall = useHomeScreenInstall(workouts.length > 0);
-  const workoutExport = useWorkoutExport(workouts);
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const toast = useToast();
 
   const totalWorkouts = workouts.length;
+  const showHandoff = totalWorkouts >= HANDOFF_MIN_WORKOUTS && Boolean(onOpenHandoff);
   const totalEP = useMemo(
     () => aggregateStats(workouts, { bodyweight: user?.weight ?? DEFAULT_BW }).totalEP,
     [workouts, user?.weight]
@@ -139,20 +138,28 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
           <span className={styles.navRowChevron}>›</span>
         </button>
 
-        {/* The athlete's whole log, theirs to take elsewhere. It lives here rather than on
-            Today because it needs a name and a sentence to be understood at all — and
-            because it is a thing you do once in a while, not a thing you do after training. */}
-        {workoutExport.available && (
+        {/* The athlete's whole log, handed to someone who can read it. It lives here rather than
+            on Today because it is a thing you do once in a while, not a thing you do after
+            training.
+
+            Deliberately the quietest row on the screen: no accent, one line of sub-copy, the same
+            shape as its neighbours. Records keeps the only yellow on Me, and all of the voice for
+            this feature is spent on the screen it opens. It also names no AI companies — a brand
+            belongs on the destination, not in a list row, and the row outlives any model name.
+
+            Hidden below a handful of workouts: a handoff built from three sessions comes back
+            with a bad answer, which teaches the athlete the feature does not work. */}
+        {showHandoff && (
           <button
             type="button"
             className={styles.navRow}
-            onClick={() => setExportMenuOpen(true)}
+            onClick={onOpenHandoff}
           >
             <span className={styles.navRowIcon}>↗</span>
             <div className={styles.navRowText}>
-              <span className={styles.navRowLabel}>Take your log to an AI</span>
+              <span className={styles.navRowLabel}>Coach handoff</span>
               <span className={styles.navRowSub}>
-                {totalWorkouts} workouts — copy them for ChatGPT, Claude or Gemini
+                {totalWorkouts} workouts, in words an AI can read
               </span>
             </div>
             <span className={styles.navRowChevron}>›</span>
@@ -176,33 +183,6 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
           </button>
         )}
       </div>
-
-      {/* Both routes are local: one fills the clipboard, one writes a file. Nothing is
-          uploaded, so the athlete decides where their log actually goes. */}
-      <ActionMenuSheet
-        title={exportMenuOpen ? 'Your whole log' : null}
-        onClose={() => setExportMenuOpen(false)}
-        items={[
-          {
-            label: 'Copy it for my AI',
-            onClick: () => {
-              void workoutExport.copyForAgent().then((result) => {
-                toast.say(result === 'copied'
-                  ? `Copied — ${totalWorkouts} workouts, ready to paste`
-                  : 'Clipboard blocked — saved as a file instead');
-              });
-            },
-          },
-          // A saved file on a phone lands in Files and is never seen again.
-          ...(workoutExport.canDownload ? [{
-            label: 'Download as a file',
-            onClick: () => {
-              const result = workoutExport.downloadJson();
-              toast.say(result === 'downloaded' ? 'Saved to your downloads' : 'Could not save the file');
-            },
-          }] : []),
-        ]}
-      />
 
       <Toast message={toast.message} />
 

@@ -13,6 +13,7 @@ import { WorkoutScreen } from './screens/WorkoutScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { ChaseScreen } from './screens/ChaseScreen';
+import { CoachHandoffScreen } from './screens/CoachHandoffScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen } from './components/settings';
 import { BottomNav, UpdatePill } from './components/ui';
@@ -214,6 +215,7 @@ function AppContent() {
             onNavigateToRecords={() => setCurrentScreen('records')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
             onNavigateToProfile={() => setCurrentScreen('profile-settings')}
+            onOpenHandoff={() => setCurrentScreen('handoff')}
             onOpenRecap={handleOpenRecap}
           />
         );
@@ -243,6 +245,8 @@ function AppContent() {
         );
       case 'chase':
         return <ChaseScreen onBack={() => setCurrentScreen('home')} />;
+      case 'handoff':
+        return <CoachHandoffScreen onBack={() => setCurrentScreen('profile')} />;
       case 'recap': {
         if (!pendingRecapData) return null;
         const closeRecap = () => { setPendingRecapData(null); setCurrentScreen('home'); };
