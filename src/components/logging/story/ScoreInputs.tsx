@@ -300,9 +300,15 @@ export function ScoreRoundsInput({ result, onChange }: ScoreRoundsInputProps) {
     onChange({ rounds: Math.max(0, intPart + delta) });
   }, [intPart, onChange]);
 
+  // On a piece two people build together, "15" means nothing on its own — and once it is saved,
+  // nothing downstream can recover whether it was the pair's or this athlete's. The app logs what
+  // YOU did, always; this is where it says so, while the answer still costs a sentence.
+  const isShared = result.exercise.partnerWorkout === true;
+
   return (
     <div className={styles.center}>
       <RoundsTapCounter value={rounds} label="rounds" onTap={handleTap} onAdjust={adjustRounds} />
+      {isShared && <p className={styles.scopeNote}>Your rounds — not the team&apos;s</p>}
 
       {result.kind === 'score_rounds' && (
         <PartialRoundControl result={result} onChange={onChange} />

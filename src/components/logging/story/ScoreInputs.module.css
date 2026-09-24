@@ -291,3 +291,14 @@
   color: var(--color-text-secondary);
   letter-spacing: 0.04em;
 }
+
+/* Whose rounds these are. On a piece the pair builds together, "15" is ambiguous the moment it
+   is typed and stays ambiguous forever — the saved number carries no record of which it meant.
+   Saying it at the input is the only place it costs nothing. */
+.scopeNote {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
