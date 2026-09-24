@@ -98,8 +98,6 @@ Return ONLY valid JSON:
   "timeCap": 900,
   "intervalTime": 180,
   "containerRounds": null,
-  "benchmarkName": null,
-  "benchmarkModified": false,
   "partnerWorkout": false,
   "teamSize": null,
   // difficultyLevel: 1–10 rating of programmed difficulty (not the athlete's fitness level).
@@ -126,6 +124,8 @@ Return ONLY valid JSON:
       // the score. Pair it with "isMaxReps": true on the movement that carries the count.
       "scoreType": "time" | "rounds" | "reps" | "load",
       "prescription": "human-readable prescription",
+      // wodName: the name THIS part is known by — see WOD NAME below. null when it has none.
+      "wodName": null,
       // isSecondary: see HIGH-LEVEL PARTS section below. false for the session's main part(s)
       // (the strength piece and/or the metcon), true for everything else (warm-up, body armor,
       // mobility, accessory/prehab, skill practice unrelated to the main lifts).
@@ -550,11 +550,17 @@ NOT THIS: an EMOM whose minutes hold different movements ("min 1: 8-10 Deadlift 
 7. Compound movement names: ALWAYS preserve the full name — "Burpee Step Up", "Burpee Box Jump Over", "Burpee Broad Jump" are distinct movements. Do NOT simplify to "Burpee".
 8. ROUND-ALTERNATING PAIRS: one line offering two movements marked "(alternates)" / "alternating" inside a rounds structure (e.g. "Push press/thrusters (alternates)" in "8 rounds of:") means the athlete switches movement each round — half the rounds are one, half the other. Emit ONE movement named as the pair ("Push Press / Thruster") with the per-round reps if the board OR the athlete's context note gives a count (the note is authoritative — "it is 8 alternating push press/thrusters" → reps: 8). If neither gives one, OMIT "reps" entirely — never invent it. Do NOT emit two separate per-round movements (that double-counts the work every round), and do NOT use the "alternative" field (that means an either/or scaling choice, not alternation).`;
 
-const RULES_BENCHMARKS = `## CONTAINER/BENCHMARK RECOGNITION
-- containerRounds: outer rounds wrapping a benchmark (7 in "7 rounds of Cindy")
-- benchmarkName: Cindy, DT, Fran, Grace, Isabel, Helen, Diane, Elizabeth, Jackie, Karen, Annie, Mary
-- benchmarkModified: true if weight/reps differ from standard
-- If definition is provided in text, use that; otherwise use standard benchmark`;
+const RULES_WOD_NAME = `## WOD NAME (per exercise: "wodName")
+The name this piece is KNOWN BY — the thing an athlete would say to ask "how did you do on it?".
+Set it when EITHER is true:
+- the board gives the piece a name, in any spelling, quoted or not: "Running GRACE", "HEAVY HELEN", "THE CHIEF", "Open 24.1", a gym's own name for it.
+- the board prescribes a benchmark or Hero WOD you recognise from its work, even unnamed (21-15-9 Thrusters + Pull-ups IS Fran; 30 Clean & Jerks for time IS Grace).
+Write it the way the board writes it, without the quotes. A variation keeps the variation's name: "Running GRACE" is NOT Grace — it is its own workout, and calling it Grace files someone's time under a workout they didn't do.
+Set it to null when the piece simply has no name. These are NOT names: a section heading or label ("WOD", "METCON", "STRENGTH", "Part C", "Workout of the Day"), a format or scheme ("3 RFT", "AMRAP 12", "For Time", "5x4"), a date, a day of the week, or an app/page title above the board. NEVER invent one, and never copy a name from a sibling part — each part answers for itself.`;
+
+const RULES_CONTAINER_ROUNDS = `## CONTAINER ROUNDS
+- containerRounds: outer rounds wrapping a named workout (7 in "7 rounds of Cindy")
+- If the text defines the work, use that definition; otherwise use the standard one.`;
 
 const RULES_REP_SCHEMES = `## VARIABLE REP SCHEMES
 "[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
@@ -578,10 +584,13 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - FIXED ADD-ON MOVEMENTS: if a movement is done every round at a CONSTANT rep count alongside the ladder (e.g. "2-4-6-8-10-12 KB lunges + push press, 6 burpees after each set"), set "perRound": false on that movement and keep its real fixed reps value. Decide this from the "after each round/set" language, NOT from whether its rep count happens to match one of the ladder rungs — a fixed "6 burpees" stays fixed even if the ladder also passes through 6.
 
 ## PARTNER / TEAM WORKOUTS
-- A partner workout means the WORK IS SHARED OR SPLIT between athletes: a team total divided up, whole rounds traded (IGUG), or one shared score built by both. Pair language alone is NOT enough — see PAIR-PACED below for pairs that only time each other.
-- THE ONE QUESTION, ask it before any keyword: while I am doing this movement, is my partner DOING IT TOO (or taking some of its reps), or is my partner IDLE / on something else / waiting for their turn? An idle or alternating partner contributes nothing to these numbers, so the board's reps are MINE in full → partnerWorkout: false. Only an actively-sharing partner makes the board a team total. Sharing needs positive evidence on the board ("between you", "split however", "team total", "as a team", "(N each)" on a round count); turn-taking language is not evidence of sharing. Apply this question to wording that does not appear anywhere in these rules — the phrasings below are examples of it, never the whole list.
-- SPECIFICALLY: "two heats", "one works while the other rests", "one on one off", "alternate/alternating", "you go I go on the minute", "share a rig/bar/rower", "partner counts for you", "partner holds" all describe WHO IS ON THE EQUIPMENT WHEN. They are logistics. Every athlete still completes the full written prescription → partnerWorkout: false, NO teamSize.
-- A PRESCRIBED REST SETTLES IT: when the board writes the rest into the structure ("[2:30 AMRAP, 2:30 REST] x 4", "3:00 on / 3:00 off"), that rest is part of every athlete's prescription, so nobody is covering anyone's work. Such a block is NEVER shared → partnerWorkout: false on it, and NO partnerSplit — no matter how much pair language surrounds it. In a genuinely shared piece the rest is never written down, because the rest IS the partner working.
+- THE ONE QUESTION, ask it before any keyword: AT THE END OF THIS BLOCK, IS THERE ONE RESULT BETWEEN US, OR DOES EACH OF US HAVE OUR OWN? That is the whole test, and it is about the SCORE, never about who is moving at any given moment.
+  - Each athlete ends with their own time / their own rounds / their own reps → partnerWorkout: false, NO teamSize. Every athlete completed the full written prescription.
+  - The pair or team ends with ONE number they built together → partnerWorkout: true, teamSize: N.
+- DO NOT ask who is working while I rest. Whether a partner is moving, idle, counting, waiting their turn or resting is CHOREOGRAPHY, and choreography never decides this. Two athletes taking strict turns still produce one shared score; two athletes moving simultaneously in separate heats still produce two separate scores. Reading the choreography instead of the score is the single most common way to get this wrong.
+- SPECIFICALLY: "two heats", "one works while the other rests", "one on one off", "share a rig/bar/rower", "partner counts for you", "partner holds" describe WHO IS ON THE EQUIPMENT WHEN. Every athlete still completes the full written prescription and ends with their own score → partnerWorkout: false, NO teamSize.
+- A PRESCRIBED REST DECIDES NOTHING. "[2:30 AMRAP, 2:30 REST] x 4" is a clock, and a clock is written the same way whether one athlete runs it or two share it. Do not read a written rest as evidence either way — go back to THE ONE QUESTION. (A rule here once said a prescribed rest proved the block was unshared; it silently unpartnered every interval board that pairs actually shared, which is the choreography error above wearing a clock.)
+- TAKING TURNS UNDER ONE CLOCK IS SHARING. "In pairs, I go you go" over "[03:00 AMRAP , 01:00 REST] x 4" means the pair builds ONE round count across those windows: each round belongs whole to whoever took it, and the pair's score is the sum. → partnerWorkout: true, teamSize: 2, partnerSplit: "rounds". The written reps ("4 Power Clean") are ONE athlete's round and are never divided — only the round COUNT is shared. Contrast a pace partner, who gives each athlete their own score (see PAIR-PACED below).
 - "IGUG", "I go you go", "in pairs", "with a partner" WITH shared/split work → partnerWorkout: true, teamSize: 2
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N — but ONLY when that team shares ONE target or score. If the work written on the board is a per-person prescription that every athlete completes in full, the team wording is a logistics grouping (who rotates onto which machine, how many share a rig) → partnerWorkout: false, NO teamSize.
 - A TEAM SIZE MUST BE EXACT TO BE REAL: a range or approximate headcount ("teams of 4-5", "groups of 3-4", "~6 per team", "max 5 per team") can never describe a shared total — a team target cannot be divided by an indeterminate number. Treat it as a logistics grouping: partnerWorkout: false, NO teamSize. Same when the team note only explains equipment sharing or turn-taking ("work in teams of 4, 30 sec segments on the bike", "share a bar", "2 per rower") — the reps on the board are still each athlete's own work.
@@ -807,8 +816,8 @@ Output:
 Input: "7 rounds of Cindy for time"
 Output:
 {
-  "type": "for_time", "format": "for_time", "scoreType": "time", "containerRounds": 7, "benchmarkName": "Cindy", "benchmarkModified": false,
-  "exercises": [{ "name": "7 Rounds of Cindy", "type": "wod", "loggingMode": "for_time", "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats", "suggestedSets": 7,
+  "type": "for_time", "format": "for_time", "scoreType": "time", "containerRounds": 7,
+  "exercises": [{ "name": "7 Rounds of Cindy", "type": "wod", "wodName": "Cindy", "loggingMode": "for_time", "prescription": "7 rounds: 5 Pull-ups, 10 Push-ups, 15 Air Squats", "suggestedSets": 7,
     "movements": [{ "name": "Pull-up", "reps": 5, "inputType": "none" }, { "name": "Push-up", "reps": 10, "inputType": "none" }, { "name": "Air Squat", "reps": 15, "inputType": "none" }] }]
 }
 
@@ -1218,7 +1227,31 @@ Output:
     ]
   }]
 }
-NOTE: the reps stay 6 / 6 / 30 — the FULL board. "Work in pairs (two heats), one work while the other rest" says only who is on the rig during which 2:30; the partner is idle while you work, so they take none of your reps. The written 2:30 REST proves it: a shared piece never prescribes the rest, because the rest is the partner working. partnerWorkout false at BOTH levels, no teamSize, no partnerSplit. Halving these to 3 / 3 / 15 would rewrite the coach's board.
+NOTE: the reps stay 6 / 6 / 30 — the FULL board. THE ONE QUESTION: at the end, does each athlete have their own score? Yes — "two heats" means each heat works its own four windows and counts its own rounds, so there are two scores, not one. partnerWorkout false at BOTH levels, no teamSize, no partnerSplit. Halving these to 3 / 3 / 15 would rewrite the coach's board.
+The 2:30 REST is NOT what makes this unshared, and must not be read that way — compare example 15c, whose clock is written identically and which IS shared. What separates them is the score: heats produce one each, "I go you go" produces one between them.
+
+### 15c. The same clock, shared — pairs trading whole sets (IS a partner workout)
+Input: "B. METCON (Intervals)\nIn pairs, I go you go (the whole set)\n[03:00 min AMRAP , 01:00 min REST] x 4 rounds (Alt' B.1 & B.2):\nB.1 4 Touch-and-Go Power Clean @40/60kg\n4 Burpee Over the Bar\nB.2 4 Front Squat @40/60kg\n4 Burpee Over the Bar"
+Output:
+{
+  "title": "WOD", "type": "amrap", "format": "amrap_intervals", "sets": 4,
+  "partnerWorkout": true, "teamSize": 2,
+  "exercises": [{
+    "name": "3:00 AMRAP x 4", "type": "wod", "loggingMode": "amrap_intervals",
+    "prescription": "In pairs, I go you go the whole set: [03:00 AMRAP / 01:00 REST] x 4 rounds, alternating B.1 and B.2",
+    "partnerWorkout": true, "partnerSplit": "rounds",
+    "stationRotation": true, "intervalCount": 4,
+    "intervalSeconds": 180, "intervalRestSeconds": 60, "workDuration": 720, "restDuration": 240,
+    "movements": [
+      { "name": "Touch-and-go Power Clean", "reps": 4, "inputType": "weight", "equipment": "barbell", "stationLabel": "B.1", "stationIndex": 0, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
+      { "name": "Burpee Over The Bar", "reps": 4, "inputType": "none", "stationIndex": 0 },
+      { "name": "Front Squat", "reps": 4, "inputType": "weight", "equipment": "barbell", "stationLabel": "B.2", "stationIndex": 1, "rxWeights": { "male": 60, "female": 40, "unit": "kg" } },
+      { "name": "Burpee Over The Bar", "reps": 4, "inputType": "none", "stationIndex": 1 }
+    ]
+  }]
+}
+NOTE: identical clock notation to 15b, opposite answer, and the clock is why neither may be read from it. THE ONE QUESTION: at the end there is ONE round count for the pair, because "I go you go (the whole set)" means each round belongs whole to whoever took it and the pair's score is the sum → partnerWorkout: true, partnerSplit: "rounds".
+The reps stay 4 / 4 / 4 / 4 — the FULL written round. partnerSplit "rounds" puts the share on the round COUNT, never on the reps; halving these to 2 would describe a round nobody did. The 01:00 REST is the pair's rest between windows and says nothing either way.
 
 ### 16. Progressive / building chipper (each round adds a movement)
 Input: "For time (TC 41 min): Buy In: 100 DB Hip Thrusts (17.5/22.5 kg). Into: Round 1: 10 Burpees Over Bar, 10 Cal Row. Round 2 - Add 20 Thrusters (30/40 kg). Round 3 - Add 30 Power Cleans. Round 4 - Add 40 Back Squats. Round 5: 10 BOB, 20 Thrusters, 30 Power Cleans, 40 Back Squats, 50 Bent Over Rows, 10 Cal Row. Cash Out: 50 Deadlifts (70/90 kg)"
@@ -1294,8 +1327,8 @@ no weight is complete, not uncertain. Use it only where you genuinely cannot tel
 
 const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not parse workout from text"}';
 
-const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP, RULES_UNCERTAINTY].join('\n\n');
-const RULES_METCON = [RULES_METCON_STRUCTURE, RULES_STATIONS, RULES_BENCHMARKS, RULES_LADDERS_PARTNERS].join('\n\n');
+const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP, RULES_WOD_NAME, RULES_UNCERTAINTY].join('\n\n');
+const RULES_METCON = [RULES_METCON_STRUCTURE, RULES_STATIONS, RULES_CONTAINER_ROUNDS, RULES_LADDERS_PARTNERS].join('\n\n');
 
 // Kind-scoped prompt: a strength/accessory part skips the metcon structure rules and examples it
 // can never use (~70% of the prompt's tokens). Beyond cost, this is what lets a multi-part
@@ -1498,7 +1531,7 @@ export interface SegmentedWorkout {
 
 const SEGMENT_SPEC = `Return ONLY valid JSON:
 {
-  "title": "session title if one is clearly written on the board, else omit",
+  "title": "the session's own name if one is written on the board, else omit — see TITLE below",
   "parts": [
     { "label": "A", "kind": "strength" | "metcon" | "accessory", "text": "the part's lines, cleaned, newline-separated" }
   ]
@@ -1509,6 +1542,10 @@ NORMALIZATION (apply inside each part's text):
 - PRESERVE everything else exactly: every line, every quantity (reps, weights, distances, calories, times, percentages), line order, round markers ("x 6", "(alt')", "21-15-9"), and coach notes. Never merge, reorder, summarize, or drop a line — even a short line repeating an earlier one.
 
 ${MOVEMENT_ALIASES_SECTION}
+
+TITLE:
+- Only a name the board gives the SESSION. A heading or chrome is not a title: "WOD", "Workout of the Day", "Metcon", "Today", a date, a gym or app name, a screen header above the board, a nav bar. Omit it in those cases and let each part speak for itself.
+- A name written over ONE part ("Running GRACE" above part C) is that part's name, not the session's — leave it inside that part's text and omit the title.
 
 SEGMENTATION:
 - A session has 1-3+ parts, usually labeled (A./B./C.) or separated by headers (STRENGTH, METCON, WOD, Cool Down). Every input line belongs to EXACTLY ONE part.
@@ -2247,6 +2284,9 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         intervalRestSeconds: typeof exercise.intervalRestSeconds === 'number' && exercise.intervalRestSeconds > 0 ? exercise.intervalRestSeconds : undefined,
         ...(ladderReps && { ladderReps }),
         ...(typeof exercise.rawText === 'string' && exercise.rawText.trim() && { rawText: exercise.rawText }),
+        // The part's name, exactly as the model answered it. A blank is an answer — this piece
+        // has no name — and nothing downstream may invent one (see RULES_WOD_NAME).
+        ...(typeof exercise.wodName === 'string' && exercise.wodName.trim() && { wodName: exercise.wodName.trim() }),
         ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),
         ...(typeof exercise.partnerWorkout === 'boolean' && { partnerWorkout: exercise.partnerWorkout }),
         ...((exercise.partnerSplit === 'reps' || exercise.partnerSplit === 'rounds') && { partnerSplit: exercise.partnerSplit }),
@@ -2282,8 +2322,6 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
     intervalTime: typeof raw.intervalTime === 'number' ? raw.intervalTime : undefined,
     restTime: typeof raw.restTime === 'number' ? raw.restTime : undefined,
     containerRounds: typeof raw.containerRounds === 'number' ? raw.containerRounds : undefined,
-    benchmarkName: typeof raw.benchmarkName === 'string' ? raw.benchmarkName : undefined,
-    benchmarkModified: typeof raw.benchmarkModified === 'boolean' ? raw.benchmarkModified : undefined,
     partnerWorkout: typeof raw.partnerWorkout === 'boolean' ? raw.partnerWorkout : undefined,
     teamSize: typeof raw.teamSize === 'number' && raw.teamSize >= 2 ? raw.teamSize : undefined,
     rawText,

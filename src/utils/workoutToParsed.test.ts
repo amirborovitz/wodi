@@ -101,8 +101,8 @@ describe('workoutToParsedWorkout', () => {
 
     it('names every part it was given a name for', () => {
       workout.exercises.forEach((saved, i) => {
-        if (!saved.aiPartName && !saved.partNameOverride) return;
-        expect(parsed.exercises[i].aiPartName).toBe(saved.partNameOverride || saved.aiPartName);
+        if (!saved.wodName) return;
+        expect(parsed.exercises[i].wodName).toBe(saved.wodName);
       });
     });
   });

@@ -203,6 +203,27 @@ function isSchemeTitle(title: string): boolean {
 }
 
 /**
+ * The structure line under a named headline — the name said ONCE.
+ *
+ * A block often names itself after the workout it is ("7 Rounds of Cindy" under a CINDY
+ * headline, "Running GRACE - 3 RFT" under RUNNING GRACE). Printing that verbatim says the name
+ * twice, one line apart. So the name is taken out and what remains is the structure ("7 ROUNDS"),
+ * which is the whole job of this line. Null when nothing but the name was there to say.
+ */
+function structureUnderName(wodName: string, exName: string | null): string | null {
+  if (!exName || exName === wodName) return null;
+  if (!exName.includes(wodName)) return exName;
+  const stripped = exName
+    .replace(wodName, ' ')
+    // The connectors a block name hangs on the workout's name: "7 ROUNDS OF Cindy", "Fran - 21-15-9".
+    .replace(/\s*[-–—:,]\s*/g, ' ')
+    .replace(/\bOF\b\s*$|^\s*\bOF\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return stripped.length >= 3 ? stripped : null;
+}
+
+/**
  * The card's title for an interval piece: the app's one notation ("2:00 ON / 2:00 OFF × 4").
  *
  * Applied only when the coach's title was the scheme anyway (or absent) — a workout with a real
@@ -1189,7 +1210,12 @@ export function buildPosterWodFromPage(
   const amrapMinutes = isAmrap ? extractAmrapMinutes(page.exercise) : undefined;
 
   const exName = page.exercise.name?.trim().toUpperCase() ?? null;
-  let title = stationClock?.title ?? (exName && !isGenericTitle(exName) ? exName : null);
+  // The name this piece is KNOWN BY outranks everything: it is what the athlete calls the
+  // workout, and the one thing the card must not compose over or re-spell. Its structure
+  // ("3 ROUNDS FOR TIME") is not lost — it becomes the line underneath (see formatLine below).
+  const wodName = page.exercise.wodName?.trim().toUpperCase() || null;
+  const structureName = exName && !isGenericTitle(exName) ? exName : null;
+  let title = wodName ?? stationClock?.title ?? structureName;
   // Station pages compose their own clock title; every other interval piece speaks the app's
   // one notation, so the card can't say the same scheme in two spellings.
   const schemeTitle = stationClock ? null : composedSchemeTitle(page.exercise, title);
@@ -1232,6 +1258,13 @@ export function buildPosterWodFromPage(
     if (isMaxPractice) return '';
     return mapFormatToType(exFmt);
   })();
+
+  // Under a named headline, the structure is what the format line is FOR — "3 ROUNDS FOR TIME"
+  // says more than "FOR TIME", which only repeats the type pill beside it. The block name is
+  // used here even when it is too generic to HEADLINE a card ("3 Rounds For Time" is exactly
+  // the structure this line exists to state); dedupeAmrapFormat still drops it if it turns out
+  // to say only what the type pill already says.
+  const formatUnderName = wodName ? structureUnderName(wodName, exName) ?? format : format;
 
   // Never let the title repeat the format/type string verbatim (e.g. a title that resolved to
   // bare "AMRAP") — matches the de-dup rule already enforced in buildPosterWod. A composed
@@ -1326,7 +1359,21 @@ export function buildPosterWodFromPage(
   const pagePr = (data.activeAchievements ?? []).find(
     (a) => a.type === 'pr' && a.movement && a.value && achievementMatchesMovementList(a, page.movements),
   );
-  const rx: string | null = pagePr ? 'PR' : null;
+  // A named workout's record is a clock, and it belongs to the page that ran it — matched by
+  // name, never by movement, so a session's two named pieces can't badge each other.
+  const pageNamedRecord = wodName
+    ? (data.activeAchievements ?? []).find(
+        (a) => a.type === 'benchmark' && !!a.wodName && a.wodName.trim().toUpperCase() === wodName
+          && (a.title === 'First Attempt!' || a.title === 'Fastest Time!'),
+      )
+    : undefined;
+  // "PR" is the lift word. A named workout's badge says what it actually is: the first time
+  // you met it, or the best clock you have on it.
+  const rx: string | null = pagePr
+    ? 'PR'
+    : pageNamedRecord
+      ? (pageNamedRecord.title === 'First Attempt!' ? 'FIRST' : 'RECORD')
+      : null;
   const totals = totalsEstimated ? [] : buildTotals(data, resultValue);
 
   const sectionLedger = section?.roundLedger;
@@ -1335,7 +1382,7 @@ export function buildPosterWodFromPage(
 
   // Same rule as buildPosterWod: on a named page the format renders as the sub-line under the
   // title — drop it when it just repeats the type pill verbatim ("FOR TIME" pill + "FOR TIME").
-  const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
+  const dedupedFormat = dedupeAmrapFormat(title, formatUnderName, type, isAmrap, amrapMinutes);
 
   return {
     type, title, date: formatSourceDate(data.sourceDate, date), format: dedupedFormat, sub, repsScheme,
@@ -1380,11 +1427,12 @@ export function buildPosterWod(
 
   const date = data.workoutDate;
 
-  // Title — null when generic or when it would duplicate the format string
+  // Title — the part's own name first (the one thing the card must not re-spell), else the
+  // session title when it isn't generic or a restatement of the format.
   const rawTitle = data.rewardDisplayTitle ?? '';
-  let title: string | null = rawTitle && !isGenericTitle(rawTitle)
-    ? rawTitle.toUpperCase()
-    : null;
+  const soloWodName = data.exercises[0]?.wodName?.trim().toUpperCase() || null;
+  let title: string | null = soloWodName
+    ?? (rawTitle && !isGenericTitle(rawTitle) ? rawTitle.toUpperCase() : null);
 
   // Same rule as the page builder: a practice scored by a max test is not a load story. A
   // practice logged on its own renders through THIS path, so it needs the identical treatment —
@@ -1441,8 +1489,19 @@ export function buildPosterWod(
   const resultValue = strengthTopSet ?? buildResultValue(data.heroResult, resultLabel);
   const resultMeta = buildHeroResultMeta(isAmrap, data.heroResult);
 
-  // RX badge
-  const rx: string | null = data.isPR ? 'PR' : null;
+  // RX badge. A named workout's record counts the same as a lift PR: it is the best clock the
+  // athlete has on that workout (see detectNamedWodAchievements).
+  const namedRecord = soloWodName
+    ? (data.activeAchievements ?? []).find(
+        (a) => a.type === 'benchmark' && !!a.wodName && a.wodName.trim().toUpperCase() === soloWodName
+          && (a.title === 'First Attempt!' || a.title === 'Fastest Time!'),
+      )
+    : undefined;
+  const rx: string | null = data.isPR
+    ? 'PR'
+    : namedRecord
+      ? (namedRecord.title === 'First Attempt!' ? 'FIRST' : 'RECORD')
+      : null;
 
   // Totals for brand strip
   const totalsEstimated = !!data.activeBreakdown?.estimated;

@@ -68,7 +68,6 @@ export interface LegacyExerciseResult {
   partialReps?: number;
   partialMovements?: string[];
   ladderStep?: number;
-  metconName?: string;
 }
 
 // ─── Block computation ───────────────────────────────────────────
@@ -602,7 +601,7 @@ export function StoryLogResults({
 
   // ── Save pipeline ──
   const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
-    onSave(source.map(r => ({ ...toLegacyResult(r), metconName: r.metconName })));
+    onSave(source.map((r) => toLegacyResult(r)));
   }, [onSave]);
 
   // ── Block advance ──

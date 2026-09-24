@@ -852,7 +852,6 @@ export function calculateWorkloadBreakdown(
     grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: workout.containerRounds,
-    benchmarkName: workout.benchmarkName,
     ...(estimated ? { estimated: true } : {}),
   };
 }

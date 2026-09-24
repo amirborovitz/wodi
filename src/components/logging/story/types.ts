@@ -139,9 +139,6 @@ export interface StoryExerciseResult {
 
   // Superset / multi-movement support
   movementResults?: MovementResult[]; // per-movement overrides for supersets
-
-  // User-entered name for this metcon/WOD block (stored as aiPartName on the Exercise)
-  metconName?: string;
 }
 
 // Per-movement result within a superset or complex exercise

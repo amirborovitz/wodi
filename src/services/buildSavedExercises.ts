@@ -316,10 +316,7 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       // it directly — see utils/blockClock.ts on why it must never be divided back out.
       ...(result.exercise.intervalSeconds != null && { intervalSeconds: result.exercise.intervalSeconds }),
       ...(result.exercise.intervalRestSeconds != null && { intervalRestSeconds: result.exercise.intervalRestSeconds }),
-      // User-entered WOD name during logging takes priority; AI-generated name is fallback
-      ...((result.metconName || result.exercise.aiPartName) && {
-        aiPartName: result.metconName || result.exercise.aiPartName,
-      }),
+      ...(result.exercise.wodName && { wodName: result.exercise.wodName }),
     };
   });
 

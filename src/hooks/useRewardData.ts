@@ -44,6 +44,9 @@ interface UseRewardDataResult {
   ) => Promise<CalculateRewardResult>;
 }
 
+/** Matches the records screen's own history depth (useRecords.RECORDS_WORKOUT_LIMIT). */
+const NAMED_WOD_HISTORY_LIMIT = 500;
+
 export function useRewardData(): UseRewardDataResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,14 +99,16 @@ export function useRewardData(): UseRewardDataResult {
         console.warn('Could not fetch PRs, using empty:', err);
       }
 
-      // Fetch recent workouts for benchmark comparison
+      // Fetch the history a named workout is measured against. Deep on purpose: the records
+      // screen reads the athlete's whole log, so a shallower window here would congratulate a
+      // "first attempt" at a Fran the records screen already holds a time for.
       let recentWorkouts: Workout[] = [];
       try {
         const recentQuery = query(
           collection(db, 'workouts'),
           where('userId', '==', userId),
           orderBy('date', 'desc'),
-          limit(50)
+          limit(NAMED_WOD_HISTORY_LIMIT)
         );
         const recentSnapshot = await getDocs(recentQuery);
         // Same rule as above: a throwaway log must not feed benchmark comparison or achievements.
@@ -132,6 +137,9 @@ export function useRewardData(): UseRewardDataResult {
       // Detect all achievements
       const achievementContext = {
         workout: {
+          // This workout is saved before the celebration is built, so it comes back in its own
+          // history — the id is what keeps it from being compared against itself.
+          id: excludeWorkoutId,
           title: workout.title,
           duration: workout.durationMinutes,
           type: workout.type,

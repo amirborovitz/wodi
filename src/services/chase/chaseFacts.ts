@@ -8,6 +8,7 @@ import {
 import { breakdownPerImplementWeights } from '../../components/celebration/movementResolution';
 import { buildMilestone } from '../../hooks/useMilestone';
 import { getEffectiveWorkoutDate, toIsoDate } from '../../utils/workoutDate';
+import { namedWodRunsOf } from '../namedWods';
 
 /**
  * CHASE — threads out of the athlete's own log.
@@ -200,33 +201,36 @@ function staleFact(familyId: MovementFamilyId, sessions: Session[], now: number)
 }
 
 /**
- * A named benchmark is the only honest rematch: "Helen" means the same work every time, while
- * two boards both titled "WOD" have nothing to do with each other.
+ * A named workout is the only honest rematch: "Helen" means the same work every time, while
+ * two boards both titled "WOD" have nothing to do with each other. Which runs count as the same
+ * named workout is not decided here — services/namedWods.ts is the one rule, shared with the
+ * records screen and the post-log celebration.
  */
 function benchmarkFacts(workouts: readonly Workout[]): ChaseFact[] {
-  const byName = new Map<string, { day: string; at: number; seconds: number }[]>();
+  const byName = new Map<string, { name: string; day: string; at: number; seconds: number }[]>();
 
   for (const workout of workouts) {
-    const name = workout.workloadBreakdown?.benchmarkName?.trim();
-    const seconds = workout.durationSeconds ?? 0;
-    if (!name || seconds <= 0 || workout.format !== 'for_time') continue;
     const trained = getEffectiveWorkoutDate(workout);
-    const runs = byName.get(name) ?? [];
-    runs.push({ day: toIsoDate(trained), at: trained.getTime(), seconds });
-    byName.set(name, runs);
+    for (const run of namedWodRunsOf(workout)) {
+      const runs = byName.get(run.key) ?? [];
+      runs.push({ name: run.name, day: toIsoDate(trained), at: trained.getTime(), seconds: run.seconds });
+      byName.set(run.key, runs);
+    }
   }
 
   const out: ChaseFact[] = [];
-  for (const [name, runs] of byName) {
+  for (const [key, runs] of byName) {
     if (runs.length < 2) continue;
     const ordered = [...runs].sort((a, b) => b.at - a.at);
+    // Display the name as the most recent board wrote it.
+    const name = ordered[0].name;
     const latest = ordered[0];
     const best = [...ordered].sort((a, b) => a.seconds - b.seconds || b.at - a.at)[0];
     const gap = latest.seconds - best.seconds;
 
     if (gap === 0) {
       out.push({
-        id: `tied:${name.toLowerCase()}`,
+        id: `tied:${key}`,
         kind: 'TIED',
         subject: name,
         raw: `${name}: ${formatTime(latest.seconds)} on ${shortDay(latest.day)} · equals your best`,
@@ -239,7 +243,7 @@ function benchmarkFacts(workouts: readonly Workout[]): ChaseFact[] {
     }
 
     out.push({
-      id: `rematch:${name.toLowerCase()}`,
+      id: `rematch:${key}`,
       kind: 'REMATCH',
       subject: name,
       raw: `${name}: ${formatTime(latest.seconds)} on ${shortDay(latest.day)} · best ${formatTime(best.seconds)}`,

@@ -254,8 +254,7 @@ export interface Exercise {
   partialReps?: number;        // Extra reps into the incomplete round — AMRAP or ladder (derived from partialMovements)
   partialMovements?: string[]; // Movement names finished in the incomplete AMRAP round
   intensity?: IntensityRating | null; // user-entered metcon block intensity
-  aiPartName?: string;     // Generated poster wordmark for this workout part
-  partNameOverride?: string; // User-edited poster wordmark override
+  wodName?: string;        // The name this part is known by ("Fran", "Running GRACE") — the model's answer, never invented
   mvpNote?: string;         // Individual standout note for team workouts (e.g. "NIMROD CRUSHED IT!")
   // This exercise's OWN slice of the whiteboard/source text — scoped to just this block, not
   // the whole photo. Carried through from ParsedExercise.rawText so poster-time text matching
@@ -331,8 +330,6 @@ export interface ParsedWorkout {
   rawText?: string;
   sourceDate?: string;          // Calendar date visible in the original WOD text/image
   containerRounds?: number;     // Outer rounds (e.g., 7 in "7 rounds of Cindy")
-  benchmarkName?: string;       // Named benchmark if recognized (e.g., "Cindy", "Fran")
-  benchmarkModified?: boolean;  // True if benchmark was modified (e.g., "DT @ 50kg")
   partnerWorkout?: boolean;     // Detected partner workout (IGUG, "in pairs", etc.)
   teamSize?: number;            // Team size (2 for pairs, N for "team of N")
   difficultyLevel?: number;     // AI-assessed programmed difficulty 1–10
@@ -405,6 +402,8 @@ export interface WorkloadBreakdown {
   grandTotalWeightedDistance?: number;
   grandTotalCalories?: number;
   containerRounds?: number;
+  // LEGACY: stamped from the session-level benchmark answer the strict parse schema no longer
+  // asks for. Never written now; read only as a fallback name for docs saved before wodName.
   benchmarkName?: string;
   // True when any movement total was derived by GUESSWORK rather than understood structure
   // (unknown/free loggingMode, station counting without station structure, session-level
@@ -590,7 +589,10 @@ export interface ParsedExercise {
   // Never derived — see utils/blockClock.ts.
   intervalSeconds?: number;
   intervalRestSeconds?: number;       // ONE rest window in seconds, when the board writes work/rest
-  aiPartName?: string;                // Generated poster wordmark for this workout part
+  // The name this part is known by: one the coach wrote for it ("Running GRACE") or a benchmark
+  // the board prescribes ("Fran"). Answered by the model per part, never invented — a heading
+  // ("WOD", "METCON") is not a name. It is the identity named-workout records are kept under.
+  wodName?: string;
   // This exercise's OWN slice of the whiteboard/source text — scoped to just this block,
   // not the whole photo. Use this (not the workout-level rawText) for any per-exercise text
   // matching (ladder detection, "after each round" phrasing, etc.) in a multi-exercise workout,
@@ -662,7 +664,8 @@ export type Screen =
   | 'records'
   | 'recap'
   | 'feed'
-  | 'chase';
+  | 'chase'
+  | 'handoff';
 
 // Common component props
 export interface BaseProps {
@@ -693,6 +696,7 @@ export interface Achievement {
   title: string;           // "New PR!" or "Best 5RM This Year"
   subtitle: string;        // "100kg Back Squat" or "Beat previous by 5kg"
   movement?: string;       // Movement name if PR
+  wodName?: string;        // The named workout this is about ("Fran") — benchmark achievements only
   value?: number;          // Weight/time if applicable
   previousBest?: number;   // For comparison display
   icon: AchievementIcon;

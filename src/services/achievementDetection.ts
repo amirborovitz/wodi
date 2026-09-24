@@ -1,8 +1,11 @@
-import type { Achievement, Exercise, ExerciseSet, MovementEquipment, PersonalRecord, Workout } from '../types';
-import { getCanonicalLiftName, isUnresolvedLiftName } from '../data/exerciseDefinitions';
+import type { Achievement, Exercise, ExerciseSet, MovementEquipment, PersonalRecord, Workout, WorkoutFormat } from '../types';
+import { getCanonicalLiftName, isUnresolvedLiftName, matchBenchmarkName } from '../data/exerciseDefinitions';
+import { namedWodRuns, namedWodRunsOf } from './namedWods';
 
 interface AchievementContext {
   workout: {
+    /** The doc's id, when it already has one. Set so this workout is never compared to itself. */
+    id?: string;
     title: string;
     duration?: number;
     type?: string;
@@ -28,14 +31,8 @@ export async function detectAllAchievements(
   const prAchievements = detectPRs(context.workout, context.allTimeRecords);
   achievements.push(...prAchievements);
 
-  // Priority 2: Check for benchmark WOD achievements
-  const benchmarkAchievement = detectBenchmarkAchievement(
-    context.workout,
-    context.recentWorkouts
-  );
-  if (benchmarkAchievement) {
-    achievements.push(benchmarkAchievement);
-  }
+  // Priority 2: named workouts — every named part gets its own verdict
+  achievements.push(...detectNamedWodAchievements(context.workout, context.recentWorkouts));
 
   // Priority 3: Workout count milestones
   const milestoneAchievement = checkWorkoutMilestone(context.totalWorkouts);
@@ -106,15 +103,19 @@ const ACCESSORY_UNLESS_BARBELL_PATTERNS = [
   'kb', 'kettlebell',
 ];
 
-const BENCHMARK_WODS = [
-  'fran', 'grace', 'helen', 'diane', 'elizabeth', 'murph',
-  'cindy', 'annie', 'karen', 'jackie', 'isabel', 'nancy',
-  'kelly', 'eva', 'lynne', 'amanda', 'mary', 'chelsea'
-];
-
-function isBenchmarkWorkout(title: string): boolean {
-  const workoutName = title.toLowerCase();
-  return BENCHMARK_WODS.some(name => workoutName.includes(name));
+/**
+ * Does a lift inside this part count toward a record?
+ *
+ * Normally a lift only earns a record in a strength piece: a barbell cycled for conditioning
+ * reps says nothing about what the athlete can lift. A NAMED workout is the exception — the
+ * whole point of "Grace" or "Isabel" is the load you did it at, and that is a number worth
+ * keeping. The name comes from the part (the model's answer); the title is read only for
+ * legacy docs saved before parts carried one.
+ */
+function liftsCountInPart(exercise: Exercise, title: string, anyPartNamed: boolean): boolean {
+  if (isPureStrengthExercise(exercise)) return true;
+  if (anyPartNamed) return !!exercise.wodName?.trim();
+  return !!matchBenchmarkName(title);
 }
 
 function isPureStrengthExercise(exercise: Exercise): boolean {
@@ -252,10 +253,10 @@ function detectPRs(
   allTimeRecords: PersonalRecord[]
 ): Achievement[] {
   const achievements: Achievement[] = [];
-  const allowMetconPRs = isBenchmarkWorkout(workout.title);
+  const anyPartNamed = workout.exercises.some((exercise) => !!exercise.wodName?.trim());
 
   for (const exercise of workout.exercises) {
-    if (!allowMetconPRs && !isPureStrengthExercise(exercise)) continue;
+    if (!liftsCountInPart(exercise, workout.title, anyPartNamed)) continue;
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {
@@ -283,69 +284,77 @@ function detectPRs(
 }
 
 /**
- * Detect achievements for benchmark WODs (named workouts)
+ * The verdict on every named workout in this session — one per named part.
+ *
+ * A named WOD is a rematch with your own past: the same work, a comparable clock. So the first
+ * run of one is news ("you've never done this before") and a faster one is a record. Which runs
+ * count as the same named workout is NOT decided here — services/namedWods.ts is the one rule,
+ * shared with the records screen and the rematch suggestions, so the celebration can never
+ * congratulate a record the records screen doesn't hold.
  */
-function detectBenchmarkAchievement(
-  workout: { title: string; duration?: number },
+function detectNamedWodAchievements(
+  workout: { id?: string; title: string; duration?: number; format?: string; exercises: Exercise[] },
   recentWorkouts: Workout[]
-): Achievement | null {
-  const workoutName = workout.title.toLowerCase();
-  const isBenchmark = isBenchmarkWorkout(workout.title);
+): Achievement[] {
+  const runs = namedWodRuns({
+    title: workout.title,
+    format: workout.format as WorkoutFormat | undefined,
+    exercises: workout.exercises,
+    // Legacy docs only (see namedWodRuns): their clock is the session's, in rounded minutes.
+    durationSeconds: workout.duration ? Math.round(workout.duration * 60) : undefined,
+  });
+  if (runs.length === 0) return [];
 
-  if (!isBenchmark) return null;
+  // This workout is already saved by the time the celebration is built, so it comes back in its
+  // own history. Measuring it against itself reports "you tied your best" on a first attempt.
+  const history = recentWorkouts
+    .filter((previous) => previous.id !== workout.id)
+    .flatMap((previous) => namedWodRunsOf(previous));
 
-  // Find previous attempts of the same WOD
-  const previousAttempts = recentWorkouts.filter(
-    w => w.title.toLowerCase() === workoutName
-  );
+  return runs.map((run) => {
+    const previousSeconds = history
+      .filter((previous) => previous.key === run.key)
+      .map((previous) => previous.seconds)
+      .sort((a, b) => a - b);
 
-  if (previousAttempts.length === 0) {
-    return {
-      type: 'benchmark',
-      title: 'First Attempt!',
-      subtitle: `Completed ${workout.title}`,
-      icon: 'star',
-    };
-  }
+    if (previousSeconds.length === 0) {
+      return {
+        type: 'benchmark' as const,
+        title: 'First Attempt!',
+        subtitle: `${run.name} · ${formatClock(run.seconds)}`,
+        wodName: run.name,
+        value: run.seconds,
+        icon: 'star' as const,
+      };
+    }
 
-  // Compare times (for "for time" workouts)
-  const currentTime = workout.duration;
-  if (!currentTime) return null;
+    const bestPrevious = previousSeconds[0];
+    if (run.seconds < bestPrevious) {
+      return {
+        type: 'benchmark' as const,
+        title: 'Fastest Time!',
+        subtitle: `${run.name} · ${formatClock(run.seconds)} (-${formatClock(bestPrevious - run.seconds)})`,
+        wodName: run.name,
+        value: run.seconds,
+        previousBest: bestPrevious,
+        icon: 'medal' as const,
+      };
+    }
 
-  const previousTimes = previousAttempts
-    .map(w => w.duration)
-    .filter((t): t is number => t !== undefined)
-    .sort((a, b) => a - b);
-
-  if (previousTimes.length === 0) return null;
-
-  const bestPrevious = previousTimes[0];
-
-  if (currentTime < bestPrevious) {
-    const improvement = bestPrevious - currentTime;
-    return {
-      type: 'benchmark',
-      title: 'Fastest Time!',
-      subtitle: `${workout.title}: ${formatTime(currentTime)} (-${formatTime(improvement)})`,
-      value: currentTime,
-      previousBest: bestPrevious,
-      icon: 'medal',
-    };
-  }
-
-  // Rank this attempt
-  const rank = previousTimes.filter(t => t < currentTime).length + 1;
-  if (rank <= 3) {
+    const rank = previousSeconds.filter((seconds) => seconds < run.seconds).length + 1;
     const ordinal = ['1st', '2nd', '3rd'][rank - 1];
     return {
-      type: 'benchmark',
-      title: `${ordinal} Fastest!`,
-      subtitle: `${workout.title}: ${formatTime(currentTime)}`,
-      icon: 'medal',
+      type: 'benchmark' as const,
+      // Fourth-fastest and beyond is still the same workout you've met before — say the name and
+      // the time without ranking it. Silence read as "this didn't count".
+      title: ordinal ? `${ordinal} Fastest!` : 'Rematch!',
+      subtitle: `${run.name} · ${formatClock(run.seconds)}`,
+      wodName: run.name,
+      value: run.seconds,
+      previousBest: bestPrevious,
+      icon: 'medal' as const,
     };
-  }
-
-  return null;
+  });
 }
 
 /**
@@ -392,13 +401,10 @@ function getGenericAchievement(): Achievement {
   };
 }
 
-/**
- * Format time in minutes to MM:SS string
- */
-function formatTime(minutes: number): string {
-  const mins = Math.floor(minutes);
-  const secs = Math.round((minutes - mins) * 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+/** A clock in seconds as MM:SS — a named workout's result is read in seconds, never minutes. */
+function formatClock(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  return `${mins}:${Math.round(seconds - mins * 60).toString().padStart(2, '0')}`;
 }
 
 /**
@@ -409,10 +415,10 @@ export function extractNewPRs(
   existingPRs: PersonalRecord[]
 ): PersonalRecord[] {
   const newPRs: PersonalRecord[] = [];
-  const allowMetconPRs = isBenchmarkWorkout(workout.title);
+  const anyPartNamed = workout.exercises.some((exercise) => !!exercise.wodName?.trim());
 
   for (const exercise of workout.exercises) {
-    if (!allowMetconPRs && !isPureStrengthExercise(exercise)) continue;
+    if (!liftsCountInPart(exercise, workout.title, anyPartNamed)) continue;
     const candidates = getWeightedMovements(exercise);
 
     for (const { name: movementName, weight: bestWeight } of candidates) {

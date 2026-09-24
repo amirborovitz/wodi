@@ -31,7 +31,6 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
-import { addGeneratedPartNames, getRecentPartNames } from '../services/partNameGeneration';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown } from '../types';
 import {
   workoutToParsedWorkout,
@@ -1993,12 +1992,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       // Asked of the session's workout id, never of `isEditingAfterSave` — see saveTarget.ts.
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
-      const { builtExercises, totalDuration } = buildSavedExercises(results);
-
-      const exercises = await addGeneratedPartNames(builtExercises, {
-        format: parsedWorkout.format,
-        recentNames: getRecentPartNames(recentWorkouts),
-      });
+      const { builtExercises: exercises, totalDuration } = buildSavedExercises(results);
 
       const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
       breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);

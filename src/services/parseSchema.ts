@@ -162,7 +162,8 @@ const exercise = obj({
   complex: nullable(bool),
   partnerWorkout: nullable(bool),
   partnerSplit: nullable({ type: 'string', enum: ['rounds', 'reps'] }),
-  aiPartName: nullable(str),
+  // The name this part is known by — see WOD NAME in the parse prompt. null when it has none.
+  wodName: nullable(str),
 
   movements: { type: 'array', items: movement },
   sections: nullable({ type: 'array', items: section }),

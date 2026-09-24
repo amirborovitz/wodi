@@ -57,7 +57,7 @@ export interface ParseAuditEntry {
 const MODEL_OWNED_FIELDS: ReadonlySet<string> = new Set([
   'name', 'reps', 'repsDisplay', 'distance', 'calories', 'time', 'unit',
   'rxWeights', 'rxCalories', 'inputType', 'equipment', 'implementCount',
-  'isMaxReps', 'maxMetric', 'alternative', 'together', 'teamSize', 'timeCap',
+  'isMaxReps', 'maxMetric', 'alternative', 'together', 'teamSize', 'timeCap', 'wodName',
 ]);
 
 /**

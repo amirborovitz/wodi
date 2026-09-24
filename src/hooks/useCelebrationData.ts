@@ -136,15 +136,91 @@ export interface CarouselPage {
  *
  * `pageIndex` indexes `carouselPageData` — the part the PR belongs to, which is also its slide.
  */
-export interface PRCelebration {
-  movement: string;
+interface RecordCelebrationBase {
+  /** The number just set: kilos for a lift, SECONDS for a named workout. */
   value: number;
-  /** The unit the lift was logged in — a 315 lb deadlift must never flash up as "315 KG". */
-  unit: LoadUnit;
   previousBest?: number;
   isFirstEver: boolean;
+  /** How many other records this session set, named on the card as "+N more". */
   extraCount: number;
   pageIndex: number | null;
+}
+
+export interface LiftPRCelebration extends RecordCelebrationBase {
+  kind: 'lift';
+  movement: string;
+  /** The unit the lift was logged in — a 315 lb deadlift must never flash up as "315 KG". */
+  unit: LoadUnit;
+}
+
+/** A named workout beaten (or met for the first time) — a record on a clock, not a bar. */
+export interface NamedWodCelebration extends RecordCelebrationBase {
+  kind: 'named-wod';
+  wodName: string;
+}
+
+export type PRCelebration = LiftPRCelebration | NamedWodCelebration;
+
+/**
+ * The one record this session leads with, or null when it set none.
+ *
+ * Two kinds of record earn the moment and they are the same beat: a heavier lift, and a named
+ * workout met for the first time or beaten. A lift leads when a session sets both — it is the
+ * louder number — and the card counts the rest. Without the named-workout half, a box's own
+ * "Running GRACE" record announced itself nowhere but a small badge on one poster page.
+ */
+export function buildRecordCelebration(
+  achievements: readonly Achievement[] | undefined,
+  pages: CarouselPage[] | null,
+): PRCelebration | null {
+  const prs = (achievements ?? []).filter(
+    (a) => a.type === 'pr' && a.movement && typeof a.value === 'number',
+  );
+  const namedRecords = (achievements ?? []).filter(
+    (a) => a.type === 'benchmark' && a.wodName && typeof a.value === 'number'
+      && (a.title === 'First Attempt!' || a.title === 'Fastest Time!'),
+  );
+  if (prs.length === 0 && namedRecords.length === 0) return null;
+
+  if (prs.length === 0) {
+    const record = namedRecords[0];
+    const name = record.wodName!.trim().toLowerCase();
+    const namedPage = pages?.findIndex(
+      (page) => page.exercise.wodName?.trim().toLowerCase() === name,
+    );
+    return {
+      kind: 'named-wod',
+      wodName: record.wodName!,
+      value: record.value!,
+      previousBest: record.previousBest,
+      isFirstEver: record.previousBest == null,
+      extraCount: namedRecords.length - 1,
+      pageIndex: namedPage != null && namedPage >= 0 ? namedPage : null,
+    };
+  }
+
+  // Biggest lift leads. Ties keep detection order so the hero stays stable across renders.
+  const best = prs.reduce((top, a) => ((a.value ?? 0) > (top.value ?? 0) ? a : top), prs[0]);
+
+  const pageIndex = pages?.findIndex((page) => achievementMatchesMovementList(best, page.movements));
+
+  // The achievement itself carries a bare number; the breakdown row the PR was matched to
+  // is what knows which unit the athlete entered.
+  const prRow = pageIndex != null && pageIndex >= 0
+    ? pages?.[pageIndex].movements.find((m) => (m.weight ?? 0) > 0)
+    : undefined;
+
+  return {
+    kind: 'lift',
+    movement: best.movement!,
+    value: best.value!,
+    unit: asLoadUnit(prRow?.unit),
+    previousBest: best.previousBest,
+    isFirstEver: best.previousBest == null,
+    // Every other record this session set, lifts and named workouts alike.
+    extraCount: prs.length - 1 + namedRecords.length,
+    pageIndex: pageIndex != null && pageIndex >= 0 ? pageIndex : null,
+  };
 }
 
 export interface CelebrationData {
@@ -1087,37 +1163,10 @@ export function useCelebrationData(
   // poster's PR badge is page-scoped, so a strength PR is otherwise unreachable in the
   // moment it happens. This drives a session-level overlay above the poster.
 
-  const prCelebration = useMemo((): PRCelebration | null => {
-    if (!isReward) return null;
-
-    const prs = (activeAchievements ?? []).filter(
-      (a) => a.type === 'pr' && a.movement && typeof a.value === 'number',
-    );
-    if (prs.length === 0) return null;
-
-    // Biggest lift leads. Ties keep detection order so the hero stays stable across renders.
-    const best = prs.reduce((top, a) => ((a.value ?? 0) > (top.value ?? 0) ? a : top), prs[0]);
-
-    const pageIndex = carouselPageData?.findIndex((page) =>
-      achievementMatchesMovementList(best, page.movements),
-    );
-
-    // The achievement itself carries a bare number; the breakdown row the PR was matched to
-    // is what knows which unit the athlete entered.
-    const prRow = pageIndex != null && pageIndex >= 0
-      ? carouselPageData?.[pageIndex].movements.find((m) => (m.weight ?? 0) > 0)
-      : undefined;
-
-    return {
-      movement: best.movement!,
-      value: best.value!,
-      unit: asLoadUnit(prRow?.unit),
-      previousBest: best.previousBest,
-      isFirstEver: best.previousBest == null,
-      extraCount: prs.length - 1,
-      pageIndex: pageIndex != null && pageIndex >= 0 ? pageIndex : null,
-    };
-  }, [isReward, activeAchievements, carouselPageData]);
+  const prCelebration = useMemo(
+    (): PRCelebration | null => (isReward ? buildRecordCelebration(activeAchievements, carouselPageData) : null),
+    [isReward, activeAchievements, carouselPageData],
+  );
 
   // ── Footer stats ──────────────────────────────────────────────────────────
 

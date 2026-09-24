@@ -273,36 +273,6 @@
   color: var(--wodi-white);
 }
 
-/* ── Metcon name input ── */
-.metconNameRow {
-  padding: 0 var(--space-4) var(--space-2);
-}
-
-.metconNameInput {
-  width: 100%;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(242, 240, 235, 0.14);
-  color: var(--wodi-white);
-  font-family: var(--font-barlow);
-  /* 16px minimum — anything smaller makes iOS Safari zoom the screen in on focus. */
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 6px 0 8px;
-  outline: none;
-  transition: border-color 0.18s ease;
-}
-
-.metconNameInput::placeholder {
-  color: var(--wodi-dim);
-  font-weight: 400;
-}
-
-.metconNameInput:focus {
-  border-bottom-color: var(--wodi-yellow);
-}
-
 /* ── Empty state hint ── */
 .emptyHint {
   text-align: center;

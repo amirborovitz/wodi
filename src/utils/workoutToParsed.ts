@@ -133,7 +133,6 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
 
   // The prescribed scheme if the doc kept one, otherwise what the athlete's own sets imply.
   const repsPerSet = exercise.suggestedRepsPerSet?.length ? exercise.suggestedRepsPerSet : repScheme;
-  const partName = exercise.partNameOverride || exercise.aiPartName;
 
   return {
     name: exercise.name,
@@ -157,7 +156,7 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
     ...(exercise.restDuration != null && { restDuration: exercise.restDuration }),
     ...(exercise.intervalSeconds != null && { intervalSeconds: exercise.intervalSeconds }),
     ...(exercise.intervalRestSeconds != null && { intervalRestSeconds: exercise.intervalRestSeconds }),
-    ...(partName && { aiPartName: partName }),
+    ...(exercise.wodName && { wodName: exercise.wodName }),
     ...(exercise.rawText && { rawText: exercise.rawText }),
     ...(exercise.partKind && { partKind: exercise.partKind }),
     ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),

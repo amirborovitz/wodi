@@ -18,7 +18,8 @@ type RecordFilter = 'all' | 'lifts' | 'benchmarks';
 const FILTERS: ReadonlyArray<[RecordFilter, string]> = [
   ['all', 'All'],
   ['lifts', 'Lifts'],
-  ['benchmarks', 'Benchmarks'],
+  // Not "Benchmarks": a box's own named workout belongs here too, and it is nobody's benchmark.
+  ['benchmarks', 'Named WODs'],
 ];
 
 /** The nudges a barbell actually moves in. A record climbs in plates, not by typing. */
@@ -215,7 +216,7 @@ function DetailSheet({
   onDelete: () => void;
   onClose: () => void;
 }): React.ReactElement {
-  // A benchmark's time is read off the workout that set it, so there is nothing here to edit —
+  // A named WOD's time is read off the workout that set it, so there is nothing here to edit —
   // the way to change one is to correct the workout.
   const editable = entry.kind === 'lift';
   const record = entry.history.find((a) => a.isBest) ?? entry.history[0];
@@ -281,7 +282,7 @@ function DetailSheet({
           <div className={styles.sheetHeadText}>
             <div className={styles.sheetEyebrowRow}>
               <span className={styles.sheetEyebrow}>
-                {entry.kind === 'benchmark' ? 'Benchmark' : 'Personal record'}
+                {entry.kind === 'benchmark' ? 'Named WOD' : 'Personal record'}
               </span>
               {isFresh(entry.achievedAt) && (
                 <span className={styles.newBadge}>

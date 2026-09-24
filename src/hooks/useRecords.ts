@@ -4,11 +4,8 @@ import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { usePRs } from './usePRs';
 import { useWorkouts, type WorkoutWithStats } from './useWorkouts';
-import {
-  getCanonicalLiftName,
-  isForTimeBenchmark,
-  matchBenchmarkName,
-} from '../data/exerciseDefinitions';
+import { getCanonicalLiftName } from '../data/exerciseDefinitions';
+import { namedWodRunsOf } from '../services/namedWods';
 import { personalRecordManualId } from '../services/personalRecordSync';
 import { getEffectiveWorkoutDate } from '../utils/workoutDate';
 import { fmtTimeSocial } from '../components/celebration/posterFormatters';
@@ -25,8 +22,9 @@ import type { PersonalRecord } from '../types';
 //                shown, and are what lets a record fall BACK when the workout behind it is
 //                corrected or deleted (see services/personalRecordSync.ts).
 //   BENCHMARKS — never persisted as records at all. A named WOD's best is derived on
-//                read from the workouts that logged it, gated to the benchmarks that
-//                are actually scored on a clock.
+//                read from the workouts that logged it. What counts as "the same named
+//                workout" is one rule, shared with the celebration and the rematch
+//                suggestions: services/namedWods.ts.
 //
 // That split is also what can and cannot be edited: a LIFT row is a document, so it can be
 // added, corrected and deleted by hand. A BENCHMARK is a reading of the workouts behind it,
@@ -111,10 +109,9 @@ function liftKey(name: string): string {
 }
 
 /**
- * Named-WOD attempts, bucketed by benchmark. Gated three ways: the title has to name a
- * benchmark, that benchmark has to be scored on a clock, and the doc has to carry a real
- * elapsed time. `duration` is minutes ROUNDED — using it would report Fran as 4:00, so a
- * doc without `durationSeconds` is skipped instead of being reported to the wrong minute.
+ * Every logged run of a named workout, bucketed by name. A session holding two named pieces
+ * contributes to two buckets — the name lives on the PART, so the row is keyed by the part's
+ * own name and timed by the part's own clock (never the session's, which mixes in its siblings).
  */
 function collectBenchmarkSamples(
   workouts: readonly WorkoutWithStats[],
@@ -122,20 +119,19 @@ function collectBenchmarkSamples(
   const buckets = new Map<string, { name: string; samples: BenchmarkSample[] }>();
 
   for (const workout of workouts) {
-    const name = matchBenchmarkName(workout.title);
-    if (!name || !isForTimeBenchmark(name)) continue;
-    // Legacy docs predate `format`; a named for-time benchmark with a logged clock is
-    // still a benchmark result, so only an explicitly non-for-time format disqualifies.
-    if (workout.format && workout.format !== 'for_time') continue;
-
-    const seconds = workout.durationSeconds;
-    if (typeof seconds !== 'number' || !(seconds > 0)) continue;
-
     const date = getEffectiveWorkoutDate(workout);
-    const key = name.toLowerCase();
-    const bucket = buckets.get(key) ?? { name, samples: [] };
-    bucket.samples.push({ workoutId: workout.id, time: date.getTime(), date, seconds });
-    buckets.set(key, bucket);
+    for (const run of namedWodRunsOf(workout)) {
+      const bucket = buckets.get(run.key) ?? { name: run.name, samples: [] };
+      bucket.samples.push({
+        // A session with two named parts must keep two rows in its history, not one that
+        // overwrites the other.
+        workoutId: `${workout.id}#${run.exerciseIndex}`,
+        time: date.getTime(),
+        date,
+        seconds: run.seconds,
+      });
+      buckets.set(run.key, bucket);
+    }
   }
 
   return buckets;

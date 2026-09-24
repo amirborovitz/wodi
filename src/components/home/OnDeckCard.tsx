@@ -22,8 +22,8 @@ function buildSubtitle(wod: ParsedWorkout): string {
   if (wod.timeCap && wod.timeCap > 0) parts.push(`${Math.round(wod.timeCap / 60)}-MIN`);
   const fmt = FORMAT_LABELS[wod.format ?? ''] ?? (wod.format ?? '').toUpperCase();
   if (fmt) parts.push(fmt);
-  if (wod.benchmarkName) parts.push('· benchmark');
-  else if (wod.partnerWorkout || wod.teamSize && wod.teamSize > 1) parts.push('· partner');
+  // A named piece says its own name in the title above — no tag needed for it.
+  if (wod.partnerWorkout || wod.teamSize && wod.teamSize > 1) parts.push('· partner');
   return parts.join(' ');
 }
 

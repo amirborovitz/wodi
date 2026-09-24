@@ -30,7 +30,6 @@ export interface WizardContext {
 interface WodStoryScreenProps {
   parsedWorkout: ParsedWorkout;
   results: StoryExerciseResult[];
-  onResultChange: (index: number, result: StoryExerciseResult) => void;
   onEditExercise: (index: number) => void;
   onSave: () => void;
   onBack: () => void;
@@ -125,7 +124,6 @@ function deriveTitle(workout: ParsedWorkout): string | null {
 export function WodStoryScreen({
   parsedWorkout,
   results,
-  onResultChange,
   onEditExercise,
   onSave,
   onBack,
@@ -312,39 +310,10 @@ export function WodStoryScreen({
         </AnimatePresence>
         <AnimatePresence>
           {groups.map((group) => {
-            // Detect if this group is a metcon/WOD block (not pure strength)
-            const isMetconGroup = group.indices.some(idx => {
-              const ex = parsedWorkout.exercises[idx];
-              return ex?.type === 'wod' || ex?.type === 'cardio';
-            });
-            // Metcon name is stored on the first exercise result in the group
-            const firstIdx = group.indices[0];
-            const firstResult = firstIdx != null ? results[firstIdx] : null;
-            const currentName = firstResult?.metconName ?? '';
-
             return (
               <div key={group.label ?? 'ungrouped'}>
                 {group.label && (
                   <SectionHeader label={`Part ${group.label}`} />
-                )}
-
-                {/* WOD name input — only for metcon/WOD groups */}
-                {isMetconGroup && firstResult && (
-                  <div className={styles.metconNameRow}>
-                    <input
-                      type="text"
-                      className={styles.metconNameInput}
-                      value={currentName}
-                      placeholder="What did your box call this? (optional)"
-                      maxLength={40}
-                      onChange={e => {
-                        onResultChange(firstIdx!, {
-                          ...firstResult,
-                          metconName: e.target.value,
-                        });
-                      }}
-                    />
-                  </div>
                 )}
 
                 {group.indices.map((idx) => {
