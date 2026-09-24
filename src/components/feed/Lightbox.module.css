@@ -1,0 +1,54 @@
+/* Above the bottom sheets (1041): this opens from a card that can itself sit
+   under one, and it is always the frontmost thing when it is up. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(env(safe-area-inset-top, 0px) + 64px) 16px calc(40px + env(safe-area-inset-bottom));
+  background: rgba(6, 7, 9, 0.94);
+  backdrop-filter: blur(8px);
+  animation: lightboxIn 0.2s ease;
+  cursor: zoom-out;
+}
+
+/* Wider than the card gave it, capped so it can't sprawl on a tablet. The
+   poster scales itself to whatever width this is. */
+.content {
+  max-width: 460px;
+  margin-inline: auto;
+  cursor: default;
+}
+
+.close {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.close:active {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+@keyframes lightboxIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop { animation: none; }
+}

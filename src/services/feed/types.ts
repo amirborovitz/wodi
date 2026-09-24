@@ -3,11 +3,19 @@
  *
  * The feed is global, no-follow and ephemeral: every post is younger than
  * FEED_WINDOW_MS and disappears on its own. There is no archive and no follow
- * graph. A post carries the POSTER it renders and the athlete's own line about
- * it — both frozen, because they are a record of what the athlete did and said
- * — and nothing else: identity is a live lookup through /publicProfiles, so an
- * athlete looks the same everywhere at once. Nothing here points back at
- * /workouts.
+ * graph. Identity is a live lookup through /publicProfiles, so an athlete looks
+ * the same everywhere at once. Nothing here points back at /workouts.
+ *
+ * A POST IS NOT A WORKOUT
+ * A workout is history — it lives in /workouts forever and the athlete owns it.
+ * A post is a thing they said to the room for a day. EVERY POST HAS A PHOTO:
+ * the feed is a room full of people, and a wall of posters with no faces in it
+ * is a leaderboard. The workout is an optional attachment on top of the photo
+ * and the caption is an extra on top of that. The full poster still lives in
+ * the Gallery, where it is the artifact; here it rides the photo as a ticket.
+ *
+ * Everything a post carries is frozen at publish time: editing the workout
+ * afterwards never rewrites the post.
  */
 
 import type { PosterPayload } from '../../components/celebration/faces/HandwrittenFace/posterPayload';
@@ -99,6 +107,25 @@ export function normalizeCaption(text: string | undefined): string | undefined {
 }
 
 /**
+ * When the session on this post was TRAINED — never when the post was written.
+ *
+ * The two are routinely hours apart: train at 7am, post at 6pm. The card's age
+ * ("2 hours ago") is about the post, so without this the feed would quietly
+ * claim an evening session. Frozen at publish time alongside the poster.
+ *
+ * `hasTime` is not a formatting flag — it says which of two different facts we
+ * actually hold. A workout logged the day it was trained carries the session's
+ * own clock in `at`. A board dated to an earlier day (the athlete tapped the
+ * poster's date, or the parser read it off the whiteboard) gives us the
+ * calendar day and nothing more, and `at` is that day's local midnight. Printing
+ * "12:00am" there would invent an hour nobody entered.
+ */
+export interface FeedTrained {
+  at: Date;
+  hasTime: boolean;
+}
+
+/**
  * The photo behind ONE post — deliberately NOT `workout.posterPhoto`.
  *
  * That field is a polaroid the athlete sticks on their poster: permanent, part
@@ -113,70 +140,36 @@ export interface FeedPhoto {
   url: string;
   /** Storage object path, kept so deleting the post can delete the file. */
   path: string;
-  /** How the photo is framed. Absent means dead centre at cover scale. */
-  crop?: PhotoCrop;
-  /** Where the poster was dragged to. Absent means its resting place. */
-  posterOffset?: PosterOffset;
 }
-
-/**
- * The poster's displacement from where the frame parks it, in % of frame width
- * and height. Both the photo AND the poster move: dragging the photo decides
- * what shows, dragging the poster decides what it covers, and there is no
- * single one of those that solves both.
- */
-export interface PosterOffset {
-  x: number;
-  y: number;
-}
-
-export const NO_POSTER_OFFSET: PosterOffset = { x: 0, y: 0 };
-
-/**
- * How a photo sits inside the 9:16 story frame.
- *
- * The frame crops — a phone photo is 3:4 or 4:3 and the frame is 9:16, so
- * something is always cut off and WHICH something is the athlete's call. This
- * is the control that makes it theirs: drag to choose what shows, pinch to
- * decide how close.
- *
- * The poster, by contrast, does not move. It is a document rather than a
- * sticker, so there is no placement that improves it — and with the photo
- * movable there is nothing left for a poster nudge to solve: you frame the
- * subject into the bands rather than sliding the poster off the subject.
- * One draggable thing per frame, so a drag is never ambiguous.
- */
-export interface PhotoCrop {
-  /** 1 = exactly covers the frame. Panning is bounded by whatever overhangs. */
-  scale: number;
-  /** Pan from centred, in % of frame width / height. */
-  x: number;
-  y: number;
-}
-
-export const DEFAULT_CROP: PhotoCrop = { scale: 1, x: 0, y: 0 };
-
-/** Past this the 1080px upload starts to show its pixels. */
-export const MAX_PHOTO_SCALE = 3;
 
 export interface FeedPost {
   id: string;
   /** The author, resolved through /publicProfiles at render time. */
   userId: string;
-  /** Frozen at publish time — editing the workout later never changes this. */
-  poster: PosterPayload;
   /**
-   * Optional. Absent means the card is the poster alone, which is the majority
-   * of posts and reads fine: the poster is the artifact, the photo is context.
+   * The workout this post is about, frozen at publish time. Optional — a shot
+   * of the whiteboard or the 6am crew is a perfectly good thing to put in the
+   * room, and demanding a poster for it is what kept those off the feed
+   * entirely.
+   */
+  poster?: PosterPayload;
+  /** Present exactly when `poster` is: it is the poster's session, not the post's. */
+  trained?: FeedTrained;
+  /**
+   * Required on anything published from here on — see the note above. Still
+   * optional on the way IN, because posts written before the photo became
+   * mandatory are still inside the 24h window; they render as the bare poster,
+   * which is exactly what they always looked like. A day from now that branch
+   * stops being reachable on its own.
    */
   photo?: FeedPhoto;
   /**
-   * The athlete's own line about the session, frozen with the poster.
+   * The athlete's own line about the session.
    *
-   * Optional and deliberately unprompted-for as a result: the sheet asks "What
-   * happened in there?", never "how did it go", so "not my day, still went" is
-   * as postable as a PR. Immutable like the rest of the post — there is no
-   * edit, only delete.
+   * Optional and deliberately unprompted-for as a result: the composer asks
+   * "Say something…", never "how did it go", so "not my day, still went" is as
+   * postable as a PR. It is never the whole post — a caption with nothing
+   * attached cannot be published. Immutable like the rest of the post.
    */
   caption?: string;
   createdAt: Date;
@@ -184,10 +177,17 @@ export interface FeedPost {
   isPR: boolean;
 }
 
-/** What the client hands to createFeedPost; ids and timestamps are set there. */
+/**
+ * What the client hands to createFeedPost; ids and timestamps are set there.
+ *
+ * The photo is required HERE and optional on FeedPost: this is what may be
+ * written, that is what may be read back. The asymmetry is the migration, and
+ * it expires with the 24h window rather than needing a backfill.
+ */
 export interface FeedPostInput {
-  poster: PosterPayload;
-  photo?: FeedPhoto;
+  photo: FeedPhoto;
+  poster?: PosterPayload;
+  trained?: FeedTrained;
   caption?: string;
   isPR: boolean;
 }

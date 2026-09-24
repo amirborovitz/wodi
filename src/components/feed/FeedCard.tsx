@@ -3,7 +3,7 @@ import { AuthorLine } from './AuthorLine';
 import { formatAge, isFadingSoon, UNKNOWN_ATHLETE } from './feedFormat';
 import { useFeedReactions } from '../../hooks/useFeed';
 import { useProfiles } from '../../hooks/useProfiles';
-import { PosterPager } from './PosterPager';
+import { PostBody } from './PostBody';
 import type { FeedPost } from '../../services/feed/types';
 import styles from './FeedCard.module.css';
 
@@ -67,7 +67,14 @@ export function FeedCard({
         </button>
       </header>
 
-      <PosterPager payload={post.poster} photo={post.photo} />
+      {/* The same renderer the composer previews with — a workout, a photo, or
+          the photo leading with the workout as a ticket over it. */}
+      <PostBody
+        poster={post.poster}
+        trained={post.trained}
+        photoUrl={post.photo?.url}
+        now={now}
+      />
 
       {/* The athlete's own line, under the artifact rather than over it: the
           poster says what they did, this says how it went, and neither has to

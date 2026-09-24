@@ -1,0 +1,145 @@
+/* Every colour here is a variable the component fills from the skin registry.
+   There is no per-skin rule in this file, and there must never be one: a new
+   skin gets its ticket by naming five colours next to its component, not by
+   adding a selector here. */
+.ticket {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--ticket-bg);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  text-align: left;
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 11px 13px 10px;
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* The format tag is a brand-lock component on the poster: a constant outlined
+   pill whose colour adapts to the surface. Same shape here. */
+.type {
+  align-self: flex-start;
+  padding: 2px 5px;
+  border: 1.5px solid var(--ticket-ink);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--ticket-ink);
+}
+
+/* A label, never the headline — the result outshouts it roughly 2:1, which is
+   the poster's own hierarchy held at card size. */
+.title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ticket-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trained {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ticket-dim);
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: right;
+}
+
+.resultLabel {
+  font-family: var(--font-body);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--ticket-dim);
+}
+
+.resultValue {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  color: var(--ticket-ink);
+}
+
+/* Two or three clocks, printed once each. Smaller than a lone result because
+   there are several of them, still the loudest thing in the row. */
+.scores {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.scoreLabel {
+  font-family: var(--font-body);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--ticket-dim);
+}
+
+.scoreValue {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 0.95;
+  color: var(--ticket-ink);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 13px 7px;
+  border-top: 1px solid var(--ticket-line);
+}
+
+.hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ticket-dim);
+}
+
+/* Anchored to the footer, signing the card — same rule as on the poster. */
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--ticket-ink);
+}
+
+.dot {
+  color: var(--ticket-dot);
+}

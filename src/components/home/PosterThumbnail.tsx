@@ -44,7 +44,7 @@ export function PosterThumbnail({ workout, onClick, fullWidth }: PosterThumbnail
         onClick={onClick}
         aria-label={`Open ${workout.title} workout`}
       >
-        <PosterCard payload={payload} />
+        {payload && <PosterCard payload={payload} />}
       </button>
 
       <div className={styles.label}>

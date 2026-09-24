@@ -4,6 +4,7 @@ import { useFeed } from '../hooks/useFeed';
 import { useProfile } from '../hooks/useProfiles';
 import { AthleteCard } from '../components/feed/AthleteCard';
 import { FeedCard } from '../components/feed/FeedCard';
+import { FeedComposer } from '../components/feed/FeedComposer';
 import { LikesSheet } from '../components/feed/LikesSheet';
 import { PulseRail } from '../components/feed/PulseRail';
 import { UNKNOWN_ATHLETE } from '../components/feed/feedFormat';
@@ -39,6 +40,7 @@ export function FeedScreen(): React.ReactElement {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [composing, setComposing] = useState(false);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -84,6 +86,21 @@ export function FeedScreen(): React.ReactElement {
             <span className={styles.liveDot} />
             LIVE
           </span>
+          {/* Straight into the composer — there is no "what do you want to
+              make?" menu in front of it, because the answer is a photo, a
+              workout or both and all three are one tap away inside. */}
+          <button
+            type="button"
+            className={styles.create}
+            onClick={() => setComposing(true)}
+            disabled={!user}
+            aria-label="New post"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
         </div>
         <p className={styles.subtitle}>Anyone training, right now · last 24 hours · no follows</p>
       </header>
@@ -140,6 +157,12 @@ export function FeedScreen(): React.ReactElement {
         error={deleteError}
         onDelete={confirmDelete}
         onCancel={() => { setDeleting(null); setDeleteError(null); }}
+      />
+
+      <FeedComposer
+        open={composing}
+        onClose={() => setComposing(false)}
+        onPosted={() => { setComposing(false); setNotice('Posted · live for 24 hours'); }}
       />
 
       {notice && <div className={styles.notice}>{notice}</div>}

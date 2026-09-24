@@ -1,0 +1,125 @@
+.section {
+  margin-top: 18px;
+}
+
+.heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px 9px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--wodi-dim);
+}
+
+.optional {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--wodi-dim2);
+}
+
+/* Scrolls past the screen edge rather than stopping at the gutter: a rail whose
+   last card is flush with the margin looks like the end of the list even when
+   it isn't. */
+.rail {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 14px 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* The card wears the workout's own skin — every colour below is a variable the
+   component fills from the skin registry, and there is no per-skin rule in this
+   file. A new skin gets its card by naming its colours next to its component. */
+/* `min-width: 0` is load-bearing, not tidying. A flex item's automatic minimum
+   size is its content's min-content width, and `.name` below is nowrap — so
+   without this the basis is ignored and a card stretches to fit an un-ellipsised
+   "PARTNER 16 ROUNDS FOR TIME (8 EACH)", which is what turned the rail into two
+   enormous cards. */
+.card {
+  position: relative;
+  flex: 0 0 128px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 9px 10px 10px;
+  border: none;
+  border-radius: 12px;
+  background: var(--card-bg);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cardAttached {
+  outline: 2.5px solid var(--wodi-yellow);
+  outline-offset: -2.5px;
+}
+
+.day {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--card-dim);
+}
+
+.name {
+  margin-top: 2px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--card-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Still the loudest thing on the card, even at rail size. */
+.result {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--card-ink);
+}
+
+.check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+}
+
+.check svg {
+  width: 100%;
+  height: 100%;
+}
+
+.note {
+  margin: 0;
+  padding: 4px 14px 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--wodi-dim2);
+}

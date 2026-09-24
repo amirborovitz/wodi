@@ -85,25 +85,16 @@ export async function uploadPosterPhoto(userId: string, file: File): Promise<Pos
 
 /**
  * The photo behind one feed post. Uploaded at PUBLISH time, not at pick time —
- * an athlete who opens the post sheet, tries a photo and backs out must leave
- * nothing behind, so the sheet previews from a local object URL and this only
- * runs when they commit.
+ * an athlete who opens the composer, tries a photo and backs out must leave
+ * nothing behind, so the composer previews from a local object URL and this
+ * only runs when they commit.
  *
- * `crop` and `posterOffset` ride along unchanged rather than being applied to
- * the pixels: they are layout decisions, and baking them in would throw away
- * the rest of the photo that the full-size view still shows.
+ * The full frame is uploaded and the card crops it with CSS. Baking the crop
+ * into the pixels would throw away the rest of the shot that the full-size view
+ * still shows.
  */
-export async function uploadFeedPhoto(
-  userId: string,
-  file: File,
-  options: { crop?: FeedPhoto['crop']; posterOffset?: FeedPhoto['posterOffset'] },
-): Promise<FeedPhoto> {
-  const uploaded = await uploadImage(userId, file, 'post-');
-  return {
-    ...uploaded,
-    ...(options.crop ? { crop: options.crop } : {}),
-    ...(options.posterOffset ? { posterOffset: options.posterOffset } : {}),
-  };
+export async function uploadFeedPhoto(userId: string, file: File): Promise<FeedPhoto> {
+  return uploadImage(userId, file, 'post-');
 }
 
 export async function deleteStoredImage(path: string): Promise<void> {

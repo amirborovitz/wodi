@@ -20,11 +20,13 @@ import { TextSticker } from './TextSticker';
 import { PosterPhotoInset } from './PosterPhotoInset';
 import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
 import { ActionMenuSheet, type ActionMenuItem } from '../../../ui/ActionMenuSheet';
-import { PostToFeedSheet } from '../../../feed/PostToFeedSheet';
+import { FeedComposer } from '../../../feed/FeedComposer';
 import { PRLift } from '../../PRLift';
 import type { PosterPhoto, PosterSticker, PosterVibeOffset } from '../../../../types';
 import type { PosterPayload } from './posterPayload';
-import { usePostToFeed, type FeedDraft } from '../../../../hooks/usePostToFeed';
+import type { ComposerWod } from '../../../../hooks/useFeedComposer';
+import { feedTrainedFrom } from '../../../../services/feed/trained';
+import { useAuth } from '../../../../context/AuthContext';
 import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { usePosterDate } from '../../../../hooks/usePosterDate';
 import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
@@ -158,7 +160,8 @@ export function HandwrittenFace({
   const [showPost, setShowPost]        = useState<boolean>(false);
 
   const photoUpload = usePosterPhotoUpload();
-  const feedPost = usePostToFeed();
+  const { user } = useAuth();
+  const [postedNotice, setPostedNotice] = useState<string | null>(null);
   // Edited in place on the poster's header; every step persists to workout.sourceDate.
   const posterDate = usePosterDate(data.sourceDate, data.workoutDate, (iso) => {
     onPosterCustomizationChange?.({ sourceDate: iso });
@@ -347,10 +350,15 @@ export function HandwrittenFace({
     };
   }, [pageWods, singleWod, carouselPage, displayDate, skinIdx, vibeConfirmed, vibe, vibeOffset, sticker, photo]);
 
-  const publish = (draft: FeedDraft): void => {
-    setShowPost(false);
-    feedPost.post(draft);
-  };
+  // What the Share shortcut hands the composer. The poster is the one on screen
+  // — unsaved skin, vibe and date edits included — and the trained time comes
+  // from the date pill beside it, so correcting "actually that was yesterday"
+  // corrects the post too.
+  const composerWod = useMemo((): ComposerWod => ({
+    payload: postPayload,
+    trained: feedTrainedFrom({ date: data.workoutDate, sourceDate: posterDate.editor.iso }),
+    isPR: data.prCelebration != null,
+  }), [postPayload, data.workoutDate, data.prCelebration, posterDate.editor.iso]);
 
   // ── Share (destination sheet, then a prepared image) ───────────────────
   // Capture cannot sit between the tap and `navigator.share`: html2canvas takes
@@ -407,10 +415,10 @@ export function HandwrittenFace({
   }, [activePanel]);
 
   useEffect(() => {
-    if (!feedPost.notice) return;
-    const timer = setTimeout(feedPost.clearNotice, 2600);
+    if (!postedNotice) return;
+    const timer = setTimeout(() => setPostedNotice(null), 2600);
     return () => clearTimeout(timer);
-  }, [feedPost.notice, feedPost.clearNotice]);
+  }, [postedNotice]);
 
   const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
@@ -633,7 +641,7 @@ export function HandwrittenFace({
   // dialog in front of it. A test log is excluded from every count, so it has
   // no business in a public feed.
 
-  const canPostToFeed = feedPost.canPost && !data.isTest;
+  const canPostToFeed = Boolean(user) && !data.isTest;
 
   // Labels stay fixed and the header carries the capture state: the sheet keys rows
   // by label, so a label that changes with state would collide across rows.
@@ -693,17 +701,17 @@ export function HandwrittenFace({
 
   const feedOverlays = (
     <>
-      <PostToFeedSheet
+      {/* The same composer the feed's "+" opens, arriving with this workout
+          already attached — Share is a shortcut into it, not a second way to
+          post. That is what retired the old "also post to feed" toggle. */}
+      <FeedComposer
         open={showPost}
-        payload={postPayload}
-        isPR={data.prCelebration != null}
-        explain={feedPost.needsConfirm}
-        posting={feedPost.posting}
-        onPost={publish}
+        initialWod={composerWod}
         onClose={() => setShowPost(false)}
+        onPosted={() => { setShowPost(false); setPostedNotice('Posted · live for 24 hours'); }}
       />
-      {feedPost.notice && (
-        <div className={styles.feedNotice} role="status">{feedPost.notice}</div>
+      {postedNotice && (
+        <div className={styles.feedNotice} role="status">{postedNotice}</div>
       )}
     </>
   );

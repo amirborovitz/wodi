@@ -10,17 +10,21 @@ import type { WorkoutWithStats } from './useWorkouts';
  * takes. Keeps the celebration pipeline out of display components, and gives
  * post-to-feed and the thumbnail one shared definition of "this poster" so a
  * feed snapshot can never disagree with what the athlete saw.
+ *
+ * Takes an absent workout and answers null, because "no workout attached" is a
+ * real state now: the feed composer holds a draft that may have only a photo in
+ * it, and hooks cannot be skipped on the render where that is true.
  */
-export function usePosterPayload(workout: WorkoutWithStats): PosterPayload {
+export function usePosterPayload(workout: WorkoutWithStats | undefined): PosterPayload | null {
   const data = useCelebrationData('detail', undefined, workout);
-  const wods = useMemo(() => buildPosterWodPages(data), [data]);
+  const wods = useMemo(() => (workout ? buildPosterWodPages(data) : []), [data, workout]);
 
-  return useMemo(() => ({
+  return useMemo(() => (workout ? {
     wods,
     skin: workout.posterSkin,
     vibe: resolvePosterVibe(data),
     vibeOffset: workout.posterVibeOffset,
     sticker: workout.posterSticker,
     photo: workout.posterPhoto,
-  }), [wods, data, workout]);
+  } : null), [wods, data, workout]);
 }

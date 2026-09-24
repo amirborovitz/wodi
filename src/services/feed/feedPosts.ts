@@ -22,6 +22,7 @@ import { FEED_WINDOW_MS, normalizeCaption } from './types';
 import { deleteStoredImage } from './feedPhoto';
 import type { FeedPhoto, FeedPost, FeedPostInput, FeedReactions } from './types';
 import type { PosterWod } from '../../components/celebration/faces/HandwrittenFace/posterData';
+import type { PosterPayload } from '../../components/celebration/faces/HandwrittenFace/posterPayload';
 
 /** Cards fetched per feed load. The 24h window keeps this naturally small. */
 const FEED_PAGE_SIZE = 60;
@@ -32,10 +33,10 @@ const FEED_PAGE_SIZE = 60;
  * back as a single-page deck rather than a card with nothing to render.
  */
 type StoredPoster =
-  | FeedPost['poster']
-  | (Omit<FeedPost['poster'], 'wods'> & { wod: PosterWod });
+  | PosterPayload
+  | (Omit<PosterPayload, 'wods'> & { wod: PosterWod });
 
-function toPosterPayload(stored: StoredPoster): FeedPost['poster'] {
+function toPosterPayload(stored: StoredPoster): PosterPayload {
   if ('wods' in stored) return stored;
   const { wod, ...rest } = stored;
   return { ...rest, wods: [wod] };
@@ -43,7 +44,8 @@ function toPosterPayload(stored: StoredPoster): FeedPost['poster'] {
 
 interface FeedPostDoc {
   userId: string;
-  poster: StoredPoster;
+  poster?: StoredPoster;
+  trained?: { at: Timestamp; hasTime: boolean };
   photo?: FeedPhoto;
   caption?: string;
   isPR: boolean;
@@ -55,10 +57,14 @@ function toFeedPost(id: string, data: FeedPostDoc): FeedPost {
   return {
     id,
     userId: data.userId,
-    poster: toPosterPayload(data.poster),
-    // Posts written before photos and captions existed simply have neither.
-    // Both are optional all the way to the card, which renders the poster
-    // alone for them — which is exactly what those posts always looked like.
+    // A post carries a poster, a photo, or both — see FeedPost. Posts written
+    // before photos and captions existed simply have neither, and render as the
+    // poster alone, which is exactly what they always looked like.
+    poster: data.poster ? toPosterPayload(data.poster) : undefined,
+    // Absent on a photo post, and on poster posts written before the feed
+    // separated "when you trained" from "when you posted". Those fall back to
+    // the card's age, which is what they always showed.
+    trained: data.trained ? { at: data.trained.at.toDate(), hasTime: data.trained.hasTime } : undefined,
     photo: data.photo,
     caption: data.caption,
     isPR: data.isPR ?? false,
@@ -70,10 +76,20 @@ function toFeedPost(id: string, data: FeedPostDoc): FeedPost {
 }
 
 export async function createFeedPost(userId: string, input: FeedPostInput): Promise<string> {
+  // Every post has a photo — see FeedPost. The composer's Post button is
+  // disabled without one; this is the backstop for anything that isn't the
+  // composer, and it throws rather than writing a card with no picture in it.
+  if (!input.photo) {
+    throw new Error('A post needs a photo');
+  }
+
   const ref = doc(collection(db, 'feedPosts'));
   await setDoc(ref, removeUndefined({
     userId,
     poster: input.poster,
+    trained: input.trained
+      ? { at: Timestamp.fromDate(input.trained.at), hasTime: input.trained.hasTime }
+      : undefined,
     photo: input.photo,
     caption: normalizeCaption(input.caption),
     isPR: input.isPR,

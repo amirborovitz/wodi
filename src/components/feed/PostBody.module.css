@@ -1,0 +1,35 @@
+/* 4:5 — the tallest a photo can be and still leave the post scannable in a
+   feed. A phone photo is 3:4 or 4:3, so this crops a little off one axis and
+   never a lot; the full shot is one tap away. */
+.photoFrame {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--wodi-card);
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
+.ticketSlot {
+  position: relative;
+  margin: -34px 12px 0;
+}
+
+/* Full-size, the photo is the shot itself — the frame on the card is a
+   composition, not the picture the athlete took. */
+.fullPhoto {
+  display: block;
+  width: 100%;
+  border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+}

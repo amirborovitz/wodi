@@ -86,6 +86,11 @@ service cloud.firestore {
                     && request.resource.data.expiresAt is timestamp
                     // Nothing outlives the 24h window (+1h of clock slack).
                     && request.resource.data.expiresAt < request.time + duration.value(25, 'h')
+                    // Every post has a photo; the workout and the caption are
+                    // attachments on top of it. The composer's Post button is
+                    // disabled without one, and this is the backstop for
+                    // anything that isn't the composer.
+                    && 'photo' in request.resource.data
                     // The caption is one line, not a post body. Clients already
                     // cap it (CAPTION_MAX in feed/types.ts); this is the
                     // backstop for anything that doesn't go through them.
