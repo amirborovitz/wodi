@@ -34,7 +34,7 @@ import type { Exercise, ParsedExercise } from '../types';
 type ClockFields = Pick<
   ParsedExercise & Exercise,
   'workDuration' | 'restDuration' | 'intervalCount' | 'partnerWorkout' | 'partnerSplit'
->;
+> & Partial<Pick<ParsedExercise & Exercise, 'intervalSeconds' | 'intervalRestSeconds'>>;
 
 /**
  * True when the block's final rest is somebody else's work, so the clock runs through it.
@@ -63,13 +63,36 @@ export function intervalChainSeconds(
   return totalWork + totalRest - Math.round(totalRest / intervals);
 }
 
-/** How many seconds this block puts on the clock. 0 when the board prescribes no work time. */
+/**
+ * How many seconds this block puts on the clock. 0 when the board prescribes no work time.
+ *
+ * The total is a RESULT, derived from the window the board stated: four 3:00 windows and the
+ * three 1:00 rests between them are fifteen minutes, and that is arithmetic on two numbers the
+ * coach wrote. `workDuration`/`restDuration` say the same thing a second time, as totals the
+ * model multiplied out for itself — so whenever the window is on the exercise, it answers, and
+ * the model's arithmetic is not consulted. Two stored copies of one fact can disagree, and the
+ * one closer to the board wins.
+ *
+ * Legacy docs, saved before `intervalSeconds` existed, still read the cumulative pair: it is all
+ * they carry. No station count enters either path — how many stations the windows rotate through
+ * has nothing to do with how long they take.
+ */
 export function blockClockSeconds(exercise: ClockFields): number {
+  const keepTrailingRest = trailingRestIsOccupied(exercise);
+  const { intervalSeconds, intervalRestSeconds, intervalCount } = exercise;
+  if (intervalSeconds && intervalSeconds > 0 && intervalCount && intervalCount > 0) {
+    return intervalChainSeconds(
+      intervalSeconds * intervalCount,
+      (intervalRestSeconds ?? 0) * intervalCount,
+      intervalCount,
+      keepTrailingRest,
+    );
+  }
   return intervalChainSeconds(
     exercise.workDuration ?? 0,
     exercise.restDuration ?? 0,
     exercise.intervalCount ?? 0,
-    trailingRestIsOccupied(exercise),
+    keepTrailingRest,
   );
 }
 
@@ -110,7 +133,9 @@ export interface BlockCadence {
 /** Structural and all-optional, so a parsed exercise, a saved one, or a bare stub all fit. */
 type CadenceFields = Partial<Pick<
   ParsedExercise & Exercise,
-  'intervalSeconds' | 'intervalRestSeconds' | 'intervalCount' | 'name' | 'prescription'
+  'intervalSeconds' | 'intervalRestSeconds' | 'intervalCount' | 'name' | 'prescription' | 'rawText'
+  // Legacy only — see backfillFromCumulative. Never a source when the window fields are present.
+  | 'workDuration' | 'restDuration'
 >>;
 
 /**
@@ -120,17 +145,25 @@ type CadenceFields = Partial<Pick<
  * `intervalCount` is exactly the field that made this bug (it holds the round count on a station
  * rotation). Reading both off the same phrase keeps them consistent with each other.
  */
-function readCadenceFromText(exercise: CadenceFields): BlockCadence | undefined {
+function readCadenceFromText(exercise: CadenceFields, scopedText?: string): BlockCadence | undefined {
   // "1.50 MIN X 16" — a board writing the clock with a dot for the colon.
-  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
+  // The block's own normalised fields lead; raw OCR is the fallback behind them. A name like
+  // "6 Min AMRAP x 2" states the window and the repeat side by side, where the same board's
+  // rawText puts a movement list between them.
+  const text = `${exercise.name || ''} ${exercise.prescription || ''} ${scopedText || ''} ${exercise.rawText || ''}`
+    .replace(/(\d+)\.(\d{2})/g, '$1:$2');
   const clockSeconds = (clock: string): number => {
     const [m, s] = clock.split(':');
     return Number(m) * 60 + Number(s || 0);
   };
 
   // "[02:00 min AMRAP , 02:00 min REST] x 4" — work and rest both written, count after.
+  // `[\s\S]*?` rather than `.*?`: a whiteboard wraps its lines, and a board that wrote
+  // "[03:00 min AMRAP , 01:00 min REST]\nx 4 rounds" put a newline exactly where the count
+  // follows. A dot cannot cross it, so the richest pattern here silently declined the notation
+  // it was written for and a poorer one answered instead.
   const workRest = text.match(
-    /(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*amrap\s*[,/]\s*(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*rest.*?(?:[xX*×]\s*)(\d+)/i,
+    /(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*amrap\s*[,/]\s*(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*rest[\s\S]{0,12}?(?:[xX*×]\s*)(\d+)/i,
   );
   if (workRest) {
     return {
@@ -140,9 +173,22 @@ function readCadenceFromText(exercise: CadenceFields): BlockCadence | undefined 
     };
   }
 
+  // "2:00 AMRAP x 4" — the same clock as the work/rest form above, on a board that prescribes no
+  // rest. The twin of that pattern and no more of a notation library than it is: without it a
+  // clock-written window was only readable when a rest happened to sit beside it.
+  const clockAmrap = text.match(
+    /(\d{1,2}:\d{2})\s*(?:min(?:ute)?s?)?\s*amrap(?:[\s\S]{0,12}?[xX*×]\s*(\d{1,3}))?/i,
+  );
+  if (clockAmrap) {
+    return {
+      workSeconds: clockSeconds(clockAmrap[1]),
+      ...(clockAmrap[2] ? { count: Number(clockAmrap[2]) } : {}),
+    };
+  }
+
   // "6 Min AMRAP x 2" / "6 minutes AMRAP" — the window written as a plain minute count. The
   // lookbehind keeps it off the seconds half of a "02:00 min AMRAP" clock, which reads as "00".
-  const minAmrap = text.match(/(?<![\d:])(\d{1,3})\s*min(?:ute)?s?\s*amrap(?:.*?[xX*×]\s*(\d{1,3}))?/i);
+  const minAmrap = text.match(/(?<![\d:])(\d{1,3})\s*min(?:ute)?s?\s*amrap(?:[\s\S]{0,12}?[xX*×]\s*(\d{1,3}))?/i);
   if (minAmrap) {
     return {
       workSeconds: Number(minAmrap[1]) * 60,
@@ -180,11 +226,24 @@ function readCadenceFromText(exercise: CadenceFields): BlockCadence | undefined 
 }
 
 /**
- * This block's cadence, or nothing. The ONE owner of "what clock does this run on" — the station
- * title and the per-block clock both ask here, so they can never disagree, and neither can
- * manufacture a number the board never carried.
+ * This block's cadence, or nothing. The ONE owner of "what clock does this run on" — the poster
+ * title, the station blueprint, the window-schedule label and the block-scored structure line all
+ * ask here, so they can never disagree, and none of them can manufacture a number the board never
+ * carried.
+ *
+ * Four of them used to answer it separately, three by dividing a cumulative duration by some
+ * count. The counts differed, so the same card printed two clocks for one piece: "[3:00/1:00] × 4"
+ * as its title and "0:48 work / 0:16 rest" as its blueprint, the latter being 720 and 240 divided
+ * by the athlete's fifteen ROUNDS. On an EMOM the round count and the window count are the same
+ * number, which is how a divisor that was never right survived next to one that was.
+ *
+ * `scopedText` is this block's own slice of the board, for the legacy text path only — never the
+ * whole session's, or a sibling part's clock would be read onto this one.
  */
-export function blockCadence(exercise: CadenceFields | null | undefined): BlockCadence | undefined {
+export function blockCadence(
+  exercise: CadenceFields | null | undefined,
+  scopedText?: string,
+): BlockCadence | undefined {
   if (!exercise) return undefined;
 
   // The model's own normalised answer, whatever notation it read it from. Trusted as written —
@@ -200,7 +259,42 @@ export function blockCadence(exercise: CadenceFields | null | undefined): BlockC
     };
   }
 
-  return readCadenceFromText(exercise);
+  return backfillRestFromCumulative(exercise, readCadenceFromText(exercise, scopedText));
+}
+
+/**
+ * LEGACY DOCS ONLY — recovers a REST the board never wrote down, and nothing else.
+ *
+ * "2:30 AMRAP x 4" with `restDuration: 600` is a real saved shape: the board stated its window
+ * and its repeat, but the 2:30 rest between them exists only as a total. A piece that rests half
+ * its clock is a different workout from one that doesn't, so dropping it misreports the board.
+ *
+ * WHY THIS IS NOT THE DIVISION THAT CAUSED THE BUG. `workDuration / intervalCount` was unsafe
+ * because BOTH numbers were unverified: on a station EMOM the model writes the ROUND count into
+ * `intervalCount`, so "EMOM for 16 minutes (4 rounds)" divided 960 by 4 and printed a four-minute
+ * window nobody ran. Here the count is not taken on trust — it must come from the BOARD's own
+ * text, and `workSeconds × count` must reconcile with `workDuration`. That equation is what
+ * proves the count is a window count rather than a round count; it is exactly the check the old
+ * division never made. A station EMOM cannot satisfy it, and a board that states no window never
+ * reaches it.
+ *
+ * The work window is never filled in here — only ever read. Nothing saved since
+ * `intervalSeconds` shipped reaches this function at all.
+ */
+function backfillRestFromCumulative(
+  exercise: CadenceFields,
+  fromText: BlockCadence | undefined,
+): BlockCadence | undefined {
+  if (!fromText || fromText.restSeconds != null) return fromText;
+  const { workSeconds, count } = fromText;
+  if (!count || count <= 1 || !workSeconds) return fromText;
+  if (!exercise.restDuration || exercise.restDuration <= 0) return fromText;
+  // The board's own window × the board's own count must account for the stored work total,
+  // give or take rounding. If it doesn't, one of the three numbers means something else and
+  // none of them may be divided.
+  if (Math.abs((exercise.workDuration ?? 0) - workSeconds * count) > count) return fromText;
+  const restSeconds = Math.round(exercise.restDuration / count);
+  return restSeconds > 0 ? { ...fromText, restSeconds } : fromText;
 }
 
 /** "1:00", "4:10" — a cadence as a clock, for a poster line. */

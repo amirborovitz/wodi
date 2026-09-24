@@ -1,5 +1,6 @@
 {
   "name": "alternating-stations-amrap",
+  "description": "Alternating stations under one repeating AMRAP clock. Each station is a separately scored block: normalizeStationSections gives it a rounds-section of its own, so a movement inside it happens once per ROUND of that station and is counted per_round. It was per_station_visit while the stations lived as a flat movement list with nowhere to put a score — that mode divides the interval count among the stations, which is an estimate that ignores what the athlete did. stationIndices still pin that the stations stay distinct.",
   "rawText": "[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):\nB.1 200m run\nMax single DB alt' Devil press @15/22.5kg\nB.2 50 D.U./80 singles\nMax sit ups",
   "aiResponses": {
     "segment|[02:00 min AMRAP / 01:00 min REST] x 6 (alt'):\nB.1 200m run\nMax single DB alt' Devil press @15/22.5kg\nB.2 50 D.U./80 singles\nMax sit ups": "{\n  \"parts\": [\n    {\n      \"label\": \"B\",\n      \"kind\": \"metcon\",\n      \"text\": \"[02:00 min AMRAP / 01:00 min REST] x 6 (alt')\\nB.1 200m run\\nMax single Dumbbell Alternating Devil Press @15/22.5kg\\nB.2 50 Double Under/80 singles\\nMax Sit-ups\"\n    }\n  ]\n}",
@@ -9,7 +10,7 @@
     "exerciseCount": "1",
     "format": "amrap_intervals",
     "loggingModes": "amrap_intervals",
-    "movementCountingModes": "per_station_visit, per_station_visit, per_station_visit, per_station_visit",
+    "movementCountingModes": "per_round, per_round, per_round, per_round",
     "stationIndices": "0, 0, 1, 1",
     "totals.distance": "600",
     "totals.reps": "150",

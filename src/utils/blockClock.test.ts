@@ -71,6 +71,25 @@ describe('blockClockSeconds', () => {
   it('survives a missing interval count without inventing a trim', () => {
     expect(blockClockSeconds(block({ intervalCount: undefined }))).toBe(960);
   });
+
+  // The total is arithmetic on the board's window, not a second stored copy of the answer.
+  it('builds the total from the stated window, not the model\'s own totals', () => {
+    // [3:00 / 1:00] x 4 → 4 x 3:00 + 3 x 1:00 = 15:00, read straight off the two numbers the
+    // coach wrote. The cumulative pair below is deliberately wrong to prove it is not consulted.
+    expect(blockClockSeconds(block({
+      intervalSeconds: 180, intervalRestSeconds: 60, intervalCount: 4,
+      workDuration: 99, restDuration: 99,
+    }))).toBe(900);
+  });
+
+  it('counts the windows, never the stations they rotate through', () => {
+    // Six 2:00 windows over three alternating stations is still 6 x 2:00 + 5 x 1:00 = 17:00.
+    // How the work is spread across stations cannot change how long the clock runs.
+    expect(blockClockSeconds(block({
+      intervalSeconds: 120, intervalRestSeconds: 60, intervalCount: 6,
+      workDuration: undefined, restDuration: undefined,
+    }))).toBe(1020);
+  });
 });
 
 describe('intervalChainSeconds', () => {
@@ -114,6 +133,33 @@ describe('blockCadence', () => {
     // intervalCount is the field that caused this; a stated window must not be re-derived from it.
     expect(blockCadence(block({ intervalSeconds: 60, intervalCount: 16, workDuration: 960 }))?.workSeconds)
       .toBe(60);
+  });
+
+  // A legacy board can state its window and its repeat but never write the rest down, leaving
+  // restDuration the only record of it ("2:30 AMRAP x 4" + restDuration 600). Recovering that one
+  // number is allowed; recovering a WINDOW never is. The line between them is corroboration, and
+  // these pin it — an attempt to widen the rest recovery into a general fallback tripped the test
+  // above and would otherwise have restored "[4:00] × 4" by another route.
+  it('recovers a rest the board left out, once its own numbers prove the count', () => {
+    // The board says 2:30 and ×4; 150 × 4 == the stored 600, so intervalCount really is windows.
+    expect(blockCadence(block({
+      name: '2:30 AMRAP x 4', workDuration: 600, restDuration: 600, intervalCount: 4,
+    }))).toEqual({ workSeconds: 150, restSeconds: 150, count: 4 });
+  });
+
+  it('refuses the rest when the board never stated a window to check the count against', () => {
+    // Same totals, but nothing to reconcile: a station EMOM's intervalCount is its ROUND count,
+    // and dividing by it is what printed a four-minute window nobody ran.
+    expect(blockCadence(block({
+      name: 'Metcon', prescription: 'four stations', workDuration: 960, restDuration: 240, intervalCount: 4,
+    }))).toBeUndefined();
+  });
+
+  it('refuses the rest when the stated window and count do not account for the work total', () => {
+    // 150 × 4 is 600, not 960 — one of these three numbers means something else, so none divide.
+    expect(blockCadence(block({
+      name: '2:30 AMRAP x 4', workDuration: 960, restDuration: 600, intervalCount: 4,
+    }))?.restSeconds).toBeUndefined();
   });
 
   describe('legacy docs — read the notation, saved before intervalSeconds existed', () => {

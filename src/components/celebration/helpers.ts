@@ -1563,18 +1563,9 @@ function hasBlockScoredSections(exercise: Exercise | null | undefined): boolean 
  * Number-of-blocks agnostic: it reads the piece's own cadence fields, not a block count.
  */
 function buildBlockScoredStructureLine(exercise: Exercise): string | undefined {
-  const timingText = `${exercise.rawText || ''} ${exercise.name || ''} ${exercise.prescription || ''}`
-    .replace(/(d+).(d{2})/g, '$1:$2');
-  const count = exercise.intervalCount
-    ?? (exercise.sections ?? []).filter((s) => s.scoreType != null).length
-    ?? 0;
-  const restSeconds = resolvePerIntervalSeconds(
-    exercise.restDuration,
-    parseExplicitRestSeconds(timingText),
-    count,
-  ) ?? parseExplicitRestSeconds(timingText);
+  const restSeconds = blockCadence(exercise)?.restSeconds;
   if (!restSeconds) return undefined;
-  return `${formatIntervalDuration(restSeconds)} rest between`;
+  return `${formatCadenceClock(restSeconds)} rest between`;
 }
 
 function isProgressiveChipper(exercise: Exercise | null | undefined): boolean {
@@ -1718,8 +1709,8 @@ function buildProgressiveChipperRows(
  * the athlete actually worked disappear from the card entirely.
  */
 function windowScheduleLabel(exercise: Exercise): string {
-  const scheme = resolveIntervalScheme(exercise);
-  const window = scheme ? formatIntervalDuration(scheme.workSeconds) : undefined;
+  const scheme = blockCadence(exercise);
+  const window = scheme ? formatCadenceClock(scheme.workSeconds) : undefined;
   return window
     ? `in each ${window} window, in order`
     : 'each round, in order';
@@ -2617,48 +2608,20 @@ export function buildRewardArtifactSections(
   );
 }
 
-// ─── Explicit work/rest durations from prescription text ─────────────────────
-// Used only to disambiguate the AI's workDuration/restDuration semantics (cumulative vs
-// per-interval) in the station blueprint — never to override an unambiguous AI value.
-
-function clockTokenToSeconds(token: string): number | undefined {
-  const clock = token.match(/^(\d{1,2}):(\d{2})$/);
-  if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
-  const unit = token.match(/^(\d+(?:\.\d+)?)\s*(min(?:ute)?s?|sec(?:ond)?s?)$/i);
-  if (unit) return /^s/i.test(unit[2]) ? Math.round(parseFloat(unit[1])) : Math.round(parseFloat(unit[1]) * 60);
-  return undefined;
-}
-
-const TIME_TOKEN_PATTERN = String.raw`(\d{1,2}:\d{2}|\d+(?:\.\d+)?\s*(?:min(?:ute)?s?|sec(?:ond)?s?))`;
-
-// One clock notation, everywhere a prescribed window is stated. A whole-minute window used to
-// print "2 min" while its 2:30 sibling printed "2:30", so a single card could carry both
-// spellings of the same fact ("4 × 2 MIN" over "2:00 AMRAP · 2:00 REST"). Every number on the
-// poster carries its unit, and mm:ss is the one a whiteboard writes.
-function formatIntervalDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
 /**
  * The clock a sequential-block piece runs on ("EVERY 1:30").
  *
- * The AI's own timing fields answer first: `workDuration` is cumulative across the piece by
- * contract, so dividing by the interval count gives the cadence with no reading of board text at
- * all. Boards write this a dozen ways ("Every 01:30 minutes:", "E1:30", "every 90 sec", "EMOM
- * x8") and a pattern that fits one fails the next — the structured field fits all of them.
+ * The window comes from the one owner, same as every other clock line on the card. It used to be
+ * `workDuration / intervalCount` here — the same division that printed a fictional split on the
+ * station blueprint, and no more defensible for being given the right divisor: a cadence the
+ * board states is read, not reconstructed from a total the model computed.
  *
  * Text is the fallback only, for docs whose parse carried no timing, and it goes through
  * normalizeIntervalNotation first so the pattern sees one canonical spelling.
  */
 function resolveBlockCadence(exercise: Exercise): string | undefined {
-  const intervals = exercise.intervalCount
-    || (hasSequentialBlocks(exercise) ? sequentialBlockSetCount(exercise) : 0);
-  if (exercise.workDuration && intervals > 0) {
-    const perInterval = Math.round(exercise.workDuration / intervals);
-    if (perInterval > 0) return `EVERY ${formatIntervalDuration(perInterval)}`;
-  }
+  const window = blockCadence(exercise)?.workSeconds;
+  if (window && window > 0) return `EVERY ${formatCadenceClock(window)}`;
   return extractEveryXCadence(
     normalizeIntervalNotation(`${exercise.rawText || ''} ${exercise.name || ''} ${exercise.prescription || ''}`),
   );
@@ -2680,55 +2643,6 @@ function parsePrescribedIntervalCount(text: string): number | undefined {
   return match ? parseInt(match[1], 10) : undefined;
 }
 
-// The AI's workDuration/restDuration are CUMULATIVE across all intervals per its contract —
-// divide by the interval count to get the single interval to display. The AI sometimes
-// violates the contract and returns the PER-INTERVAL value: when the value equals what the
-// coach's own text prescribes for one interval, dividing would invent a fictional split
-// ("0:45 AMRAP") — a value matching the explicit text is shown as-is.
-function resolvePerIntervalSeconds(
-  cumulative: number | undefined,
-  explicitSeconds: number | undefined,
-  count: number | undefined,
-): number | undefined {
-  if (!cumulative || !count || count <= 0) return undefined;
-  return cumulative === explicitSeconds ? explicitSeconds : Math.round(cumulative / count);
-}
-
-/**
- * The prescribed work/rest scheme of an interval piece — resolved ONCE.
- *
- * "How long on, how long off, how many times" is the whole identity of an interval workout, and
- * three places used to answer it independently (the title, the format line, the blueprint), so a
- * single card printed the same fact in three notations before it reached a movement: "2:00 AMRAP
- * X 4" over "4 × 2 MIN" over "2 MIN AMRAP · 2 MIN REST · 4 ROUNDS". This is the one answer they
- * all read.
- *
- * AI fields first (intervalCount + the cumulative work/rest contract), coach text as fallback —
- * the same order every other structure reader here uses.
- */
-export interface IntervalScheme {
-  workSeconds: number;
-  restSeconds?: number;
-  count?: number;
-}
-
-export function resolveIntervalScheme(
-  exercise: Exercise | undefined,
-  scopedText?: string,
-): IntervalScheme | undefined {
-  if (!exercise) return undefined;
-  const ownText = scopedText ?? `${exercise.name || ''} ${exercise.prescription || ''}`;
-  const timingText = `${exercise.rawText || ''} ${ownText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-  const explicitWork = parseExplicitWorkSeconds(timingText);
-  const parsedCount = exercise.intervalCount ?? parsePrescribedIntervalCount(timingText);
-  const count = parsedCount && parsedCount > 0 ? parsedCount : undefined;
-  const workSeconds = resolvePerIntervalSeconds(exercise.workDuration, explicitWork, count) ?? explicitWork;
-  if (!workSeconds) return undefined;
-  const explicitRest = parseExplicitRestSeconds(timingText);
-  const restSeconds = resolvePerIntervalSeconds(exercise.restDuration, explicitRest, count) ?? explicitRest;
-  return { workSeconds, restSeconds: restSeconds || undefined, count };
-}
-
 /**
  * The ONE notation for an interval scheme: "2:00 ON / 2:00 OFF × 4".
  *
@@ -2743,18 +2657,12 @@ export function buildIntervalSchemeLine(
   exercise: Exercise | undefined,
   scopedText?: string,
 ): string | undefined {
-  const scheme = resolveIntervalScheme(exercise, scopedText);
+  const scheme = blockCadence(exercise, scopedText);
   if (!scheme) return undefined;
   const window = scheme.restSeconds
-    ? `${formatIntervalDuration(scheme.workSeconds)} ON / ${formatIntervalDuration(scheme.restSeconds)} OFF`
-    : formatIntervalDuration(scheme.workSeconds);
+    ? `${formatCadenceClock(scheme.workSeconds)} ON / ${formatCadenceClock(scheme.restSeconds)} OFF`
+    : formatCadenceClock(scheme.workSeconds);
   return scheme.count && scheme.count > 1 ? `${window} × ${scheme.count}` : window;
-}
-
-function parseExplicitRestSeconds(text: string): number | undefined {
-  const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?rest`, 'i'))
-    ?? text.match(new RegExp(`rest\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
-  return match ? clockTokenToSeconds(match[1].trim()) : undefined;
 }
 
 /**
@@ -2772,12 +2680,6 @@ function parseCompactWorkRestSplit(text: string): { work: number; rest: number }
   const rest = parseInt(match[2], 10);
   if (work <= 0 || rest <= 0 || work > 600 || rest > 600) return undefined;
   return { work, rest };
-}
-
-function parseExplicitWorkSeconds(text: string): number | undefined {
-  const match = text.match(new RegExp(`${TIME_TOKEN_PATTERN}\\s*(?:min(?:ute)?s?\\s*)?(?:amrap|work)`, 'i'))
-    ?? text.match(new RegExp(`(?:amrap|work)\\s*[:=]?\\s*${TIME_TOKEN_PATTERN}`, 'i'));
-  return match ? clockTokenToSeconds(match[1].trim()) : undefined;
 }
 
 export function buildPageArtifactSections(
@@ -3008,23 +2910,19 @@ export function buildPageArtifactSections(
       blueprint = [
         stationCadence,
         rounds ? `${rounds} rounds` : null,
-        split ? `${formatIntervalDuration(split.work)} work / ${formatIntervalDuration(split.rest)} rest` : null,
+        split ? `${formatCadenceClock(split.work)} work / ${formatCadenceClock(split.rest)} rest` : null,
       ].filter(Boolean).join(' · ');
     } else {
-      // Prefer the AI's own workDuration/restDuration (trusted, no regex) over a guess — a
-      // hardcoded "1 min each" here would silently lie about the actual work/rest split.
-      // workDuration/restDuration are CUMULATIVE across all rounds (per the AI's own contract —
-      // e.g. "2:00 AMRAP x 6" -> workDuration: 720), not per-round — divide back down to get the
-      // single work/rest interval to display. The AI sometimes violates the contract and returns
-      // the PER-INTERVAL value instead: when the exercise's own text prescribes exactly that
-      // duration (e.g. "[02:00 AMRAP / 01:00 REST] x 6" saved with restDuration: 60), dividing
-      // would invent a fictional split ("0:10 rest") — so a value matching the text's explicit
-      // work/rest is shown as-is.
-      const timingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-      const workSeconds = resolvePerIntervalSeconds(exercise.workDuration, parseExplicitWorkSeconds(timingText), rounds ?? undefined);
-      const restSeconds = resolvePerIntervalSeconds(exercise.restDuration, parseExplicitRestSeconds(timingText), rounds ?? undefined);
-      const workLabel = workSeconds ? formatIntervalDuration(workSeconds) : undefined;
-      const restLabel = restSeconds ? formatIntervalDuration(restSeconds) : undefined;
+      // The window the BOARD wrote, from the one owner of that question — so this line and the
+      // title line above it can never print two different clocks for the same piece.
+      //
+      // This used to divide the cumulative work/rest by `rounds`, and on an interval AMRAP
+      // `rounds` is the SCORE: 720/15 and 240/15 printed "0:48 work / 0:16 rest" over a board
+      // that says three minutes on, one minute off. No divisor would have fixed it — a cadence
+      // is read, never derived (see utils/blockClock.ts).
+      const cadence = blockCadence(exercise, exerciseOnlyText);
+      const workLabel = cadence ? formatCadenceClock(cadence.workSeconds) : undefined;
+      const restLabel = cadence?.restSeconds ? formatCadenceClock(cadence.restSeconds) : undefined;
       const timingLabel = workLabel
         ? (restLabel ? `${workLabel} work / ${restLabel} rest` : `${workLabel} each`)
         : `${stationCount} stations`;
@@ -3040,11 +2938,20 @@ export function buildPageArtifactSections(
     // three times (title, format line, blueprint) before naming a single movement. The cap, if
     // the coach wrote one, is the only structure fact the scheme line can't carry.
     const amrapTimingText = `${exercise.rawText || ''} ${exerciseOnlyText}`.replace(/(\d+)\.(\d{2})/g, '$1:$2');
-    const isIntervalAmrap = !forTime && !pageCadence && /amrap/i.test(amrapTimingText)
-      && !!buildIntervalSchemeLine(exercise, exerciseOnlyText);
+    // An AMRAP's round count is EARNED, so it can never be this line: the blueprint is
+    // prescription, and `repeatCount` falls back to `exercise.rounds` when the board prescribed
+    // no count of its own. That is how a card came to print "13.5 rounds" as its structure — a
+    // number no coach has ever written on a whiteboard.
+    //
+    // This used to ask whether an interval SCHEME LINE could be built, which answers a different
+    // question and answered it by accident: two identical pair-paced AMRAPs got different posters
+    // because one board said "12 minutes AMRAP" and the other said "AMRAP 14", and only the first
+    // spelling was readable. Who authored the number is the thing that matters, not whether some
+    // other line happens to be available to carry the clock.
+    const isAmrapPiece = !forTime && !pageCadence && /amrap/i.test(amrapTimingText);
     const blueprintStructure = descScheme ? `[${descScheme.join('-')}] for time`
       : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
-      : isIntervalAmrap ? null
+      : isAmrapPiece ? null
       : pageCadence ? formatNestedRoundBlueprint(`${pageCadence} · ${repeatCount} rounds`, exercise)
       : `${repeatCount} rounds`;
     const blueprintParts = [

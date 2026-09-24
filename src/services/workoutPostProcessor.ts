@@ -403,8 +403,12 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   // Detect rotating interval "station" workouts (A/B/C/D repeated across outer rounds)
   const withStationRotation = runPass(passes, 'detectStationRotation', withEmomMinuteStations, detectStationRotation);
 
+  // An alternating-station AMRAP scores each station separately — give each one the section that
+  // can hold its number, so the athlete's own count replaces an estimate off the interval count.
+  const withStationSections = runPass(passes, 'normalizeStationSections', withStationRotation, normalizeStationSections);
+
   // Detect buy-in movements that the AI put in movements[] instead of buyIn[]
-  const withBuyIns = runPass(passes, 'detectMisplacedBuyIns', withStationRotation, detectMisplacedBuyIns);
+  const withBuyIns = runPass(passes, 'detectMisplacedBuyIns', withStationSections, detectMisplacedBuyIns);
 
   // Diagnostic only — warns if the AI's amrap_intervals/Buy-In classification looks inconsistent
   // with its own text, but does NOT override loggingMode/role/perRound. See function doc.
@@ -502,11 +506,21 @@ function inferCountingMode(
   movement: ParsedMovement,
   exercise: ParsedExercise,
   workout: ParsedWorkout,
-  sectionType?: ParsedSectionType
+  sectionType?: ParsedSectionType,
+  // True when the block around this movement carries its own score. Then how many times the
+  // movement happened is the athlete's logged round count for that block, and no estimate may
+  // be stamped on top of it.
+  sectionOwnsScore?: boolean,
 ): ParsedMovement['countingMode'] {
   if (movement.countingMode) return movement.countingMode;
-  if (movement.stationIndex != null) return 'per_station_visit';
-  if (movement.stationLabel) return 'per_station_visit';
+  // `per_station_visit` means "divide the interval count among the stations" — a stand-in for a
+  // count nobody had. A scored block HAS that count, so the stand-in is not merely redundant
+  // here, it wins: it is read as a per-movement override and puts the estimate back after the
+  // block score has correctly stood down.
+  if (!sectionOwnsScore) {
+    if (movement.stationIndex != null) return 'per_station_visit';
+    if (movement.stationLabel) return 'per_station_visit';
+  }
   // Station counting must come from THIS exercise's own structure: station-labeled movements
   // or multiple rounds-sections. A session-level workout.stationRotation must never leak into
   // a sibling block — "exercises.length > 1" treated every multi-part session as station
@@ -516,7 +530,7 @@ function inferCountingMode(
     (candidate) => candidate.stationLabel || candidate.stationIndex != null,
   ) ?? false)
     || (exercise.sections?.filter(section => section.sectionType === 'rounds').length ?? 0) > 1;
-  if ((exercise.stationRotation || workout.stationRotation) && exerciseStationStructure) {
+  if (!sectionOwnsScore && (exercise.stationRotation || workout.stationRotation) && exerciseStationStructure) {
     return 'per_station_visit';
   }
 
@@ -544,7 +558,8 @@ function annotateMovementSemantics(
   movements: ParsedMovement[] | undefined,
   exercise: ParsedExercise,
   workout: ParsedWorkout,
-  sectionType?: ParsedSectionType
+  sectionType?: ParsedSectionType,
+  sectionOwnsScore?: boolean,
 ): ParsedMovement[] | undefined {
   if (!movements || movements.length === 0) return movements;
 
@@ -573,7 +588,7 @@ function annotateMovementSemantics(
       ...(stationIndex != null ? { stationIndex } : {}),
     };
 
-    const countingMode = inferCountingMode(next, exercise, workout, sectionType);
+    const countingMode = inferCountingMode(next, exercise, workout, sectionType, sectionOwnsScore);
     const scoreEntryMode = inferScoreEntryMode(next, exercise.loggingMode);
     const isMaxReps = inferIsMaxReps(next, exercise.loggingMode);
 
@@ -594,7 +609,7 @@ function backfillMovementSemantics(workout: ParsedWorkout): ParsedWorkout {
       movements: annotateMovementSemantics(exercise.movements, exercise, workout),
       sections: exercise.sections?.map((section) => ({
         ...section,
-        movements: annotateMovementSemantics(section.movements, exercise, workout, section.sectionType) || section.movements,
+        movements: annotateMovementSemantics(section.movements, exercise, workout, section.sectionType, section.scoreType != null) || section.movements,
       })),
     })),
   };
@@ -646,6 +661,91 @@ function detectStationRotation(workout: ParsedWorkout): ParsedWorkout {
       ...ex,
       stationRotation: true,
     })),
+  };
+}
+
+/**
+ * An alternating-station AMRAP, rebuilt as the blocks it already is.
+ *
+ * "[03:00 AMRAP / 01:00 REST] x 4 (alt' B.1 & B.2)" is two stations taking turns under one
+ * repeating clock, and EACH STATION EARNS ITS OWN ROUND COUNT. The model expresses the stations
+ * on the movements (`stationLabel` / `stationIndex`); the machinery that can hold a per-block
+ * score — `ParsedSection.scoreType` and `.result` — is keyed on sections. So the score had
+ * nowhere to live, and every total downstream was left estimating: station visits came out as
+ * `intervalCount ÷ stationCount` (4 ÷ 2 = 2), which never consults what the athlete did, while
+ * the exercise's rep total multiplied their rounds by EVERY movement in the piece as though both
+ * stations ran every round. One board, 8 / 16 / 8 on the rows and 240 underneath.
+ *
+ * Nothing here is new behaviour — `buildSavedExercises` already multiplies each scored section's
+ * own movements by its own rounds, and `getStationVisitCountsForExercise` already abandons its
+ * estimate the moment real block scores exist. The stations simply never reached either.
+ *
+ * WHY THIS IS NOT OVERRULING THE MODEL. The stations, their order and their movements are all
+ * the model's own answer, carried across unchanged; this moves them into the field that can hold
+ * a result. It is the same deterministic structural normalisation as `normalizePerTierBuyIns`,
+ * for the same reason: where a shape lives is ours, what the shape IS stays the model's.
+ *
+ * A FIXED CADENCE IS EXCLUDED, and that is the whole gate. An EMOM's windows are prescribed work
+ * on the coach's clock — there is no number to walk away with, which is why `min 1 / min 2`
+ * stations must stay as they are (see `independentlyScoredSections`). Only an open clock earns a
+ * count per station.
+ *
+ * ONE STATION IS NOT A DIFFERENT BOARD. A single labelled station yields a single section, which
+ * `hasIndependentBlocks` reads as "not independent" — so it keeps exactly today's single rounds
+ * counter and single poster header. The station count selects nothing.
+ */
+function normalizeStationSections(workout: ParsedWorkout): ParsedWorkout {
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => {
+      // Only an open clock earns a per-station count, and only when the model left the piece flat
+      // — sections it wrote itself are its own reading of the structure and are never rebuilt.
+      if (exercise.loggingMode !== 'amrap_intervals') return exercise;
+      if (exercise.sections && exercise.sections.length > 0) return exercise;
+      const movements = exercise.movements ?? [];
+      if (movements.length === 0) return exercise;
+      if (!movements.some((movement) => movement.stationLabel?.trim())) return exercise;
+
+      // Walk the board in order: a labelled movement opens a station, unlabelled movements below
+      // it belong to it. That is how the model writes a rotation — "B.1 <lift>, <burpees>" — and
+      // it keeps every movement inside exactly one section, which sections shadowing
+      // `movements[]` makes mandatory: one left behind would vanish from the totals entirely.
+      const stations: { label?: string; movements: ParsedMovement[] }[] = [];
+      for (const movement of movements) {
+        const label = movement.stationLabel?.trim();
+        if (label || stations.length === 0) stations.push({ label: label || undefined, movements: [] });
+        stations[stations.length - 1].movements.push(movement);
+      }
+      if (stations.length === 0) return exercise;
+
+      return {
+        ...exercise,
+        sections: stations.map((station, stationOrdinal) => ({
+          sectionType: 'rounds' as const,
+          // How many rounds the athlete gets through is the SCORE; the board prescribes none.
+          rounds: 1,
+          ...(station.label ? { label: station.label } : {}),
+          scoreType: 'rounds' as const,
+          // `per_station_visit` answers "how many times did this happen" by dividing the interval
+          // count among the stations — an estimate that exists only because a flat movement list
+          // has nowhere better to look. Inside a section that owns its own round count the
+          // question has a real answer, and leaving the mode on lets the estimate shadow it: the
+          // block score stood down correctly and a second copy of the same guess, one layer
+          // further in, put 2 visits back. The station keeps its label and index, which are what
+          // it IS; only the counting stand-in goes.
+          // `stationIndex` is stamped here rather than left to be re-derived. The semantics pass
+          // numbers movements by walking a list and incrementing on each label, and it runs once
+          // per section — so it restarts at zero inside every block, and a four-movement rotation
+          // came out 0,0,0,0 instead of 0,0,1,1. Which station a movement belongs to is a fact
+          // about the piece, not about the list it happens to be walked in.
+          movements: station.movements.map(({ countingMode, ...movement }) => ({
+            ...movement,
+            ...(countingMode === 'per_station_visit' ? {} : { countingMode }),
+            stationIndex: stationOrdinal,
+          })),
+        })),
+      };
+    }),
   };
 }
 
@@ -1370,8 +1470,14 @@ function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
   // persisted and detectPartnerSplit trusts it forever, killing the partner poster treatment.
   if (workout.exercises.length === 1) {
     const ex = workout.exercises[0];
-    if (prescribesOwnRest(ex)) return stripBlockPartnerScope(workout, ex);
+    // The model's own YES is the answer — read before any structural test, because this function
+    // may only BACKFILL. `prescribesOwnRest` below is a default for a block that said nothing,
+    // and it used to run first: since it returns true for EVERY amrap_intervals block, no
+    // interval AMRAP could be a partner workout however plainly the board said so. "In pairs, I
+    // go you go" arrived with partnerWorkout: true and partnerSplit: "rounds" and left with
+    // neither, which the audit printed as an [override] on every such board.
     if (ex.partnerWorkout === true) return workout;
+    if (prescribesOwnRest(ex)) return stripBlockPartnerScope(workout, ex);
     const hasRoundStructure = (ex.suggestedSets ?? 1) > 1
       || (ex.sections?.some(s => (s.rounds ?? 1) > 1) ?? false);
     return {
