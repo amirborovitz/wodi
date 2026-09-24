@@ -1,5 +1,86 @@
 # Changelog
 
+## v0.2.0 — Post the photo. Chase the name. Stop counting flutter kicks.
+
+Three things you can do now that you couldn't, and one question Wodi has stopped asking.
+
+### A post is a photo
+
+The feed was built around the poster: you posted a workout, and a photo was something you could
+crop in behind it. Nobody posts that way. The composer opens on your camera roll now, and the
+workout is a card you may attach afterwards — a rail of your recent sessions, each one a ticket
+you tap to include, or leave out. Photos lay out in a grid and open full-screen.
+
+Posts also say when you **trained**, not when you typed it in. Logged the same day, you get the
+hour — "trained 7:02am". Logged off a board dated earlier, you get the day — "trained Monday" —
+because an hour Wodi doesn't know is an hour it won't invent.
+
+### Take your log to a coach, or to an AI
+
+A log pasted raw into a chat gets a shrug back. The same log under *"write my next 4-week block"*
+gets a block. So the question isn't a setting on an export screen — it's the feature. Pick what
+you want back (next block, weak link, progress, or just the raw log), pick how much history to
+send, and Wodi writes the text. You see it before it goes anywhere, and it goes nowhere on its
+own: the clipboard is the whole product.
+
+### A named WOD is Wodi's answer, not our list of famous names
+
+"Fran" is the same work every time, which makes it the only honest rematch. But which name a
+session held was being decided three separate ways, and the lists disagreed with each other. One
+of them filed a **"Running GRACE"** time under **Grace** — a different workout, and a record
+nobody set.
+
+The name comes off the board now, per part: the coach's own wording, or the benchmark the board
+prescribes. One place reads it, and the records screen, the post-log celebration and the rematch
+suggestions all ask that one place — so they can't disagree about what counts as the same
+workout. A named piece scored in rounds instead of time yields no record at all, rather than a
+number that means something else. The Benchmarks tab is called **Named WODs**, because that's
+what's in it.
+
+Generated poster wordmarks are gone with it, along with the metcon-name box on the logging screen.
+
+### A core tabata has nothing to log
+
+Your board said `C. Cash out - Core TABATA` and nothing else. Wodi invented a movement called
+"Cash-out: Core", asked how many reps you did in each of eight windows, and printed your eight
+answers back as **32 TOTAL REPS**. Nobody counts flutter kicks. Every answer that question
+collected was noise.
+
+A tabata is a fixed protocol — eight 20-second windows, ten seconds between. When the work is
+midline, the dose *is* the record. So the screen states four minutes and asks for nothing, the
+poster says **CORE WORK · 4 MIN**, and what's saved is four minutes of core. Both halves have to
+be true: a tabata of thrusters still gets scored, and a core circuit that isn't on a tabata clock
+still counts its reps.
+
+**Core work reaches your recap for the first time.** Movement rows were skipping anything with no
+rep count, so every core dose and every plank hold you've ever logged fell out silently. A row
+now earns its place on either measure and reports the one it was actually measured in. Ranking
+still runs on reps — a minute and a rep have no exchange rate.
+
+### Posters stop borrowing from the part next door
+
+Two bugs on the same board, both of them one page reading another page's facts:
+
+Your tabata page wore the metcon's **FOR TIME** badge. The page builder kept its own list of
+formats and interval blocks weren't on it, so every EMOM and interval page in the app quietly
+inherited whatever the session said. And part B's *"< 12 minutes T.C. >"* printed itself on part
+C — a cash-out with no cap at all — because the cap lookup fell back to the whole board's text.
+Each page reads its own piece now, and the poster harness pins every page's badge, which nothing
+could see before.
+
+Also: a total only prints when it differs from the count beside it. A one-round chipper was
+printing "50 TOTAL" against the two weighted lines and nothing against the burpees — the same
+fact, told two ways, on one card.
+
+### Under the hood
+
+One owner for "what clock is this block on". The poster used to work a cadence out by dividing
+one estimate by another, which printed `[4:00] x 4` on a board that said "EMOM for 16 minutes" —
+a prescription nobody wrote, on a card whose whole standard is that only written numbers appear.
+
+tsc -b clean; 985 tests across 74 files; 12 parse boards; 64 poster fixtures.
+
+
 ## v0.1.35 — A row is not a rowing machine
 
 The board said `10 Pull-up / Ring Row`. Wodi asked what weight you used for your pull-ups, saved
