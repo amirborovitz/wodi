@@ -22,7 +22,7 @@ import {
   FitText, ShrinkText, V, W2Body, W2Card, W2Eye, W2Foot, W2Stamp, W2Tape,
   shortMoveName, W2_DIM, W2_FAINT, W2_GREEN, W2_INK, W2_WHITE,
 } from './primitives';
-import { getPersona, ordinal } from '../../../hooks/useRecapData';
+import { getPersona, ordinal, moveStatValue, moveStatMeasure } from '../../../hooks/useRecapData';
 import type { RecapData, RecapMoveStat, RecapMoveVariant, RecapPersona } from '../../../hooks/useRecapData';
 import type { MovementCategory, MovementFamilyId } from '../../../data/movementRegistry';
 
@@ -42,6 +42,13 @@ const MIN_LEDGER_ROWS = 3;
 interface LedgerRow {
   name: string;
   reps: number;
+  /**
+   * What the row PRINTS, which is not always its reps. Core doses and holds are measured in
+   * minutes, and a row carrying only those used to render a bare "0". Ranking still runs on
+   * `reps` — see RecapMoveStat.seconds for why a minute and a rep are not comparable.
+   */
+  value: number;
+  unit?: 'min';
   /**
    * The row's second line — "russian 335 · american 216", or the frequency when
    * the family had one flavour.
@@ -94,6 +101,7 @@ export function buildLedger(data: RecapData): Ledger {
     .map(m => ({
       name: shortMoveName(m.name),
       reps: m.reps,
+      ...moveStatValue(m),
       detail: rowDetail(m),
       familyId: m.familyId,
       category: m.category,
@@ -159,7 +167,12 @@ function LedgerRowView({ row, index, count, compact }: {
         color: BRAND.yellow, lineHeight: 0.82, letterSpacing: '-0.02em',
         fontVariantNumeric: 'tabular-nums', justifySelf: 'end',
       }}>
-        {row.reps.toLocaleString()}
+        {row.value.toLocaleString()}
+        {row.unit && (
+          <span style={{ fontSize: '0.42em', marginLeft: '0.1em', letterSpacing: '0.02em' }}>
+            {row.unit}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -276,7 +289,9 @@ export function ledgerVoice(rows: LedgerRow[]): string | null {
 }
 
 function alsoLine(rows: LedgerRow[]): string {
-  return `also · ${rows.map(r => `${r.name.toLowerCase()} ${r.reps.toLocaleString()}`).join('  ·  ')}`;
+  // Each row in its own unit — a core row counts minutes, not reps. LedgerRow.value/unit
+  // already answered that once; reading `reps` here asked again and got the wrong answer.
+  return `also · ${rows.map(r => `${r.name.toLowerCase()} ${r.value.toLocaleString()}${r.unit ?? ''}`).join('  ·  ')}`;
 }
 
 export function buildWrappedCards(data: RecapData): WrappedCard[] {
@@ -420,9 +435,14 @@ export function buildWrappedCards(data: RecapData): WrappedCard[] {
               <FitText color={YEL} ls={-0.04}>{shortMoveName(top.name).toUpperCase()}</FitText>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: V(2.6, 1.5), marginTop: V(2, 1.2) }}>
                 <span style={{ fontFamily: fD, fontSize: V(17, 9.6), fontWeight: 900, color: W2_WHITE, lineHeight: 0.78, letterSpacing: '-0.03em' }}>
-                  {top.reps.toLocaleString()}
+                  {moveStatValue(top).value.toLocaleString()}
                 </span>
-                <span style={{ fontFamily: fB, fontSize: V(4.4, 2.5), fontWeight: 900, letterSpacing: '0.16em', color: W2_DIM, textTransform: 'uppercase' }}>reps</span>
+                {/* The unit is not always "reps". Core headlines a month that had nothing else
+                    to crown, and a core dose is counted in minutes — hardcoding the word put
+                    "0 REPS" under the one movement the card exists to celebrate. */}
+                <span style={{ fontFamily: fB, fontSize: V(4.4, 2.5), fontWeight: 900, letterSpacing: '0.16em', color: W2_DIM, textTransform: 'uppercase' }}>
+                  {moveStatValue(top).unit ?? 'reps'}
+                </span>
               </div>
             </div>
             <div>
@@ -729,7 +749,7 @@ function finaleFacts(
   const facts: [string, string, string][] = [];
   if (data.totalReps > 0) facts.push([data.totalReps.toLocaleString(), 'total reps', BRAND.yellow]);
   if (data.tonnage > 0) facts.push([`${data.tonnage.toLocaleString()} kg`, 'moved', W2_WHITE]);
-  if (top) facts.push([`${shortMoveName(top.name)} ${top.reps.toLocaleString()}`, 'top move', W2_WHITE]);
+  if (top) facts.push([`${shortMoveName(top.name)} ${moveStatMeasure(top)}`, 'top move', W2_WHITE]);
   facts.push([
     `${data.workouts} sessions`,
     persona.count > 0 ? `mostly ${VIBE[persona.vibe].label.toLowerCase()}` : 'logged',

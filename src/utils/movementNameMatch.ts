@@ -98,3 +98,17 @@ export function sameMovementName(a: string | undefined, b: string | undefined): 
   const right = movementNameTokens(b);
   return left.length > 0 && left.length === right.length && left.every((w, i) => w === right[i]);
 }
+
+/**
+ * A movement name with its structural ROLE prefix removed — "Cash-out: Core" → "Core".
+ *
+ * The parser sometimes writes where a movement sits into the movement's own name. The poster
+ * already carries that fact elsewhere (a BUY-IN / BUY-OUT section header, a page of its own), so
+ * printing it again inside the row says the same thing twice and reads as part of the lift.
+ *
+ * A NAME and nothing else. It never decides a kind, a quantity or a route — those belong to the
+ * model's answer, not to a prefix somebody typed.
+ */
+export function stripMovementRolePrefix(name: string): string {
+  return name.replace(/^\s*(?:buy[-\s]?in|cash[-\s]?out|buy[-\s]?out)\s*:\s*/i, '').trim() || name.trim();
+}

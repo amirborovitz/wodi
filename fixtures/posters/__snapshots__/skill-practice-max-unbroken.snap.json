@@ -183,5 +183,9 @@
   "pageMaxPractices": [
     true,
     false
+  ],
+  "pageTypes": [
+    "SKILL",
+    "FOR TIME"
   ]
 }

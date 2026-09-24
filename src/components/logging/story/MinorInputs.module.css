@@ -369,3 +369,46 @@
     transform: none;
   }
 }
+
+/* ────────────────────────────────────────────
+   FixedDoseInput — a block whose dose IS its record
+   Nothing to type. The four minutes, stated, and the
+   board underneath it so the athlete can see what
+   Wodi read. Yellow stat + dim meta, same voice as
+   every other value on this screen.
+   ──────────────────────────────────────────── */
+
+.doseEyebrow {
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--wodi-dim);
+}
+
+.doseValue {
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  color: var(--wodi-yellow);
+}
+
+.doseProtocol {
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--wodi-white);
+}
+
+.doseBoard {
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--wodi-dim);
+  max-width: 28ch;
+}

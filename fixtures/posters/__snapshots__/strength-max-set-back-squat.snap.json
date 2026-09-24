@@ -147,5 +147,8 @@
   ],
   "pageMaxPractices": [
     true
+  ],
+  "pageTypes": [
+    "SKILL"
   ]
 }

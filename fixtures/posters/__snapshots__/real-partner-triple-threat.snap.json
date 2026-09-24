@@ -379,5 +379,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "FOR TIME"
   ]
 }

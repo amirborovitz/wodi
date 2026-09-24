@@ -31,6 +31,16 @@ export interface RecapMoveStat {
   /** Row label: implement-prefixed unless the family is pattern-first. */
   name: string;
   reps: number;
+  /**
+   * Seconds of work this row was measured in TIME rather than reps — core doses, holds.
+   *
+   * Zero on almost every row, and rows are still RANKED by reps alone: a minute and a rep have
+   * no exchange rate, and pretending otherwise would let a plank out-rank a clean. What this
+   * field changes is that such a row now exists at all — measured-in-time work used to be
+   * dropped for having no reps. Read it through {@link moveStatMeasure} rather than formatting
+   * it at each call site.
+   */
+  seconds: number;
   /** Null for movements the registry doesn't know. Those never headline. */
   familyId: MovementFamilyId | null;
   /** Null alongside an unknown `familyId` — an unplaced movement has no category either. */
@@ -706,6 +716,17 @@ function buildMoveStats(
   interface Bucket {
     name: string;
     reps: number;
+    /**
+     * Work this row was measured in TIME rather than reps — a core tabata's four minutes, a
+     * plank hold's ninety seconds. Kept beside `reps` rather than converted into them: there is
+     * no exchange rate between a minute of hollow hold and a rep of anything, and inventing one
+     * is how a row starts out-ranking work it has nothing in common with.
+     *
+     * Ranking stays on reps alone for exactly that reason. A time-measured row simply reports
+     * what it is, which before this was reported as nothing at all — the loop below used to
+     * skip any entry with no reps, so every hold and every core dose fell out of the recap.
+     */
+    seconds: number;
     familyId: MovementFamilyId | null;
     /** Counted as a set of ids: a WOD with three squat legs is ONE squat workout. */
     workouts: Set<string>;
@@ -717,7 +738,10 @@ function buildMoveStats(
   for (const w of ws) {
     for (const m of w.workloadBreakdown?.movements ?? []) {
       const reps = m.totalReps ?? 0;
-      if (!m.name || reps <= 0) continue;
+      const seconds = m.totalTime ?? 0;
+      // A row earns its place with EITHER measure. Reps alone was the test, which quietly
+      // dropped everything the athlete did on a clock instead of a counter.
+      if (!m.name || (reps <= 0 && seconds <= 0)) continue;
 
       const resolved = resolveMovement(m.name);
       if (isCardioFamily(resolved.familyId)) continue;
@@ -739,12 +763,14 @@ function buildMoveStats(
         const bucket = buckets.get(key) ?? {
           name: contribution.label,
           reps: 0,
+          seconds: 0,
           familyId: contribution.familyId,
           workouts: new Set<string>(),
           repsByImplement: new Map<MovementImplement, number>(),
           variants: new Map<string, VariantBucket>(),
         };
         bucket.reps += reps;
+        bucket.seconds += seconds;
         bucket.workouts.add(w.id);
         bucket.repsByImplement.set(
           resolved.implement,
@@ -762,10 +788,11 @@ function buildMoveStats(
   }
 
   return [...buckets.values()]
-    .filter(b => b.reps > 0)
+    .filter(b => b.reps > 0 || b.seconds > 0)
     .map(b => ({
       name: b.name,
       reps: b.reps,
+      seconds: b.seconds,
       familyId: b.familyId,
       category: getFamilyCategory(b.familyId),
       implement: dominantImplement(b.repsByImplement),
@@ -881,6 +908,32 @@ function byCategoryThenReps(a: RecapMoveStat, b: RecapMoveStat): number {
 
 function repsLabel(reps: number): string {
   return `${reps.toLocaleString()} reps`;
+}
+
+/**
+ * What a movement row's number IS, in the unit that row was actually measured in.
+ *
+ * One helper rather than a `reps`/`seconds` decision at each call site, because the two are not
+ * interchangeable and a site that guessed wrong would print "0 reps" over four minutes of core
+ * work. Reps win a tie: a row with both was mostly counted, and its minutes are a detail.
+ */
+export function moveStatMeasure(stat: Pick<RecapMoveStat, 'reps' | 'seconds'>): string {
+  const { value, unit } = moveStatValue(stat);
+  return unit ? `${value.toLocaleString()} ${unit}` : repsLabel(value);
+}
+
+/**
+ * The same answer, split for the places that print the number BIG and the unit small.
+ *
+ * `unit` is absent on a rep row because every card that shows one already says "reps" in its
+ * own voice — a suffix there would be the third copy. It is present on a time row because
+ * nothing else on the card would tell the reader those are minutes.
+ */
+export function moveStatValue(
+  stat: Pick<RecapMoveStat, 'reps' | 'seconds'>,
+): { value: number; unit?: 'min' } {
+  if (stat.reps > 0) return { value: stat.reps };
+  return { value: Math.max(1, Math.round(stat.seconds / 60)), unit: 'min' };
 }
 
 /**
@@ -1261,7 +1314,7 @@ export function getPersona(data: RecapData): RecapPersona {
  */
 export function getTopMoveLine(data: RecapData): string {
   if (!data.topMove) return `${data.workouts} workout${data.workouts === 1 ? '' : 's'}`;
-  return `${data.topMove.name} ${data.topMove.reps.toLocaleString()}`;
+  return `${data.topMove.name} ${moveStatMeasure(data.topMove)}`;
 }
 
 const RECAP_VIEWED_PREFIX = 'wodi_recap_viewed_';

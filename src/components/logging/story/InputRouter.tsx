@@ -2,7 +2,7 @@ import type { StoryExerciseResult, MovementResult } from './types';
 import { LoadInput } from './LoadInput';
 import { ScoreTimeInput, ScoreRoundsInput, RoundsPerIntervalInput, OpenRepsPerIntervalInput } from './ScoreInputs';
 import { RepsSetsInput } from './RepsSetsInput';
-import { DurationInput, DistanceInput, NoteInput } from './MinorInputs';
+import { DurationInput, DistanceInput, NoteInput, FixedDoseInput } from './MinorInputs';
 import { SupersetInput } from './SupersetInput';
 import { usesSupersetInput } from './inputRouting';
 import { asksImplementCount } from './implementQuestion';
@@ -301,6 +301,10 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         />
       );
     }
+    // Nothing is collected here, on purpose. The screen states the dose; the footer's Done and
+    // "Mark as done" are the only two answers it takes. See utils/coreTabata.
+    case 'fixed_dose':
+      return <FixedDoseInput result={result} />;
     case 'note':
       return <NoteInput result={result} onChange={onChange} />;
     default:

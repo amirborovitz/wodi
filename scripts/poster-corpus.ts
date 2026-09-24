@@ -42,6 +42,8 @@ import {
   buildHeroResultMeta,
   formatPosterStrengthRepsSequence,
   composedSchemeTitle,
+  posterPageFormat,
+  mapFormatToType,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
 import { hasStructuralCorrection } from '../src/components/celebration/corrections';
 import { isMaxEffortPractice } from '../src/components/celebration/mainPart';
@@ -298,6 +300,20 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
   // "MAX REPS · ~11burpees".
   const pageMaxPractices = exercises.map((exercise) => isMaxEffortPractice(exercise));
 
+  // The badge each page actually wears — "FOR TIME", "EMOM", "TABATA". Pinned here because
+  // nothing else in this harness reaches it: `resultLabel` above goes through buildResultLabel,
+  // which takes the SESSION format, so a page inheriting a sibling's format looked identical to
+  // a page reading its own. A tabata cash-out shipped tagged FOR TIME straight through that gap.
+  const pageTypes = exercises.map((exercise) => {
+    // The page builder's own two exceptions, mirrored so this records the badge the athlete
+    // sees. A max practice reads SKILL (already pinned by pageMaxPractices above) and a flat
+    // 'free' part reads WOD — mapFormatToType covers neither.
+    if (isMaxEffortPractice(exercise)) return 'SKILL';
+    const format = posterPageFormat(exercise, displayFormat, isStrengthPagePart(exercise));
+    if (format === 'free') return 'WOD';
+    return mapFormatToType(format as Parameters<typeof mapFormatToType>[0]);
+  });
+
   // Checked against the PAGE sections (the per-part artifact), which is where a part's full
   // movement list is meant to land. Each page maps 1:1 to exercises by index.
   const dropped = exercises.flatMap((exercise, index) =>
@@ -313,7 +329,7 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     .map((c) => `${c.entry.name}: saved ${c.stored ? `${c.stored.value} ${c.stored.unit}` : 'nothing'}, rows print ${c.rows.value} ${c.rows.unit}`);
 
   return {
-    snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes, pageMaxPractices },
+    snapshot: { reward, pages, hero, resultLabel, resultValue, resultMeta, posterRows, partnerSubs, pageRepsSchemes, pageMaxPractices, pageTypes },
     dropped,
     totalMismatches,
   };

@@ -39,6 +39,7 @@ import {
   scopeSectionMovements,
 } from './workloadCalculation';
 import type { SectionMovementScope } from './workloadCalculation';
+import { isCoreTabataBlock, coreTabataDoseSeconds, CORE_DOSE_MOVEMENT_NAME } from '../utils/coreTabata';
 
 /** One logged exercise, as the save path hands it over. */
 export interface ExerciseResult {
@@ -70,7 +71,6 @@ export interface ExerciseResult {
   partialReps?: number; // Partial reps in next cycle (for restore)
   partialMovements?: string[]; // Movement names completed in AMRAP partial round
   ladderStep?: number;
-  metconName?: string;
 }
 
 
@@ -216,6 +216,27 @@ export function buildWorkloadBreakdownFromResults(
   );
 
   results.forEach((result, resultIndex) => {
+    // A block whose DOSE is its record contributes exactly that: the minutes, filed under the
+    // family, and no reps at all. The athlete was never asked for a count (the logging screen
+    // has no input — see utils/coreTabata), so there is none to store, and a fabricated one is
+    // what used to reach the recap as "32 core reps".
+    //
+    // ONE entry even when the coach named three drills. They are all midline work and the
+    // registry buckets them onto the same Core row regardless, so splitting four minutes three
+    // ways would invent a per-movement share the board never stated. The names still reach the
+    // poster — they are prescription, and prescription is read from the exercise.
+    if (isCoreTabataBlock(result.exercise)) {
+      const doseSeconds = coreTabataDoseSeconds(result.exercise);
+      if (doseSeconds > 0) {
+        movementMap.set(movementBucketKey(CORE_DOSE_MOVEMENT_NAME, resultIndex), {
+          name: CORE_DOSE_MOVEMENT_NAME,
+          exerciseIndex: resultIndex,
+          totalTime: doseSeconds,
+        });
+      }
+      return;
+    }
+
     // What divides and what does not — team-prescribed blocks only, never (together) work, never
     // a number the athlete typed — is defined once in services/partnerScope.ts. The per-metric
     // arithmetic stays spelled out below because each metric has its own "already a total" rule
@@ -879,7 +900,6 @@ export function buildWorkloadBreakdownFromResults(
     grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
     grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
     containerRounds: parsedWorkout?.containerRounds,
-    benchmarkName: parsedWorkout?.benchmarkName,
     ...(estimated ? { estimated: true } : {}),
   };
 }

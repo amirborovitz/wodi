@@ -209,5 +209,9 @@
   "pageMaxPractices": [
     false,
     false
+  ],
+  "pageTypes": [
+    "EMOM",
+    "FOR TIME"
   ]
 }

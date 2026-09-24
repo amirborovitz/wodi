@@ -4,6 +4,7 @@ import type { StoryExerciseResult } from './types';
 import type { MeasurementUnit } from '../../../types';
 import { StepperInput } from './StepperInput';
 import styles from './MinorInputs.module.css';
+import { coreTabataDoseSeconds, formatDoseMinutes, TABATA_PROTOCOL_LABEL } from '../../../utils/coreTabata';
 
 // ═══════════════════════════════════════════════════════════════════
 // DurationInput — seconds stepper + quick-pick chips
@@ -174,3 +175,39 @@ export function NoteInput({ result, onChange }: NoteInputProps) {
   );
 }
 
+
+// ═══════════════════════════════════════════════════════════════════
+// FixedDoseInput — for a block whose DOSE is the whole record
+// For: core tabata. Nothing is collected here, on purpose.
+// ═══════════════════════════════════════════════════════════════════
+
+interface FixedDoseInputProps {
+  result: StoryExerciseResult;
+}
+
+/**
+ * The screen a core tabata gets: the four minutes, stated, and nothing to type.
+ *
+ * It still exists rather than being skipped, because the athlete is the only one who knows
+ * whether they actually did the cash-out — "Mark as done" and the skip path in the wizard
+ * footer are the two answers this screen takes, and both are already there.
+ *
+ * The movement list under the dose is the board's own, shown so the athlete can see what Wodi
+ * read. It is absent when the coach named nothing, which is the honest rendering of a board
+ * that said only "Core TABATA" — never a placeholder movement standing in for one.
+ */
+export function FixedDoseInput({ result }: FixedDoseInputProps) {
+  const seconds = coreTabataDoseSeconds(result.exercise);
+  const named = (result.exercise.movements ?? [])
+    .map((movement) => movement.name?.trim())
+    .filter((name): name is string => !!name && !/^cash[- ]?out/i.test(name));
+
+  return (
+    <div className={styles.center}>
+      <div className={styles.doseEyebrow}>Nothing to log</div>
+      <div className={styles.doseValue}>{formatDoseMinutes(seconds)}</div>
+      <div className={styles.doseProtocol}>{TABATA_PROTOCOL_LABEL}</div>
+      {named.length > 0 && <p className={styles.doseBoard}>{named.join(' · ')}</p>}
+    </div>
+  );
+}

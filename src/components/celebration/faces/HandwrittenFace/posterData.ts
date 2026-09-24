@@ -20,6 +20,7 @@ import type { PeakLoad } from '../../movementResolution';
 import { movementNameTokens } from '../../../../utils/movementNameMatch';
 import { timeCapLabelFromText } from '../../../../utils/timeCap';
 import { blockCadence, formatCadenceTitle } from '../../../../utils/blockClock';
+import { isTabataBlock, isCoreTabataBlock } from '../../../../utils/coreTabata';
 import { isMaxEffortPractice } from '../../mainPart';
 import { parseSourceDate } from '../../../../utils/workoutDate';
 import { prescribesUnbrokenMax } from '../../../logging/story/types';
@@ -328,7 +329,7 @@ function isCadenceCoveredByFormat(
   return format !== normalized && format.endsWith(normalized);
 }
 
-function mapFormatToType(format: string | undefined): string {
+export function mapFormatToType(format: string | undefined): string {
   switch (format) {
     case 'for_time':        return 'FOR TIME';
     case 'amrap':           return 'AMRAP';
@@ -551,8 +552,14 @@ function dedupeAmrapFormat(
 }
 
 function explicitTimeCapSub(exercise: CelebrationData['exercises'][number] | undefined, rawText?: string): string {
-  const source = `${exercise?.name ?? ''} ${exercise?.prescription ?? ''} ${rawText ?? ''}`;
-  return timeCapLabelFromText(source) ?? '';
+  // The block's OWN words first. The session-wide rawText is a last resort and only when this
+  // part carries no text of its own to read — on a multi-part board it holds every part's cap
+  // at once, and part B's "< 12 minutes T.C. >" printed itself on part C's page, a cash-out
+  // with no cap at all. Same scoping extractAmrapMinutes above is written to, for the same
+  // reason: a sibling's clock is not this page's.
+  const own = `${exercise?.name ?? ''} ${exercise?.prescription ?? ''} ${exercise?.rawText ?? ''}`;
+  if (own.trim()) return timeCapLabelFromText(own) ?? '';
+  return timeCapLabelFromText(rawText ?? '') ?? '';
 }
 
 // Totals shown in the brand strip: REPS · EFFORT · KM/CAL
@@ -1156,6 +1163,42 @@ function formatAlternatingStationClock(exercise: Exercise): { title: string } | 
   return cadence ? { title: formatCadenceTitle(cadence) } : undefined;
 }
 
+/**
+ * Which format a carousel PAGE wears — the badge on the card, and the branch every line under
+ * it follows (the clock, the format line, the hero's caption).
+ *
+ * This page's own piece, never the session's. A session carries one format word and a board
+ * carries several pieces: Part A's EMOM must not stamp Part B's metcon, which is the whole
+ * reason this exists rather than reading `data.workoutFormat`.
+ *
+ * Exported so the poster harness can pin it. It could not before — the harness reaches the
+ * poster through `buildResultLabel`, which takes the SESSION format, so the per-page badge was
+ * the one thing on the card no fixture could see. That blind spot is how a core tabata shipped
+ * wearing its sibling metcon's "FOR TIME".
+ */
+export function posterPageFormat(
+  exercise: Exercise,
+  sessionFormat: string | undefined,
+  isStrengthPage: boolean,
+): string {
+  if (isStrengthPage) return 'strength';
+  // TABATA is a format no loggingMode can carry: the parser folds tabata into 'intervals' at the
+  // exercise level, so the word survives only on the session. Read off the CLOCK instead, which
+  // is where the protocol actually lives — and ahead of the loggingMode list below, because that
+  // list would answer 'intervals' for the very same block.
+  if (isTabataBlock(exercise)) return 'tabata';
+  const ex = exercise as unknown as Record<string, unknown>;
+  const loggingMode = ex['loggingMode'] as string | undefined;
+  if (loggingMode === 'for_time' || loggingMode === 'amrap' || loggingMode === 'amrap_intervals'
+    || loggingMode === 'strength' || loggingMode === 'free') return loggingMode;
+  // The two modes the list above leaves out. They used to fall straight past here and inherit the
+  // SESSION's format — mapFormatToType has always known both words, this list simply never
+  // handed them over.
+  if (loggingMode === 'intervals' || loggingMode === 'emom') return loggingMode;
+  if (ex['type'] === 'strength') return 'strength';
+  return sessionFormat ?? 'for_time';
+}
+
 export function buildPosterWodFromPage(
   data: CelebrationData,
   pageIndex: number,
@@ -1172,17 +1215,8 @@ export function buildPosterWodFromPage(
 
   const date = data.workoutDate;
 
-  // Prefer the exercise's own loggingMode/type over the whole workout's format.
-  // This prevents Part A's "emom" format from stamping Part B's METCON card.
-  const ex = page.exercise as unknown as Record<string, unknown>;
-  const exLoggingMode = ex['loggingMode'] as string | undefined;
-  const exType = ex['type'] as string | undefined;
-  const exFmt: string = page.isStrength
-    ? 'strength'
-    : exLoggingMode === 'for_time' || exLoggingMode === 'amrap' || exLoggingMode === 'amrap_intervals' || exLoggingMode === 'strength' || exLoggingMode === 'free'
-      ? exLoggingMode
-      : exType === 'strength' ? 'strength'
-      : data.workoutFormat ?? 'for_time';
+  // This page's own piece decides its format, never the whole workout's — see posterPageFormat.
+  const exFmt: string = posterPageFormat(page.exercise, data.workoutFormat, page.isStrength);
 
   // A practice scored by a max test is neither a format nor a load story, so neither the
   // session's format ("FOR TIME", inherited from a sibling metcon) nor "STRENGTH" describes it.
@@ -1313,6 +1347,9 @@ export function buildPosterWodFromPage(
 
   const resultLabel = (() => {
     if (strengthTopSet) return 'TOP SET';
+    // "MY TIME" would read as a time the athlete raced — this is a dose, fixed before they
+    // started. What they did is core work, and how much of it is the four minutes beside it.
+    if (isCoreTabataBlock(page.exercise)) return 'CORE WORK';
     // A max is not a total. "TOTAL REPS" over a single tested set both misstates what the number
     // is and reads as a second, different fact beside the row that already says "Max Toes to Bar".
     if (isMaxPractice) return prescribesUnbrokenMax(page.exercise) ? 'MAX UNBROKEN' : 'MAX REPS';

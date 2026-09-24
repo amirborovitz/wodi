@@ -263,5 +263,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "EMOM"
   ]
 }

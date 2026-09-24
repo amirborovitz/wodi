@@ -192,5 +192,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "INTERVALS"
   ]
 }

@@ -279,5 +279,9 @@
   "pageMaxPractices": [
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "FOR TIME"
   ]
 }

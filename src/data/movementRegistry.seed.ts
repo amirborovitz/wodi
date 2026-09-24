@@ -187,6 +187,10 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   // ── Core ───────────────────────────────────────────────────────────────────
   // Midline accessories nobody names individually. One "CORE" row beats six rows
   // of 30. Sit-ups keep their own family — those people do brag about.
+  // The family's own name, as a movement. A board that programmes "Core" without naming a
+  // drill ("Cash out — Core TABATA") is stating midline work and nothing finer, and the row it
+  // earns is the Core row. No variant: there is no flavour to sub-line, which is the point.
+  { canonicalName: 'Core', family: 'core', aliases: ['midline', 'abs', 'core work'] },
   { canonicalName: 'Russian Twist', family: 'core', variant: 'Russian Twist' },
   { canonicalName: 'Bicycle Crunch', family: 'core', variant: 'Bicycle Crunch' },
   { canonicalName: 'Hollow Rock', family: 'core', variant: 'Hollow Rock' },

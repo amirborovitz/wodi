@@ -249,5 +249,10 @@
     false,
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "STRENGTH",
+    "FOR TIME"
   ]
 }

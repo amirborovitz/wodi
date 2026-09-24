@@ -251,5 +251,10 @@
     false,
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "AMRAP",
+    "STRENGTH"
   ]
 }

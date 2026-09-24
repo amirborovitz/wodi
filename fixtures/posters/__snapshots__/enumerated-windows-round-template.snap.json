@@ -244,5 +244,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "AMRAP"
   ]
 }

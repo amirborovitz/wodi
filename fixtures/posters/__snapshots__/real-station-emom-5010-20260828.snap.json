@@ -307,5 +307,9 @@
   "pageMaxPractices": [
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "EMOM"
   ]
 }

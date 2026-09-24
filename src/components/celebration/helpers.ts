@@ -56,6 +56,8 @@ import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit } from '../../utils/loadUnits';
 import { readRepsDisplay } from '../../utils/repsDisplay';
+import { isCoreTabataBlock, coreTabataDoseSeconds, doseMinutes, TABATA_PROTOCOL_LABEL } from '../../utils/coreTabata';
+import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 
 
 // Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
@@ -1435,12 +1437,13 @@ function buildCelebrationMovementRow(params: {
     // midpoint in `reps` only feeds totals. Read through readRepsDisplay so a doc saved before
     // the parser validated the field can't print its either/or echo ("4 / 8") as a rep count.
     primary = readRepsDisplay({ repsDisplay: prescribed?.repsDisplay, alternative: prescribed?.alternative }) ?? `${perRoundReps}`;
-    if (hasWeight) {
-      if (totalReps && totalReps > 0) subNoteParts.push(totalLabel(totalReps));
-      accent = 'yellow';
-    } else if (totalReps && totalReps !== perRoundReps) {
-      subNoteParts.push(totalLabel(totalReps));
-    }
+    // Carrying a load decides this row's COLOUR. It must not also decide whether the row states
+    // a total: a total equal to the per-round count is the same number printed twice, and a
+    // kettlebell row is no more in need of that repetition than a burpee row beside it. A
+    // one-round chipper ("50 Burpees / 50 KB SDHP / 50 Goblet Squats") printed "50 TOTAL" on the
+    // two weighted lines and nothing on the burpee — the same fact, told inconsistently.
+    if (totalReps && totalReps !== perRoundReps) subNoteParts.push(totalLabel(totalReps));
+    if (hasWeight) accent = 'yellow';
   } else if (hasWeight) {
     primary = `${weight}${unitUpper}`;
     accent = 'yellow';
@@ -2709,6 +2712,35 @@ export function buildPageArtifactSections(
     ? exercise.sections.flatMap((section) => section.movements || [])
     : (exercise.movements || [])).length > 0;
   if ((!movements || movements.length === 0) && !hasPrescribedMovements) return [];
+
+  // A core tabata's page is the protocol and the board, and nothing else.
+  //
+  // Its dose already headlines the card (see computeHeroResult), so a row restating it would put
+  // the same fact on the page twice — and the generic builder restates it in the WRONG words:
+  // the timed-hold branch reads the block's seconds and prints "3:50 Core", the honest clock
+  // arguing with the four minutes above it. The protocol goes in the blueprint, where every
+  // other block's clock goes.
+  //
+  // Rows are the movements the COACH named, with no quantities against them, because there are
+  // none — the athlete was asked for nothing. A board that named no drill ("Cash out - Core
+  // TABATA") gets no rows at all, which is the honest rendering of what it said.
+  if (isCoreTabataBlock(exercise)) {
+    return [{
+      eyebrow: 'WOD',
+      title: exercise.name,
+      blueprint: TABATA_PROTOCOL_LABEL,
+      rows: (exercise.movements ?? [])
+        .filter((movement) => !!movement.name?.trim())
+        .map((movement): ArtifactRow => ({
+          primary: '',
+          // "Cash-out: Core" is the board's placement written into the movement's name. The page
+          // already IS the cash-out, so the row states the movement: "Core".
+          name: stripMovementRolePrefix(movement.name),
+          accent: 'cyan',
+        })),
+      hiddenCount: 0,
+    }];
+  }
 
   // Ascending-ladder AMRAP: render the climb as a single bar-chart track, never a flat "2→12"
   // range or movement names repeated once per round
@@ -3997,6 +4029,24 @@ export function computeHeroResult(
 
   if (isPR && prWeight) {
     return { value: `${prWeight}`, unit: 'KG PR', subtitle: prMovementName?.toUpperCase(), formatLine, storyLine, storyMovements: buildStory(1), accentClass: 'accentGold' };
+  }
+
+  // A core tabata's DOSE is its result — four minutes, which is the only true number this page
+  // has. Ahead of every branch below because all of them look for something logged, and nothing
+  // was: the athlete is asked for nothing (see utils/coreTabata). Left to fall through, the page
+  // landed on the session's EP or, worse, on the fabricated rep count that started this.
+  //
+  // The protocol replaces the format line for the same reason the badge says TABATA: "8 × 20/10"
+  // is the whole structure of the piece, and no other line on the card can state it.
+  if (!isMixed && isCoreTabataBlock(exercises[0])) {
+    return {
+      value: `${doseMinutes(coreTabataDoseSeconds(exercises[0]))}`,
+      unit: 'MIN',
+      formatLine: TABATA_PROTOCOL_LABEL,
+      storyLine,
+      storyMovements: buildStory(1),
+      accentClass: 'accentMagenta',
+    };
   }
 
   // Free/unclassified part: the hero is exactly what the athlete entered — whichever score

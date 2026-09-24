@@ -22,8 +22,6 @@
             "name": "Alt American Kettlebell Swings",
             "nameWithLoad": "Alt American Kettlebell Swings @ 20kg",
             "loadNote": "20kg",
-            "subNote": "100 total",
-            "totalNote": "100 total",
             "mineKey": "Alt American Kettlebell Swing",
             "accent": "yellow",
             "repeatCount": 1,
@@ -53,8 +51,6 @@
             "name": "Goblet Lunges",
             "nameWithLoad": "Goblet Lunges @ 20kg",
             "loadNote": "20kg",
-            "subNote": "100 total",
-            "totalNote": "100 total",
             "mineKey": "Goblet Lunge",
             "accent": "yellow",
             "repeatCount": 1,
@@ -201,8 +197,7 @@
           "load": "",
           "mine": "20kg",
           "team": "50",
-          "isPartnerShare": true,
-          "total": "100 total"
+          "isPartnerShare": true
         },
         {
           "kind": "line",
@@ -226,8 +221,7 @@
           "load": "",
           "mine": "20kg",
           "team": "50",
-          "isPartnerShare": true,
-          "total": "100 total"
+          "isPartnerShare": true
         },
         {
           "kind": "line",
@@ -276,5 +270,9 @@
   "pageMaxPractices": [
     false,
     false
+  ],
+  "pageTypes": [
+    "FOR TIME",
+    "FOR TIME"
   ]
 }

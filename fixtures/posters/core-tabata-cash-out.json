@@ -1,0 +1,57 @@
+{
+  "name": "core-tabata-cash-out",
+  "description": "BURN, 2026-09-24. A metcon and a bare 'Cash out - Core TABATA'. The tabata page must wear its OWN badge (TABATA, not the session's FOR TIME), must not inherit the metcon's 12-minute cap, and must hero the four-minute dose rather than a rep count nobody counted.",
+  "workout": {
+    "rawText": "B. METCON (Short-Medium)\nFor time:\n50 Burpee\n50 Kettlebell Sumo Deadlift High Pull\n50 Goblet Squat\nWEIGHT: 16/24kg\n< 12 minutes T.C. >\n\nC. Cash out - Core TABATA",
+    "format": "for_time",
+    "timeCap": 720,
+    "exercises": [
+      {
+        "id": "ex-1",
+        "name": "Chipper For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "prescription": "For time: 50 Burpees, 50 Kettlebell Sumo Deadlift High Pulls, 50 Goblet Squats. Weight: 16/24kg. 12 minute time cap.",
+        "rawText": "B. METCON (Short-Medium)\nFor time:\n50 Burpee\n50 Kettlebell Sumo Deadlift High Pull\n50 Goblet Squat\nWEIGHT: 16/24kg\n< 12 minutes T.C. >",
+        "sets": [
+          { "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 150, "weight": 22, "time": 720 }
+        ],
+        "rxWeights": { "male": 24, "female": 16, "unit": "kg" },
+        "movements": [
+          { "name": "Burpee", "reps": 50, "inputType": "none", "equipment": "none" },
+          { "name": "Kettlebell Sumo Deadlift High Pull", "reps": 50, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "rxWeights": { "male": 24, "female": 16, "unit": "kg" } },
+          { "name": "Goblet Squat", "reps": 50, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "rxWeights": { "male": 24, "female": 16, "unit": "kg" } }
+        ]
+      },
+      {
+        "id": "ex-2",
+        "name": "Core Tabata",
+        "type": "wod",
+        "loggingMode": "intervals",
+        "prescription": "Cash out - Core TABATA",
+        "rawText": "C. Cash out - Core TABATA",
+        "isSecondary": true,
+        "partKind": "accessory",
+        "intervalCount": 8,
+        "workDuration": 160,
+        "restDuration": 80,
+        "intervalSeconds": 20,
+        "intervalRestSeconds": 10,
+        "sets": [],
+        "movements": [
+          { "name": "Cash-out: Core", "inputType": "none", "equipment": "none", "role": "cash_out" }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Burpee", "exerciseIndex": 0, "totalReps": 50, "color": "magenta" },
+        { "name": "Kettlebell Sumo Deadlift High Pull", "exerciseIndex": 0, "totalReps": 50, "weight": 22, "unit": "kg", "color": "yellow" },
+        { "name": "Goblet Squat", "exerciseIndex": 0, "totalReps": 50, "weight": 22, "unit": "kg", "color": "yellow" },
+        { "name": "Core", "exerciseIndex": 1, "totalTime": 230 }
+      ],
+      "grandTotalReps": 150,
+      "grandTotalVolume": 2200
+    }
+  }
+}

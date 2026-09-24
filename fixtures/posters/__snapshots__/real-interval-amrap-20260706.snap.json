@@ -274,5 +274,10 @@
     false,
     false,
     false
+  ],
+  "pageTypes": [
+    "EMOM",
+    "AMRAP",
+    "WOD"
   ]
 }

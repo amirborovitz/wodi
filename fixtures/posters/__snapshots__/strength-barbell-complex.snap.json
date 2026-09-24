@@ -107,5 +107,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "STRENGTH"
   ]
 }

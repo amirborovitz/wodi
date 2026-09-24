@@ -1,0 +1,170 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Chipper For Time",
+        "blueprint": "For time (12 MIN CAP)",
+        "rows": [
+          {
+            "primary": "50",
+            "name": "Burpees",
+            "mineKey": "Burpee",
+            "accent": "magenta",
+            "repeatCount": 1
+          },
+          {
+            "primary": "50",
+            "name": "Kettlebell Sumo Deadlift High Pulls",
+            "nameWithLoad": "Kettlebell Sumo Deadlift High Pulls @ 22kg",
+            "loadNote": "22kg",
+            "mineKey": "Kettlebell Sumo Deadlift High Pull",
+            "accent": "yellow",
+            "repeatCount": 1
+          },
+          {
+            "primary": "50",
+            "name": "Goblet Squats",
+            "nameWithLoad": "Goblet Squats @ 22kg",
+            "loadNote": "22kg",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow",
+            "repeatCount": 1
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Core Tabata",
+        "blueprint": "Tabata · 8 × 20/10",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Core",
+            "accent": "cyan"
+          }
+        ],
+        "hiddenCount": 0
+      }
+    ]
+  ],
+  "hero": {
+    "value": "12:00",
+    "unit": "MIN",
+    "formatLine": "For Time",
+    "storyLine": "50 burpee · 50 kettlebell sumo deadlift high pull · 50 goblet squat",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CHIPPER FOR TIME",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "50",
+        "name": "Burpee",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "50",
+        "name": "Kettlebell Sumo Deadlift High Pull",
+        "total": "",
+        "color": "yellow",
+        "weight": 22,
+        "unit": "kg"
+      },
+      {
+        "perRound": "50",
+        "name": "Goblet Squat",
+        "total": "",
+        "color": "yellow",
+        "weight": 22,
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CORE TABATA",
+        "sectionColor": "magenta"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "12:00",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "For time (12 MIN CAP)"
+        },
+        {
+          "kind": "line",
+          "rx": "50 Burpees",
+          "load": "",
+          "mine": "",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 Kettlebell Sumo Deadlift High Pulls",
+          "load": "",
+          "mine": "22kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "50 Goblet Squats",
+          "load": "",
+          "mine": "22kg",
+          "team": ""
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "CORE TABATA",
+          "cap": "Tabata · 8 × 20/10"
+        },
+        {
+          "kind": "line",
+          "rx": "Core",
+          "load": "",
+          "mine": "",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ],
+  "pageTypes": [
+    "FOR TIME",
+    "TABATA"
+  ]
+}

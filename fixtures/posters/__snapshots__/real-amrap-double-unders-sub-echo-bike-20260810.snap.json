@@ -228,5 +228,9 @@
   "pageMaxPractices": [
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "AMRAP"
   ]
 }

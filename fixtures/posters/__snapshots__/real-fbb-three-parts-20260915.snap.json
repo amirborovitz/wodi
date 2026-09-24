@@ -284,5 +284,10 @@
     false,
     false,
     false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "STRENGTH",
+    "EMOM"
   ]
 }

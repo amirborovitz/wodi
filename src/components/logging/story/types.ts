@@ -13,6 +13,7 @@ import { findOpenMovement, findOpenMovements, scoresOpenReps, hasMaxSet } from '
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
 import { isRowErgName, matchesNamePattern } from '../../../utils/movementNameMatch';
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
+import { isCoreTabataBlock } from '../../../utils/coreTabata';
 import { asksImplementCount } from './implementQuestion';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
@@ -33,6 +34,12 @@ export type ExerciseKind =
   // still demanded a rounds count the board never had. See services/blockScore.
   | 'score_open_reps'
   | 'intervals'        // EMOM / every X:XX — cadence + sets completed
+  // The block's DOSE is the whole record — there is no number the athlete could bring. A core
+  // tabata is the case: the protocol fixes the four minutes, and nobody counts flutter kicks.
+  // Its own kind rather than a flag, because every question downstream ("what input renders?",
+  // "is this part logged?", "what's missing before save?", "what noun does it score in?") reads
+  // the kind, and a flag would leave one of them still asking for reps. See utils/coreTabata.
+  | 'fixed_dose'
   | 'free_score'       // unrecognized shape — user picks what they scored (time/rounds/reps/load)
   | 'note';            // fallback — free text
 
@@ -828,6 +835,14 @@ export function createBlankResult(
   if (kind === 'load' && hasMaxSet(exercise)) {
     const fromScheme = rps && rps.length > 0 ? rps.length + 1 : 0;
     setsTotal = Math.max(setsTotal, exercise.suggestedSets ?? 0, fromScheme);
+  }
+
+  // A block whose dose IS its record stops here, before any input is built. Nothing below this
+  // line has a question to ask: no sets to step through, no movement tiles, no score. The
+  // athlete still gets the screen (every part does) — it just states the four minutes and moves
+  // on. See utils/coreTabata for why a core tabata is that block.
+  if (isCoreTabataBlock(exercise)) {
+    return { kind: 'fixed_dose', exerciseIndex: index, exercise, setsTotal: 1 };
   }
 
   const base: StoryExerciseResult = {

@@ -3,7 +3,6 @@
     {
       "eyebrow": "WOD",
       "title": "Pairs AMRAP 14",
-      "blueprint": "5 rounds",
       "structureNote": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
       "rows": [
         {
@@ -67,7 +66,6 @@
       {
         "eyebrow": "WOD",
         "title": "Pairs AMRAP 14",
-        "blueprint": "5 rounds",
         "structureNote": "In pairs — P1 runs 200m while P2 AMRAPs; swap each run, continue where you stopped",
         "rows": [
           {
@@ -174,11 +172,6 @@
   "posterRows": {
     "reward": [
       {
-        "kind": "block",
-        "label": "",
-        "cap": "5 rounds"
-      },
-      {
         "kind": "line",
         "rx": "6 Twin Kettlebell Hang Power Cleans",
         "load": "",
@@ -221,11 +214,6 @@
     ],
     "pages": [
       [
-        {
-          "kind": "block",
-          "label": "",
-          "cap": "5 rounds"
-        },
         {
           "kind": "line",
           "rx": "6 Twin Kettlebell Hang Power Cleans",
@@ -280,5 +268,8 @@
   ],
   "pageMaxPractices": [
     false
+  ],
+  "pageTypes": [
+    "AMRAP"
   ]
 }
