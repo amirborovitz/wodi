@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.2.1 — Pick the photo, then say something about it
+
+The composer asked for everything at once — caption, photo, workout, all on one scroll — and it
+opened on a photo-shaped hole that filled half the screen before you had chosen anything. Posting
+starts with the picture, so the first screen is the picture and nothing else: your recent shots, a
+big preview, **Next**. The caption and the workout rail come after, on a screen where the card is
+already assembled and the only question left is what to add to it.
+
+Going back loses nothing. And if you came in from a poster's **Share**, the workout rides along and
+says so on the preview, so you are never wondering whether it made the trip.
+
+One fix worth naming: a card in the workout rail used to stretch to fit its own name, so a board
+line like *"PARTNER 16 ROUNDS FOR TIME (8 EACH)"* turned the rail into two enormous cards. Cards
+now say what kind of session it was, and the day above and the result below are what tell them
+apart.
+
+
 ## v0.2.0 — Post the photo. Chase the name. Stop counting flutter kicks.
 
 Three things you can do now that you couldn't, and one question Wodi has stopped asking.
