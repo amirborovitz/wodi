@@ -10,13 +10,12 @@
  * no "also post to feed" toggle anywhere, because a toggle is a second way to
  * do the same thing and the two always drift.
  *
- * PHOTO FIRST, AND IT IS ONE SCROLL
- * Not a form with a tray of buttons that open sheets. The preview sits at the
- * top, the workout rail and the photo grid are underneath it, and you get to
- * all of it by scrolling — the shape of a camera roll rather than the shape of
- * a questionnaire. Nothing opens over anything, so there is never a decision
- * about what to dismiss first. The caption comes last and stays one line,
- * because it is the smallest part of the post.
+ * TWO STEPS: PICK, THEN POST
+ * Tapping "+" opens a photo picker, not a blank form — the photo is the post,
+ * so choosing it is the whole of the first screen and nothing else competes
+ * with it. Next moves to the caption and the workout rail, and Back returns
+ * without losing anything: the draft lives out here, above both steps, so
+ * moving between them is navigation rather than a save.
  *
  * WHY IT IS A PORTAL AND NOT A SCREEN
  * It opens from inside the celebration screen, which wraps everything in a
@@ -36,14 +35,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { PhotoGrid } from './PhotoGrid';
-import { PostBody } from './PostBody';
+import { ComposerDetails } from './ComposerDetails';
+import { ComposerPick } from './ComposerPick';
 import { SelfieCamera } from './SelfieCamera';
-import { WodRail } from './WodRail';
 import { useWorkouts } from '../../hooks/useWorkouts';
 import { useFeedComposer } from '../../hooks/useFeedComposer';
 import type { ComposerWod } from '../../hooks/useFeedComposer';
-import { CAPTION_MAX } from '../../services/feed/types';
 import styles from './FeedComposer.module.css';
 
 /** Sessions offered in the rail. Older ones are a Gallery trip, not a scroll. */
@@ -76,6 +73,7 @@ export function FeedComposer(props: FeedComposerProps): React.ReactElement {
 
 function ComposerBody({ initialWod, onClose, onPosted }: FeedComposerProps): React.ReactElement {
   const { workouts, loading: loadingWorkouts } = useWorkouts(RAILED);
+  const [step, setStep] = useState<'pick' | 'details'>('pick');
   const [cameraOpen, setCameraOpen] = useState(false);
   const libraryRef = useRef<HTMLInputElement>(null);
   // Frozen for the life of the composer. The trained line has to stay put while
@@ -86,7 +84,7 @@ function ComposerBody({ initialWod, onClose, onPosted }: FeedComposerProps): Rea
   const draft = useFeedComposer(initialWod ?? null, onPosted);
 
   // The composer covers the screen, so the page under it must not scroll with
-  // it — otherwise reaching the end of the grid keeps going and the feed moves
+  // it — otherwise reaching the end of the roll keeps going and the feed moves
   // behind a screen nobody can see it through.
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -110,85 +108,27 @@ function ComposerBody({ initialWod, onClose, onPosted }: FeedComposerProps): Rea
       exit={{ y: '100%' }}
       transition={{ type: 'spring', stiffness: 400, damping: 40 }}
     >
-      <header className={styles.header}>
-        <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-            <line x1="6" y1="6" x2="18" y2="18" />
-            <line x1="18" y1="6" x2="6" y2="18" />
-          </svg>
-        </button>
-        <h1 className={styles.headerTitle}>New post</h1>
-        <button
-          type="button"
-          className={styles.postButton}
-          disabled={!draft.canPost || draft.posting}
-          onClick={draft.publish}
-        >
-          {draft.posting ? 'Posting…' : 'Post'}
-        </button>
-      </header>
-
-      <div className={styles.scroll}>
-        <div className={styles.top}>
-          {draft.photo ? (
-            // The same renderer the feed card uses — what is approved here is
-            // literally the post, not an impression of it.
-            <PostBody
-              poster={draft.wod?.payload}
-              trained={draft.wod?.trained}
-              photoUrl={draft.photo.url}
-              now={now}
-            />
-          ) : (
-            <div className={styles.placeholder}>pick a photo to start</div>
-          )}
-
-          {/* One line, under the picture, unlabelled. A caption is the extra on
-              top of a post, and a multi-line box at the top of the screen asked
-              for an essay before the athlete had even chosen a photo. */}
-          <input
-            type="text"
-            className={styles.caption}
-            value={draft.text}
-            maxLength={CAPTION_MAX}
-            placeholder="Add a caption"
-            aria-label="Add a caption"
-            onChange={(e) => draft.setText(e.target.value.slice(0, CAPTION_MAX))}
-          />
-        </div>
-
-        <WodRail
-          workouts={workouts}
-          loading={loadingWorkouts}
-          attachedId={draft.wod?.workoutId}
-          now={now}
-          onToggle={draft.toggleWod}
-        />
-
-        <PhotoGrid
-          photos={draft.photos}
-          selectedId={draft.photo?.id}
-          onSelect={draft.selectPhoto}
+      {step === 'pick' ? (
+        <ComposerPick
+          draft={draft}
+          onClose={onClose}
+          onNext={() => setStep('details')}
           onOpenCamera={() => setCameraOpen(true)}
           onOpenLibrary={openLibrary}
         />
+      ) : (
+        <ComposerDetails
+          draft={draft}
+          workouts={workouts}
+          loadingWorkouts={loadingWorkouts}
+          now={now}
+          onBack={() => setStep('pick')}
+        />
+      )}
 
-        {draft.error && <p className={styles.error} role="alert">{draft.error}</p>}
-
-        <p className={styles.window}>
-          Visible for 24 hours
-          {draft.explain && (
-            <span className={styles.explain}>
-              {' · '}anyone on Wodi can see this until then, and the feed keeps a copy —
-              editing the workout later won&apos;t change what&apos;s posted.
-            </span>
-          )}
-        </p>
-      </div>
-
-      {/* Multi-select, because the grid above is only as much of a roll as the
-          athlete hands it — see PhotoGrid. The camera is Wodi's own; see
-          SelfieCamera for why the OS one had to go. */}
+      {/* Multi-select, because the grid the athlete scrolls is only as much of a
+          roll as they have handed over — see ComposerPick. The camera is Wodi's
+          own; see SelfieCamera for why the OS one had to go. */}
       <input
         ref={libraryRef}
         type="file"

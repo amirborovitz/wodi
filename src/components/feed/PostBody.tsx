@@ -7,19 +7,24 @@
  * composed its preview by hand and the card composed it again, and the two
  * drifted the moment either changed.
  *
- * THREE SHAPES, DECIDED BY WHAT IS ATTACHED
+ * THE PHOTO ALWAYS LEADS
  *
- *   workout        → the poster, full size. It is the artifact; nothing should
- *                    be in front of it.
  *   photo          → the photo. A shot of the whiteboard or the 6am crew is a
  *                    post in its own right.
  *   photo + workout→ the photo leads and the workout becomes a WodTicket in the
  *                    same skin, lifted over the photo's bottom edge. Two full
  *                    artifacts stacked would make one post as tall as two and
- *                    bury whichever the athlete cared about.
+ *                    bury whichever the athlete cared about. The full poster
+ *                    lives in the Gallery; here it rides the photo.
  *
- * Both of them tap through to the full-size version, which is what lets the
- * card be a card.
+ * Either one taps through to the full-size version, which is what lets the card
+ * be a card.
+ *
+ * The bare-poster branch below is NOT a third shape the composer can produce —
+ * every post has a photo now. It is there for posts written before that was
+ * true and still inside the 24h window, which would otherwise render as an
+ * empty card. It stops being reachable on its own a day after this ships, and
+ * can go then.
  */
 
 import { useState } from 'react';

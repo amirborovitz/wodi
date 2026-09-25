@@ -1,22 +1,19 @@
-.section {
-  margin-top: 18px;
-}
-
 .heading {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 14px 9px;
+  padding: 18px 14px 9px;
 }
 
+/* Spoken, not an eyebrow. An uppercase tracked-out label reads as a section of
+   a form; this is an offer, and the word beside it is what makes it one. */
 .title {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.14em;
-  color: var(--wodi-dim);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--wodi-white);
 }
 
 .optional {
@@ -56,7 +53,10 @@
   display: flex;
   flex-direction: column;
   padding: 9px 10px 10px;
-  border: none;
+  /* A hairline on every card, not only the attached one: half these skins are
+     dark and sit on a dark screen, and without it a card's edge is wherever its
+     text happens to stop. */
+  border: 1px solid var(--wodi-line2);
   border-radius: 12px;
   background: var(--card-bg);
   text-align: left;
@@ -65,8 +65,9 @@
 }
 
 .cardAttached {
-  outline: 2.5px solid var(--wodi-yellow);
-  outline-offset: -2.5px;
+  border-color: var(--wodi-yellow);
+  outline: 1.5px solid var(--wodi-yellow);
+  outline-offset: -1.5px;
 }
 
 .day {
@@ -75,8 +76,11 @@
   color: var(--card-dim);
 }
 
+/* The right padding is the check badge's lane — without it a long name
+   ellipsises underneath the tick on the card that is actually attached. */
 .name {
   margin-top: 2px;
+  padding-right: 16px;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 800;

@@ -32,9 +32,9 @@ interface WodRailProps {
 
 export function WodRail({ workouts, loading, attachedId, now, onToggle }: WodRailProps): React.ReactElement {
   return (
-    <section className={styles.section}>
+    <section>
       <div className={styles.heading}>
-        <h2 className={styles.title}>ATTACH A WORKOUT</h2>
+        <h2 className={styles.title}>Attach a workout</h2>
         {/* Said out loud, because the composer is photo-first and an athlete
             who has only ever posted from a poster will assume otherwise. */}
         <span className={styles.optional}>optional</span>

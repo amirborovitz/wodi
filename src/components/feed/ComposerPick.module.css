@@ -1,0 +1,227 @@
+/* ── Nothing handed over yet (on the web, the opening position) ─────────── */
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 0 32px 80px;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--wodi-white);
+}
+
+.emptyButtons {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.emptyButton {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 96px;
+  border: none;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The camera leads. A post is usually about the thing that just happened in
+   the room you are standing in. */
+.emptyPrimary {
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+}
+
+.emptyButton svg {
+  width: 22px;
+  height: 22px;
+}
+
+.emptyAttached {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--wodi-dim2);
+}
+
+/* ── The chosen shot ────────────────────────────────────────────────────── */
+
+/* Fixed share of the screen so the roll below always has room — a preview that
+   sized to the photo would push the grid off on a portrait shot, on the one
+   screen whose job is scrolling that grid. */
+.preview {
+  position: relative;
+  flex-shrink: 0;
+  height: 44%;
+  background: #000;
+}
+
+/* `contain`, not `cover`: this step is choosing WHICH photo, so it shows the
+   whole frame. The next step shows how it will actually land. */
+.previewImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.attached {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--wodi-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachedIcon {
+  display: flex;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--wodi-yellow);
+}
+
+.attachedIcon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── The roll ───────────────────────────────────────────────────────────── */
+
+.rollHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 14px 10px;
+}
+
+.rollTitle {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--wodi-white);
+}
+
+.rollButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wodi-white);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rollCamera {
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+}
+
+.rollButton svg {
+  width: 100%;
+  height: 100%;
+}
+
+.rollScroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.rollScroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Four across and 2px gutters — a roll, not a row of cards. Rounding the tiles
+   would make each one look like a thing rather than a frame of the same roll. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding-bottom: calc(30px + var(--safe-bottom));
+}
+
+.thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Dimmed rather than outlined: the badge already says which one it is, and an
+   outline on a 4-up grid of photos reads as a border on the picture itself. */
+.thumbSelected .thumbImage {
+  opacity: 0.55;
+}
+
+.thumbImage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+}
+
+.check svg {
+  width: 100%;
+  height: 100%;
+}

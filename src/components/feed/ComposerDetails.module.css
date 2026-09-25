@@ -1,0 +1,68 @@
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 4px 0 calc(30px + var(--safe-bottom));
+}
+
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Narrower than the column it sits in, on purpose. The card is 4:5 plus a
+   ticket, so at full width it is taller than the screen and the caption and the
+   rail fall off the bottom — the two things this step exists to collect. It
+   reads as a preview at this size rather than as the post itself, which is also
+   the honest thing for it to be. */
+.preview {
+  width: 72%;
+  margin-inline: auto;
+}
+
+.captionRow {
+  padding: 0 14px;
+}
+
+.caption {
+  width: 100%;
+  height: 44px;
+  margin-top: 16px;
+  border: none;
+  border-bottom: 1px solid var(--wodi-line2);
+  background: none;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--wodi-white);
+}
+
+.caption::placeholder {
+  color: var(--wodi-dim2);
+}
+
+.caption:focus {
+  border-bottom-color: var(--wodi-yellow);
+}
+
+.error {
+  margin: 16px 14px 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ff8a8a;
+}
+
+.window {
+  margin: 20px 14px 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--wodi-dim);
+}
+
+.explain {
+  color: var(--wodi-dim2);
+}

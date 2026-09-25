@@ -62,7 +62,7 @@ export function useComposerWod(workout: WorkoutWithStats | undefined): ComposerW
   } : null), [workout, payload]);
 }
 
-interface UseFeedComposerResult {
+export interface UseFeedComposerResult {
   /**
    * Everything put in play this session, newest first. This is the composer's
    * "recents" strip — the browser cannot read the device's camera roll, so the
