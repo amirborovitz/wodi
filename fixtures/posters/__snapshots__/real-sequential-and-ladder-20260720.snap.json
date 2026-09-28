@@ -47,7 +47,7 @@
           {
             "roundLabel": "×3",
             "name": "",
-            "primary": "20 Russian KB Swings @ 24/16kg · 15 Goblet Squats @ 24/16kg · 10 T2B",
+            "primary": "20 Russian KB Swings · 15 Goblet Squats · 10 T2B",
             "suppressMine": true,
             "accent": "magenta"
           },
@@ -80,10 +80,17 @@
             "accent": "magenta"
           },
           {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "24/16kg",
+            "mineOverride": "20kg",
+            "accent": "yellow"
+          },
+          {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "900m Run · 120 Russian KB Swings · 90 Goblet Squats · 60 T2B",
-            "mineOverride": "20kg",
+            "suppressMine": true,
             "accent": "yellow"
           }
         ]
@@ -210,7 +217,7 @@
         },
         {
           "kind": "line",
-          "rx": "20 Russian KB Swings @ 24/16kg · 15 Goblet Squats @ 24/16kg · 10 T2B",
+          "rx": "20 Russian KB Swings · 15 Goblet Squats · 10 T2B",
           "load": "",
           "mine": "",
           "team": "",
@@ -250,9 +257,17 @@
         },
         {
           "kind": "line",
-          "rx": "900m Run · 120 Russian KB Swings · 90 Goblet Squats · 60 T2B",
+          "rx": "24/16kg",
           "load": "",
           "mine": "20kg",
+          "team": "",
+          "roundLabel": "RX"
+        },
+        {
+          "kind": "line",
+          "rx": "900m Run · 120 Russian KB Swings · 90 Goblet Squats · 60 T2B",
+          "load": "",
+          "mine": "",
           "team": "",
           "roundLabel": "TOTAL"
         }

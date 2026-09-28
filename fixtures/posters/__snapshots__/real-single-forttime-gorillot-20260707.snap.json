@@ -7,7 +7,7 @@
         {
           "roundLabel": "×2",
           "name": "",
-          "primary": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
+          "primary": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
           "suppressMine": true,
           "accent": "magenta"
         },
@@ -21,15 +21,22 @@
         {
           "roundLabel": "×2",
           "name": "",
-          "primary": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+          "primary": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
           "suppressMine": true,
           "accent": "magenta"
+        },
+        {
+          "roundLabel": "RX",
+          "name": "",
+          "primary": "22.5/15kg",
+          "mineOverride": "17.5kg",
+          "accent": "yellow"
         },
         {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
-          "mineOverride": "17.5kg",
+          "suppressMine": true,
           "accent": "yellow"
         }
       ]
@@ -44,7 +51,7 @@
           {
             "roundLabel": "×2",
             "name": "",
-            "primary": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
+            "primary": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
             "suppressMine": true,
             "accent": "magenta"
           },
@@ -58,15 +65,22 @@
           {
             "roundLabel": "×2",
             "name": "",
-            "primary": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+            "primary": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
             "suppressMine": true,
             "accent": "magenta"
+          },
+          {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "22.5/15kg",
+            "mineOverride": "17.5kg",
+            "accent": "yellow"
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
-            "mineOverride": "17.5kg",
+            "suppressMine": true,
             "accent": "yellow"
           }
         ]
@@ -187,7 +201,7 @@
       },
       {
         "kind": "line",
-        "rx": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
+        "rx": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
         "load": "",
         "mine": "",
         "team": "",
@@ -203,7 +217,7 @@
       },
       {
         "kind": "line",
-        "rx": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+        "rx": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
         "load": "",
         "mine": "",
         "team": "",
@@ -211,9 +225,17 @@
       },
       {
         "kind": "line",
-        "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+        "rx": "22.5/15kg",
         "load": "",
         "mine": "17.5kg",
+        "team": "",
+        "roundLabel": "RX"
+      },
+      {
+        "kind": "line",
+        "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+        "load": "",
+        "mine": "",
         "team": "",
         "roundLabel": "TOTAL"
       }
@@ -227,7 +249,7 @@
         },
         {
           "kind": "line",
-          "rx": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
+          "rx": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
           "load": "",
           "mine": "",
           "team": "",
@@ -243,7 +265,7 @@
         },
         {
           "kind": "line",
-          "rx": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+          "rx": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
           "load": "",
           "mine": "",
           "team": "",
@@ -251,9 +273,17 @@
         },
         {
           "kind": "line",
-          "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+          "rx": "22.5/15kg",
           "load": "",
           "mine": "17.5kg",
+          "team": "",
+          "roundLabel": "RX"
+        },
+        {
+          "kind": "line",
+          "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+          "load": "",
+          "mine": "",
           "team": "",
           "roundLabel": "TOTAL"
         }

@@ -47,22 +47,29 @@
           {
             "roundLabel": "×5",
             "name": "",
-            "primary": "600m Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
+            "primary": "600m Echo Bike · 10 Push Presses · 10 T2B",
             "suppressMine": true,
             "accent": "magenta"
           },
           {
             "roundLabel": "×5",
             "name": "",
-            "primary": "10 Dips / Push-ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+            "primary": "10 Dips / Push-ups · 10 Sumo Deadlift High Pulls · 20 Air Squats",
             "suppressMine": true,
             "accent": "magenta"
+          },
+          {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "35/50kg",
+            "mineOverride": "35kg",
+            "accent": "yellow"
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "3km Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
-            "mineOverride": "35kg",
+            "suppressMine": true,
             "accent": "yellow"
           }
         ]
@@ -199,7 +206,7 @@
         },
         {
           "kind": "line",
-          "rx": "600m Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
+          "rx": "600m Echo Bike · 10 Push Presses · 10 T2B",
           "load": "",
           "mine": "",
           "team": "",
@@ -207,17 +214,25 @@
         },
         {
           "kind": "line",
-          "rx": "10 Dips / Push-ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+          "rx": "10 Dips / Push-ups · 10 Sumo Deadlift High Pulls · 20 Air Squats",
           "load": "",
           "mine": "",
           "team": "",
           "roundLabel": "×5"
+        },
+        {
+          "kind": "line",
+          "rx": "35/50kg",
+          "load": "",
+          "mine": "35kg",
+          "team": "",
+          "roundLabel": "RX"
         },
         {
           "kind": "line",
           "rx": "3km Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
           "load": "",
-          "mine": "35kg",
+          "mine": "",
           "team": "",
           "roundLabel": "TOTAL"
         }

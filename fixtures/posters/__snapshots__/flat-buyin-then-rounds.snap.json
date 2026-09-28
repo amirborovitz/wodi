@@ -14,15 +14,22 @@
         {
           "roundLabel": "×5",
           "name": "",
-          "primary": "25 Pull-ups · 7 Push Jerks @ 135lb",
+          "primary": "25 Pull-ups · 7 Push Jerks",
           "suppressMine": true,
           "accent": "magenta"
+        },
+        {
+          "roundLabel": "RX",
+          "name": "",
+          "primary": "135lb",
+          "mineOverride": "135lb",
+          "accent": "yellow"
         },
         {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
-          "mineOverride": "135lb",
+          "suppressMine": true,
           "accent": "yellow"
         }
       ]
@@ -44,15 +51,22 @@
           {
             "roundLabel": "×5",
             "name": "",
-            "primary": "25 Pull-ups · 7 Push Jerks @ 135lb",
+            "primary": "25 Pull-ups · 7 Push Jerks",
             "suppressMine": true,
             "accent": "magenta"
+          },
+          {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "135lb",
+            "mineOverride": "135lb",
+            "accent": "yellow"
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
-            "mineOverride": "135lb",
+            "suppressMine": true,
             "accent": "yellow"
           }
         ]
@@ -109,7 +123,7 @@
       },
       {
         "kind": "line",
-        "rx": "25 Pull-ups · 7 Push Jerks @ 135lb",
+        "rx": "25 Pull-ups · 7 Push Jerks",
         "load": "",
         "mine": "",
         "team": "",
@@ -117,9 +131,17 @@
       },
       {
         "kind": "line",
-        "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
+        "rx": "135lb",
         "load": "",
         "mine": "135lb",
+        "team": "",
+        "roundLabel": "RX"
+      },
+      {
+        "kind": "line",
+        "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
+        "load": "",
+        "mine": "",
         "team": "",
         "roundLabel": "TOTAL"
       }
@@ -141,7 +163,7 @@
         },
         {
           "kind": "line",
-          "rx": "25 Pull-ups · 7 Push Jerks @ 135lb",
+          "rx": "25 Pull-ups · 7 Push Jerks",
           "load": "",
           "mine": "",
           "team": "",
@@ -149,9 +171,17 @@
         },
         {
           "kind": "line",
-          "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
+          "rx": "135lb",
           "load": "",
           "mine": "135lb",
+          "team": "",
+          "roundLabel": "RX"
+        },
+        {
+          "kind": "line",
+          "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
+          "load": "",
+          "mine": "",
           "team": "",
           "roundLabel": "TOTAL"
         }

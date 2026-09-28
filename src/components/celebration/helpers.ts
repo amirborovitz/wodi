@@ -1746,32 +1746,49 @@ function formatBlockTotalPart(total: MovementTotal): string {
  *   ×3   600m Echo Bike · 8 DB Snatches · 8 Step-ups · 8 T2B
  *   ×2   900m Echo Bike · 12 DB Snatches · 12 Step-ups · 12 T2B
  *   CASH-OUT  200 DU / 400 Single Unders
- *   TOTAL     5.4km Echo Bike · 72 DB Snatches · …            17.5kg
+ *   RX        15/22.5kg                                         17.5kg
+ *   TOTAL     5.4km Echo Bike · 72 DB Snatches · …
  *
  * The board first, then what it added up to. Each block is one line because that is what a
  * block IS on a whiteboard — a list of movements under a repeat count — and printing every
  * movement of every block on its own row with its own "24 total" turned a four-line board into
  * seventeen. The totals are the SAVED ones (the single truth the recap and EP read), stated once.
  *
- * Loads go on the totals line, never on the block lines: the athlete's weight doesn't change
- * between blocks, and restating "@ 15/22.5kg" three times is what made the old layout wide.
- * One shared load is stated once; different loads ride on their own movement.
+ * Loads are stated once. A metcon almost always has ONE Rx weight for everything loaded —
+ * printing "@ 15/22.5kg" after the snatches AND the step-ups is the same fact twice. So when
+ * every loaded movement shares the coach's weight, it gets its own RX line, with the athlete's
+ * weight beside it: the board's number and mine, one row. Only a board with DIFFERENT weights
+ * states each on the movement that carries it (first appearance only), and the athlete's
+ * weights then ride on the totals line.
  */
 function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): ArtifactRow[] {
   const resolveSubstitution = createSubstitutionResolver(exercise, movements);
-  // The coach's weight is part of the board, so it is printed — once, where the movement first
-  // appears. The same "@ 24/16kg" on every block is the repetition this layout exists to remove.
-  const rxStated = new Set<string>();
-  const blockRows = deriveStructuralSections(exercise).flatMap((section): ArtifactRow[] => {
+  const sections = deriveStructuralSections(exercise).map((section) => {
     const rounds = section.rounds ?? 1;
-    const line = (section.movements ?? [])
-      .map((m) => {
-        const movement = resolveSubstitution(m, rounds).movement;
+    return {
+      section,
+      rounds,
+      movements: (section.movements ?? []).map((m) => resolveSubstitution(m, rounds).movement),
+    };
+  });
+  // formatSectionRxLoad speaks inline (" @ 15/22.5kg"); the RX line wants the weight alone.
+  const rxLoadOf = (movement: ParsedMovement): string =>
+    formatSectionRxLoad(exercise, movement).replace(/^\s*@\s*/, '');
+  const rxLoads = [...new Set(sections.flatMap((s) => s.movements.map(rxLoadOf)).filter(Boolean))];
+  const sharedRx = rxLoads.length === 1 ? rxLoads[0] : undefined;
+
+  // Different weights: each is printed once, where its movement first appears. The same
+  // "@ 24/16kg" on every block is the repetition this layout exists to remove.
+  const rxStated = new Set<string>();
+  const blockRows = sections.flatMap(({ section, rounds, movements: sectionMovements }): ArtifactRow[] => {
+    const line = sectionMovements
+      .map((movement) => {
         const part = formatBlockLinePart(movement);
         const key = movement.name.toLowerCase();
-        if (!part || rxStated.has(key)) return part;
+        if (!part || sharedRx || rxStated.has(key)) return part;
         rxStated.add(key);
-        return `${part}${formatSectionRxLoad(exercise, movement)}`;
+        const rx = rxLoadOf(movement);
+        return rx ? `${part} @ ${rx}` : part;
       })
       .filter(Boolean)
       .join(' · ');
@@ -1786,6 +1803,19 @@ function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): Art
   const loads = totals.map((total) => formatPosterLoad(total));
   const distinctLoads = [...new Set(loads.filter(Boolean))];
   const sharedLoad = distinctLoads.length === 1 ? distinctLoads[0] : undefined;
+
+  // The athlete's one weight sits beside the coach's one weight. Kept even when it equals the
+  // board's: "135lb … 135lb" is the athlete saying they went Rx, and an empty column can't.
+  const rxRows: ArtifactRow[] = sharedRx
+    ? [{
+      roundLabel: 'RX',
+      name: '',
+      primary: sharedRx,
+      ...(sharedLoad ? { mineOverride: sharedLoad } : { suppressMine: true }),
+      accent: 'yellow',
+    }]
+    : [];
+
   const totalsLine = totals
     .map((total, i) => {
       const part = formatBlockTotalPart(total);
@@ -1793,14 +1823,15 @@ function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): Art
     })
     .filter(Boolean)
     .join(' · ');
-  if (!totalsLine) return blockRows;
+  if (!totalsLine) return [...blockRows, ...rxRows];
   return [
     ...blockRows,
+    ...rxRows,
     {
       roundLabel: 'TOTAL',
       name: '',
       primary: totalsLine,
-      ...(sharedLoad ? { mineOverride: sharedLoad } : { suppressMine: true }),
+      ...(sharedLoad && !sharedRx ? { mineOverride: sharedLoad } : { suppressMine: true }),
       accent: 'yellow',
     },
   ];

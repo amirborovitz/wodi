@@ -7,7 +7,7 @@
         {
           "roundLabel": "×3",
           "name": "",
-          "primary": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+          "primary": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
           "suppressMine": true,
           "accent": "magenta"
         },
@@ -33,10 +33,17 @@
           "accent": "magenta"
         },
         {
+          "roundLabel": "RX",
+          "name": "",
+          "primary": "15/22.5kg",
+          "mineOverride": "17.5kg",
+          "accent": "yellow"
+        },
+        {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
-          "mineOverride": "17.5kg",
+          "suppressMine": true,
           "accent": "yellow"
         }
       ]
@@ -51,7 +58,7 @@
           {
             "roundLabel": "×3",
             "name": "",
-            "primary": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+            "primary": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
             "suppressMine": true,
             "accent": "magenta"
           },
@@ -77,10 +84,17 @@
             "accent": "magenta"
           },
           {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "15/22.5kg",
+            "mineOverride": "17.5kg",
+            "accent": "yellow"
+          },
+          {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
-            "mineOverride": "17.5kg",
+            "suppressMine": true,
             "accent": "yellow"
           }
         ]
@@ -240,7 +254,7 @@
       },
       {
         "kind": "line",
-        "rx": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+        "rx": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
         "load": "",
         "mine": "",
         "team": "",
@@ -272,9 +286,17 @@
       },
       {
         "kind": "line",
-        "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+        "rx": "15/22.5kg",
         "load": "",
         "mine": "17.5kg",
+        "team": "",
+        "roundLabel": "RX"
+      },
+      {
+        "kind": "line",
+        "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+        "load": "",
+        "mine": "",
         "team": "",
         "roundLabel": "TOTAL"
       }
@@ -288,7 +310,7 @@
         },
         {
           "kind": "line",
-          "rx": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+          "rx": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
           "load": "",
           "mine": "",
           "team": "",
@@ -320,9 +342,17 @@
         },
         {
           "kind": "line",
-          "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+          "rx": "15/22.5kg",
           "load": "",
           "mine": "17.5kg",
+          "team": "",
+          "roundLabel": "RX"
+        },
+        {
+          "kind": "line",
+          "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+          "load": "",
+          "mine": "",
           "team": "",
           "roundLabel": "TOTAL"
         }
