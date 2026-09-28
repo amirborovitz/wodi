@@ -1,0 +1,347 @@
+{
+  "reward": [
+    {
+      "title": "Blueprint",
+      "blueprint": "3-2-1 rounds for time",
+      "rows": [
+        {
+          "roundLabel": "×3",
+          "name": "",
+          "primary": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "×2",
+          "name": "",
+          "primary": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "×1",
+          "name": "",
+          "primary": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "CASH-OUT",
+          "name": "",
+          "primary": "200 DU / 400 Single Unders",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "TOTAL",
+          "name": "",
+          "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+          "mineOverride": "17.5kg",
+          "accent": "yellow"
+        }
+      ]
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "3-2-1 rounds for time",
+        "rows": [
+          {
+            "roundLabel": "×3",
+            "name": "",
+            "primary": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "×2",
+            "name": "",
+            "primary": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "×1",
+            "name": "",
+            "primary": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "CASH-OUT",
+            "name": "",
+            "primary": "200 DU / 400 Single Unders",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "TOTAL",
+            "name": "",
+            "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+            "mineOverride": "17.5kg",
+            "accent": "yellow"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "21:15",
+    "unit": "MIN",
+    "storyLine": "5.4km echo bike · 72 alt dumbbell snatch · 72 weighted alt box step-up · 72 ttb · 200 du",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×3 ROUNDS"
+      },
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "1.8km total",
+        "color": "magenta",
+        "wasSubstituted": false,
+        "originalMovement": "Run"
+      },
+      {
+        "perRound": "8",
+        "name": "Alt Dumbbell Snatch",
+        "total": "24 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Weighted Alt Box Step-up",
+        "total": "24 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "8",
+        "name": "Toes to Bar",
+        "total": "24 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×2 ROUNDS"
+      },
+      {
+        "perRound": "900m",
+        "name": "Echo Bike",
+        "total": "1.8km total",
+        "color": "magenta",
+        "wasSubstituted": false,
+        "originalMovement": "Run"
+      },
+      {
+        "perRound": "12",
+        "name": "Alt Dumbbell Snatch",
+        "total": "24 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "12",
+        "name": "Weighted Alt Box Step-up",
+        "total": "24 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "12",
+        "name": "Toes to Bar",
+        "total": "24 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "1.8km",
+        "name": "Echo Bike",
+        "total": "",
+        "color": "magenta",
+        "wasSubstituted": false,
+        "originalMovement": "Run"
+      },
+      {
+        "perRound": "24",
+        "name": "Alt Dumbbell Snatch",
+        "total": "",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "24",
+        "name": "Weighted Alt Box Step-up",
+        "total": "",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "24",
+        "name": "Toes to Bar",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "CASH-OUT"
+      },
+      {
+        "perRound": "200",
+        "name": "Double Under",
+        "total": "",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "21:15",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "3-2-1 ROUNDS FOR TIME",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×3"
+      },
+      {
+        "kind": "line",
+        "rx": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×2"
+      },
+      {
+        "kind": "line",
+        "rx": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×1"
+      },
+      {
+        "kind": "line",
+        "rx": "200 DU / 400 Single Unders",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "CASH-OUT"
+      },
+      {
+        "kind": "line",
+        "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+        "load": "",
+        "mine": "17.5kg",
+        "team": "",
+        "roundLabel": "TOTAL"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "3-2-1 ROUNDS FOR TIME",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike · 8 Alt DB Snatches @ 15/22.5kg · 8 Weighted Alt Box Step-ups @ 15/22.5kg · 8 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×3"
+        },
+        {
+          "kind": "line",
+          "rx": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×2"
+        },
+        {
+          "kind": "line",
+          "rx": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×1"
+        },
+        {
+          "kind": "line",
+          "rx": "200 DU / 400 Single Unders",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "CASH-OUT"
+        },
+        {
+          "kind": "line",
+          "rx": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
+          "load": "",
+          "mine": "17.5kg",
+          "team": "",
+          "roundLabel": "TOTAL"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ],
+  "pageTypes": [
+    "FOR TIME"
+  ]
+}

@@ -1,0 +1,366 @@
+{
+  "name": "real-tiered-ladder-321-step-storm-20260922",
+  "description": "STEP STORM (logged 2026-09-22): 3 rounds / 2 rounds / 1 round of the same four movements with growing quantities, then a 200 DU cash-out. Run substituted to Echo Bike at 3x. The board is written block by block, so the poster reads block by block. Rebuilt from the saved doc's sections; breakdown written from the board.",
+  "workout": {
+    "title": "STEP STORM",
+    "format": "for_time",
+    "rawText": "22/09/26\nMetcon\nFor time:\n3 rounds:\n200m run\n8 alt' Dumbbell Snatch @15/22.5kg\n8 weighted alt' Box Step-up (same Dumbbell - however)\n8 Toes to Bar\n\n2 rounds:\n300m run\n12 alt' Dumbbell Snatch @15/22.5kg\n12 weighted alt' Box Step-up (same Dumbbell - however)\n12 Toes to Bar\n\n1 round:\n600m run\n24 alt' Dumbbell Snatch @15/22.5kg\n24 weighted alt' Box Step-up (same Dumbbell - however)\n24 Toes to Bar\n\nCash out : 200 Double Under / 400 singles",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "6 Rounds For Time",
+        "type": "wod",
+        "loggingMode": "for_time",
+        "partKind": "metcon",
+        "prescription": "For time: 3 rounds of 200m Run, 8 Alt Dumbbell Snatch @15/22.5kg, 8 Weighted Alt Box Step-up with same dumbbell, 8 Toes to Bar; then 2 rounds of 300m Run, 12 Alt Dumbbell Snatch @15/22.5kg, 12 Weighted Alt Box Step-up with same dumbbell, 12 Toes to Bar; then 1 round of 600m Run, 24 Alt Dumbbell Snatch @15/22.5kg, 24 Weighted Alt Box Step-up with same dumbbell, 24 Toes to Bar; cash-out: 200 Double Under / 400 Singles",
+        "rawText": "Metcon\nFor time:\n3 rounds:\n200m run\n8 alt' Dumbbell Snatch @15/22.5kg\n8 weighted alt' Box Step-up (same Dumbbell - however)\n8 Toes to Bar\n\n2 rounds:\n300m run\n12 alt' Dumbbell Snatch @15/22.5kg\n12 weighted alt' Box Step-up (same Dumbbell - however)\n12 Toes to Bar\n\n1 round:\n600m run\n24 alt' Dumbbell Snatch @15/22.5kg\n24 weighted alt' Box Step-up (same Dumbbell - however)\n24 Toes to Bar\n\nCash out : 200 Double Under / 400 singles",
+        "rounds": 6,
+        "rxWeights": {
+          "male": 22.5,
+          "female": 15,
+          "unit": "kg"
+        },
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "time": 1275
+          }
+        ],
+        "movements": [
+          {
+            "name": "Echo Bike",
+            "reps": 0,
+            "distance": 600,
+            "calories": 0,
+            "unit": "m",
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "substitution": {
+              "originalName": "Run",
+              "selectedName": "Echo Bike",
+              "substitutionType": "equivalent",
+              "distanceMultiplier": 3,
+              "originalValue": 200,
+              "adjustedValue": 600,
+              "targetUnit": "distance",
+              "originalPrescription": {
+                "distance": 200
+              }
+            }
+          },
+          {
+            "name": "Alt Dumbbell Snatch",
+            "reps": 8,
+            "rxWeights": {
+              "male": 22.5,
+              "female": 15,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "loggedWeights": [
+              17.5
+            ]
+          },
+          {
+            "name": "Weighted Alt Box Step-up",
+            "reps": 8,
+            "rxWeights": {
+              "male": 22.5,
+              "female": 15,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "loggedWeights": [
+              17.5
+            ]
+          },
+          {
+            "name": "Toes to Bar",
+            "reps": 8,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round"
+          },
+          {
+            "name": "Double Under",
+            "reps": 200,
+            "inputType": "none",
+            "equipment": "none",
+            "perRound": false,
+            "countingMode": "once",
+            "alternative": {
+              "name": "Single Under",
+              "reps": 400
+            },
+            "role": "cash_out"
+          }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 3,
+            "movements": [
+              {
+                "name": "Echo Bike",
+                "reps": 0,
+                "distance": 600,
+                "calories": 0,
+                "unit": "m",
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round",
+                "substitution": {
+                  "originalName": "Run",
+                  "selectedName": "Echo Bike",
+                  "substitutionType": "equivalent",
+                  "distanceMultiplier": 3,
+                  "originalValue": 200,
+                  "adjustedValue": 600,
+                  "targetUnit": "distance",
+                  "originalPrescription": {
+                    "distance": 200
+                  }
+                }
+              },
+              {
+                "name": "Alt Dumbbell Snatch",
+                "reps": 8,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Weighted Alt Box Step-up",
+                "reps": 8,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Toes to Bar",
+                "reps": 8,
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round"
+              }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 2,
+            "movements": [
+              {
+                "name": "Echo Bike",
+                "reps": 0,
+                "distance": 900,
+                "calories": 0,
+                "unit": "m",
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round",
+                "substitution": {
+                  "originalName": "Run",
+                  "selectedName": "Echo Bike",
+                  "substitutionType": "equivalent",
+                  "distanceMultiplier": 3,
+                  "originalValue": 200,
+                  "adjustedValue": 600,
+                  "targetUnit": "distance",
+                  "originalPrescription": {
+                    "distance": 300
+                  }
+                }
+              },
+              {
+                "name": "Alt Dumbbell Snatch",
+                "reps": 12,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Weighted Alt Box Step-up",
+                "reps": 12,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Toes to Bar",
+                "reps": 12,
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round"
+              }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 1,
+            "movements": [
+              {
+                "name": "Echo Bike",
+                "reps": 0,
+                "distance": 1800,
+                "calories": 0,
+                "unit": "m",
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round",
+                "substitution": {
+                  "originalName": "Run",
+                  "selectedName": "Echo Bike",
+                  "substitutionType": "equivalent",
+                  "distanceMultiplier": 3,
+                  "originalValue": 200,
+                  "adjustedValue": 600,
+                  "targetUnit": "distance",
+                  "originalPrescription": {
+                    "distance": 600
+                  }
+                }
+              },
+              {
+                "name": "Alt Dumbbell Snatch",
+                "reps": 24,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Weighted Alt Box Step-up",
+                "reps": 24,
+                "rxWeights": {
+                  "male": 22.5,
+                  "female": 15,
+                  "unit": "kg"
+                },
+                "inputType": "weight",
+                "equipment": "dumbbell",
+                "implementCount": 1,
+                "countingMode": "per_round",
+                "loggedWeights": [
+                  17.5
+                ]
+              },
+              {
+                "name": "Toes to Bar",
+                "reps": 24,
+                "inputType": "none",
+                "equipment": "none",
+                "countingMode": "per_round"
+              }
+            ]
+          },
+          {
+            "sectionType": "cash_out",
+            "rounds": 1,
+            "movements": [
+              {
+                "name": "Double Under",
+                "reps": 200,
+                "inputType": "none",
+                "equipment": "none",
+                "perRound": false,
+                "countingMode": "once",
+                "alternative": {
+                  "name": "Single Under",
+                  "reps": 400
+                },
+                "role": "cash_out"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Echo Bike",
+          "totalDistance": 5400,
+          "originalMovement": "Run",
+          "color": "magenta"
+        },
+        {
+          "name": "Alt Dumbbell Snatch",
+          "totalReps": 72,
+          "weight": 17.5,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Weighted Alt Box Step-up",
+          "totalReps": 72,
+          "weight": 17.5,
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Toes to Bar",
+          "totalReps": 72,
+          "color": "magenta"
+        },
+        {
+          "name": "Double Under",
+          "totalReps": 200,
+          "color": "magenta"
+        }
+      ]
+    }
+  }
+}

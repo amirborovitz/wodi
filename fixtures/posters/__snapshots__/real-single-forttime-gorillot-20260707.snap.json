@@ -3,95 +3,36 @@
     {
       "title": "Blueprint",
       "blueprint": "3 x 2 rounds for time",
-      "rows": [],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "2 ROUNDS OF",
       "rows": [
         {
-          "primary": "1800 M Echo Bike",
+          "roundLabel": "×2",
           "name": "",
-          "totalNote": "3.6 km total",
-          "mineKey": "Echo Bike",
+          "primary": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
           "suppressMine": true,
           "accent": "magenta"
         },
         {
-          "primary": "20 Alt Dumbbell Snatches @ 22.5/15kg",
+          "roundLabel": "×2",
           "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Alt Dumbbell Snatch",
-          "accent": "yellow"
+          "primary": "1800m Echo Bike · 20 Push-ups · 20 T2B",
+          "suppressMine": true,
+          "accent": "magenta"
         },
         {
-          "primary": "20 Alt Weighted Box Step Ups @ 22.5/15kg",
+          "roundLabel": "×2",
           "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Alt Weighted Box Step Up",
+          "primary": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "TOTAL",
+          "name": "",
+          "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+          "mineOverride": "17.5kg",
           "accent": "yellow"
         }
-      ],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "2 ROUNDS OF",
-      "rows": [
-        {
-          "primary": "1800 M Echo Bike",
-          "name": "",
-          "totalNote": "3.6 km total",
-          "mineKey": "Echo Bike",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "20 Push-ups",
-          "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Push-up",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "20 Toes to Bars",
-          "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Toes to Bar",
-          "suppressMine": true,
-          "accent": "magenta"
-        }
-      ],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "2 ROUNDS OF",
-      "rows": [
-        {
-          "primary": "20 Burpees",
-          "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Burpee",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "20 Goblet Squats @ 22.5/15kg",
-          "name": "",
-          "totalNote": "40 total",
-          "mineKey": "Goblet Squat",
-          "accent": "yellow"
-        },
-        {
-          "primary": "40 Double Unders / 80 Single Unders",
-          "name": "",
-          "totalNote": "80 total",
-          "mineKey": "Double Under",
-          "suppressMine": true,
-          "accent": "magenta"
-        }
-      ],
-      "isPartnerConfirmed": false
+      ]
     }
   ],
   "pages": [
@@ -99,95 +40,36 @@
       {
         "title": "Blueprint",
         "blueprint": "3 x 2 rounds for time",
-        "rows": [],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "2 ROUNDS OF",
         "rows": [
           {
-            "primary": "1800 M Echo Bike",
+            "roundLabel": "×2",
             "name": "",
-            "totalNote": "3.6 km total",
-            "mineKey": "Echo Bike",
+            "primary": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
             "suppressMine": true,
             "accent": "magenta"
           },
           {
-            "primary": "20 Alt Dumbbell Snatches @ 22.5/15kg",
+            "roundLabel": "×2",
             "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Alt Dumbbell Snatch",
-            "accent": "yellow"
+            "primary": "1800m Echo Bike · 20 Push-ups · 20 T2B",
+            "suppressMine": true,
+            "accent": "magenta"
           },
           {
-            "primary": "20 Alt Weighted Box Step Ups @ 22.5/15kg",
+            "roundLabel": "×2",
             "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Alt Weighted Box Step Up",
+            "primary": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "TOTAL",
+            "name": "",
+            "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
+            "mineOverride": "17.5kg",
             "accent": "yellow"
           }
-        ],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "2 ROUNDS OF",
-        "rows": [
-          {
-            "primary": "1800 M Echo Bike",
-            "name": "",
-            "totalNote": "3.6 km total",
-            "mineKey": "Echo Bike",
-            "suppressMine": true,
-            "accent": "magenta"
-          },
-          {
-            "primary": "20 Push-ups",
-            "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Push-up",
-            "suppressMine": true,
-            "accent": "magenta"
-          },
-          {
-            "primary": "20 Toes to Bars",
-            "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Toes to Bar",
-            "suppressMine": true,
-            "accent": "magenta"
-          }
-        ],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "2 ROUNDS OF",
-        "rows": [
-          {
-            "primary": "20 Burpees",
-            "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Burpee",
-            "suppressMine": true,
-            "accent": "magenta"
-          },
-          {
-            "primary": "20 Goblet Squats @ 22.5/15kg",
-            "name": "",
-            "totalNote": "40 total",
-            "mineKey": "Goblet Squat",
-            "accent": "yellow"
-          },
-          {
-            "primary": "40 Double Unders / 80 Single Unders",
-            "name": "",
-            "totalNote": "80 total",
-            "mineKey": "Double Under",
-            "suppressMine": true,
-            "accent": "magenta"
-          }
-        ],
-        "isPartnerConfirmed": false
+        ]
       }
     ]
   ],
@@ -304,91 +186,36 @@
         "cap": ""
       },
       {
-        "kind": "block",
-        "label": "2 ROUNDS OF",
-        "cap": ""
-      },
-      {
         "kind": "line",
-        "rx": "1800 M Echo Bike",
+        "rx": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
         "load": "",
         "mine": "",
         "team": "",
-        "total": "3.6 km total"
+        "roundLabel": "×2"
       },
       {
         "kind": "line",
-        "rx": "20 Alt Dumbbell Snatches @ 22.5/15kg",
+        "rx": "1800m Echo Bike · 20 Push-ups · 20 T2B",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×2"
+      },
+      {
+        "kind": "line",
+        "rx": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×2"
+      },
+      {
+        "kind": "line",
+        "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
         "load": "",
         "mine": "17.5kg",
         "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "line",
-        "rx": "20 Alt Weighted Box Step Ups @ 22.5/15kg",
-        "load": "",
-        "mine": "17.5kg",
-        "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "block",
-        "label": "2 ROUNDS OF",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "1800 M Echo Bike",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "3.6 km total"
-      },
-      {
-        "kind": "line",
-        "rx": "20 Push-ups",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "line",
-        "rx": "20 Toes to Bars",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "block",
-        "label": "2 ROUNDS OF",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "20 Burpees",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "line",
-        "rx": "20 Goblet Squats @ 22.5/15kg",
-        "load": "",
-        "mine": "17.5kg",
-        "team": "",
-        "total": "40 total"
-      },
-      {
-        "kind": "line",
-        "rx": "40 Double Unders / 80 Single Unders",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "80 total"
+        "roundLabel": "TOTAL"
       }
     ],
     "pages": [
@@ -399,91 +226,36 @@
           "cap": ""
         },
         {
-          "kind": "block",
-          "label": "2 ROUNDS OF",
-          "cap": ""
-        },
-        {
           "kind": "line",
-          "rx": "1800 M Echo Bike",
+          "rx": "1800m Echo Bike · 20 Alt DB Snatches @ 22.5/15kg · 20 Alt Weighted Box Step Ups @ 22.5/15kg",
           "load": "",
           "mine": "",
           "team": "",
-          "total": "3.6 km total"
+          "roundLabel": "×2"
         },
         {
           "kind": "line",
-          "rx": "20 Alt Dumbbell Snatches @ 22.5/15kg",
+          "rx": "1800m Echo Bike · 20 Push-ups · 20 T2B",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×2"
+        },
+        {
+          "kind": "line",
+          "rx": "20 Burpees · 20 Goblet Squats @ 22.5/15kg · 40 DU / 80 Single Unders",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×2"
+        },
+        {
+          "kind": "line",
+          "rx": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
           "load": "",
           "mine": "17.5kg",
           "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "line",
-          "rx": "20 Alt Weighted Box Step Ups @ 22.5/15kg",
-          "load": "",
-          "mine": "17.5kg",
-          "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "block",
-          "label": "2 ROUNDS OF",
-          "cap": ""
-        },
-        {
-          "kind": "line",
-          "rx": "1800 M Echo Bike",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "3.6 km total"
-        },
-        {
-          "kind": "line",
-          "rx": "20 Push-ups",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "line",
-          "rx": "20 Toes to Bars",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "block",
-          "label": "2 ROUNDS OF",
-          "cap": ""
-        },
-        {
-          "kind": "line",
-          "rx": "20 Burpees",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "line",
-          "rx": "20 Goblet Squats @ 22.5/15kg",
-          "load": "",
-          "mine": "17.5kg",
-          "team": "",
-          "total": "40 total"
-        },
-        {
-          "kind": "line",
-          "rx": "40 Double Unders / 80 Single Unders",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "80 total"
+          "roundLabel": "TOTAL"
         }
       ]
     ]

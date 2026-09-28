@@ -79,6 +79,7 @@ import {
   normalizeBlueprint,
   extractEveryXCadence,
   formatLoggedLoad,
+  formatPosterLoad,
 } from './posterFormatters';
 
 // ─── Debug ───────────────────────────────────────────────────────────────────
@@ -295,6 +296,9 @@ export function getSectionedForTimeLabel(exercise?: Exercise | null): string | u
   if (roundCounts.length === roundSections.length && new Set(roundCounts).size === 1) {
     return `${roundSections.length} x ${roundCounts[0]} rounds for time`;
   }
+  // Tiers of different lengths are written the way coaches write them: "3-2-1 rounds for time".
+  // "3 sections for time" is the app's word for the structure, and no board has ever said it.
+  if (roundCounts.length === roundSections.length) return `${roundCounts.join('-')} rounds for time`;
   return `${roundSections.length} sections for time`;
 }
 
@@ -1653,8 +1657,8 @@ function formatProgressiveMovementData(
   if (toShow.length === 0) return { movement: '' };
 
   const parts = toShow.map((m) => {
-    const qty = m.reps != null ? `${m.reps}` : m.calories != null ? `${m.calories}cal` : m.distance != null ? `${m.distance}m` : '';
-    const name = formatRepMovementNameForPoster(m.name, m.reps);
+    const qty = m.reps ? `${m.reps}` : m.calories ? `${m.calories}cal` : m.distance ? `${m.distance}m` : '';
+    const name = formatRepMovementNameForPoster(m.name, m.reps || undefined);
     return qty ? `${qty} ${name}` : name;
   });
 
@@ -1703,6 +1707,103 @@ function buildProgressiveChipperRows(
     }
   }
   return rows;
+}
+
+/**
+ * One movement as a block line states it: "8 DB Snatches", "600m Echo Bike", "Max Burpees".
+ * Short names, because a block line carries a whole round and the board's own shorthand is how
+ * coaches fit one on a line.
+ */
+function formatBlockLinePart(movement: ParsedMovement): string {
+  const qty = statesMaxEffort(movement) ? 'Max'
+    : movement.reps ? `${movement.reps}`
+    : movement.calories ? `${movement.calories} cal`
+    : movement.distance ? `${Math.round(movement.distance)}m`
+    : '';
+  const shortName = abbreviateMovementForPoster(stripMovementRolePrefix(movement.name));
+  const name = movement.reps && movement.reps !== 1 ? pluralizeMovementLabel(shortName) : shortName;
+  return [qty, `${name}${formatMovementAlternativeSuffix(movement)}`].filter(Boolean).join(' ');
+}
+
+/** A saved total as the totals line states it: "72 DB Snatches", "5.4km Echo Bike". */
+function formatBlockTotalPart(total: MovementTotal): string {
+  const distance = total.totalDistance ?? 0;
+  const qty = distance > 0 ? (distance >= 1000 ? `${Math.round(distance / 100) / 10}km` : `${Math.round(distance)}m`)
+    : (total.totalCalories ?? 0) > 0 ? `${total.totalCalories} cal`
+    : (total.totalReps ?? 0) > 0 ? `${total.totalReps}`
+    : '';
+  if (!qty) return '';
+  const shortName = abbreviateMovementForPoster(stripMovementRolePrefix(total.name));
+  const name = distance === 0 && (total.totalCalories ?? 0) === 0 && total.totalReps !== 1
+    ? pluralizeMovementLabel(shortName)
+    : shortName;
+  return `${qty} ${name}`;
+}
+
+/**
+ * A sectioned for-time board, told the way the coach wrote it: one line per block.
+ *
+ *   ×3   600m Echo Bike · 8 DB Snatches · 8 Step-ups · 8 T2B
+ *   ×2   900m Echo Bike · 12 DB Snatches · 12 Step-ups · 12 T2B
+ *   CASH-OUT  200 DU / 400 Single Unders
+ *   TOTAL     5.4km Echo Bike · 72 DB Snatches · …            17.5kg
+ *
+ * The board first, then what it added up to. Each block is one line because that is what a
+ * block IS on a whiteboard — a list of movements under a repeat count — and printing every
+ * movement of every block on its own row with its own "24 total" turned a four-line board into
+ * seventeen. The totals are the SAVED ones (the single truth the recap and EP read), stated once.
+ *
+ * Loads go on the totals line, never on the block lines: the athlete's weight doesn't change
+ * between blocks, and restating "@ 15/22.5kg" three times is what made the old layout wide.
+ * One shared load is stated once; different loads ride on their own movement.
+ */
+function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): ArtifactRow[] {
+  const resolveSubstitution = createSubstitutionResolver(exercise, movements);
+  // The coach's weight is part of the board, so it is printed — once, where the movement first
+  // appears. The same "@ 24/16kg" on every block is the repetition this layout exists to remove.
+  const rxStated = new Set<string>();
+  const blockRows = deriveStructuralSections(exercise).flatMap((section): ArtifactRow[] => {
+    const rounds = section.rounds ?? 1;
+    const line = (section.movements ?? [])
+      .map((m) => {
+        const movement = resolveSubstitution(m, rounds).movement;
+        const part = formatBlockLinePart(movement);
+        const key = movement.name.toLowerCase();
+        if (!part || rxStated.has(key)) return part;
+        rxStated.add(key);
+        return `${part}${formatSectionRxLoad(exercise, movement)}`;
+      })
+      .filter(Boolean)
+      .join(' · ');
+    if (!line) return [];
+    const roundLabel = section.sectionType === 'buy_in' ? 'BUY-IN'
+      : section.sectionType === 'cash_out' ? 'CASH-OUT'
+      : `×${rounds}`;
+    return [{ roundLabel, name: '', primary: line, suppressMine: true, accent: 'magenta' }];
+  });
+
+  const totals = orderMovementTotalsByPrescription(exercise, movements);
+  const loads = totals.map((total) => formatPosterLoad(total));
+  const distinctLoads = [...new Set(loads.filter(Boolean))];
+  const sharedLoad = distinctLoads.length === 1 ? distinctLoads[0] : undefined;
+  const totalsLine = totals
+    .map((total, i) => {
+      const part = formatBlockTotalPart(total);
+      return part && loads[i] && !sharedLoad ? `${part} @ ${loads[i]}` : part;
+    })
+    .filter(Boolean)
+    .join(' · ');
+  if (!totalsLine) return blockRows;
+  return [
+    ...blockRows,
+    {
+      roundLabel: 'TOTAL',
+      name: '',
+      primary: totalsLine,
+      ...(sharedLoad ? { mineOverride: sharedLoad } : { suppressMine: true }),
+      accent: 'yellow',
+    },
+  ];
 }
 
 /**
@@ -1868,13 +1969,15 @@ function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement,
     // dropped it printed a bare "Burpees Over the Bar", a line with no number and no reason for
     // having none, when what the board wrote was "Into - Max Burpees Over the Bar".
     ? 'Max'
-    : movement.reps != null
+    // A zero is not a quantity. The save writes `reps: 0` beside a bike's 600m, and reading
+    // presence instead of value printed "0 Echo Bikes" and dropped the distance.
+    : movement.reps
     ? `${movement.reps * multiplier}`
-    : movement.calories != null
+    : movement.calories
       ? /\bcal(?:orie|ories)?\b/i.test(movement.name)
         ? `${movement.calories * multiplier}`
         : `${movement.calories * multiplier} CAL`
-      : movement.distance != null
+      : movement.distance
         // Metres stay metres. A board that wrote "1000m Row" must not print "1.00 KM" — the
         // same figure in a unit the coach didn't use reads as a different number, and next to
         // the row's own "1000m" it looks like two facts (poster mirrors original notation).
@@ -1884,7 +1987,7 @@ function formatSectionMovementPart(exercise: Exercise, movement: ParsedMovement,
   const together = movement.together ? ` ${sharedWorkSuffix(movement.sharedLabel)}` : '';
   const altSuffix = formatMovementAlternativeSuffix(movement, multiplier);
   return {
-    text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps != null ? movement.reps * multiplier : undefined)}${together}${altSuffix}${load}`].filter(Boolean).join(' '),
+    text: [qty, `${formatRepMovementNameForPoster(movement.name, movement.reps ? movement.reps * multiplier : undefined)}${together}${altSuffix}${load}`].filter(Boolean).join(' '),
     hasWeight: load !== '',
   };
 }
@@ -3122,6 +3225,19 @@ export function buildPageArtifactSections(
   const pageIsSectionedForTime = !isStrength
     && (pageRoundSectionsCount > 1 || (pageHasOnceOnlySection && pageStructuralSections.length > 1))
     && /for\s*time|\brft\b/i.test(exercisePartnerScopedText);
+  // Solo: the board, one line per block, then its totals (see buildBlockLineRows). A partner
+  // board keeps the per-movement rows below, because its TEAM | ME columns are per movement —
+  // a whole block on one line has nowhere to put each athlete's share.
+  if (pageIsSectionedForTime && !splitInfo) {
+    const label = getSectionedForTimeLabel(exercise);
+    return [{
+      title: 'Blueprint',
+      blueprint: label
+        ? normalizeBlueprint([label, timeCapLabel ? `(${timeCapLabel})` : null].filter(Boolean).join(' '))
+        : blueprint,
+      rows: buildBlockLineRows(exercise, movements),
+    }];
+  }
   if (pageIsSectionedForTime) {
     // Both split shapes come through: this builder renders partner work as TEAM|ME columns, and
     // a rounds-traded board needs that just as much as a flat-share one — dropping 'rounds' here
@@ -3774,14 +3890,16 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
     // Sequential blocks run one after another on the same clock, so the piece's interval count is
     // the SUM of the blocks' set counts (4 + 4 = 8) — the rows below carry the per-block split.
     // `sets.length` and `rounds` each hold ONE block's count, contradicting those rows.
-    const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.sets?.length || 0;
+    // The count is WINDOWS on the clock, which the parse states as `intervalCount`. Saved sets are
+    // not windows: "every 3:00 × 5, 2 rounds of…" logs a set per round, and read "10 × every 3:00".
+    const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.intervalCount || ex?.sets?.length || 0;
     const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
     const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
     else return undefined;
   } else if (format === 'intervals') {
     const ex = exercises[0];
-    const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.sets?.length || ex?.rounds || 0;
+    const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.intervalCount || ex?.sets?.length || ex?.rounds || 0;
     const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
     const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;

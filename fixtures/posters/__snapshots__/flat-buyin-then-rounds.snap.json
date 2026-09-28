@@ -2,86 +2,60 @@
   "reward": [
     {
       "title": "Blueprint",
-      "blueprint": "for time",
-      "rows": [],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "BUY-IN",
+      "blueprint": "5 rounds for time",
       "rows": [
         {
-          "primary": "1000 M Row",
+          "roundLabel": "BUY-IN",
           "name": "",
-          "mineKey": "Row",
-          "suppressMine": true,
-          "accent": "magenta"
-        }
-      ],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "THEN 5 ROUNDS OF",
-      "rows": [
-        {
-          "primary": "25 Pull-ups",
-          "name": "",
-          "totalNote": "125 total",
-          "mineKey": "Pull-up",
+          "primary": "1000m Row",
           "suppressMine": true,
           "accent": "magenta"
         },
         {
-          "primary": "7 Push Jerks @ 135lb",
+          "roundLabel": "×5",
           "name": "",
-          "totalNote": "35 total",
-          "mineKey": "Push Jerk",
+          "primary": "25 Pull-ups · 7 Push Jerks @ 135lb",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "TOTAL",
+          "name": "",
+          "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
+          "mineOverride": "135lb",
           "accent": "yellow"
         }
-      ],
-      "isPartnerConfirmed": false
+      ]
     }
   ],
   "pages": [
     [
       {
         "title": "Blueprint",
-        "blueprint": "for time",
-        "rows": [],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "BUY-IN",
+        "blueprint": "5 rounds for time",
         "rows": [
           {
-            "primary": "1000 M Row",
+            "roundLabel": "BUY-IN",
             "name": "",
-            "mineKey": "Row",
-            "suppressMine": true,
-            "accent": "magenta"
-          }
-        ],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "THEN 5 ROUNDS OF",
-        "rows": [
-          {
-            "primary": "25 Pull-ups",
-            "name": "",
-            "totalNote": "125 total",
-            "mineKey": "Pull-up",
+            "primary": "1000m Row",
             "suppressMine": true,
             "accent": "magenta"
           },
           {
-            "primary": "7 Push Jerks @ 135lb",
+            "roundLabel": "×5",
             "name": "",
-            "totalNote": "35 total",
-            "mineKey": "Push Jerk",
+            "primary": "25 Pull-ups · 7 Push Jerks @ 135lb",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "TOTAL",
+            "name": "",
+            "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
+            "mineOverride": "135lb",
             "accent": "yellow"
           }
-        ],
-        "isPartnerConfirmed": false
+        ]
       }
     ]
   ],
@@ -122,72 +96,64 @@
     "reward": [
       {
         "kind": "block",
-        "label": "BUY-IN",
+        "label": "5 ROUNDS FOR TIME",
         "cap": ""
       },
       {
         "kind": "line",
-        "rx": "1000 M Row",
-        "load": "",
-        "mine": "",
-        "team": ""
-      },
-      {
-        "kind": "block",
-        "label": "THEN 5 ROUNDS OF",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "25 Pull-ups",
+        "rx": "1000m Row",
         "load": "",
         "mine": "",
         "team": "",
-        "total": "125 total"
+        "roundLabel": "BUY-IN"
       },
       {
         "kind": "line",
-        "rx": "7 Push Jerks",
+        "rx": "25 Pull-ups · 7 Push Jerks @ 135lb",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×5"
+      },
+      {
+        "kind": "line",
+        "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
         "load": "",
         "mine": "135lb",
         "team": "",
-        "total": "35 total"
+        "roundLabel": "TOTAL"
       }
     ],
     "pages": [
       [
         {
           "kind": "block",
-          "label": "BUY-IN",
+          "label": "5 ROUNDS FOR TIME",
           "cap": ""
         },
         {
           "kind": "line",
-          "rx": "1000 M Row",
-          "load": "",
-          "mine": "",
-          "team": ""
-        },
-        {
-          "kind": "block",
-          "label": "THEN 5 ROUNDS OF",
-          "cap": ""
-        },
-        {
-          "kind": "line",
-          "rx": "25 Pull-ups",
+          "rx": "1000m Row",
           "load": "",
           "mine": "",
           "team": "",
-          "total": "125 total"
+          "roundLabel": "BUY-IN"
         },
         {
           "kind": "line",
-          "rx": "7 Push Jerks",
+          "rx": "25 Pull-ups · 7 Push Jerks @ 135lb",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×5"
+        },
+        {
+          "kind": "line",
+          "rx": "1km Row · 125 Pull-ups · 35 Push Jerks",
           "load": "",
           "mine": "135lb",
           "team": "",
-          "total": "35 total"
+          "roundLabel": "TOTAL"
         }
       ]
     ]

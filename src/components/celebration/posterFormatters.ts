@@ -103,6 +103,32 @@ export function formatLoggedLoad(
   return implementCount > 1 ? `${implementCount}×${distinct[0]}${unit}` : `${distinct[0]}${unit}`;
 }
 
+/** A saved load, from either the breakdown or the story — the fields formatPosterLoad reads. */
+export interface PosterLoadSource {
+  weight?: number;
+  weightProgression?: number[];
+  unit?: string;
+  implementCount?: number;
+}
+
+/**
+ * A logged load as the poster prints it — the ONE rule every load on the card goes through.
+ *
+ * `weight` is the breakdown's EFFECTIVE figure (per implement × implementCount, for volume);
+ * progressions are stored per implement already. Display stays per implement — "2×35kg" for a
+ * pair of dumbbells, never the summed "70kg" nobody lifted on one implement. The story source
+ * used to skip the division, and since it overrides the breakdown source, the bench press read
+ * "70kg" directly above a carry reading "2×16kg".
+ */
+export function formatPosterLoad(load: PosterLoadSource): string {
+  const unit = load.unit === 'lb' ? 'lb' : 'kg';
+  const pair = (load.implementCount ?? 1) > 1 ? load.implementCount! : 1;
+  if (load.weightProgression?.length) return formatLoggedLoad(load.weightProgression, unit, pair);
+  if (!load.weight || load.weight <= 0) return '';
+  const perImplement = pair > 1 ? Math.round((load.weight / pair) * 10) / 10 : load.weight;
+  return formatLoggedLoad([perImplement], unit, pair);
+}
+
 export function stableRotation(seed: string, index: number): number {
   let hash = index * 97;
   for (let i = 0; i < seed.length; i += 1) {

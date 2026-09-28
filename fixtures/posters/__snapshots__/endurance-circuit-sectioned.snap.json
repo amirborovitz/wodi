@@ -3,66 +3,29 @@
     {
       "title": "Blueprint",
       "blueprint": "2 x 5 rounds for time (24 MIN CAP)",
-      "rows": [],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "5 ROUNDS OF",
       "rows": [
         {
-          "primary": "Echo Bike",
+          "roundLabel": "×5",
           "name": "",
-          "totalNote": "50 cal total",
-          "mineKey": "Echo Bike",
+          "primary": "Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
           "suppressMine": true,
           "accent": "magenta"
         },
         {
-          "primary": "10 Push Presses @ 35/50kg",
+          "roundLabel": "×5",
           "name": "",
-          "totalNote": "50 total",
-          "mineKey": "Push Press",
+          "primary": "10 Dips / Push Ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+          "suppressMine": true,
+          "accent": "magenta"
+        },
+        {
+          "roundLabel": "TOTAL",
+          "name": "",
+          "primary": "50 cal Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
+          "mineOverride": "35kg",
           "accent": "yellow"
-        },
-        {
-          "primary": "10 Toes to Bars",
-          "name": "",
-          "totalNote": "50 total",
-          "mineKey": "Toes to Bar",
-          "suppressMine": true,
-          "accent": "magenta"
         }
-      ],
-      "isPartnerConfirmed": false
-    },
-    {
-      "title": "5 ROUNDS OF",
-      "rows": [
-        {
-          "primary": "10 Dips / Push Ups",
-          "name": "",
-          "totalNote": "50 total",
-          "mineKey": "Dips",
-          "suppressMine": true,
-          "accent": "magenta"
-        },
-        {
-          "primary": "10 Sumo Deadlift High Pulls @ 35/50kg",
-          "name": "",
-          "totalNote": "50 total",
-          "mineKey": "Sumo Deadlift High Pull",
-          "accent": "yellow"
-        },
-        {
-          "primary": "20 Air Squats",
-          "name": "",
-          "totalNote": "100 total",
-          "mineKey": "Air Squats",
-          "suppressMine": true,
-          "accent": "magenta"
-        }
-      ],
-      "isPartnerConfirmed": false
+      ]
     }
   ],
   "pages": [
@@ -70,66 +33,29 @@
       {
         "title": "Blueprint",
         "blueprint": "2 x 5 rounds for time (24 MIN CAP)",
-        "rows": [],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "5 ROUNDS OF",
         "rows": [
           {
-            "primary": "Echo Bike",
+            "roundLabel": "×5",
             "name": "",
-            "totalNote": "50 cal total",
-            "mineKey": "Echo Bike",
+            "primary": "Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
             "suppressMine": true,
             "accent": "magenta"
           },
           {
-            "primary": "10 Push Presses @ 35/50kg",
+            "roundLabel": "×5",
             "name": "",
-            "totalNote": "50 total",
-            "mineKey": "Push Press",
+            "primary": "10 Dips / Push Ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "TOTAL",
+            "name": "",
+            "primary": "50 cal Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
+            "mineOverride": "35kg",
             "accent": "yellow"
-          },
-          {
-            "primary": "10 Toes to Bars",
-            "name": "",
-            "totalNote": "50 total",
-            "mineKey": "Toes to Bar",
-            "suppressMine": true,
-            "accent": "magenta"
           }
-        ],
-        "isPartnerConfirmed": false
-      },
-      {
-        "title": "5 ROUNDS OF",
-        "rows": [
-          {
-            "primary": "10 Dips / Push Ups",
-            "name": "",
-            "totalNote": "50 total",
-            "mineKey": "Dips",
-            "suppressMine": true,
-            "accent": "magenta"
-          },
-          {
-            "primary": "10 Sumo Deadlift High Pulls @ 35/50kg",
-            "name": "",
-            "totalNote": "50 total",
-            "mineKey": "Sumo Deadlift High Pull",
-            "accent": "yellow"
-          },
-          {
-            "primary": "20 Air Squats",
-            "name": "",
-            "totalNote": "100 total",
-            "mineKey": "Air Squats",
-            "suppressMine": true,
-            "accent": "magenta"
-          }
-        ],
-        "isPartnerConfirmed": false
+        ]
       }
     ]
   ],
@@ -212,62 +138,28 @@
         "cap": ""
       },
       {
-        "kind": "block",
-        "label": "5 ROUNDS OF",
-        "cap": ""
-      },
-      {
         "kind": "line",
-        "rx": "Echo Bike",
+        "rx": "Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
         "load": "",
         "mine": "",
         "team": "",
-        "total": "50 cal total"
+        "roundLabel": "×5"
       },
       {
         "kind": "line",
-        "rx": "10 Push Presses @ 35/50kg",
+        "rx": "10 Dips / Push Ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "roundLabel": "×5"
+      },
+      {
+        "kind": "line",
+        "rx": "50 cal Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
         "load": "",
         "mine": "35kg",
         "team": "",
-        "total": "50 total"
-      },
-      {
-        "kind": "line",
-        "rx": "10 Toes to Bars",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "50 total"
-      },
-      {
-        "kind": "block",
-        "label": "5 ROUNDS OF",
-        "cap": ""
-      },
-      {
-        "kind": "line",
-        "rx": "10 Dips / Push Ups",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "50 total"
-      },
-      {
-        "kind": "line",
-        "rx": "10 Sumo Deadlift High Pulls @ 35/50kg",
-        "load": "",
-        "mine": "35kg",
-        "team": "",
-        "total": "50 total"
-      },
-      {
-        "kind": "line",
-        "rx": "20 Air Squats",
-        "load": "",
-        "mine": "",
-        "team": "",
-        "total": "100 total"
+        "roundLabel": "TOTAL"
       }
     ],
     "pages": [
@@ -278,62 +170,28 @@
           "cap": ""
         },
         {
-          "kind": "block",
-          "label": "5 ROUNDS OF",
-          "cap": ""
-        },
-        {
           "kind": "line",
-          "rx": "Echo Bike",
+          "rx": "Echo Bike · 10 Push Presses @ 35/50kg · 10 T2B",
           "load": "",
           "mine": "",
           "team": "",
-          "total": "50 cal total"
+          "roundLabel": "×5"
         },
         {
           "kind": "line",
-          "rx": "10 Push Presses @ 35/50kg",
+          "rx": "10 Dips / Push Ups · 10 Sumo Deadlift High Pulls @ 35/50kg · 20 Air Squats",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "×5"
+        },
+        {
+          "kind": "line",
+          "rx": "50 cal Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
           "load": "",
           "mine": "35kg",
           "team": "",
-          "total": "50 total"
-        },
-        {
-          "kind": "line",
-          "rx": "10 Toes to Bars",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "50 total"
-        },
-        {
-          "kind": "block",
-          "label": "5 ROUNDS OF",
-          "cap": ""
-        },
-        {
-          "kind": "line",
-          "rx": "10 Dips / Push Ups",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "50 total"
-        },
-        {
-          "kind": "line",
-          "rx": "10 Sumo Deadlift High Pulls @ 35/50kg",
-          "load": "",
-          "mine": "35kg",
-          "team": "",
-          "total": "50 total"
-        },
-        {
-          "kind": "line",
-          "rx": "20 Air Squats",
-          "load": "",
-          "mine": "",
-          "team": "",
-          "total": "100 total"
+          "roundLabel": "TOTAL"
         }
       ]
     ]
