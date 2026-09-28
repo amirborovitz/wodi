@@ -229,6 +229,13 @@
   align-items: stretch;
 }
 
+/* Each box takes exactly half the row. Sized by content, a box grew and shrank as its number
+   got longer (the font scales with length), shoving its neighbour on every keystroke. */
+.footerRow > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .oval,

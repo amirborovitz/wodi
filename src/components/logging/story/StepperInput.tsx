@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import styles from './StepperInput.module.css';
 
@@ -93,6 +93,10 @@ export function StepperInput({
   const heldBtnRef = useRef<'plus' | 'minus' | null>(null);
   const pointerTraceRef = useRef<PointerTrace | null>(null);
   const isScrollingRef = useRef(false);
+  // What the athlete is typing, kept verbatim while the field has focus. Rendering the parsed
+  // number instead ate every half-typed decimal: "32." parsed to 32 and redrew as "32", so the
+  // next key turned 32.5 into 325. A comma is a decimal point too — plenty of keypads offer one.
+  const [draft, setDraft] = useState<string | null>(null);
 
   const clamp = useCallback((v: number) => {
     return Math.max(min, Math.min(max, v));
@@ -101,6 +105,7 @@ export function StepperInput({
   const adjust = useCallback((delta: number) => {
     const current = value ?? min;
     const next = clamp(current + delta);
+    setDraft(null);
     onChange(next);
   }, [value, min, clamp, onChange]);
 
@@ -210,11 +215,12 @@ export function StepperInput({
   }, [clearHoldTimers]);
 
   const handleInputChange = useCallback((raw: string) => {
+    setDraft(raw);
     if (raw === '') {
       onChange(undefined);
       return;
     }
-    const num = parseFloat(raw);
+    const num = parseFloat(raw.replace(',', '.'));
     if (!isNaN(num)) {
       onChange(clamp(num));
     }
@@ -224,7 +230,7 @@ export function StepperInput({
     ? { '--stepper-color': color } as CSSProperties
     : undefined;
 
-  const displayStr = value != null ? String(value) : '';
+  const displayStr = draft ?? (value != null ? String(value) : '');
 
   // ── Arcade mode: horizontal [−] [value] [+] ──────────────────────
   if (size === 'arcade') {
@@ -308,6 +314,7 @@ export function StepperInput({
           onFocus={(e) => selectAllInput(e.currentTarget)}
           onPointerUp={(e) => selectAllInput(e.currentTarget)}
           onChange={(e) => handleInputChange(e.target.value)}
+          onBlur={() => setDraft(null)}
           style={fontSize != null ? { fontSize: `${fontSize}px` } : undefined}
         />
         {unit && <span className={styles.unit}>{unit}</span>}
