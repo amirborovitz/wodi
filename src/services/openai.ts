@@ -24,8 +24,11 @@ const openai = new OpenAI({
  * (see the temperature note on the structuring call); turning it up is the first thing to measure
  * once there is a photo corpus to measure it against.
  */
-const PARSE_MODEL = 'gpt-5.5';
-const PARSE_REASONING_EFFORT = 'none' as const;
+export const PARSE_MODEL = 'gpt-5.5';
+export const PARSE_REASONING_EFFORT = 'none' as const;
+
+/** The one client — other services (the Tell Wodi chat) call the model through it, not a second. */
+export { openai as openaiClient };
 
 /**
  * The parse hit OpenAI's rate limit (429), not a workout the parser couldn't read.

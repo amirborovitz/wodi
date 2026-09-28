@@ -195,6 +195,8 @@ export interface Workout {
   feelRating?: FeelRating;  // user-entered metcon feel rating
   posterSkin?: PosterSkinId;   // chosen celebration poster skin (Slab/Chalk/Flare/Stadium)
   posterVibe?: PosterVibeKey;  // chosen "FELT" vibe on the celebration poster
+  /** The Tell Wodi conversation this workout was logged in, when it was logged by chatting. */
+  chat?: SavedChat;
   posterSticker?: PosterSticker; // free-text note placed on the celebration poster
   posterVibeOffset?: PosterVibeOffset; // manual drag nudge of the "FELT" vibe stamp
   posterPhoto?: PosterPhoto;   // optional photo clipped to the poster
@@ -877,4 +879,25 @@ export interface PlannedWorkout {
   raw: string;
   parsedWorkout?: ParsedWorkout;
   createdAt: Date;
+  /** The Tell Wodi conversation about this board, when it was started in the chat. */
+  chat?: SavedChat;
+}
+
+/** One line of a Tell Wodi conversation, as kept. A photo is kept as the fact that one was sent. */
+export interface SavedChatMessage {
+  from: 'wodi' | 'me';
+  text?: string;
+  hadPhoto?: boolean;
+  at: number;
+}
+
+/**
+ * A Tell Wodi conversation, kept so it can be reopened — on its waiting board while there is no
+ * poster yet, then on the workout it became. Answers are NOT kept here: they live on the workout
+ * once it's logged, and a chat reopened before that asks again for anything still open.
+ */
+export interface SavedChat {
+  messages: SavedChatMessage[];
+  /** Parked before the workout ("heading in") — reopening greets the athlete back. */
+  waitingForWorkout: boolean;
 }

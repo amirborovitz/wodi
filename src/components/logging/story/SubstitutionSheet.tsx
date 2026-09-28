@@ -7,6 +7,7 @@ import {
 } from '../../../data/exerciseDefinitions';
 import type { MovementSubstitution } from '../../../types';
 import { CustomNumpadSheet } from './CustomNumpadSheet';
+import { convertedSwapValue, swapDefaults } from './substitutionPatch';
 import styles from './SubstitutionSheet.module.css';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -48,31 +49,6 @@ function multiplierLabel(alt: ExerciseAlternative): string | null {
   return `×${Number.isInteger(m) ? m : m.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}`;
 }
 
-// ─── Compute default adjusted value ─────────────────────────────
-
-function computeAdjustedValue(
-  alt: ExerciseAlternative,
-  originalReps?: number,
-  originalDistance?: number,
-  originalCalories?: number,
-): number | undefined {
-  if (alt.ratio && alt.ratio !== 1) {
-    const base = originalReps ?? originalCalories;
-    if (base != null && base > 0) {
-      return Math.round(base * alt.ratio);
-    }
-  }
-  if (alt.distanceMultiplier && alt.distanceMultiplier !== 1) {
-    if (originalDistance != null && originalDistance > 0) {
-      return Math.round(originalDistance * alt.distanceMultiplier);
-    }
-    if (originalCalories != null && originalCalories > 0) {
-      return Math.round(originalCalories * alt.distanceMultiplier);
-    }
-  }
-  return undefined;
-}
-
 // ─── Conversion hint string ─────────────────────────────────────
 // Read-only preview: "40 → 120" so the user knows what to expect
 
@@ -82,7 +58,7 @@ function conversionHint(
   originalDistance?: number,
   originalCalories?: number,
 ): string | null {
-  const adjusted = computeAdjustedValue(alt, originalReps, originalDistance, originalCalories);
+  const adjusted = convertedSwapValue(alt, { reps: originalReps, distance: originalDistance, calories: originalCalories });
   if (adjusted == null) return null;
 
   const original = originalReps ?? originalDistance ?? originalCalories;
@@ -259,29 +235,19 @@ export function SubstitutionSheet({
     // If this option is already selected, don't reset the user's adjusted value
     if (pending?.name?.toLowerCase() === alt.name.toLowerCase()) return;
 
-    let tUnit = resolveTargetUnit(alt.name);
-    const adjusted = computeAdjustedValue(alt, originalReps, originalDistance, originalCalories);
-
-    // When distanceMultiplier is used with a distance origin, keep target as distance
-    // regardless of the target movement's defaultUnit. The multiplier explicitly means
-    // "multiply the distance" (e.g., 200m run × 3 = 600m echo bike).
-    if (alt.distanceMultiplier && originUnit === 'distance') {
-      tUnit = 'distance';
-    }
-
-    // If target uses a different unit and no multiplier applies, don't auto-fill a misleading number
-    const crossUnit = tUnit !== originUnit;
-    const defaultValue = crossUnit && adjusted == null ? undefined : (adjusted ?? originalValue);
-
+    // The unit and starting number are the shared swap rule's — the chat's named swaps use it too.
+    const { targetUnit, adjustedValue } = swapDefaults(alt, {
+      reps: originalReps, distance: originalDistance, calories: originalCalories,
+    });
     setPending({
       name: alt.name,
       type: alt.type,
-      adjustedValue: defaultValue,
+      adjustedValue,
       ratio: alt.ratio,
       distanceMultiplier: alt.distanceMultiplier,
-      targetUnit: tUnit,
+      targetUnit,
     });
-  }, [pending, originalReps, originalDistance, originalCalories, originalValue, originUnit, resolveTargetUnit]);
+  }, [pending, originalReps, originalDistance, originalCalories]);
 
   // Select the AI alternative — opens inline stepper
   const handleSelectAi = useCallback(() => {

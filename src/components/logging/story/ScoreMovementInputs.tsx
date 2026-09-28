@@ -15,7 +15,7 @@ import { SubstitutionSheet } from './SubstitutionSheet';
 import { CustomNumpadSheet } from './CustomNumpadSheet';
 import { hasAlternatives } from '../../../data/exerciseDefinitions';
 import { statesMaxEffort } from '../../../services/blockScore';
-import { buildSubstitutionPatch } from './substitutionPatch';
+import { alternativeSubstitution, buildSubstitutionPatch } from './substitutionPatch';
 import { useScoreMovementEdits, occurrenceDiffers } from './useScoreMovementEdits';
 import { useScorePrescription } from './useScorePrescription';
 import { ImplementToggle } from './ImplementToggle';
@@ -290,21 +290,7 @@ function AiAlternativeToggle({ mr, onChange }: AiToggleProps) {
       onChange(buildSubstitutionPatch(mr, null));
       return;
     }
-    // The board wrote both sides ("40 DU / 60 singles"), so the alternative carries its own
-    // quantity and its own unit — the chip must move the row's number too, not just its name.
-    const targetUnit = aiAlt.reps != null ? 'reps'
-      : aiAlt.distance != null ? 'distance'
-      : aiAlt.calories != null ? 'calories'
-      : undefined;
-    const sub: MovementSubstitution = {
-      originalName: mr.movement.name,
-      selectedName: aiAlt.name,
-      substitutionType: 'easier',
-      originalValue: mr.movement.reps ?? mr.movement.distance ?? mr.movement.calories,
-      adjustedValue: aiAlt.reps ?? aiAlt.distance ?? aiAlt.calories,
-      targetUnit,
-    };
-    onChange(buildSubstitutionPatch(mr, sub));
+    onChange(buildSubstitutionPatch(mr, alternativeSubstitution(mr)));
   };
 
   return (

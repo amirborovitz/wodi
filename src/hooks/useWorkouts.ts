@@ -22,7 +22,7 @@ import { sessionPartnerFactor } from '../services/partnerScope';
 // THE one ordering for the workout list — every consumer (gallery, home rail,
 // recaps) reads this order. Don't re-sort downstream.
 import { byNewestTrained } from '../utils/workoutDate';
-import type { Achievement, PosterSkinId, PosterSticker, PosterVibeKey, PosterVibeOffset, Workout, WorkoutType } from '../types';
+import type { Achievement, PosterSkinId, PosterSticker, PosterVibeKey, SavedChat, PosterVibeOffset, Workout, WorkoutType } from '../types';
 
 export interface WorkoutWithStats extends Workout {
   totalReps: number;
@@ -206,6 +206,8 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
             achievements,
             isPR,
             isTest: data.isTest === true,
+            // The Tell Wodi conversation it was logged in — the poster's "View conversation".
+            ...(data.chat ? { chat: data.chat as SavedChat } : {}),
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
           };

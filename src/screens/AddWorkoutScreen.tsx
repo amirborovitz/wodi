@@ -21,7 +21,7 @@ import {
   getDefaultFields,
 } from '../services/loggingPatternLearning';
 import type { LoggingGuidanceResponse, ExerciseLoggingMode } from '../types';
-import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { useRewardData } from '../hooks/useRewardData';
@@ -31,7 +31,8 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat } from '../types';
+import { buildLastLoadMap } from '../utils/lastLoadHistory';
 import {
   workoutToParsedWorkout,
 } from '../utils/workoutToParsed';
@@ -44,7 +45,10 @@ import {
   getDefaultEasierAlternative,
   getDistanceMultiplier,
 } from '../data/exerciseDefinitions';
-import { StoryLogResults } from '../components/logging/story/StoryLogResults';
+import { StoryLogResults, storyTeamSize, toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { initStoryResults } from '../components/logging/story/WodStoryScreen';
+import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
+import { useTellWodiChat } from '../components/tellWodi/useTellWodiChat';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { movementToKind } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
@@ -85,9 +89,11 @@ interface AddWorkoutScreenProps {
    */
   onWorkoutUpdated?: (workout: import('../hooks/useWorkouts').WorkoutWithStats) => void;
   plannedWorkout?: import('../types').PlannedWorkout | null; // Pre-parsed workout — jump straight to log-results
+  /** Open on the Tell Wodi chat instead of the capture step. */
+  startInChat?: boolean;
 }
 
-type Step = 'capture' | 'voice' | 'processing' | 'preview' | 'log-results' | 'saving' | 'wrap' | 'reward';
+type Step = 'capture' | 'voice' | 'chat' | 'processing' | 'preview' | 'log-results' | 'saving' | 'wrap' | 'reward';
 
 /** The workout this logging session writes to, once it has one — see services/saveTarget.ts. */
 interface SessionWorkout {
@@ -727,7 +733,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = isAdminEmail(user?.email);
   const canUseSavedWorkouts = isAdminEmail(user?.email);
@@ -740,7 +746,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   // screen still needs it for is the EDIT path: re-saving a workout already marked as a test must
   // not feed its volume back into the counters it was taken out of, or rewrite PRs from it.
   const isTestWorkout = editWorkout?.isTest === true;
-  const [step, setStep] = useState<Step>('capture');
+  const [step, setStep] = useState<Step>(startInChat ? 'chat' : 'capture');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -932,6 +938,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
 
       if (stored && (!storedDegraded || !raw)) {
         setParsedWorkout(stored);
+        // A board with a conversation reopens the conversation, never the form.
+        if (plannedWorkout.chat) {
+          setStep('chat');
+          tellWodi.resume(stored, plannedWorkout.chat);
+          return;
+        }
         setStep('log-results');
         return;
       }
@@ -1287,25 +1299,30 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     });
   };
 
-  const handleSaveForLater = async () => {
-    if (!parsedWorkout || !user?.id) return;
-    const raw = parsedWorkout.rawText?.trim()
-      || parsedWorkout.exercises
+  /** A board kept for later, as the savedWods doc stores it — the form's "save" and the chat's alike. */
+  const savedWodPayload = (workout: ParsedWorkout, userId: string) => {
+    const raw = workout.rawText?.trim()
+      || workout.exercises
         .map((exercise) => exercise.rawText?.trim() || exercise.prescription?.trim() || exercise.name?.trim())
         .filter(Boolean)
         .join('\n')
-      || parsedWorkout.title?.trim()
+      || workout.title?.trim()
       || 'Saved workout';
-    // Navigate immediately — don't block on the Firestore write
     // JSON round-trip strips undefined values that Firestore rejects
-    const cleanParsed = JSON.parse(JSON.stringify(parsedWorkout)) as typeof parsedWorkout;
-    const payload = {
-      userId: user.id,
+    const cleanParsed = JSON.parse(JSON.stringify(workout)) as typeof workout;
+    return {
+      userId,
       status: 'parsed',
       raw,
       parsedWorkout: cleanParsed,
       createdAt: new Date(),
     };
+  };
+
+  const handleSaveForLater = async () => {
+    if (!parsedWorkout || !user?.id) return;
+    // Navigate immediately — don't block on the Firestore write
+    const payload = savedWodPayload(parsedWorkout, user.id);
 
     try {
       if (plannedWorkout?.id) {
@@ -1932,6 +1949,77 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     setStep('log-results');
   };
 
+  // Which logging mode each part is logged in — the one rule the form and the chat both read.
+  const loggingModesFor = (workout: ParsedWorkout): ExerciseLoggingMode[] => {
+    const workoutCtx = {
+      format: workout.format,
+      scoreType: workout.scoreType,
+      exerciseCount: workout.exercises.length,
+    };
+    return workout.exercises.map((ex, i) => modeOverrides[i] ?? getExerciseLoggingMode(ex, workoutCtx));
+  };
+
+  // How the athlete said it felt, from the chat. A ref, not state: the chat hands over its results
+  // and this is read by the save in the same tick, before any re-render could deliver state.
+  const chatVibeRef = useRef<PosterVibeKey | null>(null);
+  // The conversation, carried onto the workout it became — the poster's "View conversation".
+  const chatThreadRef = useRef<SavedChat | null>(null);
+  // The waiting board a chat keeps itself on. A chat reopened from Today already has one; a new
+  // chat creates it the first time there's a board to keep. The pending create is shared so two
+  // quick messages can't each create a board.
+  const chatBoardIdRef = useRef<string | null>(plannedWorkout?.chat ? plannedWorkout.id : null);
+  const chatBoardCreateRef = useRef<Promise<string> | null>(null);
+  const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
+
+  const keepChat = async (chat: SavedChat, workout: ParsedWorkout): Promise<void> => {
+    if (!user?.id) return;
+    try {
+      if (chatBoardIdRef.current) {
+        await setDoc(doc(db, 'savedWods', chatBoardIdRef.current), { chat }, { merge: true });
+        return;
+      }
+      if (!chatBoardCreateRef.current) {
+        chatBoardCreateRef.current = addDoc(collection(db, 'savedWods'), { ...savedWodPayload(workout, user.id), chat })
+          .then((ref) => { chatBoardIdRef.current = ref.id; return ref.id; });
+        await chatBoardCreateRef.current;
+        return;
+      }
+      const id = await chatBoardCreateRef.current;
+      await setDoc(doc(db, 'savedWods', id), { chat }, { merge: true });
+    } catch (err) {
+      console.error('[TellWodi] could not keep the chat', err);
+    }
+  };
+
+  const tellWodi = useTellWodiChat({
+    readBoard: async ({ file, text }) => {
+      const workout = file
+        ? await parseWorkoutImage(await fileToBase64(file))
+        : await parseWorkoutSession(text ?? '');
+      setParsedWorkout(workout);
+      addSavedWorkout(workout);
+      return workout;
+    },
+    buildResults: (workout) => initStoryResults(
+      workout,
+      loggingModesFor(workout),
+      user?.sex,
+      storyTeamSize(workout),
+      { blankAnswers: true },
+    ),
+    lastLoads,
+    onPersist: (chat, workout) => { void keepChat(chat, workout); },
+    onFinished: (results, vibe, chat) => {
+      chatVibeRef.current = vibe;
+      chatThreadRef.current = chat;
+      requestSave(results.map(toLegacyResult) as unknown as ExerciseResult[]);
+    },
+    onOpenForms: (results) => {
+      setEditInitialResults(results);
+      setStep('log-results');
+    },
+  });
+
   /**
    * The Save button. A NEW log of a board the athlete already logged in the last couple of days
    * stops to ask whether it replaces that log or stands beside it; everything else saves at once.
@@ -2106,6 +2194,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         ...(parsedWorkout.intervalTime != null && { intervalTime: parsedWorkout.intervalTime }),
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         ...(isTestWorkout && { isTest: true }),
+        ...(chatVibeRef.current && { posterVibe: chatVibeRef.current }),
+        ...(chatThreadRef.current && { chat: chatThreadRef.current }),
         updatedAt: serverTimestamp(),
       };
 
@@ -2132,6 +2222,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           }, { merge: true });
         }
         setSavedWorkoutMeta({ id: docRef.id, totalVolume, date: workoutDate });
+        // A chat kept itself on a waiting board; it has its workout now. A board the athlete opened
+        // from Today is cleared by the caller (onWorkoutCreated), like any saved WOD.
+        if (chatBoardIdRef.current && chatBoardIdRef.current !== plannedWorkout?.id) {
+          void deleteDoc(doc(db, 'savedWods', chatBoardIdRef.current))
+            .catch((err) => console.error('[TellWodi] could not clear the waiting board', err));
+        }
       } else {
         const workoutRef = doc(db, 'workouts', saveTarget.workoutId);
         persistedWorkoutId = saveTarget.workoutId;
@@ -2352,8 +2448,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
 
   return (
     <div className={styles.container} ref={containerRef}>
-      {/* Header — hidden during full-screen steps (story, reward, saving, wrap) */}
-      {step !== 'log-results' && step !== 'reward' && step !== 'saving' && step !== 'wrap' && (
+      {/* Header — hidden during full-screen steps (chat, story, reward, saving, wrap) */}
+      {step !== 'chat' && step !== 'log-results' && step !== 'reward' && step !== 'saving' && step !== 'wrap' && (
         <header className={styles.header}>
           <Button
             variant="ghost"
@@ -2744,19 +2840,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       {/* ═══════════════════════════════════════════════════════
            LOG RESULTS - Story mode
            ═══════════════════════════════════════════════════════ */}
+      {step === 'chat' && (
+        <TellWodiChat chat={tellWodi} onBack={onBack} />
+      )}
+
       {step === 'log-results' && parsedWorkout && (
         <StoryLogResults
           parsedWorkout={parsedWorkout}
-          loggingModes={parsedWorkout.exercises.map((ex, i) => {
-            const override = modeOverrides[i];
-            if (override) return override;
-            const workoutCtx = {
-              format: parsedWorkout.format,
-              scoreType: parsedWorkout.scoreType,
-              exerciseCount: parsedWorkout.exercises.length,
-            };
-            return getExerciseLoggingMode(ex, workoutCtx);
-          })}
+          loggingModes={loggingModesFor(parsedWorkout)}
           onSave={(results) => requestSave(results as unknown as ExerciseResult[])}
           onBack={() => editWorkout ? onBack() : setStep('preview')}
           isSaving={false}

@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import type { PlannedWorkout } from '../types';
+import type { PlannedWorkout, SavedChat } from '../types';
 
 interface UsePlannedWorkoutsResult {
   planned: PlannedWorkout[];
@@ -55,6 +55,8 @@ export function usePlannedWorkouts(): UsePlannedWorkoutsResult {
             raw: data.raw ?? data.parsedWorkout?.rawText ?? '',
             parsedWorkout: data.parsedWorkout,
             createdAt,
+            // A board kept by a Tell Wodi chat carries its conversation — the row reopens it.
+            ...(data.chat ? { chat: data.chat as SavedChat } : {}),
           };
         })
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

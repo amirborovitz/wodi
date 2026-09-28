@@ -753,6 +753,20 @@ function scoredKindFromAI(exercise: ParsedExercise): ExerciseKind | undefined {
   }
 }
 
+/**
+ * How a blank result treats the athlete's own answers.
+ *
+ * The forms open on the board's numbers — the Rx weight for your sex, the time cap as your time,
+ * every interval done — so a straight-through tap logs the workout as written. A chat has no
+ * stepper for the athlete to see and correct, so a pre-filled answer there is indistinguishable
+ * from one they gave: the poster that printed 17:00 (the cap) and 50kg (the heavier Rx) was a
+ * form nobody changed. `blankAnswers` leaves every ANSWER empty. Prescription the block is built
+ * from (its quantities, its hold time, its sets) is filled exactly as before.
+ */
+export interface BlankResultOptions {
+  blankAnswers?: boolean;
+}
+
 export function createBlankResult(
   exercise: ParsedExercise,
   index: number,
@@ -760,7 +774,9 @@ export function createBlankResult(
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
   teamSize?: number,
   isSoleExercise: boolean = true,
+  options: BlankResultOptions = {},
 ): StoryExerciseResult {
+  const prefillAnswers = !options.blankAnswers;
   // The session team size divides ONLY the blocks that were actually shared. A solo strength or
   // skill block inside a partner session keeps the coach's full numbers — otherwise the athlete
   // is handed a pre-halved bar weight to log. Same gate the save path uses, so what the stepper
@@ -905,6 +921,24 @@ export function createBlankResult(
     const tiers = ladderTiers(exercise)?.tiers ?? [];
     const roundMovs = tiers[0] ?? [];
     const distinct = roundMovs.length > 0 ? roundMovs : (exercise.movements ?? []);
+    // Work done ONCE around the tiers — a buy-in before them, a cash-out after — is not part of
+    // any tier, so folding the tiers must not fold it away. It did: The Ladder's "200 DU / 400
+    // singles" cash-out had no row, so there was nothing to pick singles on, and the log saved
+    // double-unders the athlete never did. A lead-in the tiers DID absorb (one per tier) stays out.
+    const inTiers = new Set(tiers.flat());
+    const onceOnly = (where: 'before' | 'after') => {
+      const firstRounds = exercise.sections!.findIndex((s) => s.sectionType === 'rounds');
+      const lastRounds = exercise.sections!.map((s) => s.sectionType).lastIndexOf('rounds');
+      return exercise.sections!.flatMap((section, sIdx) => (
+        section.sectionType !== 'rounds'
+        && (where === 'before' ? sIdx < firstRounds : sIdx > lastRounds)
+          ? section.movements
+            .filter((mov) => !inTiers.has(mov))
+            .map((mov) => ({ mov, sectionType: section.sectionType, sectionRounds: section.rounds ?? 1, sectionIndex: sIdx }))
+          : []
+      ));
+    };
+    movementSource.push(...onceOnly('before'));
     // Each movement's quantity across every tier, so the collapsed row can state the full scheme
     // (800-600-400m) instead of just the tier it was built from.
     const qtyOf = (m?: ParsedMovement): number | undefined => m?.reps ?? m?.calories ?? m?.distance;
@@ -917,6 +951,7 @@ export function createBlankResult(
         ...(scheme.length === tiers.length ? { prescribedScheme: scheme } : {}),
       });
     });
+    movementSource.push(...onceOnly('after'));
   } else if (hasSections) {
     exercise.sections!.forEach((section, sIdx) => {
       for (const mov of section.movements) {
@@ -999,7 +1034,7 @@ export function createBlankResult(
       if (movKind === 'load') {
         mr.loadMode = 'same';
         const rxW = mov.rxWeights;
-        if (rxW) {
+        if (rxW && prefillAnswers) {
           mr.weight = isFemale ? (rxW.female ?? rxW.male) : (rxW.male ?? rxW.female);
         }
         // Re-opening your own log: what YOU lifted outranks what the board asked for. Only a
@@ -1062,7 +1097,7 @@ export function createBlankResult(
   switch (kind) {
     case 'load':
       base.loadMode = 'same';
-      if (exercise.suggestedWeight) base.weight = exercise.suggestedWeight;
+      if (exercise.suggestedWeight && prefillAnswers) base.weight = exercise.suggestedWeight;
       break;
 
     case 'reps':
@@ -1075,7 +1110,7 @@ export function createBlankResult(
 
     case 'intervals':
       base.intervalsTotal = setsTotal;
-      base.intervalsCompleted = setsTotal; // Default: all completed
+      if (prefillAnswers) base.intervalsCompleted = setsTotal; // Default: all completed
       break;
 
     case 'score_time': {
@@ -1083,7 +1118,7 @@ export function createBlankResult(
       // ("20 min cap" / "T.C - 34 MIN") — utils/timeCap.ts owns every form so this prefill
       // can't silently miss a cap the poster later displays.
       const capSeconds = parseTimeCapSeconds(exercise.prescription);
-      if (capSeconds) {
+      if (capSeconds && prefillAnswers) {
         base.timeSeconds = capSeconds;
       }
       break;

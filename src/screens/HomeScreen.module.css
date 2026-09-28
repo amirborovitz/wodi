@@ -697,3 +697,45 @@
   font-weight: 500;
   line-height: 1;
 }
+
+/* The second door: log by chatting. Full width and easy to hit, quieter than the yellow CTA so
+   the two read primary → secondary at a glance. */
+.tellWodiCTA {
+  width: 100%;
+  min-height: 52px;
+  background: #16181c;
+  border: 1px solid rgba(245, 194, 0, 0.22);
+  border-radius: 16px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  color: #f2f0eb;
+  transition: transform 0.1s ease, filter 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tellWodiCTA:active {
+  transform: scale(0.98);
+  filter: brightness(1.1);
+}
+
+.tellWodiIcon {
+  color: #f5c200;
+  flex-shrink: 0;
+}
+
+.tellWodiTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.tellWodiHint {
+  margin-left: auto;
+  font-size: 13px;
+  color: rgba(242, 240, 235, 0.38);
+}

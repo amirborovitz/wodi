@@ -10,6 +10,8 @@ export interface CelebrationFaceProps {
   onEdit?: () => void;
   onPosterCustomizationChange?: (update: PosterCustomizationUpdate) => void;
   onCorrection?: (reason: string, note: string) => void;
+  /** Present when this workout was logged in a Tell Wodi chat — opens that conversation. */
+  onViewConversation?: () => void;
 }
 
 export interface CelebrationFace {

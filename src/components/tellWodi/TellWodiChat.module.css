@@ -1,0 +1,306 @@
+/* Tell Wodi — a message thread that feels as familiar as WhatsApp and reads as Wodi:
+   ink field, one yellow, and yellow means YOU (the athlete's own bubbles wear it). */
+
+/* Pinned to the viewport, like any messaging app: the composer always sits at the bottom of the
+   screen, whatever the page around it is doing. It lives inside Add Workout's container, whose
+   own min-height and bottom padding pushed the composer below the fold. */
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--app-column);
+  margin: 0 auto;
+  background: var(--wodi-bg);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: calc(env(safe-area-inset-top, 0px) + var(--sp-3)) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--wodi-line);
+}
+
+.back {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-left: -10px;
+  background: none;
+  border: none;
+  color: var(--wodi-white);
+  cursor: pointer;
+}
+
+.title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.titleDot {
+  color: var(--wodi-yellow);
+}
+
+.formsLink {
+  min-height: 44px;
+  padding: 0 var(--sp-2);
+  background: none;
+  border: none;
+  color: var(--wodi-dim);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.thread {
+  flex: 1;
+  /* Without this a flex child grows to fit its messages instead of scrolling inside the screen,
+     and new messages land below the fold. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.rowWodi,
+.rowMe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.rowWodi { align-items: flex-start; }
+.rowMe { align-items: flex-end; }
+
+.bubbleWodi,
+.bubbleMe {
+  max-width: 80%;
+  padding: 10px 14px;
+  font-size: 1rem;
+  line-height: 1.35;
+  transition: opacity 0.2s ease;
+}
+
+.bubbleWodi {
+  background: var(--wodi-card2);
+  border-radius: 18px 18px 18px 4px;
+}
+
+.bubbleMe {
+  background: rgba(245, 194, 0, 0.16);
+  border-radius: 18px 18px 4px 18px;
+}
+
+.bubbleAnswered {
+  opacity: 0.6;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  border-radius: var(--r-lg);
+  margin-bottom: 6px;
+}
+
+.photoNote {
+  margin: 0 0 4px;
+  font-size: 0.8125rem;
+  color: var(--wodi-dim);
+}
+
+/* Last-time loads before a workout: a lookup, not a result — so nothing in it wears yellow. */
+.suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suggestionName {
+  font-weight: 600;
+  color: var(--wodi-white);
+}
+
+.suggestionLine {
+  font-size: 0.875rem;
+  color: var(--wodi-dim);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  max-width: 92%;
+}
+
+.chip,
+.chipSkip {
+  min-height: 44px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip {
+  background: var(--wodi-card);
+  border: 1px solid rgba(245, 194, 0, 0.45);
+  color: var(--wodi-white);
+}
+
+.chipSkip {
+  background: none;
+  border: 1px dashed var(--wodi-line2);
+  color: var(--wodi-dim);
+}
+
+.chip:disabled,
+.chipSkip:disabled {
+  opacity: 0.5;
+}
+
+.typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px 2px;
+}
+
+.typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wodi-dim);
+  animation: pulse 1.1s infinite ease-in-out;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.15s; }
+.typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+.composer {
+  padding: var(--sp-2) var(--sp-3) calc(env(safe-area-inset-bottom, 0px) + var(--sp-3));
+  border-top: 1px solid var(--wodi-line);
+  background: var(--wodi-bg);
+}
+
+.attachment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 var(--sp-1) var(--sp-2);
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--wodi-card);
+  font-size: 0.875rem;
+}
+
+.attachmentName {
+  color: var(--wodi-white);
+}
+
+.attachmentRemove {
+  min-width: 32px;
+  min-height: 32px;
+  background: none;
+  border: none;
+  color: var(--wodi-dim);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.composerRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  color: var(--wodi-white);
+  cursor: pointer;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 11px 16px;
+  resize: none;
+  border: 1px solid var(--wodi-line2);
+  border-radius: 22px;
+  background: var(--wodi-card);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(245, 194, 0, 0.45);
+}
+
+.send,
+.sendActive {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.send {
+  background: var(--wodi-card);
+  color: var(--wodi-dim);
+}
+
+.sendActive {
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
+}

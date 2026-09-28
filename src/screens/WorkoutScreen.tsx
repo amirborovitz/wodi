@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { motion, useMotionValue, animate as fmAnimate } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, animate as fmAnimate } from 'framer-motion';
+import { ChatTranscriptSheet } from '../components/tellWodi/ChatTranscriptSheet';
 import styles from './WorkoutScreen.module.css';
 import type { RewardData } from '../types';
 import { useCelebrationData } from '../hooks/useCelebrationData';
@@ -155,6 +156,7 @@ export function WorkoutScreen({
   const { submitCorrection, sessionCorrections } = useWorkoutCorrection(workoutId);
   const celebrationData = useCelebrationData(mode, rewardData, workout, stickerConfig, sessionCorrections);
   const [faceId] = useState(DEFAULT_FACE_ID);
+  const [showConversation, setShowConversation] = useState(false);
   const { savePosterCustomization } = usePosterCustomization(celebrationData.workoutId);
 
   if (!isReward && !workout) return null;
@@ -243,8 +245,18 @@ export function WorkoutScreen({
           onEdit={isReward ? onEdit : onEditWorkout}
           onPosterCustomizationChange={savePosterCustomization}
           onCorrection={submitCorrection}
+          onViewConversation={isDetail && workout?.chat ? () => setShowConversation(true) : undefined}
         />
       </motion.div>
+      <AnimatePresence>
+        {showConversation && workout?.chat && (
+          <ChatTranscriptSheet
+            chat={workout.chat}
+            title={workout.title}
+            onClose={() => setShowConversation(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -30,6 +30,8 @@ const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
   onAddWorkout: () => void;
+  /** Log by chatting instead of the forms. Omitted → the button isn't shown. */
+  onTellWodi?: () => void;
   onImageSelected?: (file: File) => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
@@ -62,6 +64,7 @@ function getSavedTitle(saved: PlannedWorkout): string {
 
 export function HomeScreen({
   onAddWorkout,
+  onTellWodi,
   onImageSelected,
   onOpenProfile,
   onSelectWorkout,
@@ -181,6 +184,8 @@ export function HomeScreen({
     if (planned.length === 0) return '';
     return planned.slice(0, 3).map(getSavedTitle).join(', ');
   }, [planned]);
+  // A chat waiting for its result leads the For Later line — still one line, never a new card.
+  const waitingChat = useMemo(() => planned.find((p) => p.chat != null) ?? null, [planned]);
 
   const actionSheetWorkout = deleteSheet.targetId
     ? workouts.find((w) => w.id === deleteSheet.targetId) ?? null
@@ -363,6 +368,23 @@ export function HomeScreen({
           </div>
         </motion.button>
 
+        {onTellWodi && (
+          <motion.button
+            type="button"
+            className={styles.tellWodiCTA}
+            onClick={onTellWodi}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.28 }}
+          >
+            <svg className={styles.tellWodiIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 5h14v10H10l-4 4v-4H5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            </svg>
+            <span className={styles.tellWodiTitle}>Tell Wodi</span>
+            <span className={styles.tellWodiHint}>just say what you did</span>
+          </motion.button>
+        )}
+
         {/* ── The observation slot ──
             One line under the hero, carrying whichever of the two computed observations is
             worth more today. A milestone the athlete has JUST CROSSED is an event and wins
@@ -408,11 +430,21 @@ export function HomeScreen({
               <span className={styles.savedSummaryIcon} aria-hidden="true">
                 <span className={styles.savedSummaryBookmark} />
               </span>
-              <span className={styles.savedSummaryCopy}>
-                <strong>{planned.length} saved for later</strong>
-                <span>{'·'}</span>
-                <span className={styles.savedSummaryText}>{savedSummary}</span>
-              </span>
+              {waitingChat ? (
+                <span className={styles.savedSummaryCopy}>
+                  <strong>💬 {getSavedTitle(waitingChat)}</strong>
+                  <span>{'·'}</span>
+                  <span className={styles.savedSummaryText}>
+                    waiting for you{planned.length > 1 ? ` · +${planned.length - 1} more` : ''}
+                  </span>
+                </span>
+              ) : (
+                <span className={styles.savedSummaryCopy}>
+                  <strong>{planned.length} saved for later</strong>
+                  <span>{'·'}</span>
+                  <span className={styles.savedSummaryText}>{savedSummary}</span>
+                </span>
+              )}
               <span className={styles.savedSummaryView} aria-hidden="true">
                 VIEW <span>{'>'}</span>
               </span>

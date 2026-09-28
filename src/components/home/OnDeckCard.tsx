@@ -27,6 +27,15 @@ function buildSubtitle(wod: ParsedWorkout): string {
   return parts.join(' ');
 }
 
+/** Wodi's last line in a waiting chat — the row previews the conversation, like a messaging app. */
+function lastWodiLine(planned: PlannedWorkout): string {
+  const lines = planned.chat?.messages ?? [];
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    if (lines[i].from === 'wodi' && lines[i].text) return lines[i].text!.replace(/s+/g, ' ');
+  }
+  return 'Waiting for you';
+}
+
 function getTitle(planned: PlannedWorkout): string {
   const wod = planned.parsedWorkout;
   return wod?.title?.trim()
@@ -52,21 +61,36 @@ function BookmarkIcon(): React.JSX.Element {
   );
 }
 
+function ChatIcon(): React.JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 4h16v12H10l-5 4v-4H4z" fill="#f5c200" />
+    </svg>
+  );
+}
+
+/**
+ * One board waiting for its result. A board kept by a Tell Wodi chat is the same row with the
+ * conversation's face: a chat glyph, CHATTING, Wodi's last line, and CONTINUE — it reopens the chat,
+ * never the form.
+ */
 export function OnDeckCard({ planned, onLog, onDelete }: OnDeckCardProps): React.JSX.Element {
   const title = getTitle(planned);
-  const subtitle = planned.parsedWorkout ? buildSubtitle(planned.parsedWorkout) : '';
+  const isChat = planned.chat != null;
+  const subtitle = isChat
+    ? lastWodiLine(planned)
+    : planned.parsedWorkout ? buildSubtitle(planned.parsedWorkout) : '';
 
   return (
     <div className={styles.row}>
-      {/* Bookmark icon */}
       <div className={styles.bookmarkWrap} aria-hidden="true">
-        <BookmarkIcon />
+        {isChat ? <ChatIcon /> : <BookmarkIcon />}
       </div>
 
       {/* Text */}
       <div className={styles.copy}>
         <div className={styles.titleLine}>
-          <span className={styles.savedChip}>SAVED</span>
+          <span className={styles.savedChip}>{isChat ? 'CHATTING' : 'SAVED'}</span>
           <span className={styles.title}>{title}</span>
         </div>
         {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
@@ -88,9 +112,9 @@ export function OnDeckCard({ planned, onLog, onDelete }: OnDeckCardProps): React
           type="button"
           className={styles.logBtn}
           onClick={() => onLog(planned)}
-          aria-label={`Log ${title}`}
+          aria-label={isChat ? `Continue the chat about ${title}` : `Log ${title}`}
         >
-          LOG →
+          {isChat ? 'CONTINUE →' : 'LOG →'}
         </button>
       </div>
     </div>

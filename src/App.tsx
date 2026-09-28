@@ -22,6 +22,7 @@ import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
 import { useAppVersion } from './hooks/useAppVersion';
+import { isAdminEmail } from './utils/admin';
 import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
@@ -34,6 +35,8 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
+  // Add Workout opens on the Tell Wodi chat rather than the capture step.
+  const [startInChat, setStartInChat] = useState(false);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutWithStats | null>(null);
@@ -54,6 +57,7 @@ function AppContent() {
   const handleImageSelected = (file: File) => {
     setPendingImage(file);
     setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(false);
     setEditingWorkout(null); // Clear any editing state
     setCurrentScreen('add-workout');
   };
@@ -62,6 +66,7 @@ function AppContent() {
     setEditingWorkout(workout);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(false);
     setCurrentScreen('add-workout');
   };
 
@@ -81,6 +86,7 @@ function AppContent() {
     setPendingPlannedWorkout(planned);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(false);
     setEditingWorkout(null);
     setCurrentScreen('add-workout');
   };
@@ -131,6 +137,7 @@ function AppContent() {
             onBack={() => {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
+              setStartInChat(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
@@ -145,6 +152,7 @@ function AppContent() {
               }
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
+              setStartInChat(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
               setHomeRingsKey((prev) => prev + 1);
@@ -153,6 +161,7 @@ function AppContent() {
             onSavedForLater={() => {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
+              setStartInChat(false);
               setEditingWorkout(null);
               setPendingPlannedWorkout(null);
               setCurrentScreen('home');
@@ -162,6 +171,7 @@ function AppContent() {
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
             plannedWorkout={pendingPlannedWorkout}
+            startInChat={startInChat}
           />
         );
       case 'workout-detail': {
@@ -267,8 +277,18 @@ function AppContent() {
               setPendingImage(null);
               setPendingPlannedWorkout(null);
               setShowRecentWorkoutsOnOpen(false);
+              setStartInChat(false);
               setCurrentScreen('add-workout');
             }}
+            // Admin-only while it's being tried on real workouts; then it opens to everyone.
+            onTellWodi={isAdminEmail(user?.email) ? () => {
+              setEditingWorkout(null);
+              setPendingImage(null);
+              setPendingPlannedWorkout(null);
+              setShowRecentWorkoutsOnOpen(false);
+              setStartInChat(true);
+              setCurrentScreen('add-workout');
+            } : undefined}
             onImageSelected={handleImageSelected}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {

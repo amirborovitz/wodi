@@ -76,6 +76,14 @@ function PencilIcon(): React.JSX.Element {
   );
 }
 
+function ChatIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h16v12H10l-5 4v-4H4z" />
+    </svg>
+  );
+}
+
 function MoreIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -135,7 +143,7 @@ const STICKER_DEFAULT_POS = { x: 50, y: 46 };
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection,
+  data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
 }: CelebrationFaceProps): React.JSX.Element {
   const [skinIdx, setSkinIdx]         = useState<number>(() => {
     const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
@@ -676,6 +684,8 @@ export function HandwrittenFace({
 
   const menuItems: ActionMenuItem[] = [
     ...(onEdit ? [{ label: 'Edit workout', icon: <PencilIcon />, onClick: onEdit }] : []),
+    // Where this log came from — provenance, not the poster's look, so it lives here, not the bar.
+    ...(onViewConversation ? [{ label: 'View conversation', icon: <ChatIcon />, onClick: onViewConversation }] : []),
     ...(onCorrection && data.workoutId
       ? [{ label: 'AI got it wrong?', icon: <FlagIcon />, quiet: true, onClick: () => setShowCorrection(true) }]
       : []),

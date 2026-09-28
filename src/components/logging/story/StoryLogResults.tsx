@@ -502,6 +502,11 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   }
 }
 
+/** The session's team size as the logging results are built with it — the forms and the chat alike. */
+export function storyTeamSize(workout: ParsedWorkout): number | undefined {
+  return workout.partnerWorkout ? (workout.teamSize ?? 2) : undefined;
+}
+
 // ─── Component ──────────────────────────────────────────────────
 
 export function StoryLogResults({
@@ -515,7 +520,7 @@ export function StoryLogResults({
   isEditing = false,
 }: StoryLogResultsProps) {
   const { user } = useAuth();
-  const teamSize = parsedWorkout.partnerWorkout ? (parsedWorkout.teamSize ?? 2) : undefined;
+  const teamSize = storyTeamSize(parsedWorkout);
 
   // The session team size only applies to the blocks that were actually shared. Handing the
   // whole session's team size to every input made a solo strength block inside a partner

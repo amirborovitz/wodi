@@ -4,6 +4,7 @@ import type { ParsedWorkout, ExerciseLoggingMode } from '../../../types';
 import { ExerciseRow, SectionHeader } from './ExerciseRow';
 import {
   type StoryExerciseResult,
+  type BlankResultOptions,
   getRowState,
   createBlankResult,
   isResultEmpty,
@@ -459,9 +460,10 @@ export function initStoryResults(
   loggingModes: ExerciseLoggingMode[],
   userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
   teamSize?: number,
+  options: BlankResultOptions = {},
 ): StoryExerciseResult[] {
   return workout.exercises.map((ex, i) => {
     const mode = ex.loggingMode ?? loggingModes[i] ?? 'strength';
-    return createBlankResult(ex, i, mode, userSex, teamSize, workout.exercises.length === 1);
+    return createBlankResult(ex, i, mode, userSex, teamSize, workout.exercises.length === 1, options);
   });
 }
