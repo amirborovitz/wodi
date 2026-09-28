@@ -8,7 +8,7 @@
   "expect": {
     "format": "emom",
     "loggingModes": "emom",
-    "movementNames": "Pull-up, Alt American Kettlebell Swing, Box Jump",
+    "movementNames": "Pull-up, Alternating Kettlebell Swing, Box Jump",
     "totals.reps": "220",
     "totals.volume": "2160",
     "totals.distance": "",

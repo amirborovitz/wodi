@@ -8,7 +8,6 @@
     "[quantity-backfill] exercises[].movements[].time": 1
   },
   "into-connected-emom-complex": {
-    "[override] exercises[].suggestedSets": 1,
     "[override] type": 1,
     "[quantity-backfill] exercises[].movements[].equipment": 1,
     "[quantity-backfill] exercises[].sections[].movements[].equipment": 3
@@ -22,7 +21,6 @@
   "multipart-emom-amrap": {
     "[override] type": 1,
     "[quantity-backfill] exercises[].movements[].isMaxReps": 1,
-    "[quantity-backfill] exercises[].rxWeights": 1,
     "[quantity-backfill] exercises[].sections[].movements[].isMaxReps": 1
   },
   "pair-paced-amrap": {
@@ -30,7 +28,6 @@
   },
   "palindrome-partner-chipper": {
     "[override] exercises[].movements[].inputType": 1,
-    "[override] exercises[].movements[].name": 2,
     "[override] type": 1
   },
   "per-movement-ladder-flat-collapse": {
@@ -38,12 +35,6 @@
     "[quantity-backfill] exercises[].sections[].movements[].equipment": 3
   },
   "station-emom-cycles-encoding": {
-    "[override] exercises[].movements[].name": 1,
-    "[quantity-backfill] exercises[].movements[].equipment": 1,
-    "[quantity-backfill] exercises[].rxWeights": 1
-  },
-  "station-emom-rep-ranges": {
-    "[override] exercises[].movements[].name": 1,
-    "[quantity-backfill] exercises[].rxWeights": 1
+    "[quantity-backfill] exercises[].movements[].equipment": 1
   }
 }

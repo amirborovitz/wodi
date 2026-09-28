@@ -9,7 +9,6 @@ import { hasSameMovementsEveryRound } from '../utils/sectionShape';
 import { isRowErgName, matchesNamePattern } from '../utils/movementNameMatch';
 import { parsePrescribedCeilingSeconds } from '../utils/timeCap';
 import { prescribesOwnRest } from './partnerScope';
-import { hasMaxSet } from './blockScore';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { auditPostProcess } from './parseAudit';
 
@@ -1627,12 +1626,12 @@ function extractTimeCap(workout: ParsedWorkout): number | undefined {
  * Post-process a single exercise
  */
 function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
-  // Extract weights from prescription if not in rxWeights
-  const prescriptionWeights = extractWeightsFromText(exercise.prescription);
-
-  // If movements array is missing or empty, try to parse from prescription
+  // The model answers every field (strict schema), so its movement list is an answer. Only a list
+  // it didn't give at all is read out of the prescription here — and only THOSE names, which our
+  // regex produced, are ours to normalize.
   let movements = exercise.movements;
-  if (!movements || movements.length === 0) {
+  const movementsFromModel = (movements?.length ?? 0) > 0;
+  if (!movementsFromModel) {
     movements = parseMovementsFromPrescription(exercise.prescription, exercise.name);
   }
 
@@ -1642,7 +1641,8 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
   const processedMovements = postProcessMovements(
     movements ?? [],
     exercise.prescription,
-    exercise.name
+    exercise.name,
+    movementsFromModel,
   );
 
   // Skill/practice exercises are timed blocks — don't infer sets x reps
@@ -1650,7 +1650,6 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     return {
       ...exercise,
       suggestedSets: exercise.suggestedSets || 1,
-      rxWeights: exercise.rxWeights || prescriptionWeights,
       movements: processedMovements,
     };
   }
@@ -1684,14 +1683,13 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     suggestedRepsPerSet = detectVariableRepScheme(exercise);
   }
 
-  // Trust explicit set/round counts in the prescription over the AI-returned
-  // suggestedSets. Guards against the AI misreading "hinge & pull" as two sets
-  // or interval duration text as the set count.
-  let finalSuggestedSets = suggestedRepsPerSet
-    ? suggestedRepsPerSet.length
-    : exercise.suggestedSets;
+  // The set count is the model's. The text is read only when it gave none — it used to be read
+  // FIRST, and it can't tell a whole piece from its first block: "3 rounds … 2 rounds … 1 round"
+  // matched "3 rounds" and overwrote the model's correct 6. The same reading made a max set vanish
+  // ("4 sets … + max reps" is five) until a floor was bolted on to undo it.
+  let finalSuggestedSets = exercise.suggestedSets || suggestedRepsPerSet?.length;
 
-  if (!suggestedRepsPerSet) {
+  if (!finalSuggestedSets) {
     const prescriptionText = `${exercise.name} ${exercise.prescription || ''}`;
     const setsMatch = prescriptionText.match(/\b(\d+)\s*sets?\b/i)
       || prescriptionText.match(/[x×]\s*(\d+)\s*(?:sets?|rounds?)\b/i)
@@ -1705,22 +1703,13 @@ function postProcessExercise(exercise: ParsedExercise): ParsedExercise {
     }
   }
 
-  // ...but neither source can SEE a max set. "4 sets x 5 reps @~80% + max reps @60%" is five
-  // sets: the fifth has no written rep count, so it is absent from the rep array and absent from
-  // "4 sets". Both then read 4 and overruled the AI's correct 5, and the set carrying the only
-  // earned number on the board stopped existing. A floor, never an increase — this can only stop
-  // the override shrinking the count, it never invents a set the AI did not report.
-  if (hasMaxSet({ ...exercise, suggestedRepsPerSet })) {
-    const aiCount = exercise.suggestedSets ?? 0;
-    if (aiCount > (finalSuggestedSets ?? 0)) finalSuggestedSets = aiCount;
-  }
-
+  // The exercise-level load is the model's answer too — null on a metcon means the loads are the
+  // movements' own. Copying "@17.5kg" up from the prescription stated one load for the whole piece.
   return {
     ...exercise,
     suggestedReps,
     suggestedRepsPerSet,
-    suggestedSets: finalSuggestedSets,
-    rxWeights: exercise.rxWeights || prescriptionWeights,
+    suggestedSets: finalSuggestedSets ?? exercise.suggestedSets,
     movements: processedMovements,
   };
 }
@@ -1978,7 +1967,8 @@ function enrichMovementFromPrescription(normalizedName: string, fullText: string
 function postProcessMovements(
   movements: ParsedMovement[],
   prescription: string,
-  exerciseName: string
+  exerciseName: string,
+  namesFromModel: boolean,
 ): ParsedMovement[] {
   const fullText = `${exerciseName} ${prescription}`.toLowerCase();
 
@@ -1987,11 +1977,15 @@ function postProcessMovements(
     const result = { ...mov };
     const lowerName = mov.name.toLowerCase();
 
-    // 1. Normalize movement name
-    result.name = normalizeMovementName(mov.name);
-
-    // 1b. Enrich movement name with context from prescription text
-    result.name = enrichMovementFromPrescription(result.name, fullText);
+    // 1. Normalize names OUR regex produced. A name the model gave is its answer: renaming it here
+    // ("Alt Dumbbell Snatch" → "Alt DB Snatch") reached only this flat list, never the sections,
+    // so one movement ended up with two names on one board. Spelling variants are the movement
+    // registry's job downstream, and the poster shortens names for display itself.
+    if (!namesFromModel) {
+      result.name = normalizeMovementName(mov.name);
+      // 1b. Enrich movement name with context from prescription text
+      result.name = enrichMovementFromPrescription(result.name, fullText);
+    }
 
     // 2a. Extract weights from the movement's OWN name (not full text)
     if (!result.rxWeights) {
