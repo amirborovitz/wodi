@@ -9,7 +9,7 @@
   "expect": {
     "exerciseCount": "1",
     "format": "amrap_intervals",
-    "loggingModes": "amrap_intervals",
+    "logKinds": "score_open_reps",
     "movementCountingModes": "per_round, per_round, per_round, per_round",
     "stationIndices": "0, 0, 1, 1",
     "totals.distance": "600",

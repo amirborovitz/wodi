@@ -3,14 +3,8 @@
     "[quantity-backfill] exercises[].movements[].equipment": 1,
     "[quantity-backfill] exercises[].movements[].implementCount": 1
   },
-  "bare-movement-station-emom": {
-    "[override] type": 2,
-    "[quantity-backfill] exercises[].movements[].time": 1
-  },
   "into-connected-emom-complex": {
-    "[override] type": 1,
-    "[quantity-backfill] exercises[].movements[].equipment": 1,
-    "[quantity-backfill] exercises[].sections[].movements[].equipment": 3
+    "[override] type": 1
   },
   "lettered-blocks-one-score": {
     "[quantity-backfill] exercises[].movements[].equipment": 1,

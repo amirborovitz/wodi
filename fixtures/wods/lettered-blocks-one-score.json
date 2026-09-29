@@ -8,7 +8,7 @@
   "expect": {
     "exerciseCount": "1",
     "format": "for_time",
-    "loggingModes": "for_time",
+    "logKinds": "score_time",
     "parsed.timeCap": "2400",
     "parsed.exercises.0.sections.0.rounds": "10",
     "parsed.exercises.0.sections.1.rounds": "10",

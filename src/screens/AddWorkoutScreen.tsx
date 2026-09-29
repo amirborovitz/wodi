@@ -46,11 +46,10 @@ import {
   getDistanceMultiplier,
 } from '../data/exerciseDefinitions';
 import { StoryLogResults, storyTeamSize, toLegacyResult } from '../components/logging/story/StoryLogResults';
-import { initStoryResults } from '../components/logging/story/WodStoryScreen';
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
 import { useTellWodiChat } from '../components/tellWodi/useTellWodiChat';
 import type { StoryExerciseResult } from '../components/logging/story/types';
-import { movementToKind } from '../components/logging/story/types';
+import { initStoryResults, movementToKind } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
 import { isAdminEmail } from '../utils/admin';

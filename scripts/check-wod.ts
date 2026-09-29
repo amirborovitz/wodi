@@ -123,7 +123,7 @@ Expect operators:
 
 Useful paths:
   title, type, format, scoreType, timeCap, teamSize
-  loggingModes, movementNames, movementCountingModes
+  logKinds, loggingModes, movementNames, movementCountingModes
   totals.reps, totals.volume, totals.distance, totals.calories
   hero.value, hero.unit, hero.formatLine
 `);
@@ -233,7 +233,12 @@ function flattenParsedMovements(parsed: ParsedWorkout): ParsedExercise['movement
   });
 }
 
-export function buildContext(parsed: ParsedWorkout, workload: WorkloadBreakdown, hero: HeroResult): Record<string, unknown> {
+export function buildContext(
+  parsed: ParsedWorkout,
+  workload: WorkloadBreakdown,
+  hero: HeroResult,
+  logKinds: string[],
+): Record<string, unknown> {
   const movements = flattenParsedMovements(parsed);
   return {
     title: parsed.title ?? '',
@@ -245,6 +250,10 @@ export function buildContext(parsed: ParsedWorkout, workload: WorkloadBreakdown,
     exerciseCount: parsed.exercises.length,
     exerciseNames: parsed.exercises.map((exercise) => exercise.name),
     loggingModes: parsed.exercises.map((exercise) => exercise.loggingMode ?? ''),
+    // The logging screen each part opens on — what the athlete actually meets. Prefer this over
+    // loggingModes: several modes lead to the same screen ('strength' and 'sets' both ask for a
+    // weight per set), and the model moving between them is a change nobody can see.
+    logKinds,
     movementNames: movements?.map((movement) => movement.name) ?? [],
     movementCountingModes: movements?.map((movement) => movement.countingMode ?? '') ?? [],
     stationLabels: movements?.map((movement) => movement.stationLabel ?? '') ?? [],
@@ -274,6 +283,7 @@ export async function runSessionPipeline(text: string, result: CliOptions['resul
   const { parseWorkoutSession } = await import('../src/services/openai');
   const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
   const { computeHeroResult } = await import('../src/components/celebration/helpers');
+  const { initStoryResults } = await import('../src/components/logging/story/types');
 
   const parsed = await parseWorkoutSession(text);
   const raw = JSON.stringify(parsed, null, 2);
@@ -293,7 +303,8 @@ export async function runSessionPipeline(text: string, result: CliOptions['resul
     parsed.teamSize,
     parsed.rawText ?? text,
   );
-  return { raw, parsed, workload, hero, context: buildContext(parsed, workload, hero) };
+  const logKinds = initStoryResults(parsed, [], undefined, parsed.teamSize).map((r) => r.kind);
+  return { raw, parsed, workload, hero, context: buildContext(parsed, workload, hero, logKinds) };
 }
 
 async function main(): Promise<void> {

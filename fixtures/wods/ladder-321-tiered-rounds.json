@@ -7,7 +7,7 @@
   },
   "expect": {
     "format": "for_time",
-    "loggingModes": "for_time",
+    "logKinds": "score_time",
     "movementNames": "Echo Bike, Alt Dumbbell Snatch, Weighted Step-up, Toes to Bar, Echo Bike, Alt Dumbbell Snatch, Weighted Step-up, Toes to Bar, Echo Bike, Alt Dumbbell Snatch, Weighted Step-up, Toes to Bar, Double Under",
     "totals.reps": "416",
     "totals.volume": "2520",

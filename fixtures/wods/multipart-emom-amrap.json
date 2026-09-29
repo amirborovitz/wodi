@@ -8,7 +8,7 @@
   },
   "expect": {
     "exerciseCount": "2",
-    "loggingModes": "emom, amrap",
+    "logKinds": "intervals, score_rounds",
     "parsed.exercises.1.movements.0.countingMode": "per_round",
     "parsed.exercises.1.movements.1.countingMode": "per_round",
     "parsed.exercises.1.movements.2.countingMode": "per_round",

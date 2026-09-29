@@ -8,7 +8,7 @@
   "expect": {
     "exerciseCount": "1",
     "format": "for_time",
-    "loggingModes": "for_time",
+    "logKinds": "score_time",
     "movementNames": "Run, Deadlift, Run, Power Clean, Run, Front Squat, Run, Shoulder to Overhead, Run, Pull-up",
     "totals.distance": "4000",
     "totals.reps": "200",
