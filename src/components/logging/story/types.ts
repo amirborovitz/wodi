@@ -5,6 +5,7 @@ import type {
   ParsedExercise,
   ParsedMovement,
   ParsedSectionType,
+  ParsedWorkout,
   MeasurementUnit,
 } from '../../../types';
 import type { LoadUnit } from '../../../utils/loadUnits';
@@ -1130,4 +1131,18 @@ export function createBlankResult(
   }
 
   return base;
+}
+
+/** One blank result per part of the workout — how every logging surface (forms, chat) starts. */
+export function initStoryResults(
+  workout: ParsedWorkout,
+  loggingModes: ExerciseLoggingMode[],
+  userSex?: 'male' | 'female' | 'other' | 'prefer_not_to_say',
+  teamSize?: number,
+  options: BlankResultOptions = {},
+): StoryExerciseResult[] {
+  return workout.exercises.map((ex, i) => {
+    const mode = ex.loggingMode ?? loggingModes[i] ?? 'strength';
+    return createBlankResult(ex, i, mode, userSex, teamSize, workout.exercises.length === 1, options);
+  });
 }

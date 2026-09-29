@@ -9,7 +9,7 @@
   },
   "expect": {
     "exerciseCount": "3",
-    "loggingModes": "strength, amrap, sets",
+    "logKinds": "load, score_rounds, duration",
     "parsed.partnerWorkout": "false",
     "teamSize": "",
     "parsed.exercises.1.partnerSplit": "",

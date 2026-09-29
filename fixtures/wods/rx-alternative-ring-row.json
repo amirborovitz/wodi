@@ -9,7 +9,7 @@
   "expect": {
     "exerciseCount": "1",
     "format": "for_time",
-    "loggingModes": "for_time",
+    "logKinds": "score_time",
     "movementNames": "Run, Pull-up, Front Squat, Burpee, Shoulder to Overhead, Toes to Bar",
     "parsed.exercises.0.movements.1.name": "Pull-up",
     "parsed.exercises.0.movements.1.alternative.name": "Ring Row",

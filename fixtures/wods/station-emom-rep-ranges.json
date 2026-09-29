@@ -7,7 +7,7 @@
   },
   "expect": {
     "format": "emom",
-    "loggingModes": "emom",
+    "logKinds": "intervals",
     "movementNames": "Pull-up, Alternating Kettlebell Swing, Box Jump",
     "totals.reps": "220",
     "totals.volume": "2160",

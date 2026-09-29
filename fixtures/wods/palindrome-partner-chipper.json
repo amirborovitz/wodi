@@ -9,7 +9,7 @@
   },
   "expect": {
     "format": "for_time",
-    "loggingModes": "sets, for_time",
+    "logKinds": "load, score_time",
     "hero.value": "30:00",
     "hero.unit": "MIN",
     "movementNames~=": "Box Jump Over, Bar Muscle-up, Box Jump Over"
