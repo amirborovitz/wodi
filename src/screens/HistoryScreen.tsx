@@ -19,7 +19,9 @@ type GalleryFilter = 'all' | 'pr';
 export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
   // The Gallery is the only surface that opts in to test workouts: hiding them everywhere would
   // leave them unreachable to delete, and re-opening one is how a poster change gets checked.
-  const { workouts, loading, deleteWorkout, setWorkoutTest } = useWorkouts(50, { includeTests: true });
+  // Every workout, not the newest N: a cap hid everything older with no way to reach it. The cost
+  // of a long history is paid by PosterThumbnail, which only builds posters near the screen.
+  const { workouts, loading, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER, { includeTests: true });
   const { user } = useAuth();
   const isAdmin = isAdminEmail(user?.email);
   const [filter, setFilter] = useState<GalleryFilter>('all');

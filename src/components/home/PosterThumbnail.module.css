@@ -54,6 +54,12 @@
   width: 100%;
 }
 
+/* Holds the card's place until its poster is built — same shape as Home's loading skeleton. */
+.framePending {
+  aspect-ratio: 120 / 168;
+  background: #16181c;
+}
+
 /* ── Label below the card ─────────────────────────────────────── */
 .label {
   display: flex;
