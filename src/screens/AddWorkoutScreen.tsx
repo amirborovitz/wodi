@@ -32,7 +32,7 @@ import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat } from '../types';
-import { buildLastLoadMap } from '../utils/lastLoadHistory';
+import { buildLastLoadMap, recentLoads } from '../utils/lastLoadHistory';
 import {
   workoutToParsedWorkout,
 } from '../utils/workoutToParsed';
@@ -738,7 +738,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const isAdmin = isAdminEmail(user?.email);
   const canUseSavedWorkouts = isAdminEmail(user?.email);
   const { calculateRewardData } = useRewardData();
-  const { workouts: recentWorkouts } = useWorkouts(10);
+  const { workouts: recentWorkouts } = useWorkouts(50);
   // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
   // workouts already loaded here — no extra query on the logging path.
   const lastMaxReps = useMemo(() => buildLastMaxRepsMap(recentWorkouts), [recentWorkouts]);
@@ -1970,6 +1970,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const chatBoardIdRef = useRef<string | null>(plannedWorkout?.chat ? plannedWorkout.id : null);
   const chatBoardCreateRef = useRef<Promise<string> | null>(null);
   const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
+  const loadHistory = useMemo(() => recentLoads(recentWorkouts), [recentWorkouts]);
 
   const keepChat = async (chat: SavedChat, workout: ParsedWorkout): Promise<void> => {
     if (!user?.id) return;
@@ -2008,6 +2009,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       { blankAnswers: true },
     ),
     lastLoads,
+    history: loadHistory,
+    athleteSex: user?.sex,
     onPersist: (chat, workout) => { void keepChat(chat, workout); },
     onFinished: (results, vibe, chat) => {
       chatVibeRef.current = vibe;

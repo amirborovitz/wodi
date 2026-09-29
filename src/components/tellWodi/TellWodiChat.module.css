@@ -69,6 +69,11 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--sp-4);
+}
+
+/* The measured content: its height changing is what keeps the thread pinned to the newest
+   message (see useChatViewport). Carries the gap the thread used to. */
+.threadContent {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);

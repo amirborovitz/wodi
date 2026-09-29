@@ -31,6 +31,7 @@ export function ChatTranscriptSheet({ chat, title, onClose }: ChatTranscriptShee
         <h1 className={styles.title}>{title}</h1>
       </header>
       <div className={styles.thread}>
+        <div className={styles.threadContent}>
         {chat.messages.map((message, i) => (
           <div key={`${message.at}-${i}`} className={message.from === 'me' ? styles.rowMe : styles.rowWodi}>
             <div className={message.from === 'me' ? styles.bubbleMe : styles.bubbleWodi}>
@@ -39,6 +40,7 @@ export function ChatTranscriptSheet({ chat, title, onClose }: ChatTranscriptShee
             </div>
           </div>
         ))}
+        </div>
       </div>
     </motion.div>
   );

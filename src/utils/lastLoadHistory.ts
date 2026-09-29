@@ -43,3 +43,38 @@ export function buildLastLoadMap(workouts: Workout[]): Map<string, LastLoad> {
   }
   return last;
 }
+
+/** One lift the athlete logged, at the load they last used for it. */
+export interface LoggedLoad {
+  movement: string;
+  load: string;
+  date: Date;
+}
+
+/** The family a lift belongs to — Hang Power Clean and Power Clean are both "Barbell Clean". */
+export function liftFamilyKey(movementName: string): string {
+  return resolveMovement(movementName).familyLabel.toLowerCase();
+}
+
+/**
+ * Every lift the athlete has logged with a load, once each at its latest load, newest first —
+ * what Wodi's weight advice is allowed to reason from. Same saved-breakdown source as
+ * buildLastLoadMap, so advice can only ever cite a number the athlete actually lifted.
+ */
+export function recentLoads(workouts: Workout[], max = 30): LoggedLoad[] {
+  const seen = new Set<string>();
+  const out: LoggedLoad[] = [];
+  for (const workout of workouts) {
+    if (workout.isTest) continue;
+    for (const movement of workout.workloadBreakdown?.movements ?? []) {
+      const key = lastLoadKey(movement.name);
+      if (seen.has(key)) continue;
+      const load = formatPosterLoad(movement);
+      if (!load) continue;
+      seen.add(key);
+      out.push({ movement: movement.name, load, date: getEffectiveWorkoutDate(workout) });
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}

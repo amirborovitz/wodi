@@ -19,7 +19,7 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const { messages, busy, send, tapChip, canOpenForms, openForms } = chat;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
-  const { threadRef, scrollToEnd, screenStyle } = useChatViewport(
+  const { threadRef, contentRef, onThreadScroll, pinToEnd, screenStyle } = useChatViewport(
     `${messages.length}:${messages.filter((m) => m.answered).length}:${busy}`,
   );
 
@@ -27,6 +27,8 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
   const submit = (): void => {
     if (!canSend) return;
     send(draft, photo);
+    // Your own message always brings you back to the bottom, even if you'd scrolled up.
+    pinToEnd();
     setDraft('');
     setPhoto(null);
   };
@@ -49,7 +51,8 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
         )}
       </header>
 
-      <div className={styles.thread} ref={threadRef}>
+      <div className={styles.thread} ref={threadRef} onScroll={onThreadScroll}>
+        <div className={styles.threadContent} ref={contentRef}>
         <AnimatePresence initial={false}>
           {messages.map((message) => (
             <motion.div
@@ -65,7 +68,7 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
                   message.answered ? styles.bubbleAnswered : '',
                 ].join(' ')}
               >
-                {message.imageUrl && <img className={styles.photo} src={message.imageUrl} alt="Workout board" onLoad={scrollToEnd} />}
+                {message.imageUrl && <img className={styles.photo} src={message.imageUrl} alt="Workout board" />}
                 {!message.imageUrl && message.hadPhoto && <p className={styles.photoNote}>Board photo</p>}
                 {message.text && <p className={styles.text}>{message.text}</p>}
                 {message.suggestions && (
@@ -73,11 +76,19 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
                     {message.suggestions.map((s) => (
                       <li key={s.movement} className={styles.suggestion}>
                         <span className={styles.suggestionName}>{s.movement}</span>
-                        <span className={styles.suggestionLine}>
-                          {s.last
-                            ? `Last time: ${s.last.load} (${s.last.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})`
-                            : 'Last time: not logged yet'}
-                        </span>
+                        {s.last && (
+                          <span className={styles.suggestionLine}>
+                            Last time: {s.last.load} ({s.last.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})
+                          </span>
+                        )}
+                        {s.related.map((r) => (
+                          <span key={r.movement} className={styles.suggestionLine}>
+                            {r.movement}: {r.load} ({r.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})
+                          </span>
+                        ))}
+                        {!s.last && s.related.length === 0 && (
+                          <span className={styles.suggestionLine}>Not logged yet</span>
+                        )}
                         {s.rx && <span className={styles.suggestionLine}>Board says: {s.rx}</span>}
                       </li>
                     ))}
@@ -93,7 +104,7 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
                       className={chip.label === 'Skip' ? styles.chipSkip : styles.chip}
                       whileTap={{ scale: 0.97 }}
                       disabled={busy != null}
-                      onClick={() => tapChip(message.id, chip)}
+                      onClick={() => { tapChip(message.id, chip); pinToEnd(); }}
                     >
                       {chip.label}
                     </motion.button>
@@ -116,6 +127,7 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       <footer className={styles.composer}>

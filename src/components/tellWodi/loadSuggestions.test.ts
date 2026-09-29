@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, Workout } from '../../types';
 import { createBlankResult } from '../logging/story/types';
-import { buildLastLoadMap } from '../../utils/lastLoadHistory';
+import { buildLastLoadMap, recentLoads } from '../../utils/lastLoadHistory';
 import { buildLoadSuggestions } from './loadSuggestions';
 
 const workout = (date: string, movements: Workout['workloadBreakdown'] extends infer B ? B extends { movements: infer M } ? M : never : never, extra: Partial<Workout> = {}): Workout => ({
@@ -56,4 +56,25 @@ describe('suggestions before a workout', () => {
     expect(suggestions[0]).toMatchObject({ rx: '15/22.5kg', last: { load: '17.5kg' } });
     expect(suggestions[1].last).toBeUndefined();
   });
+
+  it('a lift with no history of its own shows the related lifts that have some', () => {
+    const cleanBoard = {
+      name: '5 RFT', type: 'wod', loggingMode: 'for_time', prescription: '5 RFT: 300m run, 8 power cleans @40/60kg, 10 burpees',
+      movements: [
+        { name: 'Power Clean', reps: 8, rxWeights: { male: 60, female: 40, unit: 'kg' }, inputType: 'weight', equipment: 'barbell' },
+        { name: 'Burpee', reps: 10, inputType: 'none', equipment: 'none' },
+      ],
+    } as unknown as ParsedExercise;
+    const history = [
+      workout('2026-09-23', [
+        { name: 'Hang Power Clean', totalReps: 56, weight: 40, unit: 'kg' },
+        { name: 'Pull-up', totalReps: 48 },
+      ]),
+    ];
+    const results = [createBlankResult(cleanBoard, 0, 'for_time', 'male', undefined, true, { blankAnswers: true })];
+    const [clean] = buildLoadSuggestions(results, buildLastLoadMap(history), recentLoads(history));
+    expect(clean.last).toBeUndefined();
+    expect(clean.related.map((r) => `${r.movement} ${r.load}`)).toEqual(['Hang Power Clean 40kg']);
+  });
 });
+

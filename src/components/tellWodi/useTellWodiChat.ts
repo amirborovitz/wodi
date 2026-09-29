@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ParsedWorkout, PosterVibeKey, SavedChat } from '../../types';
 import type { StoryExerciseResult } from '../logging/story/types';
 import { readAthleteMessage, type ChatTurn } from '../../services/tellWodiReader';
-import type { LastLoad } from '../../utils/lastLoadHistory';
+import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
+import { adviseWeights } from '../../services/tellWodiCoach';
 import {
   applyAnswer,
   chatCannotLog,
@@ -51,6 +52,9 @@ interface UseTellWodiChatArgs {
   buildResults: (workout: ParsedWorkout) => StoryExerciseResult[];
   /** The athlete's last logged load per movement (see lastLoadHistory). */
   lastLoads: ReadonlyMap<string, LastLoad>;
+  /** Every lift they've logged at its latest load — what weight advice may reason from. */
+  history: LoggedLoad[];
+  athleteSex?: string;
   /** Keep the conversation — called whenever it changes once there is a board. */
   onPersist: (chat: SavedChat, workout: ParsedWorkout) => void;
   /** Everything answered: save it exactly like the forms do. */
@@ -104,13 +108,14 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
     .map((s) => [
       s.movement,
       s.last ? `last time ${s.last.load} (${s.last.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})` : null,
+      ...s.related.map((r) => `${r.movement} ${r.load} (${r.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })})`),
       s.rx ? `board ${s.rx}` : null,
     ].filter(Boolean).join(' · '))
     .join('\n');
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, onPersist, onFinished, onOpenForms,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms,
 }: UseTellWodiChatArgs): TellWodiChat {
   const [messages, setMessages] = useState<ChatMessage[]>([{ id: nextId(), from: 'wodi', text: GREETING, at: Date.now() }]);
   const [busy, setBusy] = useState<ChatBusy>(null);
@@ -124,8 +129,8 @@ export function useTellWodiChat({
   const vibeRef = useRef<PosterVibeKey | null>(null);
   const waitingRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, onPersist, onFinished, onOpenForms });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, onPersist, onFinished, onOpenForms }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms }; });
 
   const commit = useCallback((next: ChatMessage[]): void => {
     messagesRef.current = next;
@@ -201,12 +206,31 @@ export function useTellWodiChat({
     finish();
   };
 
-  /** Heading in: the athlete's own last loads against the board, then park the chat on Today. */
-  const parkBeforeWorkout = (): void => {
-    const suggestions = buildLoadSuggestions(resultsRef.current, callbacks.current.lastLoads);
+  /**
+   * Heading in: the athlete's own history against the board, Wodi's actual weight advice built on
+   * it, then the chat parks on Today until they're back.
+   */
+  const parkBeforeWorkout = async (question: string): Promise<void> => {
+    const { lastLoads: last, history: logged, athleteSex: sex } = callbacks.current;
+    const suggestions = buildLoadSuggestions(resultsRef.current, last, logged);
     if (suggestions.length > 0) {
       push({ from: 'wodi', text: "Here's where you've been on the weights:" });
       push({ from: 'wodi', suggestions });
+      setBusy('thinking');
+      try {
+        const advice = await adviseWeights({
+          boardText: workoutRef.current?.rawText ?? '',
+          question,
+          sex,
+          movements: suggestions,
+          history: logged,
+        });
+        if (advice) push({ from: 'wodi', text: advice });
+      } catch (err) {
+        console.error('[TellWodi] weight advice failed', err);
+      } finally {
+        setBusy(null);
+      }
     }
     waitingRef.current = true;
     push({ from: 'wodi', text: "I'll keep this on Today. Come back after and tell me how it went." });
@@ -227,8 +251,8 @@ export function useTellWodiChat({
       });
       settleQuestions();
       if (reading.beforeWorkout) {
-        if (reading.reaction) push({ from: 'wodi', text: reading.reaction });
-        parkBeforeWorkout();
+        // The advice is the answer; a "good luck" line before it is noise.
+        await parkBeforeWorkout(text);
         return;
       }
       if (reading.vibe) vibeRef.current = reading.vibe;
@@ -296,7 +320,7 @@ export function useTellWodiChat({
     }
     push({ from: 'me', text: chip.label });
     if (chip.action === 'later') {
-      parkBeforeWorkout();
+      void parkBeforeWorkout('');
       return;
     }
     if (chip.action !== 'done') applyAnswers(chip.answers ?? [], openSlots(resultsRef.current, closedRef.current));
