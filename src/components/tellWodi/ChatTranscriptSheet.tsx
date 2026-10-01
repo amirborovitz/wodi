@@ -35,7 +35,8 @@ export function ChatTranscriptSheet({ chat, title, onClose }: ChatTranscriptShee
         {chat.messages.map((message, i) => (
           <div key={`${message.at}-${i}`} className={message.from === 'me' ? styles.rowMe : styles.rowWodi}>
             <div className={message.from === 'me' ? styles.bubbleMe : styles.bubbleWodi}>
-              {message.hadPhoto && <p className={styles.photoNote}>Board photo</p>}
+              {message.imageUrl && <img className={styles.photo} src={message.imageUrl} alt="Workout board" />}
+              {!message.imageUrl && message.hadPhoto && <p className={styles.photoNote}>Board photo</p>}
               {message.text && <p className={styles.text}>{message.text}</p>}
             </div>
           </div>

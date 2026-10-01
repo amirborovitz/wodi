@@ -38,6 +38,20 @@ export interface User {
    * doc is the only way Safari learns the athlete already has the icon.
    */
   addedToHomeScreen?: boolean;
+  /**
+   * What the athlete has told Wodi to remember — an injury, a goal, the kit at home. Each one
+   * was proposed by Wodi and confirmed by the athlete; nothing lands here silently. Private: this
+   * doc is owner-only and `toPublicProfile` never copies it. See services/wodiAgent/athleteNotes.ts.
+   */
+  wodiNotes?: WodiNote[];
+}
+
+export interface WodiNote {
+  id: string;
+  /** One short line, as Wodi proposed it and the athlete accepted it. */
+  text: string;
+  /** YYYY-MM-DD — a note ages ("shoulder sore" from June isn't news), so the date travels with it. */
+  createdAt: string;
 }
 
 export interface UserStats {
@@ -888,6 +902,8 @@ export interface SavedChatMessage {
   from: 'wodi' | 'me';
   text?: string;
   hadPhoto?: boolean;
+  /** The uploaded board photo — absent on chats kept before photos were stored, or if the upload failed. */
+  imageUrl?: string;
   at: number;
 }
 

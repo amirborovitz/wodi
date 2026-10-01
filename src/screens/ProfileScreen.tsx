@@ -10,6 +10,8 @@ import { HANDOFF_MIN_WORKOUTS } from '../services/export/coachHandoff';
 import { MeWrappedHub } from '../components/recap/MeWrappedHub';
 import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
 import { Toast, useToast } from '../components/ui/Toast';
+import { WodiMemoryCard } from '../components/tellWodi/WodiMemoryCard';
+import { useWodiMemory } from '../hooks/useWodiMemory';
 import { DEFAULT_BW } from '../utils/xpCalculations';
 import { aggregateStats } from '../utils/statsAggregation';
 import { computeWeekStreak } from '../utils/weekStreak';
@@ -32,6 +34,7 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
   const profile = useProfileCompleteness();
   const homeScreenInstall = useHomeScreenInstall(workouts.length > 0);
   const toast = useToast();
+  const wodiMemory = useWodiMemory(workouts);
 
   const totalWorkouts = workouts.length;
   const showHandoff = totalWorkouts >= HANDOFF_MIN_WORKOUTS && Boolean(onOpenHandoff);
@@ -183,6 +186,8 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
           </button>
         )}
       </div>
+
+      <WodiMemoryCard data={wodiMemory} />
 
       <Toast message={toast.message} />
 

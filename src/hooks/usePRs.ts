@@ -11,6 +11,26 @@ interface UsePRsResult {
   refresh: () => Promise<void>;
 }
 
+/** Every PR event an athlete has, newest first — the one read of the `personalRecords` collection. */
+export async function fetchPersonalRecords(userId: string): Promise<PersonalRecord[]> {
+  const q = query(
+    collection(db, 'personalRecords'),
+    where('userId', '==', userId),
+    orderBy('date', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      movement: data.movement,
+      weight: data.weight,
+      date: data.date?.toDate() || new Date(),
+      workoutId: data.workoutId,
+    };
+  });
+}
+
 export function usePRs(): UsePRsResult {
   const { user } = useAuth();
   const [prs, setPRs] = useState<PersonalRecord[]>([]);
@@ -28,26 +48,7 @@ export function usePRs(): UsePRsResult {
       setLoading(true);
       setError(null);
 
-      const prsRef = collection(db, 'personalRecords');
-      const q = query(
-        prsRef,
-        where('userId', '==', user.id),
-        orderBy('date', 'desc')
-      );
-      const snapshot = await getDocs(q);
-
-      const prData: PersonalRecord[] = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          movement: data.movement,
-          weight: data.weight,
-          date: data.date?.toDate() || new Date(),
-          workoutId: data.workoutId,
-        };
-      });
-
-      setPRs(prData);
+      setPRs(await fetchPersonalRecords(user.id));
     } catch (err) {
       console.error('Error fetching PRs:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch PRs'));

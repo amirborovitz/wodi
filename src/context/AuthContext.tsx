@@ -20,7 +20,8 @@ import { removeUndefined } from '../utils/firestoreUtils';
 import { isHomeScreenApp } from '../utils/homeScreenApp';
 import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
 import { toPublicProfile } from '../services/feed/types';
-import type { User, UserStats } from '../types';
+import { readWodiNotes } from '../services/wodiAgent/athleteNotes';
+import type { User, UserStats, WodiNote } from '../types';
 
 export interface UserProfileUpdate {
   displayName?: string;
@@ -36,6 +37,8 @@ export interface UserProfileUpdate {
   gym?: string;
   location?: string;
   instagram?: string;
+  /** The whole list, written at once — see services/wodiAgent/athleteNotes.ts. */
+  wodiNotes?: WodiNote[];
 }
 
 interface AuthContextValue {
@@ -227,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       location: data.location,
       instagram: data.instagram,
       addedToHomeScreen: data.addedToHomeScreen === true || fromHomeScreen,
+      wodiNotes: readWodiNotes(data.wodiNotes),
     };
   };
 

@@ -1,5 +1,6 @@
 import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from './openai';
-import type { PosterVibeKey } from '../types';
+import type { PosterVibeKey, WodiNote } from '../types';
+import { notesForPrompt } from './wodiAgent/athleteNotes';
 import type { ChatSlot, SlotAnswer } from '../components/tellWodi/chatQuestions';
 
 /**
@@ -20,6 +21,8 @@ export interface ChatReading {
   beforeWorkout: boolean;
   vibe: PosterVibeKey | null;
   answers: SlotAnswer[];
+  /** Something lasting they said about themselves, for the chat to OFFER to remember. Never saved here. */
+  remember: string | null;
 }
 
 export interface ChatTurn {
@@ -37,11 +40,12 @@ const READING_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['reaction', 'beforeWorkout', 'vibe', 'answers'],
+    required: ['reaction', 'beforeWorkout', 'vibe', 'answers', 'remember'],
     properties: {
       reaction: { type: 'string' },
       beforeWorkout: { type: 'boolean' },
       vibe: { anyOf: [{ type: 'string', enum: VIBES }, { type: 'null' }] },
+      remember: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       answers: {
         type: 'array',
         items: {
@@ -87,6 +91,10 @@ just finished a workout and is texting you about it. Your job has two parts.
      ("Echo Bike"). swapAmount = how much of it for ONE occurrence, in that movement's own unit
      (metres, calories or reps), ONLY if they said it ("600m on the bike" → 600); otherwise null.
      Only answer the swap question of the movement they replaced.
+     A swap question with "usually" was ASKED ("Echo Bike again instead of the Run?"): "yes",
+     "same", "as usual" → swapTo = the "usually" value; "no, I ran" / did it as written →
+     skipped = true.
+   - A choice question with "usually": "yes" / "same as always" picks the "usually" option.
    - If they say they don't know / didn't track / want to skip a question, answer it with
      skipped = true.
    - Every field you don't use is null.
@@ -103,13 +111,21 @@ false. When it's true, answer no questions and react like a friend wishing them 
 
 Also set "vibe" if they said how it felt, mapping to the closest of:
 chill (easy, relaxed) · solid (good, strong) · sweaty (worked hard) · cooked (tired, spent) ·
-smoked (really hard) · wrecked (destroyed, "almost died"). Otherwise null.`;
+smoked (really hard) · wrecked (destroyed, "almost died"). Otherwise null.
+
+Set "remember" ONLY when they tell you something lasting about themselves that should shape future
+workouts — an injury or niggle ("my shoulder's been bad"), a goal or event, the kit they have at home,
+how they like to train. One short note in the third person ("Left shoulder sore — avoiding overhead").
+Today's numbers, how today felt, and anything already in WHAT THEY'VE ASKED YOU TO REMEMBER are never
+a note. Otherwise null. They'll be asked to confirm it.`;
 
 export async function readAthleteMessage(input: {
   boardText: string;
   slots: ChatSlot[];
   recent: ChatTurn[];
   message: string;
+  /** Their confirmed notes, so a note already kept isn't offered again. */
+  notes: readonly WodiNote[];
 }): Promise<ChatReading> {
   const questions = input.slots.map((s) => ({
     id: s.id,
@@ -118,6 +134,7 @@ export async function readAthleteMessage(input: {
     ...(s.movementNames ? { movements: s.movementNames } : {}),
     ...(s.options ? { options: s.options } : {}),
     ...(s.unit ? { unit: s.unit } : {}),
+    ...(s.usually ? { usually: s.usually } : {}),
   }));
   const conversation = input.recent
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)
@@ -136,6 +153,7 @@ export async function readAthleteMessage(input: {
           `THE BOARD:\n${input.boardText.trim() || '(no board text)'}`,
           `OPEN QUESTIONS:\n${JSON.stringify(questions, null, 2)}`,
           conversation ? `CONVERSATION SO FAR:\n${conversation}` : '',
+          `WHAT THEY'VE ASKED YOU TO REMEMBER:\n${notesForPrompt(input.notes)}`,
           `THE ATHLETE'S NEW MESSAGE:\n${input.message}`,
         ].filter(Boolean).join('\n\n'),
       },
@@ -153,5 +171,6 @@ export async function readAthleteMessage(input: {
     vibe: data.vibe && VIBES.includes(data.vibe) ? data.vibe : null,
     // Only ids the app asked about — the model answering a question nobody asked is dropped.
     answers: (data.answers ?? []).filter((a): a is SlotAnswer => !!a && known.has(a.id)),
+    remember: typeof data.remember === 'string' && data.remember.trim() ? data.remember.trim() : null,
   };
 }

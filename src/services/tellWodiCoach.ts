@@ -1,6 +1,8 @@
 import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from './openai';
 import type { LoadSuggestion } from '../components/tellWodi/loadSuggestions';
 import type { LoggedLoad } from '../utils/lastLoadHistory';
+import type { WodiNote } from '../types';
+import { notesForPrompt } from './wodiAgent/athleteNotes';
 
 /**
  * Wodi's answer to "which weight should I use?" before a workout.
@@ -17,6 +19,8 @@ export interface WeightAdviceInput {
   sex?: string;
   movements: LoadSuggestion[];
   history: LoggedLoad[];
+  /** What they've asked Wodi to remember — a sore shoulder changes the advice. */
+  notes: readonly WodiNote[];
 }
 
 const PROMPT = `You are Wodi, a friendly CrossFit coach-buddy. The athlete is about to do the workout on
@@ -32,6 +36,8 @@ Rules:
   than a strength-day load.
 - If there's no history for a movement, say so plainly and anchor on the Rx for their sex (female =
   the lighter number when the board writes two), with a scaled option.
+- Respect what they've asked you to remember (an injury, the kit they have): a recent niggle changes the
+  suggestion for the movements it touches — say so in a few words.
 - Never compare them to anyone else. No lectures, no safety boilerplate.
 - Plain text, max 4 short lines. One line per movement is ideal. No markdown, no bullet symbols.`;
 
@@ -60,6 +66,7 @@ export async function adviseWeights(input: WeightAdviceInput): Promise<string> {
           `ATHLETE: ${input.sex === 'female' ? 'female' : input.sex === 'male' ? 'male' : 'not specified'}`,
           `LOADED MOVEMENTS TODAY:\n${JSON.stringify(movements, null, 2)}`,
           `ALL THEIR RECENT LOGGED LOADS (newest first):\n${history.length ? history.join('\n') : '(none logged yet)'}`,
+          `WHAT THEY'VE ASKED YOU TO REMEMBER:\n${notesForPrompt(input.notes)}`,
           `THEIR QUESTION:\n${input.question || 'What weights should I use?'}`,
         ].join('\n\n'),
       },

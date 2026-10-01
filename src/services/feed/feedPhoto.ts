@@ -69,10 +69,10 @@ async function downscale(file: File): Promise<Blob> {
  * later — neither a Firestore field delete nor a TTL removes the file.
  */
 async function uploadImage(
-  userId: string, file: File, prefix: string,
+  userId: string, file: File, prefix: string, folder: 'feedPhotos' | 'users' = 'feedPhotos',
 ): Promise<{ url: string; path: string }> {
   const blob = await downscale(file);
-  const path = `feedPhotos/${userId}/${prefix}${Date.now()}.jpg`;
+  const path = `${folder}/${userId}/${prefix}${Date.now()}.jpg`;
   const objectRef = ref(storage, path);
   await uploadBytes(objectRef, blob, { contentType: 'image/jpeg' });
   return { url: await getDownloadURL(objectRef), path };
@@ -95,6 +95,15 @@ export async function uploadPosterPhoto(userId: string, file: File): Promise<Pos
  */
 export async function uploadFeedPhoto(userId: string, file: File): Promise<FeedPhoto> {
   return uploadImage(userId, file, 'post-');
+}
+
+/**
+ * The board photo sent to Tell Wodi, so a reopened chat (and the transcript on the logged workout)
+ * shows the board rather than a "Board photo" placeholder. Private: it lives beside the avatar
+ * under users/{uid}/, which only the owner can read — the feed never sees it.
+ */
+export async function uploadBoardPhoto(userId: string, file: File): Promise<string> {
+  return (await uploadImage(userId, file, 'board-', 'users')).url;
 }
 
 export async function deleteStoredImage(path: string): Promise<void> {

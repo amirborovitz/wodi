@@ -22,7 +22,6 @@ import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
 import { useAppVersion } from './hooks/useAppVersion';
-import { isAdminEmail } from './utils/admin';
 import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import './styles/variables.css';
@@ -280,15 +279,14 @@ function AppContent() {
               setStartInChat(false);
               setCurrentScreen('add-workout');
             }}
-            // Admin-only while it's being tried on real workouts; then it opens to everyone.
-            onTellWodi={isAdminEmail(user?.email) ? () => {
+            onTellWodi={() => {
               setEditingWorkout(null);
               setPendingImage(null);
               setPendingPlannedWorkout(null);
               setShowRecentWorkoutsOnOpen(false);
               setStartInChat(true);
               setCurrentScreen('add-workout');
-            } : undefined}
+            }}
             onImageSelected={handleImageSelected}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {

@@ -30,8 +30,8 @@ const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
   onAddWorkout: () => void;
-  /** Log by chatting instead of the forms. Omitted → the button isn't shown. */
-  onTellWodi?: () => void;
+  /** Log by chatting instead of the forms. */
+  onTellWodi: () => void;
   onImageSelected?: (file: File) => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
@@ -368,22 +368,20 @@ export function HomeScreen({
           </div>
         </motion.button>
 
-        {onTellWodi && (
-          <motion.button
-            type="button"
-            className={styles.tellWodiCTA}
-            onClick={onTellWodi}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.28 }}
-          >
-            <svg className={styles.tellWodiIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 5h14v10H10l-4 4v-4H5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-            </svg>
-            <span className={styles.tellWodiTitle}>Tell Wodi</span>
-            <span className={styles.tellWodiHint}>just say what you did</span>
-          </motion.button>
-        )}
+        <motion.button
+          type="button"
+          className={styles.tellWodiCTA}
+          onClick={onTellWodi}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08, duration: 0.28 }}
+        >
+          <svg className={styles.tellWodiIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M5 5h14v10H10l-4 4v-4H5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          </svg>
+          <span className={styles.tellWodiTitle}>Tell Wodi</span>
+          <span className={styles.tellWodiHint}>just say what you did</span>
+        </motion.button>
 
         {/* ── The observation slot ──
             One line under the hero, carrying whichever of the two computed observations is

@@ -1,0 +1,97 @@
+/* Same surface as the Me nav rows — a quiet card, no accent: Records keeps the only yellow on Me. */
+.card {
+  margin: 10px 16px 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: #141618;
+  border: 1px solid rgba(242, 240, 235, 0.12);
+}
+
+.eyebrow,
+.subEyebrow {
+  margin: 0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.38);
+}
+
+.subEyebrow {
+  margin-top: 16px;
+  font-size: 10px;
+  color: rgba(242, 240, 235, 0.22);
+}
+
+.list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(242, 240, 235, 0.08);
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowLabel {
+  display: block;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f2f0eb;
+  overflow-wrap: anywhere;
+}
+
+.rowSub {
+  display: block;
+  margin-top: 2px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  color: rgba(242, 240, 235, 0.38);
+}
+
+.forget {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.38);
+  cursor: pointer;
+}
+
+.forget:active {
+  color: #f2f0eb;
+}
+
+.empty,
+.footnote {
+  margin: 8px 0 0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(242, 240, 235, 0.38);
+}
+
+.footnote {
+  color: rgba(242, 240, 235, 0.22);
+}

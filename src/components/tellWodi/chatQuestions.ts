@@ -5,6 +5,9 @@ import { getScoredBlocks } from '../logging/story/blockScoping';
 import { hasMaxSet } from '../../services/blockScore';
 import { parseTimeCapSeconds } from '../../utils/timeCap';
 import { movementLoadUnit } from '../../utils/loadUnits';
+import { habitKey, type SwapHabit } from '../../services/wodiAgent/athleteHabits';
+
+const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
 
 /**
  * What the chat still needs to know, and how an answer lands on the workout.
@@ -45,6 +48,11 @@ export interface ChatSlot {
   unit?: string;
   /** Asked out loud. A slot that isn't is still offered to the AI, filled only if mentioned. */
   asked: boolean;
+  /**
+   * What the athlete usually does instead (see athleteHabits.ts). On a swap it turns the silent
+   * slot into a question; on a choice it puts their usual side first. Offered, never filled in.
+   */
+  usually?: string;
 }
 
 /** One answer, as the AI (or a tapped chip) gives it. Every value is nullable: blank is an answer. */
@@ -132,9 +140,14 @@ function rxPair(mr: MovementResult | undefined): number[] | undefined {
 /**
  * Every slot the chat could still fill, in the order it asks: the score first (it IS the
  * workout's result), then loads, then the board's either/or choices, then anything optional.
- * `closed` holds ids already answered or skipped.
+ * `closed` holds ids already answered or skipped. `habits` are the athlete's usual swaps, keyed by
+ * `habitKey` of the board's movement.
  */
-export function openSlots(results: StoryExerciseResult[], closed: ReadonlySet<string>): ChatSlot[] {
+export function openSlots(
+  results: StoryExerciseResult[],
+  closed: ReadonlySet<string>,
+  habits: ReadonlyMap<string, SwapHabit> = NO_HABITS,
+): ChatSlot[] {
   const multiPart = results.length > 1;
   const scores: ChatSlot[] = [];
   const loads: ChatSlot[] = [];
@@ -190,21 +203,28 @@ export function openSlots(results: StoryExerciseResult[], closed: ReadonlySet<st
 
     for (const mr of distinctChoiceMovements(r)) {
       if (mr.substitution) continue;
+      const alternative = mr.movement.alternative!.name;
+      const habit = habits.get(habitKey(mr.movement.name));
       push(choices, {
         id: `${i}.choice.${mr.movement.name.toLowerCase()}`, kind: 'choice', exerciseIndex: i,
         subject: mr.sectionType === 'cash_out' ? 'Cash-out' : mr.sectionType === 'buy_in' ? 'Buy-in' : mr.movement.name,
         movementNames: [mr.movement.name],
-        options: [mr.movement.name, mr.movement.alternative!.name], asked: true,
+        options: [mr.movement.name, alternative], asked: true,
+        ...(habit && habitKey(habit.usually) === habitKey(alternative) ? { usually: alternative } : {}),
       });
     }
 
-    // Swaps are never asked — Rx unless they say otherwise — but the athlete mentions them all
-    // the time ("switched the run to echo bike"), so every movement is open to one.
+    // Swaps aren't asked — Rx unless they say otherwise — but the athlete mentions them all the
+    // time ("switched the run to echo bike"), so every movement is open to one. The exception is a
+    // swap they make most times: that one is asked, their usual answer first. A movement with a
+    // board choice is left to the choice question, so it's never asked about twice.
     for (const mr of distinctMovements(r)) {
       if (mr.substitution) continue;
-      push(optional, {
+      const habit = mr.movement.alternative?.name ? undefined : habits.get(habitKey(mr.movement.name));
+      push(habit ? choices : optional, {
         id: `${i}.swap.${mr.movement.name.toLowerCase()}`, kind: 'swap', exerciseIndex: i,
-        subject: mr.movement.name, movementNames: [mr.movement.name], asked: false,
+        subject: mr.movement.name, movementNames: [mr.movement.name], asked: !!habit,
+        ...(habit ? { usually: habit.usually } : {}),
       });
     }
 
@@ -465,18 +485,39 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
       const [asWritten, alternative] = first.options ?? [];
       const mr = result?.movementResults?.find((m) => m.movement.name === first.movementNames?.[0]);
       const qty = (n?: number): string => (n ? `${n} ` : '');
+      const sides: ChatChip[] = [
+        { label: `${qty(mr?.movement.reps)}${asWritten}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
+        { label: `${qty(mr?.movement.alternative?.reps)}${alternative}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
+      ];
+      const prefix = first.subject === first.movementNames?.[0] ? '' : `${first.subject}: `;
+      // Their usual side goes first and is named as usual — still a question, never a pre-fill.
+      return first.usually
+        ? {
+            text: `${prefix}${alternative} again, or ${asWritten} today?`,
+            slotIds: [first.id],
+            chips: [sides[1], sides[0], skipChip([first.id])],
+          }
+        : {
+            text: `${prefix}${asWritten} or ${alternative}?`,
+            slotIds: [first.id],
+            chips: [...sides, skipChip([first.id])],
+          };
+    }
+    case 'swap': {
+      // Only asked when it's their habit (see openSlots). "As written" closes it with nothing
+      // changed — the same as a skip, which is exactly what doing the board's movement means.
+      const usual = first.usually;
+      if (!usual) return null;
       return {
-        text: `${first.subject === first.movementNames?.[0] ? '' : `${first.subject}: `}${asWritten} or ${alternative}?`,
+        text: `${usual} again instead of the ${first.subject}?`,
         slotIds: [first.id],
         chips: [
-          { label: `${qty(mr?.movement.reps)}${asWritten}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
-          { label: `${qty(mr?.movement.alternative?.reps)}${alternative}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
-          skipChip([first.id]),
+          { label: `${usual} again`, answers: [{ id: first.id, ...EMPTY_ANSWER, swapTo: usual }] },
+          { label: `Did the ${first.subject}`, answers: [{ id: first.id, ...EMPTY_ANSWER, skipped: true }] },
         ],
       };
     }
     case 'sets':
-    case 'swap':
       return null;
   }
 }

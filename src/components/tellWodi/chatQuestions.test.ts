@@ -4,7 +4,8 @@ import { createBlankResult } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
 import { EMPTY_ANSWER, applyAnswer, isComplete, nextQuestion, openSlots, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
-import type { ParsedWorkout } from '../../types';
+import type { ParsedWorkout, Workout } from '../../types';
+import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
 
 // The Ladder, 2026-09-22: 3 / 2 / 1 rounds of the same four movements, then 200 DU or 400 singles.
 const rx = { male: 22.5, female: 15, unit: 'kg' as const };
@@ -137,6 +138,59 @@ describe('Tell Wodi — what the chat asks', () => {
     const bike = saved.movements.find((m) => m.name === 'Echo Bike');
     expect(bike?.totalDistance).toBe(5400);
     expect(saved.movements.some((m) => m.name === 'Run')).toBe(false);
+  });
+
+  describe('habits — offered, never filled in', () => {
+    const bikeHabit = new Map([[habitKey('Run'), { movement: 'Run', usually: 'Echo Bike', times: 3, seen: 4, lastDate: '2026-09-20' }]]);
+    const singlesHabit = new Map([[habitKey('Double Under'), { movement: 'Double Under', usually: 'Single Under', times: 2, seen: 2, lastDate: '2026-09-20' }]]);
+    const closedUpTo = new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up', '0.choice.double under']);
+
+    it('a swap they usually make is asked, their usual answer first — and nothing is changed until they answer', () => {
+      const results = blank();
+      const slots = openSlots(results, closedUpTo, bikeHabit);
+      const question = nextQuestion(slots, results)!;
+      expect(question.text).toBe('Echo Bike again instead of the Run?');
+      expect(question.chips.map((c) => c.label)).toEqual(['Echo Bike again', 'Did the Run']);
+      expect(results[0].movementResults?.find((mr) => mr.movement.name === 'Run')?.substitution).toBeFalsy();
+    });
+
+    it('"Did the Run" closes it with the run as written', () => {
+      const results = blank();
+      const slots = openSlots(results, closedUpTo, bikeHabit);
+      const [, ran] = nextQuestion(slots, results)!.chips;
+      const slot = slots.find((s) => s.id === '0.swap.run')!;
+      const outcome = applyAnswer(results, slot, ran.answers[0]);
+      expect(outcome.closed).toBe(true);
+      expect(outcome.results[0].movementResults?.find((mr) => mr.movement.name === 'Run')?.substitution).toBeFalsy();
+    });
+
+    it('what the chat saves for "Echo Bike again" is what the habit reads back next time', () => {
+      let results = blank();
+      const slots = openSlots(results, closedUpTo, bikeHabit);
+      const [again] = nextQuestion(slots, results)!.chips;
+      results = applyAnswer(results, slots.find((s) => s.id === '0.swap.run')!, again.answers[0]).results;
+
+      const workout = { title: 'L', type: 'for_time', format: 'for_time', exercises: [ladder], rawText: '' } as unknown as ParsedWorkout;
+      const breakdown = buildWorkloadBreakdownFromResults([toLegacyResult({ ...results[0], timeSeconds: 1320 })] as unknown as ExerciseResult[], workout, 1);
+      const saved = (day: number): Workout => ({
+        id: `w${day}`, userId: 'u', date: new Date(2026, 8, day), title: 'L', type: 'for_time', status: 'completed',
+        exercises: [], workloadBreakdown: breakdown, createdAt: new Date(), updatedAt: new Date(),
+      });
+      expect(swapHabits([saved(28), saved(21)]).get(habitKey('Run'))).toMatchObject({ usually: 'Echo Bike', times: 2 });
+    });
+
+    it('a board choice puts their usual side first, and the swap question stays silent for it', () => {
+      const results = blank();
+      const slots = openSlots(results, new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']), singlesHabit);
+      expect(slots.find((s) => s.id === '0.swap.double under')?.asked).toBe(false);
+      const choice = nextQuestion(slots, results)!;
+      expect(choice.text).toBe('Cash-out: Single Under again, or Double Under today?');
+      expect(choice.chips.map((c) => c.label)).toEqual(['400 Single Under', '200 Double Under', 'Skip']);
+    });
+
+    it('no habit, no extra question', () => {
+      expect(openSlots(blank(), closedUpTo, new Map()).filter((s) => s.asked)).toEqual([]);
+    });
   });
 
   it('an amount they said wins, and the other tiers keep its ratio', () => {

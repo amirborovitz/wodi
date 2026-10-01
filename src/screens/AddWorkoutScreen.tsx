@@ -48,6 +48,10 @@ import {
 import { StoryLogResults, storyTeamSize, toLegacyResult } from '../components/logging/story/StoryLogResults';
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
 import { useTellWodiChat } from '../components/tellWodi/useTellWodiChat';
+import { useAskWodi } from '../components/tellWodi/useAskWodi';
+import { swapHabits } from '../services/wodiAgent/athleteHabits';
+import { useWodiNotes } from '../hooks/useWodiNotes';
+import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { initStoryResults, movementToKind } from '../components/logging/story/types';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
@@ -737,7 +741,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const isAdmin = isAdminEmail(user?.email);
   const canUseSavedWorkouts = isAdminEmail(user?.email);
   const { calculateRewardData } = useRewardData();
-  const { workouts: recentWorkouts } = useWorkouts(50);
+  // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
+  // Ask Wodi answers from all of it; the recent-workout helpers below keep their 50.
+  const { workouts: allWorkouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
+  const recentWorkouts = useMemo(() => allWorkouts.slice(0, 50), [allWorkouts]);
+  const ask = useAskWodi(allWorkouts);
+  const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
+  const wodiNotes = useWodiNotes();
   // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
   // workouts already loaded here — no extra query on the logging path.
   const lastMaxReps = useMemo(() => buildLastMaxRepsMap(recentWorkouts), [recentWorkouts]);
@@ -2019,6 +2029,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     onOpenForms: (results) => {
       setEditInitialResults(results);
       setStep('log-results');
+    },
+    ask,
+    habits,
+    notes: wodiNotes.notes,
+    onRemember: wodiNotes.remember,
+    uploadPhoto: (file) => {
+      if (!user?.id) return Promise.reject(new Error('Not signed in'));
+      return uploadBoardPhoto(user.id, file);
     },
   });
 

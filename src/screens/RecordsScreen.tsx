@@ -4,8 +4,8 @@ import {
   useRecords,
   FRESH_PR_DAYS,
   type RecordDraft,
-  type RecordEntry,
 } from '../hooks/useRecords';
+import type { RecordEntry } from '../services/recordEntries';
 import { AddRecordSheet } from '../components/records/AddRecordSheet';
 import styles from './RecordsScreen.module.css';
 
