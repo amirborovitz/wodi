@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.3.0 — Wodi talks back
+
+Wodi used to be a place you logged a workout. Now it's someone you talk to about your training.
+
+### Today starts with Wodi
+
+The top of Today is a message from Wodi — the one thing worth saying about your log today, like
+*"Devil Press — top set 17.5kg on 30 Jun."* Tap the day and that poster opens. Your posters sit right
+under it, bigger than before. At the bottom, one bar: **Tell Wodi…**, a camera, and **+** for
+everything else — the form, a board from your photos, or a board to save for tonight.
+
+### Ask it anything about your training
+
+*"What did I deadlift last month?"* *"What's my clean PR?"* *"How often did I train this week?"* Wodi
+answers from your own log, and attaches the posters it's quoting so you can check every number. It
+never makes one up: if it isn't logged, it says so.
+
+### One conversation
+
+Everything you and Wodi say between workouts stays in one thread. Each workout you log shows up
+in it as its poster, with your result on the card; boards you've parked wait there with a
+**Log it**. Every poster still keeps the chat it was logged in, one tap away.
+
+### It knows your habits — and asks
+
+If you usually swap the run for the Echo Bike, Wodi asks *"Echo Bike again instead of the Run?"*
+with your usual answer one tap away. It never fills it in for you, so a day you actually ran
+can't end up on your poster as a bike.
+
+### It remembers what you tell it — if you say so
+
+Mention a sore shoulder, a Hyrox in March or the kettlebell you have at home, and Wodi asks
+*"Want me to remember that?"* Nothing is kept without your tap. It shapes the weight advice and the
+answers, and everything Wodi knows about you is listed on **Me**, where you can forget any of it.
+
+### Smaller things
+
+- The board photo you send Wodi is kept, so coming back to a chat shows the board.
+- Tell Wodi is open to everyone.
+- The interface uses less yellow — the camera, Wodi's one key number and your PRs. Your posters
+  carry the rest.
+
 ## v0.2.1 — Pick the photo, then say something about it
 
 The composer asked for everything at once — caption, photo, workout, all on one scroll — and it
