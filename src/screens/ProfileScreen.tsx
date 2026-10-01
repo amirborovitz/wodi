@@ -24,9 +24,11 @@ interface ProfileScreenProps {
   onNavigateToProfile?: () => void;
   onOpenRecap?: (data: RecapData) => void;
   onOpenHandoff?: () => void;
+  /** Chase — things you could go after. Opt-in here, never Today's headline. */
+  onOpenChase?: () => void;
 }
 
-export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap, onOpenHandoff }: ProfileScreenProps) {
+export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNavigateToProfile, onOpenRecap, onOpenHandoff, onOpenChase }: ProfileScreenProps) {
   const { user } = useAuth();
   const { workouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { prCount } = usePRCount();
@@ -140,6 +142,21 @@ export function ProfileScreen({ onNavigateToRecords, onNavigateToSettings, onNav
           </div>
           <span className={styles.navRowChevron}>›</span>
         </button>
+
+        {/* Chase lives here, for whoever wants something to go after. It used to lead Today, and a
+            first line that points at a gap ("your best still stands") is pressure — Wodi is the
+            friend glad you showed up, not the one keeping score (owner, 2026-10-01). Same quiet row
+            shape as its neighbours. */}
+        {onOpenChase && (
+          <button type="button" className={styles.navRow} onClick={onOpenChase}>
+            <span className={styles.navRowIcon}>→</span>
+            <div className={styles.navRowText}>
+              <span className={styles.navRowLabel}>Chase</span>
+              <span className={styles.navRowSub}>Bests and lifts you could go after</span>
+            </div>
+            <span className={styles.navRowChevron}>›</span>
+          </button>
+        )}
 
         {/* The athlete's whole log, handed to someone who can read it. It lives here rather than
             on Today because it is a thing you do once in a while, not a thing you do after

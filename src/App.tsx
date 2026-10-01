@@ -252,6 +252,7 @@ function AppContent() {
             onNavigateToSettings={() => setCurrentScreen('settings')}
             onNavigateToProfile={() => setCurrentScreen('profile-settings')}
             onOpenHandoff={() => setCurrentScreen('handoff')}
+            onOpenChase={() => setCurrentScreen('chase')}
             onOpenRecap={handleOpenRecap}
           />
         );
@@ -280,7 +281,7 @@ function AppContent() {
           />
         );
       case 'chase':
-        return <ChaseScreen onBack={() => setCurrentScreen('home')} />;
+        return <ChaseScreen onBack={() => setCurrentScreen('profile')} />;
       case 'handoff':
         return <CoachHandoffScreen onBack={() => setCurrentScreen('profile')} />;
       case 'recap': {
@@ -311,7 +312,6 @@ function AppContent() {
             onLogPlannedWorkout={handleLogPlannedWorkout}
             onOpenRecap={handleOpenRecap}
             onOpenFeed={() => setCurrentScreen('feed')}
-            onOpenChase={() => setCurrentScreen('chase')}
             onOpenGallery={() => setCurrentScreen('history')}
             ringsKey={homeRingsKey}
           />

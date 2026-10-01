@@ -34,7 +34,6 @@ interface HomeScreenProps {
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   onOpenRecap?: (data: RecapData) => void;
   onOpenFeed?: () => void;
-  onOpenChase?: () => void;
   /** "All" beside Your posters. */
   onOpenGallery?: () => void;
   ringsKey?: number; // kept for API compatibility — unused
@@ -61,7 +60,6 @@ export function HomeScreen({
   onLogPlannedWorkout,
   onOpenRecap,
   onOpenFeed,
-  onOpenChase,
   onOpenGallery,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
@@ -75,9 +73,8 @@ export function HomeScreen({
   const profile = useProfileCompleteness();
   // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
   const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
-  // Wodi's newest message: the day's one observation, said by Wodi (see wodiMessage). Chase only
-  // speaks where it can be opened.
-  const wodiMessage = useWodiMessage(workouts, Boolean(onOpenChase));
+  // Wodi's newest message — recognition only, never a gap (see wodiMessage).
+  const wodiMessage = useWodiMessage(workouts);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
@@ -314,9 +311,9 @@ export function HomeScreen({
 
 
         {/* ── Wodi talks first ──
-            The top of Today is Wodi's newest message — the same bubble that ends the thread.
-            Tapping it opens what it's about: Chase, or the thread. Logging itself is the composer
-            docked on the nav (chat-first, owner decision 2026-10-01). */}
+            The top of Today is Wodi's newest message — the same bubble that ends the thread. It only
+            ever recognises (never "your best still stands"); tapping it opens the thread, and its day
+            opens that poster. Logging itself is the composer docked on the nav (chat-first). */}
         {!loading && (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -326,7 +323,7 @@ export function HomeScreen({
             <WodiMessageCard
               text={wodiMessage.text}
               highlight={wodiMessage.highlight}
-              onOpen={wodiMessage.opens === 'chase' && onOpenChase ? onOpenChase : onTellWodi}
+              onOpen={onTellWodi}
               link={wodiMessage.day && wodiMessage.dayWorkout ? {
                 text: wodiMessage.day.label,
                 onOpen: () => handleSelectWorkout(wodiMessage.dayWorkout!),

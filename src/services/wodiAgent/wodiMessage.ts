@@ -4,25 +4,54 @@ import { firstMeasured } from './wodiVoice';
 
 /**
  * Wodi's newest message — the one on top of Today and at the bottom of the thread, the same words
- * in both places. Built from the observations the app already computes (no AI call): a milestone
- * crossed TODAY wins outright, otherwise the top chase, otherwise the milestone's running count,
- * otherwise an opener. A server-written morning message replaces this later, in the same slot.
+ * in both places. Built from what the app already computes (no AI call).
+ *
+ * IT ONLY EVER RECOGNISES. Wodi is the friend glad you showed up, not the one keeping score, so the
+ * first thing on Today never points at a gap — no "your best still stands", no "28 days since",
+ * no "618 to go" (owner, 2026-10-01). In order: a milestone you just crossed, a best you just
+ * matched, your last workout, your running total, an opener. Chase — the things you could go after —
+ * keeps its own screen for whoever wants it; it is never Today's headline.
  */
 
 export interface WodiMessage {
   text: string;
-  /** Tapping the message opens Chase when that's what it's about. */
-  opens: 'chase' | null;
   /**
-   * The day the message is about, as written in the text ("30 Jun") and as a date — so that word
-   * can open that day's poster, the message's receipt.
+   * The day the message is about, as written in the text ("30 Jun", "yesterday") — so that word
+   * can open that day's poster, the message's receipt. `workoutId` when the message already knows
+   * which poster; otherwise the day + subject find it.
    */
-  day: { label: string; iso: string; subject: string } | null;
-  /** The ONE value set in yellow ("17.5kg") — named here, never found by pattern-matching digits. */
+  day: { label: string; iso: string; subject: string | null; workoutId: string | null } | null;
+  /** The ONE value set in yellow ("5:42") — named here, never found by pattern-matching digits. */
   highlight: string | null;
 }
 
+/** The last workout, as its poster tells it — the result is the poster's own hero, never recomputed. */
+export interface LastWorkout {
+  id: string;
+  title: string;
+  /** The poster's hero value ("5:42", "140kg"); null when it has none to give. */
+  result: string | null;
+  /** The day it was trained, YYYY-MM-DD. */
+  trained: string;
+}
+
 export const WODI_OPENER = "What'd you do today? Send me the board, or ask me anything.";
+
+/** A matched best is news for a week; the last workout for three days. Past that, it's history. */
+const TIED_NEWS_DAYS = 7;
+const LAST_WORKOUT_DAYS = 3;
+
+const DAY_MS = 86_400_000;
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function daysBetween(fromIso: string, toIso: string): number {
+  const at = (iso: string): number => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).getTime();
+  };
+  return Math.round((at(toIso) - at(fromIso)) / DAY_MS);
+}
 
 /** "pull-ups", "km" — a count reads as plural; some family names already are, or never are. */
 function plural(movement: string, unit: Milestone['unit']): string {
@@ -37,17 +66,6 @@ function count(value: number, unit: Milestone['unit']): string {
   return unit === 'km' ? `${Math.round(value).toLocaleString()} km` : Math.round(value).toLocaleString();
 }
 
-function milestoneSentence(m: Milestone): string {
-  const name = plural(m.movement, m.unit);
-  if (m.justCrossed !== null) return `You just passed ${count(m.justCrossed, m.unit)} ${name}.`;
-  if (m.remaining !== null && m.next !== null) {
-    return `${count(m.total, m.unit)} ${name} so far — ${count(m.remaining, m.unit)} to ${m.next.toLocaleString()}.`;
-  }
-  return `${count(m.total, m.unit)} ${name} so far.`;
-}
-
-const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /**
  * "30 Jun" from "2026-06-30" — how Wodi says a day: nothing that reads as a stat. The year only
  * when it isn't this one ("30 Jun 2025").
@@ -58,7 +76,7 @@ export function dayWords(iso: string, thisYear: number): string {
   return y && y !== thisYear ? `${d} ${MONTH_WORDS[m - 1]} ${y}` : `${d} ${MONTH_WORDS[m - 1]}`;
 }
 
-/** The chase's own flat line ("Deadlift: top set 140kg on 24 SEP 26"), said as a sentence. */
+/** The chase's own flat line ("Fran: 5:42 on 30 SEP 26 · equals your best"), said as a sentence. */
 function chaseSentence(fact: ChaseFact, thisYear: number): string {
   const line = fact.raw
     .replace(/:\s+/, ' — ')
@@ -74,31 +92,56 @@ function chaseSentence(fact: ChaseFact, thisYear: number): string {
   return /[.!?]$/.test(line) ? line : `${line}.`;
 }
 
+/** "today", "yesterday", "Tuesday" — how you'd say when it was, a few days back at most. */
+function recentDay(trained: string, today: string): string {
+  const ago = daysBetween(trained, today);
+  if (ago <= 0) return 'today';
+  if (ago === 1) return 'yesterday';
+  const [y, m, d] = trained.split('-').map(Number);
+  return WEEKDAYS[new Date(y, m - 1, d).getDay()];
+}
+
 export function buildWodiMessage(input: {
   milestone: Milestone | null;
-  chaseTop: ChaseFact | null;
-  /** Chase only speaks where it can be opened. */
-  chaseEnabled: boolean;
+  /** All open Chase threads — only a just-matched best (TIED) is recognition; the rest are gaps. */
+  chase: readonly ChaseFact[];
+  lastWorkout: LastWorkout | null;
   today: string; // YYYY-MM-DD
 }): WodiMessage {
-  const { milestone, chaseTop, chaseEnabled, today } = input;
-  // A crossing is the day's event; handing Chase nothing for the fortnight the milestone keeps
-  // a crossing up is how a whole feature goes unseen — so only TODAY's crossing outranks it.
-  const crossingIsTodaysNews = milestone?.crossedOn === today;
+  const { milestone, chase, lastWorkout, today } = input;
   const thisYear = Number(today.slice(0, 4));
-  if (chaseEnabled && chaseTop && !crossingIsTodaysNews) {
-    const text = chaseSentence(chaseTop, thisYear);
-    const label = dayWords(chaseTop.on, thisYear);
+
+  if (milestone && milestone.justCrossed !== null) {
+    const value = count(milestone.justCrossed, milestone.unit);
+    return { text: `You just passed ${value} ${plural(milestone.movement, milestone.unit)}.`, day: null, highlight: value };
+  }
+
+  const tied = chase.find((f) => f.kind === 'TIED' && daysBetween(f.on, today) <= TIED_NEWS_DAYS);
+  if (tied) {
+    const text = chaseSentence(tied, thisYear);
+    const label = dayWords(tied.on, thisYear);
     return {
       text,
-      opens: 'chase',
-      day: text.includes(label) ? { label, iso: chaseTop.on, subject: chaseTop.subject } : null,
-      highlight: firstMeasured(text) ?? (text.includes(chaseTop.hero.value) ? chaseTop.hero.value : null),
+      day: text.includes(label) ? { label, iso: tied.on, subject: tied.subject, workoutId: null } : null,
+      highlight: firstMeasured(text),
     };
   }
-  if (milestone) {
-    const value = count(milestone.justCrossed ?? milestone.total, milestone.unit);
-    return { text: milestoneSentence(milestone), opens: null, day: null, highlight: value };
+
+  if (lastWorkout && daysBetween(lastWorkout.trained, today) < LAST_WORKOUT_DAYS) {
+    const when = recentDay(lastWorkout.trained, today);
+    const title = lastWorkout.title.trim() || 'Your workout';
+    const text = lastWorkout.result ? `${title} ${when} — ${lastWorkout.result}.` : `${title} ${when}. Nice work.`;
+    return {
+      text,
+      day: { label: when, iso: lastWorkout.trained, subject: null, workoutId: lastWorkout.id },
+      highlight: lastWorkout.result,
+    };
   }
-  return { text: WODI_OPENER, opens: null, day: null, highlight: null };
+
+  if (milestone) {
+    const value = count(milestone.total, milestone.unit);
+    return { text: `${value} ${plural(milestone.movement, milestone.unit)} so far.`, day: null, highlight: value };
+  }
+
+  return { text: WODI_OPENER, day: null, highlight: null };
 }

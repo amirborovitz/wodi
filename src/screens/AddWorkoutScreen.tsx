@@ -758,7 +758,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const wodiNotes = useWodiNotes();
   const thread = useWodiThread(allWorkouts, plannedWorkout ?? null);
   // The same newest message as Today's, so the thread ends where Today begins.
-  const wodiMessage = useWodiMessage(allWorkouts, true);
+  const wodiMessage = useWodiMessage(allWorkouts);
   const chatOpening = useMemo(() => ({
     text: wodiMessage.text,
     highlight: wodiMessage.highlight,
