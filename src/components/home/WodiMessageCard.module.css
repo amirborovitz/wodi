@@ -1,0 +1,47 @@
+/* Wodi's message with the sender name above it, like a messaging app. */
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 320px;
+}
+
+.sender {
+  padding-left: 4px;
+}
+
+.mark {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #f2f2f0;
+}
+
+.dot {
+  color: #f5c200;
+}
+
+/* The look is the thread's own Wodi bubble (TellWodiChat.module.css .bubbleWodi) — one rule for
+   both screens. This only resets what a <button> brings: iOS Safari draws it natively and drops
+   the tail corner without `appearance: none`. */
+.bubble {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  margin: 0;
+  border: none;
+  color: #f2f2f0;
+  text-align: left;
+  font-family: 'Barlow', sans-serif;
+}
+
+.bubbleButton {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bubbleButton:active {
+  transform: scale(0.98);
+}

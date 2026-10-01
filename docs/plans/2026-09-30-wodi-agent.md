@@ -42,6 +42,16 @@ It may compare numbers the tools returned; it never produces one. Same principle
    The thread shows ~2 recent weeks and loads older on scroll; the AI only ever reads recent turns +
    tools, so length never costs anything. Pairs with the Today redesign (Wodi's message on top, one
    "Tell Wodi…" composer at the bottom, forms one tap away).
+   BUILT 2026-10-01 on `feat/wodi-thread` (uncommitted): between-workouts messages in
+   `users/{uid}/wodiThread` (owner-only rule — DEPLOY RULES WITH THE APP), `buildThreadItems` (tested)
+   merges them with poster cards + parked boards; a workout's saved chat now starts at its board
+   (questions before it stay in the thread). Today: `WodiMessageCard` (observation in Wodi's bubble)
+   on top, `TodayComposer` pinned above the nav (+ = forms, bar = thread, camera = photo sent into the
+   chat); the old "Add a workout" / "Tell Wodi" buttons and Today's never-opened photo picker deleted.
+   Then the Claude Design pass (same day): Wodi's message is one bubble on Today and in the thread;
+   nav docked as one surface with the composer; "+" sheet; poster cards show the poster's result;
+   answers attach the posters they quote ("receipts"); yellow cut to camera / key number / PR;
+   neutral user bubbles; white active tab; no greeting; posters ~30% bigger.
 5. **Server side** — the agent moves to a Cloud Function: the OpenAI key leaves the app, and Wodi can
    speak first (weekly recap, "6 days since your last log"). Needs Blaze + a push/messaging channel.
    This is the big investment; plan it on its own before starting.

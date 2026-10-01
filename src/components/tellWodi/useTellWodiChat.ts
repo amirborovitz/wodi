@@ -5,6 +5,7 @@ import { readAthleteMessage, type ChatTurn } from '../../services/tellWodiReader
 import type { AskWodiReply } from '../../services/wodiAgent/askWodi';
 import type { SwapHabit } from '../../services/wodiAgent/athleteHabits';
 import type { WodiNote } from '../../types';
+import type { ThreadMessage } from '../../services/wodiAgent/threadItems';
 import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
 import { adviseWeights } from '../../services/tellWodiCoach';
 import {
@@ -46,6 +47,10 @@ export interface ChatMessage {
   chips?: ChatChipView[];
   /** A question whose chips were used, or which a later message answered — drawn dimmed. */
   answered?: boolean;
+  /** Wodi's newest message, the same as on Today: its one named value in yellow, its day a link. */
+  headline?: ChatOpening;
+  /** Workouts this answer quoted, drawn as their posters under it. */
+  receipts?: string[];
   /** Last-time loads before a workout, drawn as one card. */
   suggestions?: LoadSuggestion[];
   at: number;
@@ -79,6 +84,18 @@ interface UseTellWodiChatArgs {
   onRemember: (text: string) => Promise<void>;
   /** Keep a board photo; resolves to where it's stored. */
   uploadPhoto: (file: File) => Promise<string>;
+  /** Keep between-workouts messages in the ongoing thread (a question and its answer). */
+  keepInThread: (messages: ThreadMessage[]) => void;
+  /** Wodi's opening words — its newest message, the one on top of Today. */
+  opening: ChatOpening;
+}
+
+/** Wodi's newest message as the chat opens on it — the same object Today shows. */
+export interface ChatOpening {
+  text: string;
+  highlight: string | null;
+  /** The day it's about ("30 Jun") and the poster that day opens. */
+  link: { label: string; workoutId: string } | null;
 }
 
 export interface TellWodiChat {
@@ -93,7 +110,6 @@ export interface TellWodiChat {
   openForms: () => void;
 }
 
-const GREETING = "Hey. What'd you do today? Send me the board — a photo, or just tell me. Or ask me anything about your training.";
 
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;
@@ -134,9 +150,9 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening,
 }: UseTellWodiChatArgs): TellWodiChat {
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: nextId(), from: 'wodi', text: GREETING, at: Date.now() }]);
+  const [messages, setMessages] = useState<ChatMessage[]>([{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }]);
   const [busy, setBusy] = useState<ChatBusy>(null);
   const [hasBoard, setHasBoard] = useState(false);
 
@@ -147,19 +163,42 @@ export function useTellWodiChat({
   const closedRef = useRef<Set<string>>(new Set());
   const vibeRef = useRef<PosterVibeKey | null>(null);
   const waitingRef = useRef(false);
+  // Where this workout's own conversation starts. Everything before it — the greeting, questions
+  // about training — belongs to the ongoing thread, not to the poster this board becomes.
+  const boardStartRef = useRef(0);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto, keepInThread });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto, keepInThread }; });
+
+  // The opening is computed from the log, which loads after the chat opens: until the athlete has
+  // said anything, it follows the newest words rather than freezing on the first render's.
+  useEffect(() => {
+    const [only, ...rest] = messagesRef.current;
+    if (rest.length > 0 || !only?.headline || only.headline === opening) return;
+    const next = [{ ...only, text: opening.text, headline: opening }];
+    messagesRef.current = next;
+    setMessages(next);
+  }, [opening]);
 
   const commit = useCallback((next: ChatMessage[]): void => {
     messagesRef.current = next;
     setMessages(next);
-    if (workoutRef.current) callbacks.current.onPersist(toSavedChat(next, waitingRef.current), workoutRef.current);
+    if (workoutRef.current) callbacks.current.onPersist(toSavedChat(next.slice(boardStartRef.current), waitingRef.current), workoutRef.current);
   }, []);
 
-  const push = useCallback((message: Omit<ChatMessage, 'id' | 'at'>): void => {
-    commit([...messagesRef.current, { ...message, id: nextId(), at: Date.now() }]);
+  const push = useCallback((message: Omit<ChatMessage, 'id' | 'at'>): ChatMessage => {
+    const full: ChatMessage = { ...message, id: nextId(), at: Date.now() };
+    commit([...messagesRef.current, full]);
+    return full;
   }, [commit]);
+
+  /** Kept in the ongoing thread only while there's no board — after that it's the workout's chat. */
+  const keepIfBetweenWorkouts = (...said: (ChatMessage | null)[]): void => {
+    if (workoutRef.current) return;
+    callbacks.current.keepInThread(said.flatMap((m) => (m?.text ? [{
+      id: m.id, from: m.from, text: m.text, at: m.at, ...(m.receipts?.length ? { workoutIds: m.receipts } : {}),
+    }] : [])));
+  };
 
   /** Dims every open question — the athlete has answered past them. */
   const settleQuestions = (): void => {
@@ -198,7 +237,7 @@ export function useTellWodiChat({
     waitingRef.current = false;
     push({ from: 'wodi', text: "That's everything. Making your poster…" });
     setBusy('saving');
-    callbacks.current.onFinished(resultsRef.current, vibeRef.current, toSavedChat(messagesRef.current, false));
+    callbacks.current.onFinished(resultsRef.current, vibeRef.current, toSavedChat(messagesRef.current.slice(boardStartRef.current), false));
   };
 
   /** Ask the next open question, hand to the form, or finish. */
@@ -294,9 +333,9 @@ export function useTellWodiChat({
   };
 
   /** Something lasting they said — offered, never kept without their tap. */
-  const offerToRemember = (note: string | null): void => {
-    if (!note) return;
-    push({
+  const offerToRemember = (note: string | null): ChatMessage | null => {
+    if (!note) return null;
+    return push({
       from: 'wodi',
       text: `Want me to remember that? "${note}"`,
       chips: [{ label: 'Remember', action: 'remember', note }, { label: 'Not now', action: 'not-now' }],
@@ -307,14 +346,18 @@ export function useTellWodiChat({
    * Words before any board: a question about their training gets its answer here; a workout
    * returns false and goes on to the board reader. True means the message has been dealt with.
    */
-  const answerQuestion = async (text: string): Promise<boolean> => {
+  const answerQuestion = async (text: string, sent: ChatMessage): Promise<boolean> => {
     setBusy('thinking');
     try {
       // The message itself was just pushed; Ask Wodi takes it separately from the history.
       const reply = await callbacks.current.ask(text, recentTurns().slice(0, -1));
       if (reply.kind === 'log') return false;
-      push({ from: 'wodi', text: reply.text || "I couldn't find that in your log." });
-      offerToRemember(reply.proposedNote);
+      const answer = push({
+        from: 'wodi',
+        text: reply.text || "I couldn't find that in your log.",
+        ...(reply.receipts.length ? { receipts: reply.receipts } : {}),
+      });
+      keepIfBetweenWorkouts(sent, answer, offerToRemember(reply.proposedNote));
       return true;
     } catch (err) {
       console.error('[TellWodi] ask failed', err);
@@ -328,10 +371,11 @@ export function useTellWodiChat({
   const send = useCallback((raw: string, file?: File | null): void => {
     const text = raw.trim();
     if (!text && !file) return;
-    const sentId = nextId();
-    commit([...messagesRef.current, {
-      id: sentId, from: 'me', text: text || undefined, imageUrl: file ? URL.createObjectURL(file) : undefined, at: Date.now(),
-    }]);
+    const sent: ChatMessage = {
+      id: nextId(), from: 'me', text: text || undefined, imageUrl: file ? URL.createObjectURL(file) : undefined, at: Date.now(),
+    };
+    const sentId = sent.id;
+    commit([...messagesRef.current, sent]);
     // The photo is kept alongside the board read, so coming back to this chat shows the board. A
     // failed upload costs only that: the chat carries on and remembers there was a photo.
     if (file) {
@@ -343,10 +387,12 @@ export function useTellWodiChat({
     void (async () => {
       let route = routeMessage({ hasBoard: !!workoutRef.current, hasFile: !!file });
       if (route === 'ask-wodi') {
-        if (await answerQuestion(text)) return;
+        if (await answerQuestion(text, sent)) return;
         route = 'read-board';   // it was a workout, not a question
       }
       if (route === 'read-board') {
+        // This message starts the workout's own chat.
+        boardStartRef.current = Math.max(0, messagesRef.current.findIndex((m) => m.id === sentId));
         setBusy('reading-board');
         try {
           // A photo is the board. Words alone are the board AND the results in one breath —
@@ -393,7 +439,7 @@ export function useTellWodiChat({
     if (chip.action === 'remember' && chip.note) {
       const note = chip.note;
       void callbacks.current.onRemember(note)
-        .then(() => push({ from: 'wodi', text: "Got it — I'll remember. It's under Me if you want to change it." }))
+        .then(() => keepIfBetweenWorkouts(push({ from: 'wodi', text: "Got it — I'll remember. It's under Me if you want to change it." })))
         .catch((err: unknown) => {
           console.error('[TellWodi] could not keep the note', err);
           push({ from: 'wodi', text: "Couldn't save that one — try again in a bit." });
@@ -425,6 +471,7 @@ export function useTellWodiChat({
       answered: true,
       at: m.at,
     }));
+    boardStartRef.current = 0;
     messagesRef.current = kept;
     setMessages(kept);
     // Answers aren't kept on a waiting board (see SavedChat), so everything still open is asked.

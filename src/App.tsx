@@ -17,6 +17,7 @@ import { CoachHandoffScreen } from './screens/CoachHandoffScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { ProfileSettingsScreen } from './components/settings';
 import { BottomNav, UpdatePill } from './components/ui';
+import { TodayComposer } from './components/home/TodayComposer';
 import { WrappedStoryScreen } from './components/recap/WrappedStoryScreen';
 import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
@@ -34,6 +35,7 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingChatText, setPendingChatText] = useState<string | null>(null);
   // Add Workout opens on the Tell Wodi chat rather than the capture step.
   const [startInChat, setStartInChat] = useState(false);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
@@ -53,14 +55,6 @@ function AppContent() {
     setPendingRecapData(recapData);
     setCurrentScreen('recap');
   };
-  const handleImageSelected = (file: File) => {
-    setPendingImage(file);
-    setShowRecentWorkoutsOnOpen(false);
-    setStartInChat(false);
-    setEditingWorkout(null); // Clear any editing state
-    setCurrentScreen('add-workout');
-  };
-
   const handleEditWorkout = (workout: WorkoutWithStats) => {
     setEditingWorkout(workout);
     setPendingImage(null);
@@ -79,6 +73,28 @@ function AppContent() {
     setEditingWorkout(null);
     setNavDir(null);
     setCurrentScreen('workout-detail');
+  };
+
+  // Today's ways in — shared by the Wodi message, the empty poster card and the docked composer.
+  const openForm = (): void => {
+    setEditingWorkout(null);
+    setPendingImage(null);
+    setPendingChatText(null);
+    setPendingPlannedWorkout(null);
+    setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(false);
+    setCurrentScreen('add-workout');
+  };
+
+  /** The Wodi thread — with a board photo already sent, and words with it, when given. */
+  const openWodi = (photo: File | null = null, words: string | null = null): void => {
+    setEditingWorkout(null);
+    setPendingImage(photo);
+    setPendingChatText(words);
+    setPendingPlannedWorkout(null);
+    setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(true);
+    setCurrentScreen('add-workout');
   };
 
   const handleLogPlannedWorkout = (planned: PlannedWorkout) => {
@@ -133,6 +149,16 @@ function AppContent() {
       case 'add-workout':
         return (
           <AddWorkoutScreen
+            // A parked board opened from the thread is a different chat: start it fresh.
+            key={pendingPlannedWorkout?.id ?? 'new'}
+            onOpenWorkout={(workout, list) => {
+              setNavDir(null);
+              setSelectedWorkout(workout);
+              setWorkoutList(list);
+              setWorkoutDetailOrigin('home');
+              setCurrentScreen('workout-detail');
+            }}
+            onOpenPlanned={handleLogPlannedWorkout}
             onBack={() => {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
@@ -167,6 +193,7 @@ function AppContent() {
             }}
             onWorkoutUpdated={handleWorkoutUpdated}
             initialImage={pendingImage}
+            initialMessage={pendingChatText}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
             plannedWorkout={pendingPlannedWorkout}
@@ -271,23 +298,8 @@ function AppContent() {
       default:
         return (
           <HomeScreen
-            onAddWorkout={() => {
-              setEditingWorkout(null);
-              setPendingImage(null);
-              setPendingPlannedWorkout(null);
-              setShowRecentWorkoutsOnOpen(false);
-              setStartInChat(false);
-              setCurrentScreen('add-workout');
-            }}
-            onTellWodi={() => {
-              setEditingWorkout(null);
-              setPendingImage(null);
-              setPendingPlannedWorkout(null);
-              setShowRecentWorkoutsOnOpen(false);
-              setStartInChat(true);
-              setCurrentScreen('add-workout');
-            }}
-            onImageSelected={handleImageSelected}
+            onAddWorkout={openForm}
+            onTellWodi={() => openWodi()}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {
               setNavDir(null);
@@ -300,6 +312,7 @@ function AppContent() {
             onOpenRecap={handleOpenRecap}
             onOpenFeed={() => setCurrentScreen('feed')}
             onOpenChase={() => setCurrentScreen('chase')}
+            onOpenGallery={() => setCurrentScreen('history')}
             ringsKey={homeRingsKey}
           />
         );
@@ -327,6 +340,14 @@ function AppContent() {
         <BottomNav
           currentScreen={currentScreen}
           onNavigate={(screen) => setCurrentScreen(screen)}
+          accessory={currentScreen === 'home' ? (
+            <TodayComposer
+              onTellWodi={() => openWodi()}
+              onPhoto={(file) => openWodi(file)}
+              onUseForm={openForm}
+              onSaveForLater={(file) => openWodi(file, 'Saving this board for later')}
+            />
+          ) : undefined}
         />
       )}
     </>

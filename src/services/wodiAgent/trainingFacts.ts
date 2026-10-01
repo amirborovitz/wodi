@@ -49,17 +49,21 @@ function nameMatches(name: string, query: string): boolean {
   return name.toLowerCase().includes(q);
 }
 
+/** A workout in the export shape, plus the id the chat attaches its poster by (a "receipt"). */
+export type FoundWorkout = ExportedWorkout & { id: string };
+
 export interface FoundWorkouts {
   /** How many workouts matched — `workouts` may be fewer when it hit the limit. */
   matched: number;
-  workouts: ExportedWorkout[];
+  workouts: FoundWorkout[];
 }
 
 export function findWorkouts(
   ctx: TrainingContext,
   args: DateRange & { movement: string | null; title: string | null; limit: number | null },
 ): FoundWorkouts {
-  const all = buildWorkoutExport(ctx.workouts).workouts;
+  // One export per workout, so each keeps its id; ctx.workouts is already newest-trained first.
+  const all: FoundWorkout[] = ctx.workouts.map((w) => ({ ...buildWorkoutExport([w]).workouts[0], id: w.id }));
   const matching = all.filter((w) => inRange(w.date, args)
     && (!args.title || w.title.toLowerCase().includes(args.title.trim().toLowerCase())
       || w.parts.some((p) => p.name.toLowerCase().includes(args.title!.trim().toLowerCase())))

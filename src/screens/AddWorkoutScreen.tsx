@@ -31,7 +31,7 @@ import { useWorkouts } from '../hooks/useWorkouts';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
-import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat } from '../types';
+import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat, PlannedWorkout } from '../types';
 import { buildLastLoadMap, recentLoads } from '../utils/lastLoadHistory';
 import {
   workoutToParsedWorkout,
@@ -49,6 +49,8 @@ import { StoryLogResults, storyTeamSize, toLegacyResult } from '../components/lo
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
 import { useTellWodiChat } from '../components/tellWodi/useTellWodiChat';
 import { useAskWodi } from '../components/tellWodi/useAskWodi';
+import { useWodiThread } from '../components/tellWodi/useWodiThread';
+import { useWodiMessage } from '../hooks/useWodiMessage';
 import { swapHabits } from '../services/wodiAgent/athleteHabits';
 import { useWodiNotes } from '../hooks/useWodiNotes';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
@@ -83,6 +85,8 @@ interface AddWorkoutScreenProps {
   onWorkoutCreated: () => void;
   onSavedForLater?: () => void;
   initialImage?: File | null;
+  /** Words sent with that photo ("Saving this board for later" from the "+" sheet). */
+  initialMessage?: string | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
   /**
@@ -91,6 +95,10 @@ interface AddWorkoutScreenProps {
    * poster they came from, carrying the updated doc so it re-renders without a refetch.
    */
   onWorkoutUpdated?: (workout: import('../hooks/useWorkouts').WorkoutWithStats) => void;
+  /** A poster card in the Wodi thread was tapped. */
+  onOpenWorkout?: (workout: import('../hooks/useWorkouts').WorkoutWithStats, list: import('../hooks/useWorkouts').WorkoutWithStats[]) => void;
+  /** A board parked mid-chat was tapped in the thread — reopen its chat. */
+  onOpenPlanned?: (planned: import('../types').PlannedWorkout) => void;
   plannedWorkout?: import('../types').PlannedWorkout | null; // Pre-parsed workout — jump straight to log-results
   /** Open on the Tell Wodi chat instead of the capture step. */
   startInChat?: boolean;
@@ -736,7 +744,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, initialMessage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
   const { user } = useAuth();
   const isAdmin = isAdminEmail(user?.email);
   const canUseSavedWorkouts = isAdminEmail(user?.email);
@@ -748,6 +756,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const ask = useAskWodi(allWorkouts);
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
   const wodiNotes = useWodiNotes();
+  const thread = useWodiThread(allWorkouts, plannedWorkout ?? null);
+  // The same newest message as Today's, so the thread ends where Today begins.
+  const wodiMessage = useWodiMessage(allWorkouts, true);
+  const chatOpening = useMemo(() => ({
+    text: wodiMessage.text,
+    highlight: wodiMessage.highlight,
+    link: wodiMessage.day && wodiMessage.dayWorkout ? { label: wodiMessage.day.label, workoutId: wodiMessage.dayWorkout.id } : null,
+  }), [wodiMessage]);
   // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
   // workouts already loaded here — no extra query on the logging path.
   const lastMaxReps = useMemo(() => buildLastMaxRepsMap(recentWorkouts), [recentWorkouts]);
@@ -870,30 +886,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     }
   }, [showRecentOnOpen, isAdmin]);
 
-  // Process initial image if provided (from HomeScreen file picker)
+  // Today's camera hands the board photo in on open: it goes straight into the chat as a sent
+  // message. Once per photo — a re-run of this effect must not send the board twice.
+  const sentOpeningPhotoRef = useRef<File | null>(null);
   useEffect(() => {
-    if (!initialImage) return;
-
-    const processInitialImage = async () => {
-      const url = URL.createObjectURL(initialImage);
-      setImageUrl(url);
-      setStep('processing');
-      setError(null);
-
-      try {
-        const base64 = await fileToBase64(initialImage);
-        const workout = await parseWorkoutImage(base64);
-        setParsedWorkout(workout);
-        addSavedWorkout(workout);
-        setStep('preview');
-      } catch (err) {
-        console.error('Error parsing workout:', err);
-        setError(parseFailureMessage(err, 'Failed to parse workout. Please try again or enter manually.'));
-        setStep('capture');
-      }
-    };
-
-    processInitialImage();
+    if (!initialImage || sentOpeningPhotoRef.current === initialImage) return;
+    sentOpeningPhotoRef.current = initialImage;
+    tellWodi.send(initialMessage ?? '', initialImage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialImage]);
 
@@ -2038,6 +2037,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       if (!user?.id) return Promise.reject(new Error('Not signed in'));
       return uploadBoardPhoto(user.id, file);
     },
+    keepInThread: thread.keep,
+    opening: chatOpening,
   });
 
   /**
@@ -2861,7 +2862,14 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
            LOG RESULTS - Story mode
            ═══════════════════════════════════════════════════════ */}
       {step === 'chat' && (
-        <TellWodiChat chat={tellWodi} onBack={onBack} />
+        <TellWodiChat
+          chat={tellWodi}
+          thread={thread}
+          onBack={onBack}
+          onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
+          onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
+          onUseForm={() => setStep('capture')}
+        />
       )}
 
       {step === 'log-results' && parsedWorkout && (

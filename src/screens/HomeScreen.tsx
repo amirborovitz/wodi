@@ -7,12 +7,10 @@ import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
-import { useMilestone } from '../hooks/useMilestone';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
-import { useChase } from '../hooks/useChase';
+import { useWodiMessage } from '../hooks/useWodiMessage';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
-import { MilestoneLine } from '../components/home/MilestoneLine';
-import { ChaseLine } from '../components/home/ChaseLine';
+import { WodiMessageCard } from '../components/home/WodiMessageCard';
 import { OnDeckCard } from '../components/home/OnDeckCard';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { FeedPulse } from '../components/home/FeedPulse';
@@ -20,7 +18,6 @@ import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
 import { isAdminEmail } from '../utils/admin';
-import { toIsoDate } from '../utils/workoutDate';
 import type { PlannedWorkout } from '../types';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
@@ -32,21 +29,15 @@ interface HomeScreenProps {
   onAddWorkout: () => void;
   /** Log by chatting instead of the forms. */
   onTellWodi: () => void;
-  onImageSelected?: (file: File) => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   onOpenRecap?: (data: RecapData) => void;
   onOpenFeed?: () => void;
   onOpenChase?: () => void;
+  /** "All" beside Your posters. */
+  onOpenGallery?: () => void;
   ringsKey?: number; // kept for API compatibility — unused
-}
-
-function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
 }
 
 function getStartOfWeek(): Date {
@@ -65,13 +56,13 @@ function getSavedTitle(saved: PlannedWorkout): string {
 export function HomeScreen({
   onAddWorkout,
   onTellWodi,
-  onImageSelected,
   onOpenProfile,
   onSelectWorkout,
   onLogPlannedWorkout,
   onOpenRecap,
   onOpenFeed,
   onOpenChase,
+  onOpenGallery,
 }: HomeScreenProps): React.ReactElement {
   const { user } = useAuth();
   // EVERY workout, not a recent window: the recap cards and the milestone below are totals over
@@ -81,18 +72,12 @@ export function HomeScreen({
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
   const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
-  // A journey marker, not a goal — see useMilestone. Null when there is nothing
-  // worth saying yet, and the line simply does not render.
-  const milestone = useMilestone(workouts);
   const profile = useProfileCompleteness();
   // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
   const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
-  const chase = useChase(workouts);
-  // A crossing is the day's event and wins the slot ON THAT DAY. The milestone line itself
-  // keeps a crossing up for a fortnight, which is right for a line with nothing to compete
-  // with — but handing Chase nothing for two weeks is how a whole feature goes unseen.
-  const crossingIsTodaysNews = milestone?.crossedOn === toIsoDate(new Date());
-  const showChaseLine = Boolean(onOpenChase) && !crossingIsTodaysNews;
+  // Wodi's newest message: the day's one observation, said by Wodi (see wodiMessage). Chase only
+  // speaks where it can be opened.
+  const wodiMessage = useWodiMessage(workouts, Boolean(onOpenChase));
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
@@ -140,7 +125,6 @@ export function HomeScreen({
   const deleteSheet = useDeleteSheet(deleteWorkout);
   const savedDeleteSheet = useDeleteSheet(deleteSavedWod);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(deleteSheet.open);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recapSlotRef = useRef<HTMLDivElement>(null);
   const pendingRecapScrollOffsetRef = useRef(0);
@@ -152,7 +136,6 @@ export function HomeScreen({
   const [pullDistance, setPullDistance] = useState(0);
 
   const firstName = user?.displayName?.split(' ')[0] ?? 'Athlete';
-  const greeting = getGreeting();
 
   const handleRecapDismissStart = () => {
     const slot = recapSlotRef.current;
@@ -223,17 +206,6 @@ export function HomeScreen({
     setSavedSheetOpen(true);
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    if (onImageSelected) {
-      onImageSelected(file);
-    } else {
-      onAddWorkout();
-    }
-  };
-
   const performRefresh = async () => {
     setIsRefreshing(true);
     try {
@@ -292,14 +264,6 @@ export function HomeScreen({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className={styles.hiddenInput}
-      />
-
       {pullDistance > 0 && (
         <div className={styles.pullIndicator} style={{ height: `${pullDistance}px` }}>
           <span className={styles.pullLabel}>
@@ -317,12 +281,11 @@ export function HomeScreen({
           transition={{ duration: 0.25 }}
         >
           <div className={styles.greetingBlock}>
-            <span className={styles.greetingLine}>{greeting},</span>
             <span className={styles.greetingName}>{firstName}</span>
           </div>
           <div className={styles.headerRight}>
             {weekCount >= 2 && (
-              <span className={styles.streakChip}>⚡ {weekCount} this week</span>
+              <span className={styles.streakChip}>{weekCount} this week</span>
             )}
             {onOpenProfile && (
               <button
@@ -350,65 +313,27 @@ export function HomeScreen({
         </motion.header>
 
 
-        {/* ── Log CTA ── */}
-        <motion.button
-          type="button"
-          className={styles.logCTA}
-          onClick={onAddWorkout}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.04, duration: 0.28 }}
-          aria-label="Add a workout"
-        >
-          <span className={styles.logIcon} aria-hidden="true">+</span>
-          <div className={styles.logTextBlock}>
-            <span className={styles.logTitle}>Add a workout</span>
-            <span className={styles.logSubtitleClean}>Make its poster &mdash; or save for later &rarr;</span>
-            <span className={styles.logSubtitle}>Make today's poster →</span>
-          </div>
-        </motion.button>
-
-        <motion.button
-          type="button"
-          className={styles.tellWodiCTA}
-          onClick={onTellWodi}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08, duration: 0.28 }}
-        >
-          <svg className={styles.tellWodiIcon} width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5 5h14v10H10l-4 4v-4H5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-          </svg>
-          <span className={styles.tellWodiTitle}>Tell Wodi</span>
-          <span className={styles.tellWodiHint}>just say what you did</span>
-        </motion.button>
-
-        {/* ── The observation slot ──
-            One line under the hero, carrying whichever of the two computed observations is
-            worth more today. A milestone the athlete has JUST CROSSED is an event and wins
-            outright; otherwise the slot points forward at the top chase. Both are the app's
-            own arithmetic over the log — see useMilestone and chaseFacts. */}
-        {!loading && (showChaseLine && chase.top ? (
+        {/* ── Wodi talks first ──
+            The top of Today is Wodi's newest message — the same bubble that ends the thread.
+            Tapping it opens what it's about: Chase, or the thread. Logging itself is the composer
+            docked on the nav (chat-first, owner decision 2026-10-01). */}
+        {!loading && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.08, duration: 0.25 }}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.04, duration: 0.28 }}
           >
-            <ChaseLine
-              fact={chase.top}
-              more={chase.facts.length - 1}
-              onOpen={() => onOpenChase?.()}
+            <WodiMessageCard
+              text={wodiMessage.text}
+              highlight={wodiMessage.highlight}
+              onOpen={wodiMessage.opens === 'chase' && onOpenChase ? onOpenChase : onTellWodi}
+              link={wodiMessage.day && wodiMessage.dayWorkout ? {
+                text: wodiMessage.day.label,
+                onOpen: () => handleSelectWorkout(wodiMessage.dayWorkout!),
+              } : undefined}
             />
           </motion.div>
-        ) : milestone && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.08, duration: 0.25 }}
-          >
-            <MilestoneLine milestone={milestone} />
-          </motion.div>
-        ))}
+        )}
 
         {/* ── For Later ── */}
         {planned.length > 0 && (
@@ -425,12 +350,12 @@ export function HomeScreen({
               onPointerUp={handleOpenSavedSheet}
               aria-label={`Open ${planned.length} saved WODs`}
             >
-              <span className={styles.savedSummaryIcon} aria-hidden="true">
-                <span className={styles.savedSummaryBookmark} />
-              </span>
+              <svg className={styles.savedSummaryIcon} width="14" height="18" viewBox="0 0 14 18" aria-hidden="true">
+                <path d="M1 1h12v16l-6-4-6 4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              </svg>
               {waitingChat ? (
                 <span className={styles.savedSummaryCopy}>
-                  <strong>💬 {getSavedTitle(waitingChat)}</strong>
+                  <strong>{getSavedTitle(waitingChat)}</strong>
                   <span>{'·'}</span>
                   <span className={styles.savedSummaryText}>
                     waiting for you{planned.length > 1 ? ` · +${planned.length - 1} more` : ''}
@@ -444,7 +369,7 @@ export function HomeScreen({
                 </span>
               )}
               <span className={styles.savedSummaryView} aria-hidden="true">
-                VIEW <span>{'>'}</span>
+                View
               </span>
             </button>
           </motion.section>
@@ -462,7 +387,10 @@ export function HomeScreen({
           transition={{ delay: 0.12, duration: 0.3 }}
         >
           <div className={styles.galleryHeader}>
-            <span className={styles.galleryTitle}>LAST WORKOUTS</span>
+            <span className={styles.galleryTitle}>Your posters</span>
+            {onOpenGallery && workouts.length > 0 && (
+              <button type="button" className={styles.galleryAll} onClick={onOpenGallery}>All</button>
+            )}
           </div>
 
           {loading ? (

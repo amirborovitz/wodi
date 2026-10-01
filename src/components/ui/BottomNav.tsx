@@ -6,6 +6,8 @@ type NavScreen = 'home' | 'feed' | 'history' | 'profile';
 interface BottomNavProps {
   currentScreen: Screen;
   onNavigate: (screen: NavScreen) => void;
+  /** Docked on top of the tabs in the same surface — Today's composer. */
+  accessory?: React.ReactNode;
 }
 
 interface NavItem {
@@ -58,9 +60,10 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
+export function BottomNav({ currentScreen, onNavigate, accessory }: BottomNavProps) {
   return (
-    <nav className={styles.nav}>
+    <nav className={accessory ? `${styles.nav} ${styles.navWithAccessory}` : styles.nav}>
+      {accessory}
       <div className={styles.container}>
         {navItems.map((item) => {
           const isActive = currentScreen === item.id || (item.id === 'profile' && currentScreen === 'settings');

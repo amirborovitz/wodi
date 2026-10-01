@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import type { Workout } from '../../types';
-import { askWodi, type CompleteFn } from './askWodi';
+import { askWodi, receiptsFor, type CompleteFn } from './askWodi';
 import type { TrainingContext } from './trainingFacts';
 
 // The loop is tested against a scripted model — never the network.
@@ -59,7 +59,7 @@ describe('askWodi', () => {
       said('140kg for 15 on 24 Sep.'),
     );
     const reply = await askWodi({ message: 'what did I deadlift last?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null });
+    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null, receipts: ['w1'] });
 
     const toolResult = seen[1].messages.find((m) => m.role === 'tool');
     expect(JSON.parse(String(toolResult?.content))).toMatchObject({
@@ -84,7 +84,7 @@ describe('askWodi', () => {
     const lookup = calls({ name: 'training_totals', args: { from: null, to: null } });
     const { complete, seen } = scripted(lookup, lookup, lookup, lookup, said('You trained once.'));
     const reply = await askWodi({ message: 'how much?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null });
+    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null, receipts: [] });
     expect(seen.map((s) => s.mustAnswer)).toEqual([false, false, false, false, true]);
   });
 
@@ -110,6 +110,18 @@ describe('askWodi', () => {
       complete,
     });
     expect(String(seen[0].messages[0].content)).toContain('- Training for a Hyrox in March (noted 2026-09-01)');
+  });
+
+  it('attaches only workouts it looked up and named, in the order it named them', () => {
+    const found = [
+      { id: 'a', date: '2026-09-22', title: 'Back Squat 5x5', parts: [], movements: [] },
+      { id: 'b', date: '2026-09-10', title: 'The Ladder', parts: [], movements: [] },
+      { id: 'c', date: '2026-08-02', title: 'Workout', parts: [], movements: [] },
+    ];
+    expect(receiptsFor('The Ladder was 22:00, and you squatted 100kg × 5 on 22 Sep.', found)).toEqual(['b', 'a']);
+    expect(receiptsFor('Nothing like that in your log.', found)).toEqual([]);
+    // "2 Aug" must not match inside "22 Aug".
+    expect(receiptsFor('That was 22 Aug.', found)).toEqual([]);
   });
 
   it('an unknown tool gets an error back, not a crash', async () => {

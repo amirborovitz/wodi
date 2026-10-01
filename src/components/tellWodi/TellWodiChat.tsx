@@ -1,21 +1,34 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { TellWodiChat as TellWodiChatState } from './useTellWodiChat';
+import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWodiChat';
 import { useChatViewport } from './useChatViewport';
+import { Receipts, ThreadHistory } from './ThreadHistory';
+import { PlusSheet } from './PlusSheet';
+import { WodiText } from './WodiText';
+import type { WodiThread } from './useWodiThread';
+import type { WorkoutWithStats } from '../../hooks/useWorkouts';
+import type { PlannedWorkout } from '../../types';
 import styles from './TellWodiChat.module.css';
 
 interface TellWodiChatProps {
   chat: TellWodiChatState;
+  /** The ongoing thread drawn above this conversation. */
+  thread: WodiThread;
   onBack: () => void;
+  onOpenWorkout: (workout: WorkoutWithStats) => void;
+  onOpenPlanned: (planned: PlannedWorkout) => void;
+  /** "+" → Fill in the form, before there's a board to hand over. */
+  onUseForm: () => void;
 }
 
 /**
  * The Tell Wodi screen: a message thread and a composer. Renders what useTellWodiChat returns and
  * nothing more — every decision about what to ask lives in the hook.
  */
-export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
+export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanned, onUseForm }: TellWodiChatProps) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const { messages, busy, send, tapChip, canOpenForms, openForms } = chat;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
@@ -33,6 +46,12 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
     setPhoto(null);
   };
 
+  /** The opening's day opens its poster here too — the same message as on Today. */
+  const headlineLink = (headline: ChatMessage['headline']): { text: string; onOpen: () => void } | undefined => {
+    const workout = headline?.link ? thread.workoutById(headline.link.workoutId) : undefined;
+    return headline?.link && workout ? { text: headline.link.label, onOpen: () => onOpenWorkout(workout) } : undefined;
+  };
+
   const typingLabel = busy === 'reading-board' ? 'Reading the board…' : busy === 'thinking' ? null : undefined;
 
   return (
@@ -43,16 +62,12 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <h1 className={styles.title}>Tell Wodi<span className={styles.titleDot}>.</span></h1>
-        {canOpenForms && busy !== 'saving' && (
-          <button type="button" className={styles.formsLink} onClick={openForms}>
-            Use the form
-          </button>
-        )}
+        <h1 className={styles.title}>wodi<span className={styles.titleDot}>.</span></h1>
       </header>
 
       <div className={styles.thread} ref={threadRef} onScroll={onThreadScroll}>
         <div className={styles.threadContent} ref={contentRef}>
+        <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} onOpenPlanned={onOpenPlanned} />
         <AnimatePresence initial={false}>
           {messages.map((message) => (
             <motion.div
@@ -70,7 +85,17 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
               >
                 {message.imageUrl && <img className={styles.photo} src={message.imageUrl} alt="Workout board" />}
                 {!message.imageUrl && message.hadPhoto && <p className={styles.photoNote}>Board photo</p>}
-                {message.text && <p className={styles.text}>{message.text}</p>}
+                {message.text && (
+                  <p className={styles.text}>
+                    {message.from === 'me' ? message.text : (
+                      <WodiText
+                        text={message.text}
+                        highlight={message.headline ? message.headline.highlight : undefined}
+                        link={headlineLink(message.headline)}
+                      />
+                    )}
+                  </p>
+                )}
                 {message.suggestions && (
                   <ul className={styles.suggestions}>
                     {message.suggestions.map((s) => (
@@ -95,13 +120,18 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
                   </ul>
                 )}
               </div>
+              <Receipts ids={message.receipts} thread={thread} onOpenWorkout={onOpenWorkout} />
               {message.chips && !message.answered && (
                 <div className={styles.chips}>
                   {message.chips.map((chip) => (
                     <motion.button
                       key={chip.label}
                       type="button"
-                      className={chip.label === 'Skip' ? styles.chipSkip : styles.chip}
+                      className={
+                        chip.action === 'remember' ? styles.chipPrimary
+                          : chip.label === 'Skip' || chip.action === 'not-now' ? styles.chipSkip
+                          : styles.chip
+                      }
                       whileTap={{ scale: 0.97 }}
                       disabled={busy != null}
                       onClick={() => { tapChip(message.id, chip); pinToEnd(); }}
@@ -141,19 +171,19 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
           <button
             type="button"
             className={styles.iconButton}
-            onClick={() => photoInputRef.current?.click()}
-            aria-label="Add a photo of the board"
+            onClick={() => setPlusOpen(true)}
+            aria-label="More ways to log"
             disabled={busy === 'saving'}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 8h3l2-2.5h6L17 8h3v11H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-              <circle cx="12" cy="13" r="3.5" stroke="currentColor" strokeWidth="1.8" />
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M9 2v14M2 9h14" />
             </svg>
           </button>
           <input
             ref={photoInputRef}
             type="file"
             accept="image/*"
+            capture="environment"
             className={styles.hiddenInput}
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -174,18 +204,34 @@ export function TellWodiChat({ chat, onBack }: TellWodiChatProps) {
               }
             }}
           />
-          <motion.button
-            type="button"
-            className={canSend ? styles.sendActive : styles.send}
-            onClick={submit}
-            disabled={!canSend}
-            whileTap={{ scale: 0.94 }}
-            aria-label="Send"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </motion.button>
+          {canSend ? (
+            <motion.button type="button" className={styles.primaryAction} onClick={submit} whileTap={{ scale: 0.94 }} aria-label="Send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </motion.button>
+          ) : (
+            <motion.button
+              type="button"
+              className={styles.primaryAction}
+              onClick={() => photoInputRef.current?.click()}
+              disabled={busy === 'saving'}
+              whileTap={{ scale: 0.94 }}
+              aria-label="Send Wodi a photo of the board"
+            >
+              <svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 6h4l2-3h6l2 3h4v12H2z" />
+                <circle cx="11" cy="11.5" r="3.5" />
+              </svg>
+            </motion.button>
+          )}
+          <PlusSheet
+            open={plusOpen}
+            onClose={() => setPlusOpen(false)}
+            onUseForm={() => (canOpenForms ? openForms() : onUseForm())}
+            onLibraryPhoto={setPhoto}
+            onSaveForLater={(file) => { send('Saving this board for later', file); pinToEnd(); }}
+          />
         </div>
       </footer>
     </div>

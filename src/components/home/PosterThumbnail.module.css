@@ -24,9 +24,14 @@
    you can actually read, a small one keeps its cards compact so the recap card
    below the gallery is not pushed past the fold. */
 .frame {
-  width: clamp(120px, 42vw, 176px);
+  /* The latest posters are the hero of Today — about three across a swipe, ~30% larger than before. */
+  width: clamp(150px, 53vw, 206px);
   border-radius: 10px;
   overflow: hidden;
+  /* Safari doesn't clip a scaled (transformed) skin to the rounded frame without its own layer,
+     so a skin with its own corner showed through — every thumbnail gets the frame's corner. */
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -82,8 +87,8 @@
 
 .labelDate {
   font-family: 'DM Mono', monospace;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
-  color: rgba(243, 241, 234, 0.4);
+  color: rgba(255, 255, 255, 0.72);
   letter-spacing: 0.02em;
 }

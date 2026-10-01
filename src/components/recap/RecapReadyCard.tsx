@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BRAND, VIBE, fD, fB } from '../celebration/faces/HandwrittenFace/brand';
+import { VIBE, fD, fB } from '../celebration/faces/HandwrittenFace/brand';
 import { W2MiniFace } from './wrapped/W2MiniFace';
 import { getTopMoveLine } from '../../hooks/useRecapData';
 import type { RecapData } from '../../hooks/useRecapData';
@@ -47,12 +47,7 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
       onTransitionEnd={handleTransitionEnd}
     >
       <div className={styles.collapseInner}>
-        <div className={styles.card} style={{ border: `1px solid ${BRAND.yellow}44` }}>
-          <div className={styles.ribbon} />
-          <div
-            className={styles.glow}
-            style={{ background: `radial-gradient(80% 60% at 88% 0%, ${BRAND.yellow}18, transparent 60%)` }}
-          />
+        <div className={styles.card}>
 
           <div className={styles.body} onClick={onOpen} role="button" aria-label={`Open ${data.period} recap`}>
             <div className={styles.headerRow}>
@@ -87,7 +82,7 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
                 <div className={styles.meta} style={{ fontFamily: fB }}>
                   {metaLine}
                 </div>
-                <div className={styles.inlineCta} style={{ fontFamily: fB, color: BRAND.yellow }}>
+                <div className={styles.inlineCta} style={{ fontFamily: fB }}>
                   {copy.cta}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="5" y1="12" x2="19" y2="12" />

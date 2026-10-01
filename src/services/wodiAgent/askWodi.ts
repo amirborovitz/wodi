@@ -5,7 +5,7 @@ import type {
 } from 'openai/resources/chat/completions';
 import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from '../openai';
 import type { ChatTurn } from '../tellWodiReader';
-import { findWorkouts, personalRecords, trainingTotals, type TrainingContext } from './trainingFacts';
+import { findWorkouts, personalRecords, trainingTotals, type FoundWorkout, type TrainingContext } from './trainingFacts';
 import { toIsoDate } from '../../utils/workoutDate';
 import { swapHabits } from './athleteHabits';
 import { notesForPrompt } from './athleteNotes';
@@ -26,7 +26,8 @@ import type { WodiNote } from '../../types';
 
 export type AskWodiReply =
   /** `proposedNote`: something lasting they said, for the chat to OFFER to remember — never saved here. */
-  | { kind: 'answer'; text: string; proposedNote: string | null }
+  /** `receipts`: ids of the workouts the answer quotes, so the chat can attach their posters. */
+  | { kind: 'answer'; text: string; proposedNote: string | null; receipts: string[] }
   | { kind: 'log' };
 
 /** One model turn. Injectable so the loop can be tested without the network. */
@@ -120,6 +121,29 @@ function runTool(name: string, rawArgs: string, ctx: TrainingContext): unknown {
   }
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MAX_RECEIPTS = 3;
+
+/**
+ * Which looked-up workouts the answer is quoting: one it names by its date ("24 Sep" — the
+ * prompt's date style) or by its title. Read off the words, against what the tools returned —
+ * the model can't attach a poster it never looked up.
+ */
+export function receiptsFor(answer: string, found: readonly FoundWorkout[]): string[] {
+  const text = answer.toLowerCase();
+  const hits: { id: string; at: number }[] = [];
+  for (const w of found) {
+    const [, m, d] = w.date.split('-').map(Number);
+    const day = m && d ? `${d} ${MONTHS[m - 1]}`.toLowerCase() : '';
+    const dayAt = day ? text.search(new RegExp(`(^|\\D)${day}\\b`)) : -1;
+    const title = w.title.trim().toLowerCase();
+    const titleAt = title.length > 3 && title !== 'workout' ? text.indexOf(title) : -1;
+    const at = [dayAt, titleAt].filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    if (at !== undefined && !hits.some((h) => h.id === w.id)) hits.push({ id: w.id, at });
+  }
+  return hits.sort((a, b) => a.at - b.at).slice(0, MAX_RECEIPTS).map((h) => h.id);
+}
+
 function readNoteText(rawArgs: string): string | null {
   try {
     const { text } = JSON.parse(rawArgs || '{}') as { text?: unknown };
@@ -165,12 +189,16 @@ export async function askWodi(input: {
 
   let ctx: TrainingContext | null = null;
   let proposedNote: string | null = null;
+  const found: FoundWorkout[] = [];
   for (let step = 0; ; step += 1) {
     // After MAX_LOOKUPS rounds of looking things up, it answers with what it has.
     const mustAnswer = step === MAX_LOOKUPS;
     const reply = await complete(messages, TOOLS, mustAnswer);
     const calls = mustAnswer ? [] : (reply.tool_calls ?? []).filter((call) => call.type === 'function');
-    if (calls.length === 0) return { kind: 'answer', text: reply.content?.trim() ?? '', proposedNote };
+    if (calls.length === 0) {
+      const text = reply.content?.trim() ?? '';
+      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found) };
+    }
     if (calls.some((call) => call.function.name === 'log_workout')) return { kind: 'log' };
 
     messages.push({ role: 'assistant', content: reply.content ?? null, tool_calls: calls });
@@ -182,6 +210,7 @@ export async function askWodi(input: {
       } else {
         ctx ??= await loadContext();
         result = runTool(call.function.name, call.function.arguments, ctx);
+        if (call.function.name === 'find_workouts') found.push(...(result as { workouts: FoundWorkout[] }).workouts);
       }
       console.info('[AskWodi]', call.function.name, call.function.arguments);
       messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });

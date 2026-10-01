@@ -1,21 +1,29 @@
+/* Docked flush to the bottom edge: one surface that can carry Today's composer on top of the
+   tabs, instead of a floating pill with a second floating pill stacked over it. --safe-bottom IS
+   env(safe-area-inset-bottom) — counted once, as padding, so the tabs clear the home indicator. */
 .nav {
   position: fixed;
-  /* --safe-bottom IS env(safe-area-inset-bottom), so adding both counted the
-     home indicator twice. It read as zero for as long as the viewport meta
-     lacked viewport-fit=cover; the moment that landed, the doubled value would
-     have thrown the dock ~68px up the screen. One count. */
-  bottom: calc(var(--space-4) + var(--safe-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--dock-bg);
-  backdrop-filter: blur(var(--dock-blur));
-  -webkit-backdrop-filter: blur(var(--dock-blur));
-  border: 1px solid var(--dock-border);
-  border-radius: var(--radius-full);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: var(--app-column);
+  margin: 0 auto;
+  padding-bottom: var(--safe-bottom);
+  background: #0b0c0e;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
   z-index: var(--z-sticky);
-  max-width: calc(100% - var(--space-8));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
-              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* With a composer on top, content scrolling under it fades out instead of being cut off. */
+.navWithAccessory::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -56px;
+  height: 56px;
+  background: linear-gradient(rgba(11, 12, 14, 0), #0b0c0e 85%);
+  pointer-events: none;
 }
 
 .container {
@@ -63,13 +71,13 @@
   transition: color var(--duration-fast) var(--ease-out);
 }
 
-/* Active state */
+/* Active state — white, not yellow: the posters carry the colour, the chrome steps back. */
 .navItem.active .icon {
-  color: var(--color-sessions);
+  color: #f2f2f0;
 }
 
 .navItem.active .label {
-  color: var(--color-sessions);
+  color: #f2f2f0;
 }
 
 /* Hover only on devices that support it */

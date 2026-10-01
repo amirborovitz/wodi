@@ -1,5 +1,6 @@
-/* Tell Wodi — a message thread that feels as familiar as WhatsApp and reads as Wodi:
-   ink field, one yellow, and yellow means YOU (the athlete's own bubbles wear it). */
+/* Tell Wodi — a message thread that feels as familiar as WhatsApp and reads as Wodi: ink field,
+   neutral bubbles, and yellow spent only where it means something — the camera, Wodi's key
+   number, a PR. Wodi's numbers are set like a log (WodiText). */
 
 /* Pinned to the viewport, like any messaging app: the composer always sits at the bottom of the
    screen, whatever the page around it is doing. It lives inside Add Workout's container, whose
@@ -40,25 +41,14 @@
 .title {
   flex: 1;
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
 }
 
 .titleDot {
   color: var(--wodi-yellow);
-}
-
-.formsLink {
-  min-height: 44px;
-  padding: 0 var(--sp-2);
-  background: none;
-  border: none;
-  color: var(--wodi-dim);
-  font-family: var(--font-body);
-  font-size: 0.875rem;
-  cursor: pointer;
 }
 
 .thread {
@@ -92,20 +82,22 @@
 .bubbleWodi,
 .bubbleMe {
   max-width: 80%;
-  padding: 10px 14px;
-  font-size: 1rem;
-  line-height: 1.35;
+  padding: 11px 15px 12px;
+  font-size: 15.5px;
+  line-height: 1.38;
+  text-wrap: pretty;
   transition: opacity 0.2s ease;
 }
 
+/* The tail is the top corner on the sender's side — the same bubble as Wodi's message on Today. */
 .bubbleWodi {
-  background: var(--wodi-card2);
-  border-radius: 18px 18px 18px 4px;
+  background: #1e2023;
+  border-radius: 4px 18px 18px 18px;
 }
 
 .bubbleMe {
-  background: rgba(245, 194, 0, 0.16);
-  border-radius: 18px 18px 4px 18px;
+  background: #2a2c30;
+  border-radius: 18px 4px 18px 18px;
 }
 
 .bubbleAnswered {
@@ -115,7 +107,7 @@
 .text {
   margin: 0;
   white-space: pre-wrap;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .photo {
@@ -165,30 +157,40 @@
   max-width: 92%;
 }
 
+/* Answers are neutral pills; the one that commits (Remember) is solid white. Dashed is reserved
+   for "waiting", so nothing here is dashed. */
 .chip,
+.chipPrimary,
 .chipSkip {
   min-height: 44px;
-  padding: 0 var(--sp-4);
-  border-radius: var(--r-pill);
-  font-family: var(--font-body);
-  font-size: 0.9375rem;
-  font-weight: 600;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .chip {
-  background: var(--wodi-card);
-  border: 1px solid rgba(245, 194, 0, 0.45);
-  color: var(--wodi-white);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #f2f2f0;
+}
+
+.chipPrimary {
+  background: #f2f2f0;
+  border: 1px solid #f2f2f0;
+  color: #0b0c0e;
 }
 
 .chipSkip {
-  background: none;
-  border: 1px dashed var(--wodi-line2);
-  color: var(--wodi-dim);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .chip:disabled,
+.chipPrimary:disabled,
 .chipSkip:disabled {
   opacity: 0.5;
 }
@@ -258,9 +260,10 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: none;
-  border: none;
-  color: var(--wodi-white);
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: #f2f2f0;
   cursor: pointer;
 }
 
@@ -274,22 +277,27 @@
   max-height: 120px;
   padding: 11px 16px;
   resize: none;
-  border: 1px solid var(--wodi-line2);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 22px;
-  background: var(--wodi-card);
-  color: var(--wodi-white);
-  font-family: var(--font-body);
-  font-size: 1rem;
+  background: #17181b;
+  color: #f2f2f0;
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
   line-height: 1.35;
+}
+
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .input:focus {
   outline: none;
-  border-color: rgba(245, 194, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-.send,
-.sendActive {
+/* The camera is the primary action; it becomes send only once there's something to send. */
+.primaryAction {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
@@ -297,15 +305,11 @@
   place-items: center;
   border-radius: 50%;
   border: none;
+  background: #f5c200;
+  color: #0b0c0e;
   cursor: pointer;
 }
 
-.send {
-  background: var(--wodi-card);
-  color: var(--wodi-dim);
-}
-
-.sendActive {
-  background: var(--wodi-yellow);
-  color: var(--wodi-bg);
+.primaryAction:disabled {
+  opacity: 0.5;
 }

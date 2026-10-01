@@ -13,8 +13,8 @@
   background: #0b0c0e;
   overflow-y: auto;
   overscroll-behavior-y: none;
-  /* fix #3: enough clearance for the floating tab bar */
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  /* Clearance for the docked surface: Tell Wodi composer + tabs. */
+  padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Constrained here rather than on .screen so the screen's background still
@@ -26,10 +26,6 @@
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   display: flex;
   flex-direction: column;
-}
-
-.hiddenInput {
-  display: none;
 }
 
 /* ── Pull to refresh ──────────────────────────────────────────── */
@@ -50,7 +46,7 @@
 /* ── Header ───────────────────────────────────────────────────── */
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   /* fix #4: tighten header bottom gap */
   padding: 14px 0 14px;
@@ -60,14 +56,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-}
-
-.greetingLine {
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(243, 241, 234, 0.45);
-  line-height: 1.4;
 }
 
 .greetingName {
@@ -84,7 +72,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 16px;
 }
 
 .streakChip {
@@ -143,70 +130,6 @@
   font-size: 14px;
   font-weight: 900;
   color: #f3f1ea;
-}
-
-/* ── Log CTA ──────────────────────────────────────────────────── */
-/* fix #1: tighter vertical padding so it doesn't dominate the fold */
-.logCTA {
-  width: 100%;
-  background: #f5c200;
-  border: none;
-  border-radius: 16px;
-  padding: 10px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  margin-bottom: 10px;
-  transition: transform 0.1s ease, filter 0.1s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.logCTA:active {
-  transform: scale(0.98);
-  filter: brightness(0.94);
-}
-
-.logIcon {
-  font-size: 20px;
-  font-weight: 300;
-  color: #0b0c0e;
-  line-height: 1;
-  width: 28px;
-  height: 28px;
-  background: rgba(0, 0, 0, 0.14);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.logTextBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.logTitle {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 22px;
-  font-weight: 900;
-  color: #0b0c0e;
-  letter-spacing: -0.01em;
-  line-height: 1;
-}
-
-.logSubtitle {
-  display: none;
-}
-
-.logSubtitleClean {
-  font-family: 'Barlow', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.5);
-  line-height: 1.2;
 }
 
 /* ── Admin button ─────────────────────────────────────────────── */
@@ -368,17 +291,29 @@
 
 .galleryHeader {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
 }
 
 .galleryTitle {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  color: rgba(243, 241, 234, 0.4);
-  letter-spacing: 0.18em;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f2f2f0;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.galleryAll {
+  min-height: 44px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
 }
 
 .galleryScroll {
@@ -455,57 +390,31 @@
   margin-bottom: 16px;
 }
 
-.savedSummaryLine,
-.savedEmptyLine {
+.savedSummaryLine {
   width: 100%;
-  min-height: 58px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #16181c;
-  border: 1px solid rgba(243, 241, 234, 0.12);
-  border-radius: 12px;
+  /* Dashed means "waiting" — the same mark as the thread's waiting card. */
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
   color: #f3f1ea;
   cursor: pointer;
-  padding: 9px 12px;
+  padding: 12px 14px;
   text-align: left;
   -webkit-tap-highlight-color: transparent;
 }
 
-.savedSummaryLine:active,
-.savedEmptyLine:active {
-  border-color: rgba(245, 194, 0, 0.32);
-  background: #1a1c20;
+.savedSummaryLine:active {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .savedSummaryIcon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  flex: 0 0 auto;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 194, 0, 0.18);
-  border-radius: 8px;
-}
-
-.savedSummaryBookmark {
-  position: relative;
-  width: 10px;
-  height: 15px;
-  background: #f5c200;
-  border-radius: 1px 1px 0 0;
-}
-
-.savedSummaryBookmark::after {
-  content: "";
-  position: absolute;
-  left: 1px;
-  bottom: -3px;
-  width: 8px;
-  height: 8px;
-  background: #16181c;
-  transform: rotate(45deg);
+  color: #f2f2f0;
 }
 
 .savedSummaryCopy {
@@ -514,7 +423,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: rgba(243, 241, 234, 0.42);
+  color: rgba(255, 255, 255, 0.72);
   font-family: 'Barlow', sans-serif;
   font-size: 13px;
   font-weight: 700;
@@ -530,7 +439,7 @@
 .savedSummaryText {
   min-width: 0;
   overflow: hidden;
-  color: rgba(243, 241, 234, 0.42);
+  color: rgba(255, 255, 255, 0.72);
   font-family: 'DM Mono', monospace;
   font-size: 11px;
   font-weight: 500;
@@ -540,41 +449,10 @@
 
 .savedSummaryView {
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 32px;
-  padding: 0 13px;
-  border-radius: 9px;
-  background: #f5c200;
-  color: #08090b;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-
-.savedSummaryView span {
-  font-family: 'Barlow', sans-serif;
-  font-size: 14px;
-  letter-spacing: 0;
-}
-
-.savedEmptyLine {
-  min-height: 50px;
-  background: transparent;
-  color: rgba(243, 241, 234, 0.56);
   font-family: 'Barlow', sans-serif;
   font-size: 13px;
-  font-weight: 800;
-}
-
-.savedLinePlus {
-  color: #f5c200;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1;
+  font-weight: 700;
+  color: #f2f2f0;
 }
 
 .savedSheetBackdrop {
@@ -698,44 +576,3 @@
   line-height: 1;
 }
 
-/* The second door: log by chatting. Full width and easy to hit, quieter than the yellow CTA so
-   the two read primary → secondary at a glance. */
-.tellWodiCTA {
-  width: 100%;
-  min-height: 52px;
-  background: #16181c;
-  border: 1px solid rgba(245, 194, 0, 0.22);
-  border-radius: 16px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  margin-bottom: 10px;
-  color: #f2f0eb;
-  transition: transform 0.1s ease, filter 0.1s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.tellWodiCTA:active {
-  transform: scale(0.98);
-  filter: brightness(1.1);
-}
-
-.tellWodiIcon {
-  color: #f5c200;
-  flex-shrink: 0;
-}
-
-.tellWodiTitle {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-
-.tellWodiHint {
-  margin-left: auto;
-  font-size: 13px;
-  color: rgba(242, 240, 235, 0.38);
-}

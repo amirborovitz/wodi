@@ -1,0 +1,56 @@
+/* Lives inside the docked nav surface (BottomNav's accessory slot) — no position of its own. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 0;
+}
+
+.plus,
+.camera {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.plus {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: #f2f2f0;
+}
+
+.camera {
+  border: none;
+  background: #f5c200;
+  color: #0b0c0e;
+}
+
+.bar {
+  flex: 1;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  background: #17181b;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  text-align: left;
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.56);
+  cursor: pointer;
+}
+
+.plus:active,
+.bar:active,
+.camera:active {
+  transform: scale(0.97);
+}
+
+.hiddenInput {
+  display: none;
+}
