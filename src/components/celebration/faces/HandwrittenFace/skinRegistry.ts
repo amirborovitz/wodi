@@ -82,12 +82,14 @@ export function isPosterSkinId(id: unknown): id is PosterSkinId {
 }
 
 /**
- * The picker's order: the athlete's favourite first (Sun until they pick another), then the
- * rest as the registry lists them. Only the order moves — what a saved poster shows doesn't.
+ * The picker's order: the athlete's favourite first, then Sun (the owner's pick of the set, so it
+ * never sinks to the end of the row), then the rest as the registry lists them. With no favourite
+ * yet, Sun leads. Only the order moves — what a saved poster shows doesn't.
  */
 export function orderSkins(favorite: PosterSkinId | undefined): PosterSkin[] {
-  const first = getSkin(favorite ?? DEFAULT_NEW_SKIN);
-  return [first, ...SKINS.filter((s) => s.id !== first.id)];
+  const lead = [getSkin(favorite ?? DEFAULT_NEW_SKIN), getSkin(DEFAULT_NEW_SKIN)]
+    .filter((s, i, all) => all.findIndex((t) => t.id === s.id) === i);
+  return [...lead, ...SKINS.filter((s) => !lead.some((l) => l.id === s.id))];
 }
 
 const INTENSITY_VIBE_MAP: Record<string, VibeKey> = {
