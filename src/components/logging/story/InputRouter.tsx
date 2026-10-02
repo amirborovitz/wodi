@@ -28,6 +28,7 @@ export function isOpenCountMovement(rowName: string, openMovementName: string | 
   return !!openMovementName && sameMovementName(rowName, openMovementName);
 }
 import { resolveBlockScore } from '../../../services/blockScore';
+import { personalIntervalCount } from './intervalRounds';
 
 interface InputRouterProps {
   result: StoryExerciseResult;
@@ -109,15 +110,8 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
       && result.exercise.partnerSplit === 'rounds';
     const useSimplifiedIntervalRounds = isAmrapIntervals && isRoundsSplitPartner && !isLadder;
 
-    // `exercise.intervalCount` is the board's TOTAL turn count across the whole shared session
-    // (e.g. "x4" = 4 turns total). When partners alternate, only half those turns are this
-    // athlete's own — dividing by teamSize here is what keeps the "rounds per interval" estimate
-    // from silently doubling into a fictional team total (this is never a team score; see the
-    // partner-split note above).
-    const totalIntervalCount = result.exercise.intervalCount ?? result.setsTotal ?? 1;
-    const personalIntervalCount = useSimplifiedIntervalRounds && teamSize && teamSize > 1
-      ? Math.max(1, Math.round(totalIntervalCount / teamSize))
-      : totalIntervalCount;
+    // Only the athlete's own turns multiply the per-interval estimate (never a team score).
+    const intervalCount = personalIntervalCount(result, teamSize) ?? 1;
 
     // The simplified path only ever needs weight/distance tiles (bodyweight reps are derived from
     // the rounds estimate, same as a plain AMRAP) — everything else keeps showing all movements.
@@ -185,7 +179,7 @@ export function InputRouter({ result, onChange, teamSize, onSubstitutionOpenChan
         {useSimplifiedIntervalRounds && (
           <RoundsPerIntervalInput
             result={result}
-            intervalCount={personalIntervalCount}
+            intervalCount={intervalCount}
             onChange={onChange}
           />
         )}

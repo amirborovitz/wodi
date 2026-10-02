@@ -1,5 +1,5 @@
 import type { Exercise, ParsedMovement, MovementTotal } from '../../types';
-import { sameMovementName } from '../../utils/movementNameMatch';
+import { sameMovementName, stripMovementRolePrefix } from '../../utils/movementNameMatch';
 
 // ─── Prescription ↔ logged-breakdown resolution ────────────────────────────────
 //
@@ -66,7 +66,7 @@ export function substitutedFromName(
   // joins back to the prescription); it just isn't a story worth telling on the poster. A swap the
   // athlete made on their own — an Echo Bike where the board wrote a run — still shows its origin.
   if (isBoardOfferedChoice(prescribedAlternative, total.name)) return undefined;
-  return total.originalMovement?.trim() || undefined;
+  return stripMovementRolePrefix(total.originalMovement ?? '').trim() || undefined;
 }
 
 /** Breakdown entries whose name (or pre-substitution original) is one of `names`. */

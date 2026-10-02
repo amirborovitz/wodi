@@ -86,7 +86,7 @@
           },
           {
             "primary": "50",
-            "name": "KB Russian Twists",
+            "name": "Russian Twists",
             "subNote": "100 total",
             "totalNote": "100 total",
             "mineKey": "Russian Twist",
@@ -247,7 +247,7 @@
         },
         {
           "kind": "line",
-          "rx": "50 KB Russian Twists",
+          "rx": "50 Russian Twists",
           "load": "",
           "mine": "",
           "team": "",

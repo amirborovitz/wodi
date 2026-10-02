@@ -154,8 +154,8 @@ Return ONLY valid JSON:
       // — both movements are done every round, neither is a buy-in).
       "buyIn": [{ "name": "Run", "distance": 600, "unit": "m" }],
       "movements": [
-        // Each movement can have a "role": "buy_in" (done once before rounds), "cash_out" (done once after rounds), or omit for normal per-round work.
-        // Use "role" when a buy-in/cash-out movement naturally belongs in the movements array (e.g., "200m Run into AMRAP: ...").
+        // Every movement on the board is written ONCE. A buy-in lives in "buyIn" and a cash-out in "cashOut" — never ALSO here.
+        // "role" exists only for a buy-in/cash-out you did not put in those lists; leave it null otherwise.
         { "name": "Shoulder to Overhead", "reps": 10, "inputType": "weight", "equipment": "barbell", "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "implementCount": 1, "alternative": { "name": "Alt Name", "reps": 10 } },
         { "name": "Echo Bike", "calories": 7, "rxCalories": { "male": 7, "female": 5 }, "inputType": "none" }
       ],
@@ -941,10 +941,7 @@ Output:
     ] }]
 }
 NOTE: "Every X:XX + AMRAP" = amrap_intervals, NOT intervals/emom. The run is a buyIn (repeated each interval). User scores total rounds+reps across all intervals.
-IMPORTANT: If you place a buy-in movement inside "movements" instead of "buyIn", you MUST set "role": "buy_in" on it so the app knows it's not repeated per AMRAP round.
-Equivalent alternatives (both are correct):
-  Option A: "buyIn": [{ "name": "Run", "distance": 200 }], "movements": [{ "name": "BMU", "reps": 4 }, ...]
-  Option B: "movements": [{ "name": "Run", "distance": 200, "role": "buy_in" }, { "name": "BMU", "reps": 4 }, ...]
+The run is written ONCE, in "buyIn". Listing it in "buyIn" AND in "movements" (with "role": "buy_in") makes it two runs.
 
 ### 12b. Interval whose fixed work repeats, then a MAX movement for the remaining time
 Input: "METCON (Intervals) [02:00 min AMRAP , 02:00 min REST] x 4 rounds: 2 rounds / 8 Push Press @35/50kg / 8 Box Jumps / Into - Max Burpees Over the Bar"

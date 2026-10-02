@@ -1,0 +1,197 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Squat",
+        "blueprint": "5 sets",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Back Squat",
+            "subNote": "15 total",
+            "totalNote": "15 total",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 5
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "title": "Blueprint",
+        "blueprint": "in each 3:00 window, in order",
+        "rows": [
+          {
+            "roundLabel": "BUY-IN",
+            "name": "",
+            "primary": "600m Echo Bike",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "AMRAP",
+            "name": "",
+            "primary": "6 DB Thrusters / Kettlebell Thrusters · 6 Box Jumps",
+            "suppressMine": true,
+            "accent": "magenta"
+          },
+          {
+            "roundLabel": "RX",
+            "name": "",
+            "primary": "2x12.5/20kg",
+            "mineOverride": "2×15kg",
+            "accent": "yellow"
+          },
+          {
+            "roundLabel": "TOTAL",
+            "name": "",
+            "primary": "3km Echo Bike · 120 DB Thrusters · 120 Box Jumps",
+            "suppressMine": true,
+            "accent": "yellow"
+          }
+        ]
+      }
+    ]
+  ],
+  "hero": {
+    "value": "20",
+    "unit": "ROUNDS",
+    "formatLine": "3:00 ON / 1:00 OFF × 5",
+    "storyLine": "120 dumbbell thruster · 120 box jump · 15 back squat · 3.0km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · BACK SQUAT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Back Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          70,
+          90
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 15
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "3:00 AMRAP X 5",
+        "sectionColor": "magenta"
+      },
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "3.0km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "6",
+        "name": "Dumbbell Thruster",
+        "total": "120 total",
+        "color": "yellow",
+        "weight": 30,
+        "unit": "kg"
+      },
+      {
+        "perRound": "6",
+        "name": "Box Jump",
+        "total": "120 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL ROUNDS",
+  "resultValue": "20",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Back Squat",
+          "load": "",
+          "mine": "70→90kg",
+          "team": "",
+          "total": "15 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "IN EACH 3:00 WINDOW, IN ORDER",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "BUY-IN"
+        },
+        {
+          "kind": "line",
+          "rx": "6 DB Thrusters / Kettlebell Thrusters · 6 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "AMRAP"
+        },
+        {
+          "kind": "line",
+          "rx": "2x12.5/20kg",
+          "load": "",
+          "mine": "2×15kg",
+          "team": "",
+          "roundLabel": "RX"
+        },
+        {
+          "kind": "line",
+          "rx": "3km Echo Bike · 120 DB Thrusters · 120 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "roundLabel": "TOTAL"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    "3-3-3-3-3 reps",
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "AMRAP"
+  ]
+}

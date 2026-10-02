@@ -243,7 +243,7 @@ export function useTellWodiChat({
   /** Ask the next open question, hand to the form, or finish. */
   const askNext = (prefix?: string): void => {
     waitingRef.current = false;
-    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits);
+    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
     const question = nextQuestion(slots, resultsRef.current);
     if (question) {
       push({
@@ -298,7 +298,7 @@ export function useTellWodiChat({
   const readWords = async (text: string): Promise<void> => {
     const workout = workoutRef.current;
     if (!workout) return;
-    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits);
+    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
     const askedBefore = slots.find((s) => s.asked)?.id;
     setBusy('thinking');
     try {
@@ -451,7 +451,7 @@ export function useTellWodiChat({
       void parkBeforeWorkout('');
       return;
     }
-    if (chip.action !== 'done') applyAnswers(chip.answers ?? [], openSlots(resultsRef.current, closedRef.current, callbacks.current.habits));
+    if (chip.action !== 'done') applyAnswers(chip.answers ?? [], openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize));
     askNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commit, push]);

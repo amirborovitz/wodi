@@ -142,8 +142,9 @@
         "name": "Twin Kettlebell Hang Power Clean",
         "total": "30 total",
         "color": "yellow",
-        "weight": 20,
+        "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "wasSubstituted": false
       },
       {
@@ -151,8 +152,9 @@
         "name": "Twin Kettlebell Front Squat",
         "total": "30 total",
         "color": "yellow",
-        "weight": 20,
+        "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "wasSubstituted": false
       },
       {
@@ -160,8 +162,9 @@
         "name": "Twin Kettlebell Push Press",
         "total": "30 total",
         "color": "yellow",
-        "weight": 20,
+        "weight": 40,
         "unit": "kg",
+        "implementCount": 2,
         "wasSubstituted": false
       }
     ],

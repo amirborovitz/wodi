@@ -1,6 +1,6 @@
 {
   "name": "real-pairs-amrap-max-situp-logged-20260829",
-  "description": "Same board, saved EXACTLY as production stored it: the save path baked the athlete's logged 20 into the Sit-up's prescription (reps: 20) beside isMaxReps/maxMetric. The row must still read 'Max Sit-up - 20 total'. maxMetric names the slot the board left open, so a number in that slot cannot be the coach's - it is our own bake, and the poster has to see through it. Hero stays ROUNDS. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen.",
+  "description": "Same board, saved EXACTLY as production stored it: the save path baked the athlete's logged 20 into the Sit-up's prescription (reps: 20) beside isMaxReps/maxMetric. The row must still read 'Max Sit-up - 20 total'. maxMetric names the slot the board left open, so a number in that slot cannot be the coach's - it is our own bake, and the poster has to see through it. Hero stays ROUNDS. Totals brought to the single truth on 2026-09-14: the backfill wrote the poster’s figures to the real doc, and the poster no longer corrects the stored breakdown on the way to the screen. Breakdown carries the saved twin shape (both bells = 40kg, implementCount 2) as the real 2026-08-29 doc does; the fixture predated it.",
   "workout": {
     "title": "WOD (שבת / חג)",
     "format": "amrap",
@@ -109,23 +109,26 @@
         {
           "name": "Twin Kettlebell Hang Power Clean",
           "totalReps": 42,
-          "weight": 20,
+          "weight": 40,
           "unit": "kg",
-          "color": "yellow"
+          "color": "yellow",
+          "implementCount": 2
         },
         {
           "name": "Twin Kettlebell Front Squat",
           "totalReps": 42,
-          "weight": 20,
+          "weight": 40,
           "unit": "kg",
-          "color": "yellow"
+          "color": "yellow",
+          "implementCount": 2
         },
         {
           "name": "Twin Kettlebell Push Press",
           "totalReps": 42,
-          "weight": 20,
+          "weight": 40,
           "unit": "kg",
-          "color": "yellow"
+          "color": "yellow",
+          "implementCount": 2
         },
         {
           "name": "Sit-up",

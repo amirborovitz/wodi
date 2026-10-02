@@ -22,6 +22,7 @@ import { ImplementToggle } from './ImplementToggle';
 import { asksImplementCount, perImplementUnit } from './implementQuestion';
 import { BoardRow, boardRowAction } from './BoardRow';
 import type { MovementSubstitution } from '../../../types';
+import { stripMovementRolePrefix } from '../../../utils/movementNameMatch';
 import styles from './ScoreMovementInputs.module.css';
 
 
@@ -115,8 +116,7 @@ function movementHasAlternate(mr: MovementResult): boolean {
 }
 
 function movementAlternateKey(mr: MovementResult): string {
-  return (cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name)
-    .replace(/^(Buy-In|Cash-Out):\s*/i, '')
+  return stripMovementRolePrefix(cleanTileLabel(mr.movement.name) || stripWeightFromName(mr.movement.name) || mr.movement.name)
     .toLowerCase()
     .trim();
 }
@@ -939,7 +939,7 @@ export function ScoreMovementInputs({
     const rawMovName = sub.isSubstituted ? sub.displayName : mr.movement.name;
     // Strip AI-generated "Buy-In:"/"Cash-Out:" prefix from display; these labels can be
     // misparsed for the first movement of a numbered AMRAP block.
-    const displayMovName = rawMovName.replace(/^(Buy-In|Cash-Out):\s*/i, '');
+    const displayMovName = stripMovementRolePrefix(rawMovName);
     const hasAlts = compact ? movementHasAlternate(mr) : canOpenAlternate(mr);
     const tileName = (
       cleanTileLabel(displayMovName)
@@ -1304,7 +1304,7 @@ export function ScoreMovementInputs({
                 >
                   <span className={styles.inlineAlternateText}>
                     <span className={styles.inlineAlternateName}>
-                      {cleanTileLabel((isActive ? sub.displayName : mr.movement.name).replace(/^(Buy-In|Cash-Out):\s*/i, ''))}
+                      {cleanTileLabel(stripMovementRolePrefix(isActive ? sub.displayName : mr.movement.name))}
                     </span>
                     <span className={styles.inlineAlternateMeta}>
                       {isActive ? (sub.conversionNote ?? 'alternate selected') : 'tap to scale / alternate'}
@@ -1381,7 +1381,7 @@ export function ScoreMovementInputs({
       {swapMr && (
         <SubstitutionSheet
           open={swapOpenKey != null}
-          originalName={swapMr.movement.name.replace(/^(Buy-In|Cash-Out):\s*/i, '')}
+          originalName={stripMovementRolePrefix(swapMr.movement.name)}
           originalReps={swapMr.movement.reps}
           originalDistance={swapMr.movement.distance}
           originalCalories={swapMr.movement.calories}

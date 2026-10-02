@@ -44,7 +44,7 @@ import {
 } from '../../services/partnerScope';
 // Block score — the ONE owner of "what does this piece count?", read from the block rather than
 // from its format name. A clock is not a score.
-import { hasIndependentBlocks, independentlyScoredSections, loggedBlockScores, resolveBlockScore, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from '../../services/blockScore';
+import { hasIndependentBlocks, independentlyScoredSections, loggedBlockScores, resolveBlockScore, scoresOpenReps, sectionRoundsCompleted, statesMaxEffort, earnsRoundCount } from '../../services/blockScore';
 import {
   DEFAULT_CELEBRATION_STICKER_CONFIG,
   type CelebrationStickerConfig,
@@ -329,17 +329,21 @@ function ladderTotalReps(exercise: Exercise): number {
 }
 
 /**
- * Per-implement weight to display for a ladder movement — prefers what was actually logged
- * over the prescribed Rx, since this is the "what I did" layer. MovementTotal.weight for a
- * twin-implement movement is the EFFECTIVE weight used for volume math (per-implement × 2), so
- * it's divided back down to the per-dumbbell/kettlebell value that was actually entered.
+ * Per-implement weight to display — what was actually logged, over the prescribed Rx, since this
+ * is the "what I did" layer. Every movement row reads it (ladder and plain alike); the Rx is only
+ * the fallback for a movement the athlete entered no weight for.
+ *
+ * MovementTotal.weight for a twin-implement movement is the EFFECTIVE weight used for volume math
+ * (per-implement × 2), so it's divided back down to the per-dumbbell/kettlebell value that was
+ * actually entered. Whether it was a pair is the athlete's (the total's implementCount — they can
+ * answer "1×" to a board that wrote two) before the board's.
  */
 function deriveDisplayWeight(
   prescribed: { weight?: number; implementCount?: 1 | 2 } | undefined,
   actual: MovementTotal | undefined,
 ): number | undefined {
   if (actual?.weight && actual.weight > 0) {
-    return prescribed?.implementCount === 2 ? actual.weight / 2 : actual.weight;
+    return (actual.implementCount ?? prescribed?.implementCount) === 2 ? actual.weight / 2 : actual.weight;
   }
   return prescribed?.weight && prescribed.weight > 0 ? prescribed.weight : undefined;
 }
@@ -1165,11 +1169,18 @@ function buildPairPacerNote(mov: ParsedMovement): string {
  * own movement, so there is nothing to recover and everything to duplicate.
  */
 function getMovementDisplayNameFromContext(
-  movement: Pick<ParsedMovement, 'name' | 'implementCount'>,
+  movement: Pick<ParsedMovement, 'name' | 'implementCount' | 'equipment'>,
   contextText?: string,
   siblingsJoinedByCaller = false,
 ): string {
   const name = movement.name;
+  // The implement is the model's answer, and a blank is an answer: a movement it says takes no
+  // dumbbell or kettlebell never borrows one from a neighbour's clause — "6 DB thrusters x2 and
+  // 6 box jumps" printed "DB Box Jumps" (THRUST, 2026-10-02). The text read below is for docs
+  // saved before the parse classified equipment.
+  const ownsHandImplement = movement.equipment == null
+    || movement.equipment === 'dumbbell'
+    || movement.equipment === 'kettlebell';
   if (!contextText || /\b(?:db|dumbbell|kb|kettlebell|twin|double)\b/i.test(name)) {
     return name;
   }
@@ -1202,7 +1213,7 @@ function getMovementDisplayNameFromContext(
   const source = matchingClause.toLowerCase();
   const hasDb = /\b(?:db'?s?|dumbbells?)\b/i.test(source);
   const hasKb = /\b(?:kb'?s?|kettlebells?)\b/i.test(source);
-  if (!hasDb && !hasKb) return name;
+  if (!ownsHandImplement || (!hasDb && !hasKb)) return name;
   const isPair = movement.implementCount === 2 || /\b(?:twin|double|pair|two|2x|2\s*x)\b/i.test(source);
   const equipment = hasDb ? 'DB' : 'KB';
   const prefix = isPair ? `Twin ${equipment}` : equipment;
@@ -1323,10 +1334,13 @@ function buildCelebrationMovementRow(params: {
   // occurrence's own quantity is already its primary value; the piece total lives in the totals
   // block, not here (poster truth standard: omit rather than assert).
   const isMergedAcrossOccurrences = (occurrenceCount ?? 1) > 1;
-  const weight = prescribed?.implementCount === 2 && prescribed.weight
-    ? prescribed.weight
-    : actual?.weight ?? prescribed?.weight;
-  const weightEachSuffix = prescribed?.implementCount === 2 ? ' each' : '';
+  // What the athlete lifted, per implement — never the board's Rx while they logged a weight.
+  // This used to print the Rx first for any pair of dumbbells, which went unseen while every
+  // pair was logged at Rx: 15kg dumbbells on a 20kg board read "20kg each" (THRUST, 2026-10-02).
+  const weight = deriveDisplayWeight(prescribed, actual);
+  const weightEachSuffix = (actual?.weight ? actual.implementCount ?? prescribed?.implementCount : prescribed?.implementCount) === 2
+    ? ' each'
+    : '';
   const unit = actual?.unit === 'lb' ? 'lb' : 'kg';
   const unitUpper = unit.toUpperCase();
   const hasWeight = (weight || 0) > 0;
@@ -1761,7 +1775,16 @@ function formatBlockTotalPart(total: MovementTotal): string {
  * states each on the movement that carries it (first appearance only), and the athlete's
  * weights then ride on the totals line.
  */
-function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): ArtifactRow[] {
+function buildBlockLineRows(
+  exercise: Exercise,
+  movements: MovementTotal[],
+  /**
+   * An AMRAP's round count is the athlete's SCORE, not the board's — so its repeating block is
+   * labelled AMRAP ("as many rounds as you can of this"), never "×20". Same rows otherwise: a
+   * buy-in wrapping an AMRAP is the same structure as one wrapping five rounds for time.
+   */
+  roundsAreScored = false,
+): ArtifactRow[] {
   const resolveSubstitution = createSubstitutionResolver(exercise, movements);
   const sections = deriveStructuralSections(exercise).map((section) => {
     const rounds = section.rounds ?? 1;
@@ -1795,6 +1818,7 @@ function buildBlockLineRows(exercise: Exercise, movements: MovementTotal[]): Art
     if (!line) return [];
     const roundLabel = section.sectionType === 'buy_in' ? 'BUY-IN'
       : section.sectionType === 'cash_out' ? 'CASH-OUT'
+      : roundsAreScored ? 'AMRAP'
       : `×${rounds}`;
     return [{ roundLabel, name: '', primary: line, suppressMine: true, accent: 'magenta' }];
   });
@@ -2251,7 +2275,6 @@ function formatSectionRowTotal(movement: ParsedMovement, rounds: number): string
 // Only the first shape ever reached the poster's sectioned renderer, so the second rendered
 // as an undifferentiated list with the prefix printed as part of the movement's name
 // ("1000m Buy-In: Row") and no header to say the row happened once.
-const ROLE_NAME_PREFIX = /^(Buy-In|Cash-Out):\s*/i;
 
 function movementStructuralRole(movement: ParsedMovement): ParsedSectionType {
   if (movement.role === 'buy_in' || /^Buy-In:/i.test(movement.name)) return 'buy_in';
@@ -2310,7 +2333,7 @@ function deriveStructuralSections(exercise: Exercise): ParsedSection[] {
   // carries it, the name goes back to being the movement's name.
   const stripRole = (m: ParsedMovement): ParsedMovement => ({
     ...m,
-    name: m.name.replace(ROLE_NAME_PREFIX, ''),
+    name: stripMovementRolePrefix(m.name),
   });
   const coreRounds = exercise.rounds ?? 1;
 
@@ -3267,6 +3290,22 @@ export function buildPageArtifactSections(
         ? normalizeBlueprint([label, timeCapLabel ? `(${timeCapLabel})` : null].filter(Boolean).join(' '))
         : blueprint,
       rows: buildBlockLineRows(exercise, movements),
+    }];
+  }
+  // The same board, scored in rounds: a buy-in (or cash-out) wrapping ONE AMRAP. Listed flat, the
+  // buy-in read as one more movement of the AMRAP and nothing said what repeats — THRUST,
+  // 2026-10-02: "200m run, into AMRAP: thrusters, box jumps" every 3:00 window looked like a
+  // three-movement round. On an interval clock the line above the rows says the template comes
+  // round in every window. A block scored by an open max count isn't scored in rounds, so it
+  // keeps its own rows.
+  const pageRoundsAreScored = (exercise.loggingMode === 'amrap' || exercise.loggingMode === 'amrap_intervals')
+    && (!scoresOpenReps(exercise) || earnsRoundCount(exercise))
+    && independentlyScoredSections(exercise).length === 0;
+  if (!isStrength && !splitInfo && pageRoundsAreScored && pageHasOnceOnlySection && pageRoundSectionsCount === 1) {
+    return [{
+      title: 'Blueprint',
+      blueprint: exercise.loggingMode === 'amrap_intervals' ? windowScheduleLabel(exercise) : blueprint,
+      rows: buildBlockLineRows(exercise, movements, true),
     }];
   }
   if (pageIsSectionedForTime) {

@@ -1,0 +1,200 @@
+{
+  "name": "real-amrap-intervals-twin-db-below-rx-20261002",
+  "description": "THRUST, 2026-10-02 (owner, via Tell Wodi). [3:00 AMRAP / 1:00 rest] x 5: 200m run buy-in every interval (swapped to 600m Echo Bike), then 6 DB thrusters @12.5/20kg x2 + 6 box jumps; 20 rounds total. The athlete used 15kg dumbbells: the poster printed the board's Rx ('20kg each') because the row read the Rx first for any pair — unseen for months because every earlier pair was logged AT Rx. Must print 15kg each. The buy-in was saved twice (the parse listed it in buyIn[] AND in movements[] with role buy_in), doubling the bike to 6000m and printing two bike lines; this fixture is the corrected single-buy-in save (5 x 600m = 3000m). The 'swapped from' note must read 'Run', not 'Buy-In: Run'. Structure: a buy-in wrapping one AMRAP renders as the board (BUY-IN / AMRAP lines under \"in each 3:00 window, in order\"), then RX vs mine, then ONE totals line — not three flat movement rows with a total each, which hid that the bike comes once per window.",
+  "workout": {
+    "title": "THRUST",
+    "format": "amrap_intervals",
+    "timeCap": 1200,
+    "rawText": "02/10/26\nMetcon\nA. STRENGTH (squat)\nBack Squat\n5 sets x 3 reps @75→90+% (ascending weight)\n(Build a heavy 3 rep for the day)\n\nB. METCON (Intervals)\n[03:00 min AMRAP , 01:00 min REST] x 5\nrounds:\n200m run\nInto, AMRAP:\n6 Dumbbell's/Kettlebell's thrusters @12.5/20kg x2\n6 box jumps",
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Dumbbell Thruster",
+          "exerciseIndex": 1,
+          "totalReps": 120,
+          "weight": 30,
+          "unit": "kg",
+          "implementCount": 2,
+          "color": "yellow"
+        },
+        {
+          "name": "Box Jump",
+          "exerciseIndex": 1,
+          "totalReps": 120,
+          "color": "magenta"
+        },
+        {
+          "name": "Back Squat",
+          "exerciseIndex": 0,
+          "totalReps": 15,
+          "weight": 80,
+          "weightProgression": [
+            70,
+            90
+          ],
+          "unit": "kg",
+          "color": "yellow"
+        },
+        {
+          "name": "Echo Bike",
+          "exerciseIndex": 1,
+          "totalReps": 0,
+          "totalDistance": 3000,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "unit": "m",
+          "wasSubstituted": true,
+          "originalMovement": "Buy-In: Run",
+          "substitutionType": "equivalent",
+          "implementCount": 1,
+          "distancePerRep": 600,
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 255,
+      "grandTotalVolume": 4800,
+      "grandTotalDistance": 3000
+    },
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Squat",
+        "type": "strength",
+        "prescription": "5 sets x 3 reps @75→90+% (ascending weight). Build a heavy 3 rep for the day.",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "sets": [
+          {
+            "id": "set-0",
+            "setNumber": 1,
+            "completed": true,
+            "targetReps": 3,
+            "actualReps": 3,
+            "weight": 70
+          },
+          {
+            "id": "set-1",
+            "setNumber": 2,
+            "completed": true,
+            "targetReps": 3,
+            "actualReps": 3
+          },
+          {
+            "id": "set-2",
+            "setNumber": 3,
+            "completed": true,
+            "targetReps": 3,
+            "actualReps": 3
+          },
+          {
+            "id": "set-3",
+            "setNumber": 4,
+            "completed": true,
+            "targetReps": 3,
+            "actualReps": 3
+          },
+          {
+            "id": "set-4",
+            "setNumber": 5,
+            "completed": true,
+            "targetReps": 3,
+            "actualReps": 3,
+            "weight": 90
+          }
+        ],
+        "movements": [
+          {
+            "name": "Back Squat",
+            "reps": 3,
+            "inputType": "weight",
+            "equipment": "barbell",
+            "countingMode": "per_round"
+          }
+        ]
+      },
+      {
+        "id": "exercise-1",
+        "name": "3:00 AMRAP x 5",
+        "type": "wod",
+        "prescription": "[03:00 AMRAP / 01:00 REST] x 5 rounds: 200m Run into AMRAP of 6 Dumbbell/Kettlebell Thrusters @12.5/20kg x2 and 6 Box Jumps",
+        "rounds": 20,
+        "partKind": "metcon",
+        "loggingMode": "amrap_intervals",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "intervalCount": 5,
+        "workDuration": 900,
+        "restDuration": 300,
+        "intervalSeconds": 180,
+        "intervalRestSeconds": 60,
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 240,
+            "weight": 15
+          }
+        ],
+        "movements": [
+          {
+            "name": "Echo Bike",
+            "reps": 0,
+            "distance": 600,
+            "calories": 0,
+            "unit": "m",
+            "inputType": "none",
+            "equipment": "none",
+            "perRound": false,
+            "countingMode": "per_interval",
+            "scoreEntryMode": "per_round",
+            "role": "buy_in",
+            "substitution": {
+              "originalName": "Buy-In: Run",
+              "selectedName": "Echo Bike",
+              "substitutionType": "equivalent",
+              "distanceMultiplier": 3,
+              "originalValue": 200,
+              "adjustedValue": 600,
+              "targetUnit": "distance",
+              "originalPrescription": {
+                "distance": 200
+              }
+            }
+          },
+          {
+            "name": "Dumbbell Thruster",
+            "reps": 6,
+            "rxWeights": {
+              "male": 20,
+              "female": 12.5,
+              "unit": "kg"
+            },
+            "inputType": "weight",
+            "equipment": "dumbbell",
+            "implementCount": 2,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "alternative": {
+              "name": "Kettlebell Thruster",
+              "reps": 6
+            },
+            "loggedWeights": [
+              15
+            ]
+          },
+          {
+            "name": "Box Jump",
+            "reps": 6,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          }
+        ]
+      }
+    ]
+  }
+}

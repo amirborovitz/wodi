@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, isComplete, nextQuestion, openSlots, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, isComplete, nextQuestion, openSlots, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
@@ -69,7 +69,7 @@ describe('Tell Wodi — what the chat asks', () => {
     const weights = nextQuestion(afterTime, results)!;
     expect(weights.text).toBe('What weight did you use for Alt Dumbbell Snatch and Weighted Alt Box Step-up?');
     expect(weights.slotIds).toHaveLength(2);
-    expect(weights.chips.map((c) => c.label)).toEqual(['15 kg', '22.5 kg', 'Skip']);
+    expect(weights.chips.map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg', 'Skip']);
 
     const afterWeights = openSlots(results, new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']));
     const choice = nextQuestion(afterWeights, results)!;
@@ -202,3 +202,56 @@ describe('Tell Wodi — what the chat asks', () => {
   });
 });
 
+
+// THRUST, 2026-10-02: [3:00 AMRAP / 1:00 rest] x 5 — 200m run, then 6 DB thrusters @12.5/20kg x2, 6 box jumps.
+describe('Tell Wodi — THRUST (AMRAP intervals)', () => {
+  const thrust = {
+    name: '3:00 AMRAP x 5', type: 'wod', loggingMode: 'amrap_intervals',
+    prescription: '[03:00 AMRAP / 01:00 REST] x 5 rounds: 200m Run into AMRAP of 6 Dumbbell Thrusters @12.5/20kg x2 and 6 Box Jumps',
+    intervalCount: 5, workDuration: 900, restDuration: 300,
+    movements: [
+      { name: 'Run', distance: 200, inputType: 'distance', equipment: 'none', role: 'buy_in', countingMode: 'per_interval' },
+      { name: 'Dumbbell Thruster', reps: 6, rxWeights: { male: 20, female: 12.5, unit: 'kg' }, inputType: 'weight', equipment: 'dumbbell', implementCount: 2, countingMode: 'per_round' },
+      { name: 'Box Jump', reps: 6, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const results = () => [createBlankResult(thrust, 0, 'amrap_intervals', 'male', undefined, true, { blankAnswers: true })];
+
+  it('"around 4 per round" is the score — 4 × 5 windows = 20 rounds, and the question closes', () => {
+    const slot = openSlots(results(), new Set()).find((s) => s.id === '0.rounds')!;
+    expect(slot.intervals).toBe(5);
+    const outcome = applyAnswer(results(), slot, answer(slot.id, { count: 4, perInterval: true }));
+    expect(outcome.closed).toBe(true);
+    expect(outcome.results[0].rounds).toBe(20);
+  });
+
+  it('a whole-workout total is kept as said', () => {
+    const slot = openSlots(results(), new Set()).find((s) => s.id === '0.rounds')!;
+    expect(applyAnswer(results(), slot, answer(slot.id, { count: 20 })).results[0].rounds).toBe(20);
+  });
+
+  it('offers every dumbbell between the two Rx weights', () => {
+    const slots = openSlots(results(), new Set(['0.rounds']));
+    const question = nextQuestion(slots, results())!;
+    expect(question.chips.map((c) => c.label)).toEqual(['12.5 kg', '15 kg', '17.5 kg', '20 kg', 'Skip']);
+  });
+});
+
+describe('weight chips — the kit a gym has between the Rx ends', () => {
+  it('kettlebells in their standard sizes', () => {
+    expect(weightChoices([16, 24], 'kg', 'kettlebell')).toEqual([16, 20, 24]);
+  });
+  it('a barbell in 5 kg / 10 lb plates', () => {
+    expect(weightChoices([40, 60], 'kg', 'barbell')).toEqual([40, 45, 50, 55, 60]);
+    expect(weightChoices([95, 135], 'lb', 'barbell')).toEqual([95, 105, 115, 125, 135]);
+  });
+  it('a wide range is thinned but keeps both Rx ends', () => {
+    const choices = weightChoices([60, 100], 'kg', 'barbell');
+    expect(choices.length).toBeLessThanOrEqual(6);
+    expect(choices[0]).toBe(60);
+    expect(choices[choices.length - 1]).toBe(100);
+  });
+  it('one Rx weight is one chip', () => {
+    expect(weightChoices([20], 'kg', 'dumbbell')).toEqual([20]);
+  });
+});

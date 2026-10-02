@@ -6,6 +6,9 @@ import { hasMaxSet } from '../../services/blockScore';
 import { parseTimeCapSeconds } from '../../utils/timeCap';
 import { movementLoadUnit } from '../../utils/loadUnits';
 import { habitKey, type SwapHabit } from '../../services/wodiAgent/athleteHabits';
+import { personalIntervalCount } from '../logging/story/intervalRounds';
+import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
+import type { MovementEquipment } from '../../types';
 
 const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
 
@@ -43,9 +46,16 @@ export interface ChatSlot {
   movementNames?: string[];
   /** A choice slot's two sides, board-first: [as written, the alternative]. */
   options?: string[];
-  /** The board's Rx loads for a weight slot — offered as one-tap answers. */
+  /** The board's Rx loads for a weight slot — the ends of the one-tap answers (weightChoices). */
   rxWeights?: number[];
   unit?: string;
+  /** The implement a weight slot is for — sets the step between the one-tap answers. */
+  equipment?: MovementEquipment;
+  /**
+   * A rounds slot on AMRAP intervals: how many work windows are the athlete's own. "About 4 per
+   * round" is a full answer — the app multiplies, the model never does (applyAnswer).
+   */
+  intervals?: number;
   /** Asked out loud. A slot that isn't is still offered to the AI, filled only if mentioned. */
   asked: boolean;
   /**
@@ -69,11 +79,13 @@ export interface SlotAnswer {
   swapTo: string | null;
   /** How much of it, in the substitute's own unit — only when they said so. */
   swapAmount: number | null;
+  /** A rounds count given PER INTERVAL ("4 each round") rather than the total. */
+  perInterval: boolean;
 }
 
 export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
   skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, choice: null,
-  swapTo: null, swapAmount: null,
+  swapTo: null, swapAmount: null, perInterval: false,
 };
 
 const isScoredKind = (r: StoryExerciseResult): boolean =>
@@ -137,6 +149,44 @@ function rxPair(mr: MovementResult | undefined): number[] | undefined {
   return distinct.length > 0 ? distinct : undefined;
 }
 
+const KETTLEBELLS: Record<string, number[]> = {
+  kg: [4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48],
+  lb: [18, 26, 35, 44, 53, 62, 70, 80, 88, 97, 106],
+};
+const MAX_WEIGHT_CHOICES = 6;
+
+/**
+ * The one-tap weights for a weight question: the board's Rx loads and every weight a gym actually
+ * has between them — "12.5 / 15 / 17.5 / 20 kg" for a dumbbell, not just the two Rx ends. The
+ * steps are how the kit comes (dumbbells in 2.5 kg, kettlebells in their standard sizes, plates in
+ * 5 kg / 10 lb), counted up from the lighter Rx — "95/135 lb" is 105, 115, 125 between. A wide
+ * range is thinned to stay tappable; the Rx ends are always kept.
+ */
+export function weightChoices(rx: number[], unit: string, equipment?: MovementEquipment): number[] {
+  const lo = Math.min(...rx);
+  const hi = Math.max(...rx);
+  if (!(lo > 0) || lo === hi) return [...new Set(rx)];
+  const lb = unit === 'lb';
+  const between = (values: number[]): number[] => values.filter((w) => w > lo && w < hi);
+  let middle: number[];
+  if (equipment === 'kettlebell') {
+    middle = between(KETTLEBELLS[lb ? 'lb' : 'kg']);
+  } else {
+    const step = equipment === 'barbell' ? (lb ? 10 : 5)
+      : equipment === 'dumbbell' ? (lb ? 5 : 2.5)
+      : hi - lo <= (lb ? 10 : 5) ? (lb ? 2 : 1)
+      : (lb ? 5 : 2.5);
+    middle = [];
+    for (let w = lo + step; w < hi - 1e-9; w += step) middle.push(Math.round(w * 10) / 10);
+  }
+  let choices = [lo, ...middle, hi];
+  while (choices.length > MAX_WEIGHT_CHOICES) {
+    const inner = choices.slice(1, -1).filter((_, index) => index % 2 === 1);
+    choices = [lo, ...inner, hi];
+  }
+  return choices;
+}
+
 /**
  * Every slot the chat could still fill, in the order it asks: the score first (it IS the
  * workout's result), then loads, then the board's either/or choices, then anything optional.
@@ -147,6 +197,7 @@ export function openSlots(
   results: StoryExerciseResult[],
   closed: ReadonlySet<string>,
   habits: ReadonlyMap<string, SwapHabit> = NO_HABITS,
+  teamSize?: number,
 ): ChatSlot[] {
   const multiPart = results.length > 1;
   const scores: ChatSlot[] = [];
@@ -166,7 +217,11 @@ export function openSlots(
       push(scores, { id: `${i}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true });
     }
     if (r.kind === 'score_rounds' && !(r.rounds && r.rounds > 0)) {
-      push(scores, { id: `${i}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true });
+      const intervals = personalIntervalCount(r, teamSize);
+      push(scores, {
+        id: `${i}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
+        ...(intervals && intervals > 1 ? { intervals } : {}),
+      });
     }
     if (r.kind === 'score_open_reps' && !(r.maxReps && r.maxReps > 0)) {
       push(scores, { id: `${i}.reps`, kind: 'reps', exerciseIndex: i, subject: part, asked: true });
@@ -187,7 +242,7 @@ export function openSlots(
         push(loads, {
           id: `${i}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
           movementNames: [mr?.movement.name ?? r.exercise.name],
-          rxWeights: rxPair(mr), unit: movementLoadUnit(mr?.movement), asked: true,
+          rxWeights: rxPair(mr), unit: movementLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
         });
       }
     } else {
@@ -195,8 +250,8 @@ export function openSlots(
         if (loadAnswered(mr)) continue;
         push(loads, {
           id: `${i}.weight.${mr.movement.name.toLowerCase()}`, kind: 'weight', exerciseIndex: i,
-          subject: mr.movement.name, movementNames: [mr.movement.name],
-          rxWeights: rxPair(mr), unit: movementLoadUnit(mr.movement), asked: true,
+          subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
+          rxWeights: rxPair(mr), unit: movementLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
         });
       }
     }
@@ -223,7 +278,7 @@ export function openSlots(
       const habit = mr.movement.alternative?.name ? undefined : habits.get(habitKey(mr.movement.name));
       push(habit ? choices : optional, {
         id: `${i}.swap.${mr.movement.name.toLowerCase()}`, kind: 'swap', exerciseIndex: i,
-        subject: mr.movement.name, movementNames: [mr.movement.name], asked: !!habit,
+        subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name], asked: !!habit,
         ...(habit ? { usually: habit.usually } : {}),
       });
     }
@@ -305,10 +360,13 @@ export function applyAnswer(
         return { results: patchResult(results, i, () => ({ partialReps: answer.extraReps! })), closed: true };
       }
       if (!answer.count || answer.count <= 0) return { results, closed: false };
+      // Per interval × the athlete's own windows — the same total the form's per-interval stepper
+      // writes. Extra reps can't be spread across windows, so a per-interval answer carries none.
+      const perInterval = answer.perInterval && slot.intervals != null && slot.intervals > 1;
       return {
         results: patchResult(results, i, () => ({
-          rounds: Math.round(answer.count!),
-          ...(answer.extraReps && answer.extraReps > 0 ? { partialReps: answer.extraReps } : {}),
+          rounds: Math.round(answer.count! * (perInterval ? slot.intervals! : 1)),
+          ...(!perInterval && answer.extraReps && answer.extraReps > 0 ? { partialReps: answer.extraReps } : {}),
         })),
         closed: true,
       };
@@ -467,38 +525,41 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
       const ids = group.map((s) => s.id);
       const names = group.flatMap((s) => s.movementNames ?? [s.subject]);
       const unit = first.unit ?? 'kg';
-      // Offer the Rx loads as one tap each — only when every movement in the group shares them.
+      // Offer the Rx loads and every real weight between them as one tap each — only when every
+      // movement in the group shares them.
       const shared = group.every((s) => JSON.stringify(s.rxWeights) === JSON.stringify(first.rxWeights));
       const rxChips: ChatChip[] = shared && first.rxWeights
-        ? first.rxWeights.map((w) => ({
+        ? weightChoices(first.rxWeights, unit, first.equipment).map((w) => ({
             label: `${w} ${unit}`,
             answers: ids.map((id) => ({ id, ...EMPTY_ANSWER, weight: w })),
           }))
         : [];
       return {
-        text: `What weight did you use for ${listNames(names)}?`,
+        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?`,
         slotIds: ids,
         chips: [...rxChips, skipChip(ids)],
       };
     }
     case 'choice': {
       const [asWritten, alternative] = first.options ?? [];
+      // The options are the answer values; what the athlete reads is the movement's own name.
+      const [writtenLabel, alternativeLabel] = [asWritten, alternative].map((o) => stripMovementRolePrefix(o ?? ''));
       const mr = result?.movementResults?.find((m) => m.movement.name === first.movementNames?.[0]);
       const qty = (n?: number): string => (n ? `${n} ` : '');
       const sides: ChatChip[] = [
-        { label: `${qty(mr?.movement.reps)}${asWritten}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
-        { label: `${qty(mr?.movement.alternative?.reps)}${alternative}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
+        { label: `${qty(mr?.movement.reps)}${writtenLabel}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
+        { label: `${qty(mr?.movement.alternative?.reps)}${alternativeLabel}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
       ];
       const prefix = first.subject === first.movementNames?.[0] ? '' : `${first.subject}: `;
       // Their usual side goes first and is named as usual — still a question, never a pre-fill.
       return first.usually
         ? {
-            text: `${prefix}${alternative} again, or ${asWritten} today?`,
+            text: `${prefix}${alternativeLabel} again, or ${writtenLabel} today?`,
             slotIds: [first.id],
             chips: [sides[1], sides[0], skipChip([first.id])],
           }
         : {
-            text: `${prefix}${asWritten} or ${alternative}?`,
+            text: `${prefix}${writtenLabel} or ${alternativeLabel}?`,
             slotIds: [first.id],
             chips: [...sides, skipChip([first.id])],
           };

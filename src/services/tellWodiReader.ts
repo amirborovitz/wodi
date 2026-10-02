@@ -51,7 +51,7 @@ const READING_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'choice', 'swapTo', 'swapAmount'],
+          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'choice', 'swapTo', 'swapAmount', 'perInterval'],
           properties: {
             id: { type: 'string' },
             skipped: { type: 'boolean' },
@@ -63,6 +63,7 @@ const READING_SCHEMA = {
             choice: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapTo: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapAmount: nullableNumber,
+            perInterval: { type: 'boolean' },
           },
         },
       },
@@ -79,6 +80,11 @@ just finished a workout and is texting you about it. Your job has two parts.
      never assume they did it as written. If they didn't say it, leave that question out.
    - "time": seconds. "22 min" = 1320, "18:45" = 1125, "under 20" is not an answer.
    - "rounds": count = full rounds, extraReps = extra reps ("7 rounds + 12" → count 7, extraReps 12).
+     A rounds question with "intervals" is a workout of several timed windows. If they give the
+     rounds for ONE window ("4 per round", "about 4 each interval", "3 rounds every time"), that
+     is their answer: count = that number, perInterval = true. Don't multiply — the app does.
+     A total for the whole workout ("20 rounds") is perInterval = false.
+   - Their own estimate is an answer: "around 4", "about 18", "roughly 7 rounds" → the number.
    - "reps", "distance" (metres), "sets": count.
    - "duration": seconds.
    - "weight": the load in the question's unit. A build like "deadlift 100 105 110" or "40-60" is
@@ -97,7 +103,7 @@ just finished a workout and is texting you about it. Your job has two parts.
    - A choice question with "usually": "yes" / "same as always" picks the "usually" option.
    - If they say they don't know / didn't track / want to skip a question, answer it with
      skipped = true.
-   - Every field you don't use is null.
+   - Every field you don't use is null (perInterval false).
 
 2. REACT like a friend at the gym would — one short line, max 8 words, warm and a little playful.
    Match their energy ("almost died" → something like "Brutal one. Respect."). Never compare them to
@@ -135,6 +141,7 @@ export async function readAthleteMessage(input: {
     ...(s.options ? { options: s.options } : {}),
     ...(s.unit ? { unit: s.unit } : {}),
     ...(s.usually ? { usually: s.usually } : {}),
+    ...(s.intervals ? { intervals: s.intervals } : {}),
   }));
   const conversation = input.recent
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)
