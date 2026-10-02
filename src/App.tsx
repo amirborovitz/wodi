@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
@@ -25,6 +25,7 @@ import type { WorkoutWithStats } from './hooks/useWorkouts';
 import { useAppVersion } from './hooks/useAppVersion';
 import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
+import { track } from './services/analytics';
 import './styles/variables.css';
 
 // Screens that show the bottom nav
@@ -49,6 +50,10 @@ function AppContent() {
   // Installed from the home screen there is no browser chrome and so no reload
   // gesture; this is the app's only route onto a newer deploy.
   const { updateReady, applyUpdate } = useAppVersion();
+
+  useEffect(() => {
+    track('screen_view', { screen_name: currentScreen });
+  }, [currentScreen]);
 
   const handleOpenRecap = (recapData: RecapData) => {
     markRecapViewed(recapData);
@@ -344,8 +349,6 @@ function AppContent() {
             <TodayComposer
               onTellWodi={() => openWodi()}
               onPhoto={(file) => openWodi(file)}
-              onUseForm={openForm}
-              onSaveForLater={(file) => openWodi(file, 'Saving this board for later')}
             />
           ) : undefined}
         />

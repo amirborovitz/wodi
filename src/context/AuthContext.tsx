@@ -21,6 +21,7 @@ import { isHomeScreenApp } from '../utils/homeScreenApp';
 import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
 import { toPublicProfile } from '../services/feed/types';
 import { readWodiNotes } from '../services/wodiAgent/athleteNotes';
+import { identify, track } from '../services/analytics';
 import type { User, UserStats, WodiNote } from '../types';
 
 export interface UserProfileUpdate {
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
+      identify(fbUser?.uid ?? null);
 
       if (fbUser) {
         // Check cache first for instant load
@@ -345,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
+      track('login', { method: 'google' });
     } catch (error) {
       console.error('Error signing in with Google:', error);
       throw error;
@@ -354,6 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithApple = async () => {
     try {
       await signInWithPopup(auth, appleProvider);
+      track('login', { method: 'apple' });
     } catch (error) {
       console.error('Error signing in with Apple:', error);
       throw error;

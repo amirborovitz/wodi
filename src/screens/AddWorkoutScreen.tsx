@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ActionMenuSheet, Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
 import { assignMovementColors } from '../services/workloadCalculation';
+import { track } from '../services/analytics';
 import { buildWorkloadBreakdownFromResults } from '../services/workloadFromResults';
 import type { ExerciseResult } from '../services/workloadFromResults';
 import { resolveSaveTarget } from '../services/saveTarget';
@@ -1218,10 +1219,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       // Convert to base64 for API
       const base64 = await fileToBase64(file);
       const workout = await parseWorkoutImage(base64);
+      track('board_read', { source: 'photo', entry: 'form' });
       setParsedWorkout(workout);
       addSavedWorkout(workout);
       setStep('preview');
     } catch (err) {
+      track('board_read_failed', { source: 'photo', entry: 'form' });
       console.error('Error parsing workout:', err);
       setError(parseFailureMessage(err, 'Failed to parse workout. Please try again or enter manually.'));
       setStep('capture');
@@ -1234,10 +1237,12 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     setError(null);
     try {
       const parsed = await parseWorkoutSession(text.trim());
+      track('board_read', { source: 'text', entry: 'form' });
       setParsedWorkout(parsed);
       addSavedWorkout(parsed);
       setStep('preview');
     } catch (err) {
+      track('board_read_failed', { source: 'text', entry: 'form' });
       console.error('Error parsing voice workout:', err);
       setError(parseFailureMessage(err, 'Could not parse workout. Try editing the text and trying again.'));
       setStep('voice');
@@ -2002,9 +2007,17 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
 
   const tellWodi = useTellWodiChat({
     readBoard: async ({ file, text }) => {
-      const workout = file
-        ? await parseWorkoutImage(await fileToBase64(file))
-        : await parseWorkoutSession(text ?? '');
+      const source = file ? 'photo' : 'text';
+      let workout: ParsedWorkout;
+      try {
+        workout = file
+          ? await parseWorkoutImage(await fileToBase64(file))
+          : await parseWorkoutSession(text ?? '');
+      } catch (err) {
+        track('board_read_failed', { source, entry: 'chat' });
+        throw err;
+      }
+      track('board_read', { source, entry: 'chat' });
       setParsedWorkout(workout);
       addSavedWorkout(workout);
       return workout;
@@ -2264,6 +2277,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         }
         // Also how a replaced earlier log becomes this session's workout: an Edit after it lands here.
         setSavedWorkoutMeta({ id: saveTarget.workoutId, totalVolume, date: session?.date ?? workoutDate });
+      }
+
+      // A test log is a throwaway (see isTest) — it stays out of the analytics too.
+      if (!isTestWorkout) {
+        const format = parsedWorkout.format || 'unknown';
+        if (isUpdate) track('workout_edited', { format, parts: exercises.length });
+        else track('workout_logged', { format, parts: exercises.length, partner: isPartnerWorkout ? 'yes' : 'no' });
       }
 
       // Calculate muscle groups from exercise names

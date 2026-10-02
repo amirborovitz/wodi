@@ -3,6 +3,7 @@ import type { FocusEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { INSTAGRAM_MAX_LENGTH, normalizeInstagram } from '../utils/instagram';
+import { track } from '../services/analytics';
 import styles from './OnboardingScreen.module.css';
 
 interface OnboardingScreenProps {
@@ -78,6 +79,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       if (igHandle) profile.instagram = igHandle;
 
       await updateUserProfile(profile);
+      track('onboarding_complete', {});
       onComplete();
     } catch (error) {
       console.error('Error completing onboarding:', error);

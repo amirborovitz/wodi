@@ -1,28 +1,31 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import type React from 'react';
-import { PlusSheet } from '../tellWodi/PlusSheet';
 import styles from './TodayComposer.module.css';
 
 interface TodayComposerProps {
   /** The bar itself: open the Wodi thread. */
   onTellWodi: () => void;
-  /** The camera, or a board from the library: open the thread with this photo already sent. */
+  /** The camera, or a board from the gallery: open the thread with this photo already sent. */
   onPhoto: (file: File) => void;
-  onUseForm: () => void;
-  onSaveForLater: (file: File) => void;
 }
 
 /**
  * Today's one way in, docked flush on top of the nav (one surface, not two floating pills).
- * The same row as the thread's composer: "+" for the other ways in, the bar, and the yellow
- * camera — the one primary action. The bar opens the thread; typing happens there.
+ * The same row as the thread's composer: "+" for a board already in the gallery, the bar, and
+ * the yellow camera — the one primary action. The bar opens the thread; typing happens there.
+ * Saving a board for later needs no button: leaving the thread keeps it.
  */
-export function TodayComposer({ onTellWodi, onPhoto, onUseForm, onSaveForLater }: TodayComposerProps): React.ReactElement {
+export function TodayComposer({ onTellWodi, onPhoto }: TodayComposerProps): React.ReactElement {
   const cameraRef = useRef<HTMLInputElement>(null);
-  const [plusOpen, setPlusOpen] = useState(false);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const sendPicked = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) onPhoto(file);
+  };
   return (
     <div className={styles.row}>
-      <button type="button" className={styles.plus} onClick={() => setPlusOpen(true)} aria-label="More ways to log">
+      <button type="button" className={styles.plus} onClick={() => galleryRef.current?.click()} aria-label="Send Wodi a board from your photos">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
           <path d="M9 2v14M2 9h14" />
         </svg>
@@ -34,25 +37,8 @@ export function TodayComposer({ onTellWodi, onPhoto, onUseForm, onSaveForLater }
           <circle cx="11" cy="11.5" r="3.5" />
         </svg>
       </button>
-      <input
-        ref={cameraRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className={styles.hiddenInput}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = '';
-          if (file) onPhoto(file);
-        }}
-      />
-      <PlusSheet
-        open={plusOpen}
-        onClose={() => setPlusOpen(false)}
-        onUseForm={onUseForm}
-        onLibraryPhoto={onPhoto}
-        onSaveForLater={onSaveForLater}
-      />
+      <input ref={galleryRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={sendPicked} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className={styles.hiddenInput} onChange={sendPicked} />
     </div>
   );
 }

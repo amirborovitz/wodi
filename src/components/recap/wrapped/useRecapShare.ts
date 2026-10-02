@@ -10,6 +10,7 @@
 
 import { useCallback, useState } from 'react';
 import { canvasToBlob, downloadBlob, elementToCanvas, shareImage } from '../../../utils/shareUtils';
+import { track } from '../../../services/analytics';
 import type { RecapData } from '../../../hooks/useRecapData';
 
 export interface RecapShare {
@@ -30,6 +31,7 @@ export function useRecapShare(): RecapShare {
       if (!shared) {
         downloadBlob(blob, `wodi-wrapped-${data.period.toLowerCase()}-${data.periodSub}.png`);
       }
+      track('poster_shared', { poster: 'wrapped', method: shared ? 'share_sheet' : 'download' });
     } catch (err) {
       console.error('[Wrapped] share failed:', err);
     } finally {

@@ -12,6 +12,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { track } from '../services/analytics';
 import { dropRecordsForWorkout, reconcileRecordsForWorkout } from '../services/personalRecordSync';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -269,6 +270,7 @@ export function useWorkouts(maxCount = 50, options: UseWorkoutsOptions = {}): Us
 
     try {
       await deleteDoc(doc(db, 'workouts', workoutId));
+      track('workout_deleted', {});
       // The records this session set have to go with it, or the Records screen keeps showing a
       // best that no longer has a workout behind it. Deliberately not awaited into the result:
       // the workout IS gone, and reporting the delete as failed over a leftover record row would

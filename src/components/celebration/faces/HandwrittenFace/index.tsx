@@ -30,6 +30,7 @@ import { useAuth } from '../../../../context/AuthContext';
 import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { usePosterDate } from '../../../../hooks/usePosterDate';
 import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
+import { track } from '../../../../services/analytics';
 import styles from './index.module.css';
 
 // ─── Bottom bar icons ───────────────────────────────────────────────────────
@@ -398,12 +399,15 @@ export function HandwrittenFace({
       // Every non-iOS desktop browser and Chrome on iOS refuse file shares, so a
       // decline that isn't a cancel still has to leave the athlete with the image.
       if (!shared) downloadBlob(blob, `${shareTitle()}.png`);
+      track('poster_shared', { poster: 'workout', method: shared ? 'share_sheet' : 'download' });
     });
   };
 
   const saveImage = (): void => {
     const blob = shareBlob.current;
-    if (blob) downloadBlob(blob, `${shareTitle()}.png`);
+    if (!blob) return;
+    downloadBlob(blob, `${shareTitle()}.png`);
+    track('poster_shared', { poster: 'workout', method: 'download' });
   };
 
   // ── Bottom bar panel ───────────────────────────────────────────────────

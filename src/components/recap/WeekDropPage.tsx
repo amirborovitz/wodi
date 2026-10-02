@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { fB } from '../celebration/faces/HandwrittenFace/brand';
 import { elementToCanvas, canvasToBlob, shareImage, downloadBlob } from '../../utils/shareUtils';
+import { track } from '../../services/analytics';
 import { useWeekPosterData } from '../../hooks/useWeekPosterData';
 import type { RecapData } from '../../hooks/useRecapData';
 import { WEEK_POSTER_WIDTH, WEEK_POSTER_HEIGHT } from './week/WeekPosterParts';
@@ -129,6 +130,7 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
       const blob = await canvasToBlob(canvas, 'png');
       const shared = await shareImage(blob, `wodi ${data.period.toLowerCase()}`);
       if (!shared) downloadBlob(blob, `wodi-${data.id}.png`);
+      track('poster_shared', { poster: 'week', method: shared ? 'share_sheet' : 'download' });
     } catch (err) {
       console.error('[WeekDrop] share failed:', err);
     } finally {
