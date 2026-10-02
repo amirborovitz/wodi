@@ -17,6 +17,7 @@ import { SkinHazard } from './SkinHazard';
 import { SkinInk } from './SkinInk';
 import { SkinFoil } from './SkinFoil';
 import { SkinAurum } from './SkinAurum';
+import { SkinSun } from './SkinSun';
 
 /**
  * The five colours a skin reduces to when a poster has to appear at the size of
@@ -59,6 +60,7 @@ export const SKINS = [
   { id: 'ink',       name: 'Ink',       Comp: SkinInk,       ticket: { bg: '#eee7d5', ink: '#171814', dim: 'rgba(23,24,20,0.5)', line: 'rgba(45,44,37,0.2)', dot: YEL } },
   { id: 'foil',      name: 'Foil',      Comp: SkinFoil,      ticket: { bg: '#15171d', ink: '#e8e7ef', dim: 'rgba(232,231,239,0.48)', line: 'rgba(232,231,239,0.16)', dot: YEL } },
   { id: 'aurum',     name: 'Aurum',     Comp: SkinAurum,     ticket: { bg: '#100d09', ink: '#efe9d8', dim: 'rgba(239,233,216,0.5)', line: 'rgba(245,194,0,0.22)', dot: YEL } },
+  { id: 'sun',       name: 'Sun',       Comp: SkinSun,       ticket: { bg: '#f3f1ea', ink: '#0b0c0e', dim: 'rgba(11,12,14,0.55)', line: 'rgba(11,12,14,0.12)', dot: YEL } },
 ] as const;
 
 export function getSkin(id: string | undefined): (typeof SKINS)[number] {
