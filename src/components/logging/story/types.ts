@@ -47,7 +47,12 @@ export type ExerciseKind =
 // ─── Load Capture Mode ──────────────────────────────────────────
 // How the user wants to record weight for a "load" exercise.
 
-export type LoadMode = 'same' | 'range' | 'bodyweight';
+/**
+ * How a load was captured: one weight for every set ('same'), a build from a start to an end
+ * weight ('range' — only the first and last sets carry a number), a weight for EACH set
+ * ('per_set', in setWeights), or no load at all ('bodyweight').
+ */
+export type LoadMode = 'same' | 'range' | 'per_set' | 'bodyweight';
 
 // ─── Story Exercise Result ──────────────────────────────────────
 // One per exercise row in the WOD Story. This is the NEW logging
@@ -75,6 +80,11 @@ export interface StoryExerciseResult {
   weight?: number;                    // single weight (same mode) or start weight (range mode)
   weightEnd?: number;                 // end weight (range mode only)
   loadMode?: LoadMode;                // how weight was captured
+  /**
+   * The weight of each set, in order — per_set mode only. weight / weightEnd still hold the first
+   * and last, so everything that reads a start → end keeps working.
+   */
+  setWeights?: number[];
   implementCount?: 1 | 2;            // single or pair (KB/DB)
   // Reps completed in a MAX set. Two shapes share this one field: a loaded [8-6-4-2-max]
   // scheme (with maxRepsWeight), and a skill practice whose board asks for a max-effort test
@@ -157,6 +167,8 @@ export interface MovementResult {
   weight?: number;
   weightEnd?: number;
   loadMode?: LoadMode;
+  /** The weight of each set, in order — per_set mode only (see LoadMode). */
+  setWeights?: number[];
   reps?: number;
   distance?: number;
   distanceUnit?: MeasurementUnit;

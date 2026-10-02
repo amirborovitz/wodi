@@ -106,7 +106,7 @@ function formatResult(r: StoryExerciseResult): FormattedPill {
       if (r.loadMode === 'bodyweight') return { text: 'BW' };
       if (r.weight == null) return { text: 'Add weight' };
       const start = formatWeight(r.weight, loadUnit, r.implementCount);
-      if (r.loadMode === 'range' && r.weightEnd != null && r.weightEnd !== r.weight) {
+      if ((r.loadMode === 'range' || r.loadMode === 'per_set') && r.weightEnd != null && r.weightEnd !== r.weight) {
         return { text: start, secondary: formatWeight(r.weightEnd, loadUnit, r.implementCount) };
       }
       return { text: start };

@@ -51,7 +51,7 @@ const READING_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'choice', 'swapTo', 'swapAmount', 'perInterval'],
+          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'perInterval'],
           properties: {
             id: { type: 'string' },
             skipped: { type: 'boolean' },
@@ -60,6 +60,7 @@ const READING_SCHEMA = {
             extraReps: nullableNumber,
             weight: nullableNumber,
             weightEnd: nullableNumber,
+            weights: { anyOf: [{ type: 'array', items: { type: 'number' } }, { type: 'null' }] },
             choice: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapTo: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapAmount: nullableNumber,
@@ -87,9 +88,14 @@ just finished a workout and is texting you about it. Your job has two parts.
    - Their own estimate is an answer: "around 4", "about 18", "roughly 7 rounds" → the number.
    - "reps", "distance" (metres), "sets": count.
    - "duration": seconds.
-   - "weight": the load in the question's unit. A build like "deadlift 100 105 110" or "40-60" is
-     weight = first, weightEnd = last. "same dumbbell for both", "17.5 for everything" answers every
-     open weight question it covers. "Rx" / "as prescribed" is NOT a number — don't answer it.
+   - "weight": the load in the question's unit, in one of three shapes:
+       · one weight for every set ("80", "80 all sets") → weight = 80.
+       · a build from a start to an end ("60 to 80", "60-80", "worked up to 80 from 60") →
+         weight = start, weightEnd = end.
+       · a weight for EACH set — three or more listed ("60, 65, 70, 75, 80", "60 65 70 75 80") →
+         weights = every one, in the order said; weight = first, weightEnd = last.
+     "same dumbbell for both", "17.5 for everything" answers every open weight question it covers.
+     "Rx" / "as prescribed" is NOT a number — don't answer it.
    - "choice": copy one of the question's options exactly. "singles" picks the singles option.
    - "score": whichever fits — seconds, count, or weight.
    - "swap": they did a DIFFERENT movement instead of this one ("switched the run to echo bike",

@@ -33,7 +33,15 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
         const firstWeight = weightedSets[0]?.weight;
         const lastWeight = weightedSets[weightedSets.length - 1]?.weight;
         if (firstWeight != null) result.weight = firstWeight;
-        if (lastWeight != null && lastWeight !== firstWeight) {
+        // Every set carries its own weight and they differ: it was logged set by set. Restored as
+        // that — read back as start → end, a re-save would blank every set in between.
+        const everySetWeighed = workingSets.length >= 3 && weightedSets.length === workingSets.length
+          && new Set(weightedSets.map((set) => set.weight)).size > 1;
+        if (everySetWeighed) {
+          result.weightEnd = lastWeight;
+          result.setWeights = weightedSets.map((set) => set.weight as number);
+          result.loadMode = 'per_set';
+        } else if (lastWeight != null && lastWeight !== firstWeight) {
           result.weightEnd = lastWeight;
           result.loadMode = 'range';
         } else if (firstWeight == null) {
@@ -170,7 +178,12 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
           const start = typed[0];
           const peak = typed[typed.length - 1];
           patched.weight = start;
-          if (peak !== start) {
+          if (typed.length > 2) {
+            // A progression longer than start → peak was logged weight by weight; keep every one.
+            patched.weightEnd = peak;
+            patched.setWeights = [...typed];
+            patched.loadMode = 'per_set';
+          } else if (peak !== start) {
             patched.weightEnd = peak;
             patched.loadMode = 'range';
           }

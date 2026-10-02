@@ -258,7 +258,10 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         mw[n] = m.weight;
         // Per-movement start->peak progression (sequential complex: each block builds its own
         // weight). Only when the block was logged as a range — a single weight has no progression.
-        if (m.weightEnd != null && m.weightEnd > 0 && m.weightEnd !== m.weight) {
+        if (m.loadMode === 'per_set' && (m.setWeights?.length ?? 0) > 1) {
+          // A weight for each set: the whole progression, as lifted.
+          mwp[n] = [...m.setWeights!];
+        } else if (m.weightEnd != null && m.weightEnd > 0 && m.weightEnd !== m.weight) {
           mwp[n] = [m.weight, m.weightEnd];
         }
       }
@@ -384,10 +387,13 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     const loads = (r.movementResults ?? []).filter(m => m.kind === 'load' && m.weight != null && m.weight > 0);
     const anchor = loads[0];
     const sharesOneLoad = anchor != null && loads.every(
-      m => m.weight === anchor.weight && (m.weightEnd ?? m.weight) === (anchor.weightEnd ?? anchor.weight),
+      m => m.weight === anchor.weight && (m.weightEnd ?? m.weight) === (anchor.weightEnd ?? anchor.weight)
+        && (m.setWeights ?? []).join() === (anchor.setWeights ?? []).join(),
     );
     const sw = sharesOneLoad ? anchor.weight : undefined;
     const ew = sharesOneLoad ? (anchor.weightEnd ?? sw) : undefined;
+    // One bar for the whole block, weighed set by set: each set states its own.
+    const perSet = sharesOneLoad && anchor.loadMode === 'per_set' ? anchor.setWeights : undefined;
     const isRange = sw != null && ew != null && sw !== ew;
     const rps = r.exercise.suggestedRepsPerSet;
     const blockReps = (r.movementResults ?? []).reduce(
@@ -395,7 +401,8 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
     ) || undefined;
     for (let i = 0; i < setsCount; i++) {
       let weight: number | undefined;
-      if (isRange && sw != null && ew != null) {
+      if (perSet) weight = perSet[i];
+      else if (isRange && sw != null && ew != null) {
         // Only the first/last set carry a real (user-entered) weight — never invent middle sets
         if (i === 0) weight = sw;
         else if (i === setsCount - 1) weight = ew;
@@ -417,6 +424,8 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       for (let i = 0; i < pc; i++) {
         let weight: number | undefined;
         if (r.loadMode === 'bodyweight') weight = undefined;
+        // A weight for each set: each set states its own (a set nobody gave a weight stays blank).
+        else if (r.loadMode === 'per_set' && r.setWeights?.length) weight = r.setWeights[i];
         else if (r.loadMode === 'range' && r.weight != null && r.weightEnd != null) {
           // Only the first/last set carry a real (user-entered) weight — never invent middle sets
           if (i === 0) weight = r.weight;

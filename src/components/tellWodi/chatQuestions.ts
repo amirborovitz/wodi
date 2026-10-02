@@ -74,6 +74,8 @@ export interface SlotAnswer {
   extraReps: number | null;
   weight: number | null;
   weightEnd: number | null;
+  /** A weight for EACH set, in order ("60, 65, 70, 75, 80"); weight / weightEnd are its ends. */
+  weights: number[] | null;
   choice: string | null;
   /** The movement done instead, in the athlete's words ("echo bike"). */
   swapTo: string | null;
@@ -84,8 +86,8 @@ export interface SlotAnswer {
 }
 
 export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
-  skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, choice: null,
-  swapTo: null, swapAmount: null, perInterval: false,
+  skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, weights: null,
+  choice: null, swapTo: null, swapAmount: null, perInterval: false,
 };
 
 const isScoredKind = (r: StoryExerciseResult): boolean =>
@@ -324,14 +326,46 @@ function patchMovements(
   };
 }
 
-function loadPatch(answer: SlotAnswer): { weight: number; weightEnd?: number; loadMode: 'same' | 'range' } | null {
-  if (answer.weight == null || answer.weight <= 0) return null;
-  const end = answer.weightEnd != null && answer.weightEnd > 0 && answer.weightEnd !== answer.weight
-    ? answer.weightEnd
-    : undefined;
+interface LoadAnswer {
+  weight: number;
+  weightEnd: number;
+  loadMode: 'same' | 'range' | 'per_set';
+  setWeights: number[] | undefined;
+}
+
+/**
+ * One weight for every set, a start → end build, or a weight for each set — the three ways an
+ * athlete says what they lifted. Every patch states setWeights, so moving from one shape to
+ * another never leaves a stale per-set list behind.
+ */
+function loadPatch(answer: SlotAnswer): LoadAnswer | null {
+  const listed = (answer.weights ?? []).filter((w) => w > 0);
+  if (listed.length >= 3 && new Set(listed).size > 1) {
+    return { weight: listed[0], weightEnd: listed[listed.length - 1], loadMode: 'per_set', setWeights: listed };
+  }
+  const start = answer.weight ?? listed[0];
+  if (start == null || start <= 0) return null;
+  const endCandidate = answer.weightEnd ?? (listed.length > 1 ? listed[listed.length - 1] : undefined);
+  const end = endCandidate != null && endCandidate > 0 && endCandidate !== start ? endCandidate : undefined;
   return end != null
-    ? { weight: answer.weight, weightEnd: end, loadMode: 'range' }
-    : { weight: answer.weight, weightEnd: answer.weight, loadMode: 'same' };
+    ? { weight: start, weightEnd: end, loadMode: 'range', setWeights: undefined }
+    : { weight: start, weightEnd: start, loadMode: 'same', setWeights: undefined };
+}
+
+/**
+ * How to answer a strength weight, with examples sized to the board: "Same every set — 80",
+ * "Built up — 60 to 80", "Each set — 60, 65, 70, 75, 80". Only where there's more than one set —
+ * a metcon's dumbbell has one weight and needs no lesson.
+ */
+function weightFormats(sets: number, unit: string): string {
+  const n = Math.min(Math.max(sets, 3), 6);
+  const [base, step] = unit === 'lb' ? [135, 10] : [60, 5];
+  const each = Array.from({ length: n }, (_, i) => base + i * step);
+  const top = each[each.length - 1];
+  return `
+Same every set — ${top}
+Built up — ${base} to ${top}
+Each set — ${each.join(', ')}`;
 }
 
 /**
@@ -534,8 +568,9 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
             answers: ids.map((id) => ({ id, ...EMPTY_ANSWER, weight: w })),
           }))
         : [];
+      const strength = result?.kind === 'load' && result.setsTotal > 1;
       return {
-        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?`,
+        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?${strength ? weightFormats(result.setsTotal, unit) : ''}`,
         slotIds: ids,
         chips: [...rxChips, skipChip(ids)],
       };
