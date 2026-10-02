@@ -18,6 +18,7 @@ import { SkinInk } from './SkinInk';
 import { SkinFoil } from './SkinFoil';
 import { SkinAurum } from './SkinAurum';
 import { SkinSun } from './SkinSun';
+import type { PosterSkinId } from '../../../../types';
 
 /**
  * The five colours a skin reduces to when a poster has to appear at the size of
@@ -63,8 +64,30 @@ export const SKINS = [
   { id: 'sun',       name: 'Sun',       Comp: SkinSun,       ticket: { bg: '#f3f1ea', ink: '#0b0c0e', dim: 'rgba(11,12,14,0.55)', line: 'rgba(11,12,14,0.12)', dot: YEL } },
 ] as const;
 
-export function getSkin(id: string | undefined): (typeof SKINS)[number] {
+/**
+ * A poster with no skin of its own renders SKINS[0] (Slab) — that fallback is how every poster
+ * logged before skins were stamped still looks, so it never moves. What a NEW poster opens in is
+ * the athlete's favourite, or this until they've picked one.
+ */
+export const DEFAULT_NEW_SKIN: PosterSkinId = 'sun';
+
+export type PosterSkin = (typeof SKINS)[number];
+
+export function getSkin(id: string | undefined): PosterSkin {
   return SKINS.find((s) => s.id === id) ?? SKINS[0];
+}
+
+export function isPosterSkinId(id: unknown): id is PosterSkinId {
+  return typeof id === 'string' && SKINS.some((s) => s.id === id);
+}
+
+/**
+ * The picker's order: the athlete's favourite first (Sun until they pick another), then the
+ * rest as the registry lists them. Only the order moves — what a saved poster shows doesn't.
+ */
+export function orderSkins(favorite: PosterSkinId | undefined): PosterSkin[] {
+  const first = getSkin(favorite ?? DEFAULT_NEW_SKIN);
+  return [first, ...SKINS.filter((s) => s.id !== first.id)];
 }
 
 const INTENSITY_VIBE_MAP: Record<string, VibeKey> = {

@@ -40,6 +40,7 @@ export interface UserProfileUpdate {
   instagram?: string;
   /** The whole list, written at once — see services/wodiAgent/athleteNotes.ts. */
   wodiNotes?: WodiNote[];
+  favoriteSkin?: string;
 }
 
 interface AuthContextValue {
@@ -233,6 +234,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       instagram: data.instagram,
       addedToHomeScreen: data.addedToHomeScreen === true || fromHomeScreen,
       wodiNotes: readWodiNotes(data.wodiNotes),
+      // Kept as stored; useFavoriteSkin checks it names a skin that still exists.
+      favoriteSkin: typeof data.favoriteSkin === 'string' ? data.favoriteSkin : undefined,
     };
   };
 

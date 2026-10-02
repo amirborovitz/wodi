@@ -54,6 +54,7 @@ import { useWodiThread } from '../components/tellWodi/useWodiThread';
 import { useWodiMessage } from '../hooks/useWodiMessage';
 import { swapHabits } from '../services/wodiAgent/athleteHabits';
 import { useWodiNotes } from '../hooks/useWodiNotes';
+import { useFavoriteSkin } from '../hooks/useFavoriteSkin';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { initStoryResults, movementToKind } from '../components/logging/story/types';
@@ -757,6 +758,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const ask = useAskWodi(allWorkouts);
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
   const wodiNotes = useWodiNotes();
+  const favoriteSkin = useFavoriteSkin();
   const thread = useWodiThread(allWorkouts, plannedWorkout ?? null);
   // The same newest message as Today's, so the thread ends where Today begins.
   const wodiMessage = useWodiMessage(allWorkouts);
@@ -2233,8 +2235,11 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         updatedAt: serverTimestamp(),
       };
 
+      // A new poster opens in the athlete's favourite skin (Sun until they pick another).
+      // Stamped on create only — an edit never changes the skin a poster already wears.
       const workoutCreateData = {
         ...workoutBase,
+        posterSkin: favoriteSkin.favorite,
         createdAt: serverTimestamp(),
       };
 

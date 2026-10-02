@@ -44,6 +44,12 @@ export interface User {
    * doc is owner-only and `toPublicProfile` never copies it. See services/wodiAgent/athleteNotes.ts.
    */
   wodiNotes?: WodiNote[];
+  /**
+   * The poster skin the athlete last chose. It leads the skin picker and new posters open in it;
+   * until they pick one, that's Sun (DEFAULT_NEW_SKIN). Posters already saved keep their own.
+   * A string as stored — a skin can be retired, so useFavoriteSkin checks it still exists.
+   */
+  favoriteSkin?: string;
 }
 
 export interface WodiNote {

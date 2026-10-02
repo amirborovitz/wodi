@@ -14,7 +14,8 @@ import { VIBE, VIBE_KEYS } from './brand';
 import { buildPosterWod, buildPosterWodPages } from './posterData';
 import { PosterDateContext } from './posterDateContext';
 import { useFitScale } from './useFitScale';
-import { SKINS, guessVibe, resolvePosterVibe } from './skinRegistry';
+import { getSkin, guessVibe, orderSkins, resolvePosterVibe } from './skinRegistry';
+import { useFavoriteSkin } from '../../../../hooks/useFavoriteSkin';
 import { CorrectionSheet } from '../../CorrectionSheet';
 import { TextSticker } from './TextSticker';
 import { PosterPhotoInset } from './PosterPhotoInset';
@@ -146,10 +147,13 @@ const STICKER_DEFAULT_POS = { x: 50, y: 46 };
 export function HandwrittenFace({
   data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
 }: CelebrationFaceProps): React.JSX.Element {
-  const [skinIdx, setSkinIdx]         = useState<number>(() => {
-    const saved = SKINS.findIndex((s) => s.id === data.posterSkin);
-    return saved >= 0 ? saved : 0;
-  });
+  const favoriteSkin = useFavoriteSkin();
+  // The athlete's favourite leads the picker. Frozen for this visit, so a pick never reshuffles
+  // the chips under their finger; it takes effect from the next poster.
+  const [skins] = useState(() => orderSkins(favoriteSkin.favorite));
+  // A poster shows its own skin; one saved before skins were stamped shows what it always did
+  // (getSkin's fallback), never whatever happens to lead the picker today.
+  const [skinIdx, setSkinIdx]         = useState<number>(() => skins.findIndex((s) => s.id === getSkin(data.posterSkin).id));
   const [vibe, setVibe]               = useState<VibeKey>(() => resolvePosterVibe(data) ?? guessVibe(data));
   const [vibeConfirmed, setVibeConfirmed] = useState<boolean>(() => resolvePosterVibe(data) != null);
   const [pulse, setPulse]             = useState<number>(0);
@@ -203,7 +207,7 @@ export function HandwrittenFace({
   // Slide that holds the PR's part — pages are already in deck order, so it's the page index.
   const prSlideIndex = isCarousel ? data.prCelebration?.pageIndex ?? null : null;
 
-  const Skin = SKINS[skinIdx].Comp;
+  const Skin = skins[skinIdx].Comp;
   const currentFelt = VIBE[vibe];
 
   const { containerRef: cardAreaRef, contentRef: cardContentRef, scale: cardScale } =
@@ -217,8 +221,9 @@ export function HandwrittenFace({
 
   const stepSkin = (direction: 1 | -1): void => {
     setSkinIdx((i) => {
-      const next = (i + direction + SKINS.length) % SKINS.length;
-      onPosterCustomizationChange?.({ posterSkin: SKINS[next].id });
+      const next = (i + direction + skins.length) % skins.length;
+      onPosterCustomizationChange?.({ posterSkin: skins[next].id });
+      favoriteSkin.remember(skins[next].id);
       return next;
     });
     setPulse((p) => p + 1);
@@ -237,7 +242,8 @@ export function HandwrittenFace({
     setSkinIdx(i);
     setPulse((p) => p + 1);
     setShowHint(false);
-    onPosterCustomizationChange?.({ posterSkin: SKINS[i].id });
+    onPosterCustomizationChange?.({ posterSkin: skins[i].id });
+    favoriteSkin.remember(skins[i].id);
   };
 
   // ── Text sticker (persists to workout.posterSticker) ───────────────────
@@ -351,7 +357,7 @@ export function HandwrittenFace({
     const posted = [pages[lead], ...pages.filter((_, i) => i !== lead)];
     return {
       wods: displayDate ? posted.map((w) => ({ ...w, date: displayDate })) : posted,
-      skin: SKINS[skinIdx].id,
+      skin: skins[skinIdx].id,
       vibe: vibeConfirmed ? vibe : null,
       ...(vibeOffset ? { vibeOffset } : {}),
       ...(sticker ? { sticker } : {}),
@@ -501,7 +507,7 @@ export function HandwrittenFace({
             initial={{ opacity: 0, y: 10, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
             <div ref={skinChipRowRef} className={styles.skinChipRow} onScroll={measureSkinScroll}>
-              {SKINS.map((s, i) => (
+              {skins.map((s, i) => (
                 <button key={s.id} className={`${styles.skinChip} ${i === skinIdx ? styles.skinChipActive : ''}`}
                   onClick={(e) => { e.stopPropagation(); pickSkin(i); }}>
                   {s.name}
