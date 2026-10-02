@@ -1330,18 +1330,76 @@ const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not
 const RULES_CORE = [RULES_BLOCKS, RULES_QUANTITIES, RULES_MOVEMENT_CORE, RULES_REP_SCHEMES, RULES_SKILL_TIMECAP, RULES_WOD_NAME, RULES_UNCERTAINTY].join('\n\n');
 const RULES_METCON = [RULES_METCON_STRUCTURE, RULES_STATIONS, RULES_CONTAINER_ROUNDS, RULES_LADDERS_PARTNERS].join('\n\n');
 
+/**
+ * What is special about a part's STRUCTURE, as the segmenter flags it. It selects which of the
+ * advanced worked examples the structuring call is shown — a plain "21-15-9" doesn't need the
+ * station rotation, the partner heats and the progressive chipper (~11k tokens of examples).
+ * The segmenter is the authority: it flags, the app only picks the matching examples.
+ */
+export type PartTrait =
+  | 'intervals' | 'stations' | 'partner' | 'chipper' | 'ladder' | 'buy_in' | 'complex' | 'benchmark' | 'multi_block';
+
+export const PART_TRAITS: readonly PartTrait[] = [
+  'intervals', 'stations', 'partner', 'chipper', 'ladder', 'buy_in', 'complex', 'benchmark', 'multi_block',
+];
+
+/**
+ * Each advanced example (by its "### N." heading) and the traits it teaches. A new example must
+ * be added here — parsePrompt.test.ts fails on an unmapped one, so none is silently always-on.
+ */
+export const ADVANCED_EXAMPLE_TRAITS: Record<string, readonly PartTrait[]> = {
+  '5': ['intervals'],
+  '5b': ['stations', 'intervals'],
+  '6': ['intervals'],
+  '7': ['partner'],
+  '8': ['benchmark'],
+  '9': ['chipper'],
+  '9b': ['chipper'],
+  '9c': ['ladder'],
+  '10': ['complex'],
+  '11': ['multi_block', 'intervals'],
+  '12': ['intervals', 'buy_in'],
+  '12b': ['intervals'],
+  '13': ['buy_in', 'chipper', 'multi_block'],
+  '14': ['multi_block', 'intervals'],
+  '14b': ['stations'],
+  '15': ['partner'],
+  '15b': ['partner', 'intervals'],
+  '15c': ['partner'],
+  '16': ['chipper'],
+  '17': ['chipper', 'ladder'],
+};
+
+/** The advanced examples one per heading; joined back with '\n' they are the original block. */
+export const ADVANCED_EXAMPLES: readonly { id: string; text: string }[] = EXAMPLES_METCON_ADVANCED
+  .split(/\n(?=### )/)
+  .map((text) => ({ id: /^### ([0-9]+[a-z]?)\./.exec(text)?.[1] ?? '', text }));
+
+function advancedExamplesFor(traits: readonly PartTrait[]): string {
+  return ADVANCED_EXAMPLES
+    .filter((example) => (ADVANCED_EXAMPLE_TRAITS[example.id] ?? PART_TRAITS).some((t) => traits.includes(t)))
+    .map((example) => example.text)
+    .join('\n');
+}
+
 // Kind-scoped prompt: a strength/accessory part skips the metcon structure rules and examples it
 // can never use (~70% of the prompt's tokens). Beyond cost, this is what lets a multi-part
 // session structure its parts in PARALLEL without bursting through OpenAI's per-minute token
 // limit. No kind (single-pass fallback, corpus/check-wod scripts) gets the full prompt.
-function buildParsePrompt(kind?: WorkoutPartSegment['kind']): string {
+//
+// `traits` (from the segmenter) narrows a metcon's advanced examples to the ones its structure
+// needs. Without traits — a re-parse, an older response, the single-pass fallback — every
+// example is sent, exactly as before. The always-sent part comes first, so calls share the
+// longest possible cached prefix.
+export function buildParsePrompt(kind?: WorkoutPartSegment['kind'], traits?: readonly PartTrait[]): string {
   const liftOnly = kind === 'strength' || kind === 'accessory';
+  const advanced = traits === undefined ? EXAMPLES_METCON_ADVANCED : advancedExamplesFor(traits);
   return [
     PARSE_INTRO,
     RULES_CORE,
     ...(liftOnly ? [] : [RULES_METCON]),
     '## EXAMPLES',
-    ...(liftOnly ? [EXAMPLE_STRENGTH] : [EXAMPLES_METCON_BASIC, EXAMPLE_STRENGTH, EXAMPLES_METCON_ADVANCED]),
+    ...(liftOnly ? [EXAMPLE_STRENGTH] : [EXAMPLES_METCON_BASIC, EXAMPLE_STRENGTH, ...(advanced ? [advanced] : [])]),
     PARSE_FOOTER,
   ].join('\n\n');
 }
@@ -1374,6 +1432,7 @@ export async function parseWorkoutText(
   sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT',
   kind?: WorkoutPartSegment['kind'],
   athleteNote?: string,
+  traits?: readonly PartTrait[],
 ): Promise<{ raw: string; parsed: ParsedWorkout }> {
   const startedAt = performance.now();
   const response = await openai.chat.completions.create({
@@ -1383,13 +1442,16 @@ export async function parseWorkoutText(
       {
         role: 'user',
         content: [
-          { type: 'text', text: buildParsePrompt(kind) },
+          { type: 'text', text: buildParsePrompt(kind, traits) },
           { type: 'text', text: `Here is the workout text to parse:\n\n${text}` },
           ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
         ],
       },
     ],
     max_completion_tokens: 4000,
+    // Routes calls that share the long static prompt to the same cache, so OpenAI can bill it as
+    // cached input rather than full price.
+    prompt_cache_key: `wodi-parse-${kind ?? 'all'}`,
     // Reading a board has exactly one right answer, so sampling buys nothing and costs
     // reproducibility: at 0.2 the same board parsed correctly on one log and invented
     // "reps": 1 on the next, which is unfixable because it will not reproduce.
@@ -1521,6 +1583,8 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
 export interface WorkoutPartSegment {
   label?: string;
   kind: WorkoutPartKind;
+  /** What's special about its structure (see PartTrait). Absent = not stated → the full prompt. */
+  traits?: PartTrait[];
   text: string;
 }
 
@@ -1533,7 +1597,7 @@ const SEGMENT_SPEC = `Return ONLY valid JSON:
 {
   "title": "the session's own name if one is written on the board, else omit — see TITLE below",
   "parts": [
-    { "label": "A", "kind": "strength" | "metcon" | "accessory", "text": "the part's lines, cleaned, newline-separated" }
+    { "label": "A", "kind": "strength" | "metcon" | "accessory", "traits": ["intervals", "partner"], "text": "the part's lines, cleaned, newline-separated" }
   ]
 }
 
@@ -1556,6 +1620,18 @@ SEGMENTATION:
 - A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
 - A date written on the board goes into the FIRST part's text (a later step reads it from there).
 - Single-part boards return one part. Never invent parts that are not on the board.
+
+TRAITS ("traits" per part — what is special about its STRUCTURE; an empty list when nothing is):
+- "intervals": the work repeats on a clock — EMOM, "every X:XX", work/rest intervals, sets for time with rest between, AMRAP intervals.
+- "stations": stations or a rotation (A/B/C/D stations, stations alternating under one clock).
+- "partner": partners, pairs, teams, P1/P2, heats, "you go I go" — whether or not it is scored as a team.
+- "chipper": a long list done once through, or rounds that add or change movements (progressive, pyramid, palindrome).
+- "ladder": reps or loads that climb or descend round to round (21-15-9, 1-2-3…, 10-8-6-4-2, "+2 each round").
+- "buy_in": work done once before or after the rounds (buy-in, cash-out, "then run 1 mile").
+- "complex": several barbell movements done together as one set ("power clean + front squat + jerk").
+- "benchmark": a named workout (Fran, Cindy, Murph…) or rounds of one ("3 rounds of Cindy").
+- "multi_block": several separately scored blocks inside this one part (alternating AMRAPs, A/B blocks each scored).
+When you are unsure whether a trait applies, include it.
 
 If the input is not a workout, return: {"error": "Could not parse workout"}`;
 
@@ -1586,9 +1662,15 @@ function validateSegmentedWorkout(data: unknown): SegmentationOutcome {
     const part = asRecord(entry);
     if (!part || typeof part.text !== 'string' || part.text.trim().length === 0) return [];
     const kind = part.kind === 'strength' || part.kind === 'accessory' ? part.kind : 'metcon';
+    // A list the model gave is an answer, even an empty one; no list at all is not, and that
+    // part keeps the full prompt.
+    const traits = Array.isArray(part.traits)
+      ? PART_TRAITS.filter((t) => (part.traits as unknown[]).includes(t))
+      : undefined;
     return [{
       ...(typeof part.label === 'string' && part.label.trim() ? { label: part.label.trim() } : {}),
       kind,
+      ...(traits ? { traits } : {}),
       text: part.text.trim(),
     }];
   });
@@ -1608,6 +1690,7 @@ async function requestSegmentation(
     messages: [{ role: 'user', content }],
     max_completion_tokens: 1500,
     temperature: 0,
+    prompt_cache_key: 'wodi-segment',
     response_format: { type: 'json_object' },
   });
 
@@ -1784,12 +1867,12 @@ async function structureSegments(
 ): Promise<ParsedWorkout> {
   console.info('[SEGMENT]', {
     title: segmented.title,
-    parts: segmented.parts.map((part) => `${part.label ?? '?'} ${part.kind} (${part.text.split('\n').length} lines)`),
+    parts: segmented.parts.map((part) => `${part.label ?? '?'} ${part.kind} [${part.traits?.join(', ') ?? 'traits not stated'}] (${part.text.split('\n').length} lines)`),
   });
 
   if (segmented.parts.length === 1) {
     const part = segmented.parts[0];
-    const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote);
+    const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote, part.traits);
     // The part was structured without the session title, so the title-aware partner
     // override runs here — once the title is back on the workout.
     return applyTitlePartnerOverride({
@@ -1828,7 +1911,7 @@ async function structurePart(part: WorkoutPartSegment, sourceLabel: 'TEXT' | 'IM
   const label = part.label ?? '?';
   for (let attempt = 0; attempt <= STRUCTURE_RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote);
+      const { parsed } = await parseWorkoutText(part.text, sourceLabel, part.kind, athleteNote, part.traits);
       if (parsed.exercises.length > 0) return parsed;
       if (attempt >= 1) {
         console.warn(`[SEGMENT] part ${label} structured empty twice — keeping it as a free part`);
