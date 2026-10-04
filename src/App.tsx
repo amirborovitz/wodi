@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { doc, deleteDoc } from 'firebase/firestore';
 import { db } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -328,17 +328,13 @@ function AppContent() {
     <>
       <UpdatePill visible={updateReady} onApply={applyUpdate} />
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentScreen}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          {renderScreen()}
-        </motion.div>
-      </AnimatePresence>
+      {/* Screens switch in ONE step. A fade-out-then-fade-in ("wait") left a frame with no screen
+          at all, and the docked nav + Today's composer — outside the fade — vanished before the
+          old screen finished leaving: both read as a flicker on every tap. Screens that animate
+          their own entrance (a poster sliding in, the chat) still do. */}
+      <div key={currentScreen}>
+        {renderScreen()}
+      </div>
 
       {/* Bottom Navigation - only on main screens */}
       {showBottomNav && (

@@ -51,6 +51,8 @@ export interface ChatMessage {
   headline?: ChatOpening;
   /** Workouts this answer quoted, drawn as their posters under it. */
   receipts?: string[];
+  /** How to answer this question — small and dim under it (see ChatQuestion.hint). */
+  hint?: string;
   /** Last-time loads before a workout, drawn as one card. */
   suggestions?: LoadSuggestion[];
   at: number;
@@ -86,8 +88,11 @@ interface UseTellWodiChatArgs {
   uploadPhoto: (file: File) => Promise<string>;
   /** Keep between-workouts messages in the ongoing thread (a question and its answer). */
   keepInThread: (messages: ThreadMessage[]) => void;
-  /** Wodi's opening words — its newest message, the one on top of Today. */
-  opening: ChatOpening;
+  /**
+   * Wodi's opening words — its newest message, the one on top of Today. Null until the log has
+   * loaded: shown once, with the right words, instead of an opener swapped out a moment later.
+   */
+  opening: ChatOpening | null;
 }
 
 /** Wodi's newest message as the chat opens on it — the same object Today shows. */
@@ -96,6 +101,14 @@ export interface ChatOpening {
   highlight: string | null;
   /** The day it's about ("30 Jun") and the poster that day opens. */
   link: { label: string; workoutId: string } | null;
+}
+
+/** Two openings say the same thing — the words, the highlight, the poster the day opens. */
+export function sameOpening(a: ChatOpening, b: ChatOpening): boolean {
+  return a.text === b.text
+    && a.highlight === b.highlight
+    && (a.link?.label ?? null) === (b.link?.label ?? null)
+    && (a.link?.workoutId ?? null) === (b.link?.workoutId ?? null);
 }
 
 export interface TellWodiChat {
@@ -152,7 +165,9 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 export function useTellWodiChat({
   readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening,
 }: UseTellWodiChatArgs): TellWodiChat {
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => (
+    opening ? [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }] : []
+  ));
   const [busy, setBusy] = useState<ChatBusy>(null);
   const [hasBoard, setHasBoard] = useState(false);
 
@@ -172,9 +187,21 @@ export function useTellWodiChat({
 
   // The opening is computed from the log, which loads after the chat opens: until the athlete has
   // said anything, it follows the newest words rather than freezing on the first render's.
+  // Compared by WORDS, never by identity: the opening is rebuilt as a new object on every
+  // render, and treating that as a change set state every render — an endless loop that blanked
+  // the chat when it was opened with nothing to send yet.
   useEffect(() => {
-    const [only, ...rest] = messagesRef.current;
-    if (rest.length > 0 || !only?.headline || only.headline === opening) return;
+    if (!opening) return;
+    const current = messagesRef.current;
+    // The log just loaded: Wodi speaks first, once.
+    if (current.length === 0) {
+      const first: ChatMessage[] = [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }];
+      messagesRef.current = first;
+      setMessages(first);
+      return;
+    }
+    const [only, ...rest] = current;
+    if (rest.length > 0 || !only?.headline || sameOpening(only.headline, opening)) return;
     const next = [{ ...only, text: opening.text, headline: opening }];
     messagesRef.current = next;
     setMessages(next);
@@ -249,6 +276,7 @@ export function useTellWodiChat({
       push({
         from: 'wodi',
         text: prefix ? `${prefix} ${question.text}` : question.text,
+        ...(question.hint ? { hint: question.hint } : {}),
         chips: question.chips.map((c) => ({ label: c.label, answers: c.answers })),
       });
       return;

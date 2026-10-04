@@ -25,7 +25,6 @@
   cursor: pointer;
 }
 
-.poster,
 .waiting,
 .receipt {
   display: flex;
@@ -41,22 +40,14 @@
   transition: transform 0.12s ease;
 }
 
-.poster:active,
 .waiting:active,
 .receipt:active {
   transform: scale(0.98);
 }
 
 /* A card is its own item in the timeline, not a reply under the bubble above it. */
-.poster,
 .waiting {
   margin: 12px 0;
-}
-
-.poster {
-  padding: 8px 14px 8px 8px;
-  background: #17181b;
-  border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 .waiting {
@@ -75,17 +66,10 @@
   border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
-.thumb,
 .receiptThumb {
   flex-shrink: 0;
   overflow: hidden;
   background: #1e2023;
-}
-
-.thumb {
-  width: 50px;
-  height: 70px;
-  border-radius: 5px;
 }
 
 .receiptThumb {
@@ -132,33 +116,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.result {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.resultValue {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 32px;
-  font-weight: 900;
-  line-height: 0.9;
-  color: #f5c200;
-}
-
-.pr {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #f5c200;
-  color: #0b0c0e;
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
 }
 
 .logButton {

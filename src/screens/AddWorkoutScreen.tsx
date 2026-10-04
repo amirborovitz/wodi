@@ -753,7 +753,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const { calculateRewardData } = useRewardData();
   // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
   // Ask Wodi answers from all of it; the recent-workout helpers below keep their 50.
-  const { workouts: allWorkouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
+  const { workouts: allWorkouts, loading: workoutsLoading } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const recentWorkouts = useMemo(() => allWorkouts.slice(0, 50), [allWorkouts]);
   const ask = useAskWodi(allWorkouts);
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
@@ -762,11 +762,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const thread = useWodiThread(allWorkouts, plannedWorkout ?? null);
   // The same newest message as Today's, so the thread ends where Today begins.
   const wodiMessage = useWodiMessage(allWorkouts);
-  const chatOpening = useMemo(() => ({
+  // Null until the log has loaded, so Wodi's first line appears once with the right words rather
+  // than as the generic opener swapped for the real one a moment later (a visible flicker).
+  const chatOpening = useMemo(() => (workoutsLoading ? null : {
     text: wodiMessage.text,
     highlight: wodiMessage.highlight,
     link: wodiMessage.day && wodiMessage.dayWorkout ? { label: wodiMessage.day.label, workoutId: wodiMessage.dayWorkout.id } : null,
-  }), [wodiMessage]);
+  }), [wodiMessage, workoutsLoading]);
   // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
   // workouts already loaded here — no extra query on the logging path.
   const lastMaxReps = useMemo(() => buildLastMaxRepsMap(recentWorkouts), [recentWorkouts]);

@@ -30,7 +30,7 @@ export function TodayComposer({ onTellWodi, onPhoto }: TodayComposerProps): Reac
           <path d="M9 2v14M2 9h14" />
         </svg>
       </button>
-      <button type="button" className={styles.bar} onClick={onTellWodi}>Tell Wodi…</button>
+      <button type="button" className={styles.bar} onClick={onTellWodi}>Message Wodi…</button>
       <button type="button" className={styles.camera} onClick={() => cameraRef.current?.click()} aria-label="Send Wodi a photo of the board">
         <svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
           <path d="M2 6h4l2-3h6l2 3h4v12H2z" />

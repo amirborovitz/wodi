@@ -1,12 +1,14 @@
-import type { PlannedWorkout, Workout } from '../../types';
+import type { PlannedWorkout } from '../../types';
 
 /**
- * The Wodi thread as the athlete reads it: the between-workouts messages, each workout logged in
- * the window as ONE poster card, and boards parked mid-chat as a waiting card — in the order they
- * happened, with a separator per day. Pure, so the ordering is pinned by tests.
+ * The Wodi thread as the athlete reads it: what was SAID between workouts, and boards parked
+ * mid-chat as a waiting card — in the order they happened, with a separator per day. Pure, so
+ * the ordering is pinned by tests.
  *
- * A workout's own conversation is NOT inlined: the card stands for it, and tapping it opens the
- * poster (which carries its chat). That's what keeps the thread short however much you train.
+ * Logged workouts are NOT cards here (owner, 2026-10-04). They're the log, which already has two
+ * homes — Today and the Gallery — and a wall of them buried why you opened the chat. A workout
+ * still appears where it means something: attached to the answer that quotes it (a receipt),
+ * and Wodi brings any of them back on request ("show me yesterday's WOD").
  */
 
 export interface ThreadMessage {
@@ -19,13 +21,14 @@ export interface ThreadMessage {
   workoutIds?: string[];
 }
 
-export type ThreadItem<W extends Workout = Workout> =
+export type ThreadItem =
   | { kind: 'day'; id: string; label: string }
   | { kind: 'message'; id: string; message: ThreadMessage }
-  | { kind: 'poster'; id: string; at: number; workout: W }
   | { kind: 'waiting'; id: string; at: number; planned: PlannedWorkout; title: string };
 
-export const THREAD_WINDOW_DAYS = 14;
+/** The chat opens on the last few days; "Earlier" reaches back a week at a time. */
+export const THREAD_WINDOW_DAYS = 3;
+export const THREAD_EARLIER_STEP_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -49,28 +52,23 @@ export function threadSince(now: Date, windowDays: number): number {
   return startOfDay(now.getTime()) - (windowDays - 1) * DAY_MS;
 }
 
-export function buildThreadItems<W extends Workout>(input: {
+export function buildThreadItems(input: {
   messages: readonly ThreadMessage[];
-  /** Any order; tests excluded already (as useWorkouts returns them). */
-  workouts: readonly W[];
   planned: readonly PlannedWorkout[];
   /** The board this chat is on right now — it's live below, so it isn't also a card above. */
   activePlannedId?: string | null;
   now: Date;
   windowDays: number;
-}): ThreadItem<W>[] {
+}): ThreadItem[] {
   const since = threadSince(input.now, input.windowDays);
-  type Timed = Exclude<ThreadItem<W>, { kind: 'day' }> & { at: number };
+  type Timed = Exclude<ThreadItem, { kind: 'day' }> & { at: number };
 
   const timed: Timed[] = [
     ...input.messages
       .filter((m) => m.at >= since)
       .map((m): Timed => ({ kind: 'message', id: `m:${m.id}`, message: m, at: m.at })),
-    // When it was LOGGED — the thread is the order things were said, not the trained date.
-    ...input.workouts
-      .filter((w) => w.createdAt.getTime() >= since)
-      .map((w): Timed => ({ kind: 'poster', id: `w:${w.id}`, at: w.createdAt.getTime(), workout: w })),
     // Only boards parked from a chat; a board saved from the form lives on Today's For Later shelf.
+    // A waiting board is something still to do, so it shows whatever its age.
     ...input.planned
       .filter((p) => p.chat && p.id !== input.activePlannedId)
       .map((p): Timed => {
@@ -82,11 +80,10 @@ export function buildThreadItems<W extends Workout>(input: {
           planned: p,
           title: p.parsedWorkout?.title?.trim() || 'Your board',
         };
-      })
-      .filter((p) => p.at >= since),
+      }),
   ].sort((a, b) => a.at - b.at);
 
-  const items: ThreadItem<W>[] = [];
+  const items: ThreadItem[] = [];
   let lastDay = -1;
   for (const item of timed) {
     const day = startOfDay(item.at);

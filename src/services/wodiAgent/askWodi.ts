@@ -90,7 +90,7 @@ Otherwise answer from their own training log, which you can only see through the
 What they've told you to remember (confirmed by them — use it, and never re-propose what's already here):
 ${notesForPrompt(notes)}
 
-How you text: warm, short, specific — like a friend at the gym. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". Never compare them with anyone else, no lectures, no safety boilerplate.`;
+How you text: warm, short, specific — like a friend at the gym. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never compare them with anyone else, no lectures, no safety boilerplate.`;
 }
 
 function runTool(name: string, rawArgs: string, ctx: TrainingContext): unknown {
@@ -129,16 +129,23 @@ const MAX_RECEIPTS = 3;
  * prompt's date style) or by its title. Read off the words, against what the tools returned —
  * the model can't attach a poster it never looked up.
  */
-export function receiptsFor(answer: string, found: readonly FoundWorkout[]): string[] {
+export function receiptsFor(answer: string, found: readonly FoundWorkout[], now: Date = new Date()): string[] {
   const text = answer.toLowerCase();
   const hits: { id: string; at: number }[] = [];
+  // "yesterday" / "today" name a day too — the way people ask for a workout back.
+  const relative: Record<string, string> = {
+    [toIsoDate(now)]: 'today',
+    [toIsoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))]: 'yesterday',
+  };
   for (const w of found) {
     const [, m, d] = w.date.split('-').map(Number);
     const day = m && d ? `${d} ${MONTHS[m - 1]}`.toLowerCase() : '';
     const dayAt = day ? text.search(new RegExp(`(^|\\D)${day}\\b`)) : -1;
     const title = w.title.trim().toLowerCase();
     const titleAt = title.length > 3 && title !== 'workout' ? text.indexOf(title) : -1;
-    const at = [dayAt, titleAt].filter((i) => i >= 0).sort((a, b) => a - b)[0];
+    const word = relative[w.date];
+    const wordAt = word ? text.search(new RegExp(`\\b${word}\\b`)) : -1;
+    const at = [dayAt, titleAt, wordAt].filter((i) => i >= 0).sort((a, b) => a - b)[0];
     if (at !== undefined && !hits.some((h) => h.id === w.id)) hits.push({ id: w.id, at });
   }
   return hits.sort((a, b) => a.at - b.at).slice(0, MAX_RECEIPTS).map((h) => h.id);
@@ -197,7 +204,7 @@ export async function askWodi(input: {
     const calls = mustAnswer ? [] : (reply.tool_calls ?? []).filter((call) => call.type === 'function');
     if (calls.length === 0) {
       const text = reply.content?.trim() ?? '';
-      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found) };
+      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found, now) };
     }
     if (calls.some((call) => call.function.name === 'log_workout')) return { kind: 'log' };
 

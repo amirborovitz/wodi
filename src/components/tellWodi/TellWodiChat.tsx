@@ -32,6 +32,9 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
   const photoInputRef = useRef<HTMLInputElement>(null);
   const { messages, busy, send, tapChip, canOpenForms, openForms } = chat;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
+  // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
+  // Everything then lands in one step — no opener swapped out, no history pushing it down.
+  const warming = !thread.ready || messages.length === 0;
   const { threadRef, contentRef, onThreadScroll, pinToEnd, screenStyle } = useChatViewport(
     `${messages.length}:${messages.filter((m) => m.answered).length}:${busy}`,
   );
@@ -67,7 +70,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
 
       <div className={styles.thread} ref={threadRef} onScroll={onThreadScroll}>
         <div className={styles.threadContent} ref={contentRef}>
-        <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} onOpenPlanned={onOpenPlanned} />
+        {thread.ready && <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} onOpenPlanned={onOpenPlanned} />}
         <AnimatePresence initial={false}>
           {messages.map((message) => (
             <motion.div
@@ -96,6 +99,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                     )}
                   </p>
                 )}
+                {message.hint && !message.answered && <p className={styles.hint}>{message.hint}</p>}
                 {message.suggestions && (
                   <ul className={styles.suggestions}>
                     {message.suggestions.map((s) => (
@@ -143,7 +147,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
               )}
             </motion.div>
           ))}
-          {(busy === 'reading-board' || busy === 'thinking') && (
+          {(busy === 'reading-board' || busy === 'thinking' || warming) && (
             <motion.div key="typing" className={styles.rowWodi} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className={styles.bubbleWodi} aria-live="polite">
                 {typingLabel ? (

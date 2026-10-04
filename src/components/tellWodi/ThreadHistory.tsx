@@ -17,9 +17,9 @@ interface ThreadHistoryProps {
 }
 
 /**
- * The ongoing thread above the live chat: what was said between workouts, each logged workout as
- * ONE poster card (its own chat lives behind it), boards parked mid-chat, a separator per day.
- * Render-only — the order and the window are useWodiThread's.
+ * The ongoing thread above the live chat: what was said between workouts (with the posters an
+ * answer quotes), boards parked mid-chat, a separator per day. Logged workouts aren't cards here —
+ * they live on Today and in the Gallery. Render-only — the order and the window are useWodiThread's.
  */
 export function ThreadHistory({ thread, onOpenWorkout, onOpenPlanned }: ThreadHistoryProps) {
   if (thread.items.length === 0 && !thread.canLoadEarlier) return null;
@@ -45,8 +45,6 @@ export function ThreadHistory({ thread, onOpenWorkout, onOpenPlanned }: ThreadHi
                 <Receipts ids={item.message.workoutIds} thread={thread} onOpenWorkout={onOpenWorkout} />
               </div>
             );
-          case 'poster':
-            return <ThreadPosterCard key={item.id} workout={item.workout} onOpen={() => onOpenWorkout(item.workout)} />;
           case 'waiting':
             return (
               <button key={item.id} type="button" className={styles.waiting} onClick={() => onOpenPlanned(item.planned)}>
@@ -94,29 +92,6 @@ function useThumbPoster(workout: WorkoutWithStats) {
   const near = useNearViewport(ref);
   const payload = usePosterPayload(near ? workout : undefined);
   return { ref, payload };
-}
-
-function ThreadPosterCard({ workout, onOpen }: { workout: WorkoutWithStats; onOpen: () => void }) {
-  const { ref, payload } = useThumbPoster(workout);
-  const lead = payload?.wods[0];
-  // The poster's own hero, never a recomputed one — a card and its poster can't disagree.
-  const result = lead && !lead.result.scores ? lead.result.value : null;
-  const meta = [lead?.type, payload?.skin?.toUpperCase()].filter(Boolean).join(' · ');
-  return (
-    <button ref={ref} type="button" className={styles.poster} onClick={onOpen} aria-label={`Open ${workout.title}`}>
-      <span className={styles.thumb}>{payload && <PosterCard payload={payload} />}</span>
-      <span className={styles.cardText}>
-        <span className={styles.cardTitle}>{workout.title || 'Workout'}</span>
-        <span className={styles.meta}>{meta || trainedLabel(workout)}</span>
-      </span>
-      {(result || workout.isPR) && (
-        <span className={styles.result}>
-          {result && <span className={styles.resultValue}>{result}</span>}
-          {workout.isPR && <span className={styles.pr}>PR</span>}
-        </span>
-      )}
-    </button>
-  );
 }
 
 function ReceiptCard({ workout, onOpen }: { workout: WorkoutWithStats; onOpen: () => void }) {

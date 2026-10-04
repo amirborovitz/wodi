@@ -31,6 +31,12 @@ export async function fetchThread(userId: string, sinceMs: number): Promise<Thre
   });
 }
 
+/** Is there anything said before `beforeMs`? — whether "Earlier" has something to show. */
+export async function hasThreadBefore(userId: string, beforeMs: number): Promise<boolean> {
+  const snapshot = await getDocs(query(threadRef(userId), where('at', '<', beforeMs), limit(1)));
+  return !snapshot.empty;
+}
+
 export async function appendThread(userId: string, messages: readonly ThreadMessage[]): Promise<void> {
   if (messages.length === 0) return;
   const batch = writeBatch(db);

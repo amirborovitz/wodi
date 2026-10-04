@@ -353,19 +353,17 @@ function loadPatch(answer: SlotAnswer): LoadAnswer | null {
 }
 
 /**
- * How to answer a strength weight, with examples sized to the board: "Same every set — 80",
- * "Built up — 60 to 80", "Each set — 60, 65, 70, 75, 80". Only where there's more than one set —
- * a metcon's dumbbell has one weight and needs no lesson.
+ * How to answer a strength weight, sized to the board. A HINT, drawn small and dim under the
+ * question and said as an example — set as part of the question, the made-up numbers read as
+ * Wodi telling you what you lifted. Only where there's more than one set: a metcon's dumbbell
+ * has one weight and needs no lesson.
  */
-function weightFormats(sets: number, unit: string): string {
+function weightHint(sets: number, unit: string): string {
   const n = Math.min(Math.max(sets, 3), 6);
   const [base, step] = unit === 'lb' ? [135, 10] : [60, 5];
   const each = Array.from({ length: n }, (_, i) => base + i * step);
   const top = each[each.length - 1];
-  return `
-Same every set — ${top}
-Built up — ${base} to ${top}
-Each set — ${each.join(', ')}`;
+  return `Type one weight, a start and end, or each set — e.g. ${top} · ${base} to ${top} · ${each.join(', ')}`;
 }
 
 /**
@@ -502,6 +500,8 @@ export interface ChatChip {
 
 export interface ChatQuestion {
   text: string;
+  /** How to answer, shown small and dim under the question — an example, never part of it. */
+  hint?: string;
   slotIds: string[];
   chips: ChatChip[];
 }
@@ -570,7 +570,8 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
         : [];
       const strength = result?.kind === 'load' && result.setsTotal > 1;
       return {
-        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?${strength ? weightFormats(result.setsTotal, unit) : ''}`,
+        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?`,
+        ...(strength ? { hint: weightHint(result.setsTotal, unit) } : {}),
         slotIds: ids,
         chips: [...rxChips, skipChip(ids)],
       };

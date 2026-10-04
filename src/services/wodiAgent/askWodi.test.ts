@@ -120,6 +120,9 @@ describe('askWodi', () => {
     ];
     expect(receiptsFor('The Ladder was 22:00, and you squatted 100kg × 5 on 22 Sep.', found)).toEqual(['b', 'a']);
     expect(receiptsFor('Nothing like that in your log.', found)).toEqual([]);
+    // "yesterday" and "today" name a day too.
+    expect(receiptsFor('Yesterday you did 100kg × 5.', found, new Date(2026, 8, 23))).toEqual(['a']);
+    expect(receiptsFor('Nothing today yet.', found, new Date(2026, 8, 23))).toEqual([]);
     // "2 Aug" must not match inside "22 Aug".
     expect(receiptsFor('That was 22 Aug.', found)).toEqual([]);
   });
