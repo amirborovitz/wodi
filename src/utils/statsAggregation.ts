@@ -1,6 +1,6 @@
 import type { Workout } from '../types';
 import { computeWorkoutEP, type EPWorkout } from './xpCalculations';
-import { getCanonicalLiftName } from '../data/exerciseDefinitions';
+import { movementIdentity } from '../data/movementRegistry';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // On-the-fly cross-workout aggregation.
@@ -65,7 +65,7 @@ export function aggregateMovementTotals(
   for (const w of workouts) {
     const countedThisWorkout = new Set<string>();
     for (const m of w.workloadBreakdown?.movements ?? []) {
-      const key = getCanonicalLiftName(m.name);
+      const key = movementIdentity(m.name);
       const roll = map.get(key) ?? {
         canonicalName: key,
         totalReps: 0, totalVolume: 0, totalDistance: 0, totalCalories: 0,
@@ -124,7 +124,7 @@ export function movementFamilyAudit(
 
   for (const w of workouts) {
     for (const m of w.workloadBreakdown?.movements ?? []) {
-      const canonicalName = getCanonicalLiftName(m.name);
+      const canonicalName = movementIdentity(m.name);
       if (!canonicalName.toLowerCase().includes(n)) continue;
       const reps = m.totalReps ?? 0;
       const volume = m.weight && m.weight > 0 && reps ? m.weight * reps : 0;

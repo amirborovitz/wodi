@@ -6,7 +6,6 @@ import {
   resolveMovement,
 } from './movementRegistry';
 import { MOVEMENT_REGISTRY_SEED } from './movementRegistry.seed';
-import { getCanonicalLiftName } from './exerciseDefinitions';
 
 const family = (name: string) => resolveMovement(name).familyId;
 const label = (name: string) => resolveMovement(name).familyLabel;
@@ -236,9 +235,9 @@ describe('registry integrity', () => {
     }
   });
 
-  it('stays coarser than getCanonicalLiftName, which PRs still depend on', () => {
-    expect(getCanonicalLiftName('Power Clean')).toBe('Power Clean');
-    expect(getCanonicalLiftName('Squat Clean')).toBe('Squat Clean');
+  it('keeps lifts apart by identity while grouping them by family', () => {
+    expect(resolveMovement('Power Clean').identity).toBe('Power Clean');
+    expect(resolveMovement('Squat Clean').identity).toBe('Squat Clean');
     expect(family('Power Clean')).toBe(family('Squat Clean'));
   });
 });

@@ -10,6 +10,7 @@ import { db } from './firebase';
 import { removeUndefined } from '../utils/firestoreUtils';
 import {
   MOVEMENT_FAMILIES,
+  mergeRegistryEntries,
   normalizeMovementKey,
   setMovementRegistry,
   type MovementFamilyId,
@@ -17,6 +18,7 @@ import {
   type MovementRegistryEntry,
   type ResolvedMovement,
 } from '../data/movementRegistry';
+import { MOVEMENT_REGISTRY_SEED } from '../data/movementRegistry.seed';
 
 const REGISTRY_COLLECTION = 'movementRegistry';
 const FLAGS_COLLECTION = 'movementFlags';
@@ -50,6 +52,7 @@ function parseEntry(raw: Record<string, unknown>): MovementRegistryEntry | null 
     variant: typeof raw.variant === 'string' && raw.variant.trim() ? raw.variant.trim() : undefined,
     aliases: aliases && aliases.length > 0 ? aliases : undefined,
     exactOnly: raw.exactOnly === true ? true : undefined,
+    unresolvedLift: raw.unresolvedLift === true ? true : undefined,
   };
 }
 
@@ -66,11 +69,11 @@ let flagChain: Promise<void> = Promise.resolve();
 let flaggingDisabled = false;
 
 /**
- * Pull the registry from Firestore and swap it in. Safe to call more than once;
+ * Pull triaged additions from Firestore and layer them over the seed. Safe to call more than once;
  * only the first call does work.
  *
  * Any failure — offline, rules, empty collection — leaves the bundled seed in
- * place. A stale registry degrades a recap row's label; a thrown error would
+ * place on its own. A missing addition degrades a recap row's label; a thrown error would
  * take out the whole recap.
  */
 export async function loadMovementRegistry(): Promise<void> {
@@ -82,7 +85,7 @@ export async function loadMovementRegistry(): Promise<void> {
       .map(d => parseEntry(d.data() as Record<string, unknown>))
       .filter((e): e is MovementRegistryEntry => e !== null);
 
-    if (entries.length > 0) setMovementRegistry(entries);
+    if (entries.length > 0) setMovementRegistry(mergeRegistryEntries(MOVEMENT_REGISTRY_SEED, entries));
   } catch (error) {
     console.warn('[movementRegistry] falling back to bundled seed', error);
   }

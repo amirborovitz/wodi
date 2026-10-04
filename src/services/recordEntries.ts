@@ -1,4 +1,4 @@
-import { getCanonicalLiftName } from '../data/exerciseDefinitions';
+import { movementIdentity } from '../data/movementRegistry';
 import { namedWodRunsOf } from './namedWods';
 import { getEffectiveWorkoutDate } from '../utils/workoutDate';
 import { fmtTimeSocial } from '../components/celebration/posterFormatters';
@@ -63,7 +63,7 @@ interface BenchmarkSample {
 }
 
 function liftKey(name: string): string {
-  return getCanonicalLiftName(name).toLowerCase();
+  return movementIdentity(name).toLowerCase();
 }
 
 /**
@@ -119,7 +119,7 @@ export function buildLiftRecords(prs: readonly PersonalRecord[]): RecordEntry[] 
     entries.push({
       id: `lift-${key}`,
       kind: 'lift',
-      movement: getCanonicalLiftName(best.movement),
+      movement: movementIdentity(best.movement),
       value: `${best.weight}kg`,
       achievedAt: best.date,
       history,

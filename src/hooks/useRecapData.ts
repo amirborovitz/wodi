@@ -631,7 +631,7 @@ function buildRecap(
       // The canonical name, not the ledger's family label: this row names the lift
       // itself ("Push Press"), where the board's label would flatten it to
       // "Shoulder to Overhead" and prefix an implement 75 KG has already implied.
-      if (!best || kg > best.kg) bestLift.set(axis, { lift: resolved.canonicalName, kg, familyId: resolved.familyId });
+      if (!best || kg > best.kg) bestLift.set(axis, { lift: resolved.identity, kg, familyId: resolved.familyId });
     }
   }
 

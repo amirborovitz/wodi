@@ -1,6 +1,6 @@
 /**
- * THE movement registry — one lookup table behind every "what did I do a lot of"
- * question the recap asks.
+ * THE movement registry — the one answer to "which movement is this?", for every
+ * part of the app that asks: records and PRs, stats, the recap, Wodi.
  *
  * Replaces the old `MOVEMENT_FAMILIES` table, whose matching was ORDER-DEPENDENT:
  * the first family whose alias matched won, so every new alias risked silently
@@ -8,16 +8,22 @@
  * Here a known movement is an exact keyed lookup, and the only fuzzy path —
  * longest-phrase match — is order-independent by construction.
  *
- * Two grains, both needed, deliberately kept apart:
- *   - `canonicalName` — fine. "Push Press" ≠ "Push Jerk". What PRs would care about.
- *   - `familyId`      — coarse. Both are Shoulder to Overhead. What the recap shows.
+ * Three grains, all needed, deliberately kept apart:
+ *   - `identity`      — THE name of the movement. "Dumbbell Push Press" ≠ "Push Press".
+ *                       Records, PRs, stats and Wodi's habits key on it, and nothing
+ *                       else may invent a second one. Only a confident match earns an
+ *                       entry's name; a qualified name the registry can't place keeps
+ *                       its own, so an unknown drill never lands in a known lift's record.
+ *   - `canonicalName` — the registry entry the name landed on, fuzzy matches included.
+ *                       What the recap groups machines and sub-lines by.
+ *   - `familyId`      — coarse. Push Press and Push Jerk are both Shoulder to Overhead.
  *
  * FAMILIES ARE A CLOSED SET. An unrecognised movement resolves to `familyId: null`
  * and gets flagged for triage — it never invents a family, and it never headlines
  * a recap. Growing the family list is a human decision, not a parse-time one.
  *
- * Scope: recap aggregation only. This never touches `MovementTotal.name`, which is
- * the coach's own wording and the only thing posters render.
+ * Display is NOT this module's business. `MovementTotal.name` is the coach's own
+ * wording and the only thing posters render; nothing here reads or rewrites it.
  */
 import { MOVEMENT_REGISTRY_SEED } from './movementRegistry.seed';
 
@@ -220,6 +226,13 @@ export interface MovementRegistryEntry {
    * "Bent Over Row" is barbell work, and no word-boundary rule separates them.
    */
   exactOnly?: true;
+  /**
+   * The name says which pattern was trained but not which LIFT — "Squats" can be
+   * back, front, goblet or air; "Press" strict or push; "Row" the erg or a barbell.
+   * Reading the board is the parser's call, and a name it left this bare must not
+   * open a record bucket: a front squat would be credited to whatever "Squat" holds.
+   */
+  unresolvedLift?: true;
 }
 
 // ── Name normalization ───────────────────────────────────────────────────────
@@ -240,10 +253,57 @@ const MODIFIER_WORDS = new Set([
   'alt', 'alternating', 'alternate', 'alternated',
   'weighted', 'loaded', 'single', 'double', 'dual', 'twin', 'pair', 'paired',
   'strict', 'kipping', 'butterfly', 'tempo', 'paused', 'pause',
-  'touch', 'and', 'go', 'tng', 'unbroken', 'max', 'heavy', 'light',
+  // "T&G" flattens to "t g".
+  'touch', 'and', 'go', 'tng', 't', 'g', 'unbroken', 'ub', 'max', 'heavy', 'light',
   'seated', 'standing', 'banded', 'assisted', 'partner',
-  'right', 'left', 'each', 'side', 'per', 'total',
+  'right', 'left', 'each', 'side', 'per', 'total', 'together',
 ]);
+
+/**
+ * Words at either END of a name that say how the lift was trained that session,
+ * not which lift it is: "Deadlift Strength", "Tall Clean Practice", "Squat For Time".
+ * Only stripped from the ends — inside a name they can be part of it.
+ */
+const EDGE_NOISE: readonly (readonly string[])[] = [
+  ['for', 'time'], ['warm', 'up'], ['build', 'up'], ['max', 'effort'],
+  ['strength'], ['work'], ['wod'], ['workout'], ['session'], ['practice'], ['skill'],
+  ['technique'], ['build'], ['building'], ['ladder'], ['complex'], ['emom'], ['set'],
+  ['slow'],
+];
+
+const UNIT_WORDS = new Set(['kg', 'lb', 'm', 'km', 'cal', 'sec', 'min', 'rep', 'round']);
+
+/**
+ * Drop what a board prints next to a movement but isn't the movement: quantities and
+ * loads ("200m", "10", "@24kg") and training-context words at the ends. Never strips
+ * a name down to nothing, or to a bare implement ("Barbell Complex" stays itself).
+ */
+function stripNonMovementWords(words: readonly string[]): string[] {
+  const out: string[] = [];
+  let afterNumber = false;
+  for (const w of words) {
+    const isNumber = /^[@~x]?\d/.test(w);
+    const skip = isNumber || w === '@' || (afterNumber && (UNIT_WORDS.has(w) || w === 'x'));
+    afterNumber = isNumber || (afterNumber && w === '@');
+    if (!skip) out.push(w);
+  }
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const noise of EDGE_NOISE) {
+      if (out.length > noise.length && noise.every((w, i) => out[i] === w)) {
+        out.splice(0, noise.length);
+        changed = true;
+      }
+      if (out.length > noise.length && noise.every((w, i) => out[out.length - noise.length + i] === w)) {
+        out.splice(out.length - noise.length, noise.length);
+        changed = true;
+      }
+    }
+  }
+  if (out.length === 0 || out.every(isImplementToken)) return [...words];
+  return out;
+}
 
 /** Tokens that name the implement outright, whatever else the movement is. */
 const IMPLEMENT_TOKENS: ReadonlyArray<readonly [MovementImplement, ReadonlySet<string>]> = [
@@ -280,7 +340,7 @@ export function normalizeMovementKey(name: string): string {
   return name
     .replace(SECTION_PREFIX, '')
     .toLowerCase()
-    .replace(/[-_/+&.,()]/g, ' ')
+    .replace(/[-_/+&.,():·]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
@@ -389,6 +449,22 @@ export function setMovementRegistry(entries: readonly MovementRegistryEntry[]): 
   compiled = compile(entries);
 }
 
+/**
+ * The bundled seed plus whatever triage has added in Firestore. Firestore EXTENDS the
+ * seed, never replaces it: identity keys records, so the answer for a movement must
+ * not depend on whether a network read finished. A Firestore row with a seed entry's
+ * canonical name overrides that entry; any other row is appended.
+ */
+export function mergeRegistryEntries(
+  seed: readonly MovementRegistryEntry[],
+  extra: readonly MovementRegistryEntry[],
+): MovementRegistryEntry[] {
+  const byName = new Map(extra.map(e => [e.canonicalName.toLowerCase(), e]));
+  const merged = seed.map(e => byName.get(e.canonicalName.toLowerCase()) ?? e);
+  const seedNames = new Set(seed.map(e => e.canonicalName.toLowerCase()));
+  return [...merged, ...extra.filter(e => !seedNames.has(e.canonicalName.toLowerCase()))];
+}
+
 export function getMovementRegistry(): readonly MovementRegistryEntry[] {
   return activeEntries;
 }
@@ -396,7 +472,14 @@ export function getMovementRegistry(): readonly MovementRegistryEntry[] {
 // ── Resolution ───────────────────────────────────────────────────────────────
 
 export interface ResolvedMovement {
-  /** Fine-grained canonical name, or the cleaned input when unknown. */
+  /**
+   * THE name of this movement — the one key records, PRs, stats and habits use.
+   * A registry entry's name (implement-qualified when the board's implement isn't the
+   * entry's: "Dumbbell Thruster"), or, when the match wasn't confident, the board's
+   * own name cleaned of quantities and training context.
+   */
+  identity: string;
+  /** The registry entry the name landed on, fuzzy matches included; the cleaned input when unknown. */
   canonicalName: string;
   /** null for movements the registry doesn't know — these never headline. */
   familyId: MovementFamilyId | null;
@@ -407,10 +490,12 @@ export interface ResolvedMovement {
   variant: string | null;
   /** How confident the match was — drives what lands in the flag queue. */
   match: 'exact' | 'phrase' | 'unknown';
+  /** The name says only the pattern, not the lift. See `MovementRegistryEntry.unresolvedLift`. */
+  unresolvedLift: boolean;
 }
 
 /**
- * Resolve a raw movement name to its canonical name, family and implement.
+ * Resolve a raw movement name to its identity, family and implement.
  *
  * A slash in a movement name means two different things and they need opposite
  * handling:
@@ -430,17 +515,7 @@ export function resolveMovement(rawName: string): ResolvedMovement {
       const known = resolved.filter(r => r.familyId !== null);
       const families = new Set(known.map(r => r.familyId));
 
-      if (families.size > 1) {
-        const cleaned = titleCase(normalizeMovementKey(rawName));
-        return {
-          canonicalName: cleaned,
-          familyId: null,
-          familyLabel: cleaned,
-          implement: 'bodyweight',
-          variant: null,
-          match: 'unknown',
-        };
-      }
+      if (families.size > 1) return unknownMovement(titleCase(normalizeMovementKey(rawName)), null);
       // One family between them (or none): the slash was an equipment choice.
       if (known.length > 0) return known[0];
     }
@@ -448,24 +523,40 @@ export function resolveMovement(rawName: string): ResolvedMovement {
   return resolveSingle(rawName);
 }
 
+/** Shorthand for the one key every record, stat and habit buckets a movement by. */
+export function movementIdentity(rawName: string): string {
+  return resolveMovement(rawName).identity;
+}
+
+function unknownMovement(cleaned: string, implement: MovementImplement | null): ResolvedMovement {
+  return {
+    identity: cleaned,
+    canonicalName: cleaned,
+    familyId: null,
+    familyLabel: cleaned,
+    implement: implement ?? 'bodyweight',
+    variant: null,
+    match: 'unknown',
+    unresolvedLift: false,
+  };
+}
+
 function resolveSingle(rawName: string): ResolvedMovement {
   const normalized = normalizeMovementKey(rawName);
-  if (!normalized) {
-    return {
-      canonicalName: rawName.trim(),
-      familyId: null,
-      familyLabel: rawName.trim(),
-      implement: 'bodyweight',
-      variant: null,
-      match: 'unknown',
-    };
-  }
+  if (!normalized) return unknownMovement(rawName.trim(), null);
 
-  const words = normalized.split(' ');
-  const statedImplement = detectImplement(words);
 
   const direct = compiled.exact.get(normalized);
-  if (direct) return describe(direct, words, statedImplement, 'exact');
+  if (direct) {
+    const directWords = normalized.split(' ');
+    return describe(direct, directWords, detectImplement(directWords), 'exact');
+  }
+
+  const words = stripNonMovementWords(normalized.split(' '));
+  const statedImplement = detectImplement(words);
+
+  const cleanedExact = compiled.exact.get(words.join(' '));
+  if (cleanedExact) return describe(cleanedExact, words, statedImplement, 'exact');
 
   // Modifiers first, so "Alt DB Snatch" still lands on the specific "DB Snatch"
   // entry rather than the generic one.
@@ -508,15 +599,7 @@ function resolveSingle(rawName: string): ResolvedMovement {
     }
   }
 
-  const cleaned = titleCase(normalized);
-  return {
-    canonicalName: cleaned,
-    familyId: null,
-    familyLabel: cleaned,
-    implement: statedImplement ?? 'bodyweight',
-    variant: null,
-    match: 'unknown',
-  };
+  return unknownMovement(titleCase(words.join(' ')), statedImplement);
 }
 
 // ── Compound movements ───────────────────────────────────────────────────────
@@ -590,17 +673,41 @@ function describe(
   // What the board actually said beats what the entry assumes, which beats the
   // family default — "DB Push Press" is a dumbbell movement even though the
   // shoulder-to-overhead family defaults to barbell.
-  const implement = statedImplement ?? entry.implement ?? MOVEMENT_FAMILIES[entry.family].defaultImplement;
+  const entryImplement = entry.implement ?? MOVEMENT_FAMILIES[entry.family].defaultImplement;
+  const implement = statedImplement ?? entryImplement;
   const familyLabel = familyLabelFor(entry.family, implement);
+  // Only a whole-name match earns the entry's identity. A phrase inside a longer name
+  // is good enough for the recap's family row, but the words around it may be the
+  // whole point — "Tall Clean" is a drill, "Back Rack Reverse Lunge" a barbell lift,
+  // "Power Clean + Push Jerk" a complex. A lift split across two records is
+  // recoverable; one lift's load merged into another's record is not.
+  const confident = match === 'exact';
 
   return {
+    identity: confident ? identityOf(entry, implement, entryImplement) : titleCase(words.join(' ')),
     canonicalName: entry.canonicalName,
     familyId: entry.family,
     familyLabel,
     implement,
     variant: entry.variant ?? deriveVariant(words, entry),
     match,
+    unresolvedLift: confident && entry.unresolvedLift === true,
   };
+}
+
+/**
+ * An entry's name, qualified by the implement when the board used a different one:
+ * a dumbbell thruster is not a barbell thruster, and its load must never stand in
+ * the barbell record. An entry whose own name already names an implement keeps it.
+ */
+function identityOf(
+  entry: MovementRegistryEntry,
+  implement: MovementImplement,
+  entryImplement: MovementImplement,
+): string {
+  if (implement === entryImplement) return entry.canonicalName;
+  if (normalizeMovementKey(entry.canonicalName).split(' ').some(isImplementToken)) return entry.canonicalName;
+  return `${titleCase(implement)} ${entry.canonicalName}`;
 }
 
 /**

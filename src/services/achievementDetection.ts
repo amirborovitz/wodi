@@ -1,5 +1,6 @@
 import type { Achievement, Exercise, ExerciseSet, MovementEquipment, PersonalRecord, Workout, WorkoutFormat } from '../types';
-import { getCanonicalLiftName, isUnresolvedLiftName, matchBenchmarkName } from '../data/exerciseDefinitions';
+import { matchBenchmarkName } from '../data/exerciseDefinitions';
+import { movementIdentity, resolveMovement } from '../data/movementRegistry';
 import { namedWodRuns, namedWodRunsOf } from './namedWods';
 
 interface AchievementContext {
@@ -140,7 +141,7 @@ function isPREligible(movementName: string, equipment?: MovementEquipment): bool
   const lower = movementName.toLowerCase();
   if (NEVER_PR_PATTERNS.some(p => lower.includes(p))) return false;
   // A name that says only which family was trained has no record to measure against.
-  if (isUnresolvedLiftName(movementName)) return false;
+  if (resolveMovement(movementName).unresolvedLift) return false;
   if (equipment === 'barbell') return true;
   // Only a DEFINITE non-barbell implement disqualifies a lift. "other" is the AI's
   // unsure bucket as well as its plate/ball/sled bucket (see MOVEMENT EQUIPMENT in
@@ -153,7 +154,7 @@ function isPREligible(movementName: string, equipment?: MovementEquipment): bool
 }
 
 function normalizePRMovementName(name: string): string {
-  return getCanonicalLiftName(name).toLowerCase();
+  return movementIdentity(name).toLowerCase();
 }
 
 /**
@@ -427,7 +428,7 @@ export function extractNewPRs(
       if (!existingPR || bestWeight > existingPR.weight) {
         newPRs.push({
           id: `${workout.id}-${movementName}`,
-          movement: getCanonicalLiftName(movementName),
+          movement: movementIdentity(movementName),
           weight: bestWeight,
           date: workout.date,
           workoutId: workout.id,

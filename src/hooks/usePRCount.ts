@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
-import { getCanonicalLiftName } from '../data/exerciseDefinitions';
+import { movementIdentity } from '../data/movementRegistry';
 
 interface UsePRCountResult {
   prCount: number;
@@ -40,7 +40,7 @@ export function usePRCount(): UsePRCountResult {
         snapshot.docs
           .map((prDoc) => prDoc.data().movement as string | undefined)
           .filter((name): name is string => Boolean(name))
-          .map((name) => getCanonicalLiftName(name).toLowerCase())
+          .map((name) => movementIdentity(name).toLowerCase())
       );
       setPRCount(movements.size);
     } catch (err) {

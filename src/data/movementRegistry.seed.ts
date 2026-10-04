@@ -1,12 +1,12 @@
 import type { MovementRegistryEntry } from './movementRegistry';
 
 /**
- * Cold-start snapshot of the movement registry.
+ * The movement registry's entries, bundled with the app.
  *
- * Firestore (`movementRegistry`) is the source of truth — this is the copy the
- * app boots with so a recap never blanks out waiting on a network read, and so
- * tests run without Firestore. Regenerate it from Firestore rather than editing
- * both by hand; new movements should arrive by triaging `movementFlags`.
+ * The registry every movement name resolves through. Firestore (`movementRegistry`)
+ * EXTENDS it with triaged additions (see `mergeRegistryEntries`) but never replaces
+ * it, so a movement's identity — and the record it lands in — never depends on a
+ * network read. New movements should arrive by triaging `movementFlags`.
  *
  * COMPOUND MOVEMENTS GET THEIR OWN ENTRY. Resolution falls back to longest-phrase
  * matching, which would file "Burpee Box Jump Over" under Box Jump (3 words) over
@@ -16,10 +16,11 @@ import type { MovementRegistryEntry } from './movementRegistry';
 export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   // ── Clean ──────────────────────────────────────────────────────────────────
   { canonicalName: 'Clean', family: 'clean' },
-  { canonicalName: 'Power Clean', family: 'clean', variant: 'Power' },
+  { canonicalName: 'Power Clean', family: 'clean', aliases: ['pc'], variant: 'Power' },
   { canonicalName: 'Squat Clean', family: 'clean', variant: 'Squat' },
   { canonicalName: 'Hang Clean', family: 'clean', variant: 'Hang' },
-  { canonicalName: 'Hang Power Clean', family: 'clean', variant: 'Hang Power' },
+  { canonicalName: 'Hang Power Clean', family: 'clean', aliases: ['hpc'], variant: 'Hang Power' },
+  { canonicalName: 'Hang Squat Clean', family: 'clean', variant: 'Hang Squat' },
   { canonicalName: 'Muscle Clean', family: 'clean', variant: 'Muscle' },
   { canonicalName: 'Dumbbell Clean', family: 'clean', implement: 'dumbbell', aliases: ['db clean'] },
   { canonicalName: 'Kettlebell Clean', family: 'clean', implement: 'kettlebell', aliases: ['kb clean'] },
@@ -33,7 +34,8 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   { canonicalName: 'Power Snatch', family: 'snatch', variant: 'Power' },
   { canonicalName: 'Squat Snatch', family: 'snatch', variant: 'Squat' },
   { canonicalName: 'Hang Snatch', family: 'snatch', variant: 'Hang' },
-  { canonicalName: 'Hang Power Snatch', family: 'snatch', variant: 'Hang Power' },
+  { canonicalName: 'Hang Power Snatch', family: 'snatch', aliases: ['hps'], variant: 'Hang Power' },
+  { canonicalName: 'Hang Squat Snatch', family: 'snatch', variant: 'Hang Squat' },
   { canonicalName: 'Muscle Snatch', family: 'snatch', variant: 'Muscle' },
   { canonicalName: 'Dumbbell Snatch', family: 'snatch', implement: 'dumbbell', aliases: ['db snatch'] },
   { canonicalName: 'Kettlebell Snatch', family: 'snatch', implement: 'kettlebell', aliases: ['kb snatch'] },
@@ -45,10 +47,13 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   { canonicalName: 'Push Jerk', family: 'shoulder_to_overhead', variant: 'Push Jerk' },
   { canonicalName: 'Split Jerk', family: 'shoulder_to_overhead', variant: 'Split Jerk' },
   { canonicalName: 'Jerk', family: 'shoulder_to_overhead', variant: 'Jerk' },
-  { canonicalName: 'Strict Press', family: 'shoulder_to_overhead', variant: 'Strict Press' },
-  { canonicalName: 'Shoulder Press', family: 'shoulder_to_overhead', variant: 'Shoulder Press' },
-  { canonicalName: 'Military Press', family: 'shoulder_to_overhead', variant: 'Military Press' },
-  { canonicalName: 'Overhead Press', family: 'shoulder_to_overhead', aliases: ['ohp'], variant: 'Overhead Press' },
+  { canonicalName: 'Power Jerk', family: 'shoulder_to_overhead', variant: 'Power Jerk' },
+  // One lift under four names — coaches use them interchangeably, so they share one record.
+  { canonicalName: 'Strict Press', family: 'shoulder_to_overhead', aliases: ['shoulder press', 'military press', 'overhead press', 'ohp', 'strict shoulder press'], variant: 'Strict Press' },
+  // Exact-only and unresolved: a bare "Press" names the pattern, not the lift — strict
+  // and push press are different records. Never phrase-matched, so it can't swallow
+  // Bench / Floor / Leg / Devil Press.
+  { canonicalName: 'Press', family: 'shoulder_to_overhead', exactOnly: true, unresolvedLift: true },
   { canonicalName: 'Z Press', family: 'shoulder_to_overhead', variant: 'Z Press' },
   { canonicalName: 'Behind the Neck Press', family: 'shoulder_to_overhead', aliases: ['press behind the neck'], variant: 'Behind the Neck' },
   { canonicalName: 'Dumbbell Push Press', family: 'shoulder_to_overhead', implement: 'dumbbell', aliases: ['db push press'], variant: 'Push Press' },
@@ -59,7 +64,8 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   { canonicalName: 'Thruster', family: 'thruster' },
 
   // ── Deadlift ───────────────────────────────────────────────────────────────
-  { canonicalName: 'Deadlift', family: 'deadlift', aliases: ['dead lift'] },
+  { canonicalName: 'Deadlift', family: 'deadlift', aliases: ['dead lift', 'dl'] },
+  { canonicalName: 'Deficit Deadlift', family: 'deadlift', variant: 'Deficit' },
   { canonicalName: 'Romanian Deadlift', family: 'deadlift', aliases: ['rdl'], variant: 'Romanian' },
   { canonicalName: 'Sumo Deadlift', family: 'deadlift', variant: 'Sumo' },
   { canonicalName: 'Stiff Leg Deadlift', family: 'deadlift', variant: 'Stiff Leg' },
@@ -106,7 +112,9 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   { canonicalName: 'Yoke Carry', family: 'carry', variant: 'Yoke' },
 
   // ── Squat (pattern-first: implement is a variant, not an identity) ──────────
-  { canonicalName: 'Squat', family: 'squat' },
+  // Unresolved: which squat a bare "Squats" was is a reading of the board — the parser's
+  // call. Folding it into Back Squat would credit a front squat to the back squat record.
+  { canonicalName: 'Squat', family: 'squat', unresolvedLift: true },
   { canonicalName: 'Air Squat', family: 'squat', implement: 'bodyweight', variant: 'Air' },
   { canonicalName: 'Back Squat', family: 'squat', implement: 'barbell', variant: 'Back' },
   { canonicalName: 'Front Squat', family: 'squat', implement: 'barbell', variant: 'Front' },
@@ -230,5 +238,6 @@ export const MOVEMENT_REGISTRY_SEED: MovementRegistryEntry[] = [
   { canonicalName: 'Swim', family: 'swim', aliases: ['swimming'] },
   // Exact-only: "Row" alone is the erg, but "Bent Over Row" and "Ring Row" are
   // not. No word-boundary rule separates them, so the erg matches whole-name only.
-  { canonicalName: 'Row', family: 'row_erg', aliases: ['rower', 'rowing', 'row erg', 'rowerg', 'erg', 'concept 2', 'concept2', 'c2'], exactOnly: true },
+  // Unresolved as a LIFT for the same reason: a bare row never opens a record bucket.
+  { canonicalName: 'Row', family: 'row_erg', aliases: ['rower', 'rowing', 'row erg', 'rowerg', 'erg', 'concept 2', 'concept2', 'c2'], exactOnly: true, unresolvedLift: true },
 ];

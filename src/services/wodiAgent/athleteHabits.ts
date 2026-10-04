@@ -35,7 +35,7 @@ const MIN_SHARE = 0.6;
 
 /** One board movement, however the board spelled it ("400m Run", "Runs" → "run"). */
 export function habitKey(movementName: string): string {
-  return resolveMovement(movementName).canonicalName.toLowerCase();
+  return resolveMovement(movementName).identity.toLowerCase();
 }
 
 interface Occurrence {
