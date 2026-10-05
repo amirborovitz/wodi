@@ -14,7 +14,7 @@ import { VIBE, VIBE_KEYS } from './brand';
 import { buildPosterWod, buildPosterWodPages } from './posterData';
 import { PosterDateContext } from './posterDateContext';
 import { useFitScale } from './useFitScale';
-import { getSkin, guessVibe, orderSkins, resolvePosterVibe } from './skinRegistry';
+import { getSkin, guessVibe, resolvePosterVibe } from './skinRegistry';
 import { useFavoriteSkin } from '../../../../hooks/useFavoriteSkin';
 import { CorrectionSheet } from '../../CorrectionSheet';
 import { TextSticker } from './TextSticker';
@@ -32,6 +32,7 @@ import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { usePosterDate } from '../../../../hooks/usePosterDate';
 import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
 import { track } from '../../../../services/analytics';
+import { lockGestureAxis, type GestureAxis } from '../../../../utils/gestureAxis';
 import styles from './index.module.css';
 
 // ─── Bottom bar icons ───────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ export function HandwrittenFace({
   const favoriteSkin = useFavoriteSkin();
   // The athlete's favourite leads the picker. Frozen for this visit, so a pick never reshuffles
   // the chips under their finger; it takes effect from the next poster.
-  const [skins] = useState(() => orderSkins(favoriteSkin.favorite));
+  const [skins] = useState(() => favoriteSkin.order.map(getSkin));
   // A poster shows its own skin; one saved before skins were stamped shows what it always did
   // (getSkin's fallback), never whatever happens to lead the picker today.
   const [skinIdx, setSkinIdx]         = useState<number>(() => skins.findIndex((s) => s.id === getSkin(data.posterSkin).id));
@@ -186,7 +187,7 @@ export function HandwrittenFace({
   const shareCardRef      = useRef<HTMLDivElement>(null);
   const shareBlob         = useRef<Blob | null>(null);
   const carouselX         = useMotionValue(0);
-  const dragRef           = useRef<{ x: number; t: number } | null>(null);
+  const dragRef           = useRef<{ x: number; y: number; t: number; axis: GestureAxis | null } | null>(null);
 
   const isCarousel  = data.isCarousel && (data.carouselPageData?.length ?? 0) > 1;
 
@@ -463,29 +464,35 @@ export function HandwrittenFace({
   };
 
   const handleTouchStart = (e: React.TouchEvent): void => {
-    dragRef.current = { x: e.touches[0].clientX, t: Date.now() };
+    dragRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), axis: null };
   };
 
   const handleTouchMove = (e: React.TouchEvent): void => {
-    if (!dragRef.current) return;
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx  = e.touches[0].clientX - drag.x;
+    drag.axis ??= lockGestureAxis(dx, e.touches[0].clientY - drag.y);
+    // An up/down swipe belongs to the workout pager — the deck stays put.
+    if (drag.axis !== 'x') return;
     const n   = pageWods?.length ?? 1;
     const w   = carouselViewportRef.current?.offsetWidth ?? 390;
-    const dx  = e.touches[0].clientX - dragRef.current.x;
     const raw = -carouselPage * w + dx;
     const clamped = Math.max(-(n - 1) * w, Math.min(0, raw));
     carouselX.set(clamped + (raw - clamped) * 0.12);
   };
 
   const handleTouchEnd = (e: React.TouchEvent): void => {
-    if (!dragRef.current) return;
-    const dx  = e.changedTouches[0].clientX - dragRef.current.x;
-    const dt  = Math.max(1, Date.now() - dragRef.current.t);
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx  = e.changedTouches[0].clientX - drag.x;
+    const dt  = Math.max(1, Date.now() - drag.t);
     const vel = (dx / dt) * 1000;
     dragRef.current = null;
+    if (drag.axis === 'y') return;
 
-    // Small movement = tap ON THE POSTER: left half previous style, right half next style. The
-    // empty deck around it is swipe-only — a tap there changes nothing.
-    if (Math.abs(dx) < 8) {
+    // A touch that never moved = tap ON THE POSTER: left half previous style, right half next
+    // style. The empty deck around it is swipe-only — a tap there changes nothing.
+    if (drag.axis === null) {
       const poster = shareCardRef.current;
       if (poster?.contains(e.target as Node)) stepSkinFromTap(e.changedTouches[0].clientX, poster);
       return;
@@ -785,12 +792,14 @@ export function HandwrittenFace({
                 <div
                   key={`${pulse}-${i}`}
                   ref={i === carouselPage ? carouselContentRef : undefined}
-                  className={i === carouselPage && carouselNeedsFit ? styles.cardWrapperFitTop : undefined}
+                  className={[
+                    i === carouselPage && carouselNeedsFit ? styles.cardWrapperFitTop : '',
+                    pulse > 0 ? styles.styleFlip : '',
+                  ].filter(Boolean).join(' ') || undefined}
                   style={{
                     width: '100%',
                     transformOrigin: 'center top',
                     transform: i === carouselPage ? `scale(${carouselScale})` : undefined,
-                    animation: i === carouselPage ? 'flipIn 0.4s cubic-bezier(0.2,0.7,0.3,1)' : undefined,
                   }}
                 >
                   <div ref={i === carouselPage ? shareCardRef : undefined} className={styles.stickerLayer}>
@@ -871,7 +880,11 @@ export function HandwrittenFace({
         <div
           key={pulse}
           ref={cardContentRef}
-          className={`${styles.cardWrapper} ${cardNeedsFit ? styles.cardWrapperFitTop : ''}`}
+          className={[
+            styles.cardWrapper,
+            cardNeedsFit ? styles.cardWrapperFitTop : '',
+            pulse > 0 ? styles.styleFlip : '',
+          ].filter(Boolean).join(' ')}
           style={{ transform: `scale(${cardScale})` }}
         >
           {/* Only the poster itself flips the style — not the empty space around it. */}

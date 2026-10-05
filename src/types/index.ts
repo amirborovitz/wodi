@@ -45,11 +45,11 @@ export interface User {
    */
   wodiNotes?: WodiNote[];
   /**
-   * The poster skin the athlete last chose. It leads the skin picker and new posters open in it;
-   * until they pick one, that's Sun (DEFAULT_NEW_SKIN). Posters already saved keep their own.
-   * A string as stored — a skin can be retired, so useFavoriteSkin checks it still exists.
+   * The poster skins the athlete has chosen, most recent first. The first leads the skin picker
+   * and new posters open in it; until they pick one, that's DEFAULT_NEW_SKIN. Posters already
+   * saved keep their own. Strings as stored — a skin can be retired, so orderSkins drops unknowns.
    */
-  favoriteSkin?: string;
+  skinOrder?: string[];
 }
 
 export interface WodiNote {

@@ -82,14 +82,31 @@ export function isPosterSkinId(id: unknown): id is PosterSkinId {
 }
 
 /**
- * The picker's order: the athlete's favourite first, then Sun (the owner's pick of the set, so it
- * never sinks to the end of the row), then the rest as the registry lists them. With no favourite
- * yet, Sun leads. Only the order moves — what a saved poster shows doesn't.
+ * The picker's order: the skins the athlete has chosen, most recent first, then the default, then
+ * the rest as the registry lists them. Choosing a skin moves it to the front and pushes the ones
+ * that were ahead of it back by one (see `chooseSkin`). With nothing chosen yet, the default leads.
+ * Only the order moves — what a saved poster shows doesn't.
  */
-export function orderSkins(favorite: PosterSkinId | undefined): PosterSkin[] {
-  const lead = [getSkin(favorite ?? DEFAULT_NEW_SKIN), getSkin(DEFAULT_NEW_SKIN)]
-    .filter((s, i, all) => all.findIndex((t) => t.id === s.id) === i);
-  return [...lead, ...SKINS.filter((s) => !lead.some((l) => l.id === s.id))];
+export function orderSkins(chosen: readonly string[]): PosterSkin[] {
+  const lead = [...chosen, DEFAULT_NEW_SKIN]
+    .filter(isPosterSkinId)
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .map(getSkin);
+  return [...lead, ...SKINS.filter((s) => !lead.includes(s))];
+}
+
+/**
+ * The chosen list as a user doc holds it. Docs from before the order was kept have only the one
+ * `favoriteSkin` they last picked — that pick starts their list.
+ */
+export function readSkinOrder(skinOrder: unknown, legacyFavorite: unknown): string[] | undefined {
+  if (Array.isArray(skinOrder)) return skinOrder.filter((id): id is string => typeof id === 'string');
+  return typeof legacyFavorite === 'string' ? [legacyFavorite] : undefined;
+}
+
+/** The chosen list after picking `id`: it goes first, everything else keeps its place behind it. */
+export function chooseSkin(chosen: readonly string[], id: PosterSkinId): PosterSkinId[] {
+  return [id, ...chosen.filter(isPosterSkinId).filter((c) => c !== id)];
 }
 
 const INTENSITY_VIBE_MAP: Record<string, VibeKey> = {

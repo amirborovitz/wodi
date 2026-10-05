@@ -159,8 +159,13 @@
 
 .cardWrapper {
   width: 100%;
-  animation: flipIn 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
   transform-origin: center top;
+}
+
+/* The fade marks a style change — not a poster arriving. Fading a poster in while it
+   slides in from a swipe (or across the parts deck) reads as flicker. */
+.styleFlip {
+  animation: flipIn 0.4s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
 .cardWrapperFitTop {

@@ -13,6 +13,7 @@ import {
   type CelebrationStickerConfig,
 } from '../services/celebrationStickerConfig';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
+import { lockGestureAxis, type GestureAxis } from '../utils/gestureAxis';
 
 // ============================================
 // Props
@@ -123,15 +124,17 @@ export function WorkoutScreen({
   onNextWorkout,
 }: WorkoutScreenProps) {
   // Vertical nav swipe (TikTok-style, detail mode only)
-  const navDragY = useMotionValue(0);
-  const navSwipeRef = useRef<{ startX: number; startY: number; startY0: number; time: number } | null>(null);
+  // Starts off-screen when arriving from a swipe, so the first frame is already at the edge —
+  // setting it in the effect below painted the poster centred for a frame first (a flash).
+  const navDragY = useMotionValue(
+    enterFrom === 'bottom' ? window.innerHeight : enterFrom === 'top' ? -window.innerHeight : 0,
+  );
+  const navSwipeRef = useRef<{ startX: number; startY: number; startY0: number; time: number; axis: GestureAxis | null } | null>(null);
   const navExiting = useRef(false);
 
   // Entrance animation: slide in from top or bottom on mount
   useEffect(() => {
     if (!enterFrom) return;
-    const startY = enterFrom === 'bottom' ? window.innerHeight : -window.innerHeight;
-    navDragY.set(startY);
     fmAnimate(navDragY, 0, { type: 'spring', stiffness: 340, damping: 32, mass: 0.9 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -173,20 +176,19 @@ export function WorkoutScreen({
       startY: e.touches[0].clientY,
       startY0: navDragY.get(),
       time: Date.now(),
+      axis: null,
     };
   };
 
   const handleNavTouchMove = (e: React.TouchEvent) => {
-    if (!navSwipeRef.current || navExiting.current) return;
-    const dx = Math.abs(e.touches[0].clientX - navSwipeRef.current.startX);
-    const dy = e.touches[0].clientY - navSwipeRef.current.startY;
-    // If horizontal movement dominates, hand off to the carousel
-    if (dx > Math.abs(dy) && dx > 10) {
-      navSwipeRef.current = null;
-      return;
-    }
+    const swipe = navSwipeRef.current;
+    if (!swipe || navExiting.current) return;
+    const dy = e.touches[0].clientY - swipe.startY;
+    swipe.axis ??= lockGestureAxis(e.touches[0].clientX - swipe.startX, dy);
+    // A sideways swipe belongs to the parts carousel — the poster stays put.
+    if (swipe.axis !== 'y') return;
     // Rubber-band at edges when no adjacent workout exists
-    const rawY = navSwipeRef.current.startY0 + dy;
+    const rawY = swipe.startY0 + dy;
     if ((!onPrevWorkout && rawY > 0) || (!onNextWorkout && rawY < 0)) {
       navDragY.set(rawY * 0.12);
     } else {
@@ -195,11 +197,13 @@ export function WorkoutScreen({
   };
 
   const handleNavTouchEnd = async (e: React.TouchEvent) => {
-    if (!navSwipeRef.current || navExiting.current) return;
-    const dy = e.changedTouches[0].clientY - navSwipeRef.current.startY;
-    const dt = Math.max(1, Date.now() - navSwipeRef.current.time);
-    const vel = (dy / dt) * 1000; // px/s
+    const swipe = navSwipeRef.current;
+    if (!swipe || navExiting.current) return;
     navSwipeRef.current = null;
+    if (swipe.axis !== 'y') return;
+    const dy = e.changedTouches[0].clientY - swipe.startY;
+    const dt = Math.max(1, Date.now() - swipe.time);
+    const vel = (dy / dt) * 1000; // px/s
 
     const DIST = 75;
     const VEL = 420;

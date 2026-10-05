@@ -21,6 +21,7 @@ import { isHomeScreenApp } from '../utils/homeScreenApp';
 import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
 import { toPublicProfile } from '../services/feed/types';
 import { readWodiNotes } from '../services/wodiAgent/athleteNotes';
+import { readSkinOrder } from '../components/celebration/faces/HandwrittenFace/skinRegistry';
 import { identify, track } from '../services/analytics';
 import type { User, UserStats, WodiNote } from '../types';
 
@@ -40,7 +41,7 @@ export interface UserProfileUpdate {
   instagram?: string;
   /** The whole list, written at once — see services/wodiAgent/athleteNotes.ts. */
   wodiNotes?: WodiNote[];
-  favoriteSkin?: string;
+  skinOrder?: string[];
 }
 
 interface AuthContextValue {
@@ -234,8 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       instagram: data.instagram,
       addedToHomeScreen: data.addedToHomeScreen === true || fromHomeScreen,
       wodiNotes: readWodiNotes(data.wodiNotes),
-      // Kept as stored; useFavoriteSkin checks it names a skin that still exists.
-      favoriteSkin: typeof data.favoriteSkin === 'string' ? data.favoriteSkin : undefined,
+      // Kept as stored; orderSkins drops any skin that no longer exists.
+      skinOrder: readSkinOrder(data.skinOrder, data.favoriteSkin),
     };
   };
 
