@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.3.1 — A dumbbell is not a barbell
+
+Your records had a blind spot: a dumbbell push press counted toward your **barbell** push press
+record. So did twin-kettlebell front squats, hang power cleans and clean & jerks. A light implement
+could hold a barbell record, or hide a real barbell PR behind it.
+
+### One name for every movement
+
+Every part of Wodi that asks "which movement is this?" — your records, your PRs, your stats, the
+recap, Wodi's habits — now gets the same answer from the same place. Before, records and the recap
+each kept their own list and could disagree about the same lift.
+
+- **A dumbbell or kettlebell lift is its own record.** A barbell held on the bar is the plain lift.
+- **Strict, Shoulder, Military and Overhead Press are one lift: Strict Press.**
+- **Every spelling of one lift is one record.** "DB Snatch", "Alt DB Snatches" and "Dumbbell
+  Snatch" share a record; so do "KB Snatch" and "KB Snatch @24kg".
+- **A name Wodi doesn't know keeps its own record**, instead of being swallowed by a lift it merely
+  contains — a Tall Clean is not a Clean, a Back Rack Reverse Lunge is not a bodyweight lunge.
+- A bare "Squats", "Press" or "Row" still never opens a record. Which one it was is the board's to say.
+
+Your posters are untouched: they still print the coach's own wording.
+
+### Sun
+
+A new poster skin: warm white, a yellow sun rising off the corner, your numbers underlined in
+highlighter. It leads the picker until you choose a favourite — and from then on your favourite
+leads, and new posters start in it.
+
+### Smaller things
+
+- Tell Wodi takes a weight for each set — *"60, 65, 70, 75, 80"* — as well as one weight or a build.
+- A twin-kettlebell clean & jerk no longer prints as "Clean + Jerk" on the poster.
+- AMRAP intervals save the same total from the form and from Tell Wodi, and a buy-in run is written
+  once, not twice.
+- Opening the chat from Today no longer blanks or flickers, and moving between screens is one step.
+- Today's **+** goes straight to your photo library.
+- Reading a board costs about a third less on a typical metcon.
+
 ## v0.3.0 — Wodi talks back
 
 Wodi used to be a place you logged a workout. Now it's someone you talk to about your training.
