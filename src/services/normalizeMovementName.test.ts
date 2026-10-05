@@ -24,6 +24,19 @@ describe('normalizeMovementName', () => {
     expect(normalizeMovementName('Sync Dual Dumbbell Devil Press')).toBe('Sync Dual Dumbbell Devil Press');
   });
 
+  it('never splits a movement whose own name contains "and"', () => {
+    // The "and" in "clean and jerk" was read as a joiner of two movements: the name split,
+    // the first half lost its qualifiers, and the poster printed "Clean + Jerk" for a
+    // twin-kettlebell clean & jerk.
+    expect(normalizeMovementName('Twin Kettlebells Clean and Jerk')).toBe('Twin Kettlebells Clean and Jerk');
+    expect(normalizeMovementName('Twin Kettlebells Clean and Jerks')).toBe('Twin Kettlebells Clean and Jerk');
+    expect(normalizeMovementName('Clean and Jerk')).toBe('Clean and Jerk');
+  });
+
+  it('keeps each part\'s qualifiers when a name really joins two movements', () => {
+    expect(normalizeMovementName('Twin KB Front Squat + Burpees')).toBe('Twin KB Front Squat + Burpees');
+  });
+
   it('still preserves the prefix modifiers it already handled', () => {
     expect(normalizeMovementName('alternating db snatch')).toMatch(/^Alt /);
   });

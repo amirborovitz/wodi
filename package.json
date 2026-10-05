@@ -22,7 +22,8 @@
     "occurrences": "tsx scripts/occurrence-audit.ts",
     "totals:audit": "node --import tsx --import ./scripts/lib/offline-env.mjs scripts/totals-audit.ts",
     "totals:dump": "node --import tsx scripts/admin-dump-workouts.ts",
-    "totals:apply": "tsx scripts/backfill-apply.ts"
+    "totals:apply": "tsx scripts/backfill-apply.ts",
+    "records:rebuild": "node --import tsx --import ./scripts/lib/offline-env.mjs scripts/records-rebuild.ts"
   },
   "dependencies": {
     "@github/copilot-sdk": "^0.1.16",

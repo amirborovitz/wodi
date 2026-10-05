@@ -2114,9 +2114,14 @@ const PRESERVED_PREFIXES: Record<string, string> = {
   'one arm': 'Single Arm',
 };
 
+// Implement abbreviations stay capitalised the way boards write them ("KB", not "Kb").
+const UPPERCASE_WORDS = new Set(['kb', 'db', 'bb']);
+
 function titleCaseMovementName(name: string): string {
   return name.split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map(word => UPPERCASE_WORDS.has(word.toLowerCase())
+      ? word.toUpperCase()
+      : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 }
 
@@ -2133,28 +2138,51 @@ function preserveDeadliftVariant(name: string): string | undefined {
   );
 }
 
+// Longest first, so the most specific alias wins.
+const SORTED_MOVEMENT_ALIASES = Object.entries(MOVEMENT_ALIASES)
+  .sort((a, b) => b[0].length - a[0].length);
+
+// Aliases that contain a compound joiner themselves ("clean and jerk"). A name containing one
+// is ONE movement — splitting it on the joiner would tear the lift in half — so these also
+// match the board's plural ("Clean and Jerks").
+const isJoinedAlias = (alias: string): boolean => /\s\+\s|\s+and\s+/.test(alias);
+const JOINED_ALIASES = SORTED_MOVEMENT_ALIASES.filter(([alias]) => isJoinedAlias(alias));
+
+const aliasRegex = (alias: string): RegExp =>
+  new RegExp(`\\b${escapeRegex(alias)}${isJoinedAlias(alias) ? '(?:e?s)?' : ''}\\b`, 'i');
+
+/**
+ * Rewrite ONLY the alias span in `lower`, keeping every other word. Returning the bare canonical
+ * discarded every word the alias table doesn't happen to know — "Sync Dual DB Thruster" collapsed
+ * to "DB Thruster", "Twin Kettlebells Clean" to "Clean" — while a sibling movement with no alias
+ * hit kept its full name, so one board rendered under two naming conventions. The board's own
+ * qualifiers are part of the workout. Undefined when no alias matches.
+ */
+function rewriteAliasSpan(lower: string): string | undefined {
+  if (MOVEMENT_ALIASES[lower]) return MOVEMENT_ALIASES[lower];
+
+  const preservedDeadlift = preserveDeadliftVariant(lower);
+  if (preservedDeadlift) return preservedDeadlift;
+
+  for (const [alias, canonical] of SORTED_MOVEMENT_ALIASES) {
+    const match = lower.match(aliasRegex(alias));
+    if (!match) continue;
+    const at = match.index ?? 0;
+    const before = lower.slice(0, at).trim();
+    const after = lower.slice(at + match[0].length).trim();
+    return [
+      before && titleCaseMovementName(before),
+      canonical,
+      after && titleCaseMovementName(after),
+    ].filter(Boolean).join(' ');
+  }
+  return undefined;
+}
+
 function normalizeSingleMovementName(name: string): string {
   const lower = name.toLowerCase().trim();
   if (!lower) return '';
-
-  if (MOVEMENT_ALIASES[lower]) {
-    return MOVEMENT_ALIASES[lower];
-  }
-
-  const preservedDeadlift = preserveDeadliftVariant(name);
-  if (preservedDeadlift) return preservedDeadlift;
-
-  const sortedAliases = Object.entries(MOVEMENT_ALIASES)
-    .sort((a, b) => b[0].length - a[0].length);
-
-  for (const [alias, canonical] of sortedAliases) {
-    const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
-    if (regex.test(lower)) {
-      return canonical;
-    }
-  }
-
-  return titleCaseMovementName(name);
+  return rewriteAliasSpan(lower) ?? titleCaseMovementName(name);
 }
 
 export function normalizeMovementName(name: string): string {
@@ -2191,7 +2219,9 @@ export function normalizeMovementName(name: string): string {
   // whitespace on both sides) — matching it as a bare substring would also fire inside any
   // movement name that merely contains those letters (Sandbag, Handstand, Standing, a
   // hyphenated "Touch-and-Go" qualifier), splitting one movement into two garbled halves.
-  const compoundParts = strippedLower
+  // Nor when the joiner belongs to a known movement: "Twin Kettlebells Clean and Jerk" is one lift.
+  const isOneJoinedMovement = JOINED_ALIASES.some(([alias]) => aliasRegex(alias).test(strippedLower));
+  const compoundParts = isOneJoinedMovement ? [] : strippedLower
     .split(/\s*\+\s*|\s+and\s+/i)
     .map(part => part.trim())
     .filter(Boolean);
@@ -2201,43 +2231,14 @@ export function normalizeMovementName(name: string): string {
       .join(' + ');
   }
 
-  const preservedDeadlift = preserveDeadliftVariant(strippedLower);
-  if (preservedDeadlift) return prefix + preservedDeadlift;
-
-  // 2. Check for word-boundary matches (safer than substring)
-  // Sort aliases by length (longest first) to match more specific ones
-  const sortedAliases = Object.entries(MOVEMENT_ALIASES)
-    .sort((a, b) => b[0].length - a[0].length);
-
-  for (const [alias, canonical] of sortedAliases) {
-    // Use word boundary regex instead of includes()
-    const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
-    const match = strippedLower.match(regex);
-    if (match) {
-      // Rewrite ONLY the matched span. Returning the bare canonical discarded every word the
-      // alias table doesn't happen to know — "Sync Dual DB Thruster" collapsed to "DB Thruster"
-      // while a sibling movement with no alias hit kept its full name, so one board rendered
-      // under two naming conventions. The board's own qualifiers are part of the workout.
-      const at = match.index ?? 0;
-      const before = strippedLower.slice(0, at).trim();
-      const after = strippedLower.slice(at + match[0].length).trim();
-      if (!before && !after) return prefix + canonical;
-      return prefix + [
-        before && titleCaseMovementName(before),
-        canonical,
-        after && titleCaseMovementName(after),
-      ].filter(Boolean).join(' ');
-    }
-  }
+  // 2. Word-boundary alias match (safer than substring), rewriting only the matched span.
+  const rewritten = rewriteAliasSpan(strippedLower);
+  if (rewritten) return prefix + rewritten;
 
   // Also try original (with prefix) for aliases that include the modifier
   if (prefix) {
-    for (const [alias, canonical] of sortedAliases) {
-      const regex = new RegExp(`\\b${escapeRegex(alias)}\\b`, 'i');
-      if (regex.test(lower)) {
-        return canonical;
-      }
-    }
+    const withPrefix = rewriteAliasSpan(lower);
+    if (withPrefix) return withPrefix;
   }
 
   // 3. Default: capitalize first letter of each word
