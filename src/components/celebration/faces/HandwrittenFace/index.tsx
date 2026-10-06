@@ -23,7 +23,7 @@ import { DeleteActionSheet } from '../../../ui/DeleteActionSheet';
 import { ActionMenuSheet, type ActionMenuItem } from '../../../ui/ActionMenuSheet';
 import { FeedComposer } from '../../../feed/FeedComposer';
 import { PRLift } from '../../PRLift';
-import type { PosterPhoto, PosterSticker, PosterVibeOffset } from '../../../../types';
+import type { PosterPhoto, PosterSkinId, PosterSticker, PosterVibeOffset } from '../../../../types';
 import type { PosterPayload } from './posterPayload';
 import type { ComposerWod } from '../../../../hooks/useFeedComposer';
 import { feedTrainedFrom } from '../../../../services/feed/trained';
@@ -149,12 +149,15 @@ export function HandwrittenFace({
   data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
 }: CelebrationFaceProps): React.JSX.Element {
   const favoriteSkin = useFavoriteSkin();
-  // The athlete's favourite leads the picker. Frozen for this visit, so a pick never reshuffles
-  // the chips under their finger; it takes effect from the next poster.
-  const [skins] = useState(() => favoriteSkin.order.map(getSkin));
+  // The row's order: last chosen first, taken fresh each time the Style row opens — so the skin
+  // just picked (by chip or by tapping the poster) is the first chip. It holds still in between,
+  // so a pick never reshuffles the chips under a finger and tapping the poster walks one fixed list.
+  const [skinOrder, setSkinOrder]     = useState<PosterSkinId[]>(() => favoriteSkin.order);
+  const skins = useMemo(() => skinOrder.map(getSkin), [skinOrder]);
   // A poster shows its own skin; one saved before skins were stamped shows what it always did
   // (getSkin's fallback), never whatever happens to lead the picker today.
-  const [skinIdx, setSkinIdx]         = useState<number>(() => skins.findIndex((s) => s.id === getSkin(data.posterSkin).id));
+  const [skinId, setSkinId]           = useState<PosterSkinId>(() => getSkin(data.posterSkin).id);
+  const skinIdx = skins.findIndex((s) => s.id === skinId);
   const [vibe, setVibe]               = useState<VibeKey>(() => resolvePosterVibe(data) ?? guessVibe(data));
   const [vibeConfirmed, setVibeConfirmed] = useState<boolean>(() => resolvePosterVibe(data) != null);
   const [pulse, setPulse]             = useState<number>(0);
@@ -220,15 +223,21 @@ export function HandwrittenFace({
 
   // ── Skin controls ──────────────────────────────────────────────────────
 
-  const stepSkin = (direction: 1 | -1): void => {
-    setSkinIdx((i) => {
-      const next = (i + direction + skins.length) % skins.length;
-      onPosterCustomizationChange?.({ posterSkin: skins[next].id });
-      favoriteSkin.remember(skins[next].id);
-      return next;
-    });
+  const pickSkin = (id: PosterSkinId): void => {
+    setSkinId(id);
     setPulse((p) => p + 1);
     setShowHint(false);
+    onPosterCustomizationChange?.({ posterSkin: id });
+    favoriteSkin.remember(id);
+    // Tapping the poster with the row open keeps its chip in sight.
+    requestAnimationFrame(() => {
+      skinChipRowRef.current?.querySelector(`[data-skin="${id}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    });
+  };
+
+  const stepSkin = (direction: 1 | -1): void => {
+    pickSkin(skins[(skinIdx + direction + skins.length) % skins.length].id);
   };
 
   const stepSkinFromTap = (clientX: number, target: HTMLElement | null): void => {
@@ -237,14 +246,6 @@ export function HandwrittenFace({
     const rect = target?.getBoundingClientRect();
     const midpoint = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
     stepSkin(clientX < midpoint ? -1 : 1);
-  };
-
-  const pickSkin = (i: number): void => {
-    setSkinIdx(i);
-    setPulse((p) => p + 1);
-    setShowHint(false);
-    onPosterCustomizationChange?.({ posterSkin: skins[i].id });
-    favoriteSkin.remember(skins[i].id);
   };
 
   // ── Text sticker (persists to workout.posterSticker) ───────────────────
@@ -439,7 +440,10 @@ export function HandwrittenFace({
     return () => clearTimeout(timer);
   }, [postedNotice]);
 
-  const toggleStylePanel = (): void => setActivePanel((p) => (p === 'style' ? null : 'style'));
+  const toggleStylePanel = (): void => {
+    if (activePanel !== 'style') setSkinOrder(favoriteSkin.order);
+    setActivePanel((p) => (p === 'style' ? null : 'style'));
+  };
   const toggleFeltPanel = (): void => setActivePanel((p) => (p === 'felt' ? null : 'felt'));
   const toggleStickerPanel = (): void => setActivePanel((p) => (p === 'sticker' ? null : 'sticker'));
   const togglePhotoPanel = (): void => setActivePanel((p) => (p === 'photo' ? null : 'photo'));
@@ -515,8 +519,8 @@ export function HandwrittenFace({
             exit={{ opacity: 0, y: 10, height: 0 }} transition={{ duration: 0.2, ease: [0.2, 0.7, 0.3, 1] }}>
             <div ref={skinChipRowRef} className={styles.skinChipRow} onScroll={measureSkinScroll}>
               {skins.map((s, i) => (
-                <button key={s.id} className={`${styles.skinChip} ${i === skinIdx ? styles.skinChipActive : ''}`}
-                  onClick={(e) => { e.stopPropagation(); pickSkin(i); }}>
+                <button key={s.id} data-skin={s.id} className={`${styles.skinChip} ${i === skinIdx ? styles.skinChipActive : ''}`}
+                  onClick={(e) => { e.stopPropagation(); pickSkin(s.id); }}>
                   {s.name}
                 </button>
               ))}

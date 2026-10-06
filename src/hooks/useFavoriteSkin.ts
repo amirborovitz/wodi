@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { chooseSkin, orderSkins } from '../components/celebration/faces/HandwrittenFace/skinRegistry';
 import type { PosterSkinId } from '../types';
@@ -6,7 +6,7 @@ import type { PosterSkinId } from '../types';
 export interface FavoriteSkin {
   /** The skin the athlete last chose — the default until they've picked one. */
   favorite: PosterSkinId;
-  /** Every skin, in picker order: last chosen first. */
+  /** Every skin, in picker order: last chosen first — including a pick still waiting to be saved. */
   order: PosterSkinId[];
   /** They chose a skin. Kept once they settle: tapping through five skins saves the one they stop on. */
   remember: (id: PosterSkinId) => void;
@@ -19,7 +19,9 @@ const NONE: readonly string[] = [];
 export function useFavoriteSkin(): FavoriteSkin {
   const { user, updateUserProfile } = useAuth();
   const stored = user?.skinOrder ?? NONE;
-  const order = orderSkins(stored).map((s) => s.id);
+  // The pick leads straight away; the save only waits for them to stop tapping.
+  const [picked, setPicked] = useState<PosterSkinId | null>(null);
+  const order = orderSkins(picked ? chooseSkin(stored, picked) : stored).map((s) => s.id);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<PosterSkinId | null>(null);
   const latest = useRef({ stored, updateUserProfile });
@@ -38,6 +40,7 @@ export function useFavoriteSkin(): FavoriteSkin {
   useEffect(() => flush, [flush]);
 
   const remember = useCallback((id: PosterSkinId): void => {
+    setPicked(id);
     pending.current = id;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(flush, SETTLE_MS);
