@@ -49,7 +49,7 @@ export function namedWodKey(name: string): string {
 }
 
 /** The part's own finish time, or null when it never ran on a clock. */
-function partFinishSeconds(exercise: Exercise, sessionFormat?: WorkoutFormat): number | null {
+export function partFinishSeconds(exercise: Exercise, sessionFormat?: WorkoutFormat): number | null {
   // Parts are standalone practices: this part's own logging mode decides, never the session's.
   // The session format is the legacy fallback for docs saved before parts carried their own.
   const mode = exercise.loggingMode ?? sessionFormat;

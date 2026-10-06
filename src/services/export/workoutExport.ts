@@ -1,4 +1,5 @@
-import type { Workout } from '../../types';
+import type { Exercise, Workout, WorkoutFormat } from '../../types';
+import { partFinishSeconds } from '../namedWods';
 import { breakdownPerImplementWeights } from '../../components/celebration/movementResolution';
 import { byNewestTrained, getEffectiveWorkoutDate, toIsoDate } from '../../utils/workoutDate';
 
@@ -27,15 +28,30 @@ export interface ExportedMovement {
   insteadOf?: string;
 }
 
+/** One part of the session: the coach's prescription and, when the part was scored, the score. */
+export interface ExportedPart {
+  name: string;
+  prescription?: string;
+  /** A for-time part they finished, as "m:ss". */
+  finishTime?: string;
+  /** A for-time part the clock stopped before they finished. */
+  capped?: boolean;
+  /** An AMRAP part: full rounds earned, and reps into the next one. */
+  rounds?: number;
+  extraReps?: number;
+}
+
 export interface ExportedWorkout {
   /** The day it was trained, not the day it was logged. */
   date: string;
   title: string;
   format?: string;
   durationSeconds?: number;
+  /** The board's time cap, when it had one. */
+  timeCapMinutes?: number;
   partner?: boolean;
-  /** Each part of the session, with the coach's own prescription. */
-  parts: { name: string; prescription?: string }[];
+  /** Each part of the session, with the coach's own prescription and the athlete's score. */
+  parts: ExportedPart[];
   movements: ExportedMovement[];
   /** True when the app had to estimate this workout's totals, so reps are omitted. */
   totalsEstimated?: boolean;
@@ -71,10 +87,12 @@ export function buildWorkoutExport(
       title: workout.title?.trim() || 'Workout',
       format: workout.format,
       durationSeconds: positive(workout.durationSeconds),
+      timeCapMinutes: workout.timeCap && workout.timeCap > 0 ? Math.round(workout.timeCap / 60) : undefined,
       partner: workout.partnerWorkout || undefined,
-      parts: (workout.exercises ?? []).map((exercise) => clean({
+      parts: (workout.exercises ?? []).map((exercise): ExportedPart => clean({
         name: exercise.name,
         prescription: exercise.prescription?.replace(/\s+/g, ' ').trim() || undefined,
+        ...partScore(exercise, workout.format),
       })),
       movements: (breakdown?.movements ?? []).map((movement): ExportedMovement => {
         const weights = breakdownPerImplementWeights(movement);
@@ -102,6 +120,24 @@ export function buildWorkoutExport(
     workoutCount: exported.length,
     workouts: exported,
   });
+}
+
+/**
+ * A part's score as it was logged — the same finish time Records ranks (`partFinishSeconds`), or
+ * an AMRAP's rounds. Parts are standalone: the part's own logging mode decides, the session's
+ * format is the fallback for docs saved before parts carried one. Nothing logged, nothing said.
+ */
+function partScore(exercise: Exercise, sessionFormat: WorkoutFormat | undefined): Omit<ExportedPart, 'name' | 'prescription'> {
+  const mode = exercise.loggingMode ?? sessionFormat;
+  if (mode === 'for_time') {
+    const seconds = partFinishSeconds(exercise, sessionFormat);
+    if (seconds != null) return { finishTime: formatTime(seconds) };
+    return (exercise.partialReps ?? 0) > 0 ? { capped: true } : {};
+  }
+  if (mode === 'amrap' && (exercise.rounds ?? 0) > 0) {
+    return { rounds: exercise.rounds, extraReps: positive(exercise.partialReps) };
+  }
+  return {};
 }
 
 function formatTime(seconds: number): string {

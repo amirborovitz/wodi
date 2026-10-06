@@ -77,6 +77,8 @@ function ChatIcon(): React.JSX.Element {
 export function OnDeckCard({ planned, onLog, onDelete }: OnDeckCardProps): React.JSX.Element {
   const title = getTitle(planned);
   const isChat = planned.chat != null;
+  // Parked before the workout: the one thing left is logging it — the chat opens asking for it.
+  const waiting = planned.chat?.waitingForWorkout === true;
   const subtitle = isChat
     ? lastWodiLine(planned)
     : planned.parsedWorkout ? buildSubtitle(planned.parsedWorkout) : '';
@@ -112,9 +114,9 @@ export function OnDeckCard({ planned, onLog, onDelete }: OnDeckCardProps): React
           type="button"
           className={styles.logBtn}
           onClick={() => onLog(planned)}
-          aria-label={isChat ? `Continue the chat about ${title}` : `Log ${title}`}
+          aria-label={isChat && !waiting ? `Continue the chat about ${title}` : `Log ${title}`}
         >
-          {isChat ? 'CONTINUE →' : 'LOG →'}
+          {waiting ? 'LOG IT →' : isChat ? 'CONTINUE →' : 'LOG →'}
         </button>
       </div>
     </div>

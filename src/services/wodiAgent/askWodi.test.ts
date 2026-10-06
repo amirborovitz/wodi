@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatCompletionMessage, ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import type { Workout } from '../../types';
-import { askWodi, receiptsFor, type CompleteFn } from './askWodi';
+import { askWodi, receiptsFor, TOOLS, type CompleteFn } from './askWodi';
 import type { TrainingContext } from './trainingFacts';
 
 // The loop is tested against a scripted model — never the network.
@@ -132,5 +132,35 @@ describe('askWodi', () => {
     await askWodi({ message: 'book me in', recent: [], notes: [], loadContext: async () => CTX, complete });
     const toolResult = seen[1].messages.find((m) => m.role === 'tool');
     expect(JSON.parse(String(toolResult?.content))).toEqual({ error: 'no tool called book_class' });
+  });
+  it('ahead of a workout it plans from the board and the log, and is never offered to log it', async () => {
+    const { complete, seen } = scripted(
+      calls({ name: 'find_workouts', args: { from: null, to: null, movement: 'deadlift', title: null, limit: null } }),
+      said('Last time on 24 Sep: 140kg for 15. Hold 120kg today.'),
+    );
+    const tools: string[][] = [];
+    const reply = await askWodi({
+      message: 'how should I pace it?',
+      recent: [],
+      notes: [],
+      upcoming: { board: '3 RFT: 10 Deadlift @100/140kg, 400m run', loads: 'Deadlift · last time 140kg (24 Sep)', sex: 'male' },
+      loadContext: async () => CTX,
+      complete: async (messages, offered, mustAnswer) => {
+        tools.push(offered.map((t) => (t.type === 'function' ? t.function.name : '')));
+        return complete(messages, offered, mustAnswer);
+      },
+    });
+    expect(reply).toMatchObject({ kind: 'answer', receipts: ['w1'] });
+    const system = String(seen[0].messages[0].content);
+    expect(system).toContain('3 RFT: 10 Deadlift @100/140kg, 400m run');
+    expect(system).toContain('Deadlift · last time 140kg (24 Sep)');
+    expect(system).not.toContain('call log_workout');
+    expect(tools[0]).not.toContain('log_workout');
+    expect(tools[0]).toContain('find_workouts');
+  });
+
+  it('without a workout ahead, a logged workout is still handed to logging', () => {
+    // The plan section is only in the prompt when there's a board to plan.
+    expect(TOOLS.map((t) => (t.type === 'function' ? t.function.name : ''))).toContain('log_workout');
   });
 });

@@ -24,6 +24,18 @@ import type { WodiNote } from '../../types';
  * forms use. Which of the two a message is, is the model's call — there is no keyword list.
  */
 
+/**
+ * A workout they're about to do — the board, and the app's own lookup of their loads on its
+ * movements. With one, the answer is a game plan for it: a target and pacing reasoned from their
+ * past results on similar work, and a weight per loaded movement.
+ */
+export interface UpcomingWorkout {
+  board: string;
+  /** Their logged loads on the board's movements, in words (the chat's load card). Empty = none. */
+  loads: string;
+  sex?: string;
+}
+
 export type AskWodiReply =
   /** `proposedNote`: something lasting they said, for the chat to OFFER to remember — never saved here. */
   /** `receipts`: ids of the workouts the answer quotes, so the chat can attach their posters. */
@@ -74,13 +86,34 @@ export const TOOLS: ChatCompletionTool[] = [
   tool('log_workout', 'The athlete\'s message is a workout to log — a board, or what they did ("Fran 5:40", "did the ladder, 22 min") — not a question. Call this and nothing else.', {}),
 ];
 
-function systemPrompt(now: Date, notes: readonly WodiNote[]): string {
+/** What a game plan is made of — only when there's a workout ahead of them. */
+function upcomingSection(upcoming: UpcomingWorkout): string {
+  const sex = upcoming.sex === 'female' ? 'female' : upcoming.sex === 'male' ? 'male' : 'not specified';
+  return `
+
+They are about to do this workout — they haven't done it yet:
+"""
+${upcoming.board.trim()}
+"""
+Athlete: ${sex} (female = the lighter number when the board writes two).
+Their logged loads on its movements, looked up by the app: ${upcoming.loads.trim() || '(none logged)'}
+
+Answer with a game plan for it, built from their log:
+- First look up their past workouts with the same movements (find_workouts by movement — a few calls is fine) and read each part's finishTime, capped or rounds against its board and timeCapMinutes. Note what they swapped (insteadOf) — that's what they'll likely do again.
+- A target: one finish time or a range no wider than 2 minutes, and a pace per round when the piece has rounds. Reason it from those past results — the target is your projection, the past times it rests on are theirs — and name the day you anchored on, so its poster comes with the answer.
+- Where to hold back and where to push — one line.
+- One weight per loaded movement, from their logged loads; with none, the board's Rx for their sex with a scaled option.
+- If nothing in their log is close enough, say so in a few words and pace it from the board alone. Never make up a past time.
+This answer may run to 6 short lines.`;
+}
+
+function systemPrompt(now: Date, notes: readonly WodiNote[], upcoming: UpcomingWorkout | null): string {
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
   return `You are Wodi, the athlete's CrossFit buddy, texting with them. Today is ${weekday} ${toIsoDate(now)}. Weeks start on Monday.
-
+${upcoming ? '' : `
 If their message is a workout to log rather than a question, call log_workout and nothing else.
-
-Otherwise answer from their own training log, which you can only see through the tools:
+`}
+Answer from their own training log, which you can only see through the tools:
 - Every number about THEIR training — a weight, a time, a date, a count, EP, a record — must come from a tool result. Never invent one, never estimate one, never do your own EP or volume maths; training_totals has it. Comparing two numbers the tools gave you is fine ("up 20kg since August").
 - Look things up before answering. If the tools come back empty, say plainly that you don't see it in their log — don't fill the gap.
 - Turn "last month", "this week", "since summer" into dates yourself.
@@ -90,8 +123,11 @@ Otherwise answer from their own training log, which you can only see through the
 What they've told you to remember (confirmed by them — use it, and never re-propose what's already here):
 ${notesForPrompt(notes)}
 
-How you text: warm, short, specific — like a friend at the gym. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never compare them with anyone else, no lectures, no safety boilerplate.`;
+How you text: warm, short, specific — like a friend at the gym. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never compare them with anyone else, no lectures, no safety boilerplate.${upcoming ? upcomingSection(upcoming) : ''}`;
 }
+
+/** Ahead of a workout the chat already knows it isn't one to log — that tool isn't offered. */
+const PLAN_TOOLS = TOOLS.filter((t) => t.type === 'function' && t.function.name !== 'log_workout');
 
 function runTool(name: string, rawArgs: string, ctx: TrainingContext): unknown {
   let args: Record<string, unknown>;
@@ -182,12 +218,15 @@ export async function askWodi(input: {
   loadContext: () => Promise<TrainingContext>;
   /** Their confirmed notes — small and already in memory, so always in the prompt. */
   notes: readonly WodiNote[];
+  /** A workout they're heading into — the answer becomes its game plan. */
+  upcoming?: UpcomingWorkout | null;
   now?: Date;
   complete?: CompleteFn;
 }): Promise<AskWodiReply> {
-  const { message, recent, loadContext, notes, now = new Date(), complete = defaultComplete } = input;
+  const { message, recent, loadContext, notes, upcoming = null, now = new Date(), complete = defaultComplete } = input;
+  const tools = upcoming ? PLAN_TOOLS : TOOLS;
   const messages: ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt(now, notes) },
+    { role: 'system', content: systemPrompt(now, notes, upcoming) },
     ...recent.map((turn): ChatCompletionMessageParam => (
       turn.from === 'wodi' ? { role: 'assistant', content: turn.text } : { role: 'user', content: turn.text }
     )),
@@ -200,7 +239,7 @@ export async function askWodi(input: {
   for (let step = 0; ; step += 1) {
     // After MAX_LOOKUPS rounds of looking things up, it answers with what it has.
     const mustAnswer = step === MAX_LOOKUPS;
-    const reply = await complete(messages, TOOLS, mustAnswer);
+    const reply = await complete(messages, tools, mustAnswer);
     const calls = mustAnswer ? [] : (reply.tool_calls ?? []).filter((call) => call.type === 'function');
     if (calls.length === 0) {
       const text = reply.content?.trim() ?? '';

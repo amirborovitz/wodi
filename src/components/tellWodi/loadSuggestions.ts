@@ -8,7 +8,7 @@ import { openSlots } from './chatQuestions';
  * same family (a hang power clean says something about a power clean), and the board's Rx.
  *
  * Only facts — the athlete's own history and the coach's Rx. The advice built on them is the AI's
- * (tellWodiCoach.ts), which may only reason from exactly these numbers. The movements are the same
+ * (the game plan in askWodi.ts), which may only reason from these and the log. The movements are the same
  * weight questions the chat asks afterwards (openSlots), so the list before class and the
  * questions after it match.
  */

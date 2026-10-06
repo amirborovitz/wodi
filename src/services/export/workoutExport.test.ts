@@ -105,3 +105,34 @@ describe('toAgentText', () => {
     expect(text).toContain('DB Snatch 22.5kg x2 30r');
   });
 });
+
+describe('each part carries its score', () => {
+  const part = (extra: Partial<Exercise>): Exercise => ({ ...exercise('Metcon', '3 RFT'), ...extra });
+
+  it('a finished for-time part has its finish time; a capped one says so, with no time', () => {
+    const [w] = buildWorkoutExport([
+      workout('2026-09-01', [], {
+        timeCap: 1200,
+        exercises: [
+          part({ loggingMode: 'for_time', sets: [{ id: 's', setNumber: 1, time: 1290, completed: true }] }),
+          part({ loggingMode: 'for_time', partialReps: 12, sets: [{ id: 's', setNumber: 1, time: 1200, completed: true }] }),
+        ],
+      }),
+    ], undefined, NOW).workouts;
+
+    expect(w.timeCapMinutes).toBe(20);
+    expect(w.parts[0]).toEqual({ name: 'Metcon', prescription: '3 RFT', finishTime: '21:30' });
+    expect(w.parts[1]).toEqual({ name: 'Metcon', prescription: '3 RFT', capped: true });
+  });
+
+  it('an AMRAP part has its rounds and reps into the next; a strength part has no score', () => {
+    const [w] = buildWorkoutExport([
+      workout('2026-09-01', [], {
+        exercises: [part({ loggingMode: 'amrap', rounds: 9, partialReps: 25 }), exercise('Back Squat', '5x5')],
+      }),
+    ], undefined, NOW).workouts;
+
+    expect(w.parts[0]).toMatchObject({ rounds: 9, extraReps: 25 });
+    expect(w.parts[1]).toEqual({ name: 'Back Squat', prescription: '5x5' });
+  });
+});

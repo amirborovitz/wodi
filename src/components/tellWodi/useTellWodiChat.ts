@@ -2,12 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ParsedWorkout, PosterVibeKey, SavedChat } from '../../types';
 import type { StoryExerciseResult } from '../logging/story/types';
 import { readAthleteMessage, type ChatTurn } from '../../services/tellWodiReader';
-import type { AskWodiReply } from '../../services/wodiAgent/askWodi';
+import type { AskFn } from './useAskWodi';
 import type { SwapHabit } from '../../services/wodiAgent/athleteHabits';
 import type { WodiNote } from '../../types';
 import type { ThreadMessage } from '../../services/wodiAgent/threadItems';
 import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
-import { adviseWeights } from '../../services/tellWodiCoach';
 import {
   applyAnswer,
   chatCannotLog,
@@ -67,7 +66,7 @@ interface UseTellWodiChatArgs {
   buildResults: (workout: ParsedWorkout) => StoryExerciseResult[];
   /** The athlete's last logged load per movement (see lastLoadHistory). */
   lastLoads: ReadonlyMap<string, LastLoad>;
-  /** Every lift they've logged at its latest load — what weight advice may reason from. */
+  /** Every lift they've logged at its latest load — the load card reads related lifts from it. */
   history: LoggedLoad[];
   athleteSex?: string;
   /** Keep the conversation — called whenever it changes once there is a board. */
@@ -77,7 +76,7 @@ interface UseTellWodiChatArgs {
   /** Hand over to the form with everything answered so far already filled in. */
   onOpenForms: (results: StoryExerciseResult[]) => void;
   /** A question about their own training, answered from their log — or handed back as a workout. */
-  ask: (message: string, recent: ChatTurn[]) => Promise<AskWodiReply>;
+  ask: AskFn;
   /** What they usually swap (athleteHabits) — offered as questions, never filled in. */
   habits: ReadonlyMap<string, SwapHabit>;
   /** What they've already asked Wodi to remember. */
@@ -293,34 +292,39 @@ export function useTellWodiChat({
   };
 
   /**
-   * Heading in: the athlete's own history against the board, Wodi's actual weight advice built on
-   * it, then the chat parks on Today until they're back.
+   * Heading in: a game plan for this board from their own log — a target and pacing from their
+   * past results on similar work, a weight per loaded movement — then the chat parks on Today until
+   * they're back. Asked again before the workout ("how should I pace it?"), it plans again for that
+   * question; the load card and the parking line are said once.
    */
   const parkBeforeWorkout = async (question: string): Promise<void> => {
     const { lastLoads: last, history: logged, athleteSex: sex } = callbacks.current;
+    const firstTime = !waitingRef.current;
     const suggestions = buildLoadSuggestions(resultsRef.current, last, logged);
-    if (suggestions.length > 0) {
+    if (firstTime && suggestions.length > 0) {
       push({ from: 'wodi', text: "Here's where you've been on the weights:" });
       push({ from: 'wodi', suggestions });
-      setBusy('thinking');
-      try {
-        const advice = await adviseWeights({
-          boardText: workoutRef.current?.rawText ?? '',
-          question,
-          sex,
-          movements: suggestions,
-          history: logged,
-          notes: callbacks.current.notes,
-        });
-        if (advice) push({ from: 'wodi', text: advice });
-      } catch (err) {
-        console.error('[TellWodi] weight advice failed', err);
-      } finally {
-        setBusy(null);
+    }
+    setBusy('thinking');
+    try {
+      // The question was just sent — it goes to Ask Wodi once, as the message, not also as history.
+      const recent = recentTurns();
+      const last = recent[recent.length - 1];
+      const plan = await callbacks.current.ask(
+        question || 'Give me a game plan for this one.',
+        last?.from === 'me' && last.text === question ? recent.slice(0, -1) : recent,
+        { board: workoutRef.current?.rawText ?? '', loads: suggestionsAsText(suggestions), sex },
+      );
+      if (plan.kind === 'answer' && plan.text) {
+        push({ from: 'wodi', text: plan.text, ...(plan.receipts.length ? { receipts: plan.receipts } : {}) });
       }
+    } catch (err) {
+      console.error('[TellWodi] game plan failed', err);
+    } finally {
+      setBusy(null);
     }
     waitingRef.current = true;
-    push({ from: 'wodi', text: "I'll keep this on Today. Come back after and tell me how it went." });
+    if (firstTime) push({ from: 'wodi', text: "It's on Today. When you're done, tap LOG IT there and just tell me your time." });
   };
 
   const readWords = async (text: string): Promise<void> => {
