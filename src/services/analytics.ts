@@ -16,8 +16,8 @@ import type { Screen, WorkoutFormat } from '../types';
 export type ShareMethod = 'share_sheet' | 'download';
 
 interface AnalyticsEvents {
-  /** The athlete moved to a different screen. */
-  screen_view: { screen_name: Screen };
+  /** A screen came up — including the sign-in page and onboarding, before there's an account. */
+  screen_view: { screen_name: Screen | 'login' | 'onboarding' };
 
   /** Signed in. */
   login: { method: 'google' | 'apple' };

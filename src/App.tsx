@@ -51,9 +51,14 @@ function AppContent() {
   // gesture; this is the app's only route onto a newer deploy.
   const { updateReady, applyUpdate } = useAppVersion();
 
+  // Existing users without onboardingComplete field are treated as complete; only new users onboard.
+  const needsOnboarding = user?.onboardingComplete === false;
+  // The screen actually in front of them: a visitor who hasn't signed in is on the sign-in page, not
+  // Home. Nothing is sent while the account is still loading.
+  const shownScreen = loading ? null : !user ? 'login' : needsOnboarding ? 'onboarding' : currentScreen;
   useEffect(() => {
-    track('screen_view', { screen_name: currentScreen });
-  }, [currentScreen]);
+    if (shownScreen) track('screen_view', { screen_name: shownScreen });
+  }, [shownScreen]);
 
   const handleOpenRecap = (recapData: RecapData) => {
     markRecapViewed(recapData);
@@ -130,10 +135,6 @@ function AppContent() {
   if (!user) {
     return <LoginScreen />;
   }
-
-  // Check if user needs onboarding (new users only)
-  // Existing users without onboardingComplete field are treated as complete
-  const needsOnboarding = user.onboardingComplete === false;
 
   if (needsOnboarding) {
     return (
