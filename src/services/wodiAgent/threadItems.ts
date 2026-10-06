@@ -57,6 +57,8 @@ export function buildThreadItems(input: {
   planned: readonly PlannedWorkout[];
   /** The board this chat is on right now — it's live below, so it isn't also a card above. */
   activePlannedId?: string | null;
+  /** Wodi's line the chat opens with right now — it's live below, so it isn't also history above. */
+  openingId?: string | null;
   now: Date;
   windowDays: number;
 }): ThreadItem[] {
@@ -65,7 +67,7 @@ export function buildThreadItems(input: {
 
   const timed: Timed[] = [
     ...input.messages
-      .filter((m) => m.at >= since)
+      .filter((m) => m.at >= since && m.id !== input.openingId)
       .map((m): Timed => ({ kind: 'message', id: `m:${m.id}`, message: m, at: m.at })),
     // Only boards parked from a chat; a board saved from the form lives on Today's For Later shelf.
     // A waiting board is something still to do, so it shows whatever its age.

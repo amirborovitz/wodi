@@ -11,6 +11,8 @@ interface WodiMessageCardProps {
   onOpen: () => void;
   /** The day it's about ("30 Jun") opens that poster — the message's receipt. */
   link?: { text: string; onOpen: () => void };
+  /** Wodi is still finding its words — the thread's own "typing" dots, not a line about to change. */
+  typing?: boolean;
 }
 
 /**
@@ -19,13 +21,17 @@ interface WodiMessageCardProps {
  * label and no "reply" button, because the bar below is how you answer. When its day can open a
  * poster, that word is the tap target (a button can't hold another button).
  */
-export function WodiMessageCard({ text, highlight, onOpen, link }: WodiMessageCardProps): React.ReactElement {
+export function WodiMessageCard({ text, highlight, onOpen, link, typing = false }: WodiMessageCardProps): React.ReactElement {
   return (
     <section className={styles.message} aria-label="Message from Wodi">
       <div className={styles.sender}>
         <span className={styles.mark}>wodi<span className={styles.dot}>.</span></span>
       </div>
-      {link ? (
+      {typing ? (
+        <div className={`${chat.bubbleWodi} ${styles.bubble}`} aria-live="polite">
+          <span className={chat.typing} aria-label="Wodi is typing"><span /><span /><span /></span>
+        </div>
+      ) : link ? (
         <div className={`${chat.bubbleWodi} ${styles.bubble}`}>
           <p className={chat.text}><WodiText text={text} highlight={highlight} link={link} /></p>
         </div>

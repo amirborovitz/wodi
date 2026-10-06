@@ -262,7 +262,7 @@ export function useTellWodiChat({
 
   const finish = (): void => {
     waitingRef.current = false;
-    push({ from: 'wodi', text: "That's everything. Making your poster…" });
+    push({ from: 'wodi', text: "Got it all — nice work. Making your poster…" });
     setBusy('saving');
     callbacks.current.onFinished(resultsRef.current, vibeRef.current, toSavedChat(messagesRef.current.slice(boardStartRef.current), false));
   };

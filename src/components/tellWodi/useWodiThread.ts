@@ -31,7 +31,12 @@ export interface WodiThread {
  * The ongoing Wodi thread — what was said between workouts, and parked boards. `workouts` are only
  * looked up, for the posters an answer quotes (receipts); they are not thread items.
  */
-export function useWodiThread(workouts: readonly WorkoutWithStats[], activePlanned: PlannedWorkout | null): WodiThread {
+export function useWodiThread(
+  workouts: readonly WorkoutWithStats[],
+  activePlanned: PlannedWorkout | null,
+  /** Wodi's kept line the chat opens with — shown live, so left out of the history above. */
+  openingId: string | null = null,
+): WodiThread {
   const { user } = useAuth();
   const { planned } = usePlannedWorkouts();
   const [windowDays, setWindowDays] = useState(THREAD_WINDOW_DAYS);
@@ -67,10 +72,11 @@ export function useWodiThread(workouts: readonly WorkoutWithStats[], activePlann
       messages: [...stored, ...kept.filter((m) => !ids.has(m.id))],
       planned,
       activePlannedId: activePlanned?.id ?? null,
+      openingId,
       now: new Date(),
       windowDays,
     });
-  }, [stored, kept, planned, activePlanned?.id, windowDays]);
+  }, [stored, kept, planned, activePlanned?.id, openingId, windowDays]);
 
   const loadEarlier = useCallback(() => setWindowDays((d) => d + THREAD_EARLIER_STEP_DAYS), []);
 

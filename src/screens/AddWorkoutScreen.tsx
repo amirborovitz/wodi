@@ -759,12 +759,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
   const wodiNotes = useWodiNotes();
   const favoriteSkin = useFavoriteSkin();
-  const thread = useWodiThread(allWorkouts, plannedWorkout ?? null);
   // The same newest message as Today's, so the thread ends where Today begins.
   const wodiMessage = useWodiMessage(allWorkouts);
-  // Null until the log has loaded, so Wodi's first line appears once with the right words rather
-  // than as the generic opener swapped for the real one a moment later (a visible flicker).
-  const chatOpening = useMemo(() => (workoutsLoading ? null : {
+  // When that message is one of Wodi's kept lines, it's the live opening — not also history above it.
+  const thread = useWodiThread(allWorkouts, plannedWorkout ?? null, wodiMessage.threadId);
+  // Null until the log has loaded and Wodi has its words, so the first line appears once with the
+  // right words rather than as the generic opener swapped for the real one a moment later (a flicker).
+  const chatOpening = useMemo(() => (workoutsLoading || wodiMessage.pending ? null : {
     text: wodiMessage.text,
     highlight: wodiMessage.highlight,
     link: wodiMessage.day && wodiMessage.dayWorkout ? { label: wodiMessage.day.label, workoutId: wodiMessage.dayWorkout.id } : null,

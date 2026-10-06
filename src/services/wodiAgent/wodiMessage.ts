@@ -3,13 +3,14 @@ import type { ChaseFact } from '../chase/chaseFacts';
 import { firstMeasured } from './wodiVoice';
 
 /**
- * Wodi's newest message — the one on top of Today and at the bottom of the thread, the same words
- * in both places. Built from what the app already computes (no AI call).
+ * Wodi's plain message — what Today and the thread say when Wodi has no line of its own (a recent
+ * workout's cheer or a day's occasion, see wodiOccasion.ts). Built from what the app already
+ * computes (no AI call).
  *
  * IT ONLY EVER RECOGNISES. Wodi is the friend glad you showed up, not the one keeping score, so the
  * first thing on Today never points at a gap — no "your best still stands", no "28 days since",
  * no "618 to go" (owner, 2026-10-01). In order: a milestone you just crossed, a best you just
- * matched, your last workout, your running total, an opener. Chase — the things you could go after —
+ * matched, your running total, an opener. Chase — the things you could go after —
  * keeps its own screen for whoever wants it; it is never Today's headline.
  */
 
@@ -25,24 +26,12 @@ export interface WodiMessage {
   highlight: string | null;
 }
 
-/** The last workout, as its poster tells it — the result is the poster's own hero, never recomputed. */
-export interface LastWorkout {
-  id: string;
-  title: string;
-  /** The poster's hero value ("5:42", "140kg"); null when it has none to give. */
-  result: string | null;
-  /** The day it was trained, YYYY-MM-DD. */
-  trained: string;
-}
-
 export const WODI_OPENER = "What'd you do today? Send me the board, or ask me anything.";
 
-/** A matched best is news for a week; the last workout for three days. Past that, it's history. */
+/** A matched best is news for a week. Past that, it's history. */
 const TIED_NEWS_DAYS = 7;
-const LAST_WORKOUT_DAYS = 3;
 
 const DAY_MS = 86_400_000;
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function daysBetween(fromIso: string, toIso: string): number {
@@ -92,23 +81,13 @@ function chaseSentence(fact: ChaseFact, thisYear: number): string {
   return /[.!?]$/.test(line) ? line : `${line}.`;
 }
 
-/** "today", "yesterday", "Tuesday" — how you'd say when it was, a few days back at most. */
-function recentDay(trained: string, today: string): string {
-  const ago = daysBetween(trained, today);
-  if (ago <= 0) return 'today';
-  if (ago === 1) return 'yesterday';
-  const [y, m, d] = trained.split('-').map(Number);
-  return WEEKDAYS[new Date(y, m - 1, d).getDay()];
-}
-
 export function buildWodiMessage(input: {
   milestone: Milestone | null;
   /** All open Chase threads — only a just-matched best (TIED) is recognition; the rest are gaps. */
   chase: readonly ChaseFact[];
-  lastWorkout: LastWorkout | null;
   today: string; // YYYY-MM-DD
 }): WodiMessage {
-  const { milestone, chase, lastWorkout, today } = input;
+  const { milestone, chase, today } = input;
   const thisYear = Number(today.slice(0, 4));
 
   if (milestone && milestone.justCrossed !== null) {
@@ -124,17 +103,6 @@ export function buildWodiMessage(input: {
       text,
       day: text.includes(label) ? { label, iso: tied.on, subject: tied.subject, workoutId: null } : null,
       highlight: firstMeasured(text),
-    };
-  }
-
-  if (lastWorkout && daysBetween(lastWorkout.trained, today) < LAST_WORKOUT_DAYS) {
-    const when = recentDay(lastWorkout.trained, today);
-    const title = lastWorkout.title.trim() || 'Your workout';
-    const text = lastWorkout.result ? `${title} ${when} — ${lastWorkout.result}.` : `${title} ${when}. Nice work.`;
-    return {
-      text,
-      day: { label: when, iso: lastWorkout.trained, subject: null, workoutId: lastWorkout.id },
-      highlight: lastWorkout.result,
     };
   }
 

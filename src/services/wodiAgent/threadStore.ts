@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, limit, orderBy, query, where, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, orderBy, query, where, writeBatch, type QuerySnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { ThreadMessage } from './threadItems';
 
@@ -17,12 +17,20 @@ const threadRef = (userId: string) => collection(db, 'users', userId, 'wodiThrea
 const MAX_READ = 300;
 
 export async function fetchThread(userId: string, sinceMs: number): Promise<ThreadMessage[]> {
-  const snapshot = await getDocs(query(
+  return readMessages(await getDocs(query(
     threadRef(userId),
     where('at', '>=', sinceMs),
     orderBy('at', 'asc'),
     limit(MAX_READ),
-  ));
+  )));
+}
+
+/** The newest `count` messages, whatever their age — what Wodi has already said on its own. */
+export async function fetchRecentThread(userId: string, count: number): Promise<ThreadMessage[]> {
+  return readMessages(await getDocs(query(threadRef(userId), orderBy('at', 'desc'), limit(count))));
+}
+
+function readMessages(snapshot: QuerySnapshot): ThreadMessage[] {
   return snapshot.docs.flatMap((d): ThreadMessage[] => {
     const data = d.data();
     if ((data.from !== 'me' && data.from !== 'wodi') || typeof data.text !== 'string' || typeof data.at !== 'number') return [];

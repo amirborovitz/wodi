@@ -323,6 +323,7 @@ export function HomeScreen({
             <WodiMessageCard
               text={wodiMessage.text}
               highlight={wodiMessage.highlight}
+              typing={wodiMessage.pending}
               onOpen={onTellWodi}
               link={wodiMessage.day && wodiMessage.dayWorkout ? {
                 text: wodiMessage.day.label,
