@@ -17,7 +17,6 @@ import { FeedPulse } from '../components/home/FeedPulse';
 import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
-import { isAdminEmail } from '../utils/admin';
 import type { PlannedWorkout } from '../types';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
@@ -62,7 +61,7 @@ export function HomeScreen({
   onOpenFeed,
   onOpenGallery,
 }: HomeScreenProps): React.ReactElement {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   // EVERY workout, not a recent window: the recap cards and the milestone below are totals over
   // whole periods and a whole history. Capped at 100, the Spring card counted 33 workouts where
   // the same recap on Me counted 59 — one recap, two answers. The query fetches the full list
@@ -472,7 +471,7 @@ export function HomeScreen({
         // Marking drops the workout from the rail (Home excludes tests), so in practice this only
         // ever reads "Mark as test" here — but the label still follows the state rather than
         // asserting it, so a workout left over from a stale fetch can't offer the wrong action.
-        secondaryAction={isAdminEmail(user?.email) && actionSheetWorkout ? {
+        secondaryAction={isAdmin && actionSheetWorkout ? {
           label: actionSheetWorkout.isTest ? 'Unmark as test' : 'Mark as test',
           onClick: () => {
             void setWorkoutTest(actionSheetWorkout.id, !actionSheetWorkout.isTest);

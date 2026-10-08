@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://wodboard-17f3d.web.app/sitemap.xml

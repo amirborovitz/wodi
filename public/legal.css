@@ -1,0 +1,44 @@
+/* Shared by privacy.html and terms.html — static pages served outside the app. */
+:root {
+  --ink: #0b0c0e;
+  --card: #16181c;
+  --text: #f3f1ea;
+  --dim: rgba(243, 241, 234, 0.62);
+  --yellow: #f5c200;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+}
+.home {
+  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+.home span { color: var(--yellow); }
+h1 {
+  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+  font-weight: 800;
+  font-size: 40px;
+  line-height: 1.1;
+  margin: 32px 0 4px;
+}
+h2 { font-size: 19px; font-weight: 700; margin: 32px 0 8px; }
+p, li { color: var(--dim); }
+ul { padding-left: 20px; }
+.updated { font-size: 14px; margin: 0 0 24px; }
+a { color: var(--yellow); }
+strong { color: var(--text); font-weight: 600; }

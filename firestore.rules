@@ -2,9 +2,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Mirrors ADMIN_EMAIL in the app — the triage owner for shared collections.
+    // The triage owner for shared collections: the `admin` custom claim, set by
+    // scripts/set-admin-claim.ts. The app reads the same claim (AuthContext isAdmin).
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == 'aborovitz@gmail.com';
+      return request.auth != null && request.auth.token.admin == true;
     }
 
     // Users can read/write their own user document
@@ -125,6 +126,11 @@ service cloud.firestore {
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.reporterId;
       allow read, update, delete: if isAdmin();
+    }
+
+    // Email sign-in codes (functions/src/index.ts). Only the server touches them.
+    match /loginCodes/{emailHash} {
+      allow read, write: if false;
     }
 
   }

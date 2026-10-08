@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useWorkouts } from '../hooks/useWorkouts';
 import { useAuth } from '../context/AuthContext';
-import { isAdminEmail } from '../utils/admin';
 import { useLongPress } from '../hooks/useLongPress';
 import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
@@ -22,8 +21,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
   // Every workout, not the newest N: a cap hid everything older with no way to reach it. The cost
   // of a long history is paid by PosterThumbnail, which only builds posters near the screen.
   const { workouts, loading, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER, { includeTests: true });
-  const { user } = useAuth();
-  const isAdmin = isAdminEmail(user?.email);
+  const { isAdmin } = useAuth();
   const [filter, setFilter] = useState<GalleryFilter>('all');
   const deleteSheet = useDeleteSheet(deleteWorkout);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(deleteSheet.open);

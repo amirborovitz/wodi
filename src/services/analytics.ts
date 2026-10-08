@@ -14,13 +14,21 @@ import type { Screen, WorkoutFormat } from '../types';
  */
 
 export type ShareMethod = 'share_sheet' | 'download';
+export type SignInMethod = 'google' | 'apple' | 'email';
+export type SignInFailureReason = 'cancelled' | 'blocked' | 'wrong_code' | 'expired_code' | 'error';
 
 interface AnalyticsEvents {
   /** A screen came up — including the sign-in page and onboarding, before there's an account. */
   screen_view: { screen_name: Screen | 'login' | 'onboarding' };
 
+  /** Tapped a sign-in button — before anything can go wrong. */
+  sign_in_tapped: { method: SignInMethod };
+  /** Sign-in didn't finish. `reason` says whether they backed out, the popup was blocked, the email code was wrong or stale, or it broke. */
+  sign_in_failed: { method: SignInMethod; reason: SignInFailureReason; error_code: string };
   /** Signed in. */
-  login: { method: 'google' | 'apple' };
+  login: { method: SignInMethod };
+  /** Reached a first-run question (1 = name … 4 = gym); step 1 is the onboarding screen_view. */
+  onboarding_step: { step: number };
   /** Finished the first-run questions. */
   onboarding_complete: Record<string, never>;
 

@@ -133,7 +133,7 @@ The recap is a **social artifact** — optimized for pride and shareability, not
 - **Partner**: `partnerFactor = 1 / teamSize`, applied only to AI-prescribed (team-total) values — never to user-entered personal numbers. Full system in `memory/project_partner_split_architecture.md`.
 - **PRs** only for weightlifting movements + named benchmarks. Weighted accessories (step-ups, lunges, weighted runs) are **not** PR-worthy.
 - **Rx prefill**: `user.sex` drives `createBlankResult()` weight + `rxCalories` prefill. Cardio machines use `calories`/`distance`, **never `reps`**.
-- **Admin**: `ADMIN_EMAIL = 'aborovitz@gmail.com'` gates "Load from Recent" (`HomeScreen`, `AddWorkoutScreen`).
+- **Admin**: the `admin` custom claim (granted by `scripts/set-admin-claim.ts`) gates "Load from Recent", the test flag and admin delete — read as `useAuth().isAdmin`, and by `isAdmin()` in `firestore.rules`. Never put an address in client code; it ships in the public bundle.
 
 ---
 

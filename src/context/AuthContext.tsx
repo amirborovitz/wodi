@@ -8,22 +8,40 @@ import {
 } from 'react';
 import {
   signInWithPopup,
+  signInWithCustomToken,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  getIdTokenResult,
   updateProfile,
   type User as FirebaseUser
 } from 'firebase/auth';
+import { FirebaseError } from 'firebase/app';
+import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { auth, googleProvider, appleProvider, db, storage } from '../services/firebase';
+import { auth, googleProvider, appleProvider, db, storage, functions } from '../services/firebase';
 import { removeUndefined } from '../utils/firestoreUtils';
 import { isHomeScreenApp } from '../utils/homeScreenApp';
 import { primeProfile, upsertPublicProfile } from '../services/feed/publicProfile';
 import { toPublicProfile } from '../services/feed/types';
 import { readWodiNotes } from '../services/wodiAgent/athleteNotes';
 import { readSkinOrder } from '../components/celebration/faces/HandwrittenFace/skinRegistry';
-import { identify, track } from '../services/analytics';
+import { identify, track, type SignInFailureReason, type SignInMethod } from '../services/analytics';
 import type { User, UserStats, WodiNote } from '../types';
+
+/** Backed out of the popup, the browser blocked it, the email code was wrong or stale, or something actually broke. */
+function signInFailureReason(errorCode: string): SignInFailureReason {
+  if (errorCode === 'auth/popup-closed-by-user' || errorCode === 'auth/cancelled-popup-request') return 'cancelled';
+  if (errorCode === 'auth/popup-blocked' || errorCode === 'auth/operation-not-supported-in-this-environment') return 'blocked';
+  if (errorCode === 'functions/permission-denied') return 'wrong_code';
+  if (errorCode === 'functions/failed-precondition') return 'expired_code';
+  return 'error';
+}
+
+// Email sign-in runs on the server (functions/src/index.ts): one call emails a 6-digit code, the
+// other trades a correct code for a token to that email's account.
+const sendLoginCode = httpsCallable<{ email: string }, { sent: true }>(functions, 'sendLoginCode');
+const verifyLoginCode = httpsCallable<{ email: string; code: string }, { token: string }>(functions, 'verifyLoginCode');
 
 export interface UserProfileUpdate {
   displayName?: string;
@@ -42,14 +60,25 @@ export interface UserProfileUpdate {
   /** The whole list, written at once — see services/wodiAgent/athleteNotes.ts. */
   wodiNotes?: WodiNote[];
   skinOrder?: string[];
+  /** The unit the athlete lifts in — see User.weightUnit. */
+  weightUnit?: 'kg' | 'lb';
 }
 
 interface AuthContextValue {
   user: User | null;
   firebaseUser: FirebaseUser | null;
+  /**
+   * Triage affordances (load-from-recent, the test-workout flag, admin delete). Read from the
+   * `admin` custom claim on the sign-in token — set server-side by scripts/set-admin-claim.ts —
+   * so no address ships in the bundle. Firestore rules check the same claim.
+   */
+  isAdmin: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
+  /** Emails a 6-digit sign-in code to this address. */
+  sendEmailCode: (email: string) => Promise<void>;
+  signInWithEmailCode: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserPhoto: (file: File) => Promise<string>;
   updateUserProfile: (profile: UserProfileUpdate) => Promise<void>;
@@ -128,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cachedUser = getCachedUser();
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(cachedUser);
+  const [isAdmin, setIsAdmin] = useState(false);
   // If we have cached user, don't show loading - render immediately
   const [loading, setLoading] = useState(!cachedUser);
 
@@ -137,6 +167,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       identify(fbUser?.uid ?? null);
+      setIsAdmin(false);
+      if (fbUser) {
+        getIdTokenResult(fbUser)
+          .then(token => setIsAdmin(token.claims.admin === true))
+          .catch(() => setIsAdmin(false));
+      }
 
       if (fbUser) {
         // Check cache first for instant load
@@ -237,6 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       wodiNotes: readWodiNotes(data.wodiNotes),
       // Kept as stored; orderSkins drops any skin that no longer exists.
       skinOrder: readSkinOrder(data.skinOrder, data.favoriteSkin),
+      weightUnit: data.weightUnit === 'lb' || data.weightUnit === 'kg' ? data.weightUnit : undefined,
     };
   };
 
@@ -348,25 +385,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signInWithGoogle = async () => {
+  const trackedSignIn = async (method: SignInMethod, signIn: () => Promise<unknown>): Promise<void> => {
     try {
-      await signInWithPopup(auth, googleProvider);
-      track('login', { method: 'google' });
+      await signIn();
+      track('login', { method });
     } catch (error) {
-      console.error('Error signing in with Google:', error);
+      const errorCode = error instanceof FirebaseError ? error.code : 'unknown';
+      track('sign_in_failed', { method, reason: signInFailureReason(errorCode), error_code: errorCode });
+      console.error(`Error signing in with ${method}:`, error);
       throw error;
     }
   };
 
-  const signInWithApple = async () => {
-    try {
-      await signInWithPopup(auth, appleProvider);
-      track('login', { method: 'apple' });
-    } catch (error) {
-      console.error('Error signing in with Apple:', error);
-      throw error;
-    }
+  const signInWithPopupFor = (method: 'google' | 'apple'): Promise<void> => {
+    track('sign_in_tapped', { method });
+    return trackedSignIn(method, () => signInWithPopup(auth, method === 'google' ? googleProvider : appleProvider));
   };
+
+  const signInWithGoogle = () => signInWithPopupFor('google');
+  const signInWithApple = () => signInWithPopupFor('apple');
+
+  const sendEmailCode = async (email: string): Promise<void> => {
+    await sendLoginCode({ email });
+  };
+
+  const signInWithEmailCode = (email: string, code: string): Promise<void> =>
+    trackedSignIn('email', async () => {
+      const { data } = await verifyLoginCode({ email, code });
+      await signInWithCustomToken(auth, data.token);
+    });
 
   const signOut = async () => {
     try {
@@ -382,9 +429,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       firebaseUser,
+      isAdmin,
       loading,
       signInWithGoogle,
       signInWithApple,
+      sendEmailCode,
+      signInWithEmailCode,
       signOut,
       updateUserPhoto,
       updateUserProfile,
