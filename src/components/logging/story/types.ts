@@ -8,7 +8,7 @@ import type {
   ParsedWorkout,
   MeasurementUnit,
 } from '../../../types';
-import type { LoadUnit } from '../../../utils/loadUnits';
+import { boardStatesLoad, type LoadUnit } from '../../../utils/loadUnits';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
 import { findOpenMovement, findOpenMovements, scoresOpenReps, hasMaxSet } from '../../../services/blockScore';
 import { hasSameMovementsEveryRound, ladderTiers } from '../../../utils/sectionShape';
@@ -778,6 +778,8 @@ function scoredKindFromAI(exercise: ParsedExercise): ExerciseKind | undefined {
  */
 export interface BlankResultOptions {
   blankAnswers?: boolean;
+  /** The athlete's profile unit — fills every load the board left without one (athleteLoadUnit.ts). */
+  weightUnit?: LoadUnit;
 }
 
 export function createBlankResult(
@@ -1155,6 +1157,27 @@ export function initStoryResults(
 ): StoryExerciseResult[] {
   return workout.exercises.map((ex, i) => {
     const mode = ex.loggingMode ?? loggingModes[i] ?? 'strength';
-    return createBlankResult(ex, i, mode, userSex, teamSize, workout.exercises.length === 1, options);
+    const exercise = withAthleteLoadUnit(ex, options.weightUnit);
+    return createBlankResult(exercise, i, mode, userSex, teamSize, workout.exercises.length === 1, options);
   });
+}
+
+/** Every movement of a part, in both places a part keeps them, passed through `fn`. */
+export function mapExerciseMovements(exercise: ParsedExercise, fn: (m: ParsedMovement) => ParsedMovement): ParsedExercise {
+  return {
+    ...exercise,
+    ...(exercise.movements ? { movements: exercise.movements.map(fn) } : {}),
+    ...(exercise.sections
+      ? { sections: exercise.sections.map((section) => ({ ...section, movements: section.movements.map(fn) })) }
+      : {}),
+  };
+}
+
+/** A load the board wrote no weight for — it's in the athlete's own unit. */
+export const isSilentLoad = (m: ParsedMovement): boolean => movementToKind(m) === 'load' && !boardStatesLoad(m);
+
+/** The profile's unit on every silent load that doesn't already carry one — how logging starts. */
+export function withAthleteLoadUnit(exercise: ParsedExercise, unit: LoadUnit | undefined): ParsedExercise {
+  if (!unit) return exercise;
+  return mapExerciseMovements(exercise, (m) => (isSilentLoad(m) && !m.loadUnit ? { ...m, loadUnit: unit } : m));
 }

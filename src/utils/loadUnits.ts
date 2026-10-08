@@ -1,11 +1,14 @@
 /**
  * Load units — one model for the whole app.
  *
- * THE BOARD'S UNIT IS THE TRUTH. A coach who wrote "135 lb" gets logged in lb, saved as 135
- * with `unit: 'lb'`, and printed on the poster as "135lb". Nothing is silently converted for
- * display — a poster that turns 135 lb into 61.2 kg is showing a number nobody wrote (poster
- * truth standard), and a logging screen that labels 135 as "kg" asks the athlete to confirm
- * a lift they never did.
+ * TWO UNITS, KEPT APART. The board's unit is the coach's: "24/16 kg" is printed in kg, always.
+ * The athlete's unit is what THEY lifted in: the board's unit by default, else the unit on their
+ * profile (`User.weightUnit`), and whatever they said if they logged in the other one. It lives
+ * on the movement as `loadUnit`, beside `loggedWeights`.
+ *
+ * Nothing is silently converted for display — a poster that turns 135 lb into 61.2 kg is showing
+ * a number nobody wrote (poster truth standard), and a logging screen that labels 135 as "kg"
+ * asks the athlete to confirm a lift they never did.
  *
  * Conversion happens in exactly ONE place: the kg-denominated math boundary. `totalVolume` /
  * EP divide by the athlete's bodyweight in kg, so an lb load must become kg before it lands
@@ -30,15 +33,15 @@ export function asLoadUnit(unit: string | undefined): LoadUnit {
   return unit === 'lb' ? 'lb' : 'kg';
 }
 
-/** Anything carrying a prescribed load — the real `RxWeights` and the narrower shapes some
- *  call sites hand around both satisfy it, so no caller needs a cast. */
+/** Anything carrying a load — the real `ParsedMovement` and the narrower shapes some call sites
+ *  hand around both satisfy it, so no caller needs a cast. */
 interface UnitBearer {
-  rxWeights?: { unit?: LoadUnit };
+  rxWeights?: { unit?: LoadUnit; male?: number; female?: number };
+  loadUnit?: LoadUnit;
 }
 
-/** Structural shape of anything that can state a prescribed load — ParsedExercise, Exercise,
- *  or a bare movement list. Kept structural so both the parse-time and the saved-doc types
- *  satisfy it without a cast. */
+/** Structural shape of anything that can state a load — ParsedExercise, Exercise, or a bare
+ *  movement list. Kept structural so both the parse-time and the saved-doc types satisfy it. */
 interface LoadUnitSource extends UnitBearer {
   movements?: ReadonlyArray<UnitBearer>;
   sections?: ReadonlyArray<{ movements: ReadonlyArray<UnitBearer> }>;
@@ -46,16 +49,36 @@ interface LoadUnitSource extends UnitBearer {
   cashOut?: ReadonlyArray<UnitBearer>;
 }
 
-/** The unit ONE movement's load is written in. */
-export function movementLoadUnit(movement: UnitBearer | undefined): LoadUnit {
+/** The board wrote a load for this movement ("24/16 kg") — and with it, a unit. */
+export function boardStatesLoad(movement: UnitBearer | undefined): boolean {
+  const rx = movement?.rxWeights;
+  return !!rx && ((rx.male ?? 0) > 0 || (rx.female ?? 0) > 0);
+}
+
+/** The unit the COACH's Rx is written in. For printing the prescription, never the athlete's lift. */
+export function rxLoadUnit(movement: UnitBearer | undefined): LoadUnit {
   return asLoadUnit(movement?.rxWeights?.unit);
 }
 
 /**
- * The unit an exercise's loads are written in. The first movement that actually states one
- * wins — boards mix a bare "Run" in among loaded movements, and a movement with no rxWeights
- * carries no opinion about the unit. Mixed-unit boards don't exist in practice; if one ever
- * shows up, the per-movement resolver is what the weight inputs and poster rows use anyway.
+ * The athlete's unit when something actually says it — their own choice, or the board's written
+ * load. Undefined is "nobody said": the chat asks rather than assume.
+ */
+export function knownLoadUnit(movement: UnitBearer | undefined): LoadUnit | undefined {
+  if (movement?.loadUnit) return movement.loadUnit;
+  return boardStatesLoad(movement) ? rxLoadUnit(movement) : undefined;
+}
+
+/** The unit ONE movement's athlete load is in: theirs, else the board's, else kg. */
+export function movementLoadUnit(movement: UnitBearer | undefined): LoadUnit {
+  return movement?.loadUnit ?? asLoadUnit(movement?.rxWeights?.unit);
+}
+
+/**
+ * The unit an exercise's athlete loads are in. The first movement that actually states one
+ * wins — boards mix a bare "Run" in among loaded movements, and a movement with no unit carries
+ * no opinion. Mixed-unit parts are rare; the per-movement resolver is what the weight inputs and
+ * poster rows use anyway.
  */
 export function exerciseLoadUnit(exercise: LoadUnitSource | undefined): LoadUnit {
   if (!exercise) return 'kg';
@@ -65,7 +88,7 @@ export function exerciseLoadUnit(exercise: LoadUnitSource | undefined): LoadUnit
     ...(exercise.movements ?? []),
     ...(exercise.sections?.flatMap((section) => section.movements) ?? []),
     ...(exercise.cashOut ?? []),
-  ].find((movement) => movement.rxWeights?.unit);
+  ].find((movement) => movement.loadUnit || movement.rxWeights?.unit);
 
-  return asLoadUnit(stated?.rxWeights?.unit ?? exercise.rxWeights?.unit);
+  return stated ? movementLoadUnit(stated) : asLoadUnit(exercise.loadUnit ?? exercise.rxWeights?.unit);
 }

@@ -1,5 +1,6 @@
 import type { Exercise, ParsedMovement, MovementTotal } from '../../types';
 import { sameMovementName, stripMovementRolePrefix } from '../../utils/movementNameMatch';
+import { movementLoadUnit } from '../../utils/loadUnits';
 
 // ─── Prescription ↔ logged-breakdown resolution ────────────────────────────────
 //
@@ -160,7 +161,7 @@ export function resolveOccurrenceLoad(
   twin?: ParsedMovement,
 ): { weights: number[]; unit: 'kg' | 'lb'; implementCount: number } | undefined {
   const logged = findMovementTotal(breakdown, movement.name);
-  const unit: 'kg' | 'lb' = logged?.unit === 'lb' || movement.rxWeights?.unit === 'lb' ? 'lb' : 'kg';
+  const unit: 'kg' | 'lb' = logged?.unit === 'lb' || movementLoadUnit(movement) === 'lb' ? 'lb' : 'kg';
   const implementCount = movement.implementCount && movement.implementCount > 1 ? movement.implementCount : 1;
 
   if (movement.loggedWeights?.length) {

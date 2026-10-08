@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { MovementResult } from './types';
-import { movementLoadUnit } from '../../../utils/loadUnits';
+import { movementLoadUnit, rxLoadUnit } from '../../../utils/loadUnits';
 
 export interface PrescriptionRow {
   label: string;
@@ -25,7 +25,7 @@ function quantity(mr: MovementResult): string {
 export function buildPrescriptionRow(mr: MovementResult): PrescriptionRow {
   const m = mr.movement;
   const weights = [m.rxWeights?.male, m.rxWeights?.female].filter((w): w is number => w != null);
-  const load = weights.length ? `@ ${[...new Set(weights)].join('/')} ${movementLoadUnit(m)}` : '';
+  const load = weights.length ? `@ ${[...new Set(weights)].join('/')} ${rxLoadUnit(m)}` : '';
   const personal: string[] = [];
   if (mr.substitution) personal.push(mr.substitution.selectedName);
   if (mr.distance != null && (mr.substitution || mr.distance !== m.distance)) {

@@ -54,7 +54,7 @@ import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, g
 import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sectionsEnumerateIntervals, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
-import { exerciseLoadUnit, movementLoadUnit } from '../../utils/loadUnits';
+import { exerciseLoadUnit, movementLoadUnit, rxLoadUnit } from '../../utils/loadUnits';
 import { readRepsDisplay } from '../../utils/repsDisplay';
 import { isCoreTabataBlock, coreTabataDoseSeconds, doseMinutes, TABATA_PROTOCOL_LABEL } from '../../utils/coreTabata';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
@@ -378,7 +378,7 @@ function buildLadderRows(exercise: Exercise, movements: MovementTotal[]): Artifa
     const w = deriveDisplayWeight({ weight: prescribedWeight, implementCount: mov.implementCount }, actual);
     if (w != null) {
       weight = w;
-      unit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit ?? 'kg');
+      unit = actual?.unit === 'lb' ? 'lb' : movementLoadUnit(mov);
       implementCount = mov.implementCount ?? 1;
       break;
     }
@@ -562,7 +562,7 @@ function buildDescendingLadderRows(
   const loggedWeight = weightedTotal?.weight;
   const rxWeight = weightedMovement?.rxWeights?.male ?? weightedMovement?.rxWeights?.female;
   const weight = loggedWeight ?? rxWeight;
-  const unit = weightedTotal?.unit === 'lb' ? 'lb' : (weightedMovement?.rxWeights?.unit ?? 'kg');
+  const unit = weightedTotal?.unit === 'lb' ? 'lb' : movementLoadUnit(weightedMovement);
 
   // The scheme's own sum — 14+12+10+8+6+4 = 54 — which is the one number a ladder row otherwise
   // never states, even though every other ladder layout prints it. Only claimed when EVERY
@@ -1005,7 +1005,7 @@ function resolveMovementEnteredLoad(
 
     return {
       weight: implementCount > 1 ? perImplementWeight * implementCount : perImplementWeight,
-      unit: movement.unit ?? parsed.rxWeights?.unit,
+      unit: movement.unit ?? parsed.loadUnit ?? parsed.rxWeights?.unit,
     };
   }
 
@@ -1678,7 +1678,7 @@ function formatProgressiveMovementData(
 
   const weightedMov = toShow.find((m) => m.rxWeights?.male != null);
   const weight = weightedMov?.rxWeights?.male != null
-    ? `${weightedMov.rxWeights.male}${movementLoadUnit(weightedMov)}`
+    ? `${weightedMov.rxWeights.male}${rxLoadUnit(weightedMov)}`
     : undefined;
 
   return { movement: (plusPrefix ? '+ ' : '') + parts.join(' · '), weight };
@@ -1922,7 +1922,7 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
       ? Math.round((bd.weight / (implementCount > 1 ? implementCount : 1)) * 10) / 10
       : undefined;
     const perImplementW = loggedPerImplement ?? (rxW && rxW > 0 ? rxW : undefined);
-    const unit = (m0.rxWeights?.unit ?? bd?.unit ?? 'kg').toUpperCase();
+    const unit = (loggedPerImplement != null ? (bd?.unit ?? movementLoadUnit(m0)) : rxLoadUnit(m0)).toUpperCase();
     const hasWeight = (perImplementW ?? 0) > 0;
     const totalUnitLabel = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
     return {
@@ -1971,7 +1971,7 @@ function formatSectionRxLoad(exercise: Exercise, movement: ParsedMovement): stri
   const male = movement.rxWeights?.male;
   const female = movement.rxWeights?.female;
   if (!male && !female) return '';
-  const unit = movement.rxWeights?.unit ?? 'kg';
+  const unit = rxLoadUnit(movement);
   const implementPrefix = movement.implementCount && movement.implementCount > 1
     ? `${movement.implementCount}x`
     : '';
@@ -4098,7 +4098,7 @@ function buildMixedStoryMovements(
           if (perSetW.length > 1 && !perSetW.every((w) => w === perSetW[0])) movProgression = perSetW;
         }
         if (movProgression && movProgression.length > 1) {
-          const wUnit = actual?.unit === 'lb' ? 'lb' : (mov.rxWeights?.unit || 'kg');
+          const wUnit = actual?.unit === 'lb' ? 'lb' : movementLoadUnit(mov);
           const movTotalReps = totalReps || (perRoundReps > 0 && rounds > 0 ? perRoundReps * rounds : undefined);
           lines.push({ perRound: '', name: displayName, total: '', color: color ?? 'yellow', weightProgression: movProgression, unit: wUnit, strengthTotalReps: movTotalReps && movTotalReps > 0 ? movTotalReps : undefined });
           continue;

@@ -17,6 +17,12 @@ export interface User {
   birthYear?: number;        // Year of birth, age calculated from this
   weight?: number;           // kg, important for calorie calculation
   sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  /**
+   * The unit the athlete lifts in — asked in onboarding, changed in settings, and followed when
+   * they log in the other unit on a board that wrote none. Only fills loads the board left
+   * without a unit; a board's own "135 lb" always wins. Unset: Wodi asks the first time.
+   */
+  weightUnit?: 'kg' | 'lb';
   onboardingComplete?: boolean;  // Track if user completed onboarding
   /**
    * Community profile — collected during onboarding, all optional, and the only
@@ -480,6 +486,11 @@ export interface ParsedMovement {
   // repeated lift merges into one entry carrying one smeared progression. Per-occurrence truth
   // belongs on the occurrence.
   loggedWeights?: number[];
+  // The unit the ATHLETE's load is in — kept apart from `rxWeights.unit`, which is the coach's.
+  // Set when the board wrote no load (from the athlete's profile, or their answer), or when the
+  // athlete logged in the other unit. Absent on older docs: then the board's unit, else kg.
+  // Read it only through `movementLoadUnit` (utils/loadUnits.ts).
+  loadUnit?: 'kg' | 'lb';
   unit?: MeasurementUnit;       // Unit for distance/time display
   isBodyweight?: boolean;       // True if no weight needed (bodyweight movement)
   inputType?: 'weight' | 'calories' | 'distance' | 'none';  // AI-classified input type
@@ -771,6 +782,7 @@ export interface RewardData {
   difficultyLevel?: number;               // AI-assessed programmed difficulty 1–10
   date?: Date;                            // The workout's actual date (Firestore `date` field)
   sourceDate?: string;                    // Date printed on the original WOD
+  posterSkin?: PosterSkinId;              // The skin the poster opens in — the athlete's favourite
 }
 
 // Weekly stats for consistency ring

@@ -1,7 +1,7 @@
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks, sectionsEnumerateIntervals } from '../utils/sectionShape';
-import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
+import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
 
 /**
  * Every partner-scope rule — which blocks are team-prescribed, what divides and what does not —
@@ -729,7 +729,7 @@ export function calculateWorkloadBreakdown(
         } else if (calories > 0) {
           unit = 'cal';
         } else if (weight) {
-          unit = movement.rxWeights?.unit || 'kg';
+          unit = movementLoadUnit(movement);
         }
 
         // Get color for this movement
@@ -804,7 +804,7 @@ export function calculateWorkloadBreakdown(
           exerciseIndex,
           totalReps: reps > 0 ? reps : undefined,
           weight,
-          unit: weight ? (exercise.rxWeights?.unit || 'kg') : undefined,
+          unit: weight ? exerciseLoadUnit(exercise) : undefined,
           color,
         });
       }

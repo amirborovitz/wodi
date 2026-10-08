@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
+import { LoadUnitSwitch } from './LoadUnitSwitch';
+import type { LoadUnitSwitch as LoadUnitSwitchState } from './useLoadUnitSwitch';
 import styles from './WizardExerciseScreen.module.css';
 
 interface WizardExerciseScreenProps {
@@ -45,6 +47,8 @@ interface WizardExerciseScreenProps {
     onFlatten: () => void;
     onRestore: () => void;
   };
+  /** The kg / lb switch — only on a part with loads (useLoadUnitSwitch). */
+  loadUnit?: LoadUnitSwitchState;
   onDone: () => void;
   onBack: () => void;
   onClose: () => void;
@@ -66,6 +70,7 @@ export function WizardExerciseScreen({
   hideFooter = false,
   prescriptionInBody = false,
   flatten,
+  loadUnit,
   onDone,
   onBack,
   onClose,
@@ -122,6 +127,7 @@ export function WizardExerciseScreen({
               && blockName.toLowerCase().trim() !== blockType.toLowerCase().trim() && (
               <span className={styles.blockName}>{blockName}</span>
             )}
+            {loadUnit && <LoadUnitSwitch {...loadUnit} />}
           </div>
           {exerciseTotal > 1 && (
             <p className={styles.exerciseCounter}>

@@ -6,6 +6,7 @@ import { resolveBlockScore, hasMaxSet, writtenSetCount } from '../../../services
 import { InputRouter, usesOrderedBoard } from './InputRouter';
 import { WizardOverview } from './WizardOverview';
 import { WizardExerciseScreen } from './WizardExerciseScreen';
+import { useLoadUnitSwitch } from './useLoadUnitSwitch';
 import type { StoryExerciseResult } from './types';
 import { initStoryResults, getPrescribedSetCount, hasOpenStationEntry, flattenResult, unflattenResult, isFlattened } from './types';
 import { uncertaintyForExercise } from '../../../services/parseUncertainty';
@@ -544,7 +545,7 @@ export function StoryLogResults({
   const [results, setResults] = useState<StoryExerciseResult[]>(() =>
     initialResults && initialResults.length > 0
       ? initialResults
-      : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize),
+      : initStoryResults(parsedWorkout, loggingModes, user?.sex, teamSize, { weightUnit: user?.weightUnit }),
   );
 
   const wizardBlocks = useMemo(
@@ -573,6 +574,7 @@ export function StoryLogResults({
   const currentGlobalIdx = currentPage?.exerciseIndex ?? 0;
   const currentScoredBlock = currentPage?.block;
   const fullResult = results[currentGlobalIdx] ?? null;
+  const loadUnit = useLoadUnitSwitch(results, setResults, currentGlobalIdx);
   const isLastExercise = blockExerciseStep >= (currentBlock?.pages.length ?? 1) - 1;
 
   // On a block page the inputs see ONLY that block — its movements, its score — so every
@@ -772,6 +774,7 @@ export function StoryLogResults({
               onFlatten: () => setFlattened(true),
               onRestore: () => setFlattened(false),
             } : undefined}
+            loadUnit={loadUnit}
             onDone={handleExerciseDone}
             onBack={handleExerciseBack}
             onClose={onBack}

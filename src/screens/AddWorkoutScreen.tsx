@@ -58,9 +58,9 @@ import { useFavoriteSkin } from '../hooks/useFavoriteSkin';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { initStoryResults, movementToKind } from '../components/logging/story/types';
+import { unitToRemember } from '../components/logging/story/athleteLoadUnit';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
-import { isAdminEmail } from '../utils/admin';
 import { matchesNamePattern } from '../utils/movementNameMatch';
 import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
@@ -747,9 +747,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
 }
 
 export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, initialMessage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
-  const { user } = useAuth();
-  const isAdmin = isAdminEmail(user?.email);
-  const canUseSavedWorkouts = isAdminEmail(user?.email);
+  const { user, isAdmin, updateUserProfile } = useAuth();
   const { calculateRewardData } = useRewardData();
   // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
   // Ask Wodi answers from all of it; the recent-workout helpers below keep their 50.
@@ -883,8 +881,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   const teamSize = parsedWorkout?.teamSize || (isPartnerWorkout ? 2 : 1);
   const partnerFactor = isPartnerWorkout ? 1 / teamSize : 1;
   useEffect(() => {
-    setSavedWorkouts(canUseSavedWorkouts ? readSavedWorkouts() : []);
-  }, [canUseSavedWorkouts]);
+    setSavedWorkouts(isAdmin ? readSavedWorkouts() : []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (showRecentOnOpen && isAdmin) {
@@ -1102,7 +1100,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   }, [step, currentExerciseIndex, parsedWorkout, loggingGuidance]);
 
   const persistSavedWorkouts = (next: SavedWorkout[]) => {
-    if (!canUseSavedWorkouts) return;
+    if (!isAdmin) return;
     setSavedWorkouts(next);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(SAVED_WORKOUTS_KEY, JSON.stringify(next));
@@ -1110,7 +1108,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   };
 
   const addSavedWorkout = (workout: ParsedWorkout) => {
-    if (!canUseSavedWorkouts) return;
+    if (!isAdmin) return;
     const newEntry: SavedWorkout = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
@@ -1141,7 +1139,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   };
 
   const handleSelectSavedWorkout = (saved: SavedWorkout) => {
-    if (!canUseSavedWorkouts) return;
+    if (!isAdmin) return;
     setParsedWorkout(normalizeParsedWorkout(saved.workout));
     setImageUrl(null);
     setError(null);
@@ -1149,13 +1147,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   };
 
   const handleRemoveSavedWorkout = (id: string) => {
-    if (!canUseSavedWorkouts) return;
+    if (!isAdmin) return;
     const next = savedWorkouts.filter((entry) => entry.id !== id);
     persistSavedWorkouts(next);
   };
 
   const handleClearSavedWorkouts = () => {
-    if (!canUseSavedWorkouts) return;
+    if (!isAdmin) return;
     persistSavedWorkouts([]);
   };
 
@@ -2032,7 +2030,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       loggingModesFor(workout),
       user?.sex,
       storyTeamSize(workout),
-      { blankAnswers: true },
+      { blankAnswers: true, weightUnit: user?.weightUnit },
     ),
     lastLoads,
     history: loadHistory,
@@ -2080,6 +2078,18 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     void saveWorkout(results);
   };
 
+  /**
+   * The unit the athlete's board-silent weights ended up in becomes their profile's — set the
+   * first time they answer "kg or lb?", and followed when they log in the other one. Never blocks
+   * the save: a failed write only means they're asked again.
+   */
+  const rememberWeightUnit = (results: ExerciseResult[]): void => {
+    const unit = unitToRemember(results.map((r) => r.exercise));
+    if (!unit || unit === user?.weightUnit) return;
+    updateUserProfile({ weightUnit: unit })
+      .catch((err: unknown) => console.error('[Save] could not keep the weight unit', err));
+  };
+
   const saveWorkout = async (results: ExerciseResult[], session: SessionWorkout | null = savedWorkoutMeta) => {
     if (!user || !parsedWorkout) return;
 
@@ -2120,6 +2130,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
       const { builtExercises: exercises, totalDuration } = buildSavedExercises(results);
+      rememberWeightUnit(results);
 
       const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
       breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);
@@ -2444,6 +2455,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
         workoutId: persistedWorkoutId,
         date: workoutDate,
+        // The skin the new poster was stamped with; after an edit, the one last picked (also its own).
+        posterSkin: favoriteSkin.favorite,
       });
       // A save ends the edit pass; "Edit" on the reward screen starts the next one.
       setIsEditingAfterSave(false);
@@ -2583,7 +2596,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
             </motion.div>
           )}
 
-          {canUseSavedWorkouts && savedWorkouts.length > 0 && (
+          {isAdmin && savedWorkouts.length > 0 && (
             <div className={styles.savedSection}>
               <div className={styles.savedHeader}>
                 <h3 className={styles.savedTitle}>Saved WODs</h3>

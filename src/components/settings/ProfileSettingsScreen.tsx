@@ -7,6 +7,7 @@ import {
   LOCATION_MAX_LENGTH,
   NAME_MAX_LENGTH,
   SEX_OPTIONS,
+  WEIGHT_UNIT_OPTIONS,
 } from '../../hooks/useProfileFields';
 import type { ProfileFieldKey } from '../../hooks/useProfileFields';
 import { useProfilePhoto } from '../../hooks/useProfilePhoto';
@@ -257,6 +258,25 @@ export function ProfileSettingsScreen({
                   className={`${styles.choice} ${fields.sex === option.value ? styles.choiceOn : ''}`}
                   onClick={() => { setField('sex', option.value); commit('sex'); }}
                   aria-pressed={fields.sex === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* The unit any weight the board leaves unsaid is logged in. Logging in the other one on
+              such a board moves it too, so this row follows the athlete rather than fighting them. */}
+          <div className={rowClass('weightUnit')}>
+            <span className={styles.label}>Lifts in</span>
+            <div className={styles.choices} role="group" aria-label="Lifts in">
+              {WEIGHT_UNIT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.choice} ${fields.weightUnit === option.value ? styles.choiceOn : ''}`}
+                  onClick={() => { setField('weightUnit', option.value); commit('weightUnit'); }}
+                  aria-pressed={fields.weightUnit === option.value}
                 >
                   {option.label}
                 </button>

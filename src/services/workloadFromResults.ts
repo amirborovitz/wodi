@@ -22,7 +22,7 @@
  */
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, WorkloadBreakdown, MovementTotal, MovementSubstitution } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
-import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
+import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
 import { matchesNamePattern } from '../utils/movementNameMatch';
 import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
 import { resolveLoggedQuantity } from '../utils/tierScaling';
@@ -311,7 +311,7 @@ export function buildWorkloadBreakdownFromResults(
 
         const unit = movementDistance > 0 ? (mov.unit || 'm')
           : movementCalories > 0 ? 'cal'
-          : weight ? (mov.rxWeights?.unit || 'kg')
+          : weight ? movementLoadUnit(mov)
           : undefined;
 
         const existing = movementMap.get(key);
@@ -550,7 +550,7 @@ export function buildWorkloadBreakdownFromResults(
           const visits = stationVisitCounts?.[movIdx] ?? movementRounds;
           const workSeconds = result.exercise.workDuration ?? parsedWorkout?.intervalTime ?? 60;
           const assumedReps = Math.max(1, Math.round(workSeconds / SECONDS_PER_UNCOUNTED_REP));
-          estimatedVolume += toKg(uncountedWeight, mov.rxWeights?.unit === 'lb' ? 'lb' : 'kg')
+          estimatedVolume += toKg(uncountedWeight, movementLoadUnit(mov))
             * assumedReps * Math.max(1, visits);
         } else {
           // Unloaded and uncounted (a stretch, a hold with no prescribed time) — nothing to
@@ -654,7 +654,7 @@ export function buildWorkloadBreakdownFromResults(
         : movementCalories > 0
           ? 'cal'
           : weight
-            ? (mov.rxWeights?.unit || 'kg')
+            ? movementLoadUnit(mov)
             : undefined;
       const existing = movementMap.get(key);
 

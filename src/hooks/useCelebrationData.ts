@@ -36,7 +36,7 @@ import {
   getTimeCapMinutes,
   DEFAULT_BW,
 } from '../utils/xpCalculations';
-import { asLoadUnit, exerciseLoadUnit, type LoadUnit } from '../utils/loadUnits';
+import { asLoadUnit, exerciseLoadUnit, movementLoadUnit, type LoadUnit } from '../utils/loadUnits';
 import {
   calculateWorkloadFromExercises,
   assignMovementColors,
@@ -421,7 +421,9 @@ export function useCelebrationData(
   // ── Poster customization (persisted to Firestore) ──────────────────────────
 
   const workoutId: string | undefined = isReward ? rewardData?.workoutId : workout?.id;
-  const posterSkin: PosterSkinId | undefined = workout?.posterSkin;
+  // The poster straight after logging has no workout doc in hand — it carries the skin it was saved in.
+  // Without it that poster fell back to Slab, so a favourite never seemed to stick.
+  const posterSkin: PosterSkinId | undefined = isReward ? rewardData?.posterSkin : workout?.posterSkin;
   const posterVibe: PosterVibeKey | undefined = workout?.posterVibe;
   const posterSticker: PosterSticker | undefined = workout?.posterSticker;
   const posterVibeOffset: PosterVibeOffset | undefined = workout?.posterVibeOffset;
@@ -751,7 +753,7 @@ export function useCelebrationData(
               name: actual?.name ?? movement.name,
               totalReps,
               weight,
-              unit: actual?.unit ?? movement.rxWeights?.unit ?? 'kg',
+              unit: actual?.unit ?? movementLoadUnit(movement),
             } as WCandidate;
           })
           .filter((x): x is WCandidate => x !== null) ?? []

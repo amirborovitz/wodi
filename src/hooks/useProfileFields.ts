@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import type { UserProfileUpdate } from '../context/AuthContext';
 import { INSTAGRAM_MAX_LENGTH, normalizeInstagram } from '../utils/instagram';
 import type { User } from '../types';
+import type { LoadUnit } from '../utils/loadUnits';
 
 /**
  * The profile form's state and persistence.
@@ -21,6 +22,12 @@ export const SEX_OPTIONS: readonly { value: Sex; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+/** The unit the athlete lifts in — see User.weightUnit. */
+export const WEIGHT_UNIT_OPTIONS: readonly { value: LoadUnit; label: string }[] = [
+  { value: 'kg', label: 'kg' },
+  { value: 'lb', label: 'lb' },
+];
+
 export interface ProfileFields {
   displayName: string;
   gym: string;
@@ -29,6 +36,7 @@ export interface ProfileFields {
   birthYear: string;
   weight: string;
   sex: string;
+  weightUnit: string;
 }
 
 export type ProfileFieldKey = keyof ProfileFields;
@@ -122,6 +130,10 @@ function validateField(key: ProfileFieldKey, fields: ProfileFields): string | nu
 
     case 'sex':
       return SEX_OPTIONS.some((option) => option.value === raw) ? null : 'Pick one';
+
+    // Optional: unset, Wodi asks the first time a board leaves a weight's unit unsaid.
+    case 'weightUnit':
+      return raw === '' || WEIGHT_UNIT_OPTIONS.some((option) => option.value === raw) ? null : 'Pick one';
   }
 }
 
@@ -146,6 +158,7 @@ function toFields(user: User | null): ProfileFields {
     birthYear: user?.birthYear?.toString() ?? '',
     weight: user?.weight?.toString() ?? '',
     sex: user?.sex ?? '',
+    weightUnit: user?.weightUnit ?? '',
   };
 }
 
@@ -280,6 +293,7 @@ export function useProfileFields(): UseProfileFieldsResult {
     }
     if (valid('weight')) update.weight = parseFloat(current.weight);
     if (valid('sex')) update.sex = current.sex as Sex;
+    if (valid('weightUnit') && current.weightUnit) update.weightUnit = current.weightUnit as LoadUnit;
 
     // Show what was actually stored, however the handle was pasted in — but only
     // when it survived normalization. Rewriting a rejected handle would erase

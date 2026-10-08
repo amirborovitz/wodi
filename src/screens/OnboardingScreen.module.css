@@ -27,8 +27,7 @@
 }
 
 .dotActive {
-  background: var(--color-sessions);
-  box-shadow: 0 0 10px var(--glow-sessions);
+  background: var(--wodi-yellow);
 }
 
 .stepContent {
@@ -46,6 +45,50 @@
    the single-question steps, which are spaced to feel like one big ask. */
 .stepContent.stepContentForm {
   gap: var(--space-4);
+}
+
+/* Step 1 — Wodi says hello. Left-aligned like a chat, not a centred form. */
+.stepContent.stepHello {
+  align-items: stretch;
+  gap: var(--sp-6);
+  text-align: left;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--wodi-white);
+}
+
+.wordmarkDot {
+  display: inline-block;
+  color: var(--wodi-yellow);
+}
+
+.helloChat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-2);
+}
+
+/* The same bubble Wodi talks in on Today and in the chat. */
+.helloBubble {
+  composes: bubbleWodi from '../components/tellWodi/TellWodiChat.module.css';
+  margin: 0;
+  font-weight: 600;
+  color: var(--wodi-white);
+  transform-origin: 0 0;
+}
+
+.helloReply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
 }
 
 .title {
@@ -102,8 +145,8 @@
 
 .input:focus {
   outline: none;
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+  border-color: var(--wodi-yellow);
+  box-shadow: 0 0 0 3px rgba(245, 194, 0, 0.15);
 }
 
 .input::-webkit-outer-spin-button,
@@ -136,8 +179,8 @@
 }
 
 .prefixedInput:focus-within {
-  border-color: var(--color-sessions);
-  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.1);
+  border-color: var(--wodi-yellow);
+  box-shadow: 0 0 0 3px rgba(245, 194, 0, 0.15);
 }
 
 .prefix {
@@ -156,6 +199,35 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+
+.unitChoice {
+  display: flex;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.unitOption,
+.unitOptionActive {
+  flex: 1;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.unitOption {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text);
+}
+
+.unitOptionActive {
+  background: var(--wodi-yellow);
+  border: 1px solid var(--wodi-yellow);
+  color: var(--wodi-bg);
 }
 
 .unit {
@@ -185,19 +257,17 @@
 .primaryButton {
   flex: 1;
   padding: var(--space-4);
-  background: linear-gradient(135deg, var(--color-sessions) 0%, #00a8ff 100%);
+  background: var(--wodi-yellow);
   border: none;
   border-radius: var(--radius-lg);
   font-size: var(--text-base);
   font-weight: var(--font-bold);
-  color: #000;
+  color: var(--wodi-bg);
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
 }
 
 .primaryButton:hover:not(:disabled) {
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
   transform: translateY(-1px);
 }
 
