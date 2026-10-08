@@ -56,3 +56,29 @@ describe('swapHabits', () => {
     expect(habits.size).toBe(0);
   });
 });
+
+describe('swapHabits — the scale they swap at', () => {
+  const withSwap = (day: string, run: number, bike: number, unit: 'distance' | 'calories'): Workout => ({
+    ...workout(day, [biked()]),
+    exercises: [{
+      id: 'e', name: 'WOD', type: 'wod', sets: [],
+      movements: [{
+        name: 'Echo Bike',
+        substitution: {
+          originalName: 'Run', selectedName: 'Echo Bike', substitutionType: 'equivalent',
+          originalValue: run, adjustedValue: bike, targetUnit: unit, originalPrescription: { distance: run },
+        },
+      }],
+    }] as unknown as Workout['exercises'],
+  });
+
+  it('reads last time\'s amount off the newest saved swap, as a ratio to the board', () => {
+    const habits = swapHabits([withSwap('2026-10-05', 400, 20, 'calories'), withSwap('2026-09-28', 600, 1800, 'distance')]);
+    expect(habits.get(habitKey('Run'))?.scale).toEqual({ from: 'distance', to: 'calories', ratio: 0.05 });
+  });
+
+  it('a swap saved without the board\'s amount has no scale', () => {
+    const habits = swapHabits([workout('2026-10-05', [biked()]), workout('2026-09-28', [biked()])]);
+    expect(habits.get(habitKey('Run'))?.scale).toBeUndefined();
+  });
+});

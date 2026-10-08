@@ -13,6 +13,7 @@ import {
   isComplete,
   nextQuestion,
   openSlots,
+  type ChatQuestion,
   type ChatSlot,
   type SlotAnswer,
 } from './chatQuestions';
@@ -32,6 +33,8 @@ export interface ChatChipView {
   action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now';
   /** The note a 'remember' chip saves — exactly the words the athlete was shown. */
   note?: string;
+  /** The follow-up this chip asks instead of answering ("Different weight" → "What weight…?"). */
+  then?: ChatQuestion;
 }
 
 export interface ChatMessage {
@@ -122,6 +125,9 @@ export interface TellWodiChat {
   openForms: () => void;
 }
 
+
+/** The way into logging a board — on its first question, and wherever a parked chat waits. */
+const DONE_CHIP: ChatChipView = { label: 'Done — log it', action: 'done' };
 
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;
@@ -248,7 +254,7 @@ export function useTellWodiChat({
       if (!outcome.closed) continue;
       closedRef.current = new Set(closedRef.current).add(slot.id);
       applied += 1;
-      if (slot.kind === 'swap') {
+      if (slot.kind === 'swap' || slot.kind === 'amount') {
         const swapped = resultsRef.current
           .find((r) => r.exerciseIndex === slot.exerciseIndex)
           ?.movementResults?.find((mr) => mr.movement.name === slot.movementNames?.[0] && mr.substitution);
@@ -266,18 +272,24 @@ export function useTellWodiChat({
     callbacks.current.onFinished(resultsRef.current, vibeRef.current, toSavedChat(messagesRef.current.slice(boardStartRef.current), false));
   };
 
+  const askQuestion = (question: ChatQuestion, prefix?: string): void => {
+    push({
+      from: 'wodi',
+      text: prefix ? `${prefix} ${question.text}` : question.text,
+      ...(question.hint ? { hint: question.hint } : {}),
+      ...(question.chips.length > 0
+        ? { chips: question.chips.map((c) => ({ label: c.label, answers: c.answers, ...(c.then ? { then: c.then } : {}) })) }
+        : {}),
+    });
+  };
+
   /** Ask the next open question, hand to the form, or finish. */
   const askNext = (prefix?: string): void => {
     waitingRef.current = false;
     const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
     const question = nextQuestion(slots, resultsRef.current);
     if (question) {
-      push({
-        from: 'wodi',
-        text: prefix ? `${prefix} ${question.text}` : question.text,
-        ...(question.hint ? { hint: question.hint } : {}),
-        chips: question.chips.map((c) => ({ label: c.label, answers: c.answers })),
-      });
+      askQuestion(question, prefix);
       return;
     }
     if (isComplete(slots) && resultsRef.current.some(chatCannotLog)) {
@@ -295,7 +307,8 @@ export function useTellWodiChat({
    * Heading in: a game plan for this board from their own log — a target and pacing from their
    * past results on similar work, a weight per loaded movement — then the chat parks on Today until
    * they're back. Asked again before the workout ("how should I pace it?"), it plans again for that
-   * question; the load card and the parking line are said once.
+   * question; the load card and the parking line are said once. Whatever Wodi says last carries
+   * "Done — log it": back from class with this chat still open, logging is one tap from here.
    */
   const parkBeforeWorkout = async (question: string): Promise<void> => {
     const { lastLoads: last, history: logged, athleteSex: sex } = callbacks.current;
@@ -306,6 +319,7 @@ export function useTellWodiChat({
       push({ from: 'wodi', suggestions });
     }
     setBusy('thinking');
+    let planned = false;
     try {
       // The question was just sent — it goes to Ask Wodi once, as the message, not also as history.
       const recent = recentTurns();
@@ -316,7 +330,14 @@ export function useTellWodiChat({
         { board: workoutRef.current?.rawText ?? '', loads: suggestionsAsText(suggestions), sex },
       );
       if (plan.kind === 'answer' && plan.text) {
-        push({ from: 'wodi', text: plan.text, ...(plan.receipts.length ? { receipts: plan.receipts } : {}) });
+        planned = true;
+        push({
+          from: 'wodi',
+          text: plan.text,
+          ...(plan.receipts.length ? { receipts: plan.receipts } : {}),
+          // A follow-up plan is the last word — the parking line isn't said again to carry the chip.
+          ...(firstTime ? {} : { chips: [DONE_CHIP] }),
+        });
       }
     } catch (err) {
       console.error('[TellWodi] game plan failed', err);
@@ -324,7 +345,11 @@ export function useTellWodiChat({
       setBusy(null);
     }
     waitingRef.current = true;
-    if (firstTime) push({ from: 'wodi', text: "It's on Today. When you're done, tap LOG IT there and just tell me your time." });
+    if (firstTime) {
+      push({ from: 'wodi', text: "Go get it. It's on Today too — when you're done, tap below or just tell me your time.", chips: [DONE_CHIP] });
+    } else if (!planned) {
+      push({ from: 'wodi', text: "Back here when you're done.", chips: [DONE_CHIP] });
+    }
   };
 
   const readWords = async (text: string): Promise<void> => {
@@ -350,12 +375,16 @@ export function useTellWodiChat({
       }
       if (reading.vibe) vibeRef.current = reading.vibe;
       const { applied, swaps } = applyAnswers(reading.answers, slots);
-      if (reading.reaction) push({ from: 'wodi', text: reading.reaction });
+      const stillOpen = askedBefore != null && !closedRef.current.has(askedBefore);
+      // Nothing landed on the question just asked: a bare "Got it." would claim it did, so only a
+      // reaction to how it felt is said — then "Didn't catch that" and the question again.
+      const missed = applied === 0 && stillOpen;
+      const reaction = missed && !reading.vibe ? '' : reading.reaction;
+      if (reaction) push({ from: 'wodi', text: reaction });
       // A swap changes what the poster and the totals say, so it's said back — never silent.
       if (swaps.length > 0) push({ from: 'wodi', text: `Noted — ${swaps.join('; ')}.` });
       offerToRemember(reading.remember);
-      const stillOpen = askedBefore != null && !closedRef.current.has(askedBefore);
-      askNext(applied === 0 && stillOpen && !reading.reaction ? "Didn't catch that." : undefined);
+      askNext(missed && !reaction ? "Didn't catch that." : undefined);
     } catch (err) {
       console.error('[TellWodi] reading failed', err);
       push({ from: 'wodi', text: 'My connection dropped for a sec — say that again?' });
@@ -446,10 +475,7 @@ export function useTellWodiChat({
           push({
             from: 'wodi',
             text: `${title ? `Got it — ${title}.` : 'Got the board.'} Done it already, or heading in?`,
-            chips: [
-              { label: 'Done — log it', action: 'done' },
-              { label: 'Doing it later', action: 'later' },
-            ],
+            chips: [DONE_CHIP, { label: 'Doing it later', action: 'later' }],
           });
           return;
         }
@@ -479,6 +505,10 @@ export function useTellWodiChat({
       return;
     }
     push({ from: 'me', text: chip.label });
+    if (chip.then) {
+      askQuestion(chip.then);
+      return;
+    }
     if (chip.action === 'later') {
       void parkBeforeWorkout('');
       return;

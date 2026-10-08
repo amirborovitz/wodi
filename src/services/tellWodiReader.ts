@@ -51,7 +51,7 @@ const READING_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'perInterval'],
+          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'swapUnit', 'perInterval', 'unit'],
           properties: {
             id: { type: 'string' },
             skipped: { type: 'boolean' },
@@ -64,7 +64,9 @@ const READING_SCHEMA = {
             choice: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapTo: { anyOf: [{ type: 'string' }, { type: 'null' }] },
             swapAmount: nullableNumber,
+            swapUnit: { anyOf: [{ type: 'string', enum: ['reps', 'distance', 'calories'] }, { type: 'null' }] },
             perInterval: { type: 'boolean' },
+            unit: { anyOf: [{ type: 'string', enum: ['kg', 'lb'] }, { type: 'null' }] },
           },
         },
       },
@@ -79,7 +81,13 @@ just finished a workout and is texting you about it. Your job has two parts.
    actually answers. Return one entry per question you can answer, using its exact id.
    - Only answer what they SAID. Never guess, never fill a question from the board's prescription,
      never assume they did it as written. If they didn't say it, leave that question out.
-   - "time": seconds. "22 min" = 1320, "18:45" = 1125, "under 20" is not an answer.
+   - A bare number with no unit ("27") answers the question Wodi just asked, in that question's
+     own terms.
+   - "time": seconds. "22 min" = 1320, "18:45" = 1125, "95 sec" = 95, "under 20" is not an answer.
+     A bare number ("27") is in whichever unit fits THIS workout. A time question with "capMinutes"
+     tells you how long it can last: under a 35-minute cap, "27" is 27 minutes (1620), never
+     27 seconds; under a 3-minute cap, "95" is 95 seconds. With no cap, judge from the board —
+     a few rounds of a chipper takes minutes, a single 500m row takes seconds.
    - "rounds": count = full rounds, extraReps = extra reps ("7 rounds + 12" → count 7, extraReps 12).
      A rounds question with "intervals" is a workout of several timed windows. If they give the
      rounds for ONE window ("4 per round", "about 4 each interval", "3 rounds every time"), that
@@ -95,21 +103,37 @@ just finished a workout and is texting you about it. Your job has two parts.
        · a weight for EACH set — three or more listed ("60, 65, 70, 75, 80", "60 65 70 75 80") →
          weights = every one, in the order said; weight = first, weightEnd = last.
      "same dumbbell for both", "17.5 for everything" answers every open weight question it covers.
+     A weight question with "sameAs" asks whether they used the load an earlier movement got:
+     "yes", "same", "same one" → copy its weight, weightEnd and weights. A number is a new answer.
      "Rx" / "as prescribed" is NOT a number — don't answer it.
+     unit = "kg" or "lb" ONLY when THEY said it with the number ("53 lb", "24 kilos", "35 pounds",
+     "16kg"); a bare "53" is null. Never take it from the board or from the question.
+   - "unit": they're saying which unit their weights were in — "kg", "kilos" → unit "kg";
+     "lb", "lbs", "pounds" → unit "lb".
    - "choice": copy one of the question's options exactly. "singles" picks the singles option.
    - "score": whichever fits — seconds, count, or weight.
    - "swap": they did a DIFFERENT movement instead of this one ("switched the run to echo bike",
      "did singles instead", "rowed instead of running"). swapTo = what they did, in plain words
-     ("Echo Bike"). swapAmount = how much of it for ONE occurrence, in that movement's own unit
-     (metres, calories or reps), ONLY if they said it ("600m on the bike" → 600); otherwise null.
+     ("Echo Bike"). swapAmount = how much of it for ONE occurrence, ONLY if they said it
+     ("600m on the bike" → 600); otherwise null. swapUnit = the unit they said it in: metres →
+     "distance", cal → "calories", reps → "reps"; null when they gave no unit.
      Only answer the swap question of the movement they replaced.
-     A swap question with "usually" was ASKED ("Echo Bike again instead of the Run?"): "yes",
-     "same", "as usual" → swapTo = the "usually" value; "no, I ran" / did it as written →
-     skipped = true.
+     A swap question with "usually" was ASKED ("Echo Bike again instead of the Run?"). Their reply
+     is about THAT movement (the Run), whatever it names:
+       · "yes", "same", "as usual" → swapTo = the "usually" value, and with "usualAmount" its
+         value and unit as swapAmount / swapUnit.
+       · ANY other movement — "singles", "no, singles this time", "rowed", "did 20 burpees" →
+         swapTo = that movement, in plain words. It is what they did instead of the Run today,
+         however unusual the pairing. "No" followed by a movement is a swap, never a skip.
+       · An amount alone ("20 cal", "1000m") → swapTo = the "usually" value, that amount.
+       · Only "no, I ran", "did the run", "as written" → skipped = true.
+   - "amount": they already swapped this movement for the one in "about"; this is how much of it
+     they did for ONE occurrence. A bare number is the answer → swapAmount; swapUnit if they said
+     a unit ("20 cal" → calories), else null.
    - A choice question with "usually": "yes" / "same as always" picks the "usually" option.
    - If they say they don't know / didn't track / want to skip a question, answer it with
      skipped = true.
-   - Every field you don't use is null (perInterval false).
+   - Every field you don't use is null (perInterval false, unit null).
 
 2. REACT like a friend at the gym would — one short line, max 8 words, warm and a little playful.
    Match their energy ("almost died" → something like "Brutal one. Respect."). Never compare them to
@@ -147,7 +171,10 @@ export async function readAthleteMessage(input: {
     ...(s.options ? { options: s.options } : {}),
     ...(s.unit ? { unit: s.unit } : {}),
     ...(s.usually ? { usually: s.usually } : {}),
+    ...(s.sameAs ? { sameAs: s.sameAs } : {}),
+    ...(s.usualAmount ? { usualAmount: s.usualAmount } : {}),
     ...(s.intervals ? { intervals: s.intervals } : {}),
+    ...(s.cap ? { capMinutes: Math.round((s.cap / 60) * 10) / 10 } : {}),
   }));
   const conversation = input.recent
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)

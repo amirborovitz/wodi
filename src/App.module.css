@@ -1,0 +1,11 @@
+/* A poster opened from the Wodi chat, covering it. The chat stays mounted underneath — scroll
+   position and all — so this layer scrolls on its own instead of the page. Above the chat's
+   fixed screen (z-index 10). */
+.posterOverChat {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--wodi-bg);
+}

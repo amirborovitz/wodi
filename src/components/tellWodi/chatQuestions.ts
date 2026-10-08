@@ -4,8 +4,9 @@ import { alternativeSubstitution, buildSubstitutionPatch, namedSwap } from '../l
 import { getScoredBlocks } from '../logging/story/blockScoping';
 import { hasMaxSet } from '../../services/blockScore';
 import { parseTimeCapSeconds } from '../../utils/timeCap';
-import { movementLoadUnit } from '../../utils/loadUnits';
-import { habitKey, type SwapHabit } from '../../services/wodiAgent/athleteHabits';
+import { knownLoadUnit, type LoadUnit } from '../../utils/loadUnits';
+import { setLoadUnit } from '../logging/story/athleteLoadUnit';
+import { habitKey, type SwapHabit, type SwapUnit } from '../../services/wodiAgent/athleteHabits';
 import { personalIntervalCount } from '../logging/story/intervalRounds';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment } from '../../types';
@@ -33,8 +34,10 @@ export type ChatSlotKind =
   | 'duration'  // a hold, seconds
   | 'choice'    // the board's own either/or ("200 DU / 400 singles")
   | 'score'     // an unclassified part: whatever they scored
+  | 'unit'      // kg or lb — asked only when a weight was given and nothing says which
   | 'sets'      // how many sets/intervals were done — OPTIONAL, filled only when mentioned
-  | 'swap';     // did something else instead ("switched the run to echo bike") — OPTIONAL
+  | 'swap'      // did something else instead ("switched the run to echo bike") — OPTIONAL
+  | 'amount';   // how much of a swap they did, when nothing converts the board's number to it
 
 export interface ChatSlot {
   id: string;
@@ -48,14 +51,25 @@ export interface ChatSlot {
   options?: string[];
   /** The board's Rx loads for a weight slot — the ends of the one-tap answers (weightChoices). */
   rxWeights?: number[];
-  unit?: string;
+  /** A weight slot's unit when something says it (board, profile, or the athlete); else unknown. */
+  unit?: LoadUnit;
   /** The implement a weight slot is for — sets the step between the one-tap answers. */
   equipment?: MovementEquipment;
+  /**
+   * A weight slot after another movement in the same part already has its load: that load, so
+   * "same" is one tap. Often the same kettlebell or dumbbell — often not, so it's asked, never copied.
+   */
+  sameAs?: EarlierLoad;
   /**
    * A rounds slot on AMRAP intervals: how many work windows are the athlete's own. "About 4 per
    * round" is a full answer — the app multiplies, the model never does (applyAnswer).
    */
   intervals?: number;
+  /**
+   * A time slot's cap, seconds — the board's ceiling. Offered as a one-tap answer, and tells the
+   * reader which unit a bare "27" is in: under a 35-min cap it can only be minutes.
+   */
+  cap?: number;
   /** Asked out loud. A slot that isn't is still offered to the AI, filled only if mentioned. */
   asked: boolean;
   /**
@@ -63,6 +77,19 @@ export interface ChatSlot {
    * slot into a question; on a choice it puts their usual side first. Offered, never filled in.
    */
   usually?: string;
+  /**
+   * A swap habit's amount for today's board, at last time's scale ("900 m" of bike for a 300m run)
+   * — so the usual swap AND its usual amount are one tap. Offered, never filled in.
+   */
+  usualAmount?: { value: number; unit: SwapUnit };
+}
+
+/** The load an earlier movement in the part was given — what "same weight" means. */
+export interface EarlierLoad {
+  movement: string;
+  weight: number;
+  weightEnd: number | null;
+  weights: number[] | null;
 }
 
 /** One answer, as the AI (or a tapped chip) gives it. Every value is nullable: blank is an answer. */
@@ -79,15 +106,19 @@ export interface SlotAnswer {
   choice: string | null;
   /** The movement done instead, in the athlete's words ("echo bike"). */
   swapTo: string | null;
-  /** How much of it, in the substitute's own unit — only when they said so. */
+  /** How much of it, for ONE occurrence — only when they said so. */
   swapAmount: number | null;
+  /** The unit swapAmount was said in ("20 cal", "900m"); null = the substitute's own unit. */
+  swapUnit: SwapUnit | null;
   /** A rounds count given PER INTERVAL ("4 each round") rather than the total. */
   perInterval: boolean;
+  /** The weight unit, only when they said it ("53 lb", "pounds"). */
+  unit: LoadUnit | null;
 }
 
 export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
   skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, weights: null,
-  choice: null, swapTo: null, swapAmount: null, perInterval: false,
+  choice: null, swapTo: null, swapAmount: null, swapUnit: null, perInterval: false, unit: null,
 };
 
 const isScoredKind = (r: StoryExerciseResult): boolean =>
@@ -139,6 +170,32 @@ function distinctChoiceMovements(result: StoryExerciseResult): MovementResult[] 
 
 const loadAnswered = (mr: MovementResult): boolean =>
   (mr.weight != null && mr.weight > 0) || mr.loadMode === 'bodyweight';
+
+/**
+ * Today's board amount at the habit's last scale — 300m of run at "600m run → 1800m bike" is 900m.
+ * Only when the board writes this movement in the unit last time's swap was measured from.
+ */
+function amountAtScale(mr: MovementResult, habit: SwapHabit): ChatSlot['usualAmount'] {
+  const scale = habit.scale;
+  if (!scale) return undefined;
+  const board = { reps: mr.movement.reps, distance: mr.movement.distance, calories: mr.movement.calories }[scale.from];
+  if (!board || board <= 0) return undefined;
+  const value = Math.round(board * scale.ratio);
+  return value > 0 ? { value, unit: scale.to } : undefined;
+}
+
+/** The load the nearest earlier movement of the part was given, if any — the "same" a slot offers. */
+function earlierLoad(result: StoryExerciseResult, mr: MovementResult): EarlierLoad | undefined {
+  const loads = distinctLoadMovements(result);
+  const given = loads.slice(0, loads.indexOf(mr)).reverse().find((m) => m.weight != null && m.weight > 0);
+  if (!given?.weight) return undefined;
+  return {
+    movement: stripMovementRolePrefix(given.movement.name),
+    weight: given.weight,
+    weightEnd: given.loadMode === 'range' ? given.weightEnd ?? null : null,
+    weights: given.loadMode === 'per_set' ? given.setWeights ?? null : null,
+  };
+}
 
 /** A single-lift block keeps its load on the result, not on a movement (see toLegacyResult). */
 const usesResultLevelLoad = (r: StoryExerciseResult): boolean =>
@@ -216,7 +273,8 @@ export function openSlots(
     };
 
     if (r.kind === 'score_time' && !(r.timeSeconds && r.timeSeconds > 0)) {
-      push(scores, { id: `${i}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true });
+      const cap = parseTimeCapSeconds(r.exercise.prescription);
+      push(scores, { id: `${i}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true, ...(cap ? { cap } : {}) });
     }
     if (r.kind === 'score_rounds' && !(r.rounds && r.rounds > 0)) {
       const intervals = personalIntervalCount(r, teamSize);
@@ -244,16 +302,18 @@ export function openSlots(
         push(loads, {
           id: `${i}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
           movementNames: [mr?.movement.name ?? r.exercise.name],
-          rxWeights: rxPair(mr), unit: movementLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
+          rxWeights: rxPair(mr), unit: knownLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
         });
       }
     } else {
       for (const mr of distinctLoadMovements(r)) {
         if (loadAnswered(mr)) continue;
+        const sameAs = earlierLoad(r, mr);
         push(loads, {
           id: `${i}.weight.${mr.movement.name.toLowerCase()}`, kind: 'weight', exerciseIndex: i,
           subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
-          rxWeights: rxPair(mr), unit: movementLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
+          rxWeights: rxPair(mr), unit: knownLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
+          ...(sameAs ? { sameAs } : {}),
         });
       }
     }
@@ -276,12 +336,24 @@ export function openSlots(
     // swap they make most times: that one is asked, their usual answer first. A movement with a
     // board choice is left to the choice question, so it's never asked about twice.
     for (const mr of distinctMovements(r)) {
-      if (mr.substitution) continue;
+      if (mr.substitution) {
+        // A swap nothing converts (300m of run → singles) has no number of its own — asked, so the
+        // row never saves the run's metres under the singles' name.
+        if (mr.substitution.adjustedValue == null) {
+          push(choices, {
+            id: `${i}.amount.${mr.movement.name.toLowerCase()}`, kind: 'amount', exerciseIndex: i,
+            subject: mr.substitution.selectedName, movementNames: [mr.movement.name], asked: true,
+          });
+        }
+        continue;
+      }
       const habit = mr.movement.alternative?.name ? undefined : habits.get(habitKey(mr.movement.name));
+      const usualAmount = habit ? amountAtScale(mr, habit) : undefined;
       push(habit ? choices : optional, {
         id: `${i}.swap.${mr.movement.name.toLowerCase()}`, kind: 'swap', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name], asked: !!habit,
         ...(habit ? { usually: habit.usually } : {}),
+        ...(usualAmount ? { usualAmount } : {}),
       });
     }
 
@@ -293,6 +365,22 @@ export function openSlots(
       // The extra reps ride on the rounds answer; listed so a later "…plus 12" still lands.
       push(optional, { id: `${i}.extra`, kind: 'rounds', exerciseIndex: i, subject: `${part} (extra reps)`, asked: false });
     }
+  }
+
+  // A weight was given and nothing says kg or lb — not the board, not their profile, not them.
+  // One question for the workout: the answer is the unit they lift in, so it moves every load the
+  // board left silent (setLoadUnit). Only ever reached by an athlete with no profile unit yet.
+  const unsure = results
+    .filter((r) => !r.skipped && !chatCannotLog(r))
+    .flatMap((r) => (r.movementResults ?? [])
+      .filter((mr) => mr.kind === 'load' && !knownLoadUnit(mr.movement)
+        && ((usesResultLevelLoad(r) ? r.weight : mr.weight) ?? 0) > 0)
+      .map((mr) => ({ exerciseIndex: r.exerciseIndex, name: mr.movement.name })));
+  if (unsure.length > 0 && !closed.has('unit')) {
+    loads.push({
+      id: 'unit', kind: 'unit', exerciseIndex: unsure[0].exerciseIndex, subject: 'weight unit',
+      movementNames: [...new Set(unsure.map((u) => u.name))], asked: true,
+    });
   }
 
   return [...scores, ...loads, ...choices, ...optional];
@@ -367,6 +455,40 @@ function weightHint(sets: number, unit: string): string {
 }
 
 /**
+ * The slot's movement done as `target` instead. `amount` is for ONE occurrence; the others keep
+ * the same ratio to their own board number — a 200m run swapped for 600m of bike makes the 300m
+ * one 900m, not 600m.
+ */
+function swapMovement(
+  results: StoryExerciseResult[],
+  slot: ChatSlot,
+  target: string,
+  amount: number | null,
+  unit: SwapUnit | null,
+): StoryExerciseResult[] {
+  const name = (slot.movementNames ?? [])[0]?.toLowerCase();
+  let scale: { factor: number; unit: SwapUnit | undefined } | undefined;
+  return patchResult(results, slot.exerciseIndex, (r) => patchMovements(r, slot.movementNames ?? [], (mr) => {
+    if (mr.movement.name.toLowerCase() !== name) return {};
+    if (scale) {
+      const board = namedSwap(mr, target).originalValue;
+      const sub = board
+        ? namedSwap(mr, target, Math.round(board * scale.factor), scale.unit)
+        : namedSwap(mr, target);
+      return buildSubstitutionPatch(mr, sub);
+    }
+    const sub = namedSwap(mr, target, amount ?? undefined, unit ?? undefined);
+    if (sub.adjustedValue != null && sub.originalValue) {
+      scale = {
+        factor: sub.adjustedValue / sub.originalValue,
+        unit: sub.targetUnit === 'time' ? undefined : sub.targetUnit,
+      };
+    }
+    return buildSubstitutionPatch(mr, sub);
+  }));
+}
+
+/**
  * Put one answer on the workout, with the same fields the form inputs write — a weight typed into
  * the chat and a weight typed on the stepper must land identically. Returns the new results and
  * whether the slot is now closed (answered or skipped). An answer that carries nothing usable
@@ -429,16 +551,22 @@ export function applyAnswer(
     case 'weight': {
       const load = loadPatch(answer);
       if (!load) return { results, closed: false };
+      const weighed = patchResult(results, i, (r) => (
+        usesResultLevelLoad(r)
+          // The lone movement carries it too, so the result reads as filled everywhere.
+          ? { ...load, ...patchMovements(r, slot.movementNames ?? [], () => load) }
+          : patchMovements(r, slot.movementNames ?? [], () => load)
+      ));
+      // "53 lb" says the unit too — the same as answering the unit question.
       return {
-        results: patchResult(results, i, (r) => (
-          usesResultLevelLoad(r)
-            // The lone movement carries it too, so the result reads as filled everywhere.
-            ? { ...load, ...patchMovements(r, slot.movementNames ?? [], () => load) }
-            : patchMovements(r, slot.movementNames ?? [], () => load)
-        )),
+        results: answer.unit ? setLoadUnit(weighed, i, slot.movementNames, answer.unit) : weighed,
         closed: true,
       };
     }
+
+    case 'unit':
+      if (!answer.unit) return { results, closed: false };
+      return { results: setLoadUnit(results, i, slot.movementNames, answer.unit), closed: true };
 
     case 'choice': {
       const picked = answer.choice?.trim().toLowerCase();
@@ -458,24 +586,16 @@ export function applyAnswer(
     case 'swap': {
       const target = answer.swapTo?.trim();
       if (!target) return { results, closed: false };
-      const name = (slot.movementNames ?? [])[0]?.toLowerCase();
-      // What they said they did is for ONE occurrence; the others keep the same ratio to their own
-      // board number — a 200m run swapped for 600m of bike makes the 300m one 900m, not 600m.
-      let factor: number | undefined;
-      return {
-        results: patchResult(results, i, (r) => patchMovements(r, slot.movementNames ?? [], (mr) => {
-          if (mr.movement.name.toLowerCase() !== name) return {};
-          const first = factor == null;
-          const sub = namedSwap(mr, target, first ? (answer.swapAmount ?? undefined) : undefined);
-          if (first) {
-            factor = sub.adjustedValue != null && sub.originalValue ? sub.adjustedValue / sub.originalValue : undefined;
-          } else if (factor != null && sub.originalValue) {
-            sub.adjustedValue = Math.round(sub.originalValue * factor);
-          }
-          return buildSubstitutionPatch(mr, sub);
-        })),
-        closed: true,
-      };
+      return { results: swapMovement(results, slot, target, answer.swapAmount, answer.swapUnit), closed: true };
+    }
+
+    case 'amount': {
+      // The swap is already made; this is its number. A bare "60" arrives as a count.
+      const amount = answer.swapAmount ?? answer.count;
+      const target = results.find((r) => r.exerciseIndex === i)?.movementResults
+        ?.find((mr) => mr.movement.name === slot.movementNames?.[0])?.substitution?.selectedName;
+      if (!amount || amount <= 0 || !target) return { results, closed: false };
+      return { results: swapMovement(results, slot, target, amount, answer.swapUnit), closed: true };
     }
 
     case 'sets': {
@@ -496,6 +616,8 @@ export function applyAnswer(
 export interface ChatChip {
   label: string;
   answers: SlotAnswer[];
+  /** A chip that answers nothing yet and asks this instead ("Different weight" → "What weight…?"). */
+  then?: ChatQuestion;
 }
 
 export interface ChatQuestion {
@@ -517,14 +639,30 @@ function formatClock(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function listNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+/** The unit the board wrote this movement in — the first positive quantity. */
+function boardUnit(mr: MovementResult): SwapUnit {
+  if ((mr.movement.distance ?? 0) > 0) return 'distance';
+  if ((mr.movement.calories ?? 0) > 0) return 'calories';
+  return 'reps';
+}
+
+/** "900 m", "20 cal", "15 reps". */
+function formatSwapAmount(value: number, unit: SwapUnit): string {
+  return unit === 'distance' ? `${value} m` : unit === 'calories' ? `${value} cal` : `${value} reps`;
+}
+
+/** "20 kg", "60 to 80 kg", "60, 65, 70 kg" — an earlier load the way the athlete gave it. */
+function describeLoad(load: EarlierLoad, unit: string): string {
+  if (load.weights && load.weights.length > 0) return `${load.weights.join(', ')} ${unit}`;
+  if (load.weightEnd != null) return `${load.weight} to ${load.weightEnd} ${unit}`;
+  return `${load.weight} ${unit}`;
 }
 
 /**
- * The next question, in words. Loads for one part go out as ONE question ("the snatches and the
- * step-ups?") — the athlete almost always used one implement for both, and "17.5" answers the lot.
+ * The next question, in words. Each loaded movement is its own question: the first names its
+ * weight, every later one in the part offers the earlier load as one tap ("Same 20 kg on the
+ * Weighted Step-up?") — often the same implement, not always, so it's asked, never assumed.
+ * "20 for both" up front still answers them all: the reader fills every open slot it covers.
  */
 export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]): ChatQuestion | null {
   const first = slots.find((s) => s.asked);
@@ -534,7 +672,7 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
 
   switch (first.kind) {
     case 'time': {
-      const cap = result ? parseTimeCapSeconds(result.exercise.prescription) : undefined;
+      const cap = first.cap;
       return {
         text: `What was your time${onPart}?`,
         slotIds: [first.id],
@@ -555,25 +693,31 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
     case 'duration':
       return { text: `How long did you hold ${first.subject}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
     case 'weight': {
-      const group = slots.filter((s) => s.asked && s.kind === 'weight' && s.exerciseIndex === first.exerciseIndex);
-      const ids = group.map((s) => s.id);
-      const names = group.flatMap((s) => s.movementNames ?? [s.subject]);
       const unit = first.unit ?? 'kg';
-      // Offer the Rx loads and every real weight between them as one tap each — only when every
-      // movement in the group shares them.
-      const shared = group.every((s) => JSON.stringify(s.rxWeights) === JSON.stringify(first.rxWeights));
-      const rxChips: ChatChip[] = shared && first.rxWeights
-        ? weightChoices(first.rxWeights, unit, first.equipment).map((w) => ({
-            label: `${w} ${unit}`,
-            answers: ids.map((id) => ({ id, ...EMPTY_ANSWER, weight: w })),
-          }))
-        : [];
+      const name = stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject);
+      const same = first.sameAs;
+      // The board's Rx loads and every real weight between them, one tap each.
+      const rxChips: ChatChip[] = (first.rxWeights ? weightChoices(first.rxWeights, unit, first.equipment) : [])
+        .map((w) => ({ label: `${w} ${unit}`, answers: [{ id: first.id, ...EMPTY_ANSWER, weight: w }] }));
       const strength = result?.kind === 'load' && result.setsTotal > 1;
-      return {
-        text: `What weight did you use for ${listNames(names.map(stripMovementRolePrefix))}?`,
+      const ask: ChatQuestion = {
+        text: `What weight did you use for ${name}?`,
         ...(strength ? { hint: weightHint(result.setsTotal, unit) } : {}),
-        slotIds: ids,
-        chips: [...rxChips, skipChip(ids)],
+        slotIds: [first.id],
+        chips: [...rxChips, skipChip([first.id])],
+      };
+      if (!same) return ask;
+      const load = describeLoad(same, unit);
+      return {
+        text: `Same ${load} on the ${name}, or a different weight?`,
+        slotIds: [first.id],
+        chips: [
+          {
+            label: `Same — ${load}`,
+            answers: [{ id: first.id, ...EMPTY_ANSWER, weight: same.weight, weightEnd: same.weightEnd, weights: same.weights }],
+          },
+          { label: 'Different weight', answers: [], then: ask },
+        ],
       };
     }
     case 'choice': {
@@ -605,13 +749,70 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
       // changed — the same as a skip, which is exactly what doing the board's movement means.
       const usual = first.usually;
       if (!usual) return null;
+      const asWritten: ChatChip = { label: `Did the ${first.subject}`, answers: [{ id: first.id, ...EMPTY_ANSWER, skipped: true }] };
+      // A habit is a guess about today, never a fence: whatever else they did is one tap away.
+      const somethingElse: ChatChip = {
+        label: 'Something else',
+        answers: [],
+        then: {
+          text: `What did you do instead of the ${first.subject}?`,
+          hint: 'e.g. singles, row 500m, 20 burpees',
+          slotIds: [first.id],
+          chips: [],
+        },
+      };
+      const amount = first.usualAmount;
+      if (!amount) {
+        return {
+          text: `${usual} again instead of the ${first.subject}?`,
+          slotIds: [first.id],
+          chips: [{ label: `${usual} again`, answers: [{ id: first.id, ...EMPTY_ANSWER, swapTo: usual }] }, somethingElse, asWritten],
+        };
+      }
+      // Their usual swap at their usual scale is ONE tap; another amount is asked, then typed.
+      const howMuch = formatSwapAmount(amount.value, amount.unit);
       return {
         text: `${usual} again instead of the ${first.subject}?`,
         slotIds: [first.id],
         chips: [
-          { label: `${usual} again`, answers: [{ id: first.id, ...EMPTY_ANSWER, swapTo: usual }] },
-          { label: `Did the ${first.subject}`, answers: [{ id: first.id, ...EMPTY_ANSWER, skipped: true }] },
+          {
+            label: `${usual} · ${howMuch}`,
+            answers: [{ id: first.id, ...EMPTY_ANSWER, swapTo: usual, swapAmount: amount.value, swapUnit: amount.unit }],
+          },
+          {
+            label: `${usual} · different amount`,
+            answers: [],
+            then: {
+              text: `How much ${usual} instead of the ${first.subject}?`,
+              hint: `Last time's scale would be ${howMuch} — type yours, e.g. 20 cal or 900 m.`,
+              slotIds: [first.id],
+              chips: [],
+            },
+          },
+          somethingElse,
+          asWritten,
         ],
+      };
+    }
+    case 'amount': {
+      const mr = result?.movementResults?.find((m) => m.movement.name === first.movementNames?.[0]);
+      const sub = mr?.substitution;
+      const board = sub?.originalValue && mr ? formatSwapAmount(sub.originalValue, boardUnit(mr)) : '';
+      const original = stripMovementRolePrefix(sub?.originalName ?? first.movementNames?.[0] ?? '');
+      return {
+        text: `How many ${first.subject} for each ${board ? `${board} ` : ''}${original}?`,
+        hint: 'A number is enough — or say the unit, e.g. 20 cal.',
+        slotIds: [first.id],
+        chips: [skipChip([first.id])],
+      };
+    }
+    case 'unit': {
+      const unitChip = (unit: LoadUnit): ChatChip => ({ label: unit, answers: [{ id: first.id, ...EMPTY_ANSWER, unit }] });
+      return {
+        text: 'Was that kg or lb?',
+        hint: "I'll remember it for next time.",
+        slotIds: [first.id],
+        chips: [unitChip('kg'), unitChip('lb'), skipChip([first.id])],
       };
     }
     case 'sets':

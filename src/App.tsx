@@ -27,6 +27,7 @@ import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import { track } from './services/analytics';
 import './styles/variables.css';
+import styles from './App.module.css';
 
 // Screens that show the bottom nav
 const MAIN_SCREENS: Screen[] = ['home', 'feed', 'history', 'profile', 'settings'];
@@ -46,6 +47,10 @@ function AppContent() {
   const [workoutList, setWorkoutList] = useState<WorkoutWithStats[]>([]);
   const [navDir, setNavDir] = useState<'up' | 'down' | null>(null);
   const [workoutDetailOrigin, setWorkoutDetailOrigin] = useState<'home' | 'history'>('history');
+  // A poster opened from the Wodi chat (a past workout it pointed at) sits ON TOP of the chat
+  // rather than replacing it: the conversation lives in memory, so leaving the screen lost the
+  // board, the game plan and every answer so far. Back closes the poster and the chat is as it was.
+  const [posterOverChat, setPosterOverChat] = useState(false);
   const [pendingRecapData, setPendingRecapData] = useState<RecapData | null>(null);
   // Installed from the home screen there is no browser chrome and so no reload
   // gesture; this is the app's only route onto a newer deploy.
@@ -66,6 +71,7 @@ function AppContent() {
     setCurrentScreen('recap');
   };
   const handleEditWorkout = (workout: WorkoutWithStats) => {
+    setPosterOverChat(false);
     setEditingWorkout(workout);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
@@ -149,20 +155,47 @@ function AppContent() {
   // Check if we should show bottom nav
   const showBottomNav = MAIN_SCREENS.includes(currentScreen);
 
+  // The poster of one workout, swiping through `workoutList` — on its own screen or over the chat.
+  const renderPoster = (workout: WorkoutWithStats, onBack: () => void) => {
+    const selectedIdx = workoutList.findIndex(w => w.id === workout.id);
+    const enterFrom = navDir === 'up' ? 'bottom' : navDir === 'down' ? 'top' : undefined;
+    return (
+      <WorkoutScreen
+        key={workout.id}
+        mode="detail"
+        enterFrom={enterFrom}
+        workout={workout}
+        onBack={() => { setNavDir(null); onBack(); }}
+        onEditWorkout={() => handleEditWorkout(workout)}
+        onPrevWorkout={selectedIdx > 0 ? () => {
+          setNavDir('down');
+          setSelectedWorkout(workoutList[selectedIdx - 1]);
+        } : undefined}
+        onNextWorkout={selectedIdx < workoutList.length - 1 ? () => {
+          setNavDir('up');
+          setSelectedWorkout(workoutList[selectedIdx + 1]);
+        } : undefined}
+      />
+    );
+  };
+
   // Render current screen
   const renderScreen = () => {
     switch (currentScreen) {
       case 'add-workout':
         return (
+          <>
           <AddWorkoutScreen
-            // A parked board opened from the thread is a different chat: start it fresh.
-            key={pendingPlannedWorkout?.id ?? 'new'}
+            // A parked board opened from the thread is a different chat: start it fresh. So is an
+            // edit begun from a poster opened over the chat — the screen doesn't change for that.
+            key={editingWorkout?.id ?? pendingPlannedWorkout?.id ?? 'new'}
             onOpenWorkout={(workout, list) => {
               setNavDir(null);
               setSelectedWorkout(workout);
               setWorkoutList(list);
+              // Where an edit begun from this poster returns to, once the chat has given way to it.
               setWorkoutDetailOrigin('home');
-              setCurrentScreen('workout-detail');
+              setPosterOverChat(true);
             }}
             onOpenPlanned={handleLogPlannedWorkout}
             onBack={() => {
@@ -205,27 +238,16 @@ function AppContent() {
             plannedWorkout={pendingPlannedWorkout}
             startInChat={startInChat}
           />
+          {posterOverChat && selectedWorkout && (
+            <div className={styles.posterOverChat}>
+              {renderPoster(selectedWorkout, () => setPosterOverChat(false))}
+            </div>
+          )}
+          </>
         );
       case 'workout-detail': {
-        const selectedIdx = workoutList.findIndex(w => w.id === selectedWorkout?.id);
-        const enterFrom = navDir === 'up' ? 'bottom' : navDir === 'down' ? 'top' : undefined;
         return selectedWorkout ? (
-          <WorkoutScreen
-            key={selectedWorkout.id}
-            mode="detail"
-            enterFrom={enterFrom}
-            workout={selectedWorkout}
-            onBack={() => { setNavDir(null); setCurrentScreen(workoutDetailOrigin); }}
-            onEditWorkout={() => handleEditWorkout(selectedWorkout)}
-            onPrevWorkout={selectedIdx > 0 ? () => {
-              setNavDir('down');
-              setSelectedWorkout(workoutList[selectedIdx - 1]);
-            } : undefined}
-            onNextWorkout={selectedIdx < workoutList.length - 1 ? () => {
-              setNavDir('up');
-              setSelectedWorkout(workoutList[selectedIdx + 1]);
-            } : undefined}
-          />
+          renderPoster(selectedWorkout, () => setCurrentScreen(workoutDetailOrigin))
         ) : (
           <HistoryScreen
             onSelectWorkout={(workout, sortedList) => {

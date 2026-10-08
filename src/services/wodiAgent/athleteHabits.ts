@@ -26,6 +26,17 @@ export interface SwapHabit {
   seen: number;
   /** The last time they made that swap, YYYY-MM-DD. */
   lastDate: string;
+  /** How much of `usually` they did for the board's amount, the last time it was saved with one. */
+  scale?: SwapScale;
+}
+
+export type SwapUnit = 'reps' | 'distance' | 'calories';
+
+/** "3 m of bike per metre of run": `ratio` of `to` for each one of `from` the board wrote. */
+export interface SwapScale {
+  from: SwapUnit;
+  to: SwapUnit;
+  ratio: number;
 }
 
 /** How far back a habit looks — recent sessions, so a changed habit changes quickly. */
@@ -76,13 +87,44 @@ export function swapHabits(workouts: readonly Workout[]): Map<string, SwapHabit>
     }
     const top = [...counts.values()].sort((a, b) => b.times - a.times)[0];
     if (!top || top.times < MIN_TIMES || top.times / occurrences.length < MIN_SHARE) continue;
+    const scale = lastScale(workouts, key, habitKey(top.name));
     habits.set(key, {
       movement: occurrences[0].asWritten,
       usually: top.name,
       times: top.times,
       seen: occurrences.length,
       lastDate: top.lastDate,
+      ...(scale ? { scale } : {}),
     });
   }
   return habits;
+}
+
+/** The board's unit, read off what the coach wrote — the first positive quantity. */
+function prescribedUnit(p: { reps?: number; distance?: number; calories?: number }): SwapUnit | undefined {
+  if ((p.distance ?? 0) > 0) return 'distance';
+  if ((p.calories ?? 0) > 0) return 'calories';
+  if ((p.reps ?? 0) > 0) return 'reps';
+  return undefined;
+}
+
+/**
+ * The amount they did the last time they swapped `movementKey` for `insteadKey`, as a ratio to
+ * what the board wrote — so 300m of run today offers what 600m → 1800m of bike said last time.
+ * Read from the saved swap itself; a swap saved without the board's amount has no scale.
+ */
+function lastScale(workouts: readonly Workout[], movementKey: string, insteadKey: string): SwapScale | undefined {
+  for (const workout of workouts) {
+    for (const exercise of workout.exercises ?? []) {
+      for (const movement of exercise.movements ?? []) {
+        const sub = movement.substitution;
+        if (!sub || habitKey(sub.originalName) !== movementKey || habitKey(sub.selectedName) !== insteadKey) continue;
+        const from = sub.originalPrescription ? prescribedUnit(sub.originalPrescription) : undefined;
+        const to = sub.targetUnit === 'time' ? undefined : sub.targetUnit;
+        if (!from || !to || !sub.originalValue || !sub.adjustedValue) return undefined;
+        return { from, to, ratio: sub.adjustedValue / sub.originalValue };
+      }
+    }
+  }
+  return undefined;
 }

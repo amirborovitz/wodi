@@ -14,6 +14,7 @@ import type { MovementResult } from './types';
  */
 
 type TargetUnit = NonNullable<MovementSubstitution['targetUnit']>;
+type SwapUnit = Exclude<TargetUnit, 'time'>;
 
 /** The unit a row is prescribed in, from the board alone. */
 function originUnit(mr: MovementResult): TargetUnit {
@@ -103,9 +104,10 @@ export function swapDefaults(
  * The swap for a substitute the athlete NAMED ("switched the run to echo bike"), for one row.
  * The conversion table is consulted first — a listed alternative carries its own multiplier. A
  * movement the table doesn't list is still recorded, by its own unit, with no invented number.
- * `amount` is what the athlete said they did, in the substitute's unit; it wins over the table.
+ * `amount` is what the athlete said they did; it wins over the table. `unit` is the unit they said
+ * it in ("20 cal") — without one, it's the substitute's own unit.
  */
-export function namedSwap(mr: MovementResult, targetName: string, amount?: number): MovementSubstitution {
+export function namedSwap(mr: MovementResult, targetName: string, amount?: number, unit?: SwapUnit): MovementSubstitution {
   const origin: SwapOrigin = {
     reps: mr.movement.reps ?? undefined,
     distance: mr.movement.distance ?? undefined,
@@ -118,7 +120,9 @@ export function namedSwap(mr: MovementResult, targetName: string, amount?: numbe
   });
   const definition = findExerciseDefinition(targetName);
   const alt: ExerciseAlternative = listed ?? { name: definition?.name ?? targetName.trim(), type: 'equivalent' };
-  const { targetUnit, adjustedValue } = swapDefaults(alt, origin);
+  const defaults = swapDefaults(alt, origin);
+  const said = amount != null && amount > 0;
+  const targetUnit = said && unit ? unit : defaults.targetUnit;
   const originalValue = [origin.reps, origin.distance, origin.calories].find((v) => v != null && v > 0);
   return {
     originalName: mr.movement.name,
@@ -127,7 +131,7 @@ export function namedSwap(mr: MovementResult, targetName: string, amount?: numbe
     ...(alt.distanceMultiplier ? { distanceMultiplier: alt.distanceMultiplier } : {}),
     ...(alt.ratio ? { repMultiplier: alt.ratio } : {}),
     originalValue,
-    adjustedValue: amount != null && amount > 0 ? amount : adjustedValue,
+    adjustedValue: said ? amount : defaults.adjustedValue,
     targetUnit,
   };
 }
