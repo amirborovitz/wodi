@@ -10,6 +10,10 @@ describe('skin order — the last chosen leads, the ones before it move back one
     expect(ids([])).toEqual([DEFAULT_NEW_SKIN, ...registry.filter((id) => id !== DEFAULT_NEW_SKIN)]);
   });
 
+  it('a first-time athlete sees Sun first and Slab second', () => {
+    expect(ids([]).slice(0, 2)).toEqual(['sun', 'slab']);
+  });
+
   it('choosing a skin puts it first and pushes everything that was ahead of it back by one', () => {
     const before = ids([]);
     const pick = before[4];
