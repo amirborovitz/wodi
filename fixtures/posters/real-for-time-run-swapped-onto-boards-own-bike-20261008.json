@@ -1,0 +1,40 @@
+{
+  "name": "real-for-time-run-swapped-onto-boards-own-bike-20261008",
+  "description": "SURGE: 3 RFT with its own 18 cal Echo Bike, and the 300m run swapped to 900 m on the Echo Bike in chat. Two bike lines on one board: the board's own (54 cal) and the swapped run (2,700 m). The save used to fold them into ONE breakdown row filed as calories, so the poster hung '⇄ Run' on the calorie line and gave neither bike a total. Breakdown here is what the save writes since the fix.",
+  "workout": {
+    "title": "SURGE",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "3 Rounds For Time",
+        "type": "wod",
+        "prescription": "3 RFT: 15/18 calories Echo Bike, 30 American Kettlebell Swing @20/28kg, 30 Weighted Step-up, 30 Burpee, 300m Run. Change the order of the movements as needed.",
+        "sets": [{ "id": "set-summary", "setNumber": 1, "completed": true, "actualReps": 270, "weight": 17.5, "time": 1620 }],
+        "movements": [
+          { "name": "Echo Bike", "calories": 18, "rxCalories": { "male": 18, "female": 15 }, "inputType": "none", "equipment": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "American Kettlebell Swing", "reps": 30, "rxWeights": { "male": 28, "female": 20, "unit": "kg" }, "inputType": "weight", "equipment": "kettlebell", "implementCount": 1, "countingMode": "per_round", "scoreEntryMode": "per_round", "loggedWeights": [20] },
+          { "name": "Weighted Step-up", "reps": 30, "inputType": "weight", "equipment": "other", "countingMode": "per_round", "scoreEntryMode": "per_round", "loadUnit": "kg", "loggedWeights": [15] },
+          { "name": "Burpee", "reps": 30, "inputType": "none", "equipment": "none", "countingMode": "per_round", "scoreEntryMode": "per_round" },
+          { "name": "Echo Bike", "reps": 0, "distance": 900, "calories": 0, "unit": "m", "inputType": "none", "equipment": "none", "countingMode": "per_round", "scoreEntryMode": "per_round", "substitution": { "originalName": "Run", "selectedName": "Echo Bike", "substitutionType": "equivalent", "distanceMultiplier": 3, "originalValue": 300, "adjustedValue": 900, "targetUnit": "distance", "originalPrescription": { "distance": 300 } } }
+        ],
+        "rounds": 3,
+        "rawText": "Endurance\nMetcon\n3 RFT:\n15/18 calories echo bike\n30 American Kettlebell Swing @20/28kg\n30 weighted step up\n30 burpee\n300m run\n\n* Change the order of the movements as needed",
+        "partKind": "metcon",
+        "loggingMode": "for_time",
+        "isSecondary": false,
+        "partnerWorkout": false
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "American Kettlebell Swing", "exerciseIndex": 0, "totalReps": 90, "weight": 20, "unit": "kg", "color": "yellow" },
+        { "name": "Weighted Step-up", "exerciseIndex": 0, "totalReps": 90, "weight": 15, "unit": "kg", "color": "yellow" },
+        { "name": "Burpee", "exerciseIndex": 0, "totalReps": 90, "color": "magenta" },
+        { "name": "Echo Bike", "exerciseIndex": 0, "totalCalories": 54, "unit": "cal", "color": "magenta" },
+        { "name": "Echo Bike", "exerciseIndex": 0, "totalDistance": 2700, "unit": "m", "distancePerRep": 900, "wasSubstituted": true, "originalMovement": "Run", "substitutionType": "equivalent", "color": "magenta" }
+      ]
+    },
+    "rawText": "Endurance\nMetcon\n3 RFT:\n15/18 calories echo bike\n30 American Kettlebell Swing @20/28kg\n30 weighted step up\n30 burpee\n300m run\n\n* Change the order of the movements as needed",
+    "format": "for_time"
+  }
+}

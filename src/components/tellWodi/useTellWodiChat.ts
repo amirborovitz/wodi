@@ -13,6 +13,7 @@ import {
   isComplete,
   nextQuestion,
   openSlots,
+  type ChatPanel,
   type ChatQuestion,
   type ChatSlot,
   type SlotAnswer,
@@ -47,6 +48,8 @@ export interface ChatMessage {
   /** The board photo once it's uploaded — what a reopened chat shows. `imageUrl` is the local preview. */
   savedImageUrl?: string;
   chips?: ChatChipView[];
+  /** Boxes to answer in, when the answer is several numbers (see ChatQuestion.panel). */
+  panel?: ChatPanel;
   /** A question whose chips were used, or which a later message answered — drawn dimmed. */
   answered?: boolean;
   /** Wodi's newest message, the same as on Today: its one named value in yellow, its day a link. */
@@ -234,7 +237,7 @@ export function useTellWodiChat({
 
   /** Dims every open question — the athlete has answered past them. */
   const settleQuestions = (): void => {
-    commit(messagesRef.current.map((m) => (m.chips && !m.answered ? { ...m, answered: true } : m)));
+    commit(messagesRef.current.map((m) => ((m.chips || m.panel) && !m.answered ? { ...m, answered: true } : m)));
   };
 
   const recentTurns = (): ChatTurn[] => messagesRef.current
@@ -277,6 +280,7 @@ export function useTellWodiChat({
       from: 'wodi',
       text: prefix ? `${prefix} ${question.text}` : question.text,
       ...(question.hint ? { hint: question.hint } : {}),
+      ...(question.panel ? { panel: question.panel } : {}),
       ...(question.chips.length > 0
         ? { chips: question.chips.map((c) => ({ label: c.label, answers: c.answers, ...(c.then ? { then: c.then } : {}) })) }
         : {}),

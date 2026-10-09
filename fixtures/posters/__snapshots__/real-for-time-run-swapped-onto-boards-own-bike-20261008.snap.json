@@ -1,0 +1,287 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "3 Rounds For Time",
+      "blueprint": "3 rounds for time",
+      "rows": [
+        {
+          "primary": "18 CAL",
+          "name": "Echo Bike",
+          "subNote": "54 cal total",
+          "totalNote": "54 cal total",
+          "mineKey": "Echo Bike",
+          "accent": "magenta",
+          "repeatCount": 3
+        },
+        {
+          "primary": "30",
+          "name": "American Kettlebell Swings",
+          "nameWithLoad": "American Kettlebell Swings @ 20kg",
+          "loadNote": "20kg",
+          "subNote": "90 total",
+          "totalNote": "90 total",
+          "mineKey": "American Kettlebell Swing",
+          "accent": "yellow",
+          "repeatCount": 3
+        },
+        {
+          "primary": "30",
+          "name": "Weighted Step-ups",
+          "nameWithLoad": "Weighted Step-ups @ 15kg",
+          "loadNote": "15kg",
+          "subNote": "90 total",
+          "totalNote": "90 total",
+          "mineKey": "Weighted Step-up",
+          "accent": "yellow",
+          "repeatCount": 3
+        },
+        {
+          "primary": "30",
+          "name": "Burpees",
+          "subNote": "90 total",
+          "totalNote": "90 total",
+          "mineKey": "Burpee",
+          "accent": "magenta",
+          "repeatCount": 3
+        },
+        {
+          "primary": "3×",
+          "name": "Echo Bike",
+          "nameWithLoad": "900m Echo Bike",
+          "subNote": "2.70 km total",
+          "totalNote": "2.70 km total",
+          "mineKey": "Run",
+          "substitutedFrom": "Run",
+          "accent": "magenta",
+          "repeatCount": 3
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "3 Rounds For Time",
+        "blueprint": "3 rounds for time",
+        "rows": [
+          {
+            "primary": "18 CAL",
+            "name": "Echo Bike",
+            "subNote": "54 cal total",
+            "totalNote": "54 cal total",
+            "mineKey": "Echo Bike",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "30",
+            "name": "American Kettlebell Swings",
+            "nameWithLoad": "American Kettlebell Swings @ 20kg",
+            "loadNote": "20kg",
+            "subNote": "90 total",
+            "totalNote": "90 total",
+            "mineKey": "American Kettlebell Swing",
+            "accent": "yellow",
+            "repeatCount": 3
+          },
+          {
+            "primary": "30",
+            "name": "Weighted Step-ups",
+            "nameWithLoad": "Weighted Step-ups @ 15kg",
+            "loadNote": "15kg",
+            "subNote": "90 total",
+            "totalNote": "90 total",
+            "mineKey": "Weighted Step-up",
+            "accent": "yellow",
+            "repeatCount": 3
+          },
+          {
+            "primary": "30",
+            "name": "Burpees",
+            "subNote": "90 total",
+            "totalNote": "90 total",
+            "mineKey": "Burpee",
+            "accent": "magenta",
+            "repeatCount": 3
+          },
+          {
+            "primary": "3×",
+            "name": "Echo Bike",
+            "nameWithLoad": "900m Echo Bike",
+            "subNote": "2.70 km total",
+            "totalNote": "2.70 km total",
+            "mineKey": "Run",
+            "substitutedFrom": "Run",
+            "accent": "magenta",
+            "repeatCount": 3
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "27:00",
+    "unit": "MIN",
+    "formatLine": "3 Rounds",
+    "storyLine": "90 american kettlebell swing · 90 weighted step-up · 90 burpee · 54 echo bike cals · 2.7km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "18 cal",
+        "name": "Echo Bike",
+        "total": "54 cal total",
+        "color": "magenta",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "American Kettlebell Swing",
+        "total": "90 total",
+        "color": "yellow",
+        "weight": 20,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Weighted Step-up",
+        "total": "90 total",
+        "color": "yellow",
+        "weight": 15,
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Burpee",
+        "total": "90 total",
+        "color": "magenta",
+        "unit": "kg",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "900m",
+        "name": "Echo Bike",
+        "total": "2.7km total",
+        "color": "magenta",
+        "wasSubstituted": true,
+        "originalMovement": "Run",
+        "substitutionType": "equivalent",
+        "substitutedPerRound": "900m"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "MY TIME",
+  "resultValue": "27:00",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "line",
+        "rx": "18 CAL Echo Bike",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "54 cal total"
+      },
+      {
+        "kind": "line",
+        "rx": "30 American Kettlebell Swings",
+        "load": "",
+        "mine": "20kg",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "30 Weighted Step-ups",
+        "load": "",
+        "mine": "15kg",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "30 Burpees",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "90 total"
+      },
+      {
+        "kind": "line",
+        "rx": "900m Echo Bike",
+        "swapFrom": "Run",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "2.70 km total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "line",
+          "rx": "18 CAL Echo Bike",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "54 cal total"
+        },
+        {
+          "kind": "line",
+          "rx": "30 American Kettlebell Swings",
+          "load": "",
+          "mine": "20kg",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "30 Weighted Step-ups",
+          "load": "",
+          "mine": "15kg",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "30 Burpees",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "90 total"
+        },
+        {
+          "kind": "line",
+          "rx": "900m Echo Bike",
+          "swapFrom": "Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "2.70 km total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ],
+  "pageTypes": [
+    "FOR TIME"
+  ]
+}

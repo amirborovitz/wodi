@@ -1,0 +1,39 @@
+{
+  "name": "real-squat-sets-then-max-reps-20261008",
+  "description": "VOLT strength part: \"Back Squat 4 sets, 5th max reps\" — no reps written for the 4 sets, logged as a build 70 → 85 kg (sets 2-3 unweighed), then the max set: 20 reps @ 50 kg. The poster printed the max row TWICE, each with the whole 70→85→50kg chain, under \"1 SETS BUILD TO HEAVY\".",
+  "workout": {
+    "title": "VOLT",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Back Squat",
+        "type": "strength",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "isSecondary": false,
+        "partnerWorkout": false,
+        "prescription": "Back Squat 4 sets, 5th set max reps",
+        "rawText": "Back Squat 4 sets\n5th max reps",
+        "sections": [
+          { "sectionType": "rounds", "rounds": 4, "movements": [{ "name": "Back Squat", "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_round", "loadUnit": "kg" }] },
+          { "sectionType": "rounds", "rounds": 1, "label": "5th max reps", "scoreType": "reps", "movements": [{ "name": "Back Squat", "inputType": "weight", "equipment": "barbell", "implementCount": 1, "isMaxReps": true, "maxMetric": "reps", "countingMode": "per_round", "loadUnit": "kg" }] }
+        ],
+        "movements": [{ "name": "Back Squat", "inputType": "weight", "equipment": "barbell", "implementCount": 1, "countingMode": "per_round", "loadUnit": "kg" }],
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "weight": 70 },
+          { "id": "set-1", "setNumber": 2, "completed": true },
+          { "id": "set-2", "setNumber": 3, "completed": true },
+          { "id": "set-3", "setNumber": 4, "completed": true, "weight": 85 },
+          { "id": "set-4", "setNumber": 5, "completed": true, "actualReps": 20, "isMax": true, "weight": 50 }
+        ]
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        { "name": "Back Squat", "exerciseIndex": 0, "totalReps": 20, "weight": 68.33, "weightProgression": [70, 85, 50], "unit": "kg", "color": "yellow" }
+      ]
+    },
+    "rawText": "I did today in the open gym- squats 4 sets and then 5th max reps then metcon - 10 rounds of every 2 min 600 meters echo bike + 12 db snatch",
+    "format": "emom"
+  }
+}

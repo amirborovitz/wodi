@@ -4,6 +4,7 @@ import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWo
 import { useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { PlusSheet } from './PlusSheet';
+import { ChatPanelCard } from './ChatPanelCard';
 import { WodiText } from './WodiText';
 import type { WodiThread } from './useWodiThread';
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
@@ -125,6 +126,13 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                 )}
               </div>
               <Receipts ids={message.receipts} thread={thread} onOpenWorkout={onOpenWorkout} />
+              {message.panel && !message.answered && (
+                <ChatPanelCard
+                  panel={message.panel}
+                  disabled={busy != null}
+                  onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); pinToEnd(); }}
+                />
+              )}
               {message.chips && !message.answered && (
                 <div className={styles.chips}>
                   {message.chips.map((chip) => (

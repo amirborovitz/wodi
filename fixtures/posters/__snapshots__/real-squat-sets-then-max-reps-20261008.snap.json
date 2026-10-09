@@ -1,0 +1,172 @@
+{
+  "reward": [
+    {
+      "eyebrow": "WOD",
+      "title": "Back Squat",
+      "blueprint": "5 sets",
+      "rows": [
+        {
+          "primary": "",
+          "name": "Back Squat",
+          "mineKey": "Back Squat",
+          "accent": "yellow",
+          "repeatCount": 5,
+          "mineOverride": "70→85kg"
+        },
+        {
+          "primary": "Max",
+          "name": "Back Squat",
+          "subNote": "20 total",
+          "totalNote": "20 total",
+          "mineKey": "Back Squat",
+          "accent": "yellow",
+          "repeatCount": 1,
+          "mineOverride": "50kg × 20"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": false
+    }
+  ],
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Back Squat",
+        "blueprint": "5 sets",
+        "rows": [
+          {
+            "primary": "",
+            "name": "Back Squat",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 5,
+            "mineOverride": "70→85kg"
+          },
+          {
+            "primary": "Max",
+            "name": "Back Squat",
+            "subNote": "20 total",
+            "totalNote": "20 total",
+            "mineKey": "Back Squat",
+            "accent": "yellow",
+            "repeatCount": 1,
+            "mineOverride": "50kg × 20"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "85",
+    "unit": "KG",
+    "subtitle": "BACK SQUAT",
+    "storyLine": "20 back squat",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×4 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Back Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          70,
+          85,
+          50
+        ],
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "×1 ROUNDS"
+      },
+      {
+        "perRound": "",
+        "name": "Back Squat",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          70,
+          85,
+          50
+        ],
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentGold"
+  },
+  "resultLabel": "TOP SET",
+  "resultValue": "85kg",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "5 sets"
+      },
+      {
+        "kind": "line",
+        "rx": "Back Squat",
+        "load": "",
+        "mine": "70→85kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "Max Back Squat",
+        "load": "",
+        "mine": "50kg × 20",
+        "team": "",
+        "total": "20 total"
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "5 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "Back Squat",
+          "load": "",
+          "mine": "70→85kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "Max Back Squat",
+          "load": "",
+          "mine": "50kg × 20",
+          "team": "",
+          "total": "20 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ],
+  "pageTypes": [
+    "STRENGTH"
+  ]
+}

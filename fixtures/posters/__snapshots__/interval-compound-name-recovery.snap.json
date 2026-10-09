@@ -10,7 +10,7 @@
           "name": "Echo Bike",
           "subNote": "4.00 km total",
           "totalNote": "4.00 km total",
-          "mineKey": "Echo Bike",
+          "mineKey": "Run",
           "substitutedFrom": "Run",
           "accent": "magenta",
           "repeatCount": 5
@@ -43,7 +43,7 @@
             "name": "Echo Bike",
             "subNote": "4.00 km total",
             "totalNote": "4.00 km total",
-            "mineKey": "Echo Bike",
+            "mineKey": "Run",
             "substitutedFrom": "Run",
             "accent": "magenta",
             "repeatCount": 5

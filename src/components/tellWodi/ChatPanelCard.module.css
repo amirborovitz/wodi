@@ -1,0 +1,131 @@
+/* Boxes inside the chat, under Wodi's question — the same surface as Wodi's bubble, so it reads as
+   part of what Wodi said. Yellow only on the one button that commits, per the design system. */
+.card {
+  width: min(100%, 340px);
+  margin: 0;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  background: #1e2023;
+  border: 1px solid var(--wodi-line);
+  border-radius: var(--r-lg);
+}
+
+.group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.title {
+  padding: 0;
+  margin-bottom: var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+}
+
+.joiner {
+  flex: none;
+  width: 28px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.field {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.box {
+  width: 100%;
+  height: 56px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--sp-1);
+  padding: 0 var(--sp-3);
+  background: var(--wodi-bg);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-md);
+  transition: border-color 0.15s ease;
+}
+
+.box:focus-within {
+  border-color: var(--wodi-yellow);
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 54px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 900;
+  color: var(--wodi-white);
+}
+
+.unit {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.done {
+  height: 48px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.done:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

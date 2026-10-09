@@ -12,6 +12,21 @@ import { movementLoadUnit } from '../../utils/loadUnits';
 // didn't do. See memory: feedback_poster_movement_data_source.
 
 /**
+ * The board line a prescribed movement IS. A saved swap renames the movement to what was done
+ * ("Echo Bike") and keeps the board's own name on `substitution.originalName` ("Run") — and the
+ * board's line is the identity: "300m Run" ridden as 900 m on the bike is still the run's line,
+ * not a second copy of the board's "18 cal Echo Bike".
+ */
+export function boardLineName(movement: ParsedMovement): string {
+  return movement.substitution?.originalName || movement.name;
+}
+
+/** The board line a breakdown entry was logged against — its original when it is a swap. */
+export function boardLineOfTotal(total: MovementTotal): string {
+  return total.originalMovement || total.name;
+}
+
+/**
  * Every movement name a part prescribes, from BOTH sections and the flat list — either may
  * carry a name the other renamed (a section's "Twin Kettlebells Clean and Jerk" against the
  * flat list's "Clean + Jerk"). Scoping has to recognise both spellings or the breakdown entry
@@ -118,16 +133,17 @@ export function findMovementTotal(
   exerciseIndex?: number,
 ): MovementTotal | undefined {
   const lower = movName.toLowerCase();
-  if (exerciseIndex !== undefined) {
-    const scoped = movements.find(
-      (m) => m.exerciseIndex === exerciseIndex
-        && (m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower),
-    );
-    if (scoped) return scoped;
-  }
-  return movements.find(
-    (m) => m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower,
-  );
+  const inScope = exerciseIndex !== undefined
+    ? movements.filter((m) => m.exerciseIndex === exerciseIndex)
+    : [];
+  // The entry logged against THIS board line first: when a swap lands on a movement the board
+  // already has, two entries share the done name and only the line tells them apart. The loose
+  // match (done name or original) stays for the ordinary case, where they never collide.
+  const ownLine = (m: MovementTotal): boolean => boardLineOfTotal(m).toLowerCase() === lower;
+  const loose = (m: MovementTotal): boolean =>
+    m.name.toLowerCase() === lower || m.originalMovement?.toLowerCase() === lower;
+  return inScope.find(ownLine) ?? inScope.find(loose)
+    ?? movements.find(ownLine) ?? movements.find(loose);
 }
 
 /**

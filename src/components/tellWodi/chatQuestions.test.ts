@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, isComplete, nextQuestion, openSlots, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, chatCannotLog, isComplete, nextQuestion, openSlots, panelAnswer, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
@@ -426,5 +426,100 @@ describe('a second weighted movement — same weight, or another', () => {
     const other = applyAnswer(rs, slot, answer(stepId, { weight: 12 })).results;
     expect(weightOf(other, 'Weighted Step-up')).toBe(12);
     expect(weightOf(other, 'American Kettlebell Swing')).toBe(20);
+  });
+});
+
+// VOLT, 2026-10-08: "Back Squat 4 sets, 5th max reps". The chat used to hand this to the form.
+describe('Tell Wodi — a strength block that ends on a max set stays in the chat', () => {
+  const squat = {
+    name: 'Back Squat',
+    type: 'strength',
+    loggingMode: 'strength',
+    prescription: 'Back Squat 4 sets, 5th set max reps',
+    rawText: 'Back Squat 4 sets\n5th max reps',
+    suggestedSets: 5,
+    movements: [{ name: 'Back Squat', inputType: 'weight', equipment: 'barbell', implementCount: 1, countingMode: 'per_round', loadUnit: 'kg' }],
+    sections: [
+      { sectionType: 'rounds', rounds: 4, movements: [{ name: 'Back Squat', inputType: 'weight', equipment: 'barbell', implementCount: 1, countingMode: 'per_round', loadUnit: 'kg' }] },
+      { sectionType: 'rounds', rounds: 1, label: '5th max reps', scoreType: 'reps', movements: [{ name: 'Back Squat', inputType: 'weight', equipment: 'barbell', implementCount: 1, isMaxReps: true, maxMetric: 'reps', countingMode: 'per_round', loadUnit: 'kg' }] },
+    ],
+  } as unknown as ParsedExercise;
+  const fresh = () => [createBlankResult(squat, 0, 'strength', 'male', undefined, true, { blankAnswers: true })];
+
+  it('asks the working weights and the max set in ONE panel of boxes — never "open the form"', () => {
+    const results = fresh();
+    expect(chatCannotLog(results[0])).toBe(false);
+    const slots = openSlots(results, new Set());
+    expect(slots.filter((s) => s.asked).map((s) => s.id)).toEqual(['0.weight', '0.maxset']);
+    const q = nextQuestion(slots, results)!;
+    expect(q.slotIds).toEqual(['0.weight', '0.maxset']);
+    expect(q.panel?.groups.map((g) => g.fields.map((f) => `${f.slotId}:${f.field}`))).toEqual([
+      ['0.weight:weight', '0.weight:weightEnd'],
+      ['0.maxset:count', '0.maxset:weight'],
+    ]);
+  });
+
+  it('the boxes save exactly what the form saves: 70 → 85 kg, then the max set, 20 @ 50 kg', () => {
+    let results = fresh();
+    const slots = openSlots(results, new Set());
+    const q = nextQuestion(slots, results)!;
+    const filled = panelAnswer(q.panel!, { '0.weight:weight': 70, '0.weight:weightEnd': 85, '0.maxset:count': 20, '0.maxset:weight': 50 });
+    expect(filled.label).toBe('70 → 85 kg · max 20 reps @ 50 kg');
+    for (const a of filled.answers) {
+      const outcome = applyAnswer(results, slots.find((s) => s.id === a.id)!, a);
+      expect(outcome.closed).toBe(true);
+      results = outcome.results;
+    }
+    const saved = toLegacyResult(results[0]);
+    expect(saved.sets.map((s) => [s.weight ?? null, s.isMax ?? false, s.actualReps ?? null])).toEqual([
+      [70, false, null], [null, false, null], [null, false, null], [85, false, null], [50, true, 20],
+    ]);
+  });
+
+  it('a group left empty is a skip, not a question asked again', () => {
+    const results = fresh();
+    const q = nextQuestion(openSlots(results, new Set()), results)!;
+    const filled = panelAnswer(q.panel!, { '0.weight:weight': 80 });
+    expect(filled.label).toBe('80 kg');
+    expect(filled.answers).toEqual([
+      { id: '0.weight', ...EMPTY_ANSWER, weight: 80 },
+      { id: '0.maxset', ...EMPTY_ANSWER, skipped: true },
+    ]);
+  });
+
+  it('typed instead: "20 at 50" answers the max set on its own', () => {
+    const results = fresh();
+    const slot = openSlots(results, new Set()).find((s) => s.id === '0.maxset')!;
+    const outcome = applyAnswer(results, slot, answer('0.maxset', { count: 20, weight: 50 }));
+    expect(outcome.closed).toBe(true);
+    expect(outcome.results[0]).toMatchObject({ maxReps: 20, maxRepsWeight: 50 });
+  });
+});
+
+// The board of 2026-10-09: a bench press, then a [2:00 AMRAP / 2:00 rest] x 5 with power cleans.
+// The chat asked the metcon's rounds, then the bench, then the metcon's cleans — every score in
+// the session first, then every load. It walks the board instead: one part at a time.
+describe('Tell Wodi — the order it asks in', () => {
+  const bench = {
+    name: 'Bench Press', type: 'strength', loggingMode: 'strength', partKind: 'strength',
+    prescription: 'Bench Press — 5 sets: 5-5-4-4-3', suggestedSets: 5, suggestedRepsPerSet: [5, 5, 4, 4, 3],
+    movements: [{ name: 'Bench Press', inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' }],
+  } as unknown as ParsedExercise;
+  const chief = {
+    name: '2:00 AMRAP x 5', type: 'wod', loggingMode: 'amrap_intervals', partKind: 'metcon',
+    prescription: '[2:00 AMRAP / 2:00 rest] x 5: 3 Power Clean, 6 Push-up, 9 Air Squat',
+    intervalCount: 5, intervalSeconds: 120, intervalRestSeconds: 120,
+    movements: [
+      { name: 'Power Clean', reps: 3, rxWeights: { male: 60, female: 40, unit: 'kg' }, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' },
+      { name: 'Push-up', reps: 6, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+      { name: 'Air Squat', reps: 9, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const workout = { title: 'THE CHIEF INTERVALS', type: 'amrap', format: 'amrap_intervals', exercises: [bench, chief] } as unknown as ParsedWorkout;
+
+  it('finishes the bench before it asks about the metcon', () => {
+    const rs = initStoryResults(workout, ['strength', 'amrap_intervals'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
+    const order = openSlots(rs, new Set()).filter((s) => s.asked).map((s) => `${s.exerciseIndex}:${s.kind}`);
+    expect(order).toEqual(['0:weight', '1:rounds', '1:weight']);
   });
 });

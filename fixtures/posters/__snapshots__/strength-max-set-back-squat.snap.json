@@ -13,7 +13,7 @@
           "mineKey": "Back Squat",
           "accent": "yellow",
           "repeatCount": 5,
-          "mineOverride": "100kg"
+          "mineOverride": "100kg × 5"
         },
         {
           "primary": "Max",
@@ -23,7 +23,7 @@
           "mineKey": "Back Squat",
           "accent": "yellow",
           "repeatCount": 1,
-          "mineOverride": "60kg"
+          "mineOverride": "60kg × 14"
         }
       ],
       "hiddenCount": 0,
@@ -45,7 +45,7 @@
             "mineKey": "Back Squat",
             "accent": "yellow",
             "repeatCount": 5,
-            "mineOverride": "100kg"
+            "mineOverride": "100kg × 5"
           },
           {
             "primary": "Max",
@@ -55,7 +55,7 @@
             "mineKey": "Back Squat",
             "accent": "yellow",
             "repeatCount": 1,
-            "mineOverride": "60kg"
+            "mineOverride": "60kg × 14"
           }
         ],
         "hiddenCount": 0,
@@ -97,7 +97,7 @@
         "kind": "line",
         "rx": "Back Squat",
         "load": "",
-        "mine": "100kg",
+        "mine": "100kg × 5",
         "team": "",
         "total": "20 total"
       },
@@ -105,7 +105,7 @@
         "kind": "line",
         "rx": "Max Back Squat",
         "load": "",
-        "mine": "60kg",
+        "mine": "60kg × 14",
         "team": "",
         "total": "14 total"
       }
@@ -121,7 +121,7 @@
           "kind": "line",
           "rx": "Back Squat",
           "load": "",
-          "mine": "100kg",
+          "mine": "100kg × 5",
           "team": "",
           "total": "20 total"
         },
@@ -129,7 +129,7 @@
           "kind": "line",
           "rx": "Max Back Squat",
           "load": "",
-          "mine": "60kg",
+          "mine": "60kg × 14",
           "team": "",
           "total": "14 total"
         }

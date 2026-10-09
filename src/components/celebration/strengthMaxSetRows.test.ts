@@ -58,11 +58,12 @@ describe('a strength block that ends on a max set', () => {
     expect(max.primary).toBe('Max');
   });
 
-  it('gives each row the bar its own sets were on', () => {
+  it('gives each row the bar its own sets were on, and its own reps', () => {
     const [working, max] = rows();
     // Not "100→60kg" on both: the working sets never climbed down, and the max never climbed.
-    expect(working.mineOverride).toBe('100kg');
-    expect(max.mineOverride).toBe('60kg');
+    // A strength line prints only this column, so each row's reps ride beside its bar.
+    expect(working.mineOverride).toBe('100kg × 5');
+    expect(max.mineOverride).toBe('60kg × 14');
   });
 
   it('splits the stored total between the rows rather than dropping it', () => {

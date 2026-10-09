@@ -50,7 +50,7 @@ import {
   type CelebrationStickerConfig,
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
-import { findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, formatPeakLoadValue, substitutedFromName } from './movementResolution';
+import { boardLineName, boardLineOfTotal, findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, formatPeakLoadValue, substitutedFromName } from './movementResolution';
 import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sectionsEnumerateIntervals, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
@@ -245,7 +245,7 @@ function isSinglePassSection(exercise: Exercise): boolean {
 function hasIntraRoundRepeat(movements: ParsedMovement[]): boolean {
   const seen = new Set<string>();
   for (const movement of movements) {
-    const key = movement.name.toLowerCase();
+    const key = boardLineName(movement).toLowerCase();
     if (seen.has(key)) return true;
     seen.add(key);
   }
@@ -888,7 +888,9 @@ function getPrescribedMovementsInOrder(exercise: Exercise | null | undefined): P
 }
 
 function findPrescribedMovementIndex(movement: MovementTotal, prescribedOrder: string[]): number {
-  const candidates = [movement.name, movement.originalMovement]
+  // The board line first: a swap that landed on a movement the board already has shares its
+  // done name with that line, and only the original says which line it was logged against.
+  const candidates = [movement.originalMovement, movement.name]
     .filter((name): name is string => Boolean(name))
     .map(normalizeStampMovementName)
     .filter(Boolean);
@@ -908,7 +910,7 @@ function findPrescribedMovementIndex(movement: MovementTotal, prescribedOrder: s
 
 function orderMovementTotalsByPrescription(exercise: Exercise | null | undefined, movements: MovementTotal[]): MovementTotal[] {
   const prescribed = getPrescribedMovementsInOrder(exercise)
-    .map((movement) => ({ movement, key: normalizeStampMovementName(movement.name) }))
+    .map((movement) => ({ movement, key: normalizeStampMovementName(boardLineName(movement)) }))
     .filter((entry) => Boolean(entry.key));
   const prescribedOrder = prescribed.map((entry) => entry.key);
   if (prescribedOrder.length === 0) return movements;
@@ -1511,7 +1513,9 @@ function buildCelebrationMovementRow(params: {
     loadNote: hasWeight && !isStrength ? `${weight}${unit}${weightEachSuffix}` : undefined,
     subNote: subNoteParts.slice(0, 1).join(' · ') || undefined,
     totalNote: subNoteParts.find((part) => /\btotal\b/i.test(part)),
-    mineKey: actual?.name ?? movementName,
+    // The entry's board line: two lines can share a done name (a run swapped onto the board's
+    // own bike), and only the line says which entry this row speaks for.
+    mineKey: actual ? boardLineOfTotal(actual) : movementName,
     // The board's movement when this row is a substitute for it. The row already DISPLAYS the
     // substitute (baseDisplayName above); this is what says so out loud.
     substitutedFrom: substitutedFromName(actual, prescribed?.alternative),
@@ -2085,33 +2089,37 @@ function buildSequentialMovementRows(
      * own sets were on.
      */
     writtenSetWeights?: number[];
+    /** The reps of each of those written sets — what the working line states beside its bar. */
+    writtenSetRepsEach?: number[];
   } = {},
 ): ArtifactRow[] {
   const occurrences = new Map<string, number>();
   for (const movement of prescribedMovements) {
-    const key = movement.name.toLowerCase();
+    const key = boardLineName(movement).toLowerCase();
     occurrences.set(key, (occurrences.get(key) ?? 0) + 1);
   }
   const maxMovementKey = options.maxSet
     ? prescribedMovements.find(statesMaxEffort)?.name.toLowerCase()
     : undefined;
   return prescribedMovements.map((movement): ArtifactRow => {
-    const actual = findMovementTotal(actualMovements, movement.name);
+    const actual = findMovementTotal(actualMovements, boardLineName(movement));
     // statesMaxEffort is THE owner of "does this movement say Max" — the same answer the logging
     // screen used to decide it had a number to ask for.
     const statesMax = statesMaxEffort(movement);
     const maxSet = statesMax ? options.maxSet : undefined;
     const maxWeight = maxSet?.weight;
     // The written half of a block whose other half is a max: same lift, same stored entry, and
-    // its share is the sets that carry a coach-written rep count.
+    // its share is the sets that carry a coach-written rep count. It is the written half whether
+    // or not those sets carry a count — "4 sets, 5th max reps" writes none — and then it states
+    // its own loads and no total, rather than the whole entry's (the max set's reps and bar).
     const isWrittenHalfOfMaxBlock = !statesMax
       && maxMovementKey != null
-      && movement.name.toLowerCase() === maxMovementKey
-      && (options.writtenSetReps ?? 0) > 0;
+      && movement.name.toLowerCase() === maxMovementKey;
+    const writtenReps = (options.writtenSetReps ?? 0) > 0 ? options.writtenSetReps : undefined;
     const row = buildCelebrationMovementRow({
       // A max row is its own occurrence and carries its own count, so the merge guard that blanks
       // a name-shared total must not blank it too — and neither may it blank the written half.
-      occurrenceCount: maxSet || isWrittenHalfOfMaxBlock ? 1 : occurrences.get(movement.name.toLowerCase()),
+      occurrenceCount: maxSet || isWrittenHalfOfMaxBlock ? 1 : occurrences.get(boardLineName(movement).toLowerCase()),
       // A logged substitution replaces the board's movement — the athlete didn't do the Rx one.
       movementName: actual?.wasSubstituted ? actual.name : movement.name,
       prescribed: {
@@ -2126,7 +2134,7 @@ function buildSequentialMovementRows(
       actual: maxSet
         ? { name: actual?.name ?? movement.name, totalReps: maxSet.actualReps, weight: maxWeight, unit: actual?.unit }
         : isWrittenHalfOfMaxBlock
-        ? { ...(actual ?? { name: movement.name }), totalReps: options.writtenSetReps }
+        ? { ...(actual ?? { name: movement.name }), totalReps: writtenReps }
         : actual,
       repeatCount: maxSet ? 1 : (options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount),
       suppressDistanceTotal: true,
@@ -2148,6 +2156,17 @@ function buildSequentialMovementRows(
     const unit = actual?.unit === 'lb' ? 'lb' : 'kg';
     const ownWeights = maxSet ? (maxWeight != null ? [maxWeight] : []) : (options.writtenSetWeights ?? []);
     const ownLoad = formatLoggedLoad(ownWeights, unit, movement.implementCount);
+    // A strength line prints only its right-hand column — never a total — so the max set's reps
+    // ride there with its bar, the way a lifter writes it: "50kg × 20". Without this the one
+    // number the athlete earned left the poster (VOLT, 2026-10-09).
+    // The working line the same way, when every written set had the same reps ("100kg × 5"); reps
+    // that changed set to set have no one number, and a board that wrote none has nothing to say.
+    const written = options.writtenSetRepsEach ?? [];
+    const sameWrittenReps = written.length > 0 && written[0] > 0 && written.every((reps) => reps === written[0]) ? written[0] : undefined;
+    const ownReps = maxSet ? maxSet.actualReps : sameWrittenReps;
+    if (options.isStrength && ownReps && ownReps > 0) {
+      return { ...row, mineOverride: ownLoad ? `${ownLoad} × ${ownReps}` : `${ownReps} reps` };
+    }
     return ownLoad ? { ...row, mineOverride: ownLoad } : { ...row, suppressMine: true };
   });
 }
@@ -2935,7 +2954,7 @@ export function buildPageArtifactSections(
     ? exercise.sections.flatMap((section) => section.movements || [])
     : (exercise.movements || []);
   for (const m of prescribedMovements) {
-    const key = m.name.toLowerCase();
+    const key = boardLineName(m).toLowerCase();
     if (m.stationLabel) {
       stationLabelMap[key] = m.stationLabel;
       if (!stationLabelsInOrder.includes(m.stationLabel)) stationLabelsInOrder.push(m.stationLabel);
@@ -2967,10 +2986,7 @@ export function buildPageArtifactSections(
   // station where it exists (matched through a substitution back to the prescribed name).
   const orderedMovements = hasStations
     ? prescribedMovements.map((prescribed): MovementTotal => {
-        const key = prescribed.name.toLowerCase();
-        return movements.find((m) =>
-          m.name.toLowerCase() === key || m.originalMovement?.toLowerCase() === key,
-        ) ?? { name: prescribed.name };
+        return findMovementTotal(movements, boardLineName(prescribed)) ?? { name: prescribed.name };
       })
     : orderMovementTotalsByPrescription(exercise, movements);
 
@@ -3391,8 +3407,13 @@ export function buildPageArtifactSections(
   // those lines flat or wrapped them in a single single-pass section. Collapsing to one row
   // per unique name loses the board's shape and — because breakdown entries are name-keyed —
   // prints the whole piece's total (160) against a line that reads 80.
+  // A strength block that ends on a max set is the same list of board lines — the written sets,
+  // then the max — whether the AI wrote it flat or as a "4 sets" section and a "5th max" section.
+  // Only the flat spelling used to reach the max-set rows; the sectioned one fell through to
+  // name-keyed rows, which stamped "Max" on both lines and printed the max twice (VOLT, 2026-10-08).
+  const endsOnMaxSet = isStrength && (exercise.sets?.some((set) => set.isMax) ?? false);
   const isFlatOccurrenceList = !hasStations
-    && (!exercise.sections?.length || isSinglePassSection(exercise))
+    && (!exercise.sections?.length || isSinglePassSection(exercise) || endsOnMaxSet)
     && hasIntraRoundRepeat(prescribedMovements);
   const rows = isStrengthBlocks
     ? buildStrengthBlockRows(exercise, movements)
@@ -3401,6 +3422,9 @@ export function buildPageArtifactSections(
         maxSet: exercise.sets?.find((set) => set.isMax),
         writtenSetReps: exercise.sets?.some((set) => set.isMax)
           ? exercise.sets.reduce((sum, set) => sum + (set.isMax ? 0 : (set.actualReps ?? 0)), 0)
+          : undefined,
+        writtenSetRepsEach: exercise.sets?.some((set) => set.isMax)
+          ? exercise.sets.filter((set) => !set.isMax).map((set) => set.actualReps ?? 0)
           : undefined,
         writtenSetWeights: exercise.sets?.some((set) => set.isMax)
           ? exercise.sets.filter((set) => !set.isMax).map((set) => set.weight ?? 0)
@@ -3416,7 +3440,7 @@ export function buildPageArtifactSections(
         teamSize,
       })
     : orderedMovements.map((movement): ArtifactRow => {
-        const key = movement.name.toLowerCase();
+        const key = boardLineOfTotal(movement).toLowerCase();
         const stationLabel = stationLabelMap[key];
 
         if (hasStations) {
@@ -3539,20 +3563,26 @@ export function buildPageArtifactSections(
           return base;
         }
 
-        const parsedMovement = exercise.movements?.find((candidate) => {
-          const name = candidate.name.toLowerCase();
-          return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
-        });
+        const parsedMovement = exercise.movements?.find((candidate) => boardLineName(candidate).toLowerCase() === key)
+          ?? exercise.movements?.find((candidate) => {
+            const name = candidate.name.toLowerCase();
+            return name === movement.name.toLowerCase() || name === movement.originalMovement?.toLowerCase();
+          });
+        // A swapped line's quantities describe the swap only when the line records it (the save
+        // stores the ridden 900 m on it). A doc saved before that still holds the BOARD's run on
+        // the line — "200m" — which belongs to the movement that wasn't done, so that row reads
+        // nothing from the prescription and states what was logged.
+        const pk = movement.wasSubstituted && parsedMovement?.substitution == null ? movement.name.toLowerCase() : key;
         const prescribed = {
-          reps: prescribedRepsMap[key],
-          repsDisplay: prescribedRepsDisplayMap[key],
-          distance: prescribedDistMap[key],
-          calories: prescribedCalsMap[key],
-          time: prescribedTimeMap[key],
-          weight: prescribedWeightMap[key],
-          implementCount: prescribedImplementMap[key],
+          reps: prescribedRepsMap[pk],
+          repsDisplay: prescribedRepsDisplayMap[pk],
+          distance: prescribedDistMap[pk],
+          calories: prescribedCalsMap[pk],
+          time: prescribedTimeMap[pk],
+          weight: prescribedWeightMap[pk],
+          implementCount: prescribedImplementMap[pk],
           relay: parsedMovement?.relay,
-          alternative: prescribedAltMap[key],
+          alternative: prescribedAltMap[pk],
         };
 
         const row = buildCelebrationMovementRow({

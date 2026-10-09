@@ -40,7 +40,7 @@ const BW_DISPLAY_PATTERNS = [
  * only the FIRST weight — so the other part's reps were priced at a load it never touched.
  *
  * Repeats WITHIN one part still merge on the name, which is exactly what a part's own total
- * means. Every entry carries `exerciseIndex` so consumers can scope back to the part; see
+ * means. The name is the board's — a swapped movement stays on the line it replaced. Every entry carries `exerciseIndex` so consumers can scope back to the part; see
  * `movementsForParts` in celebration/movementResolution.ts.
  */
 export function movementBucketKey(name: string, exerciseIndex: number): string {

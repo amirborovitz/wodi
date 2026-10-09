@@ -67,13 +67,14 @@ const posterLoad = (w: Workout, name: string) =>
   formatPosterLoad(w.workloadBreakdown!.movements.find((m) => m.name === name)!);
 
 describe('strength weights told to Wodi', () => {
-  it('the question asks; a dim hint shows the three ways to answer, sized to the board', () => {
+  it('the question is two boxes, start and peak; the hint says how to give each set instead', () => {
     const results = blank(squat);
     const q = nextQuestion(openSlots(results, new Set()), results)!;
+    expect(q.text).toBe('What did you lift on the Back Squat?');
+    expect(q.panel?.groups.map((g) => g.fields.map((f) => f.label))).toEqual([['start', 'peak']]);
     // The question is only the question; how to answer is a separate, dimmer hint — set inside
     // the question, the example numbers read as Wodi telling you what you lifted.
-    expect(q.text).toBe('What weight did you use for Back Squat?');
-    expect(q.hint).toBe('Type one weight, a start and end, or each set — e.g. 80 · 60 to 80 · 60, 65, 70, 75, 80');
+    expect(q.hint).toBe('Same every set? Leave the peak empty. Each set different? Type them — e.g. 60, 65, 70');
   });
 
   it('a weight for each set saves each set, prints every one, and survives an edit', () => {

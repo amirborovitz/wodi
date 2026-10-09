@@ -298,7 +298,7 @@ export function buildWorkloadBreakdownFromResults(
         const key = movementBucketKey(movementName, resultIndex);
 
         const rawWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
+          ?? (weightFromSets && takesSetWeight(mov) ? weightFromSets : undefined);
         const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
         const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
         const weight = explicitWeight;
@@ -490,13 +490,16 @@ export function buildWorkloadBreakdownFromResults(
       // perRoundReps is 0 and the guard below drops the part — no reps, no volume, no EP for
       // the whole block. The sets already hold every rep, so this is a TOTAL (rounds forced to
       // 1 below), not a per-round count. Only safe when one movement can own those sets: a
-      // complex or a circuit shares its sets across movements and must not claim them all.
+      // complex or a circuit shares its sets across movements and must not claim them all. "One"
+      // counts what is IN the sets: an accessory done between them is not, so it neither claims
+      // the sets nor stops the lift from owning them.
       // Reps ONLY, for the same reason the max-set sum above is routed: the sets hold a bare
       // number and the movement's own metric says what it counts. Unguarded, a lone "max
       // calories" Echo Bike banked its 40 as calories here AND as 40 reps, so one effort was
       // stored twice in two different units and the poster still had a rep figure to print.
       const setTotalReps = !hasSections
-        && iterationMovements.length === 1
+        && isInTheSets(mov)
+        && iterationMovements.filter(isInTheSets).length === 1
         && maxSetMetric === 'reps'
         && userReps === undefined
         && !mov.reps && !mov.distance && !mov.calories && !mov.time
@@ -543,12 +546,14 @@ export function buildWorkloadBreakdownFromResults(
         // entered feeds the score and never reaches the poster (truth standard — estimates may
         // inform EP, never the artifact).
         const uncountedWeight = movementLookup(result.movementWeights || {}, mk, mov.name)
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined);
+          ?? (weightFromSets && takesSetWeight(mov) ? weightFromSets : undefined);
         if (uncountedWeight && uncountedWeight > 0) {
           // Station visits, not raw rounds: in a 20-minute rotation this movement came up 5
           // times, not 20 — the same count the main path gets via getMovementEffectiveRounds.
           const visits = stationVisitCounts?.[movIdx] ?? movementRounds;
-          const workSeconds = result.exercise.workDuration ?? parsedWorkout?.intervalTime ?? 60;
+          // The PART's own clock only. The session's intervalTime belongs to whichever part set
+          // it — a bench block read a sibling metcon's 2:00 and was priced at 24 reps a set.
+          const workSeconds = result.exercise.workDuration ?? 60;
           const assumedReps = Math.max(1, Math.round(workSeconds / SECONDS_PER_UNCOUNTED_REP));
           estimatedVolume += toKg(uncountedWeight, movementLoadUnit(mov))
             * assumedReps * Math.max(1, visits);
@@ -637,14 +642,18 @@ export function buildWorkloadBreakdownFromResults(
         ? (getAlternativeType(mov.name, rawMovementName) ?? undefined)
         : undefined;
       const originalMovement = wasSubstituted ? mov.name : undefined;
-      const key = movementBucketKey(movementName, resultIndex);
+      // Bucketed on the BOARD's line, not on what was done there: "300m Run" swapped to the Echo
+      // Bike is still the run's line. Keyed on the done name, a swap onto a movement the board
+      // already has ("18 cal Echo Bike") merged into it — 54 cal + 2,700 m as one row, filed as
+      // calories, with the Run swap hung on the calorie line (SURGE, 2026-10-08).
+      const key = movementBucketKey(mov.name, resultIndex);
 
       // Weight priority: weighted avg from sets (when progressive) > user-entered per-movement > user-entered per-set > parsed Rx
       // When weights vary across sets, use the weighted average so volume = avgWeight × totalReps
-      const rawWeight = (hasVaryingSetWeights && weightFromSets && isWeightedMovement(mov))
+      const rawWeight = (hasVaryingSetWeights && weightFromSets && takesSetWeight(mov))
         ? weightFromSets
         : (movementLookup(result.movementWeights || {}, mk, mov.name)
-          ?? (weightFromSets && isWeightedMovement(mov) ? weightFromSets : undefined));
+          ?? (weightFromSets && takesSetWeight(mov) ? weightFromSets : undefined));
       // Apply KB/DB implement count multiplier (x1 or x2)
       const implementCount = movementLookup(result.implementCounts || {}, mk, mov.name) ?? 1;
       const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
@@ -663,7 +672,9 @@ export function buildWorkloadBreakdownFromResults(
       // per-exercise set progression, which would otherwise smear one block's climb onto both.
       const perMovementProgression = movementLookup(result.movementWeightProgressions || {}, mk, mov.name);
       const movWeightProgression = weight
-        ? (perMovementProgression && perMovementProgression.length > 1 ? perMovementProgression : setWeightProgression)
+        ? (perMovementProgression && perMovementProgression.length > 1
+          ? perMovementProgression
+          : (isInTheSets(mov) ? setWeightProgression : undefined))
         : undefined;
 
       if (existing) {
@@ -836,7 +847,7 @@ export function buildWorkloadBreakdownFromResults(
     const weightedAvg = distinctWeights.reduce((sum, w) => sum + w, 0) / distinctWeights.length;
 
     for (const mov of movements) {
-      if (!isWeightedMovement(mov)) continue;
+      if (!takesSetWeight(mov)) continue;
       // Scoped to THIS part: a sibling part's entry for the same lift keeps its own load, and
       // must never be patched with this part's set progression.
       const key = movementBucketKey(mov.name, resultIndex);
@@ -902,6 +913,21 @@ export function buildWorkloadBreakdownFromResults(
     containerRounds: parsedWorkout?.containerRounds,
     ...(estimated ? { estimated: true } : {}),
   };
+}
+
+/**
+ * Whether a movement is IN the block's sets. One done in the gaps between them ("in between
+ * sets: 3 × 15 band pull-aparts") is not: the sets' reps and weights are the lift's, never its.
+ * Reading the sets as shared by every movement in the block is what threw away a bench press's
+ * 21 logged reps and hung its 60→65 kg on the band pull-aparts (2026-10-09).
+ */
+function isInTheSets(movement: ParsedMovement): boolean {
+  return movement.placement !== 'between_sets';
+}
+
+/** The block's set weights apply to a movement only when it is loaded AND in the sets. */
+function takesSetWeight(movement: ParsedMovement): boolean {
+  return isInTheSets(movement) && isWeightedMovement(movement);
 }
 
 function isWeightedMovement(movement: ParsedMovement): boolean {

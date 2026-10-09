@@ -73,6 +73,7 @@ export function useWodiThread(
       planned,
       activePlannedId: activePlanned?.id ?? null,
       openingId,
+      liveBelow: true,
       now: new Date(),
       windowDays,
     });

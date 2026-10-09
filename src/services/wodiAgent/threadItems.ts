@@ -26,8 +26,12 @@ export type ThreadItem =
   | { kind: 'message'; id: string; message: ThreadMessage }
   | { kind: 'waiting'; id: string; at: number; planned: PlannedWorkout; title: string };
 
-/** The chat opens on the last few days; "Earlier" reaches back a week at a time. */
-export const THREAD_WINDOW_DAYS = 3;
+/**
+ * The chat opens on today; "Earlier" reaches back a week at a time. Opening on the last few days
+ * landed you on the tail of an old answer — its question scrolled off, its receipt posters looking
+ * like they were about today (owner, 2026-10-09).
+ */
+export const THREAD_WINDOW_DAYS = 1;
 export const THREAD_EARLIER_STEP_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -59,6 +63,8 @@ export function buildThreadItems(input: {
   activePlannedId?: string | null;
   /** Wodi's line the chat opens with right now — it's live below, so it isn't also history above. */
   openingId?: string | null;
+  /** The live chat follows — it is today's, so the thread closes on a TODAY line if it isn't on one. */
+  liveBelow?: boolean;
   now: Date;
   windowDays: number;
 }): ThreadItem[] {
@@ -94,6 +100,10 @@ export function buildThreadItems(input: {
       lastDay = day;
     }
     items.push(item);
+  }
+  const today = startOfDay(input.now.getTime());
+  if (input.liveBelow && lastDay !== today) {
+    items.push({ kind: 'day', id: `d:${today}`, label: dayLabel(today, input.now) });
   }
   return items;
 }

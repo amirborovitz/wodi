@@ -529,3 +529,145 @@ describe('buildWorkloadBreakdownFromResults — a board that writes its windows 
     expect(breakdown.movements.find((m) => m.name === 'V-up/Sit-up')?.totalReps).toBe(30);
   });
 });
+
+describe('buildWorkloadBreakdownFromResults — a swap onto a movement the board already has', () => {
+  it('keeps the swapped run apart from the board\'s own Echo Bike (SURGE, 2026-10-08)', () => {
+    // 3 RFT: 18 cal Echo Bike … 300m Run, the run swapped to 900 m on the Echo Bike. Both rows are
+    // "Echo Bike" now, but they are two lines of the board: one bucket made 54 cal + 2,700 m one
+    // row, filed as calories, and hung the Run swap on the calorie line.
+    const breakdown = buildWorkloadBreakdownFromResults([
+      {
+        exercise: exercise({
+          name: '3 Rounds For Time',
+          type: 'wod',
+          loggingMode: 'for_time',
+          suggestedSets: 3,
+          movements: [
+            movement({ name: 'Echo Bike', reps: undefined, calories: 18 }),
+            movement({ name: 'Burpee', reps: 30 }),
+            movement({ name: 'Run', reps: undefined, distance: 300 }),
+          ],
+        }),
+        sets: [{ id: 'set-summary', setNumber: 1, completed: true, time: 1620 }],
+        movementAlternatives: { Run: 'Echo Bike' },
+        movementDistances: { Run: 900 },
+        rounds: 3,
+      },
+    ]);
+
+    const bikes = breakdown.movements.filter((m) => m.name === 'Echo Bike');
+    expect(bikes).toHaveLength(2);
+    const own = bikes.find((m) => !m.wasSubstituted)!;
+    const swapped = bikes.find((m) => m.wasSubstituted)!;
+    expect(own).toMatchObject({ totalCalories: 54, unit: 'cal' });
+    expect(own.totalDistance).toBeUndefined();
+    expect(swapped).toMatchObject({ totalDistance: 2700, unit: 'm', originalMovement: 'Run' });
+    expect(swapped.totalCalories).toBeUndefined();
+  });
+});
+
+// The real board of 2026-10-09, logged through the chat:
+//
+//   Bench Press — 5 sets as follows: [5-5-4-4-3] @85-90+%
+//   In between sets: 3 sets x 15-20 Band Pull Apart
+//   …then a [2:00 AMRAP / 2:00 rest] x 5 metcon as a second part
+//
+// The parser put the accessory INSIDE the bench block, placed between its sets. The save read the
+// block's sets as ownerless because the block had two movements: the bench's 21 logged reps were
+// thrown away, the bench was priced instead as "loaded but never counted" — at the METCON's 2:00
+// interval, a clock from another part — and stored as 7,200 kg of invented work, with no bench row
+// at all. The band pull-aparts took the bench's 60→65 kg off the sets.
+//
+// The model fact these pin: a between-sets movement happens in the GAPS, so it is not in the sets.
+// The sets — their reps and their weights — belong to what is in them.
+describe('buildWorkloadBreakdownFromResults — an accessory between strength sets', () => {
+  const parsedWorkout: ParsedWorkout = {
+    title: 'THE CHIEF INTERVALS',
+    format: 'amrap_intervals',
+    type: 'amrap',
+    scoreType: 'rounds_reps',
+    // Session-level clock — it is the METCON's. The strength part must never read it.
+    intervalTime: 120,
+    exercises: [],
+  };
+  const benchBlock = (band: Partial<ParsedMovement>) => ({
+    exercise: exercise({
+      name: 'Bench Press',
+      loggingMode: 'strength',
+      suggestedSets: 5,
+      suggestedRepsPerSet: [5, 5, 4, 4, 3],
+      movements: [
+        movement({ name: 'Bench Press', reps: undefined, inputType: 'weight', equipment: 'barbell' }),
+        movement({
+          name: 'Band Pull Apart', reps: 18, occurrences: 3, placement: 'between_sets',
+          equipment: 'other', ...band,
+        }),
+      ],
+    }),
+    // Exactly what toLegacyResult builds for this block: one row per set, the bench's reps, and
+    // the bench's start/peak weight on the first and last set.
+    sets: [
+      { id: 'set-0', setNumber: 1, completed: true, actualReps: 5, weight: 60 },
+      { id: 'set-1', setNumber: 2, completed: true, actualReps: 5 },
+      { id: 'set-2', setNumber: 3, completed: true, actualReps: 4 },
+      { id: 'set-3', setNumber: 4, completed: true, actualReps: 4 },
+      { id: 'set-4', setNumber: 5, completed: true, actualReps: 3, weight: 65 },
+    ],
+    movementWeights: { 'Bench Press': 60 },
+    movementWeightProgressions: { 'Bench Press': [60, 65] },
+    rounds: 5,
+  });
+  const row = (b: ReturnType<typeof buildWorkloadBreakdownFromResults>, name: string) =>
+    b.movements.find((m) => m.name === name);
+
+  it('keeps the lift its own logged sets, and the accessory its own count with no load', () => {
+    const breakdown = buildWorkloadBreakdownFromResults(
+      [benchBlock({ inputType: 'none' })], parsedWorkout,
+    );
+
+    expect(row(breakdown, 'Bench Press')).toMatchObject({ totalReps: 21, weight: 62.5, weightProgression: [60, 65] });
+    expect(row(breakdown, 'Band Pull Apart')?.totalReps).toBe(54);
+    expect(row(breakdown, 'Band Pull Apart')?.weight).toBeUndefined();
+    // 21 × 62.5 — and nothing invented on top.
+    expect(breakdown.grandTotalVolume).toBe(1313);
+  });
+
+  it('never hands the lift\'s set weights to a loaded accessory the athlete gave no weight', () => {
+    const breakdown = buildWorkloadBreakdownFromResults(
+      [benchBlock({ inputType: 'weight' })], parsedWorkout,
+    );
+
+    expect(row(breakdown, 'Bench Press')?.totalReps).toBe(21);
+    expect(row(breakdown, 'Band Pull Apart')?.weight).toBeUndefined();
+    expect(breakdown.grandTotalVolume).toBe(1313);
+  });
+
+  it('prices an uncounted lift on its OWN part\'s clock, never the sibling metcon\'s', () => {
+    // Loaded, no count on the board, none entered: the one case EP still estimates. The strength
+    // part has no clock of its own, so it gets the default cadence — not the metcon's 2:00.
+    const breakdown = buildWorkloadBreakdownFromResults([{
+      exercise: exercise({
+        name: 'Bench Press',
+        loggingMode: 'strength',
+        suggestedSets: 5,
+        movements: [movement({ name: 'Bench Press', reps: undefined, inputType: 'weight' })],
+      }),
+      sets: [],
+      movementWeights: { 'Bench Press': 50 },
+      rounds: 5,
+    }], parsedWorkout);
+
+    // 50 kg × (60 s ÷ 5 s a rep) × 5 sets. Reading the metcon's 120 s doubled it.
+    expect(breakdown.grandTotalVolume).toBe(3000);
+  });
+
+  it('keeps a weight the athlete DID enter for the accessory', () => {
+    const block = benchBlock({ inputType: 'weight' });
+    const breakdown = buildWorkloadBreakdownFromResults(
+      [{ ...block, movementWeights: { ...block.movementWeights, 'Band Pull Apart': 10 } }], parsedWorkout,
+    );
+
+    expect(row(breakdown, 'Band Pull Apart')).toMatchObject({ totalReps: 54, weight: 10 });
+    expect(row(breakdown, 'Band Pull Apart')?.weightProgression).toBeUndefined();
+  });
+});

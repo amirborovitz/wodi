@@ -10,7 +10,7 @@
           {
             "primary": "1200m",
             "name": "Echo Bike (together)",
-            "mineKey": "Echo Bike",
+            "mineKey": "Run",
             "substitutedFrom": "Run",
             "accent": "magenta",
             "repeatCount": 1,

@@ -1,7 +1,7 @@
 import type { StoryExerciseResult, MovementResult } from '../logging/story/types';
 import { openStationResults } from '../logging/story/types';
 import { alternativeSubstitution, buildSubstitutionPatch, namedSwap } from '../logging/story/substitutionPatch';
-import { getScoredBlocks } from '../logging/story/blockScoping';
+import { isBlockScored } from '../logging/story/blockScoping';
 import { hasMaxSet } from '../../services/blockScore';
 import { parseTimeCapSeconds } from '../../utils/timeCap';
 import { knownLoadUnit, type LoadUnit } from '../../utils/loadUnits';
@@ -30,6 +30,7 @@ export type ChatSlotKind =
   | 'rounds'    // rounds completed (+ extra reps)
   | 'reps'      // an open max-reps count
   | 'weight'    // a load, optionally a start→end build
+  | 'maxset'    // the set a strength block ends on, taken to max reps: its reps and its bar
   | 'distance'  // a distance the athlete covered
   | 'duration'  // a hold, seconds
   | 'choice'    // the board's own either/or ("200 DU / 400 singles")
@@ -129,10 +130,11 @@ const isScoredKind = (r: StoryExerciseResult): boolean =>
  * Each is a shape whose answer is more than one number the chat knows how to ask for.
  */
 export function chatCannotLog(result: StoryExerciseResult): boolean {
-  if (getScoredBlocks(result.exercise).length > 0) return true;              // A/B/C blocks, each scored
+  // A/B/C blocks, each scored — the form's own test, so the chat never hands over a board the
+  // form logs on one ordinary page (a lone scored section, like a strength block's max set).
+  if (isBlockScored(result.exercise)) return true;
   if (result.kind === 'score_rounds' && (result.exercise.ladderReps?.length ?? 0) > 0) return true;
   if (result.kind === 'score_open_reps' && openStationResults(result).length > 0) return true;
-  if (result.kind === 'load' && hasMaxSet(result.exercise)) return true;      // weight + max-set reps
   return false;
 }
 
@@ -247,8 +249,9 @@ export function weightChoices(rx: number[], unit: string, equipment?: MovementEq
 }
 
 /**
- * Every slot the chat could still fill, in the order it asks: the score first (it IS the
- * workout's result), then loads, then the board's either/or choices, then anything optional.
+ * Every slot the chat could still fill, in the order it asks: part by part down the board — each
+ * part's score first (it IS that part's result), then its loads, then its either/or choices —
+ * then the weight unit if nothing says it, then anything optional.
  * `closed` holds ids already answered or skipped. `habits` are the athlete's usual swaps, keyed by
  * `habitKey` of the board's movement.
  */
@@ -259,13 +262,16 @@ export function openSlots(
   teamSize?: number,
 ): ChatSlot[] {
   const multiPart = results.length > 1;
-  const scores: ChatSlot[] = [];
-  const loads: ChatSlot[] = [];
-  const choices: ChatSlot[] = [];
+  const asked: ChatSlot[] = [];
   const optional: ChatSlot[] = [];
 
   for (const r of results) {
     if (r.skipped || chatCannotLog(r) || r.kind === 'fixed_dose' || r.kind === 'note') continue;
+    // One part at a time, in board order — its score, its loads, its choices — so the chat never
+    // jumps from the metcon's rounds to the strength's weights and back to the metcon's bar.
+    const scores: ChatSlot[] = [];
+    const loads: ChatSlot[] = [];
+    const choices: ChatSlot[] = [];
     const i = r.exerciseIndex;
     const part = multiPart ? r.exercise.name : 'the workout';
     const push = (list: ChatSlot[], slot: ChatSlot): void => {
@@ -318,6 +324,17 @@ export function openSlots(
       }
     }
 
+    // The set the block ends on, taken to max reps — asked right after the working weights, so
+    // the two land in one panel ("4 sets, 5th max reps").
+    if (r.kind === 'load' && hasMaxSet(r.exercise) && !(r.maxReps && r.maxReps > 0)) {
+      const mr = r.movementResults?.[0];
+      push(loads, {
+        id: `${i}.maxset`, kind: 'maxset', exerciseIndex: i, subject: r.exercise.name,
+        movementNames: [mr?.movement.name ?? r.exercise.name],
+        unit: knownLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
+      });
+    }
+
     for (const mr of distinctChoiceMovements(r)) {
       if (mr.substitution) continue;
       const alternative = mr.movement.alternative!.name;
@@ -365,6 +382,7 @@ export function openSlots(
       // The extra reps ride on the rounds answer; listed so a later "…plus 12" still lands.
       push(optional, { id: `${i}.extra`, kind: 'rounds', exerciseIndex: i, subject: `${part} (extra reps)`, asked: false });
     }
+    asked.push(...scores, ...loads, ...choices);
   }
 
   // A weight was given and nothing says kg or lb — not the board, not their profile, not them.
@@ -377,13 +395,13 @@ export function openSlots(
         && ((usesResultLevelLoad(r) ? r.weight : mr.weight) ?? 0) > 0)
       .map((mr) => ({ exerciseIndex: r.exerciseIndex, name: mr.movement.name })));
   if (unsure.length > 0 && !closed.has('unit')) {
-    loads.push({
+    asked.push({
       id: 'unit', kind: 'unit', exerciseIndex: unsure[0].exerciseIndex, subject: 'weight unit',
       movementNames: [...new Set(unsure.map((u) => u.name))], asked: true,
     });
   }
 
-  return [...scores, ...loads, ...choices, ...optional];
+  return [...asked, ...optional];
 }
 
 /** True when nothing the chat asks out loud is still open. */
@@ -438,20 +456,6 @@ function loadPatch(answer: SlotAnswer): LoadAnswer | null {
   return end != null
     ? { weight: start, weightEnd: end, loadMode: 'range', setWeights: undefined }
     : { weight: start, weightEnd: start, loadMode: 'same', setWeights: undefined };
-}
-
-/**
- * How to answer a strength weight, sized to the board. A HINT, drawn small and dim under the
- * question and said as an example — set as part of the question, the made-up numbers read as
- * Wodi telling you what you lifted. Only where there's more than one set: a metcon's dumbbell
- * has one weight and needs no lesson.
- */
-function weightHint(sets: number, unit: string): string {
-  const n = Math.min(Math.max(sets, 3), 6);
-  const [base, step] = unit === 'lb' ? [135, 10] : [60, 5];
-  const each = Array.from({ length: n }, (_, i) => base + i * step);
-  const top = each[each.length - 1];
-  return `Type one weight, a start and end, or each set — e.g. ${top} · ${base} to ${top} · ${each.join(', ')}`;
 }
 
 /**
@@ -564,6 +568,19 @@ export function applyAnswer(
       };
     }
 
+    case 'maxset': {
+      // The reps ARE the max set; a bar alone says nothing about it, so the question stays open.
+      if (!answer.count || answer.count <= 0) return { results, closed: false };
+      const maxed = patchResult(results, i, () => ({
+        maxReps: Math.round(answer.count!),
+        ...(answer.weight && answer.weight > 0 ? { maxRepsWeight: answer.weight } : {}),
+      }));
+      return {
+        results: answer.unit ? setLoadUnit(maxed, i, slot.movementNames, answer.unit) : maxed,
+        closed: true,
+      };
+    }
+
     case 'unit':
       if (!answer.unit) return { results, closed: false };
       return { results: setLoadUnit(results, i, slot.movementNames, answer.unit), closed: true };
@@ -626,6 +643,114 @@ export interface ChatQuestion {
   hint?: string;
   slotIds: string[];
   chips: ChatChip[];
+  /**
+   * Boxes to type the answer into, when it is several numbers — a start and a peak, a max set's
+   * reps and bar. Another way to give the SAME answers a chip or a typed message gives
+   * (panelAnswer), never a second path to the workout.
+   */
+  panel?: ChatPanel;
+}
+
+/** One box: the slot it answers and which number of that answer it holds. */
+export interface ChatPanelField {
+  slotId: string;
+  field: 'weight' | 'weightEnd' | 'count';
+  /** Under the box: "start", "peak", "reps". */
+  label: string;
+  unit: string;
+}
+
+/** Boxes read together, left to right with the joiner between them: "70 → 85", "20 @ 50". */
+export interface ChatPanelGroup {
+  title: string;
+  joiner: '→' | '@';
+  /** How the athlete's reply starts ("max 20 reps @ 50 kg"). */
+  prefix: string;
+  fields: ChatPanelField[];
+}
+
+export interface ChatPanel {
+  groups: ChatPanelGroup[];
+}
+
+export const panelFieldKey = (field: ChatPanelField): string => `${field.slotId}:${field.field}`;
+
+/**
+ * What the boxes say, as the answers a chip would carry and the words of the athlete's reply.
+ * Every group answers one slot. A group left empty is a skip — they saw the boxes and moved on,
+ * and asking again would be nagging. A peak with no start is one weight for every set.
+ */
+export function panelAnswer(
+  panel: ChatPanel,
+  values: Readonly<Record<string, number | undefined>>,
+): { label: string; answers: SlotAnswer[] } {
+  const answers: SlotAnswer[] = [];
+  const said: string[] = [];
+  for (const group of panel.groups) {
+    const slotId = group.fields[0].slotId;
+    const given = group.fields
+      .map((field) => ({ field, value: values[panelFieldKey(field)] }))
+      .filter((entry): entry is { field: ChatPanelField; value: number } => entry.value != null && entry.value > 0);
+    if (given.length === 0) {
+      answers.push({ id: slotId, ...EMPTY_ANSWER, skipped: true });
+      continue;
+    }
+    const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER };
+    for (const { field, value } of given) answer[field.field] = value;
+    if (answer.weight == null && answer.weightEnd != null) answer.weight = answer.weightEnd;
+    if (answer.weightEnd === answer.weight) answer.weightEnd = null;
+    answers.push(answer);
+    // A peak equal to the start is one weight, said once.
+    const shown = given.filter(({ field, value }) => !(field.field === 'weightEnd' && answer.weightEnd == null && value === answer.weight && given.length > 1));
+    said.push(group.prefix + shown
+      .map(({ field, value }, index) => {
+        const next = shown[index + 1];
+        return next && next.field.unit === field.unit ? `${value}` : `${value} ${field.unit}`;
+      })
+      .join(` ${group.joiner} `));
+  }
+  return { label: said.join(' · ') || 'Skip', answers };
+}
+
+/**
+ * The boxes for a lift logged in sets: where the weight went (start → peak), and the max set's
+ * reps and bar when the block ends on one — asked together, as one step.
+ */
+function liftPanelQuestion(weight: ChatSlot | undefined, maxSet: ChatSlot | undefined, name: string, unit: string): ChatQuestion {
+  const groups: ChatPanelGroup[] = [];
+  if (weight) {
+    groups.push({
+      title: maxSet ? 'Working sets' : 'Weight',
+      joiner: '→',
+      prefix: '',
+      fields: [
+        { slotId: weight.id, field: 'weight', label: 'start', unit },
+        { slotId: weight.id, field: 'weightEnd', label: 'peak', unit },
+      ],
+    });
+  }
+  if (maxSet) {
+    groups.push({
+      title: 'Max set',
+      joiner: '@',
+      prefix: 'max ',
+      fields: [
+        { slotId: maxSet.id, field: 'count', label: 'reps', unit: 'reps' },
+        { slotId: maxSet.id, field: 'weight', label: 'weight', unit },
+      ],
+    });
+  }
+  const ids = groups.map((group) => group.fields[0].slotId);
+  return {
+    text: weight && maxSet ? `How did the ${name} go?`
+      : weight ? `What did you lift on the ${name}?`
+      : `And the max set on the ${name}?`,
+    // A weight for each set has no box of its own — it's typed, and the hint says how.
+    ...(weight ? { hint: `Same every set? Leave the peak empty. Each set different? Type them — e.g. ${unit === 'lb' ? '135, 145, 155' : '60, 65, 70'}` } : {}),
+    slotIds: ids,
+    chips: [skipChip(ids)],
+    panel: { groups },
+  };
 }
 
 const skipChip = (ids: string[]): ChatChip => ({
@@ -699,13 +824,16 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
       // The board's Rx loads and every real weight between them, one tap each.
       const rxChips: ChatChip[] = (first.rxWeights ? weightChoices(first.rxWeights, unit, first.equipment) : [])
         .map((w) => ({ label: `${w} ${unit}`, answers: [{ id: first.id, ...EMPTY_ANSWER, weight: w }] }));
+      // A lift logged in sets is answered in boxes — start, peak, and the max set if there is one.
       const strength = result?.kind === 'load' && result.setsTotal > 1;
-      const ask: ChatQuestion = {
-        text: `What weight did you use for ${name}?`,
-        ...(strength ? { hint: weightHint(result.setsTotal, unit) } : {}),
-        slotIds: [first.id],
-        chips: [...rxChips, skipChip([first.id])],
-      };
+      const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && s.exerciseIndex === first.exerciseIndex);
+      const ask: ChatQuestion = strength
+        ? liftPanelQuestion(first, maxSet, name, unit)
+        : {
+            text: `What weight did you use for ${name}?`,
+            slotIds: [first.id],
+            chips: [...rxChips, skipChip([first.id])],
+          };
       if (!same) return ask;
       const load = describeLoad(same, unit);
       return {
@@ -806,6 +934,8 @@ export function nextQuestion(slots: ChatSlot[], results: StoryExerciseResult[]):
         chips: [skipChip([first.id])],
       };
     }
+    case 'maxset':
+      return liftPanelQuestion(undefined, first, stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject), first.unit ?? 'kg');
     case 'unit': {
       const unitChip = (unit: LoadUnit): ChatChip => ({ label: unit, answers: [{ id: first.id, ...EMPTY_ANSWER, unit }] });
       return {

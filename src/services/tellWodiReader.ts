@@ -108,6 +108,9 @@ just finished a workout and is texting you about it. Your job has two parts.
      "Rx" / "as prescribed" is NOT a number — don't answer it.
      unit = "kg" or "lb" ONLY when THEY said it with the number ("53 lb", "24 kilos", "35 pounds",
      "16kg"); a bare "53" is null. Never take it from the board or from the question.
+   - "maxset": the last set, taken to as many reps as they could. count = its reps, weight = the
+     bar it was on ("20 at 50", "20 reps @ 50kg" → count 20, weight 50). Reps alone is an answer.
+     unit as for "weight".
    - "unit": they're saying which unit their weights were in — "kg", "kilos" → unit "kg";
      "lb", "lbs", "pounds" → unit "lb".
    - "choice": copy one of the question's options exactly. "singles" picks the singles option.

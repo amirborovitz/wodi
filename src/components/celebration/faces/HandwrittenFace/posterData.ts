@@ -37,7 +37,7 @@ export interface PosterWod {
   title: string | null; // Named WOD title (CINDY, FRAN…) or null
   date: string;         // 'MAY 14 26'
   format: string;       // '12 ROUNDS', '4 SETS', '12-MIN AMRAP'
-  sub: string;          // '30 MIN CAP', 'build to heavy', …
+  sub: string;          // '30 MIN CAP', '12 min', …
   // Strength only: every completed set's reps spelled out in full ("6-6-5-4-3 reps"), never
   // truncated. Rendered as a quiet sub-line under the movement row, separate from `format`
   // (which states only the set count) — see formatPosterStrengthRepsSequence.
@@ -373,10 +373,12 @@ function getPosterCompletedStrengthSets(exercise: Exercise): NonNullable<Exercis
 // The scheme line replaces the clock on a strength day — a SET COUNT, never a sets×reps
 // figure. Reps almost always vary set to set on a build-up day, so "4×4" reads as a promise
 // the workout doesn't keep; "4 SETS" states only what's actually constant.
+// Counted from the sets DONE, not the sets that carry reps: "4 sets, 5th max reps" writes no rep
+// count for the four, so counting reps called a five-set block "1 SETS" (VOLT, 2026-10-08).
 function formatPosterStrengthScheme(exercise: Exercise): string | undefined {
-  const completed = getPosterCompletedStrengthSets(exercise);
-  if (completed.length === 0) return undefined;
-  return `${completed.length} SETS`;
+  const done = exercise.sets.filter((set) => set.completed).length;
+  if (done === 0) return undefined;
+  return done === 1 ? '1 SET' : `${done} SETS`;
 }
 
 // A set's rep count is a story only when the SET IS ONE MOVEMENT ("6-6-5-4-3" on a deadlift
@@ -393,6 +395,9 @@ function formatPosterStrengthScheme(exercise: Exercise): string | undefined {
 // the set count).
 export function formatPosterStrengthRepsSequence(exercise: Exercise): string | undefined {
   if (!prescribesSingleMovement(exercise)) return undefined;
+  // A block that ends on a max set is two lines — the written sets, then the max — and each
+  // states its own reps. One sequence printed under both put the max's 20 under the working sets.
+  if (exercise.sets.some((set) => set.isMax)) return undefined;
   const completed = getPosterCompletedStrengthSets(exercise);
   const reps = completed
     .map((set) => set.actualReps ?? set.targetReps)
@@ -503,11 +508,10 @@ function buildSubLine(data: CelebrationData): string {
   }
   const fmt = data.workoutFormat;
   const ex0 = data.exercises[0];
-  // A load cue over a practice that never touched a weight.
-  if (data.exercises.length === 1 && ex0 && isMaxEffortPractice(ex0)) return '';
-  if (fmt === 'strength') {
-    return 'build to heavy';
-  }
+  // Nothing under a strength day or a lone max practice: their structure (the set count) is the
+  // format line's. This used to print "build to heavy" on every strength poster — a coach cue no
+  // coach wrote, over boards like "4 sets, 5th max reps" that finish lighter (owner, 2026-10-09).
+  if (fmt === 'strength' || (data.exercises.length === 1 && ex0 && isMaxEffortPractice(ex0))) return '';
   if ((fmt === 'amrap' || fmt === 'amrap_intervals') && data.durationMinutes > 0) {
     return `${Math.round(data.durationMinutes)} min`;
   }
@@ -908,6 +912,9 @@ export function buildMineMapFromStory(storyMovements: StoryMovementLine[]): Map<
 // Build from workload breakdown — covers weighted, distance, and calorie movements.
 export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<string, string> {
   const map = new Map<string, string>();
+  // Board lines claim their key first; a done name is only a second way in. A run swapped onto
+  // the board's own Echo Bike is ALSO named "Echo Bike", and must not overwrite that line's value.
+  const boardLines = new Set(movements.map((m) => (m.originalMovement || m.name).toLowerCase().trim()));
   for (const m of movements) {
     const key = m.name.toLowerCase().trim();
     let value = '';
@@ -922,7 +929,7 @@ export function buildMineMapFromBreakdown(movements: MovementTotal[]): Map<strin
     }
 
     if (value) {
-      map.set(key, value);
+      if (!m.originalMovement || !boardLines.has(key)) map.set(key, value);
       if (m.originalMovement) map.set(m.originalMovement.toLowerCase().trim(), value);
     }
   }
@@ -1308,9 +1315,8 @@ export function buildPosterWodFromPage(
     // Station pages: the "alt. stations" format line stands alone (the clock title already
     // carries the durations).
     if (stationClock) return '';
-    // "build to heavy" is a load cue — meaningless on a practice that never touched a weight.
-    if (isMaxPractice) return '';
-    if (exFmt === 'strength') return 'build to heavy';
+    // Never a coach cue the board didn't write (no more "build to heavy") — see buildSubLine.
+    if (isMaxPractice || exFmt === 'strength') return '';
     if (isAmrap && amrapMinutes) return '';
     if (exFmt === 'for_time') return explicitTimeCapSub(page.exercise, data.rawText);
     return '';
