@@ -74,7 +74,9 @@ describe('strength weights told to Wodi', () => {
     expect(q.panel?.groups.map((g) => g.fields.map((f) => f.label))).toEqual([['start', 'peak']]);
     // The question is only the question; how to answer is a separate, dimmer hint — set inside
     // the question, the example numbers read as Wodi telling you what you lifted.
-    expect(q.hint).toBe('Same every set? Leave the peak empty. Each set different? Type them — e.g. 60, 65, 70');
+    // "Same every set" is shown, not said: the empty peak displays the start in grey.
+    expect(q.hint).toBe('Each set different? Type them — e.g. 60, 65, 70');
+    expect(q.panel?.groups[0].fields[1].emptyMeans).toBe('weight');
   });
 
   it('a weight for each set saves each set, prints every one, and survives an edit', () => {

@@ -1,4 +1,4 @@
-import type { Workout } from '../types';
+import type { MovementTotal, Workout } from '../types';
 import { resolveMovement } from '../data/movementRegistry';
 import { formatPosterLoad } from '../components/celebration/posterFormatters';
 import { getEffectiveWorkoutDate } from './workoutDate';
@@ -22,6 +22,27 @@ export interface LastLoad {
   /** As the poster prints a logged load: "17.5kg", "2×22.5kg", "100→110kg". */
   load: string;
   date: Date;
+  /** The same load as the numbers a weight answer takes: per implement, first set and top set. */
+  start: number;
+  /** Absent when every set was the same weight. */
+  peak?: number;
+  unit: 'kg' | 'lb';
+}
+
+/**
+ * A saved row's load as an answer would give it. A pair of DBs/KBs is answered per hand, the way
+ * the board writes it and the poster prints it — the row's `weight` is the pair's total.
+ */
+function loggedNumbers(movement: MovementTotal): Pick<LastLoad, 'start' | 'peak' | 'unit'> | null {
+  const unit = movement.unit === 'lb' ? 'lb' : 'kg';
+  const progression = movement.weightProgression?.filter((w) => w > 0) ?? [];
+  if (progression.length > 0) {
+    const peak = Math.max(...progression);
+    return { start: progression[0], ...(peak !== progression[0] ? { peak } : {}), unit };
+  }
+  if (!movement.weight || movement.weight <= 0) return null;
+  const pair = (movement.implementCount ?? 1) > 1 ? movement.implementCount! : 1;
+  return { start: Math.round((movement.weight / pair) * 10) / 10, unit };
 }
 
 export function lastLoadKey(movementName: string): string {
@@ -38,7 +59,8 @@ export function buildLastLoadMap(workouts: Workout[]): Map<string, LastLoad> {
       const key = lastLoadKey(movement.name);
       if (last.has(key)) continue;
       const load = formatPosterLoad(movement);
-      if (load) last.set(key, { load, date: getEffectiveWorkoutDate(workout) });
+      const numbers = loggedNumbers(movement);
+      if (load && numbers) last.set(key, { load, date: getEffectiveWorkoutDate(workout), ...numbers });
     }
   }
   return last;

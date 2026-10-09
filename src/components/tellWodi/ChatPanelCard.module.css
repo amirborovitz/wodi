@@ -12,6 +12,37 @@
   border-radius: var(--r-lg);
 }
 
+/* The lift's name on the card: with the keyboard up, Wodi's question scrolls off above it. */
+.heading {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--wodi-white);
+}
+
+/* The likely answers — one tap, no keyboard. Neutral pills like every chat answer; yellow stays on
+   the one button that commits typed numbers. */
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.quickChip {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .group {
   margin: 0;
   padding: 0;
@@ -98,6 +129,18 @@
   color: var(--wodi-white);
 }
 
+/* The number an empty box stands for (the peak: same as the start), in grey. */
+.input::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+/* The box's border already turns yellow on focus (.box:focus-within). The app-wide yellow
+   `:focus-visible` ring on the input inside it drew a second, smaller frame — same fix as the
+   Records sheet. */
+.input:focus-visible {
+  outline: none;
+}
+
 .unit {
   flex: none;
   font-family: var(--font-mono);
@@ -125,7 +168,9 @@
   cursor: pointer;
 }
 
+/* Waiting for a number reads as quiet, not as a faded yellow that looks broken. */
 .done:disabled {
-  opacity: 0.35;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
   cursor: default;
 }

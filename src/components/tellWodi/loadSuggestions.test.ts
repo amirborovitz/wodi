@@ -29,6 +29,17 @@ describe('last loads — only what the athlete logged', () => {
     expect(buildLastLoadMap(history).get('squat|front')).toBeUndefined();
   });
 
+  it('carries the load as the numbers an answer takes — first set, top set, per hand', () => {
+    const last = buildLastLoadMap([
+      workout('2026-09-12', [{ name: 'Bench Press', totalReps: 21, weight: 62.5, weightProgression: [60, 65], unit: 'kg' }]),
+      workout('2026-09-11', [{ name: 'DB Thruster', totalReps: 30, weight: 45, implementCount: 2, unit: 'kg' }]),
+    ]);
+    expect([...last.values()].find((l) => l.load === '60→65kg')).toMatchObject({ start: 60, peak: 65, unit: 'kg' });
+    // The row stores the pair's total; the answer is per dumbbell, as the board writes it.
+    expect([...last.values()].find((l) => l.load === '2×22.5kg')).toMatchObject({ start: 22.5, unit: 'kg' });
+    expect([...last.values()].find((l) => l.load === '2×22.5kg')?.peak).toBeUndefined();
+  });
+
   it('never quotes a test log', () => {
     const last = buildLastLoadMap([
       workout('2026-09-25', [{ name: 'Alt DB Snatch', totalReps: 10, weight: 40, unit: 'kg' }], { isTest: true }),

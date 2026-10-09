@@ -6,6 +6,7 @@ import { EMPTY_ANSWER, applyAnswer, chatCannotLog, isComplete, nextQuestion, ope
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
+import { buildLastLoadMap } from '../../utils/lastLoadHistory';
 
 // The Ladder, 2026-09-22: 3 / 2 / 1 rounds of the same four movements, then 200 DU or 400 singles.
 const rx = { male: 22.5, female: 15, unit: 'kg' as const };
@@ -516,6 +517,49 @@ describe('Tell Wodi — the order it asks in', () => {
     ],
   } as unknown as ParsedExercise;
   const workout = { title: 'THE CHIEF INTERVALS', type: 'amrap', format: 'amrap_intervals', exercises: [bench, chief] } as unknown as ParsedWorkout;
+
+  // What the bench and the cleans were last time — from the athlete's own saved workouts.
+  const lastLoads = buildLastLoadMap([{
+    id: 'prev', userId: 'u', date: new Date('2026-10-02'), title: 'W', type: 'amrap', exercises: [],
+    workloadBreakdown: { movements: [
+      { name: 'Bench Press', totalReps: 21, weight: 62.5, weightProgression: [60, 65], unit: 'kg' },
+      { name: 'Power Clean', totalReps: 45, weight: 50, unit: 'kg' },
+    ] },
+  } as unknown as Workout]);
+  const fresh = () => initStoryResults(workout, ['strength', 'amrap_intervals'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
+
+  it('the bench card names the lift and offers last time as one tap', () => {
+    const rs = fresh();
+    const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
+    expect(q.panel?.title).toBe('Bench Press');
+    expect(q.panel?.quick.map((c) => c.label)).toEqual(['Last time · 60 → 65 kg']);
+    // One tap is the whole answer: 60 → 65, no keyboard.
+    const slot = openSlots(rs, new Set()).find((s) => s.id === q.slotIds[0])!;
+    const done = applyAnswer(rs, slot, q.panel!.quick[0].answers![0]).results;
+    expect(done[0].weight).toBe(60);
+    expect(done[0].weightEnd).toBe(65);
+  });
+
+  it('the empty peak stands for the start, so it can show it', () => {
+    const rs = fresh();
+    const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
+    expect(q.panel?.groups[0].fields.map((f) => f.emptyMeans)).toEqual([undefined, 'weight']);
+  });
+
+  it('the cleans lead with last time, then the Rx', () => {
+    const rs = fresh();
+    const slots = openSlots(rs, new Set(['0.weight', '1.rounds']));
+    const q = nextQuestion(slots, rs, lastLoads)!;
+    expect(q.text).toBe('What weight did you use for Power Clean?');
+    expect(q.chips[0].label).toBe('Last time · 50 kg');
+    expect(q.chips.at(-1)?.label).toBe('Skip');
+  });
+
+  it('with no history, nothing is invented — the boxes and the Rx only', () => {
+    const rs = fresh();
+    const q = nextQuestion(openSlots(rs, new Set()), rs)!;
+    expect(q.panel?.quick).toEqual([]);
+  });
 
   it('finishes the bench before it asks about the metcon', () => {
     const rs = initStoryResults(workout, ['strength', 'amrap_intervals'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });

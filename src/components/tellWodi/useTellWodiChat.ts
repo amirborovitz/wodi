@@ -291,7 +291,7 @@ export function useTellWodiChat({
   const askNext = (prefix?: string): void => {
     waitingRef.current = false;
     const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
-    const question = nextQuestion(slots, resultsRef.current);
+    const question = nextQuestion(slots, resultsRef.current, callbacks.current.lastLoads);
     if (question) {
       askQuestion(question, prefix);
       return;

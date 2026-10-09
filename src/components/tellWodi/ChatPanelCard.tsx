@@ -40,9 +40,11 @@ function usePanelDraft(panel: ChatPanel, onSubmit: ChatPanelCardProps['onSubmit'
 
 /**
  * A question whose answer is several numbers, answered in boxes inside the chat — the start and
- * peak of a lift, a max set's reps and bar. Typed, never stepped: +/− steppers fire when the
- * thread is scrolled (see the stepper scroll bug). Empty until the athlete types — a prefilled
- * box confirmed with one tap would save a number nobody lifted today.
+ * peak of a lift, a max set's reps and bar. The likely answer is one tap ("Last time · 60 → 65
+ * kg"); the boxes are the fallback. Typed, never stepped: +/− steppers fire when the thread is
+ * scrolled (see the stepper scroll bug). Empty until the athlete types — a prefilled box confirmed
+ * with one tap would save a number nobody lifted today. A box whose emptiness has a meaning (the
+ * peak: same as the start) shows that number in grey instead.
  */
 export function ChatPanelCard({ panel, disabled, onSubmit }: ChatPanelCardProps) {
   const { drafts, setDraft, canSubmit, submit } = usePanelDraft(panel, onSubmit);
@@ -54,12 +56,32 @@ export function ChatPanelCard({ panel, disabled, onSubmit }: ChatPanelCardProps)
         if (canSubmit && !disabled) submit();
       }}
     >
+      <p className={styles.heading}>{panel.title}</p>
+      {panel.quick.length > 0 && (
+        <div className={styles.quick}>
+          {panel.quick.map((chip) => (
+            <motion.button
+              key={chip.label}
+              type="button"
+              className={styles.quickChip}
+              disabled={disabled}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onSubmit(chip.label, chip.answers ?? [])}
+            >
+              {chip.label}
+            </motion.button>
+          ))}
+        </div>
+      )}
       {panel.groups.map((group) => (
         <fieldset key={group.title} className={styles.group}>
           <legend className={styles.title}>{group.title}</legend>
           <div className={styles.row}>
             {group.fields.map((field, index) => {
               const key = panelFieldKey(field);
+              const echoed = field.emptyMeans
+                ? drafts[panelFieldKey({ ...field, field: field.emptyMeans })]
+                : undefined;
               return (
                 <div key={key} className={styles.cell}>
                   {index > 0 && <span className={styles.joiner} aria-hidden="true">{group.joiner}</span>}
@@ -72,6 +94,7 @@ export function ChatPanelCard({ panel, disabled, onSubmit }: ChatPanelCardProps)
                         enterKeyHint="done"
                         autoComplete="off"
                         value={drafts[key] ?? ''}
+                        placeholder={echoed ?? ''}
                         onChange={(e) => setDraft(key, e.target.value)}
                         aria-label={`${group.title} ${field.label} in ${field.unit}`}
                       />
