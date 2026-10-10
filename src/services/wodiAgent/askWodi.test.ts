@@ -154,6 +154,9 @@ describe('askWodi', () => {
     const system = String(seen[0].messages[0].content);
     expect(system).toContain('3 RFT: 10 Deadlift @100/140kg, 400m run');
     expect(system).toContain('Deadlift · last time 140kg (24 Sep)');
+    // Weights are the app's (the load card), never the plan's: a run on 2026-10-10 told an
+    // athlete to clean 60 kg for 2-minute sprints — above their one-rep max.
+    expect(system).toContain('Never name a weight');
     expect(system).not.toContain('call log_workout');
     expect(tools[0]).not.toContain('log_workout');
     expect(tools[0]).toContain('find_workouts');

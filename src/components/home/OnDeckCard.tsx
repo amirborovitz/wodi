@@ -31,7 +31,7 @@ function buildSubtitle(wod: ParsedWorkout): string {
 function lastWodiLine(planned: PlannedWorkout): string {
   const lines = planned.chat?.messages ?? [];
   for (let i = lines.length - 1; i >= 0; i -= 1) {
-    if (lines[i].from === 'wodi' && lines[i].text) return lines[i].text!.replace(/s+/g, ' ');
+    if (lines[i].from === 'wodi' && lines[i].text) return lines[i].text!.replace(/\s+/g, ' ');
   }
   return 'Waiting for you';
 }

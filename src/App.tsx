@@ -41,6 +41,8 @@ function AppContent() {
   // Add Workout opens on the Tell Wodi chat rather than the capture step.
   const [startInChat, setStartInChat] = useState(false);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
+  // A fresh chat each time a board is left for later — the board it was on now waits in the thread.
+  const [chatSession, setChatSession] = useState(0);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState<WorkoutWithStats | null>(null);
   const [editingWorkout, setEditingWorkout] = useState<WorkoutWithStats | null>(null);
@@ -188,7 +190,7 @@ function AppContent() {
           <AddWorkoutScreen
             // A parked board opened from the thread is a different chat: start it fresh. So is an
             // edit begun from a poster opened over the chat — the screen doesn't change for that.
-            key={editingWorkout?.id ?? pendingPlannedWorkout?.id ?? 'new'}
+            key={editingWorkout?.id ?? pendingPlannedWorkout?.id ?? `new-${chatSession}`}
             onOpenWorkout={(workout, list) => {
               setNavDir(null);
               setSelectedWorkout(workout);
@@ -198,6 +200,10 @@ function AppContent() {
               setPosterOverChat(true);
             }}
             onOpenPlanned={handleLogPlannedWorkout}
+            onLeaveBoard={() => {
+              setChatSession((n) => n + 1);
+              openWodi();
+            }}
             onBack={() => {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);

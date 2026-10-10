@@ -2635,7 +2635,7 @@ function formatBlockClock(exercise: Exercise): string | undefined {
  * to fill; repeating it under the hero crowds two numbers that need to stay readable side by side.
  */
 function formatBlockShortLabel(section: ParsedSection, index: number): string {
-  const label = section.label?.trim().toUpperCase().replace(/s*-s*/g, ' ').replace(/s+/g, ' ');
+  const label = section.label?.trim().toUpperCase().replace(/\s*-\s*/g, ' ').replace(/\s+/g, ' ');
   return label || `#${index + 1}`;
 }
 

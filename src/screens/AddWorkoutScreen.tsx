@@ -64,6 +64,7 @@ import { removeUndefined } from '../utils/firestoreUtils';
 import { matchesNamePattern } from '../utils/movementNameMatch';
 import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
+import { backFromChat, backFromForm, type BackTarget } from './addWorkoutBack';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
 
@@ -84,6 +85,8 @@ const FlagIcon = () => (
 
 interface AddWorkoutScreenProps {
   onBack: () => void;
+  /** Leave the board the chat is on for later: the thread, with no board open (addWorkoutBack). */
+  onLeaveBoard?: () => void;
   onWorkoutCreated: () => void;
   onSavedForLater?: () => void;
   initialImage?: File | null;
@@ -746,7 +749,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, initialMessage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, initialMessage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
   const { user, isAdmin, updateUserProfile } = useAuth();
   const { calculateRewardData } = useRewardData();
   // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
@@ -1922,6 +1925,13 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
     }
   };
 
+  const goBack = (target: BackTarget): void => {
+    if (target === 'chat') setStep('chat');
+    else if (target === 'preview') setStep('preview');
+    else if (target === 'thread' && onLeaveBoard) onLeaveBoard();
+    else onBack();
+  };
+
   const handleHeaderBack = () => {
     if (editWorkout) {
       if (step === 'log-results') {
@@ -1942,7 +1952,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       if (isEditingAfterSave) {
         setIsEditingAfterSave(false);
       }
-      setStep('preview');
+      goBack(backFromForm({ editing: false, openedFromChat: formFromChatRef.current }));
       return;
     }
 
@@ -1985,6 +1995,8 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
   // quick messages can't each create a board.
   const chatBoardIdRef = useRef<string | null>(plannedWorkout?.chat ? plannedWorkout.id : null);
   const chatBoardCreateRef = useRef<Promise<string> | null>(null);
+  // The logging form was handed over from the chat — Back returns there, not to the photo flow.
+  const formFromChatRef = useRef(false);
   const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
   const loadHistory = useMemo(() => recentLoads(recentWorkouts), [recentWorkouts]);
 
@@ -2042,6 +2054,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
       requestSave(results.map(toLegacyResult) as unknown as ExerciseResult[]);
     },
     onOpenForms: (results) => {
+      formFromChatRef.current = true;
       setEditInitialResults(results);
       setStep('log-results');
     },
@@ -2906,7 +2919,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
         <TellWodiChat
           chat={tellWodi}
           thread={thread}
-          onBack={onBack}
+          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.canOpenForms }))}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
           onUseForm={() => setStep('capture')}
@@ -2918,7 +2931,7 @@ export function AddWorkoutScreen({ onBack, onWorkoutCreated, onWorkoutUpdated, o
           parsedWorkout={parsedWorkout}
           loggingModes={loggingModesFor(parsedWorkout)}
           onSave={(results) => requestSave(results as unknown as ExerciseResult[])}
-          onBack={() => editWorkout ? onBack() : setStep('preview')}
+          onBack={() => goBack(backFromForm({ editing: Boolean(editWorkout), openedFromChat: formFromChatRef.current }))}
           isSaving={false}
           initialResults={editInitialResults}
           lastMaxReps={lastMaxReps}

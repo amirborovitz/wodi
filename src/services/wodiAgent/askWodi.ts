@@ -102,7 +102,7 @@ Answer with a game plan for it, built from their log:
 - First look up their past workouts with the same movements (find_workouts by movement — a few calls is fine) and read each part's finishTime, capped or rounds against its board and timeCapMinutes. Note what they swapped (insteadOf) — that's what they'll likely do again.
 - A target: one finish time or a range no wider than 2 minutes, and a pace per round when the piece has rounds. Reason it from those past results — the target is your projection, the past times it rests on are theirs — and name the day you anchored on, so its poster comes with the answer.
 - Where to hold back and where to push — one line.
-- One weight per loaded movement, from their logged loads; with none, the board's Rx for their sex with a scaled option.
+- Never name a weight. The card above your answer already shows their logged loads and the board's Rx — the app's numbers. A weight from you could exceed what they can lift.
 - If nothing in their log is close enough, say so in a few words and pace it from the board alone. Never make up a past time.
 This answer may run to 6 short lines.`;
 }
