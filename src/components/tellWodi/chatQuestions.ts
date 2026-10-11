@@ -993,13 +993,56 @@ export function nextQuestion(
   }
 }
 
+const NUM = '(\\d+(?:[.,]\\d+)?)';
+const UNIT = '(kg|kgs|kilos?|lb|lbs|pounds?)';
+const toNum = (text: string): number => Number(text.replace(',', '.'));
+const toUnit = (text: string | undefined): LoadUnit | null => (!text ? null : /^(lb|lbs|pounds?)$/.test(text) ? 'lb' : 'kg');
+
 /**
- * An answer the app can read WITHOUT the AI: a finish time typed as a clock ("2130", "21:30").
- * The reader sent a bare "2130" to the model and got 2,130 seconds back — 35:30 saved for 21:30
- * (2026-10-11). Anything that isn't a clean clock reading still goes to the AI.
+ * The answers the app reads WITHOUT the AI: a plain number, a clock, a weight or a range — the
+ * common answers, each with one meaning. Sent to the model, a bare "2130" came back as 2,130
+ * seconds: a 21:30 workout saved as 35:30 (2026-10-11). Read here they are exact and free, and
+ * the AI gets only real sentences ("19, legs were dead", "same as last time").
  */
 export function readAnswerLocally(slot: ChatSlot | undefined, text: string): SlotAnswer | null {
-  if (slot?.kind !== 'time') return null;
-  const seconds = readClockAnswer(text);
-  return seconds == null ? null : { id: slot.id, ...EMPTY_ANSWER, seconds };
+  if (!slot) return null;
+  const t = text.trim().toLowerCase().replace(/\s+/g, ' ');
+  const answer = (fields: Partial<SlotAnswer>): SlotAnswer => ({ id: slot.id, ...EMPTY_ANSWER, ...fields });
+  let m: RegExpMatchArray | null;
+  switch (slot.kind) {
+    case 'time': {
+      const seconds = readClockAnswer(t);
+      return seconds == null ? null : answer({ seconds });
+    }
+    case 'rounds':
+      m = t.match(/^(\d{1,3})(?: ?rounds?)?(?: ?\+ ?(\d{1,3})(?: ?reps?)?)?$/);
+      return m ? answer({ count: Number(m[1]), extraReps: m[2] ? Number(m[2]) : null }) : null;
+    case 'reps':
+      m = t.match(/^(\d{1,4})(?: ?reps?)?$/);
+      return m ? answer({ count: Number(m[1]) }) : null;
+    case 'distance':
+      m = t.match(/^(\d{1,6})(?: ?(?:m|meters?|metres?))?$/);
+      return m ? answer({ count: Number(m[1]) }) : null;
+    case 'duration': {
+      // A hold: a bare number is SECONDS ("45"), a clock is minutes:seconds ("1:30").
+      m = t.match(/^(\d{1,3})(?: ?(?:s|sec|secs|seconds?))?$/);
+      if (m) return answer({ seconds: Number(m[1]) });
+      m = t.match(/^(\d{1,2}):(\d{2})$/);
+      return m && Number(m[2]) < 60 ? answer({ seconds: Number(m[1]) * 60 + Number(m[2]) }) : null;
+    }
+    case 'weight': {
+      m = t.match(new RegExp(`^${NUM} ?${UNIT}?$`));
+      if (m) return answer({ weight: toNum(m[1]), unit: toUnit(m[2]) });
+      m = t.match(new RegExp(`^${NUM} ?${UNIT}? ?(?:-|–|→|->|to) ?${NUM} ?${UNIT}?$`));
+      if (m) return answer({ weight: toNum(m[1]), weightEnd: toNum(m[3]), unit: toUnit(m[2] ?? m[4]) });
+      m = t.match(new RegExp(`^${NUM}(?: ?, ?${NUM}){2,}(?: ?${UNIT})?$`));
+      if (m) {
+        const weights = (t.match(/\d+(?:[.,]\d+)?/g) ?? []).map(toNum);
+        return answer({ weights, weight: weights[0], weightEnd: weights[weights.length - 1], unit: toUnit(t.match(new RegExp(`${UNIT}$`))?.[1]) });
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
 }

@@ -580,3 +580,54 @@ describe('answers the app reads itself', () => {
     expect(readAnswerLocally({ ...timeSlot, id: '1.rounds', kind: 'rounds' }, '2130')).toBeNull();
   });
 });
+
+describe('every plain answer is read by the app — the AI only gets sentences', () => {
+  const slot = (kind: string, id = `0.${kind}`) => ({ id, kind, exerciseIndex: 0, subject: 'x', asked: true }) as unknown as Parameters<typeof readAnswerLocally>[0];
+  const read = (kind: string, text: string) => readAnswerLocally(slot(kind), text);
+
+  it('rounds: "19", "19 rounds", "19+5"', () => {
+    expect(read('rounds', '19')).toMatchObject({ count: 19, extraReps: null });
+    expect(read('rounds', '19 rounds')).toMatchObject({ count: 19 });
+    expect(read('rounds', '19+5')).toMatchObject({ count: 19, extraReps: 5 });
+    expect(read('rounds', '19 + 5 reps')).toMatchObject({ count: 19, extraReps: 5 });
+  });
+
+  it('reps: "120", "120 reps"', () => {
+    expect(read('reps', '120')).toMatchObject({ count: 120 });
+    expect(read('reps', '120 reps')).toMatchObject({ count: 120 });
+  });
+
+  it('a weight, with its unit only when typed', () => {
+    expect(read('weight', '60')).toMatchObject({ weight: 60, weightEnd: null, unit: null });
+    expect(read('weight', '60kg')).toMatchObject({ weight: 60, unit: 'kg' });
+    expect(read('weight', '135 lb')).toMatchObject({ weight: 135, unit: 'lb' });
+    expect(read('weight', '22.5')).toMatchObject({ weight: 22.5 });
+  });
+
+  it('a climbing weight: "45-50", "45 → 50 kg", "45 to 50"', () => {
+    expect(read('weight', '45-50')).toMatchObject({ weight: 45, weightEnd: 50 });
+    expect(read('weight', '45 → 50 kg')).toMatchObject({ weight: 45, weightEnd: 50, unit: 'kg' });
+    expect(read('weight', '45 to 50')).toMatchObject({ weight: 45, weightEnd: 50 });
+  });
+
+  it('a weight for each set: "60, 65, 70"', () => {
+    expect(read('weight', '60, 65, 70')).toMatchObject({ weights: [60, 65, 70], weight: 60, weightEnd: 70 });
+  });
+
+  it('a hold in seconds: "45", "1:30"', () => {
+    expect(read('duration', '45')).toMatchObject({ seconds: 45 });
+    expect(read('duration', '1:30')).toMatchObject({ seconds: 90 });
+  });
+
+  it('a distance in metres: "1000", "1000m"', () => {
+    expect(read('distance', '1000')).toMatchObject({ count: 1000 });
+    expect(read('distance', '1000m')).toMatchObject({ count: 1000 });
+  });
+
+  it('sentences still go to the AI', () => {
+    expect(read('rounds', '19, legs were dead')).toBeNull();
+    expect(read('weight', 'same as last time')).toBeNull();
+    expect(read('weight', '20kg dumbbells, the 22.5s were taken')).toBeNull();
+    expect(read('reps', 'around 100 I think')).toBeNull();
+  });
+});
