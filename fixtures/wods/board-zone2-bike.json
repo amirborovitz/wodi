@@ -1,0 +1,13 @@
+{
+  "name": "board-zone2-bike",
+  "rawText": "30 min Zone 2\nBike or Row\nConversational pace",
+  "aiResponses": {
+    "segment|30 min Zone 2\nBike or Row\nConversational pace": "{\n  \"parts\": [\n    {\n      \"label\": \"A\",\n      \"kind\": \"metcon\",\n      \"traits\": [],\n      \"text\": \"30 min Zone 2\\nBike or Row\\nConversational pace\"\n    }\n  ]\n}",
+    "structure|30 min Zone 2\nBike or Row\nConversational pace": "{\"title\":\"STEADY\",\"type\":\"metcon\",\"format\":\"intervals\",\"scoreType\":\"reps\",\"difficultyLevel\":2,\"timeCap\":1800,\"sets\":null,\"intervalTime\":null,\"rawText\":\"30 min Zone 2\\nBike or Row\\nConversational pace\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"30 min Zone 2\",\"type\":\"cardio\",\"prescription\":\"30 min Zone 2 Bike or Row at conversational pace\",\"rawText\":\"30 min Zone 2\\nBike or Row\\nConversational pace\",\"loggingMode\":\"cardio\",\"scoreType\":\"reps\",\"suggestedSets\":1,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":null,\"workDuration\":1800,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Bike\",\"reps\":null,\"distance\":null,\"calories\":\"max\",\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"calories\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"once\",\"scoreEntryMode\":\"total\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":{\"name\":\"Row\",\"reps\":null,\"distance\":null,\"calories\":null}}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "distance"
+  },
+  "description": "Fixed duration; athlete logs distance or calories."
+}

@@ -1528,6 +1528,10 @@ function backfillPartnerSplit(workout: ParsedWorkout): ParsedWorkout {
  * Ensures type and format are consistent for time cap calculations
  */
 function correctWorkoutType(workout: ParsedWorkout, correctedFormat: ParsedWorkout['format']): ParsedWorkout['type'] {
+  // The type is the model's answer too. It follows the format only when the format was BACKFILLED
+  // here; a format the model chose leaves the type it chose ("strength" for an E2MOM complex is
+  // what that board is — overwriting it with "emom" was the clock deciding again).
+  if (correctedFormat === workout.format) return workout.type;
   // Map format to appropriate type
   if (correctedFormat === 'amrap' || correctedFormat === 'amrap_intervals') {
     return 'amrap';
@@ -1559,6 +1563,14 @@ function correctWorkoutFormat(workout: ParsedWorkout): ParsedWorkout['format'] {
   // Uncorrected parses are untouched, so the legacy rescue this function exists for (the AI
   // returning "strength" for a mixed board) keeps working everywhere it always did.
   if (workout.userContext?.trim()) return workout.format;
+
+  // And the model's own answer outranks it too — this is a BACKFILL for a blank format, never an
+  // override. Reading words off the board second-guessed every parse: "1+ (AMRAP)" on a 5/3/1
+  // deadlift's last set turned a strength session into "amrap_intervals", "rest" in a strength
+  // part did the same to an 8-min AMRAP, and "5 sets for time, rest 1:1" lost its intervals
+  // (board test set, 2026-10-11). The strict schema means the model always answers; a blank here
+  // is only a legacy doc.
+  if (workout.format) return workout.format;
 
   // prominentText = title + exercise names (high-signal, used for priority checks)
   // fullText = title + rawText + names + prescriptions (broader, used as fallback)

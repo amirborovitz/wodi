@@ -1,3 +1,5 @@
+import { resolveMovement } from '../src/data/movementRegistry';
+import { stripMovementRolePrefix } from '../src/utils/movementNameMatch';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -253,8 +255,13 @@ async function runFixture(fixture: WodFixture): Promise<FixtureRunResult> {
  * screen, or different totals, depending on the day.
  */
 function readingSignature(context: Record<string, unknown>): string {
-  return ['exerciseCount', 'logKinds', 'movementNames', 'totals.reps', 'totals.distance', 'totals.calories']
-    .map((key) => `${key}=${stringifyValue(getPath(context, key))}`)
+  // Movements compared the way the app compares them — by identity, not spelling: "Kettlebell
+  // Swing" and "American Kettlebell Swing" are one lift to records and stats, so a run that spells
+  // it differently has not read the board differently.
+  const names = (getPath(context, 'movementNames') as string[] | undefined) ?? [];
+  const movements = names.map((name) => resolveMovement(stripMovementRolePrefix(name)).identity).join(', ');
+  return [`movements=${movements}`, ...['exerciseCount', 'logKinds', 'totals.reps', 'totals.distance', 'totals.calories']
+    .map((key) => `${key}=${stringifyValue(getPath(context, key))}`)]
     .join(' · ');
 }
 

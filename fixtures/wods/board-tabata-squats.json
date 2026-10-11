@@ -1,0 +1,13 @@
+{
+  "name": "board-tabata-squats",
+  "rawText": "Tabata Air Squats\n8 rounds 20s on / 10s off\nScore = lowest round",
+  "aiResponses": {
+    "segment|Tabata Air Squats\n8 rounds 20s on / 10s off\nScore = lowest round": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"intervals\",\"benchmark\"],\"text\":\"Tabata Air Squat\\n8 rounds 20s on / 10s off\\nScore = lowest round\"}]}",
+    "structure|Tabata Air Squat\n8 rounds 20s on / 10s off\nScore = lowest round": "{\"title\":\"TABATA AIR SQUAT\",\"type\":\"metcon\",\"format\":\"tabata\",\"scoreType\":\"reps\",\"difficultyLevel\":4,\"timeCap\":240,\"sets\":8,\"intervalTime\":20,\"rawText\":\"Tabata Air Squat\\n8 rounds 20s on / 10s off\\nScore = lowest round\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":false,\"exercises\":[{\"name\":\"Tabata Air Squat\",\"type\":\"wod\",\"prescription\":\"8 rounds 20s on / 10s off. Score = lowest round.\",\"rawText\":\"Tabata Air Squat\\n8 rounds 20s on / 10s off\\nScore = lowest round\",\"loggingMode\":\"intervals\",\"scoreType\":\"reps\",\"suggestedSets\":8,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":8,\"rxWeights\":null,\"intervalCount\":8,\"workDuration\":160,\"restDuration\":80,\"intervalSeconds\":20,\"intervalRestSeconds\":10,\"stationRotation\":false,\"isSecondary\":false,\"complex\":false,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Air Squat\",\"reps\":\"max\",\"distance\":null,\"calories\":null,\"time\":20,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_open_reps"
+  },
+  "description": "The score is a rep count (lowest round)."
+}

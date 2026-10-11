@@ -1,0 +1,13 @@
+{
+  "name": "board-wendler-531-plus",
+  "rawText": "Deadlift 5/3/1+\n65% x 5\n75% x 3\n85% x 1+ (AMRAP)",
+  "aiResponses": {
+    "segment|Deadlift 5/3/1+\n65% x 5\n75% x 3\n85% x 1+ (AMRAP)": "{\"parts\":[{\"label\":\"A\",\"kind\":\"strength\",\"traits\":[],\"text\":\"Deadlift 5/3/1+\\n65% x 5\\n75% x 3\\n85% x 1+ (AMRAP)\"}]}",
+    "structure|Deadlift 5/3/1+\n65% x 5\n75% x 3\n85% x 1+ (AMRAP)": "{\"title\":\"Deadlift\",\"type\":\"strength\",\"format\":\"strength\",\"scoreType\":\"load\",\"difficultyLevel\":6,\"timeCap\":null,\"sets\":3,\"intervalTime\":null,\"rawText\":\"Deadlift 5/3/1+\\n65% x 5\\n75% x 3\\n85% x 1+ (AMRAP)\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"Deadlift 5/3/1+\",\"type\":\"strength\",\"prescription\":\"Deadlift 5/3/1+: 65% x 5, 75% x 3, 85% x 1+ (AMRAP)\",\"rawText\":\"Deadlift 5/3/1+\\n65% x 5\\n75% x 3\\n85% x 1+ (AMRAP)\",\"loggingMode\":\"strength\",\"scoreType\":\"load\",\"suggestedSets\":3,\"suggestedReps\":null,\"suggestedRepsPerSet\":[5,3,1],\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":null,\"workDuration\":null,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Deadlift\",\"reps\":null,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"barbell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":null,\"scoreEntryMode\":null,\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "load"
+  },
+  "description": "Last set is max reps at a load — a max set at the end of a strength block."
+}

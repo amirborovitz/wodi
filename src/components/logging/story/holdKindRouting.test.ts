@@ -68,6 +68,16 @@ describe('the hold screen comes from the parse, not its wording', () => {
     expect(createBlankResult(cashOut, 0, 'sets').kind).toBe('reps');
   });
 
+  it('a cardio piece the AI scores as "max calories" keeps the cardio screen', () => {
+    // The recorded Zone 2 parse: mode cardio, scoreType "reps" (the field has no word for calories
+    // or distance), the bike's open count in calories. It opened a reps screen.
+    const zone2: ParsedExercise = {
+      name: 'Zone 2', type: 'cardio', loggingMode: 'cardio', scoreType: 'reps', prescription: '30 min Zone 2, bike or row', suggestedSets: 1,
+      movements: [{ name: 'Bike', time: 1800, inputType: 'calories', equipment: 'none', isMaxReps: true, maxMetric: 'calories' }],
+    };
+    expect(createBlankResult(zone2, 0, 'cardio').kind).toBe('distance');
+  });
+
   it('however the summary happens to be phrased', () => {
     const terse = stationEmom('EMOM 16, four stations');
     const wordy = stationEmom('Every minute for 16 minutes, rotate: bike calories, swings, burpees, then a 30 second plank hold');

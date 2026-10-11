@@ -1,0 +1,14 @@
+{
+  "name": "board-every-3-max-pushups",
+  "rawText": "Every 3:00 x 5:\n400m Run\nMax Push-ups in remaining time\nScore = total push-ups",
+  "aiResponses": {
+    "segment|Every 3:00 x 5:\n400m Run\nMax Push-ups in remaining time\nScore = total push-ups": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"intervals\"],\"text\":\"Every 3:00 x 5:\\n400m Run\\nMax Push-up in remaining time\\nScore = total Push-up\"}]}",
+    "structure|Every 3:00 x 5:\n400m Run\nMax Push-up in remaining time\nScore = total Push-up": "{\"title\":\"HARD STOP\",\"type\":\"emom\",\"format\":\"emom\",\"scoreType\":\"reps\",\"difficultyLevel\":6,\"timeCap\":900,\"sets\":5,\"intervalTime\":180,\"rawText\":\"Every 3:00 x 5:\\n400m Run\\nMax Push-up in remaining time\\nScore = total Push-up\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":false,\"exercises\":[{\"name\":\"Every 3:00 x 5\",\"type\":\"wod\",\"prescription\":\"Every 3:00 x 5: 400m Run, then Max Push-up in remaining time. Score = total Push-up\",\"rawText\":\"Every 3:00 x 5:\\n400m Run\\nMax Push-up in remaining time\\nScore = total Push-up\",\"loggingMode\":\"emom\",\"scoreType\":\"reps\",\"suggestedSets\":5,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":5,\"workDuration\":900,\"restDuration\":null,\"intervalSeconds\":180,\"intervalRestSeconds\":null,\"stationRotation\":false,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Run\",\"reps\":null,\"distance\":400,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":\"m\",\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null},{\"name\":\"Push-up\",\"reps\":\"max\",\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"total\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_open_reps",
+    "totals.distance": "2000"
+  },
+  "description": "Run fixed (2000m); push-ups are the score."
+}

@@ -6,24 +6,11 @@
   "board-death-by-burpees": {
     "[quantity-backfill] exercises[].movements[].isMaxReps": 1
   },
-  "board-five-three-one-and-metcon": {
-    "[override] format": 1
-  },
-  "board-intervals-for-time-each-set": {
-    "[override] format": 1,
-    "[override] type": 1
-  },
-  "board-partner-amrap-igug": {
-    "[override] format": 1
-  },
   "board-skill-hs-walk": {
     "[quantity-backfill] timeCap": 1
   },
-  "board-two-pieces-rest-between": {
-    "[override] type": 1
-  },
-  "into-connected-emom-complex": {
-    "[override] type": 1
+  "board-zone2-bike": {
+    "[quantity-backfill] exercises[].movements[].time": 1
   },
   "lettered-blocks-one-score": {
     "[quantity-backfill] exercises[].movements[].equipment": 1,
@@ -32,16 +19,11 @@
     "[quantity-backfill] exercises[].sections[].movements[].implementCount": 1
   },
   "multipart-emom-amrap": {
-    "[override] type": 1,
     "[quantity-backfill] exercises[].movements[].isMaxReps": 1,
     "[quantity-backfill] exercises[].sections[].movements[].isMaxReps": 1
   },
-  "pair-paced-amrap": {
-    "[override] type": 1
-  },
   "palindrome-partner-chipper": {
-    "[override] exercises[].movements[].inputType": 1,
-    "[override] type": 1
+    "[override] exercises[].movements[].inputType": 1
   },
   "per-movement-ladder-flat-collapse": {
     "[quantity-backfill] exercises[].movements[].equipment": 1,

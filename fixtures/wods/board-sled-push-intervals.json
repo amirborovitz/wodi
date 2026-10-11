@@ -1,0 +1,14 @@
+{
+  "name": "board-sled-push-intervals",
+  "rawText": "Sled Push\n6 x 25m heavy\nRest 1:30",
+  "aiResponses": {
+    "segment|Sled Push\n6 x 25m heavy\nRest 1:30": "{\n  \"title\": \"Sled Push\",\n  \"parts\": [\n    {\n      \"label\": \"A\",\n      \"kind\": \"metcon\",\n      \"traits\": [\n        \"intervals\"\n      ],\n      \"text\": \"6 x 25m heavy\\nRest 1:30\"\n    }\n  ]\n}",
+    "structure|6 x 25m heavy\nRest 1:30": "{\"title\":\"HAUL\",\"type\":\"strength\",\"format\":\"strength\",\"scoreType\":\"load\",\"difficultyLevel\":5,\"timeCap\":null,\"sets\":6,\"intervalTime\":null,\"rawText\":\"6 x 25m heavy\\nRest 1:30\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"6 x 25m Heavy\",\"type\":\"strength\",\"prescription\":\"6 x 25m heavy, rest 1:30\",\"rawText\":\"6 x 25m heavy\\nRest 1:30\",\"loggingMode\":\"strength\",\"scoreType\":\"load\",\"suggestedSets\":6,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":null,\"workDuration\":null,\"restDuration\":450,\"intervalSeconds\":null,\"intervalRestSeconds\":90,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Heavy Carry\",\"reps\":null,\"distance\":25,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"other\",\"inputType\":\"weight\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":\"m\",\"countingMode\":\"per_round\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":[{\"field\":\"exercises[0].movements[0].name\",\"reason\":\"The text says only '6 x 25m heavy' and does not specify the movement/implement; interpreted as a heavy loaded carry because 25m heavy is distance-based loaded strength work.\"}]}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "load",
+    "totals.distance": "150"
+  },
+  "description": "Load on the sled is the athlete's number; distance fixed (150m)."
+}

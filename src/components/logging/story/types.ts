@@ -1,3 +1,4 @@
+import { getMaxMetric } from '../../../utils/maxMetric';
 import type {
   BlockResult,
   ExerciseLoggingMode,
@@ -844,8 +845,18 @@ export function createBlankResult(
   // which held only while the model kept leaving `scoreType` out — the clock still decided in
   // practice. Making the parse a strict schema (parseSchema.ts) turned every field into one the
   // model must answer, the fallback stopped running, and every EMOM silently changed screens.
+  //
+  // A single-machine cardio piece is the same case from the other side: its score is the machine's
+  // reading — calories or distance — which the cardio screen takes and `scoreType` has no noun for.
+  // So an open count in the machine's own unit ("30 min bike", scored as max calories) is that
+  // reading, not a rep count; only an open REP count could move it.
   const aiKind = scoredKindFromAI(exercise);
-  const kind: ExerciseKind = containerKind === 'intervals' && aiKind !== 'score_open_reps'
+  const openMovement = findOpenMovement(exercise);
+  const machineReading = containerKind === 'distance' && aiKind === 'score_open_reps'
+    && openMovement != null && getMaxMetric(openMovement) !== 'reps';
+  const kind: ExerciseKind = machineReading
+    ? 'distance'
+    : containerKind === 'intervals' && aiKind !== 'score_open_reps'
     ? 'intervals'
     : aiKind
       ?? (containerKind === 'score_rounds' && scoresOpenReps(exercise)
