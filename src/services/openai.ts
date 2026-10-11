@@ -1957,7 +1957,7 @@ function validateRxWeights(data: unknown): RxWeights | undefined {
 }
 
 function validateMeasurementUnit(value: unknown): MeasurementUnit | undefined {
-  const validUnits: MeasurementUnit[] = ['kg', 'lb', 'm', 'km', 'mi', 'cal'];
+  const validUnits: MeasurementUnit[] = ['kg', 'lb', 'm', 'km', 'mi', 'yd', 'ft', 'cal'];
   if (typeof value === 'string' && validUnits.includes(value as MeasurementUnit)) {
     return value as MeasurementUnit;
   }

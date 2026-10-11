@@ -20,6 +20,7 @@
  * Lifted out of AddWorkoutScreen.tsx, where 669 lines of domain logic sat inside a screen
  * component — against rule 1, and unreachable from the dev scripts, which cannot import a .tsx.
  */
+import { toMetres } from '../utils/distanceUnits';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, WorkloadBreakdown, MovementTotal, MovementSubstitution } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
@@ -287,7 +288,8 @@ export function buildWorkloadBreakdownFromResults(
         // prescription it replaced. Reading `mov` alone stored the board's run under the bike's
         // name — 14 Sep, 5 × 200m = 1000m where the athlete rode 5 × 600m.
         const addOn = (entries: Record<string, number> | undefined, metric: 'reps' | 'distance' | 'calories'): number => (
-          resolveLoggedQuantity(entries, mk, mov, mov, result.movementSubstitutions, metric) ?? mov[metric] ?? 0
+          resolveLoggedQuantity(entries, mk, mov, mov, result.movementSubstitutions, metric)
+            ?? (metric === 'distance' ? toMetres(mov.distance ?? 0, mov.unit) : mov[metric]) ?? 0
         );
         const movReps = isFixed
           ? addOn(result.movementReps, 'reps') * fixedMultiplier
@@ -309,7 +311,7 @@ export function buildWorkloadBreakdownFromResults(
           ? addOn(result.movementDistances, 'distance') * fixedMultiplier
           : 0;
 
-        const unit = movementDistance > 0 ? (mov.unit || 'm')
+        const unit = movementDistance > 0 ? 'm'
           : movementCalories > 0 ? 'cal'
           : weight ? movementLoadUnit(mov)
           : undefined;
@@ -507,7 +509,9 @@ export function buildWorkloadBreakdownFromResults(
         : undefined;
 
       const perRoundReps = userReps ?? maxSetReps ?? setTotalReps ?? mov.reps ?? 0;
-      const perRoundDistance = userDistance ?? maxSetDistance ?? mov.distance ?? 0;
+      // The board's distance in metres ("1 mile run" is 1,609 m of work); what the athlete entered
+      // already is. See utils/distanceUnits.
+      const perRoundDistance = userDistance ?? maxSetDistance ?? toMetres(mov.distance ?? 0, mov.unit);
       const perRoundCalories = userCalories ?? maxSetCalories ?? mov.calories ?? 0;
       const perRoundTime = mov.time || 0;
 
@@ -659,7 +663,7 @@ export function buildWorkloadBreakdownFromResults(
       const explicitWeight = rawWeight && implementCount > 1 ? rawWeight * implementCount : rawWeight;
       const weight = explicitWeight;
       const unit = movementDistance > 0
-        ? (mov.unit || 'm')
+        ? 'm'
         : movementCalories > 0
           ? 'cal'
           : weight
@@ -709,7 +713,7 @@ export function buildWorkloadBreakdownFromResults(
           originalMovement,
           substitutionType,
           implementCount: implementCount > 1 ? implementCount : undefined,
-          distancePerRep: userDistancePerRep ?? (mov.distance && mov.distance > 0 ? mov.distance : undefined),
+          distancePerRep: userDistancePerRep ?? (mov.distance && mov.distance > 0 ? toMetres(mov.distance, mov.unit) : undefined),
           together: isTogether || undefined,
           sharedLabel: mov.sharedLabel,
         });

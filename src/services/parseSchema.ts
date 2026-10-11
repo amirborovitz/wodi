@@ -89,7 +89,9 @@ const movement = obj({
 
   rxWeights: nullable(rxPair),
   rxCalories: nullable(rxCalories),
-  unit: nullable(str),
+  // A closed list, so a written-out "mile" or "yards" can't come back as text the validator
+  // drops — which turned "1 mile run" into 1 metre.
+  unit: nullable({ type: 'string', enum: ['m', 'km', 'mi', 'yd', 'ft', 'cal', 'kg', 'lb'] }),
 
   countingMode: nullable({
     type: 'string',

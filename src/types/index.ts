@@ -441,7 +441,7 @@ export interface WorkloadBreakdown {
 }
 
 // Unit types for measurements
-export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'cal';
+export type MeasurementUnit = 'kg' | 'lb' | 'm' | 'km' | 'mi' | 'yd' | 'ft' | 'cal';
 export type MovementCountingMode = 'per_round' | 'per_interval' | 'per_station_visit' | 'once';
 // Structural position of a movement written outside the main scheme. See ParsedMovement.placement
 // for why this exists alongside MovementCountingMode and why it currently has one member.

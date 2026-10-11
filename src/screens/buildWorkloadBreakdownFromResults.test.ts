@@ -671,3 +671,57 @@ describe('buildWorkloadBreakdownFromResults — an accessory between strength se
     expect(row(breakdown, 'Band Pull Apart')?.weightProgression).toBeUndefined();
   });
 });
+
+// A board that writes each round out, with a different station per round (2026-10-10, a Hyrox-
+// style piece from the board test set):
+//
+//   4 rounds: 1km Run + station — R1: 1000m SkiErg · R2: 50m Sled Push · R3: 80m Burpee Broad
+//   Jumps · R4: 100 Wall Balls
+//
+// The model read it right: four sections, each ONE round of Run + that round's station, every
+// movement "per_round". The count then read the R1-R4 labels as a station ROTATION cycled 4
+// times and visited every station four times — 400 wall balls, 16 km of running. A station-visit
+// count is the answer for movements the model marked per_station_visit; a movement it marked
+// per_round happens once per round of its own section.
+describe('buildWorkloadBreakdownFromResults — rounds written out, a station per round', () => {
+  const section = (station: ParsedMovement, label: string, index: number) => ({
+    sectionType: 'rounds' as const,
+    rounds: 1,
+    movements: [
+      movement({ name: 'Run', reps: undefined, distance: 1000, unit: 'm', countingMode: 'per_round' }),
+      { ...station, stationLabel: label, stationIndex: index, countingMode: 'per_round' as const },
+    ],
+  });
+  const stations = [
+    movement({ name: 'Ski Erg', reps: undefined, distance: 1000, unit: 'm' }),
+    movement({ name: 'Sled Push', reps: undefined, distance: 50, unit: 'm' }),
+    movement({ name: 'Burpee Broad Jump', reps: undefined, distance: 80, unit: 'm' }),
+    movement({ name: 'Wall Ball', reps: 100 }),
+  ];
+  const ex = exercise({
+    name: 'HYROX SIM',
+    type: 'wod',
+    loggingMode: 'for_time',
+    suggestedSets: 4,
+    movements: [
+      movement({ name: 'Run', reps: undefined, distance: 1000, unit: 'm', countingMode: 'per_round' }),
+      ...stations.map((s, i) => ({ ...s, stationLabel: `R${i + 1}`, stationIndex: i, countingMode: 'per_round' as const })),
+    ],
+    sections: stations.map((s, i) => section(s, `R${i + 1}`, i)),
+  });
+  const parsedWorkout: ParsedWorkout = {
+    title: 'HYROX SIM', format: 'for_time', type: 'for_time', scoreType: 'time', exercises: [ex],
+  };
+
+  it('counts each round once: 4 km of running, every station once', () => {
+    const parsed = calculateWorkloadBreakdown(parsedWorkout);
+    const saved = buildWorkloadBreakdownFromResults([{ exercise: ex, sets: [], rounds: 4 }], parsedWorkout);
+    for (const b of [parsed, saved]) {
+      const row = (name: string) => b.movements.find((m) => m.name === name);
+      expect(row('Run')?.totalDistance).toBe(4000);
+      expect(row('Ski Erg')?.totalDistance).toBe(1000);
+      expect(row('Sled Push')?.totalDistance).toBe(50);
+      expect(row('Wall Ball')?.totalReps).toBe(100);
+    }
+  });
+});

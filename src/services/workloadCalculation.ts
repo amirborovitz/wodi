@@ -1,3 +1,4 @@
+import { toMetres } from '../utils/distanceUnits';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks, sectionsEnumerateIntervals } from '../utils/sectionShape';
@@ -496,7 +497,16 @@ export function getMovementMultiplier(
   // board whose windows are written out. `??` only rescues null, so that 0 beat the section's own
   // count and every window after the first contributed nothing — 19 stored where the athlete did
   // 19+16+13+10. Nothing reached this line while `per_interval` was short-circuiting above it.
-  const stationVisits = stationVisitCounts?.[movementIndex];
+  //
+  // And on a board whose rounds are WRITTEN OUT — one section per round, as many as the piece has —
+  // each row already appears once per round it happened in, so a station-visit count, which
+  // describes one cycle repeated, would count every round a second time. "4 rounds: 1km run + R1:
+  // SkiErg · R2: Sled Push…" read that way stored 400 wall balls for 100 (2026-10-10). Two blocks
+  // alternating over six windows are one cycle, not six rounds, and keep their visits — the same
+  // shape test the interval boards use (sectionsEnumerateIntervals), fed the piece's round count
+  // whichever field holds it.
+  const writtenOut = sectionsEnumerateIntervals(exercise.sections, exercise.intervalCount ?? exercise.suggestedSets);
+  const stationVisits = writtenOut ? undefined : stationVisitCounts?.[movementIndex];
   return isBuyInCashOut
     ? { multiplier: 1, estimated: false }
     : {
@@ -704,7 +714,9 @@ export function calculateWorkloadBreakdown(
         // the flat form too, since that sums the same written values per occurrence.
         const sideMultiplier = movement.perSide ? 2 : 1;
         const reps = (flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier))) * sideMultiplier;
-        const distance = (flat ? flat.distance : (movement.distance || 0) * movMultiplier) * sideMultiplier;
+        // Totals are metres whatever the board wrote ("1 mile run"); the board's own words stay on the
+        // prescription. See utils/distanceUnits.
+        const distance = toMetres((flat ? flat.distance : (movement.distance || 0) * movMultiplier) * sideMultiplier, movement.unit);
         const calories = (flat ? flat.calories : (movement.calories || 0) * movMultiplier) * sideMultiplier;
         const time = (flat ? flat.time : (movement.time || 0) * movMultiplier) * sideMultiplier;
 
@@ -760,7 +772,7 @@ export function calculateWorkloadBreakdown(
             unit,
             color,
             implementCount: implementCount > 1 ? implementCount : undefined,
-            distancePerRep: (movement.distance || 0) > 0 ? (movement.distance || 0) : undefined,
+            distancePerRep: (movement.distance || 0) > 0 ? toMetres(movement.distance || 0, movement.unit) : undefined,
           });
         }
 
