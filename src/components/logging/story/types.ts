@@ -803,13 +803,19 @@ export function createBlankResult(
   const cadenceKind = loggingMode === 'intervals' && baseKind === 'score_time' && isFixedCadenceInterval(exercise)
     ? 'intervals'
     : baseKind;
+  // A strength block logs as a lift whatever clock it runs on: the clock is scheduling, it belongs
+  // in the header (CLAUDE.md rule 2b). What decides is what the block IS — the model's `type` —
+  // not which timer the board wrote. An E2MOM complex on the interval screen saved one set holding
+  // a weight range; the lift screen saves one entry per set (strengthBlockRouting.test.ts).
+  const strengthOnClock = exercise.type === 'strength' && (loggingMode === 'emom' || loggingMode === 'intervals');
+  const clockKind = strengthOnClock ? 'load' : cadenceKind;
   // "weighted" in exercise name contradicts a 'reps' classification — override to load.
   // Guard against distance/calorie movements (e.g. "Weighted Vest Run").
   const weightedKind = (
-    cadenceKind === 'reps'
+    clockKind === 'reps'
     && /\bweighted\b/i.test(exercise.name)
     && !exercise.movements?.some(m => m.inputType === 'distance' || m.inputType === 'calories')
-  ) ? 'load' : cadenceKind;
+  ) ? 'load' : clockKind;
   // The reverse contradiction: a strength-block exercise whose movements are all
   // bodyweight (e.g. "8 Strict Toes to Bar" inside "3 sets: …") has no weight to log —
   // the block's loggingMode says 'strength' but there is nothing to put on a bar.
@@ -856,8 +862,10 @@ export function createBlankResult(
     && openMovement != null && getMaxMetric(openMovement) !== 'reps';
   const kind: ExerciseKind = machineReading
     ? 'distance'
-    : containerKind === 'intervals' && aiKind !== 'score_open_reps'
-    ? 'intervals'
+    // The same for a strength block on a clock: an EMOM's default scoreType ("reps") must not bump
+    // the lift back off its screen. Only an open count moves either.
+    : (containerKind === 'intervals' || (strengthOnClock && containerKind === 'load')) && aiKind !== 'score_open_reps'
+    ? containerKind
     : aiKind
       ?? (containerKind === 'score_rounds' && scoresOpenReps(exercise)
         // Safety net for a parse that omitted scoreType: an open movement means the rounds are

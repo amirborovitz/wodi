@@ -9,7 +9,7 @@
   "expect": {
     "exerciseCount": "2",
     "format": "for_time",
-    "logKinds": "intervals, score_time",
+    "logKinds": "load, score_time",
     "parsed.exercises.0.name": "Weightlifting",
     "parsed.exercises.0.movements.0.name": "Push Press",
     "parsed.exercises.0.movements.1.name": "Push Jerk",

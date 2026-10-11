@@ -63,7 +63,12 @@ describe('a fixed-cadence block keeps the interval screen', () => {
     expect(createBlankResult(emom(), 0, 'emom').kind).toBe('intervals');
   });
 
-  it('holds for a single-movement cadence block too', () => {
+  // This used to assert 'intervals' for a STRENGTH lift on a cadence. That was the 31 Aug push
+  // press: the interval screen saved one set carrying a weight range, and the poster printed
+  // "1 × EVERY 02:00" over "5 SETS". The agreed model (2026-09-01): the clock is scheduling, a
+  // strength block logs as a lift — see strengthBlockRouting.test.ts. A metcon cadence block
+  // (type "wod") is what this describe pins, and it still keeps the interval screen.
+  it('a strength lift on a cadence is not a cadence block — it opens the lift screen', () => {
     const singleLift = emom({
       name: 'Push Press',
       type: 'strength',
@@ -72,7 +77,7 @@ describe('a fixed-cadence block keeps the interval screen', () => {
       suggestedSets: 5,
       movements: [{ name: 'Push Press', reps: 3, inputType: 'weight', equipment: 'barbell' }],
     });
-    expect(createBlankResult(singleLift, 0, 'emom').kind).toBe('intervals');
+    expect(createBlankResult(singleLift, 0, 'emom').kind).toBe('load');
   });
 });
 
