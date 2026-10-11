@@ -10,5 +10,12 @@
     "logKinds": "score_time",
     "totals.reps": "150"
   },
-  "description": "Done once through."
+  "description": "Done once through.",
+  "expectSaved": {
+    "0:Double Under:totalReps": 50,
+    "0:Wall Ball:totalReps": 40,
+    "0:Toes to Bar:totalReps": 30,
+    "0:Burpee:totalReps": 20,
+    "0:Clean and Jerk:totalReps": 10
+  }
 }

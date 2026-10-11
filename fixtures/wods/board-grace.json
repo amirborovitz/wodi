@@ -10,5 +10,8 @@
     "logKinds": "score_time",
     "totals.reps": "30"
   },
-  "description": "Benchmark; PR-worthy."
+  "description": "Benchmark; PR-worthy.",
+  "expectSaved": {
+    "0:Clean and Jerk:totalReps": 30
+  }
 }

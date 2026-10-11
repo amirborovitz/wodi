@@ -10,5 +10,12 @@
     "logKinds": "score_time",
     "totals.distance": "5130"
   },
-  "description": "4km run total; each station once."
+  "description": "4km run total; each station once.",
+  "expectSaved": {
+    "0:Wall Ball:totalReps": 100,
+    "0:Run:totalDistance": 4000,
+    "0:Ski Erg:totalDistance": 1000,
+    "0:Sled Push:totalDistance": 50,
+    "0:Burpee Broad Jump:totalDistance": 80
+  }
 }

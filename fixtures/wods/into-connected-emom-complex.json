@@ -22,5 +22,13 @@
     "totals.distance": "900",
     "parsed.exercises.1.sections.2.movements.0.name": "Run",
     "parsed.exercises.1.sections.4.movements.0.name": "Run"
+  },
+  "expectSaved": {
+    "0:Push Press:totalReps": 8,
+    "0:Push Jerk:totalReps": 8,
+    "1:Russian Kettlebell Swing:totalReps": 120,
+    "1:Goblet Squat:totalReps": 90,
+    "1:Toes to Bar:totalReps": 60,
+    "1:Run:totalDistance": 900
   }
 }

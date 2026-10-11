@@ -16,5 +16,9 @@
     "parsed.exercises.1.movements.0.relay": "true",
     "parsed.exercises.1.movements.0.distance": "200",
     "parsed.exercises.1.partnerWorkout!=": "true"
+  },
+  "expectSaved": {
+    "0:Front Squat:totalReps": 12,
+    "2:Tibialis Raise:totalReps": 36
   }
 }

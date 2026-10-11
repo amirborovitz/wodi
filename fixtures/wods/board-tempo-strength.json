@@ -9,5 +9,8 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "Tempo is a cue, not reps. 24 reps total."
+  "description": "Tempo is a cue, not reps. 24 reps total.",
+  "expectSaved": {
+    "0:Strict Press:totalReps": 24
+  }
 }

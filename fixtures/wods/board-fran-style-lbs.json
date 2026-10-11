@@ -10,5 +10,9 @@
     "logKinds": "score_time",
     "totals.reps": "90"
   },
-  "description": "Rx in lb. 45 thrusters + 45 pull-ups."
+  "description": "Rx in lb. 45 thrusters + 45 pull-ups.",
+  "expectSaved": {
+    "0:Thruster:totalReps": 45,
+    "0:Pull-up:totalReps": 45
+  }
 }

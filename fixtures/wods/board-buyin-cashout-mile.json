@@ -10,5 +10,11 @@
     "logKinds": "score_time",
     "totals.distance": "3219"
   },
-  "description": "Miles: 2 x 1609m = 3218m once each, not per round. 45 DL, 45 HSPU."
+  "description": "Miles: 2 x 1609m = 3218m once each, not per round. 45 DL, 45 HSPU.",
+  "expectSaved": {
+    "0:Deadlift:totalReps": 45,
+    "0:Handstand Push-up:totalReps": 45,
+    "0:Buy-In: Run:totalDistance": 1609,
+    "0:Cash-Out: Run:totalDistance": 1609
+  }
 }

@@ -9,5 +9,9 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "Superset: two movements, each its own weight (complex false). 3 sets of 10 each."
+  "description": "Superset: two movements, each its own weight (complex false). 3 sets of 10 each.",
+  "expectSaved": {
+    "0:Dumbbell Bench Press:totalReps": 30,
+    "0:Bent Over Row:totalReps": 30
+  }
 }

@@ -266,9 +266,15 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
           mwp[n] = [m.weight, m.weightEnd];
         }
       }
-      if (m.distance != null && m.distance > 0) md[n] = m.distance;
-      if (m.reps != null && m.reps > 0) mr[n] = m.reps;
-      if (m.calories != null && m.calories > 0) mc[n] = m.calories;
+      // An ENTRY is what the athlete changed. The board's own amount, carried here because the
+      // logging screen opens on it, is prescription — the save reads that off the board itself,
+      // per round and in the board's unit. Passed on as an entry it was taken for a total the
+      // athlete gave: "4 sets of 1800 echo bike" stored 1,800 m where they rode 7,200, a "1 mile
+      // run" stored 1 m, and a confirmed partner distance lost its split (2026-10-11).
+      const isBoardAmount = (value: number, prescribed: number | undefined): boolean => !m.substitution && value === prescribed;
+      if (m.distance != null && m.distance > 0 && !isBoardAmount(m.distance, m.movement.distance)) md[n] = m.distance;
+      if (m.reps != null && m.reps > 0 && !isBoardAmount(m.reps, m.movement.reps)) mr[n] = m.reps;
+      if (m.calories != null && m.calories > 0 && !isBoardAmount(m.calories, m.movement.calories)) mc[n] = m.calories;
       // Every answer, 1 included: a missing entry has to mean "never asked", or a lift switched
       // down to one dumbbell is indistinguishable from one nobody asked about.
       if (m.implementCount) ic[n] = m.implementCount;

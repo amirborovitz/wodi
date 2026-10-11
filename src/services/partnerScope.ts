@@ -31,6 +31,11 @@ export interface TeamScopedExercise {
   loggingMode?: ExerciseLoggingMode;
   workDuration?: number;
   restDuration?: number;
+  // How a traded-rounds block divides: the team's round count, and the athlete's own when the
+  // board states it ("6 rounds each athlete", "15 RFT (8 each)") — see exercisePartnerFactor.
+  partnerSplit?: 'rounds' | 'reps';
+  suggestedSets?: number;
+  personalRounds?: number;
 }
 
 /**
@@ -118,7 +123,14 @@ export function exercisePartnerFactor(
   sessionFactor: number,
   isSoleExercise: boolean,
 ): number {
-  return isTeamPrescribedExercise(exercise, sessionFactor, isSoleExercise) ? sessionFactor : 1;
+  if (!isTeamPrescribedExercise(exercise, sessionFactor, isSoleExercise)) return 1;
+  // Traded rounds with the athlete's own count on the board: the coach's number is the truth —
+  // their share is personal ÷ team rounds, not 1 ÷ team size. "Teams of 3, 6 rounds each athlete"
+  // written as 6 rounds was divided by three: 20 front squats saved where each did 60.
+  const team = exercise.suggestedSets ?? 0;
+  const mine = exercise.personalRounds ?? 0;
+  if (exercise.partnerSplit === 'rounds' && mine > 0 && team > 0 && mine <= team) return mine / team;
+  return sessionFactor;
 }
 
 // ─── Rounds ───────────────────────────────────────────────────────────────────

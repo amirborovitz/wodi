@@ -1,18 +1,16 @@
+import { analyzeExerciseMetric, getExerciseLoggingMode, type ExerciseInputType } from '../services/exerciseLoggingMode';
 import { restoreStoryResults } from '../utils/restoreStoryResults';
-import { buildSavedExercises } from '../services/buildSavedExercises';
+import { buildSavedWorkoutTotals, sessionPartnerScope } from '../services/savedWorkout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ActionMenuSheet, Button, Card } from '../components/ui';
 import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
-import { assignMovementColors } from '../services/workloadCalculation';
 import { track } from '../services/analytics';
-import { buildWorkloadBreakdownFromResults } from '../services/workloadFromResults';
 import type { ExerciseResult } from '../services/workloadFromResults';
 import { resolveSaveTarget } from '../services/saveTarget';
 import { flagParseOverrides } from '../services/parseFlagService';
 import { findRecentSameBoard } from '../services/sameBoard';
 import { parseSourceDate } from '../utils/workoutDate';
-import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
 import { smartClassifyExercise } from '../services/exerciseClassification';
 import type { ExerciseMetricType } from '../services/exerciseClassification';
 import {
@@ -61,7 +59,6 @@ import { initStoryResults, movementToKind } from '../components/logging/story/ty
 import { unitToRemember } from '../components/logging/story/athleteLoadUnit';
 import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
-import { matchesNamePattern } from '../utils/movementNameMatch';
 import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
 import { backFromChat, backFromForm, type BackTarget } from './addWorkoutBack';
@@ -245,202 +242,6 @@ function getDefaultAlternativesForExercise(exercise: ParsedExercise): {
   return { selected, distances, reps };
 }
 
-// ============================================
-// EXERCISE CLASSIFICATION SYSTEM
-// ============================================
-
-// Metric type for exercises
-type ExerciseMetric = 'weight_reps' | 'reps_only' | 'calories' | 'distance' | 'time';
-
-interface ExerciseClassification {
-  inputType: ExerciseInputType;
-  metric: ExerciseMetric;
-  confidence: 'high' | 'medium' | 'low';
-  reason: string;
-}
-
-// Explicit metric indicators in workout text (highest priority)
-const EXPLICIT_CALORIE_PATTERNS = [
-  /max\s*cal/i, /for\s*cal/i, /\d+\s*cal\b/i, /calories/i,
-];
-
-const EXPLICIT_DISTANCE_PATTERNS = [
-  /\d+\s*m\b/, /\d+\s*meter/i, /\d+\s*metre/i,
-  /\d+\s*km\b/i, /\d+\s*mile/i, /\d+\s*mi\b/,
-  /\d+\s*yard/i, /\d+\s*yd\b/i,
-  /\d+\s*ft\b/, /\d+\s*feet/i,
-  /for distance/i, /max distance/i,
-];
-
-// (unused) EXPLICIT_TIME_PATTERNS removed
-
-// Cardio machines - can track calories OR distance depending on workout text
-const CARDIO_MACHINE_PATTERNS = [
-  'echo bike', 'ecobike', 'assault bike', 'air bike', 'airbike', 'airdyne',
-  'ski erg', 'skierg', 'ski-erg',
-  'rower', 'rowing', 'row erg', 'rowerg', 'row',
-  'bike erg', 'bikeerg',
-];
-
-// Weighted carries — tracked separately from cardio distance (e.g., "moved 50kg 200m")
-
-// Distance-based cardio - typically track distance
-const DISTANCE_CARDIO_PATTERNS = [
-  'run', 'running', 'sprint',
-  'swim', 'swimming',
-  'walk', 'walking', 'hike',
-  'sled push', 'sled pull', 'sled drag',
-];
-
-// Bodyweight exercises - track reps only, no weight (unless explicitly weighted)
-const BODYWEIGHT_PATTERNS = [
-  'pull-up', 'pullup', 'pull up',
-  'push-up', 'pushup', 'push up',
-  'burpee', 'burpees',
-  'air squat', 'airsquat',
-  'sit-up', 'situp', 'sit up',
-  'v-up', 'vup', 'v up',
-  'toes to bar', 't2b', 'ttb',
-  'knees to elbow', 'k2e', 'kte',
-  'muscle-up', 'muscleup', 'muscle up',
-  'handstand push-up', 'hspu',
-  'handstand walk', 'hs walk',
-  'pistol', 'pistols',
-  'lunge', 'lunges', // unless weighted
-  'box jump', 'box step',
-  'double under', 'du', 'single under', 'su',
-  'rope climb',
-  'hollow hold', 'hollow rock', 'hollow',
-  'plank', 'l-sit', 'l sit',
-  'wall sit', 'wall hold',
-  'ring hold', 'ring support',
-];
-
-type ExerciseInputType = 'weighted' | 'bodyweight' | 'cardio_calories' | 'cardio_distance';
-
-// Analyze workout text to determine what metric to track
-function analyzeExerciseMetric(exercise: ParsedExercise): ExerciseClassification {
-  const text = `${exercise.name} ${exercise.prescription}`.toLowerCase();
-
-  // 1. Check for EXPLICIT metric indicators in the text (highest confidence)
-
-  // Explicit calories mentioned
-  if (EXPLICIT_CALORIE_PATTERNS.some(p => p.test(text))) {
-    return {
-      inputType: 'cardio_calories',
-      metric: 'calories',
-      confidence: 'high',
-      reason: 'Explicit calorie target in workout text',
-    };
-  }
-
-  // Explicit distance mentioned
-  if (EXPLICIT_DISTANCE_PATTERNS.some(p => p.test(text))) {
-    return {
-      inputType: 'cardio_distance',
-      metric: 'distance',
-      confidence: 'high',
-      reason: 'Explicit distance target in workout text',
-    };
-  }
-
-  // 2. Check for cardio machines - need to infer metric
-  const isCardioMachine = matchesNamePattern(text, CARDIO_MACHINE_PATTERNS);
-  if (isCardioMachine) {
-    // Default to calories for machines if no explicit metric
-    return {
-      inputType: 'cardio_calories',
-      metric: 'calories',
-      confidence: 'medium',
-      reason: 'Cardio machine detected, defaulting to calories (no explicit metric)',
-    };
-  }
-
-  // 3. Check for distance exercises (run, swim, etc.)
-  const isDistanceExercise = matchesNamePattern(text, DISTANCE_CARDIO_PATTERNS);
-  if (isDistanceExercise) {
-    return {
-      inputType: 'cardio_distance',
-      metric: 'distance',
-      confidence: 'medium',
-      reason: 'Distance-based exercise detected',
-    };
-  }
-
-  // 4. Check for explicit cardio type from parser
-  if (exercise.type === 'cardio') {
-    return {
-      inputType: 'cardio_calories',
-      metric: 'calories',
-      confidence: 'low',
-      reason: 'Exercise type is cardio, defaulting to calories',
-    };
-  }
-
-  // 5. Check for bodyweight exercises
-  const isBodyweight = matchesNamePattern(text, BODYWEIGHT_PATTERNS);
-  const hasWeight = exercise.rxWeights ||
-                    /\d+\s*(kg|lb|pound)/i.test(text) ||
-                    text.includes('weighted');
-  const weightedImplementPatterns = [
-    'goblet', 'kettlebell', 'kb', 'dumbbell', 'db', 'barbell', 'bb',
-    'press', 'deadlift', 'clean', 'snatch', 'thruster', 'front rack', 'overhead',
-    'back squat', 'front squat', 'squat'
-  ];
-  const hasWeightedImplement = matchesNamePattern(text, weightedImplementPatterns);
-
-  if (!hasWeight && hasWeightedImplement && !isBodyweight) {
-    return {
-      inputType: 'weighted',
-      metric: 'weight_reps',
-      confidence: 'medium',
-      reason: 'Weighted movement keyword detected without explicit load',
-    };
-  }
-
-  if (isBodyweight && !hasWeight && !hasWeightedImplement) {
-    return {
-      inputType: 'bodyweight',
-      metric: 'reps_only',
-      confidence: 'high',
-      reason: 'Bodyweight exercise without weight specification',
-    };
-  }
-
-  // 6. Default to weighted
-  return {
-    inputType: 'weighted',
-    metric: 'weight_reps',
-    confidence: 'high',
-    reason: 'Standard weighted exercise',
-  };
-}
-
-function classifyExercise(exercise: ParsedExercise): ExerciseInputType {
-  return analyzeExerciseMetric(exercise).inputType;
-}
-
-// Determine the logging mode for each exercise
-// ExerciseLoggingMode is now imported from '../types'
-
-function shouldForceForTimeMode(exercise: ParsedExercise): boolean {
-  if (exercise.type === 'strength' || exercise.type === 'skill') return false;
-  const movements = exercise.movements || [];
-  if (movements.length < 2) return false;
-
-  const name = exercise.name.toLowerCase();
-  const prescription = exercise.prescription.toLowerCase();
-  // Only use signals from THIS exercise's own name/prescription
-  const hasForTimeSignal =
-    name.includes('for time') ||
-    prescription.includes('for time') ||
-    /\brft\b/i.test(name) ||
-    /\brft\b/i.test(prescription);
-
-  // Structural: for-time signal + multiple movements = for_time mode
-  // Independent of what the movements are (reps, distance, calories, etc.)
-  return hasForTimeSignal;
-}
 
 // Preview readback: what the logging step will ask for, per mode. Shown under each exercise
 // on the preview so a wrong interpretation ("weight?" on a bodyweight piece) is visible
@@ -478,121 +279,6 @@ function getLoggingModeHint(exercise: ParsedExercise, mode: ExerciseLoggingMode)
   return mode === 'emom' ? emomLoggingHint(exercise) : LOGGING_MODE_HINTS[mode];
 }
 
-function getExerciseLoggingMode(
-  exercise: ParsedExercise,
-  workoutContext?: { format: string; scoreType: string; exerciseCount: number },
-): ExerciseLoggingMode {
-  // Trust AI-classified loggingMode when present (set by AI or post-processor backfill)
-  if (exercise.loggingMode) return exercise.loggingMode;
-
-  // ────────────────────────────────────────────────────────────────
-  // FALLBACK: Regex classification for old data without loggingMode
-  // ────────────────────────────────────────────────────────────────
-
-  // ────────────────────────────────────────────────────────────────
-  // ARCHITECTURE: Each exercise is classified primarily from its own
-  // name, prescription, type, and movements.  For multi-exercise
-  // workouts the global workoutFormat is ignored — real WODs have
-  // 2-3 parts (A = strength, B = EMOM, C = for-time) so a single
-  // global format would misclassify every part except one.
-  //
-  // EXCEPTION: Single-exercise workouts (benchmarks like Grace,
-  // Isabel, Fran) are unambiguous — the workout format IS the
-  // exercise format.  We trust the AI-parsed workout format here
-  // to avoid a delayed reclassification jump.
-  // ────────────────────────────────────────────────────────────────
-
-  // For single-exercise workouts, trust the workout-level format
-  if (workoutContext && workoutContext.exerciseCount === 1) {
-    if (workoutContext.format === 'for_time' || workoutContext.scoreType === 'time') {
-      return 'for_time';
-    }
-    if (workoutContext.format === 'amrap') {
-      return 'amrap';
-    }
-  }
-
-  const name = exercise.name.toLowerCase();
-  const prescription = exercise.prescription.toLowerCase();
-  const classification = classifyExercise(exercise);
-  const movements = exercise.movements || [];
-
-  // 1. AMRAP — exercise explicitly mentions AMRAP
-  const isAmrapPattern =
-    name.includes('amrap') ||
-    prescription.includes('amrap');
-
-  if (isAmrapPattern && (name.includes('x') || name.includes('rest'))) {
-    return 'amrap_intervals';
-  }
-  if (isAmrapPattern) {
-    return 'amrap';
-  }
-
-  // 2. For-time — exercise explicitly mentions "for time" / RFT
-  if (shouldForceForTimeMode(exercise)) {
-    return 'for_time';
-  }
-
-  const isForTimePattern =
-    name.includes('for time') ||
-    prescription.includes('for time') ||
-    /\brounds?\s+for\s+time\b/i.test(name) ||
-    /\brounds?\s+for\s+time\b/i.test(prescription) ||
-    /\d+\s*rft\b/i.test(name) ||
-    name.includes('sets for time') ||
-    prescription.includes('sets for time');
-
-  if (isForTimePattern) {
-    return 'for_time';
-  }
-
-  // 3. Cardio — single-movement cardio exercises
-  if (classification === 'cardio_calories' && movements.length <= 1) {
-    return 'cardio';
-  }
-  if (classification === 'cardio_distance' && movements.length <= 1) {
-    return 'cardio_distance';
-  }
-
-  // 4. EMOM — exercise explicitly mentions EMOM / E2MOM / "every N" / "min 1"
-  const isEmomPattern =
-    name.includes('emom') || name.includes('e2mom') ||
-    /every\s+\d+/i.test(name) ||
-    /\bmin\s*\d/i.test(name) || /\bmin\s*\d/i.test(prescription) ||
-    /\bminute\b/i.test(name);
-
-  if (isEmomPattern) {
-    return 'emom';
-  }
-
-  // 5. Intervals — exercise explicitly mentions intervals
-  //    BUT NOT if this is a team/IGUG workout (those are for-time, not split-time intervals)
-  //    and NOT if it just mentions "interval" as context (e.g. "after each interval")
-  if (/\binterval/i.test(name) || /\binterval/i.test(prescription)) {
-    const isTeamIGUG = /i\s*go\s*y(ou|o?u?)\s*go|igug|teams?\s+of|in\s+pairs?|partner/i.test(name)
-      || /i\s*go\s*y(ou|o?u?)\s*go|igug|teams?\s+of|in\s+pairs?|partner/i.test(prescription);
-    const hasForTime = /for\s+time/i.test(name) || /for\s+time/i.test(prescription);
-    const hasTimeCap = /\d+\s*min\s*t\.?c|time\s*cap/i.test(prescription);
-    if (isTeamIGUG || hasForTime || hasTimeCap) {
-      return 'for_time';
-    }
-    return 'intervals';
-  }
-
-  // 6. Bodyweight
-  if (classification === 'bodyweight') {
-    return 'bodyweight';
-  }
-
-  // 7. Strength
-  if (exercise.type === 'strength') {
-    return 'strength';
-  }
-
-  // 8. Default — weight/reps per set
-  return 'sets';
-}
 
 function getImplementCountInfo(movement: ParsedMovement, exerciseText: string): { count: 1 | 2; isFixed: boolean; isKbDb: boolean } {
   const name = movement.name.toLowerCase();
@@ -870,19 +556,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const [sameBoardPrompt, setSameBoardPrompt] = useState<{ results: ExerciseResult[]; match: WorkoutWithStats } | null>(null);
   const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
   const [editInitialResults, setEditInitialResults] = useState<StoryExerciseResult[] | undefined>(undefined);
-  // Trust an explicit AI `false` (post-processor title override already reconciled it) — pair
-  // language alone doesn't make a partner workout (pair-paced AMRAPs are solo work; the pair is
-  // only the clock). The regex fallback below runs only when the AI left the field unset.
-  const isPartnerWorkout = parsedWorkout?.partnerWorkout === false ? false : Boolean(
-    parsedWorkout?.partnerWorkout ||
-    parsedWorkout?.rawText?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of \d+\b|\b\d+[- ]person\b|\bigug\b|\bi\s*go\s*you\s*go\b|\bgroups? of \d+\b/i) ||
-    parsedWorkout?.title?.match(/\bwith a partner\b|\bpartner workout\b|\bin pairs\b|\bpairs\b|\bteam of \d+\b|\b\d+[- ]person\b|\bigug\b|\bi\s*go\s*you\s*go\b|\bgroups? of \d+\b/i) ||
-    parsedWorkout?.exercises?.some(exercise =>
-      /with a partner|partner workout|in pairs|pairs|team of \d+|\d+[- ]person|igug|i\s*go\s*you\s*go|groups? of \d+/i.test(`${exercise.name} ${exercise.prescription}`)
-    )
-  );
-  const teamSize = parsedWorkout?.teamSize || (isPartnerWorkout ? 2 : 1);
-  const partnerFactor = isPartnerWorkout ? 1 / teamSize : 1;
+  const { isPartnerWorkout, teamSize, partnerFactor } = sessionPartnerScope(parsedWorkout);
   useEffect(() => {
     setSavedWorkouts(isAdmin ? readSavedWorkouts() : []);
   }, [isAdmin]);
@@ -2142,84 +1816,10 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       // Asked of the session's workout id, never of `isEditingAfterSave` — see saveTarget.ts.
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
-      const { builtExercises: exercises, totalDuration } = buildSavedExercises(results);
+      const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes } =
+        buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor);
       rememberWeightUnit(results);
-
-      const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
-      breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);
-      const totalVolume = breakdownFromResults.grandTotalVolume;
-      const totalReps = breakdownFromResults.grandTotalReps;
-
       const workoutTitle = parsedWorkout.title || "Today's Workout";
-
-      // Duration: use the MAXIMUM of actual completion time vs programmed time.
-      // Actual split times can be shorter than programmed intervals (e.g., 60s work
-      // within a 90s interval window), so we take the larger value.
-      const timeCapSeconds = parsedWorkout.timeCap || 0;
-      const emomSeconds = (parsedWorkout.intervalTime && (parsedWorkout.sets || parsedWorkout.containerRounds))
-        ? parsedWorkout.intervalTime * (parsedWorkout.containerRounds || parsedWorkout.sets || 0)
-        : 0;
-
-      // Primary: use AI-returned workDuration/restDuration per exercise (reliable, no regex).
-      // blockClock owns the arithmetic: N work intervals have N-1 rests BETWEEN them, so summing
-      // work + rest counted a final rest nobody ever stands through. See utils/blockClock.
-      let perExerciseDuration = 0;
-      for (const r of results) {
-        perExerciseDuration += blockClockSeconds(r.exercise);
-      }
-
-      // Fallback: regex extraction from exercise name/prescription (for older AI responses)
-      if (perExerciseDuration === 0 && timeCapSeconds === 0 && emomSeconds === 0) {
-        for (const r of results) {
-          const rx = (r.exercise.prescription || '').toLowerCase() + ' ' + (r.exercise.name || '').toLowerCase();
-          // "Every 3:00 x 5" or "Every 03:00 min x 5 rounds"
-          const emomMatch = rx.match(/every\s+(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*[x×]\s*(\d+)/i);
-          if (emomMatch) {
-            const mins = parseInt(emomMatch[1], 10);
-            const secs = parseInt(emomMatch[2], 10);
-            const sets = parseInt(emomMatch[3], 10);
-            perExerciseDuration += (mins * 60 + secs) * sets;
-            continue;
-          }
-          // "03:00 min AMRAP, 01:00 min REST x 4 rounds" or "[03:00 min AMRAP, 01:00 min REST] x 4"
-          const intervalAmrap = rx.match(/\[?(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*amrap[^,]*,\s*(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*rest\]?\s*[x×]\s*(\d+)/i);
-          if (intervalAmrap) {
-            const workSecs = parseInt(intervalAmrap[1], 10) * 60 + parseInt(intervalAmrap[2], 10);
-            const restSecs = parseInt(intervalAmrap[3], 10) * 60 + parseInt(intervalAmrap[4], 10);
-            const rounds = parseInt(intervalAmrap[5], 10);
-            // Same rule as the primary path — the last rest is not on the clock. This branch
-            // reads PER-INTERVAL values off the board text, so multiply up before applying it.
-            perExerciseDuration += intervalChainSeconds(
-              workSecs * rounds,
-              restSecs * rounds,
-              rounds,
-              trailingRestIsOccupied(r.exercise),
-            );
-            continue;
-          }
-          // "AMRAP 3:00", "03:00 min AMRAP" — MM:SS format
-          const capMMSS = rx.match(/(?:amrap|emom)\s+(\d+):(\d+)/i)
-            || rx.match(/(\d+):(\d+)\s*(?:min(?:ute)?s?)?\s*(?:amrap|emom)/i);
-          if (capMMSS) {
-            perExerciseDuration += parseInt(capMMSS[1], 10) * 60 + parseInt(capMMSS[2], 10);
-            continue;
-          }
-          // "AMRAP 12", "18 min AMRAP", "EMOM 15" — plain minutes
-          const capMatch = rx.match(/(?:amrap|emom)\s+(\d+)/i)
-            || rx.match(/(\d+)\s*(?:min(?:ute)?s?)\s*(?:amrap|emom)/i);
-          if (capMatch) {
-            perExerciseDuration += parseInt(capMatch[1], 10) * 60;
-          }
-        }
-      }
-
-      // When AI workDuration is available (perExerciseDuration from primary path),
-      // trust it over timeCap which can be wrong (e.g., AI confusing 200m with 200 minutes).
-      const programmedDuration = perExerciseDuration > 0
-        ? perExerciseDuration
-        : Math.max(timeCapSeconds, emomSeconds);
-      const effectiveDuration = Math.max(totalDuration, programmedDuration);
-      const durationMinutes = effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : 0;
 
       // A workout being re-saved — or an earlier log being replaced — keeps the day it was logged.
       const workoutDate = session?.date || new Date();

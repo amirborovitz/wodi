@@ -9,5 +9,12 @@
     "exerciseCount": "1",
     "logKinds": "score_time"
   },
-  "description": "Team of 2, split as needed: each athlete's share is half — personal totals = half the board."
+  "description": "Team of 2, split as needed: each athlete's share is half — personal totals = half the board.",
+  "expectSaved": {
+    "0:Wall Ball:totalReps": 40,
+    "0:Pull-up:totalReps": 30,
+    "0:Dumbbell Snatch:totalReps": 20,
+    "0:Bar Muscle-up:totalReps": 10,
+    "0:Row:totalCalories": 50
+  }
 }

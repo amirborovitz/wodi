@@ -14,5 +14,12 @@
     "totals.distance": "5400",
     "hero.value": "5.4",
     "hero.unit": "KM"
+  },
+  "expectSaved": {
+    "0:Double Under:totalReps": 200,
+    "0:Alt Dumbbell Snatch:totalReps": 72,
+    "0:Weighted Step-up:totalReps": 72,
+    "0:Toes to Bar:totalReps": 72,
+    "0:Echo Bike:totalDistance": 5400
   }
 }

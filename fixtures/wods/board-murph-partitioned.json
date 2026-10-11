@@ -11,5 +11,12 @@
     "totals.reps": "600",
     "totals.distance": "3219"
   },
-  "description": "Vest is a load; 3218m run; 600 reps."
+  "description": "Vest is a load; 3218m run; 600 reps.",
+  "expectSaved": {
+    "0:Air Squat:totalReps": 300,
+    "0:Push-up:totalReps": 200,
+    "0:Pull-up:totalReps": 100,
+    "0:Buy-In: Run:totalDistance": 1609,
+    "0:Cash-Out: Run:totalDistance": 1609
+  }
 }

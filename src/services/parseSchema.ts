@@ -164,6 +164,9 @@ const exercise = obj({
   complex: nullable(bool),
   partnerWorkout: nullable(bool),
   partnerSplit: nullable({ type: 'string', enum: ['rounds', 'reps'] }),
+  // Each athlete's OWN round count when the board states it ("6 rounds each athlete", "(8 each)");
+  // suggestedSets stays the team's. The partner factor reads the two together (partnerScope.ts).
+  personalRounds: nullable({ type: 'integer' }),
   // The name this part is known by — see WOD NAME in the parse prompt. null when it has none.
   wodName: nullable(str),
 

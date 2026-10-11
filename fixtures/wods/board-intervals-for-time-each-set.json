@@ -10,5 +10,9 @@
     "logKinds": "score_time",
     "totals.distance": "2000"
   },
-  "description": "Five separately timed sets (time per set); 2000m run, 75 swings."
+  "description": "Five separately timed sets (time per set); 2000m run, 75 swings.",
+  "expectSaved": {
+    "0:American Kettlebell Swing:totalReps": 75,
+    "0:Run:totalDistance": 2000
+  }
 }

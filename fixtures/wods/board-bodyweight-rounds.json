@@ -10,5 +10,10 @@
     "logKinds": "score_time",
     "totals.reps": "225"
   },
-  "description": "No clock written — for time or just done; no weights asked."
+  "description": "No clock written — for time or just done; no weights asked.",
+  "expectSaved": {
+    "0:Air Squat:totalReps": 100,
+    "0:Sit-up:totalReps": 75,
+    "0:Push-up:totalReps": 50
+  }
 }

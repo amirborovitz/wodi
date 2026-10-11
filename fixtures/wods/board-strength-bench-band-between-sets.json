@@ -9,5 +9,9 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "Band Pull Apart is unweighted (inputType none) and placed between_sets; bench owns the 5 sets."
+  "description": "Band Pull Apart is unweighted (inputType none) and placed between_sets; bench owns the 5 sets.",
+  "expectSaved": {
+    "0:Band Pull Apart:totalReps": 54,
+    "0:Bench Press:totalReps": 21
+  }
 }

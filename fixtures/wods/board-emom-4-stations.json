@@ -11,5 +11,10 @@
     "totals.reps": "100",
     "totals.calories": "48"
   },
-  "description": "Station rotation, 4 visits each. Bike 48 cal, swings 60, burpees 40, plank 4 x 30s."
+  "description": "Station rotation, 4 visits each. Bike 48 cal, swings 60, burpees 40, plank 4 x 30s.",
+  "expectSaved": {
+    "0:American Kettlebell Swing:totalReps": 60,
+    "0:Burpee:totalReps": 40,
+    "0:Bike:totalCalories": 48
+  }
 }

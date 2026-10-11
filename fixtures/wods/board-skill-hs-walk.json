@@ -9,5 +9,8 @@
     "exerciseCount": "1",
     "logKinds": "intervals"
   },
-  "description": "Practice block (accessory); no score needed."
+  "description": "Practice block (accessory); no score needed.",
+  "expectSaved": {
+    "0:Handstand Walk:totalDistance": 150
+  }
 }

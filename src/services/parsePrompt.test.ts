@@ -16,8 +16,8 @@ describe('buildParsePrompt — the full prompt is unchanged', () => {
     }).toMatchInlineSnapshot(`
       {
         "accessory": "ea76e2527b2ee066",
-        "metcon": "d4af37759393ec71",
-        "none": "d4af37759393ec71",
+        "metcon": "a3d5fb3273d7177f",
+        "none": "a3d5fb3273d7177f",
         "strength": "ea76e2527b2ee066",
       }
     `);

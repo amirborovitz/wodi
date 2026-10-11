@@ -15,5 +15,13 @@
     "totals.volume": "8000",
     "hero.value": "35:00",
     "hero.unit": "MIN"
+  },
+  "expectSaved": {
+    "0:Deadlift:totalReps": 40,
+    "0:Power Clean:totalReps": 40,
+    "0:Front Squat:totalReps": 40,
+    "0:Shoulder to Overhead:totalReps": 40,
+    "0:Pull-up:totalReps": 40,
+    "0:Run:totalDistance": 4000
   }
 }

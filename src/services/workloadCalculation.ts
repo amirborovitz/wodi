@@ -44,6 +44,15 @@ const BW_DISPLAY_PATTERNS = [
  * means. The name is the board's — a swapped movement stays on the line it replaced. Every entry carries `exerciseIndex` so consumers can scope back to the part; see
  * `movementsForParts` in celebration/movementResolution.ts.
  */
+/**
+ * A per-side amount ("10/10", "20/20m") is done on BOTH sides, so the written number is half the
+ * work. The one rule both breakdowns apply to the board's quantities — the save used to skip it,
+ * storing 30 for a 10/10 single-arm press over 3 sets that was 60 (2026-10-11).
+ */
+export function perSideFactor(movement: Pick<ParsedMovement, 'perSide'>): number {
+  return movement.perSide ? 2 : 1;
+}
+
 export function movementBucketKey(name: string, exerciseIndex: number): string {
   return `${exerciseIndex}::${name.toLowerCase()}`;
 }
@@ -712,7 +721,7 @@ export function calculateWorkloadBreakdown(
         // both, so the written quantity is half the real work — which is why a 6/6 windmill
         // counted 6 and a 20/20m carry counted 20. Applied to every quantity uniformly, and to
         // the flat form too, since that sums the same written values per occurrence.
-        const sideMultiplier = movement.perSide ? 2 : 1;
+        const sideMultiplier = perSideFactor(movement);
         const reps = (flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier))) * sideMultiplier;
         // Totals are metres whatever the board wrote ("1 mile run"); the board's own words stay on the
         // prescription. See utils/distanceUnits.

@@ -9,5 +9,8 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "Last set is max reps at a load — a max set at the end of a strength block."
+  "description": "Last set is max reps at a load — a max set at the end of a strength block.",
+  "expectSaved": {
+    "0:Deadlift:totalReps": 9
+  }
 }

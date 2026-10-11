@@ -12,5 +12,8 @@
     "loggingModes": "strength, amrap_intervals",
     "totals.distance": "1000",
     "movementNames!~=": "Buy-In: Run, Buy-In: Run"
+  },
+  "expectSaved": {
+    "0:Back Squat:totalReps": 15
   }
 }

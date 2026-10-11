@@ -19,5 +19,10 @@
     "parsed.exercises.0.sections.2.movements.0.reps": "30",
     "parsed.exercises.0.sections.2.movements.1.reps": "10",
     "parsed.exercises.0.sections.2.movements.2.reps": "15"
+  },
+  "expectSaved": {
+    "0:Air Squat:totalReps": 120,
+    "0:Twin Dumbbell Push Press:totalReps": 60,
+    "0:Box Jump:totalReps": 45
   }
 }

@@ -26,6 +26,12 @@ interface WodFixture {
    */
   aiResponses: RecordedResponses;
   expect: Record<string, string>;
+  /**
+   * What an athlete who did the board as written must end up with in the SAVE, keyed
+   * "part:Movement:field" — checked by src/corpusSave.test.ts. Kept through every re-record:
+   * re-recording refreshes what the AI said, never what we require.
+   */
+  expectSaved?: Record<string, number>;
 }
 
 interface CorpusOptions {
@@ -159,6 +165,7 @@ function readFixture(filePath: string): WodFixture {
     rawText: fixture.rawText,
     aiResponses: fixture.aiResponses ?? {},
     expect: fixture.expect,
+    ...(fixture.expectSaved ? { expectSaved: fixture.expectSaved } : {}),
   };
 }
 

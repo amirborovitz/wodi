@@ -37,6 +37,7 @@ import {
   getStationVisitCountsForExercise,
   movementBucketKey,
   movementForSectionCounting,
+  perSideFactor,
   scopeSectionMovements,
 } from './workloadCalculation';
 import type { SectionMovementScope } from './workloadCalculation';
@@ -508,12 +509,13 @@ export function buildWorkloadBreakdownFromResults(
         ? result.sets.reduce((sum, s) => sum + (s.actualReps ?? 0), 0) || undefined
         : undefined;
 
-      const perRoundReps = userReps ?? maxSetReps ?? setTotalReps ?? mov.reps ?? 0;
-      // The board's distance in metres ("1 mile run" is 1,609 m of work); what the athlete entered
-      // already is. See utils/distanceUnits.
-      const perRoundDistance = userDistance ?? maxSetDistance ?? toMetres(mov.distance ?? 0, mov.unit);
-      const perRoundCalories = userCalories ?? maxSetCalories ?? mov.calories ?? 0;
-      const perRoundTime = mov.time || 0;
+      // The board's own quantities, as work: both sides of a per-side amount ("10/10"), and metres
+      // whatever unit it wrote ("1 mile run" is 1,609 m). What the athlete entered already is work.
+      const sides = perSideFactor(mov);
+      const perRoundReps = userReps ?? maxSetReps ?? setTotalReps ?? (mov.reps ?? 0) * sides;
+      const perRoundDistance = userDistance ?? maxSetDistance ?? toMetres((mov.distance ?? 0) * sides, mov.unit);
+      const perRoundCalories = userCalories ?? maxSetCalories ?? (mov.calories ?? 0) * sides;
+      const perRoundTime = (mov.time || 0) * sides;
 
       // Whether each entered figure is the whole block's total or one round's work. A total is
       // stored as entered; a per-round figure repeats by rounds.

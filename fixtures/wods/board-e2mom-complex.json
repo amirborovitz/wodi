@@ -9,5 +9,10 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "A barbell complex: complex true, ONE weight for all three lifts, building. Cadence is a header, not a different screen."
+  "description": "A barbell complex: complex true, ONE weight for all three lifts, building. Cadence is a header, not a different screen.",
+  "expectSaved": {
+    "0:Power Clean:totalReps": 6,
+    "0:Front Squat:totalReps": 6,
+    "0:Split Jerk:totalReps": 6
+  }
 }

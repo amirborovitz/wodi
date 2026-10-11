@@ -10,5 +10,13 @@
     "logKinds": "score_time",
     "totals.distance": "800"
   },
-  "description": "Two blocks inside one piece; each counted twice."
+  "description": "Two blocks inside one piece; each counted twice.",
+  "expectSaved": {
+    "0:Kettlebell Swing:totalReps": 42,
+    "0:Wall Ball:totalReps": 30,
+    "0:Pull-up:totalReps": 24,
+    "0:Burpee:totalReps": 20,
+    "0:Run:totalDistance": 800,
+    "0:Bike:totalCalories": 40
+  }
 }

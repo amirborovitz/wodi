@@ -18,5 +18,13 @@
     "totals.reps": "250",
     "totals.volume": "5000",
     "totals.distance": "2000"
+  },
+  "expectSaved": {
+    "0:Pull-up:totalReps": 50,
+    "0:Front Squat:totalReps": 50,
+    "0:Burpee:totalReps": 50,
+    "0:Shoulder to Overhead:totalReps": 50,
+    "0:Toes to Bar:totalReps": 50,
+    "0:Run:totalDistance": 2000
   }
 }

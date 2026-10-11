@@ -10,5 +10,9 @@
     "logKinds": "load",
     "totals.distance": "120"
   },
-  "description": "Carry asks its load; L-sit is time, not reps; press per side = 20 a set."
+  "description": "Carry asks its load; L-sit is time, not reps; press per side = 20 a set.",
+  "expectSaved": {
+    "0:Single-arm Kettlebell Press:totalReps": 60,
+    "0:Farmer Carry:totalDistance": 120
+  }
 }

@@ -10,5 +10,8 @@
     "exerciseCount": "2",
     "logKinds": "load, score_rounds"
   },
-  "description": "Two parts. Lunges with twin DBs (implementCount 2), 15kg each."
+  "description": "Two parts. Lunges with twin DBs (implementCount 2), 15kg each.",
+  "expectSaved": {
+    "0:Front Squat:totalReps": 11
+  }
 }

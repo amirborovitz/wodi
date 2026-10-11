@@ -9,5 +9,8 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "One lift; a top single plus back-off sets — one weight question, not a score."
+  "description": "One lift; a top single plus back-off sets — one weight question, not a score.",
+  "expectSaved": {
+    "0:Back Squat:totalReps": 7
+  }
 }

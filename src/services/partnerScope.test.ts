@@ -167,3 +167,27 @@ describe('movementTotals', () => {
       .toEqual({ reps: 8 });
   });
 });
+
+describe('exercisePartnerFactor — the board states each athlete\'s own round count', () => {
+  // "Teams of 3, relay — 6 rounds EACH athlete: 10 front squats, 10 box jump overs" (2026-10-11).
+  // The round count was taken for the team's and divided by three: 20 front squats saved where
+  // each athlete did 60. A per-athlete count is the athlete's own; the coach's number is the truth.
+  const relay = { name: 'Relay', partnerWorkout: true, partnerSplit: 'rounds' as const };
+
+  it('uses the stated per-athlete count against the team\'s rounds', () => {
+    // 18 team rounds, 6 each → this athlete owns a third, as the board says.
+    expect(exercisePartnerFactor({ ...relay, suggestedSets: 18, personalRounds: 6 }, 1 / 3, true)).toBeCloseTo(1 / 3);
+  });
+
+  it('never divides when the round count written IS the athlete\'s own', () => {
+    expect(exercisePartnerFactor({ ...relay, suggestedSets: 6, personalRounds: 6 }, 1 / 3, true)).toBe(1);
+  });
+
+  it('honours an uneven stated share ("15 RFT (8 each)")', () => {
+    expect(exercisePartnerFactor({ ...relay, suggestedSets: 15, personalRounds: 8 }, 0.5, true)).toBeCloseTo(8 / 15);
+  });
+
+  it('without a stated count, divides the team\'s rounds by the team (unchanged)', () => {
+    expect(exercisePartnerFactor({ ...relay, suggestedSets: 14 }, 0.5, true)).toBe(0.5);
+  });
+});

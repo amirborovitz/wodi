@@ -14,5 +14,10 @@
     "totals.distance": "",
     "hero.value": "220",
     "hero.unit": "REPS"
+  },
+  "expectSaved": {
+    "0:Alternating Kettlebell Swing:totalReps": 90,
+    "0:Box Jump:totalReps": 75,
+    "0:Pull-up:totalReps": 55
   }
 }

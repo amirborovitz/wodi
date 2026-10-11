@@ -9,5 +9,9 @@
     "exerciseCount": "1",
     "logKinds": "intervals"
   },
-  "description": "Fixed work every 90s; 24 snatches, 48 burpees."
+  "description": "Fixed work every 90s; 24 snatches, 48 burpees.",
+  "expectSaved": {
+    "0:Bar-facing Burpee:totalReps": 48,
+    "0:Hang Power Snatch:totalReps": 24
+  }
 }

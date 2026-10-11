@@ -11,5 +11,10 @@
     "totals.reps": "150",
     "totals.distance": "1000"
   },
-  "description": "Synchronized = both do ALL the work (no halving). 1000m run each."
+  "description": "Synchronized = both do ALL the work (no halving). 1000m run each.",
+  "expectSaved": {
+    "0:Air Squat:totalReps": 100,
+    "0:Burpee:totalReps": 50,
+    "0:Run:totalDistance": 1000
+  }
 }

@@ -22,5 +22,9 @@
     "parsed.exercises.1.movements.2.isMaxReps": "true",
     "parsed.exercises.1.movements.3.isMaxReps": "true",
     "parsed.exercises.1.movements.4.isMaxReps": "true"
+  },
+  "expectSaved": {
+    "0:Kettlebell Windmill:totalReps": 36,
+    "0:Suitcase Carry:totalDistance": 120
   }
 }

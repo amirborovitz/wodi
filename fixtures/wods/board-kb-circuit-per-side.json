@@ -10,5 +10,10 @@
     "logKinds": "score_time",
     "totals.reps": "150"
   },
-  "description": "5/5 snatches = 10 per round, not 20."
+  "description": "5/5 snatches = 10 per round, not 20.",
+  "expectSaved": {
+    "0:American Kettlebell Swing:totalReps": 50,
+    "0:Goblet Squat:totalReps": 50,
+    "0:Kettlebell Snatch:totalReps": 50
+  }
 }

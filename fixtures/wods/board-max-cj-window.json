@@ -9,5 +9,8 @@
     "exerciseCount": "1",
     "logKinds": "load"
   },
-  "description": "One heavy weight is the score; PR-worthy."
+  "description": "One heavy weight is the score; PR-worthy.",
+  "expectSaved": {
+    "0:Clean and Jerk:totalReps": 1
+  }
 }
