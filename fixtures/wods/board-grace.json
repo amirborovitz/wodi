@@ -1,0 +1,14 @@
+{
+  "name": "board-grace",
+  "rawText": "GRACE\n30 Clean & Jerks for time\n60/40kg",
+  "aiResponses": {
+    "segment|GRACE\n30 Clean & Jerks for time\n60/40kg": "{\"title\":\"GRACE\",\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"benchmark\"],\"text\":\"30 Clean and Jerk for time\\n60/40kg\"}]}",
+    "structure|30 Clean and Jerk for time\n60/40kg": "{\"title\":\"GRACE\",\"type\":\"for_time\",\"format\":\"for_time\",\"scoreType\":\"time\",\"difficultyLevel\":7,\"timeCap\":null,\"sets\":1,\"intervalTime\":null,\"rawText\":\"30 Clean and Jerk for time\\n60/40kg\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"30 Clean and Jerk For Time\",\"type\":\"wod\",\"prescription\":\"30 Clean and Jerk for time at 60/40kg\",\"rawText\":\"30 Clean and Jerk for time\\n60/40kg\",\"loggingMode\":\"for_time\",\"scoreType\":null,\"suggestedSets\":1,\"suggestedReps\":30,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":{\"male\":60,\"female\":40,\"unit\":\"kg\"},\"intervalCount\":null,\"workDuration\":null,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":\"Grace\",\"movements\":[{\"name\":\"Clean and Jerk\",\"reps\":30,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"barbell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":{\"male\":60,\"female\":40,\"unit\":\"kg\"},\"rxCalories\":null,\"unit\":null,\"countingMode\":\"once\",\"scoreEntryMode\":\"total\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_time",
+    "totals.reps": "30"
+  },
+  "description": "Benchmark; PR-worthy."
+}

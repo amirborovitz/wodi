@@ -375,25 +375,22 @@ export function prescribesUnbrokenMax(
   return /\bunbroken\b/i.test(`${exercise.name || ''} ${exercise.prescription || ''} ${exercise.rawText || ''}`);
 }
 
-const DURATION_HOLD_PATTERNS = [
-  'wall sit',
-  'wall hold',
-  'plank',
-  'hollow hold',
-  'l-sit',
-  'l sit',
-  'ring hold',
-  'ring support',
-];
-
+/**
+ * The hold screen (seconds per set) is for a block whose work IS holds: every movement a
+ * prescribed time, nothing counted, nothing loaded. Read from the parse — the movements' own
+ * `time`, quantities and kind — never from the wording of the prescription. Keying on "plank"
+ * + "30s" in the summary sent a 4-station EMOM with one plank station to the hold screen on one
+ * parse and not the next (2026-10-10).
+ */
 function getDurationOverrideKind(exercise: ParsedExercise): ExerciseKind | undefined {
-  const text = `${exercise.name || ''} ${exercise.prescription || ''}`.toLowerCase();
-  const hasHoldPattern = DURATION_HOLD_PATTERNS.some((pattern) => text.includes(pattern));
-  const hasTimePrescription = /\b\d+(?:\s*[-–]\s*\d+)?\s*(?:sec(?:onds?)?|s\b|min(?:utes?)?)\b/i.test(text)
-    || exercise.movements?.some((movement) => (movement.time ?? 0) > 0);
-  const hasExplicitLoad = !!exercise.rxWeights || /\b\d+(?:\.\d+)?\s*(?:kg|lb|lbs)\b/i.test(text);
-
-  return hasHoldPattern && hasTimePrescription && !hasExplicitLoad ? 'duration' : undefined;
+  const movements = exercise.sections?.length
+    ? exercise.sections.flatMap((section) => section.movements)
+    : exercise.movements ?? [];
+  // The movement classifier's own answer: a timed movement measured in distance or calories (a
+  // 30 min bike) is cardio, a loaded one is load, and only a timed, uncounted, unloaded one is a hold.
+  const isHold = (movement: ParsedMovement): boolean => movementToKind(movement) === 'duration'
+    && !movement.reps;
+  return movements.length > 0 && movements.every(isHold) ? 'duration' : undefined;
 }
 
 function getPrescribedDurationSeconds(exercise: ParsedExercise): number | undefined {
@@ -821,7 +818,8 @@ export function createBlankResult(
     ? exercise.sections.flatMap(s => s.movements)
     : exercise.movements ?? [];
   const isAllBodyweight = allMovements.length > 0
-    ? allMovements.every(m => movementToKind(m) === 'reps')
+    // A hold is bodyweight work too: a cash-out of tibialis raises and a plank has no weight to log.
+    ? allMovements.every(m => movementToKind(m) === 'reps' || movementToKind(m) === 'duration')
     : !exercise.rxWeights && classifyMovementName(exercise.name) === 'bodyweight';
   // Everything above derives a kind from the block's CLOCK — which timer it runs on. That is a
   // guess about the score, and it is the guess that categorised "2 rounds of 8/8, into max

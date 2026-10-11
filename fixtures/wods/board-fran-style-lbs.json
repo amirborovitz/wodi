@@ -1,0 +1,14 @@
+{
+  "name": "board-fran-style-lbs",
+  "rawText": "21-15-9\nThrusters (95/65#)\nPull-ups\nFor time",
+  "aiResponses": {
+    "segment|21-15-9\nThrusters (95/65#)\nPull-ups\nFor time": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"ladder\"],\"text\":\"21-15-9\\nThruster (95/65#)\\nPull-up\\nFor time\"}]}",
+    "structure|21-15-9\nThruster (95/65#)\nPull-up\nFor time": "{\"title\":\"FRAN\",\"type\":\"for_time\",\"format\":\"for_time\",\"scoreType\":\"time\",\"difficultyLevel\":7,\"timeCap\":null,\"sets\":3,\"intervalTime\":null,\"rawText\":\"21-15-9\\nThruster (95/65#)\\nPull-up\\nFor time\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"21-15-9 For Time\",\"type\":\"wod\",\"prescription\":\"21-15-9 Thrusters (95/65 lb) and Pull-ups for time\",\"rawText\":\"21-15-9\\nThruster (95/65#)\\nPull-up\\nFor time\",\"loggingMode\":\"for_time\",\"scoreType\":null,\"suggestedSets\":3,\"suggestedReps\":null,\"suggestedRepsPerSet\":[21,15,9],\"ladderReps\":null,\"rounds\":null,\"rxWeights\":{\"male\":95,\"female\":65,\"unit\":\"lb\"},\"intervalCount\":null,\"workDuration\":null,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":\"FRAN\",\"movements\":[{\"name\":\"Thruster\",\"reps\":21,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"barbell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":{\"male\":95,\"female\":65,\"unit\":\"lb\"},\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_round\",\"scoreEntryMode\":null,\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null},{\"name\":\"Pull-up\",\"reps\":21,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_round\",\"scoreEntryMode\":null,\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_time",
+    "totals.reps": "90"
+  },
+  "description": "Rx in lb. 45 thrusters + 45 pull-ups."
+}

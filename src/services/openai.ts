@@ -337,12 +337,14 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
 | for_time | "for time", "RFT" (no "x sets") | time |
 | amrap | "AMRAP 12" (single) | rounds_reps |
 | emom | "EMOM", "every 1:00", "E2MOM" | reps |
-| strength | "5x5", "3x8 @70%", "build to 1RM" | load |
-| tabata | "tabata", "20s on/10s off" | reps |
+| strength | "5x5", "3x8 @70%", "build to 1RM", "6 x 25m heavy sled push" — sets of a loaded movement where the LOAD is the athlete's number and nothing is timed | load |
+| tabata | "tabata", "20s on/10s off" — each round's count is open (isMaxReps) | reps |
 
 OVERRIDE — the scoreType column is a DEFAULT, not a rule. A format is a CLOCK; scoreType is what
 the athlete COUNTS, and they are independent. Before taking the default, ask: does this block
-leave any quantity OPEN ("max", "as many as possible", "max reps in the time remaining")?
+leave a REP COUNT open ("max", "as many as possible", "max reps in the time remaining")? A cardio
+piece of fixed length ("30 min bike") leaves its distance or calories open — that is the cardio
+format's own score, so it keeps "cardio" / "cardio_distance" and its default.
   - YES → "scoreType": "reps", and "isMaxReps": true on that movement. Whatever else the board
     prescribes — rounds, reps, distance — is prescription the athlete cannot change, so it is
     never the score. This holds no matter which format you picked.
@@ -400,7 +402,7 @@ Every movement MUST include "inputType":
 - "calories": cardio machines when the user must LOG calories (standalone cardio — "max cal", open-ended calorie target)
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
-- CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate/vest (e.g. any squat, lunge, split squat, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature. Step-ups and box step-ups are bodyweight by nature: "none", unless the board loads them ("weighted box step-ups", "DB step-ups").
+- CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate (e.g. any squat, lunge, split squat, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature. Step-ups and box step-ups are bodyweight by nature: "none", unless the board loads them ("weighted box step-ups", "DB step-ups"). A weight vest worn for a whole piece ("Murph with a 20/14 lb vest") loads none of its movements: they keep their own inputType, and the vest stays in the prescription.
 
 ## MOVEMENT EQUIPMENT
 Every movement performed with an external load MUST also include "equipment" — the implement the load is on (include it even when the board writes no weight):
@@ -564,7 +566,7 @@ const RULES_CONTAINER_ROUNDS = `## CONTAINER ROUNDS
 - If the text defines the work, use that definition; otherwise use the standard one.`;
 
 const RULES_REP_SCHEMES = `## VARIABLE REP SCHEMES
-"[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length.
+"[6-5-4-3-2]" or "21-15-9" → suggestedRepsPerSet array, suggestedSets = array length. One lift written set by set ("65% x 5 / 75% x 3 / 85% x 1+") is the same thing: ONE movement with suggestedRepsPerSet [5, 3, 1], never one movement per line.
 Bracket notation like "[20-16-12-8-4]" in a for_time workout → suggestedRepsPerSet: [20, 16, 12, 8, 4], suggestedSets: 5.
 CRITICAL: NEVER treat a bracketed descending rep scheme as "N rounds of the same reps". "[20-16-12-8-4]" is 5 DIFFERENT sets, not 5 rounds of 20.
 CRITICAL — PER-MOVEMENT INDEPENDENT SCHEMES: when SEVERAL movements EACH carry their OWN bracketed rep scheme and the schemes DIFFER (e.g. "[50-40-30] air squats, [30-20-10] push press, 15 box jumps after each set"), a single "suggestedRepsPerSet" CANNOT represent them — it holds only ONE scheme, so applying it to every movement falsely claims they all descend 50-40-30. Instead emit ONE "rounds":1 section PER round, each listing EVERY movement with ITS OWN rep for that round (the pyramid model). A fixed-rep add-on ("15 box jumps after each set") repeats its CONSTANT rep count every round. Do NOT collapse divergent per-movement schemes into one suggestedRepsPerSet, and do NOT drop the fixed add-on movement.

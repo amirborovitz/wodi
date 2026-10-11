@@ -1,0 +1,13 @@
+{
+  "name": "board-death-by-burpees",
+  "rawText": "Death by Burpees\nMin 1: 1 burpee, min 2: 2 burpees... until you can't",
+  "aiResponses": {
+    "segment|Death by Burpees\nMin 1: 1 burpee, min 2: 2 burpees... until you can't": "{\"title\":\"Death by Burpees\",\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"intervals\",\"ladder\"],\"text\":\"Min 1: 1 Burpee, min 2: 2 Burpee... until you can't\"}]}",
+    "structure|Min 1: 1 Burpee, min 2: 2 Burpee... until you can't": "{\"title\":\"BURPEE CLIMB\",\"type\":\"emom\",\"format\":\"emom\",\"scoreType\":\"reps\",\"difficultyLevel\":6,\"timeCap\":null,\"sets\":null,\"intervalTime\":60,\"rawText\":\"Min 1: 1 Burpee, min 2: 2 Burpee... until you can't\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":false,\"exercises\":[{\"name\":\"Burpee EMOM Ladder\",\"type\":\"wod\",\"prescription\":\"Min 1: 1 Burpee, min 2: 2 Burpee... until you can't\",\"rawText\":\"Min 1: 1 Burpee, min 2: 2 Burpee... until you can't\",\"loggingMode\":\"emom\",\"scoreType\":\"reps\",\"suggestedSets\":null,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":[1,2],\"rounds\":null,\"rxWeights\":null,\"intervalCount\":null,\"workDuration\":null,\"restDuration\":null,\"intervalSeconds\":60,\"intervalRestSeconds\":null,\"stationRotation\":false,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Burpee\",\"reps\":null,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":\"1, 2, 3... increasing by 1 each minute until failure\",\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"total\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_open_reps"
+  },
+  "description": "Score is the last full minute completed."
+}

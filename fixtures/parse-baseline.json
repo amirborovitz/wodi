@@ -3,6 +3,25 @@
     "[quantity-backfill] exercises[].movements[].equipment": 1,
     "[quantity-backfill] exercises[].movements[].implementCount": 1
   },
+  "board-death-by-burpees": {
+    "[quantity-backfill] exercises[].movements[].isMaxReps": 1
+  },
+  "board-five-three-one-and-metcon": {
+    "[override] format": 1
+  },
+  "board-intervals-for-time-each-set": {
+    "[override] format": 1,
+    "[override] type": 1
+  },
+  "board-partner-amrap-igug": {
+    "[override] format": 1
+  },
+  "board-skill-hs-walk": {
+    "[quantity-backfill] timeCap": 1
+  },
+  "board-two-pieces-rest-between": {
+    "[override] type": 1
+  },
   "into-connected-emom-complex": {
     "[override] type": 1
   },

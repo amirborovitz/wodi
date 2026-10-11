@@ -1,0 +1,13 @@
+{
+  "name": "board-every-90s-sets",
+  "rawText": "Every 90s x 8:\n3 Hang Power Snatch @ 50kg\n6 Bar-facing Burpees",
+  "aiResponses": {
+    "segment|Every 90s x 8:\n3 Hang Power Snatch @ 50kg\n6 Bar-facing Burpees": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"intervals\"],\"text\":\"Every 90s x 8:\\n3 Hang Power Snatch @ 50kg\\n6 Bar-facing Burpee\"}]}",
+    "structure|Every 90s x 8:\n3 Hang Power Snatch @ 50kg\n6 Bar-facing Burpee": "{\"title\":\"SNATCH BURN\",\"type\":\"emom\",\"format\":\"emom\",\"scoreType\":\"reps\",\"difficultyLevel\":6,\"timeCap\":null,\"sets\":8,\"intervalTime\":90,\"rawText\":\"Every 90s x 8:\\n3 Hang Power Snatch @ 50kg\\n6 Bar-facing Burpee\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":false,\"exercises\":[{\"name\":\"Every 90s x 8\",\"type\":\"wod\",\"prescription\":\"Every 90s x 8: 3 Hang Power Snatch @ 50kg, 6 Bar-facing Burpee\",\"rawText\":\"Every 90s x 8:\\n3 Hang Power Snatch @ 50kg\\n6 Bar-facing Burpee\",\"loggingMode\":\"emom\",\"scoreType\":null,\"suggestedSets\":8,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":8,\"workDuration\":720,\"restDuration\":null,\"intervalSeconds\":90,\"intervalRestSeconds\":null,\"stationRotation\":false,\"isSecondary\":false,\"complex\":false,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Hang Power Snatch\",\"reps\":3,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"barbell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":{\"male\":50,\"female\":50,\"unit\":\"kg\"},\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null},{\"name\":\"Bar-facing Burpee\",\"reps\":6,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_interval\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "intervals"
+  },
+  "description": "Fixed work every 90s; 24 snatches, 48 burpees."
+}

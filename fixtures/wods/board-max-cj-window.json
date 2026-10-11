@@ -1,0 +1,13 @@
+{
+  "name": "board-max-cj-window",
+  "rawText": "15 min to find a 1RM Clean & Jerk",
+  "aiResponses": {
+    "segment|15 min to find a 1RM Clean & Jerk": "{\"parts\":[{\"label\":\"A\",\"kind\":\"strength\",\"traits\":[],\"text\":\"15 min to find a 1RM Clean and Jerk\"}]}",
+    "structure|15 min to find a 1RM Clean and Jerk": "{\"title\":\"CLEAN JERK\",\"type\":\"strength\",\"format\":\"strength\",\"scoreType\":\"load\",\"difficultyLevel\":7,\"timeCap\":900,\"sets\":null,\"intervalTime\":null,\"rawText\":\"15 min to find a 1RM Clean and Jerk\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"Clean and Jerk 1RM\",\"type\":\"strength\",\"prescription\":\"15 min to find a 1RM Clean and Jerk\",\"rawText\":\"15 min to find a 1RM Clean and Jerk\",\"loggingMode\":\"strength\",\"scoreType\":\"load\",\"suggestedSets\":null,\"suggestedReps\":1,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":null,\"workDuration\":900,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Clean and Jerk\",\"reps\":1,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"barbell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":null,\"rxCalories\":null,\"unit\":null,\"countingMode\":null,\"scoreEntryMode\":null,\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "load"
+  },
+  "description": "One heavy weight is the score; PR-worthy."
+}

@@ -1,0 +1,14 @@
+{
+  "name": "board-intervals-for-time-each-set",
+  "rawText": "5 sets for time:\n400m Run\n15 KB Swings 24/16\nRest 1:1",
+  "aiResponses": {
+    "segment|5 sets for time:\n400m Run\n15 KB Swings 24/16\nRest 1:1": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"traits\":[\"intervals\"],\"text\":\"5 sets for time:\\n400m Run\\n15 Kettlebell Swing 24/16\\nRest 1:1\"}]}",
+    "structure|5 sets for time:\n400m Run\n15 Kettlebell Swing 24/16\nRest 1:1": "{\"title\":\"SWING RUN\",\"type\":\"metcon\",\"format\":\"intervals\",\"scoreType\":\"time_per_set\",\"difficultyLevel\":6,\"timeCap\":null,\"sets\":5,\"intervalTime\":null,\"rawText\":\"5 sets for time:\\n400m Run\\n15 Kettlebell Swing 24/16\\nRest 1:1\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":null,\"exercises\":[{\"name\":\"5 Sets For Time\",\"type\":\"wod\",\"prescription\":\"5 sets for time: 400m Run, 15 Kettlebell Swing 24/16, rest 1:1\",\"rawText\":\"5 sets for time:\\n400m Run\\n15 Kettlebell Swing 24/16\\nRest 1:1\",\"loggingMode\":\"intervals\",\"scoreType\":null,\"suggestedSets\":5,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":null,\"rxWeights\":null,\"intervalCount\":5,\"workDuration\":null,\"restDuration\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"stationRotation\":null,\"isSecondary\":false,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Run\",\"reps\":null,\"distance\":400,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":\"m\",\"countingMode\":\"per_round\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null},{\"name\":\"American Kettlebell Swing\",\"reps\":15,\"distance\":null,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"kettlebell\",\"inputType\":\"weight\",\"implementCount\":1,\"rxWeights\":{\"male\":24,\"female\":16,\"unit\":\"kg\"},\"rxCalories\":null,\"unit\":null,\"countingMode\":\"per_round\",\"scoreEntryMode\":\"per_round\",\"perRound\":null,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":null}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "score_time",
+    "totals.distance": "2000"
+  },
+  "description": "Five separately timed sets (time per set); 2000m run, 75 swings."
+}

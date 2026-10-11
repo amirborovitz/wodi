@@ -1,0 +1,13 @@
+{
+  "name": "board-skill-hs-walk",
+  "rawText": "Skill (10 min):\nEMOM 10: 15m Handstand Walk practice\nscale: 3 wall walks",
+  "aiResponses": {
+    "segment|Skill (10 min):\nEMOM 10: 15m Handstand Walk practice\nscale: 3 wall walks": "{\"parts\":[{\"label\":\"A\",\"kind\":\"accessory\",\"traits\":[\"intervals\"],\"text\":\"Skill (10 min):\\nEMOM 10: 15m Handstand Walk practice\\nscale: 3 Wall Walk\"}]}",
+    "structure|Skill (10 min):\nEMOM 10: 15m Handstand Walk practice\nscale: 3 Wall Walk": "{\"title\":\"WALK\",\"type\":\"emom\",\"format\":\"emom\",\"scoreType\":\"reps\",\"difficultyLevel\":4,\"timeCap\":null,\"sets\":10,\"intervalTime\":60,\"rawText\":\"Skill (10 min):\\nEMOM 10: 15m Handstand Walk practice\\nscale: 3 Wall Walk\",\"sourceDate\":null,\"partnerWorkout\":false,\"teamSize\":null,\"stationRotation\":false,\"exercises\":[{\"name\":\"EMOM 10 Skill\",\"type\":\"skill\",\"prescription\":\"Skill (10 min): EMOM 10: 15m Handstand Walk practice; scale: 3 Wall Walk\",\"rawText\":\"Skill (10 min):\\nEMOM 10: 15m Handstand Walk practice\\nscale: 3 Wall Walk\",\"loggingMode\":\"emom\",\"scoreType\":null,\"suggestedSets\":10,\"suggestedReps\":null,\"suggestedRepsPerSet\":null,\"ladderReps\":null,\"rounds\":10,\"rxWeights\":null,\"intervalCount\":10,\"workDuration\":600,\"restDuration\":null,\"intervalSeconds\":60,\"intervalRestSeconds\":null,\"stationRotation\":false,\"isSecondary\":true,\"complex\":null,\"partnerWorkout\":false,\"partnerSplit\":null,\"wodName\":null,\"movements\":[{\"name\":\"Handstand Walk\",\"reps\":null,\"distance\":15,\"calories\":null,\"time\":null,\"repsDisplay\":null,\"perSide\":null,\"equipment\":\"none\",\"inputType\":\"none\",\"implementCount\":null,\"rxWeights\":null,\"rxCalories\":null,\"unit\":\"m\",\"countingMode\":\"per_interval\",\"scoreEntryMode\":null,\"perRound\":true,\"role\":null,\"occurrences\":null,\"placement\":null,\"stationLabel\":null,\"stationIndex\":null,\"together\":null,\"sharedLabel\":null,\"relay\":null,\"alternative\":{\"name\":\"Wall Walk\",\"reps\":3,\"distance\":null,\"calories\":null}}],\"sections\":null,\"buyIn\":null,\"cashOut\":null}],\"uncertain\":null}"
+  },
+  "expect": {
+    "exerciseCount": "1",
+    "logKinds": "intervals"
+  },
+  "description": "Practice block (accessory); no score needed."
+}
