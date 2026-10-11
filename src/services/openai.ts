@@ -1,3 +1,4 @@
+import { completeParse, type ParsePart } from './parseModel';
 import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind, ParseUncertainty } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
@@ -1417,35 +1418,29 @@ export async function parseWorkoutText(
   traits?: readonly PartTrait[],
 ): Promise<{ raw: string; parsed: ParsedWorkout }> {
   const startedAt = performance.now();
-  const response = await openai.chat.completions.create({
-    model: PARSE_MODEL,
-    reasoning_effort: PARSE_REASONING_EFFORT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: buildParsePrompt(kind, traits) },
-          { type: 'text', text: `Here is the workout text to parse:\n\n${text}` },
-          ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
-        ],
-      },
+  // Which model answers is parseModel.ts's decision — temperature 0 there: reading a board has
+  // exactly one right answer, and at 0.2 the same board parsed correctly on one log and invented
+  // "reps": 1 on the next, which is unfixable because it will not reproduce.
+  const response = await completeParse({
+    parts: [
+      { type: 'text', text: buildParsePrompt(kind, traits) },
+      { type: 'text', text: `Here is the workout text to parse:\n\n${text}` },
+      ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
     ],
-    max_completion_tokens: 4000,
-    // Routes calls that share the long static prompt to the same cache, so OpenAI can bill it as
-    // cached input rather than full price.
-    prompt_cache_key: `wodi-parse-${kind ?? 'all'}`,
-    // Reading a board has exactly one right answer, so sampling buys nothing and costs
-    // reproducibility: at 0.2 the same board parsed correctly on one log and invented
-    // "reps": 1 on the next, which is unfixable because it will not reproduce.
-    temperature: 0,
     // The form. Fields the app cannot work without (equipment, the work/rest split) are slots
     // the response is rejected without, instead of MUSTs buried in the prompt that the model
     // was free to skip. See parseSchema.ts.
-    response_format: { type: 'json_schema', json_schema: PARSE_RESPONSE_SCHEMA },
+    schema: PARSE_RESPONSE_SCHEMA,
+    // A long board's structure runs past 4,000 tokens: the answer was cut off mid-JSON and the
+    // parse failed (the 3-2-1 ladder, 2026-10-11). It's a ceiling, not a target — billed per use.
+    maxOutputTokens: 8192,
+    // Routes calls that share the long static prompt to the same cache, so OpenAI can bill it as
+    // cached input rather than full price.
+    cacheKey: `wodi-parse-${kind ?? 'all'}`,
   });
   console.info(`[TIMING] structure (${kind ?? 'full'}): ${Math.round(performance.now() - startedAt)}ms`);
 
-  const content = response.choices[0]?.message?.content || '';
+  const content = response.text;
   let jsonStr = content;
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) jsonStr = jsonMatch[1];
@@ -1663,20 +1658,10 @@ function validateSegmentedWorkout(data: unknown): SegmentationOutcome {
   };
 }
 
-async function requestSegmentation(
-  content: OpenAI.Chat.Completions.ChatCompletionContentPart[],
-): Promise<SegmentationOutcome> {
-  const response = await openai.chat.completions.create({
-    model: PARSE_MODEL,
-    reasoning_effort: PARSE_REASONING_EFFORT,
-    messages: [{ role: 'user', content }],
-    max_completion_tokens: 1500,
-    temperature: 0,
-    prompt_cache_key: 'wodi-segment',
-    response_format: { type: 'json_object' },
-  });
+async function requestSegmentation(content: ParsePart[]): Promise<SegmentationOutcome> {
+  const response = await completeParse({ parts: content, maxOutputTokens: 1500, cacheKey: 'wodi-segment' });
 
-  const raw = response.choices[0]?.message?.content || '';
+  const raw = response.text;
   const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (jsonMatch ? jsonMatch[1] : raw).trim();
   // Stage 1 output verbatim — the transcribed + cleaned board text, before any validation drops a part.
@@ -1701,12 +1686,9 @@ async function segmentWorkoutText(text: string, athleteNote?: string): Promise<S
 }
 
 async function segmentWorkoutImage(base64Image: string): Promise<SegmentedWorkout | null> {
-  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+  const content: ParsePart[] = [
     { type: 'text', text: IMAGE_SEGMENT_PROMPT },
-    {
-      type: 'image_url',
-      image_url: { url: `data:image/jpeg;base64,${base64Image}`, detail: 'high' },
-    },
+    { type: 'image', mimeType: 'image/jpeg', base64: base64Image },
   ];
   // One retry on malformed output only — recapturing the photo is expensive for the user,
   // but a "this isn't a workout" verdict is final.

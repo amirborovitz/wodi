@@ -1,3 +1,4 @@
+import { installScriptAppCheck } from './lib/appCheckDebug';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -280,6 +281,8 @@ export function buildContext(
  * runOfflinePipeline so the two differ only in where the AI answers come from.
  */
 export async function runSessionPipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
+  // Gemini goes through Firebase AI Logic, which needs App Check (scripts/lib/appCheckDebug.ts).
+  await installScriptAppCheck();
   const { parseWorkoutSession } = await import('../src/services/openai');
   const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
   const { computeHeroResult } = await import('../src/components/celebration/helpers');

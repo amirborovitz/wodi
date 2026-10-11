@@ -32,6 +32,8 @@ interface CorpusOptions {
   record: boolean;
   /** Rewrite the over-parse baseline instead of checking against it. */
   baseline: boolean;
+  /** Live only: parse every board this many times; a board passes only when every run does. */
+  repeat: number;
   fixture?: string;
   file?: string;
   name?: string;
@@ -93,7 +95,7 @@ Usage:
 }
 
 function parseArgs(argv: string[]): CorpusOptions {
-  const options: CorpusOptions = { live: false, add: false, record: false, baseline: false };
+  const options: CorpusOptions = { live: false, add: false, record: false, baseline: false, repeat: 1 };
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -108,6 +110,7 @@ function parseArgs(argv: string[]): CorpusOptions {
     else if (arg === '--add') options.add = true;
     else if (arg === '--record') options.record = true;
     else if (arg === '--baseline') options.baseline = true;
+    else if (arg === '--repeat') options.repeat = Math.max(1, Number(next()) || 1);
     else if (arg === '--fixture') options.fixture = next();
     else if (arg === '--file') options.file = next();
     else if (arg === '--name') options.name = next();
@@ -228,28 +231,82 @@ async function runCached(fixture: WodFixture): Promise<{ pipeline: PipelineResul
   }
 }
 
-async function runFixture(fixture: WodFixture, live: boolean): Promise<FixtureRunResult> {
+async function runFixture(fixture: WodFixture): Promise<FixtureRunResult> {
   try {
     const cached = await runCached(fixture);
-    const pipeline = live
-      ? await runSessionPipeline(fixture.rawText)
-      : cached.pipeline;
     return {
       fixture,
-      mode: live ? 'live' : 'offline',
-      pipeline,
+      mode: 'offline',
+      pipeline: cached.pipeline,
       cachedPipeline: cached.pipeline,
       audit: cached.audit,
-      failures: evaluateExpectations(pipeline.context, fixture),
+      failures: evaluateExpectations(cached.pipeline.context, fixture),
     };
   } catch (error) {
-    return {
-      fixture,
-      mode: live ? 'live' : 'offline',
-      failures: [],
-      audit: [],
-      error: (error as Error).message,
-    };
+    return { fixture, mode: 'offline', failures: [], audit: [], error: (error as Error).message };
+  }
+}
+
+/**
+ * What a board's reading comes down to — the fields the expectations speak about. Two live runs
+ * with different signatures read the same board two ways: the athlete would meet a different
+ * screen, or different totals, depending on the day.
+ */
+function readingSignature(context: Record<string, unknown>): string {
+  return ['exerciseCount', 'logKinds', 'movementNames', 'totals.reps', 'totals.distance', 'totals.calories']
+    .map((key) => `${key}=${stringifyValue(getPath(context, key))}`)
+    .join(' · ');
+}
+
+/** The board parsed live `repeat` times. It passes only when every run meets the expectations. */
+async function runFixtureLive(fixture: WodFixture, offline: FixtureRunResult, repeat: number): Promise<FixtureRunResult> {
+  const runs = await Promise.all(Array.from({ length: repeat }, () => runSessionPipeline(fixture.rawText).then(
+    (pipeline) => ({ pipeline, error: undefined as string | undefined }),
+    (error: unknown) => ({ pipeline: undefined, error: (error as Error).message }),
+  )));
+  const failed = runs.find((run) => run.error);
+  if (failed) return { ...offline, mode: 'live', failures: [], error: failed.error };
+  const failures = [...new Set(runs.flatMap((run, index) => evaluateExpectations(run.pipeline!.context, fixture)
+    .map((failure) => (repeat > 1 ? `run ${index + 1}: ${failure}` : failure))))];
+  const readings = new Set(runs.map((run) => readingSignature(run.pipeline!.context)));
+  if (readings.size > 1) failures.push(`READ ${readings.size} DIFFERENT WAYS in ${repeat} runs: ${[...readings].join('  ||  ')}`);
+  return { ...offline, mode: 'live', pipeline: runs[0].pipeline, failures };
+}
+
+/** Token use per model across a live run, read off parseModel.ts's [PARSE-USAGE] lines. */
+const usageByModel = new Map<string, { calls: number; input: number; cached: number; output: number }>();
+function captureParseUsage(): void {
+  const info = console.info.bind(console);
+  console.info = (...args: unknown[]) => {
+    if (args[0] === '[PARSE-USAGE]' && typeof args[1] === 'string') {
+      const usage = JSON.parse(args[1]) as { model: string; inputTokens: number; cachedInputTokens: number; outputTokens: number };
+      const row = usageByModel.get(usage.model) ?? { calls: 0, input: 0, cached: 0, output: 0 };
+      row.calls += 1; row.input += usage.inputTokens; row.cached += usage.cachedInputTokens; row.output += usage.outputTokens;
+      usageByModel.set(usage.model, row);
+      return;
+    }
+    info(...args);
+  };
+}
+
+// USD per 1M tokens [input, cached input, output] — list prices; check before trusting a total.
+const PRICES: [RegExp, number, number, number][] = [
+  [/^gpt-5\.5/, 5, 0.5, 30],
+  [/^gemini-3(\.\d)?-pro/, 2, 0.2, 12],
+  [/^gemini-3(\.\d)?-flash-lite/, 0.25, 0.025, 1.5],
+  [/^gemini-3(\.\d)?-flash/, 0.5, 0.05, 3],
+  [/^gemini-2\.5-pro/, 1.25, 0.125, 10],
+  [/^gemini-2\.5-flash-lite/, 0.1, 0.01, 0.4],
+  [/^gemini-2\.5-flash/, 0.3, 0.03, 2.5],
+];
+
+function printUsage(boards: number, repeat: number): void {
+  for (const [model, row] of usageByModel) {
+    const price = PRICES.find(([pattern]) => pattern.test(model));
+    const cost = price ? ((row.input - row.cached) * price[1] + row.cached * price[2] + row.output * price[3]) / 1e6 : NaN;
+    const perBoard = boards * repeat > 0 ? cost / (boards * repeat) : NaN;
+    console.log(`
+USAGE ${model}: ${row.calls} calls · ${row.input} in (${row.cached} cached) · ${row.output} out · ~${cost.toFixed(3)} total · ~${perBoard.toFixed(4)} per board`);
   }
 }
 
@@ -428,13 +485,24 @@ async function runCorpus(options: CorpusOptions): Promise<void> {
   if (fixtures.length === 0) {
     throw new Error(`No fixtures found in ${FIXTURE_DIR}.`);
   }
-  const results: FixtureRunResult[] = [];
-  for (const fixture of fixtures) {
-    const result = await runFixture(fixture, options.live);
-    printRunResult(result);
-    results.push(result);
+  // Offline replays first, one at a time: the replay patches the client for the whole process.
+  const offline: FixtureRunResult[] = [];
+  for (const fixture of fixtures) offline.push(await runFixture(fixture));
+  let results = offline;
+  if (options.live) {
+    captureParseUsage();
+    results = new Array<FixtureRunResult>(fixtures.length);
+    let next = 0;
+    // A few boards at a time — a full corpus one by one, repeated, takes most of an hour.
+    await Promise.all(Array.from({ length: 4 }, async () => {
+      for (let index = next++; index < fixtures.length; index = next++) {
+        results[index] = await runFixtureLive(fixtures[index], offline[index], options.repeat);
+      }
+    }));
   }
+  results.forEach(printRunResult);
   printSummary(results);
+  if (options.live) printUsage(fixtures.length, options.repeat);
 
   // Only a full offline run may touch the baseline: one fixture can't speak for the others, and a
   // live run's numbers describe today's prompt rather than the recorded answers the file is about.
