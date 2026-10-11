@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, chatCannotLog, isComplete, nextQuestion, openSlots, panelAnswer, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, chatCannotLog, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
@@ -565,5 +565,18 @@ describe('Tell Wodi — the order it asks in', () => {
     const rs = initStoryResults(workout, ['strength', 'amrap_intervals'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
     const order = openSlots(rs, new Set()).filter((s) => s.asked).map((s) => `${s.exerciseIndex}:${s.kind}`);
     expect(order).toEqual(['0:weight', '1:rounds', '1:weight']);
+  });
+});
+
+describe('answers the app reads itself', () => {
+  const timeSlot = { id: '1.time', kind: 'time', exerciseIndex: 1, subject: '4 Sets', asked: true } as const;
+  it('"2130" to "what was your time?" is 21:30, not 2,130 seconds', () => {
+    expect(readAnswerLocally(timeSlot, '2130')).toMatchObject({ id: '1.time', seconds: 1290 });
+  });
+  it('words still go to the AI', () => {
+    expect(readAnswerLocally(timeSlot, 'about 21 and a half, brutal')).toBeNull();
+  });
+  it('only a time question is read this way', () => {
+    expect(readAnswerLocally({ ...timeSlot, id: '1.rounds', kind: 'rounds' }, '2130')).toBeNull();
   });
 });

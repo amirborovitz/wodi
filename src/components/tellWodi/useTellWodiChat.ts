@@ -13,6 +13,7 @@ import {
   isComplete,
   nextQuestion,
   openSlots,
+  readAnswerLocally,
   type ChatPanel,
   type ChatQuestion,
   type ChatSlot,
@@ -361,6 +362,15 @@ export function useTellWodiChat({
     if (!workout) return;
     const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
     const askedBefore = slots.find((s) => s.asked)?.id;
+    // A clean clock reading to "what was your time?" needs no model — read it here (free, exact).
+    const local = readAnswerLocally(slots.find((s) => s.asked), text);
+    if (local) {
+      settleQuestions();
+      applyAnswers([local], slots);
+      push({ from: 'wodi', text: 'Got it.' });
+      askNext();
+      return;
+    }
     setBusy('thinking');
     try {
       const reading = await readAthleteMessage({

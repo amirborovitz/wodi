@@ -1,3 +1,4 @@
+import { readClockAnswer } from '../../utils/clockAnswer';
 import type { StoryExerciseResult, MovementResult } from '../logging/story/types';
 import { openStationResults } from '../logging/story/types';
 import { alternativeSubstitution, buildSubstitutionPatch, namedSwap } from '../logging/story/substitutionPatch';
@@ -990,4 +991,15 @@ export function nextQuestion(
     case 'sets':
       return null;
   }
+}
+
+/**
+ * An answer the app can read WITHOUT the AI: a finish time typed as a clock ("2130", "21:30").
+ * The reader sent a bare "2130" to the model and got 2,130 seconds back — 35:30 saved for 21:30
+ * (2026-10-11). Anything that isn't a clean clock reading still goes to the AI.
+ */
+export function readAnswerLocally(slot: ChatSlot | undefined, text: string): SlotAnswer | null {
+  if (slot?.kind !== 'time') return null;
+  const seconds = readClockAnswer(text);
+  return seconds == null ? null : { id: slot.id, ...EMPTY_ANSWER, seconds };
 }
