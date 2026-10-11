@@ -101,9 +101,41 @@ function collectDateCandidates(
   tokens?.forEach((token) => collectTokenCandidates(token, referenceDate, candidates));
 }
 
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+function isoOf(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * The day an athlete NAMES in their own words — "I did yesterday", "this morning", "on Friday".
+ * Calendar arithmetic, not judgement: a typed log said "yesterday" and was filed on the day it
+ * was logged (2026-10-11), so streaks and weeks counted it on the wrong day.
+ *
+ * A weekday counts only after "on"/"last" — "Monday Murph" names a workout, not a day.
+ */
+function relativeDay(text: string | undefined, referenceDate: Date): string | undefined {
+  if (!text) return undefined;
+  const lower = text.toLowerCase();
+  const day = (offset: number): string => {
+    const date = new Date(referenceDate);
+    date.setDate(date.getDate() - offset);
+    return isoOf(date);
+  };
+  if (/\byesterday\b/.test(lower)) return day(1);
+  if (/\b(?:today|this morning|this evening|tonight)\b/.test(lower)) return day(0);
+  const weekday = lower.match(/\b(?:on|last)\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (weekday) {
+    const back = (referenceDate.getDay() - WEEKDAYS.indexOf(weekday[1]) + 7) % 7 || 7;
+    return day(back);
+  }
+  return undefined;
+}
+
 /**
  * Resolves ambiguous numeric dates using calendar validity first, proximity to
  * the workout/capture date second, and day-first notation as the final tie-break.
+ * With no date written, the athlete's own day word ("yesterday", "on Friday") decides.
  */
 export function resolveSourceDate(
   parsedSourceDate: string | undefined,
@@ -117,5 +149,5 @@ export function resolveSourceDate(
     a.distanceDays - b.distanceDays
     || ORDER_PRIORITY[a.order] - ORDER_PRIORITY[b.order],
   );
-  return candidates[0]?.iso;
+  return candidates[0]?.iso ?? relativeDay(rawText, referenceDate);
 }
