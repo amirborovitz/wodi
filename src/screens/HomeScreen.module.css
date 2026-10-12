@@ -13,8 +13,10 @@
   background: #0b0c0e;
   overflow-y: auto;
   overscroll-behavior-y: none;
-  /* Clearance for the docked surface: Tell Wodi composer + tabs. */
-  padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+  /* Clearance for the docked surface, and no more: border 1 + composer row 54 (10 top + 44)
+     + tab row 70 = 125. Any slack past the dock's real height is what made a page that fits
+     scroll anyway — the padding alone pushed it past 100dvh. */
+  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Constrained here rather than on .screen so the screen's background still
