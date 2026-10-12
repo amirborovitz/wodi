@@ -439,8 +439,13 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
           else if (i === pc - 1) weight = r.weightEnd;
           else weight = undefined;
         } else weight = r.weight;
-        const sr = rps?.[i] ?? r.repsPerSet ?? r.exercise.suggestedReps;
-        sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: rps?.[i] ?? r.exercise.suggestedReps, actualReps: sr, weight, completed: true });
+        // A single lift's reps per set may live on the lift itself ("5 sets every 2:00: 3 Push
+        // Press" — the model's answer). Missing it sent every set with no reps, and the save
+        // collapsed them into one weightless summary set (GRIND, 2026-10-11).
+        const liftReps = r.exercise.movements?.[0]?.reps ?? undefined;
+        const prescribed = rps?.[i] ?? r.exercise.suggestedReps ?? liftReps;
+        const sr = rps?.[i] ?? r.repsPerSet ?? prescribed;
+        sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: prescribed, actualReps: sr, weight, completed: true });
       }
       if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, isMax: true, completed: true });
       return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };

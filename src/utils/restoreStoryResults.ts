@@ -1,4 +1,4 @@
-import type { ParsedMovement, ParsedWorkout, Workout, User } from '../types';
+import type { MovementTotal, ParsedMovement, ParsedWorkout, Workout, User } from '../types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { createBlankResult } from '../components/logging/story/types';
 import { getSavedMaxStrengthSet, getSavedWorkingStrengthSets, getSavedStrengthRepScheme } from './workoutToParsed';
@@ -8,6 +8,22 @@ import { enteredQuantityFactor, exercisePartnerFactor, sessionPartnerFactor } fr
 import { entersTotalValue } from '../services/workloadFromResults';
 
 /** Restore the actual logging inputs when a saved workout is opened for editing. */
+/**
+ * The load the athlete TYPED for one movement, as they typed it: one implement's weight, start →
+ * peak (or every set). Read from the movement's own record first, then the totals row — never the
+ * row's `weight`, which is the effective load (a pair's total, a build's average).
+ *
+ * One rule for both restore paths. The lift path used to read only the saved SETS, so a lift saved
+ * as one summary set (the old interval screen, GRIND 2026-10-11) reopened as a single 45 where the
+ * athlete had typed 45 → 50.
+ */
+function typedLoad(mov: { loggedWeights?: number[] } | undefined, bm: MovementTotal | undefined): number[] {
+  if (mov?.loggedWeights?.length) return mov.loggedWeights;
+  if (bm?.weightProgression?.length) return bm.weightProgression;
+  if (bm?.weight && bm.weight > 0) return [Math.round((bm.weight / Math.max(1, bm.implementCount ?? 1)) * 10) / 10];
+  return [];
+}
+
 export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: ParsedWorkout, userSex?: User['sex']): StoryExerciseResult[] {
   // Build StoryExerciseResult[] from saved data for pre-population.
   // Mirror initStoryResults' blank exactly — same teamSize, same sole-exercise flag — or the
@@ -29,7 +45,13 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
       case 'load': {
         const maxSet = getSavedMaxStrengthSet(savedEx.sets);
         const workingSets = getSavedWorkingStrengthSets(savedEx.sets);
-        const weightedSets = workingSets.filter(set => set.weight != null);
+        const fromSets = workingSets.filter(set => set.weight != null);
+        // Sets that don't carry the climb (one summary set) leave the typed load to say it.
+        const liftName = savedEx.movements?.[0]?.name ?? parsedEx.name;
+        const typed = typedLoad(savedEx.movements?.[0], findMovementTotal(allBreakdownMovements, liftName, i));
+        const weightedSets = new Set(fromSets.map((set) => set.weight)).size < 2 && typed.length > 1 && fromSets.length < 3
+          ? typed.map((weight) => ({ weight }))
+          : fromSets;
         const firstWeight = weightedSets[0]?.weight;
         const lastWeight = weightedSets[weightedSets.length - 1]?.weight;
         if (firstWeight != null) result.weight = firstWeight;
@@ -49,16 +71,22 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
         } else {
           result.loadMode = 'same';
         }
-        const repScheme = getSavedStrengthRepScheme(savedEx.sets);
-        if (repScheme?.length === 1) {
-          result.repsPerSet = repScheme[0];
+        // One summary set for a block of several (the old interval screen's shape) is the BLOCK's
+        // total, not a set: its reps are 5 × 3 = 15, and it was one row for five sets. Read as a
+        // set, a re-save stored one set — or five sets of 15.
+        const isSummary = savedEx.sets.length === 1 && (savedEx.sets[0].id === 'set-summary' || (savedEx.rounds ?? 1) > 1);
+        if (!isSummary) {
+          const repScheme = getSavedStrengthRepScheme(savedEx.sets);
+          if (repScheme?.length === 1) {
+            result.repsPerSet = repScheme[0];
+          }
         }
         if (maxSet) {
           result.maxReps = maxSet.actualReps;
           result.maxRepsWeight = maxSet.weight;
         }
-        result.setsTotal = Math.max(result.setsTotal, savedEx.sets.length);
-        result.setsCompleted = savedEx.sets.length;
+        result.setsTotal = Math.max(result.setsTotal, isSummary ? (savedEx.rounds ?? 1) : savedEx.sets.length);
+        result.setsCompleted = isSummary ? result.setsTotal : savedEx.sets.length;
         break;
       }
       case 'reps': {
@@ -170,10 +198,7 @@ export function restoreStoryResults(editWorkout: Workout, editParsedWorkout: Par
         // The load the athlete typed, as they typed it: one dumbbell's weight, start → peak.
         // The breakdown's `weight` is the EFFECTIVE load (both dumbbells, averaged across a
         // build) — reading it back as the entry doubled a pair on every edit, 35 → 70 → 140.
-        const typed = mov.loggedWeights?.length ? mov.loggedWeights
-          : bm.weightProgression?.length ? bm.weightProgression
-          : bm.weight && bm.weight > 0 ? [Math.round((bm.weight / Math.max(1, bm.implementCount ?? 1)) * 10) / 10]
-          : [];
+        const typed = typedLoad(mov, bm);
         if (typed.length > 0) {
           const start = typed[0];
           const peak = typed[typed.length - 1];

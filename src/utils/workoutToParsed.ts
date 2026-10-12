@@ -122,8 +122,11 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
   const exercise = unbakeSubstitutions(saved);
   // Only strength sets describe a rep scheme. A metcon summary is an earned total.
   const isStrength = exercise.loggingMode === 'strength' || exercise.type === 'strength';
-  const workingSets = isStrength ? getSavedWorkingStrengthSets(exercise.sets) : [];
-  const repScheme = isStrength ? getSavedStrengthRepScheme(exercise.sets) : undefined;
+  // One summary set for a block of several (the old interval screen) holds the BLOCK's total —
+  // 5 × 3 = 15 — not a set's reps. Read as a rep scheme, a re-save stored 5 × 15 = 75 (GRIND).
+  const isSummary = exercise.sets.length === 1 && (exercise.sets[0].id === 'set-summary' || (exercise.rounds ?? 1) > 1);
+  const workingSets = isStrength && !isSummary ? getSavedWorkingStrengthSets(exercise.sets) : [];
+  const repScheme = isStrength && !isSummary ? getSavedStrengthRepScheme(exercise.sets) : undefined;
 
   // "(N each)" partner rounds: the save path writes the pre-save `suggestedSets` out as
   // `personalRounds`, so that is where the per-athlete round count has to be read back from.

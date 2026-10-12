@@ -170,3 +170,28 @@ describe('a typed log ("I did … 4 sets of 1800 echo bike …")', () => {
     });
   });
 });
+
+describe('a single lift on a clock ("5 sets every 2:00: 3 push press", 45 → 50 kg)', () => {
+  // GRIND, 2026-10-11. The reps per set live on the lift itself (the model's answer), not in a rep
+  // scheme. The lift screen didn't read them there, so every set went to the save with no reps —
+  // and the save collapsed them into ONE summary set with no weight. Totals stayed right, so a
+  // totals-only check passed; the saved SETS, which the poster and the edit screen read, did not.
+  const grind = {
+    title: 'GRIND', type: 'strength', format: 'emom', scoreType: 'load',
+    exercises: [{
+      name: '5 Sets Every 2:00', type: 'strength', loggingMode: 'emom', prescription: '5 sets every 2 min: 3 Push Press',
+      suggestedSets: 5,
+      movements: [{ name: 'Push Press', reps: 3, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' }],
+    }],
+  } as unknown as ParsedWorkout;
+
+  it('saves five sets of 3, climbing 45 → 50 — and the totals agree', () => {
+    let results = logAsWritten(grind);
+    // The athlete's actual answer: 45 → 50, not the as-written default.
+    const slot = openSlots(initStoryResults(grind, ['emom'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' }), new Set()).find((s) => s.kind === 'weight')!;
+    results = applyAnswer(results, slot, { id: slot.id, ...EMPTY_ANSWER, weight: 45, weightEnd: 50 }).results;
+    const saved = buildSavedWorkoutTotals(grind, results.map(toLegacyResult) as unknown as ExerciseResult[], 1);
+    expect(saved.exercises[0].sets.map((s) => `${s.actualReps}@${s.weight ?? '-'}`)).toEqual(['3@45', '3@-', '3@-', '3@-', '3@50']);
+    expect(saved.breakdownFromResults.movements[0]).toMatchObject({ totalReps: 15, weightProgression: [45, 50] });
+  });
+});

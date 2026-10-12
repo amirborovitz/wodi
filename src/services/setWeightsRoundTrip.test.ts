@@ -130,3 +130,54 @@ describe('strength weights told to Wodi', () => {
     expect(posterLoad(edited, 'Strict Press')).toBe('30→32.5→35→37.5kg');
   });
 });
+
+describe('editing a lift saved the old way — one summary set, the climb kept on the movement', () => {
+  // GRIND, 2026-10-11: "5 sets every 2 min, 3 push press" logged as 45 → 50 on the INTERVAL screen
+  // (before strength blocks moved to the lift screen). It saved ONE summary set at 45; the 45 → 50
+  // lived only on the movement's typed weights and the totals row. Edit rebuilt the lift from the
+  // sets and showed a single box with 45 — the climb gone, and a re-save would have kept it gone.
+  const grind: Workout = {
+    id: 'grind', userId: 't', title: 'GRIND', type: 'strength', status: 'completed', format: 'emom',
+    date: new Date('2026-10-11'), createdAt: new Date('2026-10-11'), updatedAt: new Date('2026-10-11'),
+    exercises: [{
+      id: 'exercise-0', name: '5 Sets Every 2:00', type: 'strength', loggingMode: 'emom', rounds: 5,
+      prescription: '5 sets every 2 min: 3 Push Press',
+      sets: [{ id: 'set-summary', setNumber: 1, completed: true, actualReps: 15, weight: 45 }],
+      movements: [{ name: 'Push Press', reps: 3, inputType: 'weight', equipment: 'barbell', loggedWeights: [45, 50] }],
+    }],
+    workloadBreakdown: { movements: [{ name: 'Push Press', exerciseIndex: 0, totalReps: 15, weight: 45, weightProgression: [45, 50], unit: 'kg' }], grandTotalReps: 15, grandTotalVolume: 712 },
+  } as unknown as Workout;
+
+  it('opens with the climb the athlete typed, 45 → 50', () => {
+    const [push] = restoreStoryResults(grind, workoutToParsedWorkout(grind), 'male');
+    expect(push.kind).toBe('load');
+    expect(push).toMatchObject({ weight: 45, weightEnd: 50, loadMode: 'range' });
+  });
+
+  it('and a re-save keeps it — now as five sets climbing 45 → 50, the lift screen\'s own shape', () => {
+    const resaved = reEdit(grind);
+    expect(setWeights(resaved)).toEqual([45, null, null, null, 50]);
+    expect(posterLoad(resaved, 'Push Press')).toBe('45→50kg');
+  });
+});
+
+describe('the re-saved GRIND counts what was done', () => {
+  it('5 sets × 3 push press is 15 reps, not 5 × 15', () => {
+    const grindAgain = structuredClone(
+      // Same doc as above, rebuilt here so this block stands alone.
+      {
+        id: 'grind', userId: 't', title: 'GRIND', type: 'strength', status: 'completed', format: 'emom',
+        date: new Date('2026-10-11'), createdAt: new Date('2026-10-11'), updatedAt: new Date('2026-10-11'),
+        exercises: [{
+          id: 'exercise-0', name: '5 Sets Every 2:00', type: 'strength', loggingMode: 'emom', rounds: 5,
+          prescription: '5 sets every 2 min: 3 Push Press',
+          sets: [{ id: 'set-summary', setNumber: 1, completed: true, actualReps: 15, weight: 45 }],
+          movements: [{ name: 'Push Press', reps: 3, inputType: 'weight', equipment: 'barbell', loggedWeights: [45, 50] }],
+        }],
+        workloadBreakdown: { movements: [{ name: 'Push Press', exerciseIndex: 0, totalReps: 15, weight: 45, weightProgression: [45, 50], unit: 'kg' }], grandTotalReps: 15, grandTotalVolume: 712 },
+      },
+    ) as unknown as Workout;
+    const resaved = reEdit(grindAgain);
+    expect(resaved.workloadBreakdown!.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(15);
+  });
+});
