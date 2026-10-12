@@ -2,6 +2,9 @@ import type { Exercise, ParsedWorkout, WorkloadBreakdown } from '../types';
 import { buildSavedExercises } from './buildSavedExercises';
 import { assignMovementColors } from './workloadCalculation';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from './workloadFromResults';
+import { toLoggedJson } from './loggedRecord';
+import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import type { StoryExerciseResult } from '../components/logging/story/types';
 import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
 
 /**
@@ -11,6 +14,10 @@ import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from 
  * its own way could pass while the app stored something else.
  *
  * Moved verbatim out of the save handler (2026-10-11); the screen keeps only the writes.
+ *
+ * It takes the athlete's ANSWERS, not a saved shape: the answers are stored as they are
+ * (`loggedJson`) and every total is derived from them here, in one call — so the record an edit
+ * reopens and the totals the poster prints can never come from two different logs.
  */
 
 export interface SessionPartnerScope {
@@ -45,13 +52,17 @@ export interface SavedWorkoutTotals {
   totalDuration: number;
   effectiveDuration: number;
   durationMinutes: number;
+  /** The board and the answers, exactly as logged — see services/loggedRecord.ts. */
+  loggedJson: string;
 }
 
 export function buildSavedWorkoutTotals(
   parsedWorkout: ParsedWorkout,
-  results: ExerciseResult[],
+  answers: StoryExerciseResult[],
   partnerFactor: number,
 ): SavedWorkoutTotals {
+  // The one conversion from the athlete's answers to the stored shape.
+  const results = answers.map(toLegacyResult) as unknown as ExerciseResult[];
   const { builtExercises: exercises, totalDuration } = buildSavedExercises(results);
 
   const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
@@ -128,5 +139,6 @@ export function buildSavedWorkoutTotals(
     : Math.max(timeCapSeconds, emomSeconds);
   const effectiveDuration = Math.max(totalDuration, programmedDuration);
   const durationMinutes = effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : 0;
-  return { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes };
+  const loggedJson = toLoggedJson(parsedWorkout, answers);
+  return { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes, loggedJson };
 }

@@ -1,5 +1,5 @@
 import { analyzeExerciseMetric, getExerciseLoggingMode, type ExerciseInputType } from '../services/exerciseLoggingMode';
-import { restoreStoryResults } from '../utils/restoreStoryResults';
+import { reopenLogged } from '../services/loggedRecord';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from '../services/savedWorkout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -32,21 +32,18 @@ import { WorkoutScreen } from './WorkoutScreen';
 import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat, PlannedWorkout } from '../types';
 import { buildLastLoadMap, recentLoads } from '../utils/lastLoadHistory';
-import {
-  workoutToParsedWorkout,
-} from '../utils/workoutToParsed';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
 import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
-import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
+import { getMovementKeys } from '../components/workouts/InlineMovementEditor';
 import { TellWodiSheet } from '../components/workouts/TellWodiSheet';
 import {
   getAlternativeType,
   getDefaultEasierAlternative,
   getDistanceMultiplier,
 } from '../data/exerciseDefinitions';
-import { StoryLogResults, storyTeamSize, toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { StoryLogResults, storyTeamSize } from '../components/logging/story/StoryLogResults';
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
-import { useTellWodiChat } from '../components/tellWodi/useTellWodiChat';
+import { useTellWodiChat, type FormHandoff } from '../components/tellWodi/useTellWodiChat';
 import { useAskWodi } from '../components/tellWodi/useAskWodi';
 import { useWodiThread } from '../components/tellWodi/useWodiThread';
 import { useWodiMessage } from '../hooks/useWodiMessage';
@@ -173,25 +170,6 @@ function readSavedWorkouts(): SavedWorkout[] {
 
 // Check if a movement requires weight input (barbell/KB/DB movements)
 
-function buildImplementCountsFromPerMovement(
-  exercise: ParsedExercise,
-  perMovementCounts: Record<string, 1 | 2>,
-): Record<string, number> {
-  if (!exercise.movements) return {};
-  const counts: Record<string, number> = {};
-  const mKeys = getMovementKeys(exercise.movements);
-  const exerciseText = `${exercise.name} ${exercise.prescription}`;
-  exercise.movements.forEach((mov, i) => {
-    const key = mKeys[i];
-    // Use saved per-movement count, or fall back to smart default
-    const saved = perMovementCounts[key] ?? perMovementCounts[mov.name];
-    const count = saved ?? getImplementCountInfo(mov, exerciseText).count;
-    if (count > 1) {
-      counts[key] = count;
-    }
-  });
-  return counts;
-}
 
 function getDefaultAlternativesForExercise(exercise: ParsedExercise): {
   selected: Record<string, string>;
@@ -499,19 +477,19 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   // AMRAP interval state (for "amrap_intervals" format)
   const [, setIntervalRounds] = useState<number[]>([]); // rounds per set
   const [, setCurrentRounds] = useState<string>(''); // current set rounds input
-  const [workoutWeight, setWorkoutWeight] = useState<string>(''); // weight used (e.g., KB weight)
+  const [, setWorkoutWeight] = useState<string>(''); // weight used (e.g., KB weight)
 
   // Movement alternatives state (maps original movement to selected alternative)
   const [, setSelectedAlternatives] = useState<Record<string, string>>({});
   // Custom distances for alternatives (maps movement name to user-edited distance)
   const [, setCustomDistances] = useState<Record<string, number>>({});
   // Custom reps for movements (maps movement name to reps)
-  const [customReps, setCustomReps] = useState<Record<string, number>>({});
+  const [, setCustomReps] = useState<Record<string, number>>({});
   // Per-movement weight tracking (maps movement name to weight)
   const [, setMovementWeights] = useState<Record<string, number>>({});
 
   // Per-movement KB/DB implement count (1 = single, 2 = pair)
-  const [movementImplementCounts, setMovementImplementCounts] = useState<Record<string, 1 | 2>>({});
+  const [, setMovementImplementCounts] = useState<Record<string, 1 | 2>>({});
 
   // Cycle tracker state (for variable rep scheme for-time workouts)
   const [, setCompletedCycles] = useState(0);
@@ -553,7 +531,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const [savedWorkoutMeta, setSavedWorkoutMeta] = useState<SessionWorkout | null>(null);
   // A new log whose board was already logged in the last couple of days, held until the athlete
   // says whether it replaces that log or stands beside it (see services/sameBoard.ts).
-  const [sameBoardPrompt, setSameBoardPrompt] = useState<{ results: ExerciseResult[]; match: WorkoutWithStats } | null>(null);
+  const [sameBoardPrompt, setSameBoardPrompt] = useState<{ results: StoryExerciseResult[]; match: WorkoutWithStats } | null>(null);
   const [isEditingAfterSave, setIsEditingAfterSave] = useState(false);
   const [editInitialResults, setEditInitialResults] = useState<StoryExerciseResult[] | undefined>(undefined);
   const { isPartnerWorkout, teamSize, partnerFactor } = sessionPartnerScope(parsedWorkout);
@@ -588,21 +566,16 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       date: editWorkout.date instanceof Date ? editWorkout.date : new Date(editWorkout.date),
     });
 
-    // The saved doc IS the parse — sections, complexes, part names, per-exercise partner flags
-    // and the coach's time cap all survive on it. Rebuilding any of that from `sets[]` or the
-    // workload breakdown loses it, and since an edit rewrites `exercises[]` wholesale, losing it
-    // here destroys it in Firestore.
-    const editParsedWorkout = workoutToParsedWorkout(editWorkout);
+    // The board and the answers exactly as they were logged (rebuilt once for an older workout).
+    const logged = reopenLogged(editWorkout, user?.sex);
 
     // Set up parsed workout and flags
-    setParsedWorkout(editParsedWorkout);
+    setParsedWorkout(logged.parsed);
     setImageUrl(editWorkout.imageUrl || null);
     setError(null);
     setIsEditingAfterSave(true); // Flag to update instead of create
 
-    const storyResults = restoreStoryResults(editWorkout, editParsedWorkout, user?.sex);
-
-    setEditInitialResults(storyResults);
+    setEditInitialResults(logged.results);
     setStep('log-results');
   }, [editWorkout]);
 
@@ -1108,201 +1081,14 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     setStep('log-results');
   };
 
-  // Get the current exercise and its logging mode
-  const currentExercise = parsedWorkout?.exercises[currentExerciseIndex];
+  // The workout context the logging-mode choice reads
   const workoutContext = parsedWorkout ? {
     format: parsedWorkout.format,
     scoreType: parsedWorkout.scoreType,
     exerciseCount: parsedWorkout.exercises.length,
   } : undefined;
 
-  // Track which interval sets have been manually edited
-  const [, setManuallyEditedIntervalSets] = useState<Set<number>>(new Set());
 
-  const upsertExerciseResult = (result: ExerciseResult) => {
-    if (isEditingAfterSave && exerciseResults.length > currentExerciseIndex) {
-      const next = [...exerciseResults];
-      next[currentExerciseIndex] = result;
-      setExerciseResults(next);
-      return next;
-    }
-    const next = [...exerciseResults, result];
-    setExerciseResults(next);
-    return next;
-  };
-
-  // Finish interval exercise and move to next or save
-  const finishIntervalExercise = (splitTimes: number[]) => {
-    if (!parsedWorkout || !currentExercise) return;
-
-    const weight = parseFloat(workoutWeight) || undefined;
-
-    // Calculate total reps per set from movements (for volume calculation)
-    const intMovKeys = getMovementKeys(currentExercise.movements || []);
-    const repsPerSet = currentExercise.movements?.reduce((sum, mov, i) => {
-      const reps = movementLookup(customReps, intMovKeys[i], mov.name) ?? mov.reps ?? 0;
-      return sum + reps;
-    }, 0) || 0;
-
-    // Build sets array with split times
-    const sets: ExerciseSet[] = splitTimes.map((time, i) => ({
-      id: `set-${i}`,
-      setNumber: i + 1,
-      time,
-      weight,
-      actualReps: repsPerSet > 0 ? repsPerSet : undefined, // Store reps for volume calculation
-      completed: true,
-    }));
-
-    // Save exercise result
-    const effectiveImplementCounts = buildImplementCountsFromPerMovement(currentExercise, movementImplementCounts);
-
-    const result: ExerciseResult = {
-      exercise: currentExercise,
-      sets,
-      completionTime: splitTimes.reduce((sum, t) => sum + t, 0),
-      ...(Object.keys(effectiveImplementCounts).length > 0 ? { implementCounts: { ...effectiveImplementCounts } } : {}),
-    };
-
-    const newResults = upsertExerciseResult(result);
-
-    // Check if this was the last exercise
-    if (currentExerciseIndex >= parsedWorkout.exercises.length - 1) {
-      // All exercises done, save the entire workout
-      saveWorkout(newResults);
-    } else {
-      // Move to next exercise
-      const nextIndex = currentExerciseIndex + 1;
-      if (isEditingAfterSave && newResults[nextIndex]) {
-        hydrateExerciseState(nextIndex, newResults);
-      } else {
-        setCurrentExerciseIndex(nextIndex);
-        const nextExercise = parsedWorkout.exercises[nextIndex];
-        initializeSetsForExercise(nextExercise);
-
-        // Reset interval state for next exercise
-        setCurrentIntervalSet(1);
-        const nextMode = getExerciseLoggingMode(nextExercise, workoutContext);
-        if (nextMode === 'intervals') {
-          const nextIntervalSets = nextExercise.suggestedSets || parsedWorkout?.sets || 1;
-          setIntervalSplitTimes(Array(nextIntervalSets).fill(0));
-        } else {
-          setIntervalSplitTimes([]);
-        }
-        setManuallyEditedIntervalSets(new Set());
-        setWorkoutWeight('');
-        setCompletionMinutes('');
-        setCompletionSeconds('');
-        setCardioTurns('');
-        setCardioCaloriesPerTurn('');
-        setCardioDistanceTurns('');
-        setCardioDistancePerTurn('');
-
-        // Prefill cardio values divided by team size for team workouts
-        if (teamSize > 1 && nextExercise.movements) {
-          for (const mov of nextExercise.movements) {
-            if (mov.inputType === 'calories' && mov.calories) {
-              setCardioTurns('1');
-              setCardioCaloriesPerTurn(Math.round(mov.calories / teamSize).toString());
-              break;
-            }
-            if (mov.inputType === 'distance' && mov.distance) {
-              setCardioDistanceTurns('1');
-              setCardioDistancePerTurn(Math.round(mov.distance / teamSize).toString());
-              break;
-            }
-          }
-        }
-      }
-    }
-  };
-
-  // Finish AMRAP interval exercise and move to next or save
-  const finishAmrapIntervalExercise = (rounds: number[]) => {
-    if (!parsedWorkout || !currentExercise) return;
-
-    const weight = parseFloat(workoutWeight) || undefined;
-
-    // Calculate reps per round from movements (for volume calculation)
-    const amrapMovKeys = getMovementKeys(currentExercise.movements || []);
-    const repsPerRound = currentExercise.movements?.reduce((sum, mov, i) => {
-      const reps = movementLookup(customReps, amrapMovKeys[i], mov.name) ?? mov.reps ?? 0;
-      return sum + reps;
-    }, 0) || 1;
-
-    // Build sets array with rounds - actualReps = rounds × reps_per_round for volume
-    const sets: ExerciseSet[] = rounds.map((roundCount, i) => ({
-      id: `set-${i}`,
-      setNumber: i + 1,
-      actualReps: Math.round(roundCount * repsPerRound), // Total reps = rounds × reps per round
-      weight,
-      completed: true,
-    }));
-
-    // Save exercise result
-    const effectiveImplementCounts = buildImplementCountsFromPerMovement(currentExercise, movementImplementCounts);
-
-    const result: ExerciseResult = {
-      exercise: currentExercise,
-      sets,
-      ...(Object.keys(effectiveImplementCounts).length > 0 ? { implementCounts: { ...effectiveImplementCounts } } : {}),
-    };
-
-    const newResults = upsertExerciseResult(result);
-
-    // Check if this was the last exercise
-    if (currentExerciseIndex >= parsedWorkout.exercises.length - 1) {
-      // All exercises done, save the entire workout
-      saveWorkout(newResults);
-    } else {
-      // Move to next exercise
-      const nextIndex = currentExerciseIndex + 1;
-      if (isEditingAfterSave && newResults[nextIndex]) {
-        hydrateExerciseState(nextIndex, newResults);
-      } else {
-        setCurrentExerciseIndex(nextIndex);
-        const nextExercise = parsedWorkout.exercises[nextIndex];
-        initializeSetsForExercise(nextExercise);
-
-        // Reset interval state for next exercise
-        setCurrentIntervalSet(1);
-        setIntervalRounds([]);
-        setCurrentRounds('');
-        const nextMode2 = getExerciseLoggingMode(nextExercise, workoutContext);
-        if (nextMode2 === 'intervals') {
-          const nextIntervalSets2 = nextExercise.suggestedSets || parsedWorkout?.sets || 1;
-          setIntervalSplitTimes(Array(nextIntervalSets2).fill(0));
-        } else {
-          setIntervalSplitTimes([]);
-        }
-        setWorkoutWeight('');
-        setCardioTurns('');
-        setCardioCaloriesPerTurn('');
-        setCardioDistanceTurns('');
-        setCardioDistancePerTurn('');
-
-        // Prefill cardio values divided by team size for team workouts
-        if (teamSize > 1 && nextExercise.movements) {
-          for (const mov of nextExercise.movements) {
-            if (mov.inputType === 'calories' && mov.calories) {
-              setCardioTurns('1');
-              setCardioCaloriesPerTurn(Math.round(mov.calories / teamSize).toString());
-              break;
-            }
-            if (mov.inputType === 'distance' && mov.distance) {
-              setCardioDistanceTurns('1');
-              setCardioDistancePerTurn(Math.round(mov.distance / teamSize).toString());
-              break;
-            }
-          }
-        }
-      }
-    }
-  };
-
-  // Retained for upcoming interval UI wiring.
-  void finishIntervalExercise;
-  void finishAmrapIntervalExercise;
 
   const initializeSetsForExercise = (exercise: ParsedExercise) => {
     // EMOM exercises: one set per minute, weight only
@@ -1428,91 +1214,6 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
 
     setCurrentSets(sets);
     setManuallyEditedSets(new Set()); // Reset manual edits for new exercise
-  };
-
-  const hydrateExerciseState = (index: number, results: ExerciseResult[]) => {
-    if (!parsedWorkout) return;
-    const exercise = parsedWorkout.exercises[index];
-    const exerciseMode = getExerciseLoggingMode(exercise, workoutContext);
-    const existing = results[index];
-
-    setCurrentExerciseIndex(index);
-
-    if (isEditingAfterSave && existing) {
-      setCurrentSets(existing.sets);
-      if (existing.completionTime) {
-        const totalSeconds = existing.completionTime;
-        setCompletionMinutes(Math.floor(totalSeconds / 60).toString());
-        setCompletionSeconds((totalSeconds % 60).toString());
-      } else {
-        setCompletionMinutes('');
-        setCompletionSeconds('');
-      }
-      // Restore cardio state (calories)
-      if (existing.cardioTurns) {
-        setCardioTurns(existing.cardioTurns.toString());
-        setCardioCaloriesPerTurn(existing.cardioCaloriesPerTurn?.toString() || '');
-      } else {
-        setCardioTurns('');
-        setCardioCaloriesPerTurn('');
-      }
-      // Restore cardio state (distance)
-      if (existing.distanceTurns) {
-        setCardioDistanceTurns(existing.distanceTurns.toString());
-        setCardioDistancePerTurn(existing.distancePerTurn?.toString() || '');
-        setCardioDistanceUnit(existing.distanceUnit || 'm');
-      } else {
-        setCardioDistanceTurns('');
-        setCardioDistancePerTurn('');
-      }
-      setMovementWeights(existing.movementWeights || {});
-      setSelectedAlternatives(existing.movementAlternatives || {});
-      setCustomDistances(existing.movementDistances || {});
-      setCustomReps(existing.movementReps || {});
-      setMovementImplementCounts((existing.implementCounts || {}) as Record<string, 1 | 2>);
-      setWorkoutWeight(
-        existing.sets?.[0]?.weight !== undefined
-          ? existing.sets[0].weight.toString()
-          : ''
-      );
-      // Restore cycle tracker state
-      setCompletedCycles(existing.completedCycles ?? 0);
-      setPartialReps(existing.partialReps);
-    } else {
-      initializeSetsForExercise(exercise);
-      // Prefill time cap for for-time exercises, otherwise clear
-      const isExForTime = exerciseMode === 'for_time' && parsedWorkout?.timeCap;
-      if (isExForTime) {
-        const tcMinutes = Math.floor(parsedWorkout!.timeCap! / 60);
-        const tcSeconds = parsedWorkout!.timeCap! % 60;
-        setCompletionMinutes(tcMinutes.toString());
-        setCompletionSeconds(tcSeconds > 0 ? tcSeconds.toString() : '');
-      } else {
-        setCompletionMinutes('');
-        setCompletionSeconds('');
-      }
-      setMovementWeights({});
-      setWorkoutWeight('');
-      setCardioDistanceTurns('');
-      setCardioDistancePerTurn('');
-      setCompletedCycles(0);
-      setPartialReps(undefined);
-      const defaults = getDefaultAlternativesForExercise(exercise);
-      setSelectedAlternatives(defaults.selected);
-      setCustomDistances(defaults.distances);
-      setCustomReps(defaults.reps);
-      if (exerciseMode !== 'emom') {
-        const { counts: defaultCounts } = computeImplementMaps(exercise);
-        setMovementImplementCounts(defaultCounts);
-      }
-    }
-
-    // Reset interval-specific state on entry
-    setCurrentIntervalSet(1);
-    setIntervalSplitTimes([]);
-    setManuallyEditedIntervalSets(new Set());
-    setIntervalRounds([]);
-    setCurrentRounds('');
   };
 
   // Track which sets have been manually edited (not auto-filled from first set)
@@ -1641,11 +1342,13 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     onBack();
   };
 
+  // Edit straight from the poster: the standard screen reopens on exactly what was just saved
+  // (saveWorkout keeps it), however it was logged — chat or form. It used to rebuild from a list
+  // only the retired per-exercise form filled, so it opened empty: a chat log's deadlift and push
+  // press had to be typed again (HAUL, 2026-10-12).
   const handleEditFromReward = () => {
     if (!parsedWorkout) return;
     setIsEditingAfterSave(true);
-    const lastIndex = Math.max(0, exerciseResults.length - 1);
-    hydrateExerciseState(lastIndex, exerciseResults);
     setStep('log-results');
   };
 
@@ -1671,6 +1374,12 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const chatBoardCreateRef = useRef<Promise<string> | null>(null);
   // The logging form was handed over from the chat — Back returns there, not to the photo flow.
   const formFromChatRef = useRef(false);
+  // The athlete left the chat for the standard screen, with a board or before one — measured.
+  const leftChatRef = useRef(false);
+  const leaveChat = (how: FormHandoff, board: boolean): void => {
+    leftChatRef.current = true;
+    track('standard_screen_from_chat', { how, board: board ? 'yes' : 'no' });
+  };
   const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
   const loadHistory = useMemo(() => recentLoads(recentWorkouts), [recentWorkouts]);
 
@@ -1725,12 +1434,17 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     onFinished: (results, vibe, chat) => {
       chatVibeRef.current = vibe;
       chatThreadRef.current = chat;
-      requestSave(results.map(toLegacyResult) as unknown as ExerciseResult[]);
+      requestSave(results);
     },
-    onOpenForms: (results) => {
+    onOpenForms: (results, how) => {
+      leaveChat(how, true);
       formFromChatRef.current = true;
       setEditInitialResults(results);
       setStep('log-results');
+    },
+    onUseForm: (how) => {
+      leaveChat(how, false);
+      setStep('capture');
     },
     ask,
     habits,
@@ -1750,7 +1464,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
    * Only a new log asks — a session already writing a workout updates it (saveTarget.ts), and
    * that includes opening a saved workout for edit.
    */
-  const requestSave = (results: ExerciseResult[]) => {
+  const requestSave = (results: StoryExerciseResult[]) => {
     if (!parsedWorkout) return;
     if (resolveSaveTarget(savedWorkoutMeta?.id).kind === 'create') {
       const match = findRecentSameBoard(
@@ -1770,14 +1484,14 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
    * first time they answer "kg or lb?", and followed when they log in the other one. Never blocks
    * the save: a failed write only means they're asked again.
    */
-  const rememberWeightUnit = (results: ExerciseResult[]): void => {
+  const rememberWeightUnit = (results: StoryExerciseResult[]): void => {
     const unit = unitToRemember(results.map((r) => r.exercise));
     if (!unit || unit === user?.weightUnit) return;
     updateUserProfile({ weightUnit: unit })
       .catch((err: unknown) => console.error('[Save] could not keep the weight unit', err));
   };
 
-  const saveWorkout = async (results: ExerciseResult[], session: SessionWorkout | null = savedWorkoutMeta) => {
+  const saveWorkout = async (results: StoryExerciseResult[], session: SessionWorkout | null = savedWorkoutMeta) => {
     if (!user || !parsedWorkout) return;
 
     // Validation moved to EditExerciseSheet (skip/edit prompt on close).
@@ -1816,7 +1530,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       // Asked of the session's workout id, never of `isEditingAfterSave` — see saveTarget.ts.
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
-      const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes } =
+      const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes, loggedJson } =
         buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor);
       rememberWeightUnit(results);
       const workoutTitle = parsedWorkout.title || "Today's Workout";
@@ -1842,6 +1556,8 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         durationSeconds: effectiveDuration > 0 ? effectiveDuration : null,
         notes: null,
         rawText: parsedWorkout.rawText?.trim() || null,
+        // What was logged, exactly — an edit reopens this, not a rebuild from the totals.
+        loggedJson,
         ...(parsedWorkout.userContext && { userContext: parsedWorkout.userContext }),
         // The cap is PRESCRIPTION — what the coach wrote. It must never be overwritten with
         // effectiveDuration (what the athlete actually took): that is already persisted as
@@ -1911,11 +1627,18 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         setSavedWorkoutMeta({ id: saveTarget.workoutId, totalVolume, date: session?.date ?? workoutDate });
       }
 
+      // What an Edit from the poster reopens: these answers, exactly as just saved.
+      setEditInitialResults(results);
+
       // A test log is a throwaway (see isTest) — it stays out of the analytics too.
       if (!isTestWorkout) {
         const format = parsedWorkout.format || 'unknown';
         if (isUpdate) track('workout_edited', { format, parts: exercises.length });
-        else track('workout_logged', { format, parts: exercises.length, partner: isPartnerWorkout ? 'yes' : 'no' });
+        else {
+          // Which way this log was made — the chat, the standard screen, or the chat handing over.
+          const loggedOn = leftChatRef.current ? 'chat_then_standard' : chatThreadRef.current ? 'chat' : 'standard';
+          track('workout_logged', { format, parts: exercises.length, partner: isPartnerWorkout ? 'yes' : 'no', logged_on: loggedOn });
+        }
       }
 
       // Calculate muscle groups from exercise names
@@ -2519,10 +2242,9 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         <TellWodiChat
           chat={tellWodi}
           thread={thread}
-          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.canOpenForms }))}
+          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard }))}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
-          onUseForm={() => setStep('capture')}
         />
       )}
 
@@ -2530,7 +2252,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         <StoryLogResults
           parsedWorkout={parsedWorkout}
           loggingModes={loggingModesFor(parsedWorkout)}
-          onSave={(results) => requestSave(results as unknown as ExerciseResult[])}
+          onSave={requestSave}
           onBack={() => goBack(backFromForm({ editing: Boolean(editWorkout), openedFromChat: formFromChatRef.current }))}
           isSaving={false}
           initialResults={editInitialResults}

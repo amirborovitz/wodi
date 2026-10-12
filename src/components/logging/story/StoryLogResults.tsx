@@ -172,7 +172,8 @@ type WizardPhase = 'overview' | 'logging';
 interface StoryLogResultsProps {
   parsedWorkout: ParsedWorkout;
   loggingModes: ExerciseLoggingMode[];
-  onSave: (results: LegacyExerciseResult[]) => void;
+  /** The answers exactly as logged — the save derives everything else from them. */
+  onSave: (results: StoryExerciseResult[]) => void;
   onBack: () => void;
   isSaving?: boolean;
   initialResults?: StoryExerciseResult[];
@@ -625,29 +626,23 @@ export function StoryLogResults({
     [parsedWorkout.uncertain, currentGlobalIdx],
   );
 
-  // ── Save pipeline ──
-  const saveLegacyResults = useCallback((source: StoryExerciseResult[]) => {
-    onSave(source.map((r) => toLegacyResult(r)));
-  }, [onSave]);
-
   // ── Block advance ──
   const goToNextBlock = useCallback((latestResults: StoryExerciseResult[]) => {
     if (isLastBlock) {
-      saveLegacyResults(latestResults);
+      onSave(latestResults);
     } else {
-      void latestResults;
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       setBlockExerciseStep(0);
       setIsSubstitutionOpen(false);
       setWizardPhase('logging');
     }
-  }, [currentStep, isLastBlock, saveLegacyResults]);
+  }, [currentStep, isLastBlock, onSave]);
 
   const handleBlockAdvance = useCallback(() => {
-    if (!currentBlock) { saveLegacyResults(results); return; }
+    if (!currentBlock) { onSave(results); return; }
     goToNextBlock(results);
-  }, [currentBlock, goToNextBlock, results, saveLegacyResults]);
+  }, [currentBlock, goToNextBlock, results, onSave]);
 
   // ── Exercise advance (within block) ──
   const advanceExercise = useCallback(() => {
@@ -740,8 +735,8 @@ export function StoryLogResults({
   }, [wizardBlocks.length]);
 
   const handleOverviewSkipAll = useCallback(() => {
-    saveLegacyResults(results);
-  }, [results, saveLegacyResults]);
+    onSave(results);
+  }, [results, onSave]);
 
 
   // ── Render ──────────────────────────────────────────────────────

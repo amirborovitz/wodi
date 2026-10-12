@@ -206,6 +206,7 @@ export interface Workout {
   durationSeconds?: number; // the athlete's actual elapsed time, to the second (what `duration` rounds)
   notes?: string;
   rawText?: string;
+  loggedJson?: string;     // The board as read + the athlete's answers, exactly as logged — an edit reopens these (services/loggedRecord.ts)
   userContext?: string;    // Athlete-supplied context/correction used when parsing (kept for reproducible re-parses)
   corrections?: string[];  // Athlete-flagged AI mistakes ("AI got it wrong?" on the poster) awaiting a fix pass
   timeCap?: number;        // seconds, from parsedWorkout.timeCap

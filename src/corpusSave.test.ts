@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { ParsedWorkout } from './types';
+import type { ParsedWorkout, Workout } from './types';
 import { initStoryResults, type StoryExerciseResult } from './components/logging/story/types';
-import { storyTeamSize, toLegacyResult } from './components/logging/story/StoryLogResults';
+import { storyTeamSize } from './components/logging/story/StoryLogResults';
 import { openSlots, applyAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
 import { getExerciseLoggingMode } from './services/exerciseLoggingMode';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from './services/savedWorkout';
-import type { ExerciseResult } from './services/workloadFromResults';
+import { reopenLogged } from './services/loggedRecord';
+import { removeUndefined } from './utils/firestoreUtils';
 
 /**
  * WHAT THE ATHLETE ENDS UP SEEING — every corpus board, logged through the chat and saved.
@@ -69,7 +70,7 @@ function savedAsWritten(parsed: ParsedWorkout): Record<string, number> {
   const results = logAsWritten(parsed);
   const saved = buildSavedWorkoutTotals(
     parsed,
-    results.map(toLegacyResult) as unknown as ExerciseResult[],
+    results,
     sessionPartnerScope(parsed).partnerFactor,
   ).breakdownFromResults;
   const out: Record<string, number> = {};
@@ -143,6 +144,36 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     }
     expect(wrong).toEqual([]);
   });
+
+  it('an edit reopens exactly what was logged, and saving it untouched changes nothing', () => {
+    // Every board, every kind — AMRAPs and max tests too: the round trip isn't about the totals
+    // being right, it's about an edit never turning one log into a different one.
+    const drifted: string[] = [];
+    let largest = 0;
+    for (const { name, parsed } of boards) {
+      const answers = logAsWritten(parsed);
+      const { partnerFactor } = sessionPartnerScope(parsed);
+      const first = buildSavedWorkoutTotals(parsed, answers, partnerFactor);
+      largest = Math.max(largest, first.loggedJson.length);
+
+      // Stored as Firestore stores it: undefined dropped, a fresh copy read back.
+      const stored = structuredClone(removeUndefined({
+        id: 'w', userId: 't', title: parsed.title ?? 'W', type: parsed.type, status: 'completed',
+        date: new Date('2026-10-12'), exercises: first.exercises, workloadBreakdown: first.breakdownFromResults,
+        loggedJson: first.loggedJson,
+      })) as unknown as Workout;
+      const reopened = reopenLogged(stored, 'male');
+      if (JSON.stringify(reopened.results) !== JSON.stringify(answers)) drifted.push(`${name}: the answers reopened differently`);
+      if (JSON.stringify(reopened.parsed) !== JSON.stringify(parsed)) drifted.push(`${name}: the board reopened differently`);
+
+      const again = buildSavedWorkoutTotals(reopened.parsed, reopened.results, partnerFactor);
+      if (JSON.stringify(again.exercises) !== JSON.stringify(first.exercises)) drifted.push(`${name}: re-save changed the sets`);
+      if (JSON.stringify(again.breakdownFromResults) !== JSON.stringify(first.breakdownFromResults)) drifted.push(`${name}: re-save changed the totals`);
+    }
+    expect(drifted).toEqual([]);
+    // A Firestore doc holds 1 MiB; the record must stay a small part of it.
+    expect(largest).toBeLessThan(200_000);
+  });
 });
 
 describe('a typed log ("I did … 4 sets of 1800 echo bike …")', () => {
@@ -190,7 +221,7 @@ describe('a single lift on a clock ("5 sets every 2:00: 3 push press", 45 → 50
     // The athlete's actual answer: 45 → 50, not the as-written default.
     const slot = openSlots(initStoryResults(grind, ['emom'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' }), new Set()).find((s) => s.kind === 'weight')!;
     results = applyAnswer(results, slot, { id: slot.id, ...EMPTY_ANSWER, weight: 45, weightEnd: 50 }).results;
-    const saved = buildSavedWorkoutTotals(grind, results.map(toLegacyResult) as unknown as ExerciseResult[], 1);
+    const saved = buildSavedWorkoutTotals(grind, results, 1);
     expect(saved.exercises[0].sets.map((s) => `${s.actualReps}@${s.weight ?? '-'}`)).toEqual(['3@45', '3@-', '3@-', '3@-', '3@50']);
     expect(saved.breakdownFromResults.movements[0]).toMatchObject({ totalReps: 15, weightProgression: [45, 50] });
   });
