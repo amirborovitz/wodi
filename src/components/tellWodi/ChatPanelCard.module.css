@@ -1,29 +1,52 @@
-/* Boxes inside the chat, under Wodi's question — the same surface as Wodi's bubble, so it reads as
-   part of what Wodi said. Yellow only on the one button that commits, per the design system. */
+/* One compact card under Wodi's question (design: "wodi Chat Today" frame 04, ~190px tall): the
+   lift named once with last time beside it, −/+ pills, and one button that names what it saves.
+   Neutral throughout — yellow in the chat is kept for the camera, Wodi's number and a PR. */
 .card {
-  width: min(100%, 340px);
+  width: min(100%, 330px);
   margin: 0;
-  padding: var(--sp-4);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) 14px;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-4);
-  background: #1e2023;
+  gap: var(--sp-3);
+  background: #17181b;
   border: 1px solid var(--wodi-line);
   border-radius: var(--r-lg);
 }
 
-/* The lift's name on the card: with the keyboard up, Wodi's question scrolls off above it. */
+/* The lift's name, said once — with the keyboard up, Wodi's question scrolls off above it. */
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
 .heading {
   margin: 0;
-  font-family: var(--font-body);
-  font-size: 17px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 18px;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--wodi-white);
 }
 
-/* The likely answers — one tap, no keyboard. Neutral pills like every chat answer; yellow stays on
-   the one button that commits typed numbers. */
+/* "Last · 60 → 65 kg" — what the card starts on, quiet beside the name. */
+.last {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* The board's Rx loads, one tap each — only when there's no last time to start on. */
 .quick {
   display: flex;
   flex-wrap: wrap;
@@ -31,8 +54,8 @@
 }
 
 .quickChip {
-  min-height: 44px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 0 14px;
   border-radius: var(--r-pill);
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -50,127 +73,219 @@
   min-width: 0;
 }
 
-.title {
+/* Only when the card asks two things (working sets and a max set). */
+.groupTitle {
   padding: 0;
   margin-bottom: var(--sp-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.56);
 }
 
 .row {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
+  gap: var(--sp-2);
 }
 
-.cell {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-}
-
-.joiner {
-  flex: none;
-  width: 28px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.field {
+.col {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--sp-1);
+  gap: 5px;
 }
 
-.box {
-  width: 100%;
-  height: 56px;
+.colLabel {
+  padding-left: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.joiner {
+  flex: none;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+/* − 60 kg + */
+.pill {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1e2023;
+  border: 1px solid var(--wodi-line);
+  border-radius: var(--r-pill);
+}
+
+.pill:focus-within {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.pillStep {
+  flex: none;
+  width: 40px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  /* No double-tap zoom on a control tapped several times in a row. */
+  touch-action: manipulation;
+}
+
+.pillStep:disabled {
+  color: rgba(255, 255, 255, 0.24);
+  cursor: default;
+}
+
+.pillValue {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: var(--sp-1);
-  padding: 0 var(--sp-3);
-  background: var(--wodi-bg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--r-md);
-  transition: border-color 0.15s ease;
+  gap: 2px;
 }
 
-.box:focus-within {
-  border-color: var(--wodi-yellow);
-}
-
-.input {
-  flex: 1 1 auto;
-  min-width: 0;
+.pillInput {
   width: 100%;
-  height: 54px;
+  min-width: 0;
   padding: 0;
   background: transparent;
   border: 0;
   outline: none;
   text-align: right;
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 900;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
   color: var(--wodi-white);
 }
 
-/* The number an empty box stands for (the peak: same as the start), in grey. */
-.input::placeholder {
+.pillInput::placeholder {
   color: rgba(255, 255, 255, 0.28);
 }
 
-/* The box's border already turns yellow on focus (.box:focus-within). The app-wide yellow
-   `:focus-visible` ring on the input inside it drew a second, smaller frame — same fix as the
-   Records sheet. */
+/* The pill's border shows focus; the app-wide yellow ring would draw a second frame. */
+.pillInput:focus-visible {
+  outline: none;
+}
+
+.pillUnit {
+  flex: none;
+  min-width: 18px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+/* A plain number box — the max set's reps and bar. */
+.box {
+  height: 44px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 var(--sp-3);
+  background: #1e2023;
+  border: 1px solid var(--wodi-line);
+  border-radius: var(--r-pill);
+}
+
+.box:focus-within {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 42px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--wodi-white);
+}
+
 .input:focus-visible {
   outline: none;
 }
 
 .unit {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.done {
-  height: 48px;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: var(--wodi-yellow);
-  color: #0b0c0e;
   font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.log,
+.skip {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-/* Waiting for a number reads as quiet, not as a faded yellow that looks broken. */
-.done:disabled {
+/* Names what it saves ("Log 60 → 65 kg"), so one tap is a choice, not a habit. */
+.log {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--wodi-white);
+  border: 1px solid var(--wodi-white);
+  color: #0b0c0e;
+}
+
+.log:disabled {
   background: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
   color: rgba(255, 255, 255, 0.35);
   cursor: default;
+}
+
+.skip {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: var(--wodi-white);
+}
+
+.skip:disabled {
+  opacity: 0.5;
 }

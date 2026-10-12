@@ -18,20 +18,18 @@ interface TellWodiChatProps {
   onBack: () => void;
   onOpenWorkout: (workout: WorkoutWithStats) => void;
   onOpenPlanned: (planned: PlannedWorkout) => void;
-  /** "+" → Fill in the form, before there's a board to hand over. */
-  onUseForm: () => void;
 }
 
 /**
  * The Tell Wodi screen: a message thread and a composer. Renders what useTellWodiChat returns and
  * nothing more — every decision about what to ask lives in the hook.
  */
-export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanned, onUseForm }: TellWodiChatProps) {
+export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanned }: TellWodiChatProps) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const { messages, busy, send, tapChip, canOpenForms, openForms } = chat;
+  const { messages, busy, send, tapChip, openForms, changeAnswer, finished, placeholder } = chat;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
   // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
   // Everything then lands in one step — no opener swapped out, no history pushing it down.
@@ -125,6 +123,16 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                   </ul>
                 )}
               </div>
+              {message.slotIds && !finished && (
+                <button
+                  type="button"
+                  className={styles.change}
+                  disabled={busy != null}
+                  onClick={() => { changeAnswer(message.id); pinToEnd(); }}
+                >
+                  Change
+                </button>
+              )}
               <Receipts ids={message.receipts} thread={thread} onOpenWorkout={onOpenWorkout} />
               {message.panel && !message.answered && (
                 <ChatPanelCard
@@ -206,7 +214,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
           <textarea
             className={styles.input}
             rows={1}
-            placeholder="Message Wodi…"
+            placeholder={placeholder}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -240,7 +248,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
           <PlusSheet
             open={plusOpen}
             onClose={() => setPlusOpen(false)}
-            onUseForm={() => (canOpenForms ? openForms() : onUseForm())}
+            onUseForm={openForms}
             onLibraryPhoto={setPhoto}
             onSaveForLater={(file) => { send('Saving this board for later', file); pinToEnd(); }}
           />

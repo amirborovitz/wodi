@@ -1,6 +1,6 @@
 import { readClockAnswer } from '../../utils/clockAnswer';
 import type { StoryExerciseResult, MovementResult } from '../logging/story/types';
-import { openStationResults } from '../logging/story/types';
+import { getWeightStep, openStationResults } from '../logging/story/types';
 import { alternativeSubstitution, buildSubstitutionPatch, namedSwap } from '../logging/story/substitutionPatch';
 import { isBlockScored } from '../logging/story/blockScoping';
 import { hasMaxSet } from '../../services/blockScore';
@@ -643,6 +643,11 @@ export interface ChatQuestion {
   text: string;
   /** How to answer, shown small and dim under the question — an example, never part of it. */
   hint?: string;
+  /**
+   * How to answer by typing instead, shown as the message box's placeholder while this question
+   * is open — where the typing happens, not as another line in the bubble.
+   */
+  placeholder?: string;
   slotIds: string[];
   chips: ChatChip[];
   /**
@@ -660,13 +665,23 @@ export interface ChatPanelField {
   /** Under the box: "start", "peak", "reps". */
   label: string;
   unit: string;
-  /** Left empty, this box IS that one's number — the peak of a lift done at one weight. */
-  emptyMeans?: ChatPanelField['field'];
 }
 
 /** Boxes read together, left to right with the joiner between them: "70 → 85", "20 @ 50". */
 export interface ChatPanelGroup {
   title: string;
+  /**
+   * `weight`: −/+ pills, start → peak for a lift in sets (the peak suggested from the start by
+   * the standard screen's own rule, utils/peakSuggestion), one pill otherwise. `boxes`: plain
+   * typed numbers.
+   */
+  control: 'weight' | 'boxes';
+  /** What one −/+ moves a weight by — the standard screen's step for this implement and unit. */
+  step?: number;
+  /** Where + starts from on an empty pill: the board's lightest Rx. Never shown as a value. */
+  base?: number;
+  /** The unit the answer carries when nothing else said it — last time's, shown on the card. */
+  answerUnit?: LoadUnit;
   joiner: '→' | '@';
   /** How the athlete's reply starts ("max 20 reps @ 50 kg"). */
   prefix: string;
@@ -676,7 +691,15 @@ export interface ChatPanelGroup {
 export interface ChatPanel {
   /** What the boxes are about, on the card itself — the question above can scroll away. */
   title: string;
-  /** The likely answers, one tap each, above the boxes. Typing is the fallback. */
+  /** "Last · 60 → 65 kg" beside the title — what the card starts on, said where it shows. */
+  last?: string;
+  /**
+   * The card's starting numbers, by field (panelFieldKey): the athlete's own last load for this
+   * lift, never a guess. The commit button names them ("Log 60 → 65 kg"), so one tap saves
+   * exactly what it says. Empty when there's no history.
+   */
+  start: Readonly<Record<string, number>>;
+  /** The likely answers, one tap each — the board's Rx, when there's no last time to start on. */
   quick: ChatChip[];
   groups: ChatPanelGroup[];
 }
@@ -703,7 +726,7 @@ export function panelAnswer(
       answers.push({ id: slotId, ...EMPTY_ANSWER, skipped: true });
       continue;
     }
-    const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER };
+    const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER, ...(group.answerUnit ? { unit: group.answerUnit } : {}) };
     for (const { field, value } of given) answer[field.field] = value;
     if (answer.weight == null && answer.weightEnd != null) answer.weight = answer.weightEnd;
     if (answer.weightEnd === answer.weight) answer.weightEnd = null;
@@ -729,23 +752,14 @@ function liftPanelQuestion(
   maxSet: ChatSlot | undefined,
   name: string,
   unit: string,
-  quick: ChatChip[],
+  likely: LikelyLoads,
 ): ChatQuestion {
   const groups: ChatPanelGroup[] = [];
-  if (weight) {
-    groups.push({
-      title: maxSet ? 'Working sets' : 'Weight',
-      joiner: '→',
-      prefix: '',
-      fields: [
-        { slotId: weight.id, field: 'weight', label: 'start', unit },
-        { slotId: weight.id, field: 'weightEnd', label: 'peak', unit, emptyMeans: 'weight' },
-      ],
-    });
-  }
+  if (weight) groups.push(weightGroup(weight, name, unit, maxSet ? 'Working sets' : 'Weight', true, likely));
   if (maxSet) {
     groups.push({
       title: 'Max set',
+      control: 'boxes',
       joiner: '@',
       prefix: 'max ',
       fields: [
@@ -759,34 +773,79 @@ function liftPanelQuestion(
     text: weight && maxSet ? `How did the ${name} go?`
       : weight ? `What did you lift on the ${name}?`
       : `And the max set on the ${name}?`,
-    // A weight for each set has no box of its own — it's typed, and the hint says how. "Same every
-    // set" needs no words: the empty peak shows the start in grey.
-    ...(weight ? { hint: `Each set different? Type them — e.g. ${unit === 'lb' ? '135, 145, 155' : '60, 65, 70'}` } : {}),
+    // A weight for each set has no pill of its own — it's typed, and the message box says how.
+    ...(weight ? { placeholder: `Or type each set: ${unit === 'lb' ? '135, 145, 155' : '60, 65, 70'}` } : {}),
     slotIds: ids,
-    chips: [skipChip(ids)],
-    panel: { title: name, quick: weight ? quick : [], groups },
+    // Skip is on the card itself.
+    chips: [],
+    panel: panelFor(name, groups, weight ? likely : NO_LIKELY),
+  };
+}
+
+/** What a weight card starts on and offers: last time (the card's starting numbers), else the Rx. */
+interface LikelyLoads {
+  last: LastLoad | undefined;
+  rx: ChatChip[];
+}
+const NO_LIKELY: LikelyLoads = { last: undefined, rx: [] };
+
+/**
+ * The weight pills for one load: start → peak for a lift done in sets, one weight otherwise —
+ * in last time's unit when nothing else has said one.
+ */
+function weightGroup(slot: ChatSlot, name: string, unit: string, title: string, inSets: boolean, likely: LikelyLoads): ChatPanelGroup {
+  const answerUnit = !slot.unit && likely.last ? likely.last.unit : undefined;
+  const shown = answerUnit ?? unit;
+  return {
+    title,
+    control: 'weight',
+    step: getWeightStep(name, slot.equipment, shown === 'lb' ? 'lb' : 'kg'),
+    ...(slot.rxWeights?.length ? { base: Math.min(...slot.rxWeights) } : {}),
+    ...(answerUnit ? { answerUnit } : {}),
+    joiner: '→',
+    prefix: '',
+    fields: inSets
+      ? [
+          { slotId: slot.id, field: 'weight', label: 'start', unit: shown },
+          { slotId: slot.id, field: 'weightEnd', label: 'peak', unit: shown },
+        ]
+      : [{ slotId: slot.id, field: 'weight', label: 'weight', unit: shown }],
+  };
+}
+
+/**
+ * The card: with history it starts on last time's load and says so beside the title; without,
+ * it starts empty and the board's Rx loads are one tap each.
+ */
+function panelFor(title: string, groups: ChatPanelGroup[], likely: LikelyLoads): ChatPanel {
+  const load = groups.find((g) => g.control === 'weight');
+  const last = likely.last;
+  if (!load || !last) return { title, start: {}, quick: likely.rx, groups };
+  const [startField, peakField] = load.fields;
+  const unit = startField.unit;
+  return {
+    title,
+    last: `Last · ${last.start}${last.peak ? ` → ${last.peak}` : ''} ${unit}`,
+    start: {
+      [panelFieldKey(startField)]: last.start,
+      ...(peakField ? { [panelFieldKey(peakField)]: last.peak ?? last.start } : {}),
+    },
+    quick: [],
+    groups,
   };
 }
 
 const NO_LAST_LOADS: ReadonlyMap<string, LastLoad> = new Map();
 
 /**
- * "Last time · 60 → 65 kg" — the weight they most likely lifted again, one tap. Their own logged
- * load for this lift, never a guess; offered, never filled in. Only in the unit being asked, or —
- * when nothing has said the unit yet — in the unit they logged it in, which the answer then carries.
+ * The weight they most likely lifted again: their own logged load for this lift, never a guess.
+ * Only in the unit being asked, or — when nothing has said the unit yet — in the unit they logged
+ * it in, which the answer then carries.
  */
-function lastTimeChip(slot: ChatSlot, lastLoads: ReadonlyMap<string, LastLoad>): ChatChip | undefined {
+function lastLoadFor(slot: ChatSlot, lastLoads: ReadonlyMap<string, LastLoad>): LastLoad | undefined {
   const name = slot.movementNames?.[0];
   const last = name ? lastLoads.get(lastLoadKey(name)) : undefined;
-  if (!last || (slot.unit && slot.unit !== last.unit)) return undefined;
-  const shown = slot.unit ?? last.unit;
-  return {
-    label: `Last time · ${last.start}${last.peak ? ` → ${last.peak}` : ''} ${shown}`,
-    answers: [{
-      id: slot.id, ...EMPTY_ANSWER, weight: last.start, weightEnd: last.peak ?? null,
-      ...(slot.unit ? {} : { unit: last.unit }),
-    }],
-  };
+  return !last || (slot.unit && slot.unit !== last.unit) ? undefined : last;
 }
 
 const skipChip = (ids: string[]): ChatChip => ({
@@ -861,12 +920,13 @@ export function nextQuestion(
       const unit = first.unit ?? 'kg';
       const name = stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject);
       const same = first.sameAs;
-      // The board's Rx loads and every real weight between them, one tap each.
-      const last = lastTimeChip(first, lastLoads);
-      const rxChips: ChatChip[] = (first.rxWeights ? weightChoices(first.rxWeights, unit, first.equipment) : [])
-        .filter((w) => !(last && last.answers?.[0]?.weight === w && last.answers[0].weightEnd == null))
-        .map((w) => ({ label: `${w} ${unit}`, answers: [{ id: first.id, ...EMPTY_ANSWER, weight: w }] }));
-      const likely = [...(last ? [last] : []), ...rxChips];
+      // Last time starts the card; without it, the board's Rx loads and every real weight between
+      // them are one tap each.
+      const likely: LikelyLoads = {
+        last: lastLoadFor(first, lastLoads),
+        rx: (first.rxWeights ? weightChoices(first.rxWeights, unit, first.equipment) : [])
+          .map((w) => ({ label: `${w} ${unit}`, answers: [{ id: first.id, ...EMPTY_ANSWER, weight: w }] })),
+      };
       // A lift logged in sets is answered in boxes — start, peak, and the max set if there is one.
       const strength = result?.kind === 'load' && result.setsTotal > 1;
       const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && s.exerciseIndex === first.exerciseIndex);
@@ -875,7 +935,8 @@ export function nextQuestion(
         : {
             text: `What weight did you use for ${name}?`,
             slotIds: [first.id],
-            chips: [...likely, skipChip([first.id])],
+            chips: [],
+            panel: panelFor(name, [weightGroup(first, name, unit, 'Weight', false, likely)], likely),
           };
       if (!same) return ask;
       const load = describeLoad(same, unit);
@@ -978,7 +1039,7 @@ export function nextQuestion(
       };
     }
     case 'maxset':
-      return liftPanelQuestion(undefined, first, stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject), first.unit ?? 'kg', []);
+      return liftPanelQuestion(undefined, first, stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject), first.unit ?? 'kg', NO_LIKELY);
     case 'unit': {
       const unitChip = (unit: LoadUnit): ChatChip => ({ label: unit, answers: [{ id: first.id, ...EMPTY_ANSWER, unit }] });
       return {
@@ -989,6 +1050,34 @@ export function nextQuestion(
       };
     }
     case 'sets':
+      return null;
+  }
+}
+
+/**
+ * What the app read, said back in Wodi's reply ("Got it — 2:13."), so a typo is visible on the
+ * spot: a bare "Got it." let "213" for 21:30 go by unseen (HAUL, 2026-10-12). Null for an
+ * answer with nothing to repeat.
+ */
+export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | null {
+  switch (slot.kind) {
+    case 'time':
+    case 'duration':
+      return answer.seconds ? formatClock(answer.seconds) : null;
+    case 'rounds':
+      if (slot.id.endsWith('.extra')) return answer.extraReps ? `+${answer.extraReps} reps` : null;
+      if (!answer.count) return null;
+      return `${answer.count} round${answer.count === 1 ? '' : 's'}${answer.extraReps ? ` + ${answer.extraReps} reps` : ''}`;
+    case 'reps':
+      return answer.count ? `${answer.count} reps` : null;
+    case 'distance':
+      return answer.count ? `${answer.count} m` : null;
+    case 'weight': {
+      if (answer.weight == null) return null;
+      const unit = answer.unit ?? slot.unit ?? '';
+      return describeLoad({ movement: '', weight: answer.weight, weightEnd: answer.weightEnd, weights: answer.weights }, unit).trim();
+    }
+    default:
       return null;
   }
 }

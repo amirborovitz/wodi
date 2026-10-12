@@ -165,6 +165,9 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  /* Room the "New version" pill takes at the top while it shows (set by UpdatePill), so a
+     header can sit below it instead of under it. 0 the rest of the time. */
+  --update-space: 0px;
 
   /* Ring Colors - Trinity System */
   --color-ring-sessions: #00FFFF;   /* Cyan - inner ring */

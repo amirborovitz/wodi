@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { LoadUnit } from '../../../utils/loadUnits';
 import { perImplementUnit } from './implementQuestion';
+import { suggestPeak } from '../../../utils/peakSuggestion';
 import styles from './ProgressiveWeightRow.module.css';
 
 function selectAllInput(target: HTMLInputElement | null) {
@@ -20,11 +21,6 @@ export function workLabel(setsTotal: number, repsPerSet: number | undefined): st
   return setsTotal > 0 ? `${setsTotal} sets` : undefined;
 }
 
-/** Round down to nearest multiple of 5 */
-function suggestPeak(start: number | undefined): number | undefined {
-  if (!start || start <= 0) return undefined;
-  return Math.floor(start * 1.3 / 5) * 5;
-}
 
 // ─── Icons ───────────────────────────────────────────────────────
 

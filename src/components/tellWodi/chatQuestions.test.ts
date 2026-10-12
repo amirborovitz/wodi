@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, chatCannotLog, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, chatCannotLog, describeAnswer, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
@@ -70,7 +70,7 @@ describe('Tell Wodi — what the chat asks', () => {
     const snatch = nextQuestion(afterTime, results)!;
     expect(snatch.text).toBe('What weight did you use for Alt Dumbbell Snatch?');
     expect(snatch.slotIds).toEqual(['0.weight.alt dumbbell snatch']);
-    expect(snatch.chips.map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg', 'Skip']);
+    expect([...(snatch.panel?.quick ?? []), ...snatch.chips].map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg']);
 
     // The step-ups are asked, not assumed: the snatch's load is one tap, any other is typed.
     const snatchSlot = afterTime.find((s) => s.id === '0.weight.alt dumbbell snatch')!;
@@ -83,7 +83,7 @@ describe('Tell Wodi — what the chat asks', () => {
     // "Different" answers nothing — it asks the step-ups' own weight, with the board's dumbbells.
     expect(stepUp.chips[1].answers).toEqual([]);
     expect(stepUp.chips[1].then?.text).toBe('What weight did you use for Weighted Alt Box Step-up?');
-    expect(stepUp.chips[1].then?.chips.map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg', 'Skip']);
+    expect([...(stepUp.chips[1].then?.panel?.quick ?? []), ...(stepUp.chips[1].then?.chips ?? [])].map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg']);
     expect(stepUp.chips[0].answers?.[0]).toMatchObject({ id: '0.weight.weighted alt box step-up', weight: 17.5 });
 
     const afterWeights = openSlots(results, new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']));
@@ -297,7 +297,7 @@ describe('Tell Wodi — THRUST (AMRAP intervals)', () => {
   it('offers every dumbbell between the two Rx weights', () => {
     const slots = openSlots(results(), new Set(['0.rounds']));
     const question = nextQuestion(slots, results())!;
-    expect(question.chips.map((c) => c.label)).toEqual(['12.5 kg', '15 kg', '17.5 kg', '20 kg', 'Skip']);
+    expect([...(question.panel?.quick ?? []), ...question.chips].map((c) => c.label)).toEqual(['12.5 kg', '15 kg', '17.5 kg', '20 kg']);
   });
 });
 
@@ -528,31 +528,42 @@ describe('Tell Wodi — the order it asks in', () => {
   } as unknown as Workout]);
   const fresh = () => initStoryResults(workout, ['strength', 'amrap_intervals'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
 
-  it('the bench card names the lift and offers last time as one tap', () => {
+  it('the bench card starts on last time, says so beside the name, and one tap logs exactly that', () => {
     const rs = fresh();
     const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
     expect(q.panel?.title).toBe('Bench Press');
-    expect(q.panel?.quick.map((c) => c.label)).toEqual(['Last time · 60 → 65 kg']);
-    // One tap is the whole answer: 60 → 65, no keyboard.
+    expect(q.panel?.last).toBe('Last · 60 → 65 kg');
+    expect(q.panel?.start).toEqual({ '0.weight:weight': 60, '0.weight:weightEnd': 65 });
+    // With last time to start on, the Rx isn't offered too — the card is the one likely answer.
+    expect(q.panel?.quick).toEqual([]);
+    // "Log 60 → 65 kg": the card's starting numbers, sent as they are.
+    const filled = panelAnswer(q.panel!, q.panel!.start);
+    expect(filled.label).toBe('60 → 65 kg');
     const slot = openSlots(rs, new Set()).find((s) => s.id === q.slotIds[0])!;
-    const done = applyAnswer(rs, slot, q.panel!.quick[0].answers![0]).results;
+    const done = applyAnswer(rs, slot, filled.answers[0]).results;
     expect(done[0].weight).toBe(60);
     expect(done[0].weightEnd).toBe(65);
   });
 
-  it('the empty peak stands for the start, so it can show it', () => {
+  it('the bench is −/+ pills, start and peak, in plate steps; Skip is on the card', () => {
     const rs = fresh();
     const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
-    expect(q.panel?.groups[0].fields.map((f) => f.emptyMeans)).toEqual([undefined, 'weight']);
+    expect(q.panel?.groups[0]).toMatchObject({ control: 'weight', step: 2.5 });
+    expect(q.panel?.groups[0].fields.map((f) => f.field)).toEqual(['weight', 'weightEnd']);
+    expect(q.chips).toEqual([]);
+    // Each set different is typed — the message box says how, not another line in the bubble.
+    expect(q.placeholder).toBe('Or type each set: 60, 65, 70');
   });
 
-  it('the cleans lead with last time, then the Rx', () => {
+  it('the cleans get one weight, starting on last time', () => {
     const rs = fresh();
     const slots = openSlots(rs, new Set(['0.weight', '1.rounds']));
     const q = nextQuestion(slots, rs, lastLoads)!;
     expect(q.text).toBe('What weight did you use for Power Clean?');
-    expect(q.chips[0].label).toBe('Last time · 50 kg');
-    expect(q.chips.at(-1)?.label).toBe('Skip');
+    expect(q.panel?.groups.map((g) => [g.control, g.fields.map((f) => f.field)])).toEqual([['weight', ['weight']]]);
+    expect(q.panel?.last).toBe('Last · 50 kg');
+    expect(q.panel?.start).toEqual({ '1.weight.power clean:weight': 50 });
+    expect(q.chips).toEqual([]);
   });
 
   it('with no history, nothing is invented — the boxes and the Rx only', () => {
@@ -578,6 +589,28 @@ describe('answers the app reads itself', () => {
   });
   it('only a time question is read this way', () => {
     expect(readAnswerLocally({ ...timeSlot, id: '1.rounds', kind: 'rounds' }, '2130')).toBeNull();
+  });
+});
+
+// HAUL, 2026-10-12: "213" typed for 21:30 was read as 2:13 and answered with a bare "Got it." —
+// the typo went by unseen. Wodi now says back what it read, so a wrong number shows on the spot.
+describe('what Wodi says back after reading an answer', () => {
+  const slot = (kind: string, extra: Record<string, unknown> = {}) =>
+    ({ id: `0.${kind}`, kind, exerciseIndex: 0, subject: 'x', asked: true, ...extra }) as unknown as Parameters<typeof describeAnswer>[0];
+  const heard = (kind: string, text: string, extra: Record<string, unknown> = {}) =>
+    describeAnswer(slot(kind, extra), readAnswerLocally(slot(kind, extra), text)!);
+
+  it('the typo shows: "213" reads back as 2:13, "2130" as 21:30', () => {
+    expect(heard('time', '213')).toBe('2:13');
+    expect(heard('time', '2130')).toBe('21:30');
+  });
+
+  it('counts, distances and loads read back the way they were given', () => {
+    expect(heard('rounds', '19+5')).toBe('19 rounds + 5 reps');
+    expect(heard('reps', '120')).toBe('120 reps');
+    expect(heard('distance', '5000')).toBe('5000 m');
+    expect(heard('weight', '45 to 50', { unit: 'kg' })).toBe('45 to 50 kg');
+    expect(heard('weight', '60, 65, 70 kg')).toBe('60, 65, 70 kg');
   });
 });
 

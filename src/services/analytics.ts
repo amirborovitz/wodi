@@ -37,8 +37,20 @@ interface AnalyticsEvents {
   /** The AI could not read it. */
   board_read_failed: { source: 'photo' | 'text'; entry: 'form' | 'chat' };
 
-  /** A new workout was saved. */
-  workout_logged: { format: WorkoutFormat | 'unknown'; parts: number; partner: 'yes' | 'no' };
+  /**
+   * A new workout was saved. `logged_on`: in the Wodi chat start to finish, on the standard
+   * logging screen, or begun in the chat and finished on the standard screen.
+   */
+  workout_logged: {
+    format: WorkoutFormat | 'unknown'; parts: number; partner: 'yes' | 'no';
+    logged_on: 'chat' | 'standard' | 'chat_then_standard';
+  };
+  /**
+   * Left the Wodi chat for the standard logging screen. `how`: typed it ("use the standard
+   * screen"), the "+" menu, the "Log on standard screen" chip, or Wodi handing over a part the
+   * chat can't log. `board`: whether a workout was already read (its answers go along).
+   */
+  standard_screen_from_chat: { how: 'typed' | 'plus_menu' | 'chip' | 'wodi_handoff'; board: 'yes' | 'no' };
   /** A saved workout was fixed and re-saved. */
   workout_edited: { format: WorkoutFormat | 'unknown'; parts: number };
   /** A workout was deleted. */

@@ -22,7 +22,8 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: calc(env(safe-area-inset-top, 0px) + var(--sp-3)) var(--sp-4) var(--sp-3);
+  /* Below the "New version" pill while it shows (--update-space), never under it. */
+  padding: calc(env(safe-area-inset-top, 0px) + var(--update-space) + var(--sp-3)) var(--sp-4) var(--sp-3);
   border-bottom: 1px solid var(--wodi-line);
 }
 
@@ -197,6 +198,24 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.72);
 }
+
+/* Under one of my answers: ask that question again. Quiet — it's a fix, not a next step. */
+.change {
+  margin-top: -4px;
+  min-height: 32px;
+  padding: 0 4px;
+  background: none;
+  border: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.56);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.change:disabled { opacity: 0.5; }
 
 .chip:disabled,
 .chipPrimary:disabled,

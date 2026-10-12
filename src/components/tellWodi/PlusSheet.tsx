@@ -61,8 +61,8 @@ export function PlusSheet({ open, onClose, onUseForm, onLibraryPhoto, onSaveForL
                   </svg>
                 </span>
                 <span className={styles.words}>
-                  <span className={styles.title}>Fill in the form</span>
-                  <span className={styles.sub}>Type it in yourself</span>
+                  <span className={styles.title}>Log on standard screen</span>
+                  <span className={styles.sub}>Fill it in yourself — anything you told me comes along</span>
                 </span>
               </button>
               <button type="button" className={styles.option} onClick={() => libraryRef.current?.click()}>
