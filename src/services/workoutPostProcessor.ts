@@ -322,8 +322,7 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
   const partnerResult = detectAndAdjustPartnerWorkout(workout);
   recordPass(passes, 'detectAndAdjustPartnerWorkout',
     (partnerResult.partnerWorkout != null && partnerResult.partnerWorkout !== workout.partnerWorkout)
-    || (partnerResult.teamSize != null && partnerResult.teamSize !== workout.teamSize)
-    || partnerResult.adjustedSets != null);
+    || (partnerResult.teamSize != null && partnerResult.teamSize !== workout.teamSize));
 
   // Extract time cap if missing
   const timeCap = workout.timeCap || partnerResult.timeCap || extractTimeCap(workout);
@@ -359,13 +358,11 @@ export function postProcessParsedWorkout(workout: ParsedWorkout): ParsedWorkout 
       ? true
       : (workout.partnerWorkout ?? partnerResult.partnerWorkout ?? undefined),
     teamSize: workout.teamSize || partnerResult.teamSize || undefined,
-    sets: partnerResult.adjustedSets ?? workout.sets,
-    exercises: processedExercises.map(ex => ({
-      ...ex,
-      suggestedSets: (ex.type === 'wod' && partnerResult.adjustedSets)
-        ? partnerResult.adjustedSets
-        : ex.suggestedSets,
-    })),
+    // The round counts are the AI's: the team's (suggestedSets) and each athlete's own
+    // (personalRounds) — partnerScope.ts divides between them. A "(N each)" regex here used to
+    // overwrite the team's count with N, so "30 RFT (6 each)" became 6 of 6 and the athlete was
+    // credited the team's 300 cal (RELAY, 2026-10-15).
+    exercises: processedExercises,
   };
 
   // Detect ladder rep patterns (e.g., "4-6-8-10-12") on amrap exercises
@@ -2481,11 +2478,10 @@ export function applyTitlePartnerOverride(workout: ParsedWorkout): ParsedWorkout
 }
 
 /**
- * Detect partner workout patterns in raw text and adjust rounds
+ * Detect partner workout patterns in raw text when the AI left the flag unset, and its team size.
  */
 function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
   partnerWorkout: boolean;
-  adjustedSets?: number;
   timeCap?: number;
   teamSize?: number;
 } {
@@ -2524,18 +2520,10 @@ function detectAndAdjustPartnerWorkout(workout: ParsedWorkout): {
     teamSize = 2;
   }
 
-  // Extract "(N each)" pattern to get per-person round count
-  const eachMatch = lower.match(/\((\d+)\s*each\)/);
-  let adjustedSets: number | undefined;
-  if (eachMatch) {
-    adjustedSets = parseInt(eachMatch[1], 10);
-  }
-
-  console.warn('🔧 [detectPartnerWorkout] Detected partner workout:', { adjustedSets, teamSize });
+  console.warn('🔧 [detectPartnerWorkout] Detected partner workout:', { teamSize });
 
   return {
     partnerWorkout: true,
-    adjustedSets,
     teamSize,
   };
 }

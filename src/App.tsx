@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { doc, deleteDoc } from 'firebase/firestore';
-import { db } from './services/firebase';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginScreen } from './screens/LoginScreen';
 import { HomeScreen } from './screens/HomeScreen';
@@ -37,10 +35,11 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
-  const [pendingChatText, setPendingChatText] = useState<string | null>(null);
   // Add Workout opens on the Tell Wodi chat rather than the capture step.
   const [startInChat, setStartInChat] = useState(false);
   const [pendingPlannedWorkout, setPendingPlannedWorkout] = useState<PlannedWorkout | null>(null);
+  // Where that board was opened from — Back from its chat returns there.
+  const [plannedFromToday, setPlannedFromToday] = useState(false);
   // A fresh chat each time a board is left for later — the board it was on now waits in the thread.
   const [chatSession, setChatSession] = useState(0);
   const [showRecentWorkoutsOnOpen, setShowRecentWorkoutsOnOpen] = useState(false);
@@ -97,26 +96,25 @@ function AppContent() {
   const openForm = (): void => {
     setEditingWorkout(null);
     setPendingImage(null);
-    setPendingChatText(null);
     setPendingPlannedWorkout(null);
     setShowRecentWorkoutsOnOpen(false);
     setStartInChat(false);
     setCurrentScreen('add-workout');
   };
 
-  /** The Wodi thread — with a board photo already sent, and words with it, when given. */
-  const openWodi = (photo: File | null = null, words: string | null = null): void => {
+  /** The Wodi thread — with a board photo already sent, when given. */
+  const openWodi = (photo: File | null = null): void => {
     setEditingWorkout(null);
     setPendingImage(photo);
-    setPendingChatText(words);
     setPendingPlannedWorkout(null);
     setShowRecentWorkoutsOnOpen(false);
     setStartInChat(true);
     setCurrentScreen('add-workout');
   };
 
-  const handleLogPlannedWorkout = (planned: PlannedWorkout) => {
+  const handleLogPlannedWorkout = (planned: PlannedWorkout, fromToday: boolean) => {
     setPendingPlannedWorkout(planned);
+    setPlannedFromToday(fromToday);
     setPendingImage(null);
     setShowRecentWorkoutsOnOpen(false);
     setStartInChat(false);
@@ -199,7 +197,7 @@ function AppContent() {
               setWorkoutDetailOrigin('home');
               setPosterOverChat(true);
             }}
-            onOpenPlanned={handleLogPlannedWorkout}
+            onOpenPlanned={(planned) => handleLogPlannedWorkout(planned, false)}
             onLeaveBoard={() => {
               setChatSession((n) => n + 1);
               openWodi();
@@ -212,14 +210,8 @@ function AppContent() {
               setPendingPlannedWorkout(null);
               setCurrentScreen(editingWorkout ? 'workout-detail' : 'home');
             }}
-            onWorkoutCreated={async () => {
-              if (pendingPlannedWorkout?.id) {
-                try {
-                  await deleteDoc(doc(db, 'savedWods', pendingPlannedWorkout.id));
-                } catch (err) {
-                  console.error('[SavedWod] Failed to remove logged saved WOD:', err);
-                }
-              }
+            // A saved board that was just logged is cleared by the save itself (clearWaitingBoard).
+            onWorkoutCreated={() => {
               setPendingImage(null);
               setShowRecentWorkoutsOnOpen(false);
               setStartInChat(false);
@@ -238,10 +230,10 @@ function AppContent() {
             }}
             onWorkoutUpdated={handleWorkoutUpdated}
             initialImage={pendingImage}
-            initialMessage={pendingChatText}
             showRecentOnOpen={showRecentWorkoutsOnOpen}
             editWorkout={editingWorkout}
             plannedWorkout={pendingPlannedWorkout}
+            plannedFromToday={plannedFromToday}
             startInChat={startInChat}
           />
           {posterOverChat && selectedWorkout && (
@@ -334,7 +326,6 @@ function AppContent() {
         return (
           <HomeScreen
             onAddWorkout={openForm}
-            onTellWodi={() => openWodi()}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {
               setNavDir(null);
@@ -343,7 +334,7 @@ function AppContent() {
               setWorkoutDetailOrigin('home');
               setCurrentScreen('workout-detail');
             }}
-            onLogPlannedWorkout={handleLogPlannedWorkout}
+            onLogPlannedWorkout={(planned) => handleLogPlannedWorkout(planned, true)}
             onOpenRecap={handleOpenRecap}
             onOpenFeed={() => setCurrentScreen('feed')}
             onOpenGallery={() => setCurrentScreen('history')}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { stepOnGrid } from '../../utils/stepGrid';
 import styles from './ChatPanelCard.module.css';
 
 interface WeightPillProps {
@@ -11,9 +12,6 @@ interface WeightPillProps {
   /** Read by a screen reader: "Start weight", "Peak weight", "Weight". */
   label: string;
 }
-
-/** "62.5", not "62.50"; a step never leaves 62.49999. */
-const tidy = (value: number): number => Math.round(value * 100) / 100;
 
 function readNumber(text: string): number | undefined {
   const value = Number(text.trim().replace(',', '.'));
@@ -34,12 +32,13 @@ export function WeightPill({ value, onChange, step, base, unit, label }: WeightP
     onChange(readNumber(draft));
     setDraft(null);
   };
+  const shown = draft ?? (value != null ? String(value) : '');
   const stepBy = (direction: 1 | -1): void => {
     if (value == null) {
       if (direction > 0) onChange(base && base > 0 ? base : step);
       return;
     }
-    const next = tidy(value + direction * step);
+    const next = stepOnGrid(value, direction, step);
     onChange(next > 0 ? next : undefined);
   };
   return (
@@ -54,7 +53,9 @@ export function WeightPill({ value, onChange, step, base, unit, label }: WeightP
           inputMode="decimal"
           enterKeyHint="done"
           autoComplete="off"
-          value={draft ?? (value != null ? String(value) : '')}
+          value={shown}
+          // "22.5", "102.5": four characters and up step down a size, or the last digit is cut.
+          data-long={shown.length >= 4 || undefined}
           placeholder="—"
           onFocus={(e) => { setDraft(value != null ? String(value) : ''); e.currentTarget.select(); }}
           onChange={(e) => setDraft(e.target.value)}

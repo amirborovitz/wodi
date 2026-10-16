@@ -10,7 +10,8 @@ import { setLoadUnit } from '../logging/story/athleteLoadUnit';
 import { habitKey, type SwapHabit, type SwapUnit } from '../../services/wodiAgent/athleteHabits';
 import { personalIntervalCount } from '../logging/story/intervalRounds';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
-import type { MovementEquipment } from '../../types';
+import type { MovementEquipment, ParsedWorkout, ParseUncertainty } from '../../types';
+import { askableUncertainty } from '../../services/parseUncertainty';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 
 const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
@@ -40,7 +41,8 @@ export type ChatSlotKind =
   | 'unit'      // kg or lb — asked only when a weight was given and nothing says which
   | 'sets'      // how many sets/intervals were done — OPTIONAL, filled only when mentioned
   | 'swap'      // did something else instead ("switched the run to echo bike") — OPTIONAL
-  | 'amount';   // how much of a swap they did, when nothing converts the board's number to it
+  | 'amount'    // how much of a swap they did, when nothing converts the board's number to it
+  | 'clarify';  // something the board reader couldn't settle — its own question (ParseUncertainty)
 
 export interface ChatSlot {
   id: string;
@@ -85,6 +87,8 @@ export interface ChatSlot {
    * — so the usual swap AND its usual amount are one tap. Offered, never filled in.
    */
   usualAmount?: { value: number; unit: SwapUnit };
+  /** A 'clarify' slot's flag: the question, how it's answered, and the field the answer goes in. */
+  uncertainty?: ParseUncertainty;
 }
 
 /** The load an earlier movement in the part was given — what "same weight" means. */
@@ -407,6 +411,23 @@ export function openSlots(
 }
 
 /** True when nothing the chat asks out loud is still open. */
+/**
+ * What the board reader couldn't settle, as questions — asked before anything else, because the
+ * answer can change what the rest of the questions are (a clock length, who did which part). The
+ * reader decides WHAT is unclear on any board in any language; this only turns each into a slot.
+ */
+export function clarifySlots(workout: ParsedWorkout | null | undefined): ChatSlot[] {
+  return askableUncertainty(workout).map((flag) => ({
+    id: `clarify.${flag.field}`,
+    kind: 'clarify',
+    exerciseIndex: Number(/^exercises\[(\d+)\]/.exec(flag.field)?.[1] ?? 0),
+    subject: flag.question ?? '',
+    ...(flag.answer === 'choice' && flag.options?.length ? { options: flag.options.map((o) => o.label) } : {}),
+    asked: true,
+    uncertainty: flag,
+  }));
+}
+
 export function isComplete(slots: ChatSlot[]): boolean {
   return !slots.some((s) => s.asked);
 }
@@ -506,6 +527,9 @@ export function applyAnswer(
   answer: SlotAnswer,
 ): { results: StoryExerciseResult[]; closed: boolean } {
   if (answer.skipped) return { results, closed: true };
+  // An answer about the board changes the board, not the results — the chat writes it there
+  // (answerUncertainty) and rebuilds the results from it.
+  if (slot.kind === 'clarify') return { results, closed: false };
   const i = slot.exerciseIndex;
 
   switch (slot.kind) {
@@ -895,6 +919,19 @@ export function nextQuestion(
   const onPart = results.length > 1 ? ` on ${first.subject}` : '';
 
   switch (first.kind) {
+    case 'clarify': {
+      const notSure: ChatChip = { label: 'Not sure', answers: [{ id: first.id, ...EMPTY_ANSWER, skipped: true }] };
+      const how = first.uncertainty?.answer;
+      return {
+        text: first.subject,
+        slotIds: [first.id],
+        ...(how === 'duration' ? { placeholder: 'How long — e.g. 20 min' } : how === 'number' ? { placeholder: 'Type a number' } : {}),
+        chips: [
+          ...(first.options ?? []).map((label) => ({ label, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: label }] })),
+          notSure,
+        ],
+      };
+    }
     case 'time': {
       const cap = first.cap;
       return {
@@ -1077,9 +1114,22 @@ export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | nul
       const unit = answer.unit ?? slot.unit ?? '';
       return describeLoad({ movement: '', weight: answer.weight, weightEnd: answer.weightEnd, weights: answer.weights }, unit).trim();
     }
+    case 'clarify':
+      switch (slot.uncertainty?.answer) {
+        case 'duration': return answer.seconds ? describeDuration(answer.seconds) : null;
+        case 'number': return answer.count != null ? String(answer.count) : null;
+        case 'choice': return answer.choice ? answer.choice.toLowerCase() : null;
+        default: return null;
+      }
     default:
       return null;
   }
+}
+
+/** "20 min", "90 sec", "1:30" — a length of time the way it was said. */
+function describeDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds} sec`;
+  return seconds % 60 === 0 ? `${seconds / 60} min` : formatClock(seconds);
 }
 
 const NUM = '(\\d+(?:[.,]\\d+)?)';
@@ -1119,6 +1169,8 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
       m = t.match(/^(\d{1,2}):(\d{2})$/);
       return m && Number(m[2]) < 60 ? answer({ seconds: Number(m[1]) * 60 + Number(m[2]) }) : null;
     }
+    case 'clarify':
+      return readClarifyLocally(slot, t, answer);
     case 'weight': {
       m = t.match(new RegExp(`^${NUM} ?${UNIT}?$`));
       if (m) return answer({ weight: toNum(m[1]), unit: toUnit(m[2]) });
@@ -1130,6 +1182,37 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
         return answer({ weights, weight: weights[0], weightEnd: weights[weights.length - 1], unit: toUnit(t.match(new RegExp(`${UNIT}$`))?.[1]) });
       }
       return null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * A plain answer to a board question, read by the app. How long a clock ran is said in MINUTES
+ * ("20", "20 min", "20:00"); seconds only when said ("90 sec"). A tapped option or its exact words
+ * pick it. Anything else is a sentence, and goes to the reader.
+ */
+function readClarifyLocally(
+  slot: ChatSlot,
+  t: string,
+  answer: (fields: Partial<SlotAnswer>) => SlotAnswer,
+): SlotAnswer | null {
+  let m: RegExpMatchArray | null;
+  switch (slot.uncertainty?.answer) {
+    case 'duration':
+      m = t.match(/^(\d{1,3})(?: ?(?:m|min|mins|minutes?))?$/);
+      if (m) return answer({ seconds: Number(m[1]) * 60 });
+      m = t.match(/^(\d{1,4}) ?(?:s|sec|secs|seconds?)$/);
+      if (m) return answer({ seconds: Number(m[1]) });
+      m = t.match(/^(\d{1,3}):(\d{2})$/);
+      return m && Number(m[2]) < 60 ? answer({ seconds: Number(m[1]) * 60 + Number(m[2]) }) : null;
+    case 'number':
+      m = t.match(/^(\d+(?:[.,]\d+)?)$/);
+      return m ? answer({ count: toNum(m[1]) }) : null;
+    case 'choice': {
+      const picked = slot.options?.find((o) => o.toLowerCase() === t);
+      return picked ? answer({ choice: picked }) : null;
     }
     default:
       return null;

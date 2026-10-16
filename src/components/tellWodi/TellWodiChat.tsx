@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWodiChat';
 import { useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
-import { PlusSheet } from './PlusSheet';
 import { ChatPanelCard } from './ChatPanelCard';
+import { ChatPoster } from './ChatPoster';
 import { WodiText } from './WodiText';
 import type { WodiThread } from './useWodiThread';
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
@@ -27,9 +27,17 @@ interface TellWodiChatProps {
 export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanned }: TellWodiChatProps) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
-  const [plusOpen, setPlusOpen] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const { messages, busy, send, tapChip, openForms, changeAnswer, finished, placeholder } = chat;
+  const libraryInputRef = useRef<HTMLInputElement>(null);
+  // A picked or shot board is attached, not sent — words can go with it.
+  const attachPicked = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file) setPhoto(file);
+    e.target.value = '';
+  };
+  const { messages, busy, send, tapChip, changeAnswer, finished, placeholder, hasBoard } = chat;
+  // The board you still owe, one tap away however far the thread scrolls — not while this chat is on a board.
+  const pinned = hasBoard ? null : thread.pinned;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
   // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
   // Everything then lands in one step — no opener swapped out, no history pushing it down.
@@ -54,6 +62,10 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
     return headline?.link && workout ? { text: headline.link.label, onOpen: () => onOpenWorkout(workout) } : undefined;
   };
 
+  /** A cheer for a workout just logged carries that poster, big, with Share. */
+  const cheeredWorkout = (headline: ChatMessage['headline']): WorkoutWithStats | undefined =>
+    (headline?.posterId ? thread.workoutById(headline.posterId) : undefined);
+
   const typingLabel = busy === 'reading-board' ? 'Reading the board…' : busy === 'thinking' ? null : undefined;
 
   return (
@@ -69,7 +81,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
 
       <div className={styles.thread} ref={threadRef} onScroll={onThreadScroll}>
         <div className={styles.threadContent} ref={contentRef}>
-        {thread.ready && <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} onOpenPlanned={onOpenPlanned} />}
+        {thread.ready && <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} />}
         <AnimatePresence initial={false}>
           {messages.map((message) => (
             <motion.div
@@ -134,6 +146,10 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                 </button>
               )}
               <Receipts ids={message.receipts} thread={thread} onOpenWorkout={onOpenWorkout} />
+              {(() => {
+                const cheered = cheeredWorkout(message.headline);
+                return cheered ? <ChatPoster workout={cheered} onOpen={() => onOpenWorkout(cheered)} /> : null;
+              })()}
               {message.panel && !message.answered && (
                 <ChatPanelCard
                   panel={message.panel}
@@ -181,6 +197,17 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
       </div>
 
       <footer className={styles.composer}>
+        {pinned && (
+          <button type="button" className={styles.pinned} onClick={() => onOpenPlanned(pinned.board)}>
+            {/* The unfinished poster in miniature — the same one that leads Today's rail. */}
+            <span className={styles.pinnedThumb} aria-hidden="true"><span className={styles.pinnedThumbBlank} /></span>
+            <span className={styles.pinnedText}>
+              <span className={styles.pinnedTitle}>{pinned.title}</span>
+              <span className={styles.pinnedMeta}>{pinned.saved}</span>
+            </span>
+            <span className={styles.pinnedAction}>{pinned.add}</span>
+          </button>
+        )}
         {photo && (
           <div className={styles.attachment}>
             <span className={styles.attachmentName}>Board photo attached</span>
@@ -191,8 +218,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
           <button
             type="button"
             className={styles.iconButton}
-            onClick={() => setPlusOpen(true)}
-            aria-label="More ways to log"
+            onClick={() => libraryInputRef.current?.click()}
+            aria-label="Send Wodi a board from your photos"
             disabled={busy === 'saving'}
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -205,12 +232,9 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
             accept="image/*"
             capture="environment"
             className={styles.hiddenInput}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) setPhoto(file);
-              e.target.value = '';
-            }}
+            onChange={attachPicked}
           />
+          <input ref={libraryInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={attachPicked} />
           <textarea
             className={styles.input}
             rows={1}
@@ -245,13 +269,6 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
               </svg>
             </motion.button>
           )}
-          <PlusSheet
-            open={plusOpen}
-            onClose={() => setPlusOpen(false)}
-            onUseForm={openForms}
-            onLibraryPhoto={setPhoto}
-            onSaveForLater={(file) => { send('Saving this board for later', file); pinToEnd(); }}
-          />
         </div>
       </footer>
     </div>

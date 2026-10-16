@@ -341,3 +341,89 @@
 .primaryAction:disabled {
   opacity: 0.5;
 }
+
+/* The board still to log, pinned on top of the composer: one tap back to finishing its poster,
+   however far the thread scrolls. Dashed is the app's "waiting" mark; yellow stays the camera's
+   alone, so two yellow buttons never stack. */
+.pinned {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  margin-bottom: var(--sp-2);
+  padding: 8px;
+  border: 1px dashed rgba(242, 240, 235, 0.24);
+  border-radius: var(--r-md);
+  background: var(--wodi-card);
+  color: var(--wodi-white);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.12s ease;
+}
+
+.pinned:active {
+  transform: scale(0.98);
+}
+
+.pinnedText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pinnedTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinnedMeta {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(242, 240, 235, 0.6);
+}
+
+.pinnedAction {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: var(--wodi-white);
+  color: #0c0d0f;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* The unfinished poster in miniature: ink card, a line of title, the dashed blank result. */
+.pinnedThumb {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 28px;
+  height: 38px;
+  padding: 4px;
+  border: 1px solid rgba(242, 240, 235, 0.18);
+  border-radius: 4px;
+  background: #0b0c0e linear-gradient(rgba(242, 240, 235, 0.55), rgba(242, 240, 235, 0.55)) 4px 5px / 14px 2px no-repeat;
+}
+
+.pinnedThumbBlank {
+  height: 12px;
+  border: 1px dashed rgba(245, 194, 0, 0.6);
+  border-radius: 2px;
+}

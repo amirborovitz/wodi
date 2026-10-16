@@ -106,7 +106,10 @@ const movement = obj({
   stationLabel: nullable(str),
   stationIndex: nullable({ type: 'integer' }),
 
-  together: nullable(bool),
+  // On a partner or team part, how THIS movement's amount is shared — answered for every movement,
+  // so "nothing written" never has to mean "split": "split" the athletes divide it, "each" every
+  // athlete does the full amount, "together" done at the same time. null only off a partner part.
+  share: nullable({ type: 'string', enum: ['split', 'each', 'together'] }),
   sharedLabel: nullable(str),
   relay: nullable(bool),
 
@@ -167,6 +170,9 @@ const exercise = obj({
   // Each athlete's OWN round count when the board states it ("6 rounds each athlete", "(8 each)");
   // suggestedSets stays the team's. The partner factor reads the two together (partnerScope.ts).
   personalRounds: nullable({ type: 'integer' }),
+  // How much of the clock each athlete is actually working on a partner part (0–1) — the app's
+  // effort minutes count the rest as partly worked. null off a partner part.
+  activeShare: nullable(num),
   // The name this part is known by — see WOD NAME in the parse prompt. null when it has none.
   wodName: nullable(str),
 
@@ -177,18 +183,19 @@ const exercise = obj({
 });
 
 /**
- * One thing on the board the model could not read with confidence.
- *
- * Until this existed, "the board doesn't say" and "I can't make it out" were the same answer —
- * both an absent field — and the post-processor filled the blank either way. So an illegible 15
- * became a confident 10, stored as the coach's own number and never questioned again.
+ * One thing on the board the model could not settle — see ParseUncertainty.
  *
  * `field` is a dotted path into THIS response (`exercises[0].movements[2].reps`), which is what
- * lets the app act on it: a flagged blank is one the app refuses to fill in.
+ * lets the app act on it: a flagged blank is one the app refuses to fill in, and the athlete's
+ * answer to `question` is written straight into it.
  */
 const uncertainty = obj({
   field: str,
   reason: str,
+  kind: { type: 'string', enum: ['unreadable', 'missing', 'ambiguous'] },
+  question: nullable(str),
+  answer: nullable({ type: 'string', enum: ['duration', 'number', 'choice'] }),
+  options: nullable({ type: 'array', items: obj({ label: str, value: str }) }),
 });
 
 const workout = obj({

@@ -1,8 +1,8 @@
 import { completeParse, type ParsePart } from './parseModel';
 import OpenAI from 'openai';
-import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind, ParseUncertainty } from '../types';
+import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind, ParseUncertainty, UncertaintyAnswer, UncertaintyKind, UncertaintyOption } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
-import { refuseGuessesOnUncertainFields, shiftUncertaintyPaths } from './parseUncertainty';
+import { fitAnswerToSchema, refuseGuessesOnUncertainFields, shiftUncertaintyPaths, toAppLayout, type PartLayout } from './parseUncertainty';
 import { resolveSourceDate } from './sourceDateResolution';
 import { PARSE_RESPONSE_SCHEMA } from './parseSchema';
 import { readRepsDisplay } from '../utils/repsDisplay';
@@ -599,9 +599,10 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - "teams of N", "group of N", "in a team of N" → partnerWorkout: true, teamSize: N — but ONLY when that team shares ONE target or score. If the work written on the board is a per-person prescription that every athlete completes in full, the team wording is a logistics grouping (who rotates onto which machine, how many share a rig) → partnerWorkout: false, NO teamSize.
 - A TEAM SIZE MUST BE EXACT TO BE REAL: a range or approximate headcount ("teams of 4-5", "groups of 3-4", "~6 per team", "max 5 per team") can never describe a shared total — a team target cannot be divided by an indeterminate number. Treat it as a logistics grouping: partnerWorkout: false, NO teamSize. Same when the team note only explains equipment sharing or turn-taking ("work in teams of 4, 30 sec segments on the bike", "share a bar", "2 per rower") — the reps on the board are still each athlete's own work.
 - A board TITLED or headed "Partner WOD" / "Partner Metcon" is a partner workout even when no other partner phrasing appears in the body → partnerWorkout: true, teamSize: 2 (unless a different team size is stated). Keep that heading line in rawText — it is part of the board.
-- "(6 each)" → suggestedSets: 6 (per-person count for the logging UI, NOT total).
-- CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, suggestedSets: 3). The app computes per-person share as sections.rounds × partnerFactor. Never pre-divide sections.rounds by team size.
-- NO-SPLIT movements: a movement is not divided between partners whenever the board marks it "(together)", "(each)"/"(ea)", or "sync"/"synchro"/"in sync". All three mean every athlete performs the full written amount. Set "together": true AND "sharedLabel" to which word the board used ("together" | "each" | "sync") so the poster can echo the board's own notation. Examples: "600m run (together)" → distance: 600, together: true, sharedLabel: "together". "6 HSPU (EACH)" → reps: 6, together: true, sharedLabel: "each". "12 Sync Dual DB Thrusters" → reps: 12, together: true, sharedLabel: "sync".
+- "(6 each)" on a round count is each athlete's OWN rounds → personalRounds: 6. The round count itself stays the TEAM's ("30 RFT (6 each)" → suggestedSets: 30, personalRounds: 6).
+- CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, personalRounds: 3). The app computes each athlete's share from the two. Never pre-divide a round count by team size.
+- HOW EACH MOVEMENT IS SHARED: on a partner or team part, EVERY movement — buy-in and cash-out included — answers "share": "split" when the athletes divide its amount between them; "each" when every athlete does the full written amount on their own; "together" when they do it at the same time. "(together)", "(each)"/"(ea)" and "sync"/"synchro"/"in sync" on the board settle it — also set "sharedLabel" to the word the board used ("together" | "each" | "sync") so the poster can echo the board's own notation. When nothing on the board settles how a movement is shared, that is "ambiguous": leave "share" null and ask (see WHAT YOU CANNOT SETTLE). Off a partner part, "share" is null. Examples: "600m run (together)" → distance: 600, share: "together", sharedLabel: "together". "6 HSPU (EACH)" → reps: 6, share: "each", sharedLabel: "each". "12 Sync Dual DB Thrusters" → reps: 12, share: "together", sharedLabel: "sync".
+- WORKING TIME: on a partner or team part, "activeShare" is how much of the clock each athlete is actually working, 0–1. One works while the others wait → 1 ÷ team size. Turns that overlap (the next athlete starts before the last one finishes, a partner joins halfway) → more, by how much they overlap. Side by side the whole time → 1. When the board doesn't settle how the work is arranged, that is "ambiguous": leave it null and ask. Off a partner part, null.
 - "(each)" ATTACHED TO A MOVEMENT is a no-split marker (above). "(N each)" attached to a ROUND COUNT ("6 rounds (3 each)") is a per-person round count. Same word, opposite meaning — read what the "(each)" is attached to.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
 - CRITICAL PARTNER SPLIT DISTINCTION: There are two partner workout shapes. Use partnerSplit: "rounds" only when partners explicitly trade/own complete rounds, e.g. "6 rounds (3 each)", "alternate full rounds", or a single total round target completed round-by-round. For sectioned for-time partner workouts ("In pairs: 3 rounds ... then 3 rounds ... then buy-out/cash-out"), use partnerSplit: "reps" even if the instructions say "I go you go" or "split however"; each exercise inside the section is shared/split unless that movement is marked together. Keep section.rounds as the prescribed section repeat count.
@@ -1046,7 +1047,8 @@ Output:
               "distance": 600,
               "unit": "m",
               "inputType": "none",
-              "together": true
+              "share": "together",
+              "sharedLabel": "together"
             },
             {
               "name": "Clean and Jerk",
@@ -1297,16 +1299,30 @@ NOTE: Each section with different reps/distances gets its own sections entry wit
 /**
  * Deliberately one short, general rule and no examples. The failure it addresses is not a shape
  * the model needs shown — it is permission the model did not have. Examples here would only teach
- * it which four things are allowed to be unreadable.
+ * it which few things are allowed to be uncertain, and boards come in endless shapes.
+ *
+ * The app keeps no list of what to check: whatever the model names here, the chat asks, and the
+ * answer is written into the named field (parseUncertainty.ts answerUncertainty).
  */
-const RULES_UNCERTAINTY = `## WHEN YOU CANNOT READ SOMETHING
-If a number, word or structure is genuinely illegible or ambiguous, do NOT settle on the most
-likely value. Leave that field null and add an entry to "uncertain": the field's dotted path in
-this response, and what you actually saw.
-An honest "I could not read this" is a CORRECT answer. It costs the athlete one tap. A plausible
-guess is stored as the coach's own number and is never questioned again.
-This is for what you cannot read — not for what the board simply doesn't say. A board that states
-no weight is complete, not uncertain. Use it only where you genuinely cannot tell.`;
+const RULES_UNCERTAINTY = `## WHAT YOU CANNOT SETTLE FROM THE BOARD
+When something that changes what the athlete did, or how their work counts, cannot be settled from
+the board, do NOT settle on the most likely value. Leave that field null and add an entry to
+"uncertain". Three kinds:
+- "unreadable": you cannot make out a number, word or structure.
+- "missing": the workout needs it and the board does not say it.
+- "ambiguous": the board could fairly mean more than one thing.
+An honest "I can't tell" is a CORRECT answer — it costs the athlete one tap. A plausible guess is
+stored as the coach's own word and is never questioned again.
+Each entry: "field" = the dotted path in this response of the field the answer belongs in — the
+most specific one, inside the part it is about; "reason" = what you actually saw; "question" = one
+short question to the athlete, in English, about what they did; "answer" = "duration" (the field
+then holds seconds), "number", or "choice" with "options": each a short label for the athlete and
+"value", the JSON to write into the field.
+Ask as FEW questions as you can: one per decision the athlete actually made (one for a whole buy-in,
+not one per movement in it), and never about what the board's own notation already settles — "I go
+you go"/IGUG means the athletes take turns, so the work is split. Never flag the athlete's own
+result — their time, rounds, reps or loads are always asked anyway — and a board that states no
+weight is complete. Most boards have nothing to flag.`;
 
 const PARSE_FOOTER = 'If the text is not a workout, return: {"error": "Could not parse workout from text"}';
 
@@ -2067,9 +2083,12 @@ function validateMovement(data: unknown): ParsedMovement | null {
     placement,
     stationLabel: typeof raw.stationLabel === 'string' ? raw.stationLabel : undefined,
     stationIndex: typeof raw.stationIndex === 'number' ? raw.stationIndex : undefined,
-    // A board that named the arrangement is stating there's no split, so the label implies
-    // together — the two can never disagree downstream.
-    together: raw.together === true || isSharedWorkLabel(raw.sharedLabel) ? true : undefined,
+    // `together` is the app's one question about a partner movement: does every athlete do the
+    // full amount? The model's "share" answers it — "each" and "together" both mean yes. A board
+    // that named the arrangement (sharedLabel) is stating there's no split, so the two can never
+    // disagree. `raw.together` is the field's name before 2026-10-14, still in recorded responses.
+    together: raw.share === 'each' || raw.share === 'together' || raw.together === true || isSharedWorkLabel(raw.sharedLabel)
+      ? true : undefined,
     sharedLabel: isSharedWorkLabel(raw.sharedLabel) ? raw.sharedLabel : undefined,
     relay: raw.relay === true ? true : undefined,
     alternative,
@@ -2078,9 +2097,13 @@ function validateMovement(data: unknown): ParsedMovement | null {
   };
 }
 
+const UNCERTAINTY_KINDS: readonly UncertaintyKind[] = ['unreadable', 'missing', 'ambiguous'];
+const UNCERTAINTY_ANSWERS: readonly UncertaintyAnswer[] = ['duration', 'number', 'choice'];
+
 /**
- * The model's own list of what it could not read. Entries without both halves are dropped: a path
- * with no reason cannot be shown to an athlete, and a reason with no path cannot be acted on.
+ * The model's own list of what it could not settle. Entries without both a path and a reason are
+ * dropped: a path with no reason cannot be shown to an athlete, and a reason with no path cannot
+ * be acted on. A question is kept only with a way to answer it.
  */
 function validateUncertainty(raw: unknown): ParseUncertainty[] | undefined {
   if (!Array.isArray(raw)) return undefined;
@@ -2088,9 +2111,27 @@ function validateUncertainty(raw: unknown): ParseUncertainty[] | undefined {
     const record = asRecord(item);
     const field = record?.field;
     const reason = record?.reason;
-    return typeof field === 'string' && field.trim() && typeof reason === 'string' && reason.trim()
-      ? [{ field: field.trim(), reason: reason.trim() }]
+    if (typeof field !== 'string' || !field.trim() || typeof reason !== 'string' || !reason.trim()) return [];
+    const kind = UNCERTAINTY_KINDS.find((k) => k === record?.kind);
+    const answer = UNCERTAINTY_ANSWERS.find((a) => a === record?.answer);
+    const question = typeof record?.question === 'string' && record.question.trim() ? record.question.trim() : null;
+    const options = Array.isArray(record?.options)
+      ? record.options.flatMap((o): UncertaintyOption[] => {
+          const opt = asRecord(o);
+          return typeof opt?.label === 'string' && opt.label.trim() && typeof opt.value === 'string'
+            ? [{ label: opt.label.trim(), value: opt.value }]
+            : [];
+        })
       : [];
+    return [fitAnswerToSchema({
+      field: field.trim(),
+      reason: reason.trim(),
+      ...(kind ? { kind } : {}),
+      // A question is only askable with a way to answer it; a choice needs its options.
+      ...(question && answer && (answer !== 'choice' || options.length > 0)
+        ? { question, answer, ...(answer === 'choice' ? { options } : {}) }
+        : {}),
+    })];
   });
   return entries.length > 0 ? entries : undefined;
 }
@@ -2123,6 +2164,8 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
 
   // Validate exercises
   const exercises: ParsedExercise[] = [];
+  // How each part's movements sat in the reply — the reader's paths are written against it.
+  const layouts: PartLayout[] = [];
   const rawExercises = Array.isArray(raw.exercises) ? raw.exercises : [];
 
   for (const ex of rawExercises) {
@@ -2175,6 +2218,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
 
       // Combine: buyIn (perRound=false) + core + cashOut (perRound=false)
       const movements = [...buyInMovements, ...coreMovements, ...cashOutMovements];
+      layouts.push({ buyIn: buyInMovements.length, core: coreMovements.length, cashOut: cashOutMovements.length });
 
       // Validate optional sections (buy-in / rounds blocks / cash-out)
       let sections: ParsedSection[] | undefined = undefined;
@@ -2339,6 +2383,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
         ...(typeof exercise.partnerWorkout === 'boolean' && { partnerWorkout: exercise.partnerWorkout }),
         ...((exercise.partnerSplit === 'reps' || exercise.partnerSplit === 'rounds') && { partnerSplit: exercise.partnerSplit }),
         ...(typeof exercise.personalRounds === 'number' && exercise.personalRounds > 0 && { personalRounds: Math.round(exercise.personalRounds) }),
+        ...(typeof exercise.activeShare === 'number' && exercise.activeShare > 0 && { activeShare: Math.min(exercise.activeShare, 1) }),
         ...(exercise.complex === true && { complex: true }),
       });
     }
@@ -2378,7 +2423,7 @@ export function validateParsedWorkout(data: unknown): ParsedWorkout {
     difficultyLevel: typeof raw.difficultyLevel === 'number' && raw.difficultyLevel >= 1 && raw.difficultyLevel <= 10
       ? Math.round(raw.difficultyLevel)
       : undefined,
-    uncertain: validateUncertainty(raw.uncertain),
+    uncertain: toAppLayout(validateUncertainty(raw.uncertain), layouts),
   };
 }
 

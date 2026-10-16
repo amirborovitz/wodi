@@ -318,6 +318,13 @@ export interface Exercise {
   // each"). Distinct from the pre-save-only ParsedExercise.suggestedSets, which never survives
   // into the saved Exercise — this is the value the poster's round ledger actually reads.
   personalRounds?: number;
+  /**
+   * On a partner or team part: the share of the clock each athlete is actually working — one at a
+   * time in a team of 4 ≈ 0.25, overlapping turns more, side by side the whole time 1. The AI's
+   * read of how the work is arranged; effort minutes (xpCalculations) count the rest as partly
+   * worked. Absent on a solo part and on parts saved before 2026-10-15.
+   */
+  activeShare?: number;
 }
 
 export interface ExerciseSet {
@@ -363,22 +370,51 @@ export interface ParsedWorkout {
   teamSize?: number;            // Team size (2 for pairs, N for "team of N")
   difficultyLevel?: number;     // AI-assessed programmed difficulty 1–10
   userContext?: string;         // Athlete-supplied context/correction fed into the parse (may state facts not on the board)
-  uncertain?: ParseUncertainty[]; // Fields the AI could not read — see ParseUncertainty
+  uncertain?: ParseUncertainty[]; // What the AI could not settle from the board — see ParseUncertainty
 }
 
 /**
- * A field the AI explicitly could not read off the board.
+ * Something on the board the AI could not settle — and the question that settles it.
  *
- * The distinction this exists to draw: "the board doesn't say" and "I can't make it out" used to
- * arrive as the same thing — an absent field — and the app filled the blank either way, turning an
- * illegible number into a confident one. A field named here is one the app must NOT invent; it
- * stays empty and the athlete is asked.
+ * Boards come in endless shapes and languages, so the app keeps no list of "things to check". The
+ * AI that reads the board names what it can't settle; the chat asks the athlete; the answer is
+ * written into the very field named here, and everything downstream (totals, poster, EP) reads
+ * that field as it always does. A field named here is one the app must NOT invent.
+ *
+ * Three kinds of gap, because "I can't make it out", "the board doesn't say" and "it could mean
+ * either" used to all arrive as an absent field — and the app filled the blank with a guess.
  */
 export interface ParseUncertainty {
-  /** Dotted path into the parse, e.g. `exercises[0].movements[2].reps`. */
+  /** Dotted path into the parse, e.g. `exercises[0].movements[2].reps` — where the answer goes. */
   field: string;
-  /** What the model actually saw — the athlete's context when it asks. */
+  /**
+   * When one question covers several fields ("how was the buy-in shared?"): every field the answer
+   * goes into. `field` is then the reader's own name for the group.
+   */
+  targets?: string[];
+  /** What the model actually saw. */
   reason: string;
+  /** Absent on parses from before 2026-10-14, which only ever flagged what they couldn't read. */
+  kind?: UncertaintyKind;
+  /** The question for the athlete, in plain words. Absent or null: nothing to ask. */
+  question?: string | null;
+  /** How it's answered — see UncertaintyAnswer. Absent or null: nothing to ask. */
+  answer?: UncertaintyAnswer | null;
+  /** The likely answers, for a 'choice'. */
+  options?: UncertaintyOption[] | null;
+}
+
+/** 'unreadable': can't make it out · 'missing': needed, not written · 'ambiguous': could mean either. */
+export type UncertaintyKind = 'unreadable' | 'missing' | 'ambiguous';
+
+/** 'duration': a length of time (the field holds seconds) · 'number' · 'choice': one of the options. */
+export type UncertaintyAnswer = 'duration' | 'number' | 'choice';
+
+export interface UncertaintyOption {
+  /** What the athlete taps: "We split it". */
+  label: string;
+  /** What goes into the field, as JSON: "true", "1200", "\"rounds\"". */
+  value: string;
 }
 
 // Workload breakdown types
@@ -645,10 +681,18 @@ export interface ParsedExercise {
   // WORKOUTS rules). THIS field answers "is THIS specific block the partnered one" — set false
   // (not omitted) on a solo strength/skill block even when the session overall is partnered.
   // 'rounds' = partners trade whole rounds (IGUG); 'reps' = partners share one flat/continuous
-  // total, no round structure. The per-person round count for 'rounds' continues to be
-  // suggestedSets (existing "(N each)" convention) — no separate field needed pre-save.
+  // total, no round structure. For 'rounds', suggestedSets is the TEAM's round count and
+  // personalRounds this athlete's own ("30 RFT (6 each)" → 30 and 6) — see partnerScope.ts.
   partnerWorkout?: boolean;
   partnerSplit?: 'reps' | 'rounds';
+  personalRounds?: number;
+  /**
+   * On a partner or team part: the share of the clock each athlete is actually working — one at a
+   * time in a team of 4 ≈ 0.25, overlapping turns more, side by side the whole time 1. The AI's
+   * read of how the work is arranged; effort minutes (xpCalculations) count the rest as partly
+   * worked. Absent on a solo part and on parts saved before 2026-10-15.
+   */
+  activeShare?: number;
   // True when this exercise's movements are performed as ONE barbell complex per set — an
   // unbroken sequence on a single bar ("1 Power Clean + 1 Hang Power Clean", "3 Snatch + 2 OHS").
   // The movements[] keep each sub-lift; the poster renders them as one combined line, and volume
@@ -763,12 +807,14 @@ export interface RewardData {
     type: WorkoutType;
     format?: WorkoutFormat;   // for_time, amrap, etc.
     duration: number;         // minutes (max of actual vs programmed)
-    actualTimeMinutes?: number; // Actual completion time (for intensity EP)
+    actualTimeMinutes?: number; // Actual completion time
     exerciseCount: number;
     totalVolume: number;      // kg
     totalReps: number;
   };
   exercises: Exercise[];      // Full exercise data with logged sets
+  /** The board's cap, seconds — what effort minutes measure the finish against. */
+  timeCap?: number;
   muscleGroups?: {
     muscles: MuscleGroup[];
     byRegion: Record<BodyRegion, MuscleGroup[]>;
@@ -796,12 +842,11 @@ export interface WeeklyStats {
 // EP (Effort Points) calculation breakdown
 export interface EPBreakdown {
   base: number;        // EP_BASE per workout
-  time: number;        // timeCap_minutes × EP_METCON_RATE
+  time: number;        // effort minutes × EP_METCON_RATE — how long AND how hard (effortMinutes)
   volume: number;      // (totalVolume / bodyweight) × EP_VOLUME_RATE
   bodyweight: number;  // Bodyweight movement credit (burpees, pull-ups, etc.)
   distance: number;    // distance_meters × EP_DISTANCE_RATE (× carry multiplier)
   calories: number;    // machine_calories × EP_CALORIE_RATE (Echo Bike, Row, Ski…)
-  intensity: number;   // Bonus for beating the time cap (timeCap / actualTime ratio)
   pr: number;          // EP_PR_BONUS per PR
   difficulty: number;  // Difficulty multiplier bonus/penalty (0 when no difficultyLevel)
   total: number;

@@ -159,9 +159,9 @@ describe('workoutToParsedWorkout', () => {
       .toBe('21-15-9\nThrusters');
   });
 
-  it('reads the per-athlete round count back out of personalRounds', () => {
-    // The save writes the pre-save suggestedSets out as personalRounds; reading sets.length
-    // instead gave "12 RFT, 6 each" a 12-round personal share.
+  it("gives back the team's rounds AND the athlete's own, as the partner math reads them", () => {
+    // "12 RFT (6 each)": suggestedSets is the TEAM's 12, personalRounds the athlete's 6 —
+    // partnerScope.ts divides between them (RELAY, 2026-10-15).
     const parsed = workoutToParsedWorkout({
       ...base,
       exercises: [{
@@ -169,7 +169,8 @@ describe('workoutToParsedWorkout', () => {
         partnerWorkout: true, partnerSplit: 'rounds', personalRounds: 6, rounds: 12,
       }],
     });
-    expect(parsed.exercises[0].suggestedSets).toBe(6);
+    expect(parsed.exercises[0].suggestedSets).toBe(12);
+    expect(parsed.exercises[0].personalRounds).toBe(6);
   });
 
   it('keeps the container fields the duration recompute needs', () => {

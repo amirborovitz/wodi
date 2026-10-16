@@ -1,4 +1,5 @@
 import type { PlannedWorkout, ParsedWorkout } from '../../types';
+import { formatLabel } from './unfinishedPoster';
 import styles from './OnDeckCard.module.css';
 
 interface OnDeckCardProps {
@@ -7,20 +8,10 @@ interface OnDeckCardProps {
   onDelete?: (planned: PlannedWorkout) => void;
 }
 
-const FORMAT_LABELS: Record<string, string> = {
-  for_time: 'FOR TIME',
-  amrap: 'AMRAP',
-  amrap_intervals: 'AMRAP',
-  intervals: 'INTERVALS',
-  emom: 'EMOM',
-  strength: 'STRENGTH',
-  tabata: 'TABATA',
-};
-
 function buildSubtitle(wod: ParsedWorkout): string {
   const parts: string[] = [];
   if (wod.timeCap && wod.timeCap > 0) parts.push(`${Math.round(wod.timeCap / 60)}-MIN`);
-  const fmt = FORMAT_LABELS[wod.format ?? ''] ?? (wod.format ?? '').toUpperCase();
+  const fmt = formatLabel(wod);
   if (fmt) parts.push(fmt);
   // A named piece says its own name in the title above — no tag needed for it.
   if (wod.partnerWorkout || wod.teamSize && wod.teamSize > 1) parts.push('· partner');

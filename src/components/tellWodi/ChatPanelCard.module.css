@@ -137,7 +137,8 @@
 
 .pillStep {
   flex: none;
-  width: 40px;
+  /* 32, not 40: two pills share a 330px card, and every pixel here is one the number lacks. */
+  width: 32px;
   height: 44px;
   display: grid;
   place-items: center;
@@ -180,6 +181,11 @@
   font-weight: 800;
   line-height: 1;
   color: var(--wodi-white);
+}
+
+/* "22.5", "102.5" — the box is ~50px; at 24px a fourth character is cut off. */
+.pillInput[data-long] {
+  font-size: 19px;
 }
 
 .pillInput::placeholder {

@@ -31,11 +31,8 @@ import type {
 } from '../components/celebration/types';
 import type { WorkoutWithStats } from './useWorkouts';
 import { useAuth } from '../context/AuthContext';
-import {
-  calculateWorkoutEP,
-  getTimeCapMinutes,
-  DEFAULT_BW,
-} from '../utils/xpCalculations';
+import { computeWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
+import type { EPBreakdown } from '../types';
 import { asLoadUnit, exerciseLoadUnit, movementLoadUnit, type LoadUnit } from '../utils/loadUnits';
 import {
   calculateWorkloadFromExercises,
@@ -294,8 +291,8 @@ export interface CelebrationData {
 
   // EP
   totalEP: number;
-  rewardEP: ReturnType<typeof calculateWorkoutEP> | null;
-  detailEP: ReturnType<typeof calculateWorkoutEP> | null;
+  /** The itemised EP — the same computeWorkoutEP every total uses, after logging and after. */
+  ep: EPBreakdown | null;
 
   // Difficulty
   displayDifficultyLevel: number | undefined;
@@ -582,39 +579,33 @@ export function useCelebrationData(
     movementCount: activeBreakdown?.movements?.length ?? 0,
   });
 
-  const rewardEP = isReward
-    ? calculateWorkoutEP(
-        totalVolume,
-        durationMinutes,
-        bodyweight,
-        isPR ?? false,
-        activeBreakdown?.movements,
-        rewardData?.workoutSummary?.actualTimeMinutes,
-        difficultyLevel,
-      )
+  // ONE formula, fed the same workout either way: the poster just logged (rewardData) and the
+  // poster reopened from history (workout) used to compute EP separately — only the first had the
+  // intensity bonus, so RELAY read 273 the moment it was logged and 257 forever after.
+  const ep = isReward && rewardData
+    ? computeWorkoutEP({
+        type: rewardData.workoutSummary.type,
+        format: rewardData.workoutSummary.format,
+        timeCap: rewardData.timeCap,
+        duration: rewardData.workoutSummary.duration,
+        difficultyLevel: rewardData.difficultyLevel,
+        workloadBreakdown: activeBreakdown ?? undefined,
+        teamSize: rewardData.teamSize,
+        isPR: isPR ?? false,
+        exercises: rewardData.exercises,
+      }, { bodyweight })
+    : workout
+    ? computeWorkoutEP(workout, { bodyweight })
     : null;
 
-  const detailEP =
-    !isReward && workout
-      ? calculateWorkoutEP(
-          workout.totalVolume,
-          getTimeCapMinutes(workout),
-          bodyweight,
-          workout.isPR ?? false,
-          workout.workloadBreakdown?.movements,
-          undefined,
-          difficultyLevel,
-        )
-      : null;
-
-  const totalEP = isReward ? (rewardEP?.total ?? 0) : (detailEP?.total ?? 0);
+  const totalEP = ep?.total ?? 0;
 
   if (shouldLogCelebrationDebug()) {
     // Itemised so any zero is explainable, not a mystery: EP shows which term is 0 (volume 0 =
     // nothing weighted, calories 0 = no machine work), workload shows the grand totals and the
     // per-movement rows that feed them (and whether they were estimated/guesswork).
     console.log('[CelebrationDebug] EP + workload breakdown', {
-      ep: rewardEP ?? detailEP,
+      ep,
       workload: {
         grandTotalReps: activeBreakdown?.grandTotalReps ?? 0,
         grandTotalVolume: activeBreakdown?.grandTotalVolume ?? 0,
@@ -1258,8 +1249,7 @@ export function useCelebrationData(
     totalCalories,
     totalWeightedDistance,
     totalEP,
-    rewardEP,
-    detailEP,
+    ep,
     displayDifficultyLevel,
     difficultyLevel,
     teamSize: posterTeamSize || 1,

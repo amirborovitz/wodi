@@ -1,4 +1,4 @@
-/* Sized and surfaced like the For Later line above the rail, so it reads as part of
+/* Sized and surfaced like the rest of Today's cards, so it reads as part of
    Today rather than as something pasted on top of it. */
 .card {
   display: flex;

@@ -39,10 +39,13 @@ function readMessages(snapshot: QuerySnapshot): ThreadMessage[] {
   });
 }
 
-/** Is there anything said before `beforeMs`? — whether "Earlier" has something to show. */
-export async function hasThreadBefore(userId: string, beforeMs: number): Promise<boolean> {
-  const snapshot = await getDocs(query(threadRef(userId), where('at', '<', beforeMs), limit(1)));
-  return !snapshot.empty;
+/**
+ * When the newest thing said before `beforeMs` was said, or null — whether "Earlier" has something
+ * to show, and how far back it has to reach to show it.
+ */
+export async function newestThreadBefore(userId: string, beforeMs: number): Promise<number | null> {
+  const [newest] = readMessages(await getDocs(query(threadRef(userId), where('at', '<', beforeMs), orderBy('at', 'desc'), limit(1))));
+  return newest?.at ?? null;
 }
 
 export async function appendThread(userId: string, messages: readonly ThreadMessage[]): Promise<void> {

@@ -1,0 +1,49 @@
+/* The poster just logged, under Wodi's cheer: big enough to read, one Share under it. Share is
+   white, not yellow — the camera below is the composer's one yellow action. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: min(240px, 70%);
+  margin-top: var(--sp-2);
+}
+
+.poster {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  overflow: hidden;
+  background: none;
+  /* The <button> UA sheet overrides inherited typography; skins style themselves from the page. */
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.share {
+  height: 44px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--wodi-white);
+  color: #0c0d0f;
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.share:active {
+  transform: scale(0.98);
+}
+
+/* The full-size copy the shared image is drawn from — laid out, never seen. */
+.offscreen {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+}

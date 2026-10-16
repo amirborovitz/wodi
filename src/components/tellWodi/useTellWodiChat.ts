@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ParsedWorkout, PosterVibeKey, SavedChat } from '../../types';
+import type { ParsedWorkout, PlannedWorkout, PosterVibeKey, SavedChat } from '../../types';
 import type { StoryExerciseResult } from '../logging/story/types';
 import { readAthleteMessage, type ChatTurn } from '../../services/tellWodiReader';
 import type { AskFn } from './useAskWodi';
@@ -10,6 +10,7 @@ import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
 import {
   applyAnswer,
   chatCannotLog,
+  clarifySlots,
   describeAnswer,
   isComplete,
   nextQuestion,
@@ -20,6 +21,7 @@ import {
   type ChatSlot,
   type SlotAnswer,
 } from './chatQuestions';
+import { answerUncertainty, uncertaintyValue } from '../../services/parseUncertainty';
 import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
 import { routeMessage } from './chatRouting';
 
@@ -31,7 +33,7 @@ import { routeMessage } from './chatRouting';
  */
 
 /** How the athlete got from the chat to the standard logging screen — measured (analytics.ts). */
-export type FormHandoff = 'typed' | 'plus_menu' | 'chip' | 'wodi_handoff';
+export type FormHandoff = 'typed' | 'chip' | 'wodi_handoff';
 
 export interface ChatChipView {
   label: string;
@@ -59,7 +61,9 @@ export interface ChatMessage {
   panel?: ChatPanel;
   /** A question whose chips were used, or which a later message answered — drawn dimmed. */
   answered?: boolean;
-  /** Wodi's newest message, the same as on Today: its one named value in yellow, its day a link. */
+  /** A question about the board. A reopened chat asks again whatever is open, so one left open isn't kept. */
+  asks?: boolean;
+  /** Wodi's newest message, the chat's opening line: its one named value in yellow, its day a link. */
   headline?: ChatOpening;
   /** Workouts this answer quoted, drawn as their posters under it. */
   receipts?: string[];
@@ -88,6 +92,8 @@ interface UseTellWodiChatArgs {
   athleteSex?: string;
   /** Keep the conversation — called whenever it changes once there is a board. */
   onPersist: (chat: SavedChat, workout: ParsedWorkout) => void;
+  /** The board changed under the chat — a question about it was answered (ParseUncertainty). */
+  onBoardChanged: (workout: ParsedWorkout) => void;
   /** Everything answered: save it exactly like the forms do. */
   onFinished: (results: StoryExerciseResult[], vibe: PosterVibeKey | null, chat: SavedChat) => void;
   /** Hand over to the form with everything answered so far already filled in. */
@@ -113,12 +119,14 @@ interface UseTellWodiChatArgs {
   opening: ChatOpening | null;
 }
 
-/** Wodi's newest message as the chat opens on it — the same object Today shows. */
+/** Wodi's newest message as the chat opens on it. */
 export interface ChatOpening {
   text: string;
   highlight: string | null;
   /** The day it's about ("30 Jun") and the poster that day opens. */
   link: { label: string; workoutId: string } | null;
+  /** A cheer for a workout just logged: its poster, drawn big under the line with Share. */
+  posterId: string | null;
 }
 
 /** Two openings say the same thing — the words, the highlight, the poster the day opens. */
@@ -126,7 +134,8 @@ export function sameOpening(a: ChatOpening, b: ChatOpening): boolean {
   return a.text === b.text
     && a.highlight === b.highlight
     && (a.link?.label ?? null) === (b.link?.label ?? null)
-    && (a.link?.workoutId ?? null) === (b.link?.workoutId ?? null);
+    && (a.link?.workoutId ?? null) === (b.link?.workoutId ?? null)
+    && a.posterId === b.posterId;
 }
 
 export interface TellWodiChat {
@@ -136,8 +145,6 @@ export interface TellWodiChat {
   tapChip: (messageId: string, chip: ChatChipView) => void;
   /** Reopen a kept conversation on its board. */
   resume: (workout: ParsedWorkout, chat: SavedChat) => void;
-  /** The standard screen, from the "+" menu: with the board and answers if there is one. */
-  openForms: () => void;
   /** Ask again what one of my messages answered — a typo is fixed in the chat, not after it. */
   changeAnswer: (messageId: string) => void;
   /** Logging is over (saving) — answers can't be changed here any more. */
@@ -152,7 +159,7 @@ export interface TellWodiChat {
 /** The way into logging a board — on its first question, and wherever a parked chat waits. */
 const DONE_CHIP: ChatChipView = { label: 'Done — log it', action: 'done' };
 /** The standard logging screen, offered by name beside the chat's own way in. */
-const STANDARD_SCREEN_CHIP: ChatChipView = { label: 'Log on standard screen', action: 'forms', handoff: 'chip' };
+const STANDARD_SCREEN_CHIP: ChatChipView = { label: 'Fill it in myself', action: 'forms', handoff: 'chip' };
 
 /**
  * What a "Change" can reopen: a value the athlete gave. A swap rewrites the movement itself, so
@@ -163,10 +170,17 @@ const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 're
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;
 
-function toSavedChat(messages: ChatMessage[], waitingForWorkout: boolean): SavedChat {
+/**
+ * The chat as its waiting board keeps it. A question asked after the athlete's last word was still
+ * open when they left: reopening asks it again, and keeping it too put the same question on screen
+ * twice. Questions they replied to stay — the transcript reads back complete.
+ */
+export function toSavedChat(messages: ChatMessage[], waitingForWorkout: boolean): SavedChat {
+  const lastMine = messages.map((m) => m.from).lastIndexOf('me');
   return {
     waitingForWorkout,
     messages: messages
+      .filter((m, i) => !(m.asks && i > lastMine))
       .filter((m) => m.text || m.imageUrl || m.hadPhoto || m.suggestions)
       .map((m) => ({
         from: m.from,
@@ -177,6 +191,21 @@ function toSavedChat(messages: ChatMessage[], waitingForWorkout: boolean): Saved
         at: m.at,
       })),
   };
+}
+
+/**
+ * The conversation a saved board reopens. A board saved without one (from the standard screen)
+ * opens as a chat waiting for its result — every saved board opens in the chat.
+ */
+export function chatForSavedBoard(planned: PlannedWorkout): SavedChat {
+  return planned.chat ?? { messages: [], waitingForWorkout: true };
+}
+
+/** What Wodi says on reopening: back from the workout, it asks how this board went — by name. */
+export function resumeGreeting(workout: ParsedWorkout, waitingForWorkout: boolean): string {
+  if (!waitingForWorkout) return 'Picking up where we left off.';
+  const title = workout.title?.trim();
+  return title ? `How'd ${title} go?` : "How'd it go?";
 }
 
 /** "Echo Bike instead of Run, 600m a round" — what a swap will save, in words. */
@@ -199,7 +228,7 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening,
 }: UseTellWodiChatArgs): TellWodiChat {
   const [messages, setMessages] = useState<ChatMessage[]>(() => (
     opening ? [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }] : []
@@ -219,8 +248,11 @@ export function useTellWodiChat({
   // about training — belongs to the ongoing thread, not to the poster this board becomes.
   const boardStartRef = useRef(0);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread }; });
+  // Every answer that landed, in order — replayed onto the results when an answer about the board
+  // itself rebuilds them, so nothing the athlete already said is lost.
+  const givenRef = useRef<SlotAnswer[]>([]);
 
   // The opening is computed from the log, which loads after the chat opens: until the athlete has
   // said anything, it follows the newest words rather than freezing on the first render's.
@@ -285,9 +317,14 @@ export function useTellWodiChat({
     for (const answer of answers) {
       const slot = slots.find((s) => s.id === answer.id);
       if (!slot) continue;
+      if (slot.kind === 'clarify') {
+        if (settleBoardQuestion(slot, answer)) applied += 1;
+        continue;
+      }
       const outcome = applyAnswer(resultsRef.current, slot, answer);
       resultsRef.current = outcome.results;
       if (!outcome.closed) continue;
+      givenRef.current = [...givenRef.current, answer];
       closedRef.current = new Set(closedRef.current).add(slot.id);
       applied += 1;
       if (CHANGEABLE.has(slot.kind)) closed.push(slot.id);
@@ -301,6 +338,33 @@ export function useTellWodiChat({
     }
     return { applied, closed, swaps };
   };
+
+  /**
+   * An answer about the board itself: written into the field the reader named, which changes the
+   * board, so the results are rebuilt from it and every answer already given is laid back on top.
+   * False when the reply didn't answer it — the question stays open.
+   */
+  const settleBoardQuestion = (slot: ChatSlot, answer: SlotAnswer): boolean => {
+    const workout = workoutRef.current;
+    const flag = slot.uncertainty;
+    if (!workout || !flag) return false;
+    const value = answer.skipped ? undefined : uncertaintyValue(flag, answer);
+    if (!answer.skipped && value === undefined) return false;
+    const next = answerUncertainty(workout, flag.field, value);
+    workoutRef.current = next;
+    let results = callbacks.current.buildResults(next);
+    const all = openSlots(results, new Set(), callbacks.current.habits, next.teamSize);
+    for (const given of givenRef.current) {
+      const s = all.find((x) => x.id === given.id);
+      if (s) results = applyAnswer(results, s, given).results;
+    }
+    resultsRef.current = results;
+    callbacks.current.onBoardChanged(next);
+    return true;
+  };
+
+  /** Every question still open: the board's own first — their answers can change the rest. */
+  const slotsNow = (): ChatSlot[] => [...clarifySlots(workoutRef.current), ...openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize)];
 
   /** My message gave these answers — it can be tapped to change them. */
   const markAnswered = (messageId: string, slotIds: string[]): void => {
@@ -319,6 +383,7 @@ export function useTellWodiChat({
   const askQuestion = (question: ChatQuestion, prefix?: string): void => {
     push({
       from: 'wodi',
+      asks: true,
       text: prefix ? `${prefix} ${question.text}` : question.text,
       ...(question.hint ? { hint: question.hint } : {}),
       ...(question.placeholder ? { placeholder: question.placeholder } : {}),
@@ -329,10 +394,13 @@ export function useTellWodiChat({
     });
   };
 
-  /** Ask the next open question, hand to the form, or finish. */
-  const askNext = (prefix?: string): void => {
-    waitingRef.current = false;
-    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
+  /**
+   * Ask the next open question, hand to the form, or finish. `stillWaiting`: a chat reopened
+   * before the athlete has said anything stays parked — leaving again must not lose the welcome back.
+   */
+  const askNext = (prefix?: string, stillWaiting = false): void => {
+    waitingRef.current = stillWaiting;
+    const slots = slotsNow();
     const question = nextQuestion(slots, resultsRef.current, callbacks.current.lastLoads);
     if (question) {
       askQuestion(question, prefix);
@@ -341,8 +409,8 @@ export function useTellWodiChat({
     if (isComplete(slots) && resultsRef.current.some(chatCannotLog)) {
       push({
         from: 'wodi',
-        text: 'One part of this board is easier to log on the standard screen — I\'ll bring over everything you told me.',
-        chips: [{ label: 'Open the standard screen', action: 'forms', handoff: 'wodi_handoff' }],
+        text: 'One part of this board is easier to fill in yourself — I\'ll bring over everything you told me.',
+        chips: [{ label: 'Fill it in myself', action: 'forms', handoff: 'wodi_handoff' }],
       });
       return;
     }
@@ -401,7 +469,7 @@ export function useTellWodiChat({
   const readWords = async (text: string, sentId: string): Promise<void> => {
     const workout = workoutRef.current;
     if (!workout) return;
-    const slots = openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize);
+    const slots = slotsNow();
     const askedBefore = slots.find((s) => s.asked)?.id;
     // A clean clock reading to "what was your time?" needs no model — read it here (free, exact).
     const local = readAnswerLocally(slots.find((s) => s.asked), text);
@@ -583,7 +651,7 @@ export function useTellWodiChat({
       return;
     }
     if (chip.action !== 'done') {
-      const { closed } = applyAnswers(chip.answers ?? [], openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize));
+      const { closed } = applyAnswers(chip.answers ?? [], slotsNow());
       markAnswered(said.id, closed);
     }
     askNext();
@@ -594,6 +662,7 @@ export function useTellWodiChat({
     workoutRef.current = workout;
     resultsRef.current = callbacks.current.buildResults(workout);
     closedRef.current = new Set();
+    givenRef.current = [];
     waitingRef.current = chat.waitingForWorkout;
     setHasBoard(true);
     const kept: ChatMessage[] = chat.messages.map((m) => ({
@@ -609,12 +678,9 @@ export function useTellWodiChat({
     messagesRef.current = kept;
     setMessages(kept);
     // Answers aren't kept on a waiting board (see SavedChat), so everything still open is asked.
-    askNext(chat.waitingForWorkout ? "Welcome back — how'd it go?" : 'Picking up where we left off.');
+    askNext(resumeGreeting(workout, chat.waitingForWorkout), chat.waitingForWorkout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const openForms = useCallback((): void => openStandardScreen('plus_menu'), []);
 
   /**
    * "Change" on one of my answers: those questions open again and the next thing Wodi asks is
@@ -635,5 +701,5 @@ export function useTellWodiChat({
   const placeholder = [...messages].reverse().find((m) => m.from === 'wodi' && !m.answered && m.placeholder)?.placeholder
     ?? 'Message Wodi…';
 
-  return { messages, busy, send, tapChip, resume, openForms, changeAnswer, finished, hasBoard, placeholder };
+  return { messages, busy, send, tapChip, resume, changeAnswer, finished, hasBoard, placeholder };
 }

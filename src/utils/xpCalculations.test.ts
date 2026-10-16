@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateWorkoutEP,
+  effortClockOf,
+  effortMinutes,
   calculateDistanceEP,
   calculateCalorieEP,
   calculateBodyweightEP,
@@ -90,39 +92,96 @@ describe('helpers: machine + carry classification', () => {
 
 describe('calculateWorkoutEP — full breakdown', () => {
   it('bare volume workout: base + time + volume only', () => {
-    // time = floor(20×3)=60; volume = floor((3000/75)×0.5)=floor(20)=20.
+    // 20 effort minutes: time = floor(20×3)=60; volume = floor((3000/75)×0.5)=floor(20)=20.
     expect(calculateWorkoutEP(3000, 20, 75, false)).toEqual({
       base: EP_BASE, time: 60, volume: 20,
-      bodyweight: 0, distance: 0, calories: 0, intensity: 0, pr: 0, difficulty: 0,
+      bodyweight: 0, distance: 0, calories: 0, pr: 0, difficulty: 0,
       total: 90,
     });
   });
 
-  it('full workout with PR, intensity and difficulty multiplier', () => {
+  it('full workout with PR and difficulty multiplier', () => {
     const movements = [
       { name: 'Pull-up', totalReps: 50 },          // bw medium → 25 vvol
       { name: 'Burpee', totalReps: 30 },           // bw high   → 21 vvol → (46)×0.5 = 23
       { name: 'Echo Bike', totalCalories: 40 },    // 40×0.3 = 12 calories
       { name: 'Run', totalDistance: 800 },         // 800×0.01×1.0 = 8 distance
     ];
-    // time=floor(15×3)=45; volume=floor((1500/75)×0.5)=10;
-    // intensity: (15-12)/15=0.2 → 2 tiers × 5 = 10; pr=25;
-    // subtotal=10+45+10+23+8+12+10+25 = 143;
-    // difficulty lvl 8 → ×1.12 → round(160.16)-143 = 17; total=160.
-    expect(calculateWorkoutEP(1500, 15, 75, true, movements, 12, 8)).toEqual({
+    // 15 effort minutes: time=floor(15×3)=45; volume=floor((1500/75)×0.5)=10; pr=25;
+    // subtotal=10+45+10+23+8+12+25 = 133;
+    // difficulty lvl 8 → ×1.12 → round(148.96)-133 = 16; total=149.
+    expect(calculateWorkoutEP(1500, 15, 75, true, movements, 8)).toEqual({
       base: EP_BASE, time: 45, volume: 10,
-      bodyweight: 23, distance: 8, calories: 12, intensity: 10, pr: 25, difficulty: 17,
-      total: 160,
+      bodyweight: 23, distance: 8, calories: 12, pr: 25, difficulty: 16,
+      total: 149,
     });
-  });
-
-  it('no intensity bonus when the athlete did not beat the cap', () => {
-    const ep = calculateWorkoutEP(0, 20, 75, false, [], 20 /* == cap */);
-    expect(ep.intensity).toBe(0);
   });
 
   it('falls back to DEFAULT_BW when bodyweight is 0', () => {
     // volume = floor((7500/75)×0.5) = floor(50) = 50 using DEFAULT_BW 75.
     expect(calculateWorkoutEP(7500, 0, 0).volume).toBe(50);
+  });
+});
+
+// How long, and how hard — the owner's own examples (2026-10-15).
+describe('effortMinutes — how long and how hard, in one number', () => {
+  it('an AMRAP or EMOM is its length for everyone', () => {
+    expect(effortMinutes({ clockMinutes: 20 })).toBe(20);
+  });
+
+  it('a for-time piece done at the cap is the cap', () => {
+    expect(effortMinutes({ clockMinutes: 30, finishMinutes: 30 })).toBe(30);
+    // Past the cap is still the cap — the clock stopped them.
+    expect(effortMinutes({ clockMinutes: 30, finishMinutes: 34 })).toBe(30);
+  });
+
+  it('30-minute cap done in 20: shorter but harder — a bit MORE than the athlete who used all 30', () => {
+    // 20 × (30/20)^1.15 = 20 × 1.594 ≈ 31.9
+    const fast = effortMinutes({ clockMinutes: 30, finishMinutes: 20 });
+    expect(fast).toBeCloseTo(31.9, 1);
+    expect(fast).toBeGreaterThan(30);
+    expect(fast / 30).toBeLessThan(1.1);
+  });
+
+  it('a generous cap never counts the push past ×2', () => {
+    // 5 × 2^1.15 ≈ 11.1, not 5 × 6^1.15
+    expect(effortMinutes({ clockMinutes: 30, finishMinutes: 5 })).toBeCloseTo(11.1, 1);
+  });
+
+  it('a team of 4 taking turns on a 20-minute clock: a bit more than 20 / 4', () => {
+    // 20 × (¼ + ¾ × ¼) = 20 × 0.4375 = 8.75
+    expect(effortMinutes({ clockMinutes: 20, activeShare: 0.25 })).toBeCloseTo(8.75, 5);
+  });
+
+  it('side by side the whole time is the whole clock', () => {
+    expect(effortMinutes({ clockMinutes: 20, activeShare: 1 })).toBe(20);
+  });
+
+  it('a team piece done under the cap: the team\'s push, on your share of the clock', () => {
+    // RELAY: 14 of a 22 cap, overlapping turns (0.4): 14 × (0.4 + 0.6 × ¼) × (22/14)^1.15 ≈ 12.95
+    expect(effortMinutes({ clockMinutes: 22, finishMinutes: 14, activeShare: 0.4 })).toBeCloseTo(12.95, 1);
+  });
+});
+
+describe('effortClockOf — read off the saved workout, so every screen agrees', () => {
+  const relay = {
+    type: 'for_time' as const, timeCap: 1320, duration: 22, teamSize: 5,
+    exercises: [
+      { loggingMode: 'strength' as const, sets: [{ id: 's', setNumber: 1, completed: true, weight: 45 }] },
+      { loggingMode: 'for_time' as const, partnerWorkout: true, activeShare: 0.4, sets: [{ id: 's', setNumber: 1, completed: true, time: 840 }] },
+    ],
+  };
+
+  it('the cap, the logged finish and the partnered part\'s share', () => {
+    expect(effortClockOf(relay)).toEqual({ clockMinutes: 22, finishMinutes: 14, activeShare: 0.4 });
+  });
+
+  it('a partner part saved before the share existed reads as one at a time', () => {
+    const legacy = { ...relay, exercises: relay.exercises.map(({ activeShare: _s, ...ex }) => ex) };
+    expect(effortClockOf(legacy).activeShare).toBeCloseTo(0.2, 5);
+  });
+
+  it('a solo piece works the whole clock', () => {
+    expect(effortClockOf({ type: 'amrap' as const, timeCap: 1200 })).toEqual({ clockMinutes: 20, activeShare: 1 });
   });
 });

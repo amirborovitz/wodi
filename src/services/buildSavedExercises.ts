@@ -4,6 +4,11 @@ import { getMovementKeys, movementLookup } from '../components/workouts/InlineMo
 import { resolveLoggedQuantity } from '../utils/tierScaling';
 import { openQuantitySlot, sectionRoundsCompleted } from './blockScore';
 
+/** The athlete did something other than the board on this line — a swap, or the board's other option. */
+function isAthletesOwnLine(substitution: MovementSubstitution | undefined, selectedName: string, mov: ParsedMovement): boolean {
+  return substitution != null || selectedName !== mov.name;
+}
+
 /** The production save conversion, shared with persistence round-trip regression tests. */
 export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExercises: Exercise[]; totalDuration: number } {
   // Calculate total duration (totals computed after exercises map)
@@ -62,19 +67,25 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       // already in movementReps and in the workload breakdown, which is where a number the
       // ATHLETE produced belongs.
       const openSlot = openQuantitySlot(mov);
+      const substitution = substitutionForSave(mk, mov);
+      // The line keeps the COACH'S numbers unless the athlete did something else on it — a swap or
+      // the board's other option, whose own amounts the line then has to state. Otherwise their own
+      // amount (a partner's share, a scaled count) lives in the breakdown — the poster's "mine"
+      // column — never on the line: KICK START's "30 cal (IGUG)" was saved, and printed, as 15.
+      const bake = isAthletesOwnLine(substitution, selectedName, mov);
       return {
         ...mov,
         name: selectedName,
         // Assigned, not spread-when-present: `mov` may already carry the swap an earlier
         // edit un-baked, so going back to Rx has to CLEAR it here or the swap returns on the
         // next open. `undefined` never reaches Firestore — removeUndefined strips it.
-        substitution: substitutionForSave(mk, mov),
-        ...(selectedCalories !== undefined && openSlot !== 'calories' ? { calories: selectedCalories } : {}),
-        ...(selectedReps !== undefined && openSlot !== 'reps' ? { reps: selectedReps } : {}),
+        substitution,
+        ...(bake && selectedCalories !== undefined && openSlot !== 'calories' ? { calories: selectedCalories } : {}),
+        ...(bake && selectedReps !== undefined && openSlot !== 'reps' ? { reps: selectedReps } : {}),
         // Relay pacers keep their prescribed per-trip distance — the logged value is a TOTAL
         // (already in the breakdown), and detail mode needs the per-trip prescription to
         // reconstruct the "N×" trip count.
-        ...(selectedDistance !== undefined && mov.relay !== true && openSlot !== 'distance'
+        ...(bake && selectedDistance !== undefined && mov.relay !== true && openSlot !== 'distance'
           ? { distance: selectedDistance } : {}),
         // The athlete's load goes HERE and only here. `rxWeights` is the coach's, and stays.
         //
@@ -119,13 +130,15 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
         const openSlot = openQuantitySlot(mov);
         const selectedName = movementLookup(result.movementAlternatives || {}, mk, mov.name) ?? mov.name;
         const loggedWeights = loggedLoadFor(mk, mov.name);
+        const substitution = substitutionForSave(mk, mov);
+        const bake = isAthletesOwnLine(substitution, selectedName, mov);
         return {
           ...mov,
           name: selectedName,
-          substitution: substitutionForSave(mk, mov),
-          ...(reps !== undefined && openSlot !== 'reps' ? { reps } : {}),
-          ...(distance !== undefined && !mov.relay && openSlot !== 'distance' ? { distance } : {}),
-          ...(calories !== undefined && openSlot !== 'calories' ? { calories } : {}),
+          substitution,
+          ...(bake && reps !== undefined && openSlot !== 'reps' ? { reps } : {}),
+          ...(bake && distance !== undefined && !mov.relay && openSlot !== 'distance' ? { distance } : {}),
+          ...(bake && calories !== undefined && openSlot !== 'calories' ? { calories } : {}),
           ...(loggedWeights ? { loggedWeights } : {}),
           ...implementCountFor(mk, mov),
         };
@@ -146,11 +159,13 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
         return total + perRound * sectionRoundsCompleted(sec);
       }, 0);
     } else if (baseMovements && baseMovements.length > 0) {
-      // Single-clock piece: one round count for the whole thing.
-      const repsPerRound = baseMovements.reduce((sum, mov, mi) => {
-        const reps = result.movementReps?.[fsKeys[mi]] ?? result.movementReps?.[mov.name] ?? mov.reps ?? 0;
-        return sum + reps;
-      }, 0);
+      // Single-clock piece: one round count for the whole thing. A buy-in or cash-out is done
+      // ONCE, however many rounds follow — counting it per round turned a 100-push-up buy-in
+      // into 400 (KICK START, 2026-10-14: 1,152 reps saved for 4 rounds of a 118-rep round).
+      const repsOf = (mov: (typeof baseMovements)[number], mi: number): number =>
+        result.movementReps?.[fsKeys[mi]] ?? result.movementReps?.[mov.name] ?? mov.reps ?? 0;
+      const doneOnce = (mov: (typeof baseMovements)[number]): boolean => mov.role === 'buy_in' || mov.role === 'cash_out';
+      const repsPerRound = baseMovements.reduce((sum, mov, mi) => (doneOnce(mov) ? sum : sum + repsOf(mov, mi)), 0);
       const roundCountsFromSets: number[] = [];
 
       if (repsPerRound > 0) {
@@ -167,10 +182,8 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       const totalRounds = roundCounts.reduce((sum, value) => sum + value, 0);
 
       baseMovements.forEach((mov, mi) => {
-        const perRound = result.movementReps?.[fsKeys[mi]] ?? result.movementReps?.[mov.name] ?? mov.reps ?? 0;
-        if (perRound > 0) {
-          repsFromMovements += perRound * totalRounds;
-        }
+        const reps = repsOf(mov, mi);
+        if (reps > 0) repsFromMovements += doneOnce(mov) ? reps : reps * totalRounds;
       });
     }
 
@@ -306,9 +319,12 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
       ...(typeof result.exercise.isSecondary === 'boolean' && { isSecondary: result.exercise.isSecondary }),
       ...(typeof result.exercise.partnerWorkout === 'boolean' && { partnerWorkout: result.exercise.partnerWorkout }),
       ...(result.exercise.partnerSplit && { partnerSplit: result.exercise.partnerSplit }),
-      ...(result.exercise.partnerSplit === 'rounds' && result.exercise.suggestedSets && {
-        personalRounds: result.exercise.suggestedSets,
+      // The athlete's OWN round count is the AI's personalRounds; suggestedSets is the TEAM's ("30 RFT
+      // (6 each)" → 30 and 6). This used to copy suggestedSets here, back when a regex rewrote it to N.
+      ...(result.exercise.partnerSplit === 'rounds' && result.exercise.personalRounds && {
+        personalRounds: result.exercise.personalRounds,
       }),
+      ...(result.exercise.activeShare != null && { activeShare: result.exercise.activeShare }),
       ...(result.exercise.intervalCount != null && { intervalCount: result.exercise.intervalCount }),
       ...(result.exercise.workDuration != null && { workDuration: result.exercise.workDuration }),
       ...(result.exercise.restDuration != null && { restDuration: result.exercise.restDuration }),

@@ -43,7 +43,7 @@ import {
 } from '../data/exerciseDefinitions';
 import { StoryLogResults, storyTeamSize } from '../components/logging/story/StoryLogResults';
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
-import { useTellWodiChat, type FormHandoff } from '../components/tellWodi/useTellWodiChat';
+import { chatForSavedBoard, useTellWodiChat, type FormHandoff } from '../components/tellWodi/useTellWodiChat';
 import { useAskWodi } from '../components/tellWodi/useAskWodi';
 import { useWodiThread } from '../components/tellWodi/useWodiThread';
 import { useWodiMessage } from '../hooks/useWodiMessage';
@@ -54,7 +54,7 @@ import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { initStoryResults, movementToKind } from '../components/logging/story/types';
 import { unitToRemember } from '../components/logging/story/athleteLoadUnit';
-import { calculateWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
+import { computeWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
 import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
@@ -84,8 +84,6 @@ interface AddWorkoutScreenProps {
   onWorkoutCreated: () => void;
   onSavedForLater?: () => void;
   initialImage?: File | null;
-  /** Words sent with that photo ("Saving this board for later" from the "+" sheet). */
-  initialMessage?: string | null;
   showRecentOnOpen?: boolean;
   editWorkout?: import('../hooks/useWorkouts').WorkoutWithStats | null; // Workout to edit (skip to logging)
   /**
@@ -98,7 +96,9 @@ interface AddWorkoutScreenProps {
   onOpenWorkout?: (workout: import('../hooks/useWorkouts').WorkoutWithStats, list: import('../hooks/useWorkouts').WorkoutWithStats[]) => void;
   /** A board parked mid-chat was tapped in the thread — reopen its chat. */
   onOpenPlanned?: (planned: import('../types').PlannedWorkout) => void;
-  plannedWorkout?: import('../types').PlannedWorkout | null; // Pre-parsed workout — jump straight to log-results
+  plannedWorkout?: import('../types').PlannedWorkout | null; // A saved board — opens in its chat
+  /** The saved board was opened from Today (its tile), not from inside the chat — Back returns there. */
+  plannedFromToday?: boolean;
   /** Open on the Tell Wodi chat instead of the capture step. */
   startInChat?: boolean;
 }
@@ -413,7 +413,7 @@ function normalizeParsedWorkout(parsed: ParsedWorkout): ParsedWorkout {
   };
 }
 
-export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, initialMessage, showRecentOnOpen, editWorkout, plannedWorkout, startInChat = false }: AddWorkoutScreenProps) {
+export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWorkoutUpdated, onOpenWorkout, onOpenPlanned, onSavedForLater, initialImage, showRecentOnOpen, editWorkout, plannedWorkout, plannedFromToday = false, startInChat = false }: AddWorkoutScreenProps) {
   const { user, isAdmin, updateUserProfile } = useAuth();
   const { calculateRewardData } = useRewardData();
   // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
@@ -427,13 +427,14 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   // The same newest message as Today's, so the thread ends where Today begins.
   const wodiMessage = useWodiMessage(allWorkouts);
   // When that message is one of Wodi's kept lines, it's the live opening — not also history above it.
-  const thread = useWodiThread(allWorkouts, plannedWorkout ?? null, wodiMessage.threadId);
+  const thread = useWodiThread(allWorkouts, !workoutsLoading, plannedWorkout ?? null, wodiMessage.threadId);
   // Null until the log has loaded and Wodi has its words, so the first line appears once with the
   // right words rather than as the generic opener swapped for the real one a moment later (a flicker).
   const chatOpening = useMemo(() => (workoutsLoading || wodiMessage.pending ? null : {
     text: wodiMessage.text,
     highlight: wodiMessage.highlight,
     link: wodiMessage.day && wodiMessage.dayWorkout ? { label: wodiMessage.day.label, workoutId: wodiMessage.dayWorkout.id } : null,
+    posterId: wodiMessage.cheered?.id ?? null,
   }), [wodiMessage, workoutsLoading]);
   // Seeds the max-effort stepper on skill practices ("last time 16"). Read off the recent
   // workouts already loaded here — no extra query on the logging path.
@@ -545,13 +546,13 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     }
   }, [showRecentOnOpen, isAdmin]);
 
-  // Today's camera hands the board photo in on open: it goes straight into the chat as a sent
+  // Today's camera (or "+", a board from the photos) hands the board photo in on open: it goes straight into the chat as a sent
   // message. Once per photo — a re-run of this effect must not send the board twice.
   const sentOpeningPhotoRef = useRef<File | null>(null);
   useEffect(() => {
     if (!initialImage || sentOpeningPhotoRef.current === initialImage) return;
     sentOpeningPhotoRef.current = initialImage;
-    tellWodi.send(initialMessage ?? '', initialImage);
+    tellWodi.send('', initialImage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialImage]);
 
@@ -584,6 +585,12 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     if (!plannedWorkout) return;
 
     let cancelled = false;
+    // Every saved board opens in its chat — the one it was kept by, or a new one asking how it went.
+    const openInChat = (workout: ParsedWorkout): void => {
+      setParsedWorkout(workout);
+      setStep('chat');
+      tellWodi.resume(workout, chatForSavedBoard(plannedWorkout));
+    };
     const loadSavedWorkout = async () => {
       setImageUrl(null);
       setError(null);
@@ -599,14 +606,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         : false;
 
       if (stored && (!storedDegraded || !raw)) {
-        setParsedWorkout(stored);
-        // A board with a conversation reopens the conversation, never the form.
-        if (plannedWorkout.chat) {
-          setStep('chat');
-          tellWodi.resume(stored, plannedWorkout.chat);
-          return;
-        }
-        setStep('log-results');
+        openInChat(stored);
         return;
       }
 
@@ -620,8 +620,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       try {
         const parsed = await parseWorkoutSession(raw);
         if (cancelled) return;
-        setParsedWorkout(parsed);
-        setStep('log-results');
+        openInChat(parsed);
 
         const parsedDegraded = parsed.exercises.some(
           (exercise) => exercise.loggingMode === 'free' && !exercise.movements?.length,
@@ -639,8 +638,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         if (stored && !isRateLimitError(err)) {
           // Reparse failed — the degraded parse still logs a score; better than blocking.
           console.warn('[SavedWod] reparse of degraded saved parse failed — using stored parse:', err);
-          setParsedWorkout(stored);
-          setStep('log-results');
+          openInChat(stored);
           return;
         }
         console.error('[SavedWod] Failed to parse raw saved WOD:', err);
@@ -1367,10 +1365,10 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const chatVibeRef = useRef<PosterVibeKey | null>(null);
   // The conversation, carried onto the workout it became — the poster's "View conversation".
   const chatThreadRef = useRef<SavedChat | null>(null);
-  // The waiting board a chat keeps itself on. A chat reopened from Today already has one; a new
-  // chat creates it the first time there's a board to keep. The pending create is shared so two
-  // quick messages can't each create a board.
-  const chatBoardIdRef = useRef<string | null>(plannedWorkout?.chat ? plannedWorkout.id : null);
+  // The waiting board a chat keeps itself on. A saved board opened from Today is that board — its
+  // chat is written onto it, never a second one; a new chat creates it the first time there's a
+  // board to keep. The pending create is shared so two quick messages can't each create a board.
+  const chatBoardIdRef = useRef<string | null>(plannedWorkout?.id ?? null);
   const chatBoardCreateRef = useRef<Promise<string> | null>(null);
   // The logging form was handed over from the chat — Back returns there, not to the photo flow.
   const formFromChatRef = useRef(false);
@@ -1383,11 +1381,17 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
   const loadHistory = useMemo(() => recentLoads(recentWorkouts), [recentWorkouts]);
 
+  // The board has its workout — nothing keeps it waiting any more (see clearWaitingBoard).
+  const boardLoggedRef = useRef(false);
+
   const keepChat = async (chat: SavedChat, workout: ParsedWorkout): Promise<void> => {
-    if (!user?.id) return;
+    if (!user?.id || boardLoggedRef.current) return;
     try {
+      // The board goes along each time: an answered question about it changed it, and a board
+      // reopened later must not ask that question again.
+      const { parsedWorkout } = savedWodPayload(workout, user.id);
       if (chatBoardIdRef.current) {
-        await setDoc(doc(db, 'savedWods', chatBoardIdRef.current), { chat }, { merge: true });
+        await setDoc(doc(db, 'savedWods', chatBoardIdRef.current), { chat, parsedWorkout }, { merge: true });
         return;
       }
       if (!chatBoardCreateRef.current) {
@@ -1397,10 +1401,29 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         return;
       }
       const id = await chatBoardCreateRef.current;
-      await setDoc(doc(db, 'savedWods', id), { chat }, { merge: true });
+      // Logged while the board was being created: a write now would bring back a board just cleared.
+      if (boardLoggedRef.current) return;
+      await setDoc(doc(db, 'savedWods', id), { chat, parsedWorkout }, { merge: true });
     } catch (err) {
       console.error('[TellWodi] could not keep the chat', err);
     }
+  };
+
+  /**
+   * Logged, so the board stops waiting — cleared by the save itself, whichever way it was kept
+   * (saved from the standard screen, or kept by its chat) and however the athlete leaves the poster
+   * afterwards. Clearing it only on the poster's Done left it on Today after any other way out.
+   * Once: an Edit re-saves, and the rules refuse a delete of a board that's already gone — a refused
+   * write holds up every write queued behind it.
+   */
+  const clearWaitingBoard = async (): Promise<void> => {
+    if (boardLoggedRef.current) return;
+    boardLoggedRef.current = true;
+    const chatBoard = chatBoardIdRef.current
+      ?? (chatBoardCreateRef.current ? await chatBoardCreateRef.current.catch(() => null) : null);
+    const ids = new Set([plannedWorkout?.id, chatBoard].filter((id): id is string => Boolean(id)));
+    await Promise.all([...ids].map((id) => deleteDoc(doc(db, 'savedWods', id))
+      .catch((err: unknown) => console.error('[SavedWod] could not clear the logged board', err))));
   };
 
   const tellWodi = useTellWodiChat({
@@ -1431,6 +1454,8 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     history: loadHistory,
     athleteSex: user?.sex,
     onPersist: (chat, workout) => { void keepChat(chat, workout); },
+    // An answer about the board itself (ParseUncertainty) changed it — the save reads this one.
+    onBoardChanged: setParsedWorkout,
     onFinished: (results, vibe, chat) => {
       chatVibeRef.current = vibe;
       chatThreadRef.current = chat;
@@ -1604,12 +1629,6 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
           }, { merge: true });
         }
         setSavedWorkoutMeta({ id: docRef.id, totalVolume, date: workoutDate });
-        // A chat kept itself on a waiting board; it has its workout now. A board the athlete opened
-        // from Today is cleared by the caller (onWorkoutCreated), like any saved WOD.
-        if (chatBoardIdRef.current && chatBoardIdRef.current !== plannedWorkout?.id) {
-          void deleteDoc(doc(db, 'savedWods', chatBoardIdRef.current))
-            .catch((err) => console.error('[TellWodi] could not clear the waiting board', err));
-        }
       } else {
         const workoutRef = doc(db, 'workouts', saveTarget.workoutId);
         persistedWorkoutId = saveTarget.workoutId;
@@ -1626,6 +1645,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         // Also how a replaced earlier log becomes this session's workout: an Edit after it lands here.
         setSavedWorkoutMeta({ id: saveTarget.workoutId, totalVolume, date: session?.date ?? workoutDate });
       }
+      void clearWaitingBoard();
 
       // What an Edit from the poster reopens: these answers, exactly as just saved.
       setEditInitialResults(results);
@@ -1782,6 +1802,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       setRewardData({
         ...reward,
         workloadBreakdown,
+        ...(parsedWorkout.timeCap ? { timeCap: parsedWorkout.timeCap } : {}),
         workoutContext: workoutContextLine || undefined,
         workoutRawText: parsedWorkout.rawText?.trim() || undefined,
         sourceDate: parsedWorkout.sourceDate,
@@ -1808,19 +1829,20 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         });
       }
 
-      // Compute final EP using the same formula WorkoutScreen will use (PRs now known)
+      // The EP the poster and every total will show — computeWorkoutEP on the workout just saved
+      // (PRs now known), never a second formula with its own inputs.
       const finalHasPR = reward.achievements?.some(a => a.type === 'pr') || reward.heroAchievement?.type === 'pr';
-      const epTimeCapMinutes = durationMinutes;
-      const epDifficultyLevel = parsedWorkout.format === 'strength' ? undefined : parsedWorkout.difficultyLevel;
-      const finalEP = calculateWorkoutEP(
-        totalVolume,
-        epTimeCapMinutes,
-        user.weight || DEFAULT_BW,
-        finalHasPR || false,
-        breakdownFromResults.movements,
-        actualTimeMinutes,
-        epDifficultyLevel,
-      ).total;
+      const finalEP = computeWorkoutEP({
+        type: parsedWorkout.type,
+        format: parsedWorkout.format,
+        timeCap: parsedWorkout.timeCap,
+        duration: workoutBase.duration ?? undefined,
+        difficultyLevel: parsedWorkout.difficultyLevel,
+        workloadBreakdown: breakdownFromResults,
+        ...(teamSize > 1 && { teamSize }),
+        isPR: finalHasPR || false,
+        exercises,
+      }, { bodyweight: user.weight || DEFAULT_BW }).total;
 
       // Compute wrap label (mirrors StoryLogResults typeLabel logic)
       const wrapCtx = { format: parsedWorkout.format, scoreType: parsedWorkout.scoreType, exerciseCount: parsedWorkout.exercises.length };
@@ -2242,7 +2264,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         <TellWodiChat
           chat={tellWodi}
           thread={thread}
-          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard }))}
+          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday }))}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
         />

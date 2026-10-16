@@ -1,0 +1,183 @@
+{
+  "name": "partner-amrap-buyin-kick-start",
+  "description": "Real board 2026-10-14: partner buy-in (800 run, 100 push-ups, 100 SL V-ups) into an untimed AMRAP with synch goblet squats and IGUG box jumps / T2B / calories. Logged 4 rounds, 17.5 kg. The buy-in is done ONCE — it must be its own block, never a peer of the round movements.",
+  "workout": {
+    "title": "KICK START",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Kick Start AMRAP",
+        "type": "wod",
+        "prescription": "800m Run, 100 Push-ups, and 100 SL V-Ups, then AMRAP: 14 Goblet Squats (synch), 30 Box Jumps (IGUG), 30 Toes to Bar (IGUG), 14 Goblet Squats (synch), 30 Calories (IGUG)",
+        "sets": [
+          {
+            "id": "set-summary",
+            "setNumber": 1,
+            "completed": true,
+            "actualReps": 552,
+            "weight": 17.5
+          }
+        ],
+        "movements": [
+          {
+            "name": "Buy-In: Run",
+            "distance": 800,
+            "unit": "m",
+            "inputType": "none",
+            "equipment": "none",
+            "perRound": false,
+            "countingMode": "once",
+            "scoreEntryMode": "per_round",
+            "role": "buy_in"
+          },
+          {
+            "name": "Buy-In: Push-up",
+            "reps": 100,
+            "inputType": "none",
+            "equipment": "none",
+            "perRound": false,
+            "countingMode": "once",
+            "scoreEntryMode": "per_round",
+            "role": "buy_in"
+          },
+          {
+            "name": "Buy-In: Single Leg V-Up",
+            "reps": 100,
+            "inputType": "none",
+            "equipment": "none",
+            "perRound": false,
+            "countingMode": "once",
+            "scoreEntryMode": "per_round",
+            "role": "buy_in"
+          },
+          {
+            "name": "Goblet Squat",
+            "reps": 14,
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "together": true,
+            "sharedLabel": "sync",
+            "loggedWeights": [
+              17.5
+            ]
+          },
+          {
+            "name": "Box Jump",
+            "reps": 30,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Toes to Bar",
+            "reps": 30,
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          },
+          {
+            "name": "Goblet Squat",
+            "reps": 14,
+            "inputType": "weight",
+            "equipment": "kettlebell",
+            "implementCount": 1,
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round",
+            "together": true,
+            "sharedLabel": "sync",
+            "loggedWeights": [
+              17.5
+            ]
+          },
+          {
+            "name": "Calories",
+            "calories": 30,
+            "unit": "cal",
+            "inputType": "none",
+            "equipment": "none",
+            "countingMode": "per_round",
+            "scoreEntryMode": "per_round"
+          }
+        ],
+        "rounds": 4,
+        "rawText": "Kick start:\n800 run\n100 Push-up\n100 SL V-Up\nInto AMRAP:\n14 Goblet Squat (synch)\n30 Box Jump (IGUG)\n30 Toes to Bar (IGUG)\n14 Goblet Squat (synch)\n30 Calories (IGUG)",
+        "partKind": "metcon",
+        "loggingMode": "amrap",
+        "isSecondary": false,
+        "partnerWorkout": true,
+        "partnerSplit": "reps",
+        "wodName": "Kick start"
+      }
+    ],
+    "workloadBreakdown": {
+      "movements": [
+        {
+          "name": "Goblet Squat",
+          "exerciseIndex": 0,
+          "totalReps": 112,
+          "totalDistance": 0,
+          "totalCalories": 0,
+          "totalTime": 0,
+          "weight": 17.5,
+          "unit": "kg",
+          "wasSubstituted": false,
+          "implementCount": 1,
+          "together": true,
+          "sharedLabel": "sync",
+          "color": "yellow"
+        },
+        {
+          "name": "Box Jump",
+          "exerciseIndex": 0,
+          "totalReps": 60,
+          "color": "magenta"
+        },
+        {
+          "name": "Toes to Bar",
+          "exerciseIndex": 0,
+          "totalReps": 60,
+          "color": "cyan"
+        },
+        {
+          "name": "Buy-In: Push-up",
+          "exerciseIndex": 0,
+          "totalReps": 50,
+          "color": "magenta"
+        },
+        {
+          "name": "Buy-In: Single Leg V-Up",
+          "exerciseIndex": 0,
+          "totalReps": 50,
+          "color": "magenta"
+        },
+        {
+          "name": "Buy-In: Run",
+          "exerciseIndex": 0,
+          "totalDistance": 400,
+          "unit": "m",
+          "distancePerRep": 800,
+          "color": "magenta"
+        },
+        {
+          "name": "Calories",
+          "exerciseIndex": 0,
+          "totalCalories": 60,
+          "unit": "cal",
+          "color": "magenta"
+        }
+      ],
+      "grandTotalReps": 332,
+      "grandTotalVolume": 1960,
+      "grandTotalDistance": 400,
+      "grandTotalCalories": 60
+    },
+    "rawText": "Kick start:\n800 run\n100 Push-up\n100 SL V-Up\nInto AMRAP:\n14 Goblet Squat (synch)\n30 Box Jump (IGUG)\n30 Toes to Bar (IGUG)\n14 Goblet Squat (synch)\n30 Calories (IGUG)",
+    "format": "amrap",
+    "teamSize": 2
+  }
+}

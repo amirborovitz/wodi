@@ -128,11 +128,9 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
   const workingSets = isStrength && !isSummary ? getSavedWorkingStrengthSets(exercise.sets) : [];
   const repScheme = isStrength && !isSummary ? getSavedStrengthRepScheme(exercise.sets) : undefined;
 
-  // "(N each)" partner rounds: the save path writes the pre-save `suggestedSets` out as
-  // `personalRounds`, so that is where the per-athlete round count has to be read back from.
-  const suggestedSets = exercise.partnerSplit === 'rounds' && exercise.personalRounds
-    ? exercise.personalRounds
-    : exercise.rounds ?? (exercise.sets.length || 3);
+  // The round count is the board's — on a traded-rounds team piece, the TEAM's — and the
+  // athlete's own comes back as personalRounds beside it (partnerScope.ts reads the two together).
+  const suggestedSets = exercise.rounds ?? (exercise.sets.length || 3);
 
   // The prescribed scheme if the doc kept one, otherwise what the athlete's own sets imply.
   const repsPerSet = exercise.suggestedRepsPerSet?.length ? exercise.suggestedRepsPerSet : repScheme;
@@ -165,6 +163,8 @@ function toParsedExercise(saved: Exercise): ParsedExercise {
     ...(typeof exercise.isSecondary === 'boolean' && { isSecondary: exercise.isSecondary }),
     ...(typeof exercise.partnerWorkout === 'boolean' && { partnerWorkout: exercise.partnerWorkout }),
     ...(exercise.partnerSplit && { partnerSplit: exercise.partnerSplit }),
+    ...(exercise.personalRounds != null && { personalRounds: exercise.personalRounds }),
+    ...(exercise.activeShare != null && { activeShare: exercise.activeShare }),
     ...(exercise.complex === true && { complex: true }),
   };
 }

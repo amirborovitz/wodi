@@ -79,6 +79,11 @@ export interface HighlightStampData {
 export interface ArtifactRow {
   primary: string;
   name: string;
+  /**
+   * Done ONCE — before the rounds or after them (the parse's role) — so the row never carries a
+   * round multiplier, and the page puts it in its own BUY-IN / CASH-OUT block. Absent: every round.
+   */
+  onceOnly?: 'buy_in' | 'cash_out';
   nameWithLoad?: string;
   loadNote?: string;
   subNote?: string;

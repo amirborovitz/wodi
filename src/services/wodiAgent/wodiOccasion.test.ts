@@ -50,6 +50,14 @@ describe('a workout just logged gets a cheer', () => {
   it('a workout three days old is history, not news', () => {
     expect(newKey({ workouts: [workout('w1', '2026-10-04')] })).toBeNull();
   });
+
+  it('a deleted workout takes its cheer with it — the line is not today\'s message any more', () => {
+    const gone: [string, ThreadMessage] = ['cheer:deleted', {
+      id: 'cheer:deleted', from: 'wodi', text: 'SNATCH CLIMB done in 15:00', at: TODAY_START + 1000, workoutIds: ['deleted'],
+    }];
+    const pick = pickOccasion(input({ workouts: [workout('w1', '2026-10-01')], said: new Map([gone, said('cheer:w1', 0)]) }));
+    expect(pick.kind === 'said' && pick.message.id === 'cheer:deleted').toBe(false);
+  });
 });
 
 describe('some days Wodi speaks first — once a day, only with a reason', () => {

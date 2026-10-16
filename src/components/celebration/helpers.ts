@@ -2116,12 +2116,14 @@ function buildSequentialMovementRows(
       && maxMovementKey != null
       && movement.name.toLowerCase() === maxMovementKey;
     const writtenReps = (options.writtenSetReps ?? 0) > 0 ? options.writtenSetReps : undefined;
+    const role = movementStructuralRole(movement);
+    const onceOnly = role === 'rounds' ? undefined : role;
     const row = buildCelebrationMovementRow({
       // A max row is its own occurrence and carries its own count, so the merge guard that blanks
       // a name-shared total must not blank it too — and neither may it blank the written half.
       occurrenceCount: maxSet || isWrittenHalfOfMaxBlock ? 1 : occurrences.get(boardLineName(movement).toLowerCase()),
       // A logged substitution replaces the board's movement — the athlete didn't do the Rx one.
-      movementName: actual?.wasSubstituted ? actual.name : movement.name,
+      movementName: actual?.wasSubstituted ? actual.name : onceOnly ? stripMovementRolePrefix(movement.name) : movement.name,
       prescribed: {
         reps: movement.reps,
         repsDisplay: movement.repsDisplay,
@@ -2136,7 +2138,7 @@ function buildSequentialMovementRows(
         : isWrittenHalfOfMaxBlock
         ? { ...(actual ?? { name: movement.name }), totalReps: writtenReps }
         : actual,
-      repeatCount: maxSet ? 1 : (options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount),
+      repeatCount: maxSet || onceOnly ? 1 : (options.movementRepeatCounts?.get(movement.name.toLowerCase()) ?? options.repeatCount),
       suppressDistanceTotal: true,
       suppressCalorieTotal: true,
       isStrength: options.isStrength,
@@ -2148,6 +2150,7 @@ function buildSequentialMovementRows(
       sharedLabel: movement.sharedLabel ?? actual?.sharedLabel,
       isMaxEffort: statesMax,
     });
+    if (onceOnly) row.onceOnly = onceOnly;
     // The poster resolves a row's right-hand value from the breakdown through mineKey, and the
     // breakdown holds ONE progression for the whole block. Left alone, both rows of a max block
     // print the same "100→60kg" — a climb the working sets never made and the max set never made
@@ -3585,13 +3588,18 @@ export function buildPageArtifactSections(
           alternative: prescribedAltMap[pk],
         };
 
+        // A buy-in or cash-out (the AI's role) is done ONCE: never "x rounds", and its block says
+        // what it is, so the name goes back to being the movement's name.
+        const structuralRole = parsedMovement ? movementStructuralRole(parsedMovement) : 'rounds';
+        const onceOnly = structuralRole === 'rounds' ? undefined : structuralRole;
+        const displayName = parsedMovement
+          ? getMovementDisplayNameFromContext(parsedMovement, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`)
+          : movement.name;
         const row = buildCelebrationMovementRow({
-          movementName: parsedMovement
-            ? getMovementDisplayNameFromContext(parsedMovement, `${exercise.name || ''} ${exercise.prescription || ''} ${rawText || ''}`)
-            : movement.name,
+          movementName: onceOnly ? stripMovementRolePrefix(displayName) : displayName,
           prescribed,
           actual: movement,
-          repeatCount: movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
+          repeatCount: onceOnly ? 1 : movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
           isStrength,
           statesOwnReps: strengthRowsStateOwnReps,
           partnerSplit: splitInfo?.split,
@@ -3637,6 +3645,7 @@ export function buildPageArtifactSections(
           }
         }
 
+        if (onceOnly) row.onceOnly = onceOnly;
         return row;
       });
 
@@ -3680,12 +3689,20 @@ export function buildPageArtifactSections(
       }]
     : swapLast;
 
-  return [{
+  // Done once, before or after the rounds: each its own block, so the poster tells the story in
+  // order — buy-in, then the rounds, then the cash-out — and nothing reads as part of every round.
+  const onceOnlyBlock = (role: 'buy_in' | 'cash_out'): ArtifactSection[] => {
+    const blockRows = complexCollapsed.filter((r) => r.onceOnly === role);
+    return blockRows.length > 0
+      ? [{ title: role === 'buy_in' ? 'BUY-IN' : 'CASH-OUT', rows: blockRows, hiddenCount: 0, isPartnerConfirmed: !!splitInfo }]
+      : [];
+  };
+  return [...onceOnlyBlock('buy_in'), {
     eyebrow: sectionEyebrow,
     title: exercise.name,
     blueprint,
     structureNote,
-    rows: complexCollapsed,
+    rows: complexCollapsed.filter((r) => !r.onceOnly),
     hiddenCount: 0,
     ...((descSchemeGlobal || strengthBubbleScheme) && {
       descLadderScheme: descSchemeGlobal ?? strengthBubbleScheme,
@@ -3693,7 +3710,7 @@ export function buildPageArtifactSections(
     }),
     roundLedger,
     isPartnerConfirmed: !!splitInfo,
-  }];
+  }, ...onceOnlyBlock('cash_out')];
 }
 
 // ─── Hero result ──────────────────────────────────────────────────────────────

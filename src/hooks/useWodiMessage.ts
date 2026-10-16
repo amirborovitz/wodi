@@ -20,6 +20,8 @@ export interface WodiMessageData extends WodiMessage {
   pending: boolean;
   /** The thread message these words are kept as, when they're Wodi's own line. */
   threadId: string | null;
+  /** The workout this line cheers — a poster just logged, drawn big under the line with Share. */
+  cheered: WorkoutWithStats | null;
 }
 
 /** How far back "already said" looks. Wodi says a line or two a day; questions add a few more. */
@@ -55,7 +57,7 @@ function startOfToday(): number {
 }
 
 /**
- * Wodi's newest message, from the athlete's log — the same words on Today and in the thread.
+ * Wodi's newest message, from the athlete's log — the line the chat opens on.
  * A workout just logged gets a cheer; some days Wodi brings something up on its own
  * (wodiOccasion.ts); otherwise the plain recognition line (wodiMessage.ts).
  * `workouts` newest trained first (as useWorkouts returns them).
@@ -129,12 +131,12 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
       : pick?.kind === 'new' && written?.id === pick.occasion.key ? written
       : null;
     if (userId && (!pick || (pick.kind === 'new' && !ownLine))) {
-      return { text: '', highlight: null, day: null, dayWorkout: null, pending: true, threadId: null };
+      return { text: '', highlight: null, day: null, dayWorkout: null, pending: true, threadId: null, cheered: null };
     }
     if (ownLine) return ownLineMessage(ownLine, workouts);
 
     const message = buildWodiMessage({ milestone, chase: chase.facts, today: toIsoDate(new Date()) });
-    return { ...message, dayWorkout: dayWorkoutFor(message, workouts), pending: false, threadId: null };
+    return { ...message, dayWorkout: dayWorkoutFor(message, workouts), pending: false, threadId: null, cheered: null };
   }, [pick, written, userId, milestone, chase.facts, workouts]);
 }
 
@@ -144,7 +146,8 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
  */
 function ownLineMessage(line: ThreadMessage, workouts: readonly WorkoutWithStats[]): WodiMessageData {
   const workout = line.workoutIds?.[0] ? workouts.find((w) => w.id === line.workoutIds![0]) ?? null : null;
-  const base = { text: line.text, highlight: firstMeasured(line.text), pending: false, threadId: line.id };
+  const cheered = workout && line.id.startsWith('cheer:') ? workout : null;
+  const base = { text: line.text, highlight: firstMeasured(line.text), pending: false, threadId: line.id, cheered };
   if (!workout) return { ...base, day: null, dayWorkout: null };
   const trained = toIsoDate(getEffectiveWorkoutDate(workout));
   const lower = line.text.toLowerCase();

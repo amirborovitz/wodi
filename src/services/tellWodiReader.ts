@@ -114,6 +114,11 @@ just finished a workout and is texting you about it. Your job has two parts.
    - "unit": they're saying which unit their weights were in — "kg", "kilos" → unit "kg";
      "lb", "lbs", "pounds" → unit "lb".
    - "choice": copy one of the question's options exactly. "singles" picks the singles option.
+   - "clarify": a question about the board itself, asked in "about" (how long the clock ran,
+     whether partners split something). Answer it the way its "answer" says: "duration" → seconds
+     (a clock length said as a bare number is minutes: "20" → 1200); "number" → count;
+     "choice" → copy one of its options exactly, picking whichever their words mean. "Not sure",
+     "don't know" → skipped.
    - "score": whichever fits — seconds, count, or weight.
    - "swap": they did a DIFFERENT movement instead of this one ("switched the run to echo bike",
      "did singles instead", "rowed instead of running"). swapTo = what they did, in plain words
@@ -179,6 +184,7 @@ export async function readAthleteMessage(input: {
     ...(s.usualAmount ? { usualAmount: s.usualAmount } : {}),
     ...(s.intervals ? { intervals: s.intervals } : {}),
     ...(s.cap ? { capMinutes: Math.round((s.cap / 60) * 10) / 10 } : {}),
+    ...(s.uncertainty?.answer ? { answer: s.uncertainty.answer } : {}),
   }));
   const conversation = input.recent
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)

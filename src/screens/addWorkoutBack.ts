@@ -3,23 +3,27 @@
  * the screen header can't disagree.
  *
  * The chat is home base. A board half-logged in the chat is already kept (the chat saves itself
- * as it goes), so Back on it means "later": the athlete lands on the thread, where the board waits
- * as "saved for later — Log it". Sending them to Today instead hid it in the For Later line, and
- * the board got uploaded a second time (2026-10-10).
+ * as it goes), so Back on it means "later": the athlete lands on the thread, where the board is
+ * pinned above the composer ("Finish"), as it leads Today's rail. Sending them to Today with no
+ * sign of it once got the board uploaded a second time (2026-10-10).
  */
 export type BackTarget =
   /** Leave Add Workout altogether — Today, or the poster an edit began from. */
   | 'exit'
-  /** The thread with no board open; the one just left waits there as a card. */
+  /** The thread with no board open; the one just left is pinned there. */
   | 'thread'
   /** Back into the chat this form was opened from. */
   | 'chat'
   /** The form flow's own previous step — the parsed board. */
   | 'preview';
 
-/** Back from the chat itself. */
-export function backFromChat(input: { boardOpen: boolean }): BackTarget {
-  return input.boardOpen ? 'thread' : 'exit';
+/**
+ * Back from the chat itself — to where the athlete came from. A board opened from its tile on
+ * Today goes back to Today, where the tile still shows it; a board read or reopened inside the
+ * chat goes back to the thread, where it is pinned.
+ */
+export function backFromChat(input: { boardOpen: boolean; boardFromToday: boolean }): BackTarget {
+  return input.boardOpen && !input.boardFromToday ? 'thread' : 'exit';
 }
 
 /** Back from the logging form, at its first part. */

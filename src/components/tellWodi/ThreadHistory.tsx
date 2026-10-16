@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import type { WodiThread } from './useWodiThread';
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
-import type { PlannedWorkout } from '../../types';
 import { usePosterPayload } from '../../hooks/usePosterPayload';
 import { useNearViewport } from '../../hooks/useNearViewport';
 import { PosterCard } from '../celebration/faces/HandwrittenFace/PosterCard';
@@ -13,21 +12,20 @@ import styles from './ThreadHistory.module.css';
 interface ThreadHistoryProps {
   thread: WodiThread;
   onOpenWorkout: (workout: WorkoutWithStats) => void;
-  onOpenPlanned: (planned: PlannedWorkout) => void;
 }
 
 /**
  * The ongoing thread above the live chat: what was said between workouts (with the posters an
- * answer quotes), boards parked mid-chat, a separator per day. Logged workouts aren't cards here —
- * they live on Today and in the Gallery. Render-only — the order and the window are useWodiThread's.
+ * answer quotes), a separator per day. Logged workouts aren't cards here — they live on Today and
+ * in the Gallery — and a board still to log is pinned above the composer, not buried in here. Render-only — the order and the window are useWodiThread's.
  */
-export function ThreadHistory({ thread, onOpenWorkout, onOpenPlanned }: ThreadHistoryProps) {
+export function ThreadHistory({ thread, onOpenWorkout }: ThreadHistoryProps) {
   if (thread.items.length === 0 && !thread.canLoadEarlier) return null;
   return (
     <>
       {thread.canLoadEarlier && (
         <button type="button" className={styles.earlier} onClick={thread.loadEarlier}>
-          Earlier
+          Show earlier
         </button>
       )}
       {thread.items.map((item) => {
@@ -44,16 +42,6 @@ export function ThreadHistory({ thread, onOpenWorkout, onOpenPlanned }: ThreadHi
                 </div>
                 <Receipts ids={item.message.workoutIds} thread={thread} onOpenWorkout={onOpenWorkout} />
               </div>
-            );
-          case 'waiting':
-            return (
-              <button key={item.id} type="button" className={styles.waiting} onClick={() => onOpenPlanned(item.planned)}>
-                <span className={styles.cardText}>
-                  <span className={styles.cardTitle}>{item.title}</span>
-                  <span className={styles.meta}>Board · saved for later</span>
-                </span>
-                <span className={styles.logButton}>Log it</span>
-              </button>
             );
         }
       })}

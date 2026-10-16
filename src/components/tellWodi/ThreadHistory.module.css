@@ -1,5 +1,5 @@
-/* The thread above the live chat. Cards share the chat's surface (#17181B); yellow is spent on a
-   poster's result and the PR pill — the posters carry the rest. Dashed means "waiting", only. */
+/* The thread above the live chat. Receipts share the chat's surface (#17181B); yellow is spent on
+   a poster's result and the PR pill — the posters carry the rest. */
 
 .day {
   margin: 14px 0 6px;
@@ -25,13 +25,15 @@
   cursor: pointer;
 }
 
-.waiting,
 .receipt {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  border-radius: 14px;
+  gap: 10px;
+  max-width: 260px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 12px;
+  background: #17181b;
+  border: 1px solid rgba(255, 255, 255, 0.09);
   text-align: left;
   color: #f2f2f0;
   font: inherit;
@@ -40,42 +42,17 @@
   transition: transform 0.12s ease;
 }
 
-.waiting:active,
 .receipt:active {
   transform: scale(0.98);
 }
 
-/* A card is its own item in the timeline, not a reply under the bubble above it. */
-.waiting {
-  margin: 12px 0;
-}
-
-.waiting {
-  padding: 12px 12px 12px 16px;
-  background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.24);
-}
-
-.receipt {
-  width: auto;
-  max-width: 260px;
-  gap: 10px;
-  padding: 6px 12px 6px 6px;
-  border-radius: 12px;
-  background: #17181b;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-}
-
 .receiptThumb {
   flex-shrink: 0;
-  overflow: hidden;
-  background: #1e2023;
-}
-
-.receiptThumb {
   width: 30px;
   height: 42px;
+  overflow: hidden;
   border-radius: 4px;
+  background: #1e2023;
 }
 
 .cardText {
@@ -86,25 +63,16 @@
   gap: 3px;
 }
 
-.cardTitle,
 .receiptTitle {
   font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.cardTitle {
-  font-size: 18px;
-}
-
-.receiptTitle {
-  font-size: 14px;
-  letter-spacing: 0.03em;
 }
 
 .meta {
@@ -116,18 +84,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.logButton {
-  flex-shrink: 0;
-  display: inline-grid;
-  place-items: center;
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  font-family: 'Barlow', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #f2f2f0;
 }

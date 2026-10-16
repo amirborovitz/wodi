@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { LoadUnit } from '../../../utils/loadUnits';
 import { perImplementUnit } from './implementQuestion';
 import { suggestPeak } from '../../../utils/peakSuggestion';
+import { stepOnGrid } from '../../../utils/stepGrid';
 import styles from './ProgressiveWeightRow.module.css';
 
 function selectAllInput(target: HTMLInputElement | null) {
@@ -74,6 +75,11 @@ interface ProgressiveWeightRowProps {
 }
 
 // ─── Component ───────────────────────────────────────────────────
+
+/** One press of a ±step chevron — it lands on the implement's grid (see stepOnGrid). */
+function stepBy(from: number, delta: number): number {
+  return Math.max(0, stepOnGrid(from, Math.sign(delta), Math.abs(delta)));
+}
 
 export function ProgressiveWeightRow({
   weight,
@@ -149,7 +155,7 @@ export function ProgressiveWeightRow({
   }, [onChange]);
 
   const stepSingle = useCallback((delta: number) => {
-    const next = Math.max(0, (weightRef.current ?? 0) + delta);
+    const next = stepBy(weightRef.current ?? 0, delta);
     weightRef.current = next;
     peakRef.current = next;
     onChange(next, next);
@@ -175,7 +181,7 @@ export function ProgressiveWeightRow({
 
   // ── Chevron steppers (with long-press) ──
   const stepStart = useCallback((delta: number) => {
-    const next = Math.max(0, (weightRef.current ?? 0) + delta);
+    const next = stepBy(weightRef.current ?? 0, delta);
     weightRef.current = next;
     if (!peakTouched.current) {
       const peak = suggestPeak(next);
@@ -188,7 +194,7 @@ export function ProgressiveWeightRow({
 
   const stepPeak = useCallback((delta: number) => {
     peakTouched.current = true;
-    const next = Math.max(0, (peakRef.current ?? weightRef.current ?? 0) + delta);
+    const next = stepBy(peakRef.current ?? weightRef.current ?? 0, delta);
     peakRef.current = next;
     onChange(weightRef.current, next);
   }, [onChange]);
@@ -233,7 +239,7 @@ export function ProgressiveWeightRow({
     if (!dragRef.current.didDrag) return;
 
     const steps = Math.round(dy / PX_PER_STEP);
-    const newWeight = Math.max(0, dragRef.current.baseWeight + steps * step);
+    const newWeight = Math.max(0, stepOnGrid(dragRef.current.baseWeight, steps, step));
     const field = dragRef.current.field;
 
     if (field === 'start') {

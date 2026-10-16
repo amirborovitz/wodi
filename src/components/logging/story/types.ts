@@ -1058,9 +1058,10 @@ export function createBlankResult(
       // the FULL prescribed amount, not a shared slice of it (see partnerSplit.ts).
       const isRoundsSplit = exercise.partnerWorkout === true && exercise.partnerSplit === 'rounds';
       const isPartner = sharedTeamSize != null && !isRoundsSplit;
-      // Runs are never divided — each person runs the full distance
-      const isRun = /\b(run|running|sprint)\b/i.test(mov.name);
-      const shareDivisor = (isPartner && !mov.together && !isRun) ? sharedTeamSize : 1;
+      // Whether THIS movement is shared is the parse's answer (`together`, from its "share") —
+      // never the movement's name. A "runs are never split" name rule here pre-filled 800 m while
+      // the totals, following the parse, credited 400 m: one run, two answers (KICK START, 2026-10-14).
+      const shareDivisor = (isPartner && !mov.together) ? sharedTeamSize : 1;
 
       // Pre-fill from prescription, using user's sex for Rx selection
       if (movKind === 'load') {

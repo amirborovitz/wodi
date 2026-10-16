@@ -8,10 +8,10 @@ import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
-import { useWodiMessage } from '../hooks/useWodiMessage';
 import { PosterThumbnail } from '../components/home/PosterThumbnail';
-import { WodiMessageCard } from '../components/home/WodiMessageCard';
 import { OnDeckCard } from '../components/home/OnDeckCard';
+import { UnfinishedPosterTile } from '../components/home/UnfinishedPosterTile';
+import { buildUnfinishedPoster } from '../components/home/unfinishedPoster';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { FeedPulse } from '../components/home/FeedPulse';
 import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
@@ -26,8 +26,6 @@ const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
   onAddWorkout: () => void;
-  /** Log by chatting instead of the forms. */
-  onTellWodi: () => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
@@ -53,7 +51,6 @@ function getSavedTitle(saved: PlannedWorkout): string {
 
 export function HomeScreen({
   onAddWorkout,
-  onTellWodi,
   onOpenProfile,
   onSelectWorkout,
   onLogPlannedWorkout,
@@ -72,8 +69,6 @@ export function HomeScreen({
   const profile = useProfileCompleteness();
   // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
   const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
-  // Wodi's newest message — recognition only, never a gap (see wodiMessage).
-  const wodiMessage = useWodiMessage(workouts);
   const [savedSheetOpen, setSavedSheetOpen] = useState(false);
 
   // One drop card at a time, widest scope first. The month / season drop owns the
@@ -121,6 +116,7 @@ export function HomeScreen({
   const deleteSheet = useDeleteSheet(deleteWorkout);
   const savedDeleteSheet = useDeleteSheet(deleteSavedWod);
   const { handlers: longPressHandlers, consumeLongPress } = useLongPress<string>(deleteSheet.open);
+  const { handlers: savedLongPressHandlers, consumeLongPress: consumeSavedLongPress } = useLongPress<string>(savedDeleteSheet.open);
   const scrollRef = useRef<HTMLDivElement>(null);
   const recapSlotRef = useRef<HTMLDivElement>(null);
   const pendingRecapScrollOffsetRef = useRef(0);
@@ -159,12 +155,13 @@ export function HomeScreen({
   );
 
   const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
-  const savedSummary = useMemo(() => {
-    if (planned.length === 0) return '';
-    return planned.slice(0, 3).map(getSavedTitle).join(', ');
-  }, [planned]);
-  // A chat waiting for its result leads the For Later line — still one line, never a new card.
-  const waitingChat = useMemo(() => planned.find((p) => p.chat != null) ?? null, [planned]);
+  // The newest saved board leads the rail as the poster it will become; any others wait in the
+  // For Later sheet, one tap from its caption. One tile, never a shelf pushing the posters away.
+  const waitingBoard = planned[0] ?? null;
+  const unfinishedPoster = useMemo(
+    () => (waitingBoard ? buildUnfinishedPoster(waitingBoard, new Date()) : null),
+    [waitingBoard],
+  );
 
   const actionSheetWorkout = deleteSheet.targetId
     ? workouts.find((w) => w.id === deleteSheet.targetId) ?? null
@@ -191,6 +188,11 @@ export function HomeScreen({
     // For Later underneath it would read as though the WOD had gone. `planned` is this
     // render's snapshot and still holds the deleted row, so 1 means "that was the last one".
     if (deleted && planned.length <= 1) setSavedSheetOpen(false);
+  };
+
+  const handleOpenWaitingBoard = () => {
+    if (consumeSavedLongPress() || !waitingBoard) return;
+    onLogPlannedWorkout?.(waitingBoard);
   };
 
   const handleLogSavedWod = (saved: PlannedWorkout) => {
@@ -309,69 +311,6 @@ export function HomeScreen({
         </motion.header>
 
 
-        {/* ── Wodi talks first ──
-            The top of Today is Wodi's newest message — the same bubble that ends the thread. It only
-            ever recognises (never "your best still stands"); tapping it opens the thread, and its day
-            opens that poster. Logging itself is the composer docked on the nav (chat-first). */}
-        {!loading && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.04, duration: 0.28 }}
-          >
-            <WodiMessageCard
-              text={wodiMessage.text}
-              highlight={wodiMessage.highlight}
-              typing={wodiMessage.pending}
-              onOpen={onTellWodi}
-              link={wodiMessage.day && wodiMessage.dayWorkout ? {
-                text: wodiMessage.day.label,
-                onOpen: () => handleSelectWorkout(wodiMessage.dayWorkout!),
-              } : undefined}
-            />
-          </motion.div>
-        )}
-
-        {/* ── For Later ── */}
-        {planned.length > 0 && (
-          <motion.section
-            className={styles.savedShelf}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.08, duration: 0.28 }}
-          >
-            <button
-              type="button"
-              className={styles.savedSummaryLine}
-              onClick={handleOpenSavedSheet}
-              onPointerUp={handleOpenSavedSheet}
-              aria-label={`Open ${planned.length} saved WODs`}
-            >
-              <svg className={styles.savedSummaryIcon} width="14" height="18" viewBox="0 0 14 18" aria-hidden="true">
-                <path d="M1 1h12v16l-6-4-6 4z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-              </svg>
-              {waitingChat ? (
-                <span className={styles.savedSummaryCopy}>
-                  <strong>{getSavedTitle(waitingChat)}</strong>
-                  <span>{'·'}</span>
-                  <span className={styles.savedSummaryText}>
-                    waiting for you{planned.length > 1 ? ` · +${planned.length - 1} more` : ''}
-                  </span>
-                </span>
-              ) : (
-                <span className={styles.savedSummaryCopy}>
-                  <strong>{planned.length} saved for later</strong>
-                  <span>{'·'}</span>
-                  <span className={styles.savedSummaryText}>{savedSummary}</span>
-                </span>
-              )}
-              <span className={styles.savedSummaryView} aria-hidden="true">
-                View
-              </span>
-            </button>
-          </motion.section>
-        )}
-
         {/* ── Poster gallery ── */}
         {/* No `layout` here: this section contains the horizontal poster rail, and layout
             projection re-measures/transforms it on every re-render (the pull-to-refresh
@@ -396,7 +335,7 @@ export function HomeScreen({
                 <div key={i} className={styles.skeleton} />
               ))}
             </div>
-          ) : workouts.length === 0 ? (
+          ) : workouts.length === 0 && !unfinishedPoster ? (
             <button type="button" className={styles.emptyCard} onClick={onAddWorkout}>
               <span className={styles.emptyCardText}>
                 Your first poster is one workout away →
@@ -404,6 +343,17 @@ export function HomeScreen({
             </button>
           ) : (
             <div className={styles.galleryScroll}>
+              {unfinishedPoster && waitingBoard && (
+                <div className={styles.posterItem}>
+                  <UnfinishedPosterTile
+                    poster={unfinishedPoster}
+                    onOpen={handleOpenWaitingBoard}
+                    more={planned.length - 1}
+                    onOpenMore={handleOpenSavedSheet}
+                    pressHandlers={savedLongPressHandlers(waitingBoard.id)}
+                  />
+                </div>
+              )}
               {galleryWorkouts.map(workout => (
                 <div key={workout.id} className={styles.posterItem} {...longPressHandlers(workout.id)}>
                   <PosterThumbnail

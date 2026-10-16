@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import { stepOnGrid } from '../../../utils/stepGrid';
 import styles from './StepperInput.module.css';
 
 function selectAllInput(target: HTMLInputElement) {
@@ -104,7 +105,8 @@ export function StepperInput({
 
   const adjust = useCallback((delta: number) => {
     const current = value ?? min;
-    const next = clamp(current + delta);
+    // A press lands on the step's grid — see stepOnGrid.
+    const next = clamp(stepOnGrid(current, Math.sign(delta), Math.abs(delta)));
     setDraft(null);
     onChange(next);
   }, [value, min, clamp, onChange]);

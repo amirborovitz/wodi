@@ -47,10 +47,11 @@ interface AnalyticsEvents {
   };
   /**
    * Left the Wodi chat for the standard logging screen. `how`: typed it ("use the standard
-   * screen"), the "+" menu, the "Log on standard screen" chip, or Wodi handing over a part the
-   * chat can't log. `board`: whether a workout was already read (its answers go along).
+   * screen"), the "Fill it in myself" chip, or Wodi handing over a part the chat can't log.
+   * ('plus_menu' was the "+" sheet, removed 2026-10-14 — older events still carry it.)
+   * `board`: whether a workout was already read (its answers go along).
    */
-  standard_screen_from_chat: { how: 'typed' | 'plus_menu' | 'chip' | 'wodi_handoff'; board: 'yes' | 'no' };
+  standard_screen_from_chat: { how: 'typed' | 'chip' | 'wodi_handoff'; board: 'yes' | 'no' };
   /** A saved workout was fixed and re-saved. */
   workout_edited: { format: WorkoutFormat | 'unknown'; parts: number };
   /** A workout was deleted. */

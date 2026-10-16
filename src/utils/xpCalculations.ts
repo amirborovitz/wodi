@@ -1,11 +1,11 @@
-import type { Workout, WorkoutType, EPBreakdown } from '../types';
+import type { Exercise, Workout, WorkoutType, EPBreakdown } from '../types';
 
 // ============================================
 // EP (Effort Points) Constants
 // ============================================
 
 export const EP_BASE = 10;           // Every completed workout
-export const EP_METCON_RATE = 3;     // Per minute of time cap (not actual time)
+export const EP_METCON_RATE = 3;     // Per EFFORT minute — see effortMinutes()
 export const EP_VOLUME_RATE = 0.5;   // Per (totalVolume / bodyweight) unit
 export const EP_DISTANCE_RATE = 0.01; // Per meter of distance
 export const EP_CALORIE_RATE = 0.3;  // Per calorie — AIR-BIKE anchor (Echo/Assault). Other
@@ -17,7 +17,9 @@ export const EP_CALORIE_RATE = 0.3;  // Per calorie — AIR-BIKE anchor (Echo/As
 export const EP_CARRY_MULTIPLIER = 2.5; // Weighted carry multiplier
 export const EP_PR_BONUS = 25;       // Per PR achieved
 export const EP_BODYWEIGHT_RATE = 0.5;  // Same as volume rate, for bodyweight movements
-export const EP_INTENSITY_RATE = 5;  // Per 10% faster than time cap (max 50% = +25 EP)
+export const EP_REST_CREDIT = 0.25;  // A minute waiting your turn mid-piece counts as this much work
+export const EP_PUSH_EXPONENT = 1.15; // Beating the cap counts a little more than linearly
+export const EP_PUSH_MAX = 2;        // The cap-over-finish push never counts beyond ×2
 export const DEFAULT_BW = 75;        // Fallback bodyweight (kg)
 
 // ============================================
@@ -179,26 +181,63 @@ export function calculateBodyweightEP(
 }
 
 /**
+ * How long, and how hard, the athlete actually worked — in minutes of solo, at-the-cap effort.
+ *
+ * One idea where there used to be two (time from the cap + a separate intensity bonus that only
+ * the post-log screen ever saw, so one workout had two EP numbers):
+ *
+ * - The minutes are YOURS: a for-time finish, not the cap. Not finishing counts as the cap.
+ * - The push is the cap over your finish (30 cap, done in 20 → ×1.5, at most ×2). It counts a
+ *   little more than linearly, so the faster athlete earns slightly MORE than the one who used the
+ *   whole cap — shorter, but harder. An AMRAP or EMOM is its length for everyone: push ×1.
+ * - On a team, you work your share of the clock (`activeShare`, the AI's read of how the work is
+ *   arranged — one at a time, overlapping, side by side) and the rest is not nothing: waiting for
+ *   your turn mid-piece counts at EP_REST_CREDIT. A team of 4 on a 20-minute clock, one at a
+ *   time: 20 × (¼ + ¾ × ¼) ≈ 8.75 minutes — a bit more than 20 / 4.
+ *
+ * Pinned with worked examples in xpCalculations.test.ts.
+ */
+export interface EffortClock {
+  /** The cap, or the clock's length. 0 when the piece has none. */
+  clockMinutes: number;
+  /** A for-time finish, when there is one. */
+  finishMinutes?: number;
+  /** Share of the clock this athlete works — 1 alone or side by side. */
+  activeShare?: number;
+}
+
+export function effortMinutes({ clockMinutes, finishMinutes, activeShare }: EffortClock): number {
+  const finished = finishMinutes != null && finishMinutes > 0 && (clockMinutes <= 0 || finishMinutes < clockMinutes)
+    ? finishMinutes
+    : undefined;
+  const minutes = finished ?? clockMinutes;
+  if (!(minutes > 0)) return 0;
+  const push = finished != null && clockMinutes > 0 ? Math.min(clockMinutes / finished, EP_PUSH_MAX) : 1;
+  const share = activeShare != null && activeShare > 0 ? Math.min(activeShare, 1) : 1;
+  const worked = share + (1 - share) * EP_REST_CREDIT;
+  return minutes * worked * push ** EP_PUSH_EXPONENT;
+}
+
+/**
  * Calculate EP breakdown for a single workout.
  *
  * @param totalVolume      Total weight moved (kg)
- * @param timeCapMinutes   Time cap in minutes (for metcon formats) or actual duration as fallback
+ * @param effortMins       How long and how hard the athlete worked — see {@link effortMinutes}
  * @param bodyweight       Athlete bodyweight in kg (uses DEFAULT_BW if 0 / not set)
  * @param isPR             Whether this workout includes a PR
  * @param movements        Optional movement breakdown for distance EP calculation
- * @param actualTimeMinutes Optional actual completion time (for intensity bonus when beating time cap)
+ * @param difficultyLevel  The board's difficulty 1–10, when known
  */
 export function calculateWorkoutEP(
   totalVolume: number,
-  timeCapMinutes: number,
+  effortMins: number,
   bodyweight: number,
   isPR: boolean = false,
   movements?: Array<{ name: string; totalReps?: number; totalDistance?: number; totalCalories?: number; weight?: number }>,
-  actualTimeMinutes?: number,
   difficultyLevel?: number
 ): EPBreakdown {
   const bw = bodyweight > 0 ? bodyweight : DEFAULT_BW;
-  const time = Math.floor(timeCapMinutes * EP_METCON_RATE);
+  const time = Math.floor(effortMins * EP_METCON_RATE);
   const volume = totalVolume > 0
     ? Math.floor((totalVolume / bw) * EP_VOLUME_RATE)
     : 0;
@@ -206,20 +245,11 @@ export function calculateWorkoutEP(
   const distance = movements ? calculateDistanceEP(movements) : 0;
   const calories = movements ? calculateCalorieEP(movements) : 0;
 
-  // Intensity bonus: reward faster completions relative to time cap.
-  // Each 10% faster = +EP_INTENSITY_RATE, capped at 50% faster (5 tiers).
-  let intensity = 0;
-  if (actualTimeMinutes && actualTimeMinutes > 0 && timeCapMinutes > 0 && actualTimeMinutes < timeCapMinutes) {
-    const pctFaster = (timeCapMinutes - actualTimeMinutes) / timeCapMinutes; // 0–1
-    const tiers = Math.min(Math.floor(pctFaster * 10), 5); // 0–5 tiers
-    intensity = tiers * EP_INTENSITY_RATE;
-  }
-
   const pr = isPR ? EP_PR_BONUS : 0;
 
   // Difficulty multiplier: 1.0 at level 5, ±4% per level away from 5.
   // Range: level 1 → 0.84×, level 5 → 1.00×, level 8 → 1.12×, level 10 → 1.20×
-  const subtotal = EP_BASE + time + volume + bwEP + distance + calories + intensity + pr;
+  const subtotal = EP_BASE + time + volume + bwEP + distance + calories + pr;
   let difficulty = 0;
   if (difficultyLevel && difficultyLevel >= 1 && difficultyLevel <= 10) {
     const multiplier = 1.0 + (difficultyLevel - 5) * 0.04;
@@ -233,7 +263,6 @@ export function calculateWorkoutEP(
     bodyweight: bwEP,
     distance,
     calories,
-    intensity,
     pr,
     difficulty,
     total: subtotal + difficulty,
@@ -241,44 +270,67 @@ export function calculateWorkoutEP(
 }
 
 // The workout fields EP derivation reads. EP is NOT persisted — it is recomputed from the
-// stored breakdown every time it's shown. Keeping the input shape narrow lets stats/tests build
+// stored workout every time it's shown. Keeping the input shape narrow lets stats/tests build
 // a workout stub without a full Firestore doc.
 export type EPWorkout = Pick<
   Workout,
-  'type' | 'timeCap' | 'duration' | 'format' | 'difficultyLevel' | 'workloadBreakdown'
-> & { isPR?: boolean };
+  'type' | 'timeCap' | 'duration' | 'format' | 'difficultyLevel' | 'workloadBreakdown' | 'teamSize'
+> & {
+  isPR?: boolean;
+  exercises?: Array<Pick<Exercise, 'loggingMode' | 'sets' | 'partnerWorkout' | 'activeShare'>>;
+};
 
 /**
- * THE single source of truth for a persisted workout's EP.
+ * The clock a workout's effort is measured against, read off the saved workout itself — so the
+ * screen after logging, the poster and every total compute the same number from the same doc.
+ */
+export function effortClockOf(workout: EPWorkout): EffortClock {
+  const exercises = workout.exercises ?? [];
+  // A for-time finish is the athlete's own logged time on the part that runs on the clock.
+  const finishSeconds = Math.max(0, ...exercises
+    .filter((ex) => ex.loggingMode === 'for_time')
+    .flatMap((ex) => (ex.sets ?? []).map((set) => set.time ?? 0)));
+  // The partnered part's arrangement. A part saved before activeShare existed is read as one at a
+  // time — the commonest team shape, and what the old flat team split assumed.
+  const partnered = exercises.find((ex) => ex.partnerWorkout === true);
+  const teamSize = workout.teamSize ?? 1;
+  const activeShare = partnered
+    ? partnered.activeShare ?? (teamSize > 1 ? 1 / teamSize : 1)
+    : 1;
+  return {
+    clockMinutes: getTimeCapMinutes(workout),
+    ...(finishSeconds > 0 ? { finishMinutes: finishSeconds / 60 } : {}),
+    activeShare,
+  };
+}
+
+/**
+ * THE single source of truth for a workout's EP — after logging, on the poster, in every total.
  *
- * Every consumer — recap poster, weekly stats, career totals — must call this so the number is
- * identical everywhere. Because EP is recomputed (never stored), the old bug was three separate
- * call sites passing different inputs: Profile/weekly dropped the PR, intensity and difficulty
- * terms, so career EP silently under-counted the sum of what each workout actually earned.
- *
- * `intensity` needs the actual completion time, which only exists at log time; pass it via
- * `actualTimeMinutes` there. Aggregating history without it simply yields no intensity bonus
- * (correct — most formats never earn one anyway).
+ * Every consumer must call this so the number is identical everywhere. Because EP is recomputed
+ * (never stored), the old bugs were separate call sites passing different inputs: Profile/weekly
+ * dropped the PR and difficulty terms, and the intensity bonus only ever existed on the screen
+ * right after logging (RELAY, 2026-10-15: 273 there, 257 on its poster). Effort minutes read the
+ * finish off the saved workout, so there is nothing left to pass in.
  */
 export function computeWorkoutEP(
   workout: EPWorkout,
-  opts: { bodyweight?: number; actualTimeMinutes?: number } = {},
+  opts: { bodyweight?: number } = {},
 ): EPBreakdown {
   const totalVolume = workout.workloadBreakdown?.grandTotalVolume ?? 0;
-  const timeCapMinutes = getTimeCapMinutes(workout);
   const movements = workout.workloadBreakdown?.movements;
   // Difficulty multiplier applies to metcon-style work only, never pure strength (mirrors save).
   const difficultyLevel = workout.format === 'strength' ? undefined : workout.difficultyLevel;
   return calculateWorkoutEP(
     totalVolume,
-    timeCapMinutes,
+    effortMinutes(effortClockOf(workout)),
     opts.bodyweight ?? DEFAULT_BW,
     workout.isPR ?? false,
     movements,
-    opts.actualTimeMinutes,
     difficultyLevel,
   );
 }
+
 
 /**
  * Get time-cap minutes for EP calculation.
@@ -354,7 +406,6 @@ export function calculateWorkoutXP(
     bodyweight: 0,
     distance: 0,
     calories: 0,
-    intensity: 0,
     pr,
     difficulty: 0,
     total: base + volume + time + pr,

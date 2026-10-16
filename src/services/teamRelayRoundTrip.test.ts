@@ -110,7 +110,7 @@ describe('a round-trading team relay (teams of 5, 30 RFT, 6 each)', () => {
     expect(twice.exercises[1].sets[0].time).toBe(915);
   });
 
-  it('keeps a per-round number the athlete typed over the Rx through an edit', () => {
+  it("a per-round number the athlete typed over the Rx is theirs: the line keeps the coach's, the totals keep theirs", () => {
     const parsed = board();
     const results = parsed.exercises.map((ex, i) => createBlankResult(ex, i, ex.loggingMode!, 'male', 5, false));
     const metcon = results[1];
@@ -119,10 +119,14 @@ describe('a round-trading team relay (teams of 5, 30 RFT, 6 each)', () => {
       mr.movement.name === 'Echo Bike' ? { ...mr, calories: 12 } : mr
     ));
     const logged = save(results.map(toLegacyResult), parsed);
-    // 12 a round, over the athlete's own 6 rounds.
+    // The board said 10 a round; the athlete rode 12, over their own 6 rounds. The poster's line
+    // states the coach's 10 and its "mine" column the athlete's 72 (2026-10-14: a saved line used
+    // to take the athlete's number and lose the board's).
+    expect(metconPrescription(logged).bikeCalories).toBe(10);
     expect(metconTotals(logged).bike).toBe(72);
-    const edited = editAndSave(logged);
-    expect(metconPrescription(edited).bikeCalories).toBe(12);
+    // An edit reopens exactly what was logged (loggedRecord.reopenLogged) — the same answers.
+    const edited = save(results.map(toLegacyResult), parsed, logged);
+    expect(metconPrescription(edited).bikeCalories).toBe(10);
     expect(metconTotals(edited).bike).toBe(72);
   });
 });

@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { backFromChat, backFromForm } from './addWorkoutBack';
 
 describe('Back inside Add Workout', () => {
-  it('a board half-logged in the chat goes back to the thread, where it waits', () => {
-    expect(backFromChat({ boardOpen: true })).toBe('thread');
+  it('a board read or reopened inside the chat goes back to the thread, where it is pinned', () => {
+    expect(backFromChat({ boardOpen: true, boardFromToday: false })).toBe('thread');
+  });
+
+  it('a board opened from its tile on Today goes back to Today — where you came from', () => {
+    expect(backFromChat({ boardOpen: true, boardFromToday: true })).toBe('exit');
   });
 
   it('the thread with no board open goes back to Today (unchanged)', () => {
-    expect(backFromChat({ boardOpen: false })).toBe('exit');
+    expect(backFromChat({ boardOpen: false, boardFromToday: false })).toBe('exit');
   });
 
   it('the form the chat handed over to goes back to that chat', () => {

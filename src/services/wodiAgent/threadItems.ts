@@ -1,9 +1,12 @@
 import type { PlannedWorkout } from '../../types';
+import { isAboutDeletedWorkout } from './wodiOccasion';
 
 /**
- * The Wodi thread as the athlete reads it: what was SAID between workouts, and boards parked
- * mid-chat as a waiting card — in the order they happened, with a separator per day. Pure, so
- * the ordering is pinned by tests.
+ * The Wodi thread as the athlete reads it: what was SAID between workouts, in the order it was
+ * said, with a separator per day. Pure, so the ordering is pinned by tests.
+ *
+ * A board waiting for its result is NOT a card in here: history scrolls away, and a board you
+ * still owe was getting buried in it. It is pinned above the composer instead (pinnedBoard).
  *
  * Logged workouts are NOT cards here (owner, 2026-10-04). They're the log, which already has two
  * homes — Today and the Gallery — and a wall of them buried why you opened the chat. A workout
@@ -23,8 +26,7 @@ export interface ThreadMessage {
 
 export type ThreadItem =
   | { kind: 'day'; id: string; label: string }
-  | { kind: 'message'; id: string; message: ThreadMessage }
-  | { kind: 'waiting'; id: string; at: number; planned: PlannedWorkout; title: string };
+  | { kind: 'message'; id: string; message: ThreadMessage };
 
 /**
  * The chat opens on today; "Earlier" reaches back a week at a time. Opening on the last few days
@@ -56,50 +58,49 @@ export function threadSince(now: Date, windowDays: number): number {
   return startOfDay(now.getTime()) - (windowDays - 1) * DAY_MS;
 }
 
+/**
+ * The window after a tap on "Earlier": a week further back, and at least far enough to reach the
+ * newest older message — a quiet month must not leave the tap showing nothing.
+ */
+export function earlierWindow(windowDays: number, olderAt: number, now: Date): number {
+  const reach = Math.round((startOfDay(now.getTime()) - startOfDay(olderAt)) / DAY_MS) + 1;
+  return Math.max(windowDays + THREAD_EARLIER_STEP_DAYS, reach);
+}
+
+/**
+ * The board pinned above the composer: the newest one saved — the same board Today's rail leads
+ * with — unless it's the one this chat is already on.
+ */
+export function pinnedBoard(planned: readonly PlannedWorkout[], activePlannedId: string | null): PlannedWorkout | null {
+  return planned.find((p) => p.id !== activePlannedId) ?? null;
+}
+
 export function buildThreadItems(input: {
   messages: readonly ThreadMessage[];
-  planned: readonly PlannedWorkout[];
-  /** The board this chat is on right now — it's live below, so it isn't also a card above. */
-  activePlannedId?: string | null;
   /** Wodi's line the chat opens with right now — it's live below, so it isn't also history above. */
   openingId?: string | null;
   /** The live chat follows — it is today's, so the thread closes on a TODAY line if it isn't on one. */
   liveBelow?: boolean;
+  /** Every logged workout's id, once known — a line about a deleted one is left out. */
+  liveWorkoutIds?: ReadonlySet<string> | null;
   now: Date;
   windowDays: number;
 }): ThreadItem[] {
   const since = threadSince(input.now, input.windowDays);
-  type Timed = Exclude<ThreadItem, { kind: 'day' }> & { at: number };
-
-  const timed: Timed[] = [
-    ...input.messages
-      .filter((m) => m.at >= since && m.id !== input.openingId)
-      .map((m): Timed => ({ kind: 'message', id: `m:${m.id}`, message: m, at: m.at })),
-    // Only boards parked from a chat; a board saved from the form lives on Today's For Later shelf.
-    // A waiting board is something still to do, so it shows whatever its age.
-    ...input.planned
-      .filter((p) => p.chat && p.id !== input.activePlannedId)
-      .map((p): Timed => {
-        const lastSaid = p.chat!.messages[p.chat!.messages.length - 1]?.at ?? p.createdAt.getTime();
-        return {
-          kind: 'waiting',
-          id: `p:${p.id}`,
-          at: lastSaid,
-          planned: p,
-          title: p.parsedWorkout?.title?.trim() || 'Your board',
-        };
-      }),
-  ].sort((a, b) => a.at - b.at);
+  const said = input.messages
+    .filter((m) => m.at >= since && m.id !== input.openingId)
+    .filter((m) => !input.liveWorkoutIds || !isAboutDeletedWorkout(m, input.liveWorkoutIds))
+    .sort((a, b) => a.at - b.at);
 
   const items: ThreadItem[] = [];
   let lastDay = -1;
-  for (const item of timed) {
-    const day = startOfDay(item.at);
+  for (const m of said) {
+    const day = startOfDay(m.at);
     if (day !== lastDay) {
-      items.push({ kind: 'day', id: `d:${day}`, label: dayLabel(item.at, input.now) });
+      items.push({ kind: 'day', id: `d:${day}`, label: dayLabel(m.at, input.now) });
       lastDay = day;
     }
-    items.push(item);
+    items.push({ kind: 'message', id: `m:${m.id}`, message: m });
   }
   const today = startOfDay(input.now.getTime());
   if (input.liveBelow && lastDay !== today) {

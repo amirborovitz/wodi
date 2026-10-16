@@ -30,8 +30,7 @@ import { feedTrainedFrom } from '../../../../services/feed/trained';
 import { useAuth } from '../../../../context/AuthContext';
 import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { usePosterDate } from '../../../../hooks/usePosterDate';
-import { captureBlob, downloadBlob, isNativeShareSupported, shareImage } from '../../../../utils/shareUtils';
-import { track } from '../../../../services/analytics';
+import { ShareIcon, usePosterShare } from '../../../../hooks/usePosterShare';
 import { lockGestureAxis, type GestureAxis } from '../../../../utils/gestureAxis';
 import styles from './index.module.css';
 
@@ -115,26 +114,6 @@ function FeedIcon(): React.JSX.Element {
   );
 }
 
-function ShareIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" y1="2" x2="12" y2="15" />
-    </svg>
-  );
-}
-
-function DownloadIcon(): React.JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
-
 // ─── Text sticker (TEXT tab) ────────────────────────────────────────────────
 
 const STICKER_MAX = 24;
@@ -167,8 +146,6 @@ export function HandwrittenFace({
   const [skinScroll, setSkinScroll]   = useState<{ thumbPct: number; offsetPct: number }>({ thumbPct: 100, offsetPct: 0 });
   const [showCorrection, setShowCorrection] = useState<boolean>(false);
   const [showMenu, setShowMenu]       = useState<boolean>(false);
-  const [showShare, setShowShare]     = useState<boolean>(false);
-  const [shareState, setShareState]   = useState<'preparing' | 'ready' | 'failed'>('preparing');
   const [sticker, setSticker]         = useState<PosterSticker | null>(() => data.posterSticker ?? null);
   const [stickerDraft, setStickerDraft] = useState<string>(() => data.posterSticker?.text ?? '');
   const [vibeOffset, setVibeOffset]   = useState<PosterVibeOffset | null>(() => data.posterVibeOffset ?? null);
@@ -188,7 +165,6 @@ export function HandwrittenFace({
   const carouselViewportRef = useRef<HTMLDivElement>(null);
   const skinChipRowRef    = useRef<HTMLDivElement>(null);
   const shareCardRef      = useRef<HTMLDivElement>(null);
-  const shareBlob         = useRef<Blob | null>(null);
   const carouselX         = useMotionValue(0);
   const dragRef           = useRef<{ x: number; y: number; t: number; axis: GestureAxis | null } | null>(null);
 
@@ -377,46 +353,15 @@ export function HandwrittenFace({
     isPR: data.prCelebration != null,
   }), [postPayload, data.workoutDate, data.prCelebration, posterDate.editor.iso]);
 
-  // ── Share (destination sheet, then a prepared image) ───────────────────
-  // Capture cannot sit between the tap and `navigator.share`: html2canvas takes
-  // long enough that Safari drops the transient activation and refuses the share,
-  // which is why the old one-tap version fell through to a download on iOS.
-  // Opening the sheet starts the capture; the tap that shares is a fresh gesture
-  // on an image that is already in hand.
-
-  const openShare = (): void => {
-    const el = shareCardRef.current;
-    if (!el) return;
-    shareBlob.current = null;
-    setShareState('preparing');
-    setShowShare(true);
-    void captureBlob(el)
-      .then((blob) => { shareBlob.current = blob; setShareState('ready'); })
-      .catch((err) => { console.error('Failed to render poster:', err); setShareState('failed'); });
-  };
+  // ── Share (destination sheet, then a prepared image — see usePosterShare) ───
 
   const shareTitle = (): string => {
     const shareWod = isCarousel && pageWods ? pageWods[carouselPage] : singleWod;
     return shareWod.title ?? shareWod.type;
   };
 
-  const shareToApps = (): void => {
-    const blob = shareBlob.current;
-    if (!blob) return;
-    void shareImage(blob, shareTitle()).then((shared) => {
-      // Every non-iOS desktop browser and Chrome on iOS refuse file shares, so a
-      // decline that isn't a cancel still has to leave the athlete with the image.
-      if (!shared) downloadBlob(blob, `${shareTitle()}.png`);
-      track('poster_shared', { poster: 'workout', method: shared ? 'share_sheet' : 'download' });
-    });
-  };
-
-  const saveImage = (): void => {
-    const blob = shareBlob.current;
-    if (!blob) return;
-    downloadBlob(blob, `${shareTitle()}.png`);
-    track('poster_shared', { poster: 'workout', method: 'download' });
-  };
+  const share = usePosterShare(shareTitle);
+  const openShare = (): void => share.open(shareCardRef.current);
 
   // ── Bottom bar panel ───────────────────────────────────────────────────
 
@@ -680,21 +625,14 @@ export function HandwrittenFace({
       // next one, so the sheet always opens on a clean error slate.
       ? [{ label: "Post to Wodi feed…", icon: <FeedIcon />, onClick: () => setShowPost(true) }]
       : []),
-    ...(isNativeShareSupported()
-      ? [{ label: 'Share image…', icon: <ShareIcon />, onClick: shareToApps, disabled: shareState !== 'ready' }]
-      : []),
-    { label: 'Save image', icon: <DownloadIcon />, onClick: saveImage, disabled: shareState !== 'ready' },
+    ...share.items,
   ];
 
   const shareSheet = (
     <ActionMenuSheet
-      title={showShare
-        ? shareState === 'failed' ? "Couldn't render this poster"
-          : shareState === 'preparing' ? 'Preparing image…'
-          : 'Share this poster'
-        : null}
+      title={share.title}
       items={shareItems}
-      onClose={() => setShowShare(false)}
+      onClose={share.close}
     />
   );
 

@@ -5,15 +5,15 @@ import styles from './TodayComposer.module.css';
 interface TodayComposerProps {
   /** The bar itself: open the Wodi thread. */
   onTellWodi: () => void;
-  /** The camera, or a board from the gallery: open the thread with this photo already sent. */
+  /** The camera, or "+" — a board from the photos: open the thread with this photo already sent. */
   onPhoto: (file: File) => void;
 }
 
 /**
  * Today's one way in, docked flush on top of the nav (one surface, not two floating pills).
- * The same row as the thread's composer: "+" for a board already in the gallery, the bar, and
- * the yellow camera — the one primary action. The bar opens the thread; typing happens there.
- * Saving a board for later needs no button: leaving the thread keeps it.
+ * The same row as the thread's composer, and the same "+": a board from your photos, straight
+ * from the phone's picker. The bar opens the thread; typing happens there. The yellow camera is
+ * the one primary action. Saving a board for later needs no button: the chat asks.
  */
 export function TodayComposer({ onTellWodi, onPhoto }: TodayComposerProps): React.ReactElement {
   const cameraRef = useRef<HTMLInputElement>(null);

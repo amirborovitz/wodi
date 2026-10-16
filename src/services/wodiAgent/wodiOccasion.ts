@@ -229,6 +229,15 @@ export function isOccasionMessage(m: ThreadMessage): boolean {
   return m.from === 'wodi' && OCCASION_PREFIXES.some((p) => m.id.startsWith(p));
 }
 
+/**
+ * A line about a workout lasts as long as the workout: delete it and "done in 15:00" goes with it,
+ * on Today and in the thread. Lines about no workout (the week, a note) are never affected.
+ */
+export function isAboutDeletedWorkout(m: ThreadMessage, liveWorkoutIds: ReadonlySet<string>): boolean {
+  if (!isOccasionMessage(m) || !m.workoutIds?.length) return false;
+  return !m.workoutIds.some((id) => liveWorkoutIds.has(id));
+}
+
 export function pickOccasion(input: OccasionInput): OccasionPick {
   const { workouts, said, today, todayStartMs } = input;
   const latest = workouts[0];
@@ -238,7 +247,10 @@ export function pickOccasion(input: OccasionInput): OccasionPick {
   if (fresh && !said.has(`cheer:${fresh.id}`)) return { kind: 'new', occasion: cheerOccasion(fresh, input) };
 
   // One new thing a day: whatever Wodi already said today stays today's message.
-  const saidToday = [...said.values()].filter((m) => isOccasionMessage(m) && m.at >= todayStartMs).sort((a, b) => b.at - a.at)[0];
+  const live = new Set(workouts.map((w) => w.id));
+  const saidToday = [...said.values()]
+    .filter((m) => isOccasionMessage(m) && m.at >= todayStartMs && !isAboutDeletedWorkout(m, live))
+    .sort((a, b) => b.at - a.at)[0];
   if (saidToday) return { kind: 'said', message: saidToday };
 
   const next = proactiveOccasions(input).find((o) => !said.has(o.key));

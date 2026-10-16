@@ -1,0 +1,443 @@
+{
+  "reward": [
+    {
+      "title": "BUY-IN",
+      "rows": [
+        {
+          "primary": "800m",
+          "name": "Run",
+          "mineKey": "Buy-In: Run",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "400m",
+          "onceOnly": "buy_in"
+        },
+        {
+          "primary": "100",
+          "name": "Push-ups",
+          "subNote": "50 total",
+          "totalNote": "50 total",
+          "mineKey": "Buy-In: Push-up",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "50",
+          "onceOnly": "buy_in"
+        },
+        {
+          "primary": "100",
+          "name": "Single Leg V-Ups",
+          "subNote": "50 total",
+          "totalNote": "50 total",
+          "mineKey": "Buy-In: Single Leg V-Up",
+          "accent": "magenta",
+          "repeatCount": 1,
+          "partnerSplit": "reps",
+          "teamShare": "50",
+          "onceOnly": "buy_in"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": true
+    },
+    {
+      "eyebrow": "PARTNER AMRAP",
+      "title": "Kick Start AMRAP",
+      "rows": [
+        {
+          "primary": "14",
+          "name": "Goblet Squats (sync)",
+          "nameWithLoad": "Goblet Squats (sync) @ 17.5kg",
+          "loadNote": "17.5kg",
+          "mineKey": "Goblet Squat",
+          "accent": "yellow",
+          "repeatCount": 4,
+          "partnerSplit": "reps"
+        },
+        {
+          "primary": "30",
+          "name": "Box Jumps",
+          "subNote": "60 total",
+          "totalNote": "60 total",
+          "mineKey": "Box Jump",
+          "accent": "magenta",
+          "repeatCount": 4,
+          "partnerSplit": "reps"
+        },
+        {
+          "primary": "30",
+          "name": "Toes to Bars",
+          "subNote": "60 total",
+          "totalNote": "60 total",
+          "mineKey": "Toes to Bar",
+          "accent": "cyan",
+          "repeatCount": 4,
+          "partnerSplit": "reps"
+        },
+        {
+          "primary": "14",
+          "name": "Goblet Squats (sync)",
+          "nameWithLoad": "Goblet Squats (sync) @ 17.5kg",
+          "loadNote": "17.5kg",
+          "mineKey": "Goblet Squat",
+          "accent": "yellow",
+          "repeatCount": 4,
+          "partnerSplit": "reps"
+        },
+        {
+          "primary": "30 CAL",
+          "name": "Calories",
+          "mineKey": "Calories",
+          "accent": "magenta",
+          "repeatCount": 4,
+          "partnerSplit": "reps"
+        }
+      ],
+      "hiddenCount": 0,
+      "isPartnerConfirmed": true
+    }
+  ],
+  "pages": [
+    [
+      {
+        "title": "BUY-IN",
+        "rows": [
+          {
+            "primary": "800m",
+            "name": "Run",
+            "mineKey": "Buy-In: Run",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "400m",
+            "onceOnly": "buy_in"
+          },
+          {
+            "primary": "100",
+            "name": "Push-ups",
+            "subNote": "50 total",
+            "totalNote": "50 total",
+            "mineKey": "Buy-In: Push-up",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "50",
+            "onceOnly": "buy_in"
+          },
+          {
+            "primary": "100",
+            "name": "Single Leg V-Ups",
+            "subNote": "50 total",
+            "totalNote": "50 total",
+            "mineKey": "Buy-In: Single Leg V-Up",
+            "accent": "magenta",
+            "repeatCount": 1,
+            "partnerSplit": "reps",
+            "teamShare": "50",
+            "onceOnly": "buy_in"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": true
+      },
+      {
+        "eyebrow": "PARTNER AMRAP",
+        "title": "Kick Start AMRAP",
+        "rows": [
+          {
+            "primary": "14",
+            "name": "Goblet Squats (sync)",
+            "nameWithLoad": "Goblet Squats (sync) @ 17.5kg",
+            "loadNote": "17.5kg",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow",
+            "repeatCount": 4,
+            "partnerSplit": "reps"
+          },
+          {
+            "primary": "30",
+            "name": "Box Jumps",
+            "subNote": "60 total",
+            "totalNote": "60 total",
+            "mineKey": "Box Jump",
+            "accent": "magenta",
+            "repeatCount": 4,
+            "partnerSplit": "reps"
+          },
+          {
+            "primary": "30",
+            "name": "Toes to Bars",
+            "subNote": "60 total",
+            "totalNote": "60 total",
+            "mineKey": "Toes to Bar",
+            "accent": "cyan",
+            "repeatCount": 4,
+            "partnerSplit": "reps"
+          },
+          {
+            "primary": "14",
+            "name": "Goblet Squats (sync)",
+            "nameWithLoad": "Goblet Squats (sync) @ 17.5kg",
+            "loadNote": "17.5kg",
+            "mineKey": "Goblet Squat",
+            "accent": "yellow",
+            "repeatCount": 4,
+            "partnerSplit": "reps"
+          },
+          {
+            "primary": "30 CAL",
+            "name": "Calories",
+            "mineKey": "Calories",
+            "accent": "magenta",
+            "repeatCount": 4,
+            "partnerSplit": "reps"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": true
+      }
+    ]
+  ],
+  "hero": {
+    "value": "4",
+    "unit": "ROUNDS",
+    "storyLine": "112 goblet squat · 60 box jump · 60 ttb · 50 buy-in: push-up · 50 buy-in: single leg v-up · 400m buy-in: run · 60 calories cals",
+    "storyMovements": [
+      {
+        "perRound": "800m",
+        "name": "Buy-In: Run",
+        "total": "800m total",
+        "color": "magenta",
+        "partnerNote": "your part 400m",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "25",
+        "name": "Buy-In: Push-up",
+        "total": "100 total",
+        "color": "magenta",
+        "unit": "kg",
+        "partnerNote": "your part 50",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "25",
+        "name": "Buy-In: Single Leg V-Up",
+        "total": "100 total",
+        "color": "magenta",
+        "unit": "kg",
+        "partnerNote": "your part 50",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "28",
+        "name": "Goblet Squat",
+        "total": "112 total",
+        "color": "yellow",
+        "weight": 17.5,
+        "unit": "kg",
+        "implementCount": 1,
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Box Jump",
+        "total": "120 total",
+        "color": "magenta",
+        "unit": "kg",
+        "partnerNote": "your part 60",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30",
+        "name": "Toes to Bar",
+        "total": "120 total",
+        "color": "cyan",
+        "unit": "kg",
+        "partnerNote": "your part 60",
+        "wasSubstituted": false
+      },
+      {
+        "perRound": "30 cal",
+        "name": "Calories",
+        "total": "120 cal total",
+        "color": "magenta",
+        "partnerNote": "your part 60 cal",
+        "wasSubstituted": false
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "OUR ROUNDS",
+  "resultValue": "4",
+  "posterRows": {
+    "reward": [
+      {
+        "kind": "block",
+        "label": "BUY-IN",
+        "cap": ""
+      },
+      {
+        "kind": "line",
+        "rx": "800m Run",
+        "load": "",
+        "mine": "",
+        "team": "400m",
+        "isPartnerShare": true
+      },
+      {
+        "kind": "line",
+        "rx": "100 Push-ups",
+        "load": "",
+        "mine": "",
+        "team": "50",
+        "isPartnerShare": true,
+        "total": "50 total"
+      },
+      {
+        "kind": "line",
+        "rx": "100 Single Leg V-Ups",
+        "load": "",
+        "mine": "",
+        "team": "50",
+        "isPartnerShare": true,
+        "total": "50 total"
+      },
+      {
+        "kind": "block",
+        "label": "",
+        "cap": "PARTNER AMRAP"
+      },
+      {
+        "kind": "line",
+        "rx": "14 Goblet Squats (sync)",
+        "load": "",
+        "mine": "17.5kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "30 Box Jumps",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "60 total"
+      },
+      {
+        "kind": "line",
+        "rx": "30 Toes to Bars",
+        "load": "",
+        "mine": "",
+        "team": "",
+        "total": "60 total"
+      },
+      {
+        "kind": "line",
+        "rx": "14 Goblet Squats (sync)",
+        "load": "",
+        "mine": "17.5kg",
+        "team": ""
+      },
+      {
+        "kind": "line",
+        "rx": "30 CAL Calories",
+        "load": "",
+        "mine": "60cal",
+        "team": ""
+      }
+    ],
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "BUY-IN",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "800m Run",
+          "load": "",
+          "mine": "",
+          "team": "400m",
+          "isPartnerShare": true
+        },
+        {
+          "kind": "line",
+          "rx": "100 Push-ups",
+          "load": "",
+          "mine": "",
+          "team": "50",
+          "isPartnerShare": true,
+          "total": "50 total"
+        },
+        {
+          "kind": "line",
+          "rx": "100 Single Leg V-Ups",
+          "load": "",
+          "mine": "",
+          "team": "50",
+          "isPartnerShare": true,
+          "total": "50 total"
+        },
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "PARTNER AMRAP"
+        },
+        {
+          "kind": "line",
+          "rx": "14 Goblet Squats (sync)",
+          "load": "",
+          "mine": "17.5kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "30 Box Jumps",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "30 Toes to Bars",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "60 total"
+        },
+        {
+          "kind": "line",
+          "rx": "14 Goblet Squats (sync)",
+          "load": "",
+          "mine": "17.5kg",
+          "team": ""
+        },
+        {
+          "kind": "line",
+          "rx": "30 CAL Calories",
+          "load": "",
+          "mine": "60cal",
+          "team": ""
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null
+  ],
+  "pageMaxPractices": [
+    false
+  ],
+  "pageTypes": [
+    "AMRAP"
+  ]
+}
