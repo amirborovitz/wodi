@@ -32,6 +32,9 @@ import { usePosterPhotoUpload } from '../../../../hooks/usePosterPhotoUpload';
 import { usePosterDate } from '../../../../hooks/usePosterDate';
 import { ShareIcon, usePosterShare } from '../../../../hooks/usePosterShare';
 import { lockGestureAxis, type GestureAxis } from '../../../../utils/gestureAxis';
+import { MoveReplay } from '../../../replay/MoveReplay';
+import { ReplayIcon } from '../../../replay/ReplayIcon';
+import { usePosterReplay } from '../../../replay/usePosterReplay';
 import styles from './index.module.css';
 
 // ─── Bottom bar icons ───────────────────────────────────────────────────────
@@ -125,7 +128,7 @@ const STICKER_DEFAULT_POS = { x: 50, y: 46 };
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
+  data, mode, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
 }: CelebrationFaceProps): React.JSX.Element {
   const favoriteSkin = useFavoriteSkin();
   // The row's order: last chosen first, taken fresh each time the Style row opens — so the skin
@@ -183,6 +186,20 @@ export function HandwrittenFace({
     () => pageWods?.[0] ?? buildPosterWod(data),
     [pageWods, data],
   );
+
+  // The page on screen performs itself — by itself once right after logging, then on Replay.
+  const replay = usePosterReplay({
+    workoutId: data.workoutId,
+    wod: isCarousel && pageWods ? pageWods[carouselPage] : singleWod,
+    surface: 'poster',
+    autoPlay: mode === 'reward',
+  });
+  const replayOverlay = (
+    <AnimatePresence>
+      {replay.replaying && replay.script && <MoveReplay key="replay" script={replay.script} onDone={replay.finish} />}
+    </AnimatePresence>
+  );
+  const posterLayerClass = `${styles.stickerLayer} ${replay.replaying ? styles.stickerLayerReplaying : ''}`;
 
   // Slide that holds the PR's part — pages are already in deck order, so it's the page index.
   const prSlideIndex = isCarousel ? data.prCelebration?.pageIndex ?? null : null;
@@ -580,6 +597,12 @@ export function HandwrittenFace({
           <PhotoIcon />
           <span className={styles.tabLabel}>Photo</span>
         </button>
+        {replay.script && (
+          <button className={styles.tabBtn} onClick={replay.play} disabled={replay.replaying} aria-label="Replay the workout">
+            <ReplayIcon />
+            <span className={styles.tabLabel}>Replay</span>
+          </button>
+        )}
         <button className={styles.shareBtn}
           onClick={openShare} aria-label="Share poster" aria-haspopup="menu">
           <ShareIcon />
@@ -739,12 +762,13 @@ export function HandwrittenFace({
                     pulse > 0 ? styles.styleFlip : '',
                   ].filter(Boolean).join(' ') || undefined}
                   style={{
+                    position: 'relative',
                     width: '100%',
                     transformOrigin: 'center top',
                     transform: i === carouselPage ? `scale(${carouselScale})` : undefined,
                   }}
                 >
-                  <div ref={i === carouselPage ? shareCardRef : undefined} className={styles.stickerLayer}>
+                  <div ref={i === carouselPage ? shareCardRef : undefined} className={i === carouselPage ? posterLayerClass : styles.stickerLayer}>
                     <PosterDateContext.Provider value={i === carouselPage ? posterDate.editor : null}>
                       <Skin
                         wod={pageWod}
@@ -762,6 +786,7 @@ export function HandwrittenFace({
                       <PosterPhotoInset photo={photo} onMove={movePhoto} onDrop={dropPhoto} onLongPress={() => setPendingDelete('photo')} />
                     )}
                   </div>
+                  {i === carouselPage && replayOverlay}
                 </div>
               </div>
             ))}
@@ -832,7 +857,7 @@ export function HandwrittenFace({
           {/* Only the poster itself flips the style — not the empty space around it. */}
           <div
             ref={shareCardRef}
-            className={styles.stickerLayer}
+            className={posterLayerClass}
             onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
             role="button"
             aria-label="Tap left for previous style, right for next style"
@@ -854,8 +879,9 @@ export function HandwrittenFace({
               <PosterPhotoInset photo={photo} onMove={movePhoto} onDrop={dropPhoto} onLongPress={() => setPendingDelete('photo')} />
             )}
           </div>
+          {replayOverlay}
         </div>
-        {showHint && <div className={styles.tapHint}>Tap left/right to change style</div>}
+        {showHint &&<div className={styles.tapHint}>Tap left/right to change style</div>}
       </div>
 
       {bottomBar}

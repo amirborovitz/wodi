@@ -59,6 +59,11 @@ interface AnalyticsEvents {
 
   /** A poster left the app — the workout poster, the weekly drop, or a Wrapped page. */
   poster_shared: { poster: 'workout' | 'week' | 'wrapped'; method: ShareMethod };
+  /**
+   * A poster's move replay ended. `surface`: under the cheer in the chat, or on the poster screen.
+   * `trigger`: played by itself after logging, or the Replay button. `outcome`: ran to the poster, or tapped away.
+   */
+  poster_replayed: { surface: 'chat' | 'poster'; trigger: 'auto' | 'tap'; outcome: 'watched' | 'skipped' };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;

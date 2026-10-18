@@ -1,0 +1,149 @@
+/* The replay sits exactly over the poster's box, whatever size that is — a 240px card in the chat
+   or the full poster screen — so every size is a share of the card's own width (cqw). */
+.replay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  container-type: size;
+  display: flex;
+  flex-direction: column;
+  /* Percent padding is a share of the card's width — cqw can't be used on the container itself. */
+  padding: 6% 6% 5%;
+  border-radius: var(--replay-radius, var(--r-lg));
+  background: var(--wodi-bg);
+  color: var(--wodi-white);
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.replay:focus-visible {
+  outline: 2px solid var(--wodi-yellow);
+  outline-offset: 2px;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqw;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 3.4cqw;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wodi-dim);
+}
+
+.title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 9.5cqw;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  display: block;
+}
+
+/* Fixed height, so a line arriving or the result landing never moves the athlete. */
+.caption {
+  position: relative;
+  height: 27cqw;
+  display: flex;
+  align-items: flex-end;
+}
+
+.line,
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5cqw;
+  min-width: 0;
+}
+
+.lineText {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 12cqw;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+/* The athlete's own weight — yours, so it's the yellow. */
+.lineDetail {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 4.4cqw;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wodi-yellow);
+}
+
+.heroLabel {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 3.4cqw;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wodi-dim);
+}
+
+.heroValue {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 22cqw;
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  color: var(--wodi-yellow);
+  font-variant-numeric: tabular-nums;
+  transform-origin: left bottom;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4cqw;
+}
+
+.dots {
+  display: flex;
+  gap: 1.6cqw;
+}
+
+.dot,
+.dotOn {
+  width: 2cqw;
+  height: 2cqw;
+  border-radius: var(--r-pill);
+  background: var(--wodi-line2);
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dotOn {
+  background: var(--wodi-yellow);
+}
+
+.wordmark {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  font-size: 6cqw;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--wodi-white);
+}
+
+.wordmarkDot {
+  color: var(--wodi-yellow);
+}

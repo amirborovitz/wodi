@@ -27,6 +27,8 @@
   flex-direction: column;
   overflow: hidden;
   background: #090b0d;
+  /* The move replay takes the skins' corner, so it sits on the poster's exact shape. */
+  --replay-radius: 18px;
 }
 
 /* ── Story background (vibe-tinted gradient behind everything) ──────────── */
@@ -158,6 +160,7 @@
 }
 
 .cardWrapper {
+  position: relative;
   width: 100%;
   transform-origin: center top;
 }
@@ -474,6 +477,13 @@
   position: relative;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Under the replay, the poster waits out of sight — and pops back when it ends. */
+.stickerLayerReplaying {
+  opacity: 0;
+  transform: scale(0.96);
 }
 
 /* ── Feed post result ───────────────────────────────────────────────────── */
@@ -528,6 +538,11 @@
 .tabBtn svg {
   width: 17px;
   height: 17px;
+}
+
+.tabBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .tabBtnActive {

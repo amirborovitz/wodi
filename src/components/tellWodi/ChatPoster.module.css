@@ -8,6 +8,12 @@
   margin-top: var(--sp-2);
 }
 
+/* The poster's own box — the replay plays exactly over it, then hands back to it. */
+.posterBox {
+  position: relative;
+  --replay-radius: 10px;
+}
+
 .poster {
   display: block;
   width: 100%;
@@ -23,7 +29,43 @@
   cursor: pointer;
 }
 
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* Replay is the quiet one: an outlined circle beside Share. */
+.replay {
+  flex: 0 0 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--wodi-line2);
+  border-radius: var(--r-pill);
+  background: var(--wodi-card);
+  color: var(--wodi-white);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.replay svg {
+  width: 20px;
+  height: 20px;
+}
+
+.replay:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.replay:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
 .share {
+  flex: 1;
   height: 44px;
   border: none;
   border-radius: var(--r-pill);
