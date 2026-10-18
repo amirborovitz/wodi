@@ -664,3 +664,46 @@ describe('every plain answer is read by the app — the AI only gets sentences',
     expect(read('reps', 'around 100 I think')).toBeNull();
   });
 });
+
+describe('Tell Wodi — fixing an answer already given', () => {
+  const slotById = (results: ReturnType<typeof blank>, id: string, reopened: ReadonlySet<string> = new Set()) =>
+    openSlots(results, new Set(), undefined, undefined, reopened).find((s) => s.id === id)!;
+
+  it('"Change" on a time asks it again — the old value no longer passes it over (it used to save it)', () => {
+    let results = blank();
+    results = applyAnswer(results, slotById(results, '0.time'), answer('0.time', { seconds: 18 * 60 + 30 })).results;
+    const closed = new Set(['0.time']);
+    // Answered: not asked again.
+    expect(openSlots(results, closed).some((s) => s.id === '0.time')).toBe(false);
+    // Reopened: asked first, even though the result still holds 18:30.
+    const reopened = openSlots(results, new Set(), undefined, undefined, new Set(['0.time']));
+    expect(nextQuestion(reopened, results)!.slotIds).toEqual(['0.time']);
+  });
+
+  it('a reopened weight is asked again too', () => {
+    const id = '0.weight.alt dumbbell snatch';
+    let results = blank();
+    results = applyAnswer(results, slotById(results, id), answer(id, { weight: 22.5 })).results;
+    expect(openSlots(results, new Set()).some((s) => s.id === id)).toBe(false);
+    expect(openSlots(results, new Set(), undefined, undefined, new Set([id])).some((s) => s.id === id)).toBe(true);
+  });
+
+  it('a corrected time replaces the old one', () => {
+    let results = blank();
+    const slot = slotById(results, '0.time');
+    results = applyAnswer(results, slot, answer('0.time', { seconds: 18 * 60 + 30 })).results;
+    results = applyAnswer(results, slot, answer('0.time', { seconds: 19 * 60 + 30 })).results;
+    expect(results[0].timeSeconds).toBe(19 * 60 + 30);
+  });
+
+  it('correcting "singles" back to double-unders undoes the singles', () => {
+    const id = '0.choice.double under';
+    let results = blank();
+    const choice = slotById(results, id);
+    results = applyAnswer(results, choice, answer(id, { choice: 'Single Under' })).results;
+    const swapped = () => results[0].movementResults?.filter((mr) => mr.movement.name === 'Double Under' && mr.substitution) ?? [];
+    expect(swapped().length).toBeGreaterThan(0);
+    results = applyAnswer(results, choice, answer(id, { choice: 'Double Under' })).results;
+    expect(swapped()).toEqual([]);
+  });
+});

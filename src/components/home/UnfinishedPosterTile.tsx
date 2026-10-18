@@ -6,9 +6,9 @@ import styles from './UnfinishedPosterTile.module.css';
 interface UnfinishedPosterTileProps {
   poster: UnfinishedPoster;
   onOpen: () => void;
-  /** Other boards saved for later — opens the list. */
-  more: number;
-  onOpenMore: () => void;
+  /** Other boards saved for later — opens the list. Left out where only this board matters (the chat). */
+  more?: number;
+  onOpenMore?: () => void;
   /** Long-press handlers (delete), the same gesture as on a poster. */
   pressHandlers?: React.HTMLAttributes<HTMLButtonElement> & { draggable?: false };
 }
@@ -18,7 +18,7 @@ interface UnfinishedPosterTileProps {
  * blank. Tapping it opens the board's chat at "How'd it go?". Render-only — buildUnfinishedPoster
  * decides every word.
  */
-export function UnfinishedPosterTile({ poster, onOpen, more, onOpenMore, pressHandlers }: UnfinishedPosterTileProps): React.ReactElement {
+export function UnfinishedPosterTile({ poster, onOpen, more = 0, onOpenMore, pressHandlers }: UnfinishedPosterTileProps): React.ReactElement {
   return (
     <div className={thumb.wrapper}>
       <button
@@ -43,7 +43,7 @@ export function UnfinishedPosterTile({ poster, onOpen, more, onOpenMore, pressHa
 
       <div className={styles.caption}>
         <span className={styles.saved}>{poster.savedLabel}</span>
-        {more > 0 ? (
+        {more > 0 && onOpenMore ? (
           <button type="button" className={styles.more} onClick={onOpenMore}>+{more} saved</button>
         ) : (
           <span className={styles.add} aria-hidden="true">{poster.result.add} →</span>

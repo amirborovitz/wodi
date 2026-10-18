@@ -1481,6 +1481,12 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     },
     keepInThread: thread.keep,
     opening: chatOpening,
+    waitingBoard: thread.pinned?.board ?? null,
+    // The chat's saves now write to this board, and logging it clears it from Saved.
+    onTakeBoard: (planned) => {
+      chatBoardIdRef.current = planned.id;
+      if (planned.parsedWorkout) setParsedWorkout(planned.parsedWorkout);
+    },
   });
 
   /**

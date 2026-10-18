@@ -15,6 +15,7 @@ import { askableUncertainty } from '../../services/parseUncertainty';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 
 const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
+const NO_IDS: ReadonlySet<string> = new Set();
 
 /**
  * What the chat still needs to know, and how an answer lands on the workout.
@@ -77,6 +78,11 @@ export interface ChatSlot {
   cap?: number;
   /** Asked out loud. A slot that isn't is still offered to the AI, filled only if mentioned. */
   asked: boolean;
+  /**
+   * Already answered — this is what the athlete said ("18:30"). Offered to the AI only so a typed
+   * correction ("oops, 19:30 not 18:30") can land; never asked again unless they reopen it.
+   */
+  answered?: string;
   /**
    * What the athlete usually does instead (see athleteHabits.ts). On a swap it turns the silent
    * slot into a question; on a choice it puts their usual side first. Offered, never filled in.
@@ -259,14 +265,18 @@ export function weightChoices(rx: number[], unit: string, equipment?: MovementEq
  * part's score first (it IS that part's result), then its loads, then its either/or choices —
  * then the weight unit if nothing says it, then anything optional.
  * `closed` holds ids already answered or skipped. `habits` are the athlete's usual swaps, keyed by
- * `habitKey` of the board's movement.
+ * `habitKey` of the board's movement. `reopened` holds ids the athlete asked to answer again
+ * ("Change", or a correction they typed): listed even though the results already carry a value.
  */
 export function openSlots(
   results: StoryExerciseResult[],
   closed: ReadonlySet<string>,
   habits: ReadonlyMap<string, SwapHabit> = NO_HABITS,
   teamSize?: number,
+  reopened: ReadonlySet<string> = NO_IDS,
 ): ChatSlot[] {
+  /** Still to ask: nothing fills it yet, or the athlete is answering it again. */
+  const toAsk = (id: string, filled: boolean): boolean => reopened.has(id) || !filled;
   const multiPart = results.length > 1;
   const asked: ChatSlot[] = [];
   const optional: ChatSlot[] = [];
@@ -284,32 +294,32 @@ export function openSlots(
       if (!closed.has(slot.id)) list.push(slot);
     };
 
-    if (r.kind === 'score_time' && !(r.timeSeconds && r.timeSeconds > 0)) {
+    if (r.kind === 'score_time' && toAsk(`${i}.time`, (r.timeSeconds ?? 0) > 0)) {
       const cap = parseTimeCapSeconds(r.exercise.prescription);
       push(scores, { id: `${i}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true, ...(cap ? { cap } : {}) });
     }
-    if (r.kind === 'score_rounds' && !(r.rounds && r.rounds > 0)) {
+    if (r.kind === 'score_rounds' && toAsk(`${i}.rounds`, (r.rounds ?? 0) > 0)) {
       const intervals = personalIntervalCount(r, teamSize);
       push(scores, {
         id: `${i}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
         ...(intervals && intervals > 1 ? { intervals } : {}),
       });
     }
-    if (r.kind === 'score_open_reps' && !(r.maxReps && r.maxReps > 0)) {
+    if (r.kind === 'score_open_reps' && toAsk(`${i}.reps`, (r.maxReps ?? 0) > 0)) {
       push(scores, { id: `${i}.reps`, kind: 'reps', exerciseIndex: i, subject: part, asked: true });
     }
-    if (r.kind === 'free_score' && !(r.timeSeconds || r.rounds || r.repsTotal || r.weight)) {
+    if (r.kind === 'free_score' && toAsk(`${i}.score`, Boolean(r.timeSeconds || r.rounds || r.repsTotal || r.weight))) {
       push(scores, { id: `${i}.score`, kind: 'score', exerciseIndex: i, subject: part, asked: true });
     }
-    if (r.kind === 'distance' && !(r.distanceValue && r.distanceValue > 0)) {
+    if (r.kind === 'distance' && toAsk(`${i}.distance`, (r.distanceValue ?? 0) > 0)) {
       push(scores, { id: `${i}.distance`, kind: 'distance', exerciseIndex: i, subject: r.exercise.name, asked: true });
     }
-    if (r.kind === 'duration' && !(r.durationSeconds && r.durationSeconds > 0)) {
+    if (r.kind === 'duration' && toAsk(`${i}.duration`, (r.durationSeconds ?? 0) > 0)) {
       push(scores, { id: `${i}.duration`, kind: 'duration', exerciseIndex: i, subject: r.exercise.name, asked: true });
     }
 
     if (usesResultLevelLoad(r)) {
-      if (!(r.weight && r.weight > 0) && r.loadMode !== 'bodyweight') {
+      if (toAsk(`${i}.weight`, (r.weight ?? 0) > 0) && r.loadMode !== 'bodyweight') {
         const mr = r.movementResults?.[0];
         push(loads, {
           id: `${i}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
@@ -319,10 +329,11 @@ export function openSlots(
       }
     } else {
       for (const mr of distinctLoadMovements(r)) {
-        if (loadAnswered(mr)) continue;
+        const id = `${i}.weight.${mr.movement.name.toLowerCase()}`;
+        if (!toAsk(id, loadAnswered(mr))) continue;
         const sameAs = earlierLoad(r, mr);
         push(loads, {
-          id: `${i}.weight.${mr.movement.name.toLowerCase()}`, kind: 'weight', exerciseIndex: i,
+          id, kind: 'weight', exerciseIndex: i,
           subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
           rxWeights: rxPair(mr), unit: knownLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
           ...(sameAs ? { sameAs } : {}),
@@ -332,7 +343,7 @@ export function openSlots(
 
     // The set the block ends on, taken to max reps — asked right after the working weights, so
     // the two land in one panel ("4 sets, 5th max reps").
-    if (r.kind === 'load' && hasMaxSet(r.exercise) && !(r.maxReps && r.maxReps > 0)) {
+    if (r.kind === 'load' && hasMaxSet(r.exercise) && toAsk(`${i}.maxset`, (r.maxReps ?? 0) > 0)) {
       const mr = r.movementResults?.[0];
       push(loads, {
         id: `${i}.maxset`, kind: 'maxset', exerciseIndex: i, subject: r.exercise.name,
@@ -342,7 +353,7 @@ export function openSlots(
     }
 
     for (const mr of distinctChoiceMovements(r)) {
-      if (mr.substitution) continue;
+      if (!toAsk(`${i}.choice.${mr.movement.name.toLowerCase()}`, Boolean(mr.substitution))) continue;
       const alternative = mr.movement.alternative!.name;
       const habit = habits.get(habitKey(mr.movement.name));
       push(choices, {
@@ -384,7 +395,7 @@ export function openSlots(
     if (!isScoredKind(r) && r.setsCompleted == null && r.intervalsCompleted == null && r.setsTotal > 1) {
       push(optional, { id: `${i}.sets`, kind: 'sets', exerciseIndex: i, subject: r.exercise.name, asked: false });
     }
-    if (r.kind === 'score_rounds' && !(r.partialReps && r.partialReps > 0)) {
+    if (r.kind === 'score_rounds' && toAsk(`${i}.extra`, (r.partialReps ?? 0) > 0)) {
       // The extra reps ride on the rounds answer; listed so a later "…plus 12" still lands.
       push(optional, { id: `${i}.extra`, kind: 'rounds', exerciseIndex: i, subject: `${part} (extra reps)`, asked: false });
     }
@@ -615,8 +626,16 @@ export function applyAnswer(
       const picked = answer.choice?.trim().toLowerCase();
       const [asWritten, alternative] = (slot.options ?? []).map((o) => o.toLowerCase());
       if (!picked) return { results, closed: false };
-      // As written: nothing to change, the board's own movement is what gets saved.
-      if (picked === asWritten) return { results, closed: true };
+      // As written: the board's own movement is what gets saved — and a correction back to it
+      // undoes the other option picked earlier.
+      if (picked === asWritten) {
+        return {
+          results: patchResult(results, i, (r) => patchMovements(r, slot.movementNames ?? [], (mr) => (
+            mr.substitution ? buildSubstitutionPatch(mr, null) : {}
+          ))),
+          closed: true,
+        };
+      }
       if (picked !== alternative) return { results, closed: false };
       return {
         results: patchResult(results, i, (r) => patchMovements(r, slot.movementNames ?? [], (mr) => (

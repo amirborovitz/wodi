@@ -141,6 +141,10 @@ just finished a workout and is texting you about it. Your job has two parts.
    - A choice question with "usually": "yes" / "same as always" picks the "usually" option.
    - If they say they don't know / didn't track / want to skip a question, answer it with
      skipped = true.
+   - A question with "answered" was already answered — that is what they said. Answer it again
+     ONLY when they correct it ("oops, 19:30 not 18:30", "actually it was 45 kg", "I meant 7
+     rounds"): the corrected value, in that question's terms. A bare number is never a
+     correction — it answers the question Wodi just asked.
    - Every field you don't use is null (perInterval false, unit null).
 
 2. REACT like a friend at the gym would — one short line, max 8 words, warm and a little playful.
@@ -185,6 +189,7 @@ export async function readAthleteMessage(input: {
     ...(s.intervals ? { intervals: s.intervals } : {}),
     ...(s.cap ? { capMinutes: Math.round((s.cap / 60) * 10) / 10 } : {}),
     ...(s.uncertainty?.answer ? { answer: s.uncertainty.answer } : {}),
+    ...(s.answered ? { answered: s.answered } : {}),
   }));
   const conversation = input.recent
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)

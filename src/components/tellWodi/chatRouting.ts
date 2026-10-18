@@ -20,6 +20,16 @@ export function routeMessage(state: { hasBoard: boolean; hasFile: boolean; text:
   return 'ask-wodi';
 }
 
+/**
+ * Ask Wodi handed the words back as a workout. With a board saved for later, they are most
+ * likely its result ("18:30, echo bike instead of the run") — but a name is not how anyone
+ * recognises a board, so Wodi shows the board itself and asks: one tap for "this one", one for
+ * "something else". Never a guess either way.
+ */
+export function routeWorkoutWords(state: { hasWaitingBoard: boolean }): 'confirm-board' | 'read-board' {
+  return state.hasWaitingBoard ? 'confirm-board' : 'read-board';
+}
+
 // What the screen is called, and what it is.
 const SCREEN = '(?:standard|regular|normal|usual|classic|old|manual)\\s+(?:screen|form|way|logging|log|view|page)';
 const STANDARD_SCREEN = new RegExp([

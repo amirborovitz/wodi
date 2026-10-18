@@ -427,3 +427,8 @@
   border: 1px dashed rgba(245, 194, 0, 0.6);
   border-radius: 2px;
 }
+
+/* A saved board, drawn as the same unfinished poster as on Today — recognised by sight, not by name. */
+.board {
+  margin-top: var(--sp-2);
+}

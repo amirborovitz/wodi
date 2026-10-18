@@ -6,6 +6,7 @@ import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
 import { WodiText } from './WodiText';
+import { UnfinishedPosterTile } from '../home/UnfinishedPosterTile';
 import type { WodiThread } from './useWodiThread';
 import type { WorkoutWithStats } from '../../hooks/useWorkouts';
 import type { PlannedWorkout } from '../../types';
@@ -150,6 +151,18 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                 const cheered = cheeredWorkout(message.headline);
                 return cheered ? <ChatPoster workout={cheered} onOpen={() => onOpenWorkout(cheered)} /> : null;
               })()}
+              {message.board && (
+                <div className={styles.board}>
+                  {/* Tapping the board itself is "this one" — once, while the question is open. */}
+                  <UnfinishedPosterTile
+                    poster={message.board}
+                    onOpen={() => {
+                      const yes = message.chips?.find((c) => c.action === 'this-board');
+                      if (yes && !message.answered && busy == null) { tapChip(message.id, yes); pinToEnd(); }
+                    }}
+                  />
+                </div>
+              )}
               {message.panel && !message.answered && (
                 <ChatPanelCard
                   panel={message.panel}

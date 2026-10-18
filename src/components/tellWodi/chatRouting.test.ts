@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asksForStandardScreen, routeMessage } from './chatRouting';
+import { asksForStandardScreen, routeMessage, routeWorkoutWords } from './chatRouting';
 
 describe('routeMessage — where a chat message goes', () => {
   it('a photo before there is a board is the board', () => {
@@ -21,6 +21,16 @@ describe('routeMessage — where a chat message goes', () => {
 
   it('a photo is a board even when its caption mentions the form', () => {
     expect(routeMessage({ hasBoard: false, hasFile: true, text: 'open the form' })).toBe('read-board');
+  });
+});
+
+describe('routeWorkoutWords — a workout told in words while no board is open', () => {
+  it('with nothing saved, the words are read as a new board', () => {
+    expect(routeWorkoutWords({ hasWaitingBoard: false })).toBe('read-board');
+  });
+
+  it('with a board saved for later, Wodi shows it and asks whether the words are about it', () => {
+    expect(routeWorkoutWords({ hasWaitingBoard: true })).toBe('confirm-board');
   });
 });
 
