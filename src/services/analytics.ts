@@ -52,6 +52,8 @@ interface AnalyticsEvents {
    * `board`: whether a workout was already read (its answers go along).
    */
   standard_screen_from_chat: { how: 'typed' | 'chip' | 'wodi_handoff'; board: 'yes' | 'no' };
+  /** A saved board was cleared without a log — "Didn't do it" in its chat, or on its Today tile. */
+  saved_board_dropped: { where: 'chat' | 'today' };
   /** A saved workout was fixed and re-saved. */
   workout_edited: { format: WorkoutFormat | 'unknown'; parts: number };
   /** A workout was deleted. */

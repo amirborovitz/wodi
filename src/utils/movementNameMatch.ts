@@ -56,6 +56,14 @@ export function isRowErgName(name: string): boolean {
     && words.every((word) => ROW_ERG_WORDS.has(word));
 }
 
+/**
+ * True when the text says the athlete holds a load in each hand: "Double KB Snatch", "Twin DB
+ * Press", or the poster's own "2×16kg". The ONE place that reads a pair off the words.
+ */
+export function namesAPair(text: string): boolean {
+  return /\b(?:twin|double|pair|two|dual|2\s*[x×])(?![a-z])/i.test(text);
+}
+
 const MOVEMENT_TOKEN_ALIASES: Record<string, string> = {
   db: 'dumbbell',
   kb: 'kettlebell',

@@ -10,6 +10,8 @@ describe('a finish time the athlete types', () => {
     expect(readClockAnswer('21:30')).toBe(1290);
     expect(readClockAnswer('21.30')).toBe(1290);
     expect(readClockAnswer('21 30')).toBe(1290);
+    expect(readClockAnswer('17;24')).toBe(1044);
+    expect(readClockAnswer('17,24')).toBe(1044);
     expect(readClockAnswer('930')).toBe(570);
     expect(readClockAnswer('9:05')).toBe(545);
     expect(readClockAnswer('1:02:15')).toBe(3735);

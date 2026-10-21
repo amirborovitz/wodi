@@ -17,7 +17,8 @@ interface ChatPosterProps {
 
 /**
  * The poster just logged, big under Wodi's cheer, with Share right there — the moment you're
- * proud of is where you share. The first time it shows, the athlete performs the board and the
+ * proud of is where you share. A session of several parts shows its lead poster (the WOD first —
+ * orderPosterParts) and "+N more", which opens the whole deck; the chat never stacks posters. The first time it shows, the athlete performs the board and the
  * card gives way to the poster; Replay plays it again. Sharing is the poster screen's own
  * (usePosterShare); the image is drawn off-screen at the poster's full width so it is as sharp
  * as one shared from the poster.
@@ -42,6 +43,7 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
   }, [capturing]);
 
   if (!payload) return null;
+  const more = payload.wods.length - 1;
   return (
     <div className={styles.wrap}>
       <div className={styles.posterBox}>
@@ -68,6 +70,9 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
           </button>
         )}
         <button type="button" className={styles.share} onClick={() => setCapturing(true)}>Share</button>
+        {more > 0 && (
+          <button type="button" className={styles.more} onClick={onOpen}>+{more} more</button>
+        )}
       </div>
 
       {capturing && (

@@ -37,7 +37,7 @@ describe('last loads — only what the athlete logged', () => {
     expect([...last.values()].find((l) => l.load === '60→65kg')).toMatchObject({ start: 60, peak: 65, unit: 'kg' });
     // The row stores the pair's total; the answer is per dumbbell, as the board writes it.
     expect([...last.values()].find((l) => l.load === '2×22.5kg')).toMatchObject({ start: 22.5, unit: 'kg' });
-    expect([...last.values()].find((l) => l.load === '2×22.5kg')?.peak).toBeUndefined();
+    expect([...last.values()].find((l) => l.load === '2×22.5kg')).not.toHaveProperty('peak');
   });
 
   it('never quotes a test log', () => {

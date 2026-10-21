@@ -54,7 +54,8 @@
   display: block;
 }
 
-/* Fixed height, so a line arriving or the result landing never moves the athlete. */
+/* Fixed height, so a line arriving or the result landing never moves the athlete. The line's size
+   is chosen to fit it (lineSizeFor in replayScript.ts — keep its numbers in step with these). */
 .caption {
   position: relative;
   height: 27cqw;
@@ -73,7 +74,7 @@
 .lineText {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 900;
-  font-size: 12cqw;
+  font-size: var(--line-size);
   line-height: 0.9;
   letter-spacing: -0.02em;
   text-transform: uppercase;

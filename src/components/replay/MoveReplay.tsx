@@ -44,7 +44,7 @@ export function MoveReplay({ script, onDone }: MoveReplayProps): React.ReactElem
         <g ref={stageRef} />
       </svg>
 
-      <div className={styles.caption} aria-live="polite">
+      <div className={styles.caption} style={{ '--line-size': `${script.lineSize}cqw` } as React.CSSProperties} aria-live="polite">
         <AnimatePresence mode="popLayout" initial={false}>
           {heroText !== null && script.hero ? (
             <motion.div

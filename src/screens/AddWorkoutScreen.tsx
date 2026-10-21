@@ -1302,6 +1302,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     if (target === 'chat') setStep('chat');
     else if (target === 'preview') setStep('preview');
     else if (target === 'thread' && onLeaveBoard) onLeaveBoard();
+    else if (target === 'logged') onWorkoutCreated();
     else onBack();
   };
 
@@ -1381,6 +1382,9 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const lastLoads = useMemo(() => buildLastLoadMap(recentWorkouts), [recentWorkouts]);
   const loadHistory = useMemo(() => recentLoads(recentWorkouts), [recentWorkouts]);
 
+  // The save in flight was the chat's own finish — it ends in the chat, not on the poster screen.
+  const savingFromChatRef = useRef(false);
+
   // The board has its workout — nothing keeps it waiting any more (see clearWaitingBoard).
   const boardLoggedRef = useRef(false);
 
@@ -1419,11 +1423,31 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const clearWaitingBoard = async (): Promise<void> => {
     if (boardLoggedRef.current) return;
     boardLoggedRef.current = true;
+    await deleteKeptBoards();
+  };
+
+  // Boards this session already deleted — never deleted twice (see clearWaitingBoard).
+  const deletedBoardsRef = useRef(new Set<string>());
+  /** The board(s) this session keeps — the one it opened, the one its chat created — gone from Saved. */
+  const deleteKeptBoards = async (): Promise<void> => {
     const chatBoard = chatBoardIdRef.current
       ?? (chatBoardCreateRef.current ? await chatBoardCreateRef.current.catch(() => null) : null);
-    const ids = new Set([plannedWorkout?.id, chatBoard].filter((id): id is string => Boolean(id)));
-    await Promise.all([...ids].map((id) => deleteDoc(doc(db, 'savedWods', id))
-      .catch((err: unknown) => console.error('[SavedWod] could not clear the logged board', err))));
+    const ids = [...new Set([plannedWorkout?.id, chatBoard])]
+      .filter((id): id is string => Boolean(id) && !deletedBoardsRef.current.has(id as string));
+    ids.forEach((id) => deletedBoardsRef.current.add(id));
+    await Promise.all(ids.map((id) => deleteDoc(doc(db, 'savedWods', id))
+      .catch((err: unknown) => console.error('[SavedWod] could not clear the board', err))));
+  };
+
+  /**
+   * "Didn't do it": the board is cleared without a log, and the chat lets go of it — a board
+   * started next in this chat is kept as its own.
+   */
+  const dropWaitingBoard = (): void => {
+    void deleteKeptBoards();
+    chatBoardIdRef.current = null;
+    chatBoardCreateRef.current = null;
+    track('saved_board_dropped', { where: 'chat' });
   };
 
   const tellWodi = useTellWodiChat({
@@ -1459,9 +1483,11 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     onFinished: (results, vibe, chat) => {
       chatVibeRef.current = vibe;
       chatThreadRef.current = chat;
+      savingFromChatRef.current = true;
       requestSave(results);
     },
     onOpenForms: (results, how) => {
+      savingFromChatRef.current = false;
       leaveChat(how, true);
       formFromChatRef.current = true;
       setEditInitialResults(results);
@@ -1487,6 +1513,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       chatBoardIdRef.current = planned.id;
       if (planned.parsedWorkout) setParsedWorkout(planned.parsedWorkout);
     },
+    onDropBoard: dropWaitingBoard,
   });
 
   /**
@@ -1528,7 +1555,9 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     // Validation moved to EditExerciseSheet (skip/edit prompt on close).
     // By the time we reach here, user has already made their choices.
 
-    setStep('saving');
+    // The chat says "Making your poster…" itself; the form steps to the saving screen.
+    const inChat = savingFromChatRef.current;
+    if (!inChat) setStep('saving');
 
     // Repairing a saved workout, rather than logging a new one. The two differ in what the save
     // is allowed to do besides write the doc — see the guards below.
@@ -1850,6 +1879,13 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         exercises,
       }, { bodyweight: user.weight || DEFAULT_BW }).total;
 
+      // A log finished in the chat ends there: its poster goes into the conversation under Wodi's
+      // cheer, with the EP and any PR — what the flash and the poster screen said, said in place.
+      if (inChat) {
+        tellWodi.posterReady({ workoutId: persistedWorkoutId, ep: finalEP, pr: Boolean(finalHasPR) });
+        return;
+      }
+
       // Compute wrap label (mirrors StoryLogResults typeLabel logic)
       const wrapCtx = { format: parsedWorkout.format, scoreType: parsedWorkout.scoreType, exerciseCount: parsedWorkout.exercises.length };
       const wrapLabels = new Set<string>();
@@ -1867,6 +1903,10 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       setStep('wrap');
     } catch (err) {
       console.error('Error saving workout:', err);
+      if (inChat) {
+        tellWodi.saveFailed();
+        return;
+      }
       setError('Failed to save workout. Please try again.');
       setStep('log-results');
     }
@@ -2270,7 +2310,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         <TellWodiChat
           chat={tellWodi}
           thread={thread}
-          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday }))}
+          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday, logged: tellWodi.logged }))}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
         />

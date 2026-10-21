@@ -15,15 +15,27 @@
   border: 1px solid rgba(242, 240, 235, 0.14);
   border-radius: 10px;
   color: #f2f0eb;
-  font: inherit;
   text-align: left;
-  cursor: pointer;
-  touch-action: manipulation;
+  position: relative;
   transition: transform 0.12s ease;
 }
 
-.card:active {
+.card:has(.open:active) {
   transform: scale(0.97);
+}
+
+/* The card's tap: the whole card, under "Didn't do it". */
+.open {
+  position: absolute;
+  inset: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .format {
@@ -94,6 +106,48 @@
   font-weight: 900;
   line-height: 1;
   color: rgba(242, 240, 235, 0.22);
+}
+
+/* Two days on: the blank asks, with its two answers. */
+.ask {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #f2f0eb;
+}
+
+.answers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.logIt,
+.didnt {
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.logIt {
+  background: #f2f0eb;
+  color: #0b0c0e;
+}
+
+.didnt {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid rgba(242, 240, 235, 0.4);
+  color: #f2f0eb;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .footer {

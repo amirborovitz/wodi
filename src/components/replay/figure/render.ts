@@ -6,7 +6,7 @@
  */
 
 import { BIKE, ROWER } from './moves';
-import type { Frame } from './moves';
+import type { Frame, Hands } from './moves';
 import { BONES, STAGE, add, skeleton, vec } from './skeleton';
 import type { Point } from './skeleton';
 import type { MovementImplement } from '../../../data/movementRegistry';
@@ -16,6 +16,7 @@ const NEAR = 'var(--wodi-yellow)';
 const FAR = 'color-mix(in srgb, var(--wodi-yellow) 45%, var(--wodi-bg))';
 const KIT = 'var(--wodi-white)';
 const RIG = 'var(--wodi-dim2)';
+const FAR_KIT = 'var(--wodi-dim)';
 const FLOOR_MARKS = 8;
 
 type Attrs = Record<string, string | number>;
@@ -34,7 +35,7 @@ const set = (el: SVGElement, attrs: Attrs): void => {
 const show = (el: SVGElement, on: boolean): void => { el.style.display = on ? '' : 'none'; };
 const segment = (el: SVGElement, a: Point, b: Point): void => set(el, { x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
 
-export interface FigurePainter { paint: (frame: Frame, implement: MovementImplement) => void }
+export interface FigurePainter { paint: (frame: Frame, implement: MovementImplement, hands: Hands) => void }
 
 export function createFigurePainter(root: SVGGElement): FigurePainter {
   root.replaceChildren();
@@ -76,6 +77,10 @@ export function createFigurePainter(root: SVGGElement): FigurePainter {
   const rope = make(root, 'path', { 'stroke-width': 2, fill: 'none' }, { stroke: KIT });
   const shadow = make(root, 'ellipse', { cy: STAGE.ground + 1, rx: 26, ry: 4 }, { fill: 'var(--wodi-bg)' });
 
+  // The far hand's bell of a pair, behind the body like the arm that holds it.
+  const farDumbbell = make(root, 'circle', { r: 8, 'stroke-width': 3 }, { fill: 'var(--wodi-bg)', stroke: FAR_KIT });
+  const farKettlebell = make(root, 'circle', { r: 9 }, { fill: FAR_KIT });
+
   // ── the athlete: far limbs, near legs, body, head, near arm ──
   const uaB = line(FAR, 9), faB = line(FAR, 8), thB = line(FAR, 11), shB = line(FAR, 10);
   const thF = line(NEAR, 11), shF = line(NEAR, 10);
@@ -91,7 +96,7 @@ export function createFigurePainter(root: SVGGElement): FigurePainter {
   const kettlebell = make(root, 'circle', { r: 9 }, { fill: KIT });
   const ball = make(root, 'circle', { r: 12, 'stroke-width': 3 }, { fill: 'var(--wodi-bg)', stroke: KIT });
 
-  function paint({ pose, props }: Frame, implement: MovementImplement): void {
+  function paint({ pose, props }: Frame, implement: MovementImplement, hands: Hands): void {
     const s = skeleton(pose);
     segment(thB, s.hip, s.kneeB); segment(shB, s.kneeB, s.footB);
     segment(uaB, s.shoulder, s.elbowB); segment(faB, s.elbowB, s.handB);
@@ -107,13 +112,21 @@ export function createFigurePainter(root: SVGGElement): FigurePainter {
     const load = props.held ? implement : null;
     show(plate, load === 'barbell'); show(hub, load === 'barbell');
     if (load === 'barbell') { set(plate, { cx: s.handF[0], cy: s.handF[1] }); set(hub, { cx: s.handF[0], cy: s.handF[1] }); }
+    const pair = hands === 'pair';
     show(dumbbell, load === 'dumbbell');
-    if (load === 'dumbbell') set(dumbbell, { cx: s.handF[0], cy: s.handF[1] });
+    show(farDumbbell, load === 'dumbbell' && pair);
+    if (load === 'dumbbell') {
+      set(dumbbell, { cx: s.handF[0], cy: s.handF[1] });
+      set(farDumbbell, { cx: s.handB[0], cy: s.handB[1] });
+    }
     // A kettlebell hangs off the hand, past the end of the forearm.
     show(kettlebell, load === 'kettlebell');
+    show(farKettlebell, load === 'kettlebell' && pair);
     if (load === 'kettlebell') {
       const bell = add(s.handF, vec(pose.faF, 11));
+      const farBell = add(s.handB, vec(pose.faB, 11));
       set(kettlebell, { cx: bell[0], cy: bell[1] });
+      set(farKettlebell, { cx: farBell[0], cy: farBell[1] });
     }
 
     show(ball, !!props.ball);

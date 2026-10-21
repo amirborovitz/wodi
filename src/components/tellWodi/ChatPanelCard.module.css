@@ -46,7 +46,7 @@
   color: rgba(255, 255, 255, 0.72);
 }
 
-/* The board's Rx loads, one tap each — only when there's no last time to start on. */
+/* A load's likely answers, one tap each: the same load as earlier, the board's Rx. */
 .quick {
   display: flex;
   flex-wrap: wrap;
@@ -66,6 +66,13 @@
   cursor: pointer;
 }
 
+/* "No weight" picked for this load. */
+.quickChipOn {
+  background: var(--wodi-white);
+  border-color: var(--wodi-white);
+  color: #0c0d0f;
+}
+
 .group {
   margin: 0;
   padding: 0;
@@ -73,15 +80,70 @@
   min-width: 0;
 }
 
-/* Only when the card asks two things (working sets and a max set). */
+/* Only when the card asks several things: "POWER SNATCH · BARBELL", "TWIN KB SNATCH · PER BELL"
+   (design: "wodi Unfinished Poster Flow", the weights card). */
 .groupTitle {
   padding: 0;
-  margin-bottom: var(--sp-2);
+  margin-bottom: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.56);
+}
+
+/* A load's chips sit between its name and its pills. */
+.group .quick {
+  margin-bottom: 6px;
+}
+
+/* A kettlebell: "2 ×", the five sizes around the likely one, "kg". */
+.bells {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bellsPair {
+  flex: none;
+  margin-right: 2px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.bell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--wodi-white);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.bellOn {
+  background: var(--wodi-white);
+  border-color: var(--wodi-white);
+  color: #0c0d0f;
+}
+
+.bellsUnit {
+  flex: none;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.56);
 }
 
@@ -168,24 +230,38 @@
   gap: 2px;
 }
 
+/* The number's own width: a hidden copy of it holds the space, the input lies over it — so the
+   number and its unit sit centered in the pill, as wide as they read. */
+.pillNumber {
+  position: relative;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pillNumber[data-long] {
+  font-size: 19px;
+}
+
+.pillMeasure {
+  visibility: hidden;
+  white-space: pre;
+}
+
 .pillInput {
+  position: absolute;
+  inset: 0;
   width: 100%;
   min-width: 0;
   padding: 0;
   background: transparent;
   border: 0;
   outline: none;
-  text-align: right;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
+  text-align: center;
+  font: inherit;
   color: var(--wodi-white);
-}
-
-/* "22.5", "102.5" — the box is ~50px; at 24px a fourth character is cut off. */
-.pillInput[data-long] {
-  font-size: 19px;
 }
 
 .pillInput::placeholder {
@@ -199,7 +275,6 @@
 
 .pillUnit {
   flex: none;
-  min-width: 18px;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 600;

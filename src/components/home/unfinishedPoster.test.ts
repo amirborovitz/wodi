@@ -52,3 +52,14 @@ describe('a saved board, drawn as the poster it will become', () => {
     expect(poster).toMatchObject({ title: 'Your board', format: null, lines: [], savedLabel: 'SAVED · YESTERDAY' });
   });
 });
+
+describe('two days on, the tile asks whether it was done', () => {
+  it('a board saved today or yesterday just waits', () => {
+    expect(buildUnfinishedPoster(board({}), NOW).asks).toBe(false);
+    expect(buildUnfinishedPoster(board({}, new Date(2026, 9, 12, 7, 0)), NOW).asks).toBe(false);
+  });
+
+  it('a board saved 48 hours ago asks "Did you do it?"', () => {
+    expect(buildUnfinishedPoster(board({}, new Date(2026, 9, 11, 18, 0)), NOW).asks).toBe(true);
+  });
+});

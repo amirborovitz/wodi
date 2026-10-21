@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
-import { createBlankResult, initStoryResults } from '../logging/story/types';
+import { createBlankResult, initStoryResults, type StoryExerciseResult } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, chatCannotLog, describeAnswer, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, carriedLoads, chatCannotLog, describeAnswer, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
+import { buildSavedExercises } from '../../services/buildSavedExercises';
 import type { ParsedWorkout, Workout } from '../../types';
 import { habitKey, swapHabits } from '../../services/wodiAgent/athleteHabits';
-import { buildLastLoadMap } from '../../utils/lastLoadHistory';
+import { buildLastLoadMap, type LastLoad } from '../../utils/lastLoadHistory';
 
 // The Ladder, 2026-09-22: 3 / 2 / 1 rounds of the same four movements, then 200 DU or 400 singles.
 const rx = { male: 22.5, female: 15, unit: 'kg' as const };
@@ -64,27 +65,35 @@ describe('Tell Wodi — what the chat asks', () => {
 
     const first = nextQuestion(slots, results)!;
     expect(first.text).toBe('What was your time?');
-    expect(first.chips.map((c) => c.label)).toEqual(['Hit the cap (25:00)', 'Skip']);
+    // A card: minutes : seconds, starting empty — never a guessed time — with the cap one tap.
+    const clock = first.panel!.groups[0];
+    expect(clock).toMatchObject({ control: 'clock', joiner: ':', start: {}, base: 25 });
+    expect(clock.quick.map((c) => c.label)).toEqual(['Hit the cap · 25:00']);
+    expect(first.chips).toEqual([]);
+    const typed = panelAnswer(first.panel!, { '0.time:minutes': 17, '0.time:seconds': 24 });
+    expect(typed.label).toBe('17:24');
+    expect(typed.answers).toEqual([{ id: '0.time', ...EMPTY_ANSWER, seconds: 1044 }]);
+    // Minutes alone is a time on the minute; nothing set is a skip.
+    expect(panelAnswer(first.panel!, { '0.time:minutes': 18 }).label).toBe('18:00');
+    expect(panelAnswer(first.panel!, {}).answers[0].skipped).toBe(true);
 
+    // Both loads on one card, each with the board's dumbbells one tap away; nothing assumed.
     const afterTime = openSlots(results, new Set(['0.time']));
-    const snatch = nextQuestion(afterTime, results)!;
-    expect(snatch.text).toBe('What weight did you use for Alt Dumbbell Snatch?');
-    expect(snatch.slotIds).toEqual(['0.weight.alt dumbbell snatch']);
-    expect([...(snatch.panel?.quick ?? []), ...snatch.chips].map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg']);
-
-    // The step-ups are asked, not assumed: the snatch's load is one tap, any other is typed.
-    const snatchSlot = afterTime.find((s) => s.id === '0.weight.alt dumbbell snatch')!;
-    const withSnatch = applyAnswer(results, snatchSlot, answer(snatchSlot.id, { weight: 17.5 })).results;
-    const afterSnatch = openSlots(withSnatch, new Set(['0.time', '0.weight.alt dumbbell snatch']));
-    const stepUp = nextQuestion(afterSnatch, withSnatch)!;
-    expect(stepUp.text).toBe('Same 17.5 kg on the Weighted Alt Box Step-up, or a different weight?');
-    expect(stepUp.slotIds).toEqual(['0.weight.weighted alt box step-up']);
-    expect(stepUp.chips.map((c) => c.label)).toEqual(['Same — 17.5 kg', 'Different weight']);
-    // "Different" answers nothing — it asks the step-ups' own weight, with the board's dumbbells.
-    expect(stepUp.chips[1].answers).toEqual([]);
-    expect(stepUp.chips[1].then?.text).toBe('What weight did you use for Weighted Alt Box Step-up?');
-    expect([...(stepUp.chips[1].then?.panel?.quick ?? []), ...(stepUp.chips[1].then?.chips ?? [])].map((c) => c.label)).toEqual(['15 kg', '17.5 kg', '20 kg', '22.5 kg']);
-    expect(stepUp.chips[0].answers?.[0]).toMatchObject({ id: '0.weight.weighted alt box step-up', weight: 17.5 });
+    const weights = nextQuestion(afterTime, results)!;
+    expect(weights.text).toBe('What weights did you use?');
+    expect(weights.slotIds).toEqual(['0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']);
+    expect(weights.panel?.groups.map((g) => g.title)).toEqual(['Alt Dumbbell Snatch', 'Weighted Alt Box Step-up']);
+    expect(weights.panel?.groups.map((g) => g.quick.map((c) => c.label))).toEqual([
+      ['15 kg', '17.5 kg', '20 kg', '22.5 kg'],
+      ['15 kg', '17.5 kg', '20 kg', '22.5 kg'],
+    ]);
+    // One answer for both — the button names each weight it saves.
+    const filled = panelAnswer(weights.panel!, { '0.weight.alt dumbbell snatch:weight': 17.5, '0.weight.weighted alt box step-up:weight': 15 });
+    expect(filled.label).toBe('17.5 kg · 15 kg');
+    expect(filled.answers.map((a) => [a.id, a.weight])).toEqual([
+      ['0.weight.alt dumbbell snatch', 17.5],
+      ['0.weight.weighted alt box step-up', 15],
+    ]);
 
     const afterWeights = openSlots(results, new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']));
     const choice = nextQuestion(afterWeights, results)!;
@@ -297,7 +306,7 @@ describe('Tell Wodi — THRUST (AMRAP intervals)', () => {
   it('offers every dumbbell between the two Rx weights', () => {
     const slots = openSlots(results(), new Set(['0.rounds']));
     const question = nextQuestion(slots, results())!;
-    expect([...(question.panel?.quick ?? []), ...question.chips].map((c) => c.label)).toEqual(['12.5 kg', '15 kg', '17.5 kg', '20 kg']);
+    expect([...(question.panel?.groups.flatMap((g) => g.quick) ?? []), ...question.chips].map((c) => c.label)).toEqual(['12.5 kg', '15 kg', '17.5 kg', '20 kg']);
   });
 });
 
@@ -403,22 +412,23 @@ describe('a second weighted movement — same weight, or another', () => {
   const weightOf = (rs: ReturnType<typeof afterSwing>, name: string) =>
     rs[0].movementResults!.find((mr) => mr.movement.name === name)!.weight;
 
-  it('the swings are asked on their own', () => {
+  it('the swings and the step-ups are asked together, on one card', () => {
     const rs = initStoryResults(workout, ['for_time'], 'female', undefined, { blankAnswers: true, weightUnit: 'kg' });
     const q = nextQuestion(openSlots(rs, new Set(['0.time'])), rs)!;
-    expect(q.text).toBe('What weight did you use for American Kettlebell Swing?');
-    expect(q.slotIds).toEqual([swingId]);
+    expect(q.text).toBe('What weights did you use?');
+    expect(q.slotIds).toEqual([swingId, stepId]);
   });
 
-  it('then the step-ups: "same 20 kg?" is one tap, and nothing is filled until they answer', () => {
+  it('swings already said: the step-ups offer "Same · 20 kg" as one tap, and nothing is filled until they answer', () => {
     const rs = afterSwing();
     expect(weightOf(rs, 'Weighted Step-up')).toBeUndefined();
     const slots = openSlots(rs, new Set(['0.time', swingId]));
     const q = nextQuestion(slots, rs)!;
-    expect(q.text).toBe('Same 20 kg on the Weighted Step-up, or a different weight?');
-    expect(q.chips.map((c) => c.label)).toEqual(['Same — 20 kg', 'Different weight']);
-    const same = applyAnswer(rs, slots.find((s) => s.id === stepId)!, q.chips[0].answers![0]).results;
-    expect(weightOf(same, 'Weighted Step-up')).toBe(20);
+    expect(q.text).toBe('What weight did you use for Weighted Step-up?');
+    const same = q.panel!.groups[0].quick[0];
+    expect(same.label).toBe('Same · 20 kg');
+    const done = applyAnswer(rs, slots.find((s) => s.id === stepId)!, same.answers[0]).results;
+    expect(weightOf(done, 'Weighted Step-up')).toBe(20);
   });
 
   it('a different weight lands on the step-ups only', () => {
@@ -427,6 +437,99 @@ describe('a second weighted movement — same weight, or another', () => {
     const other = applyAnswer(rs, slot, answer(stepId, { weight: 12 })).results;
     expect(weightOf(other, 'Weighted Step-up')).toBe(12);
     expect(weightOf(other, 'American Kettlebell Swing')).toBe(20);
+  });
+});
+
+// SNATCH RUN, 2026-10-18: 6 strict press with the bar, then side bends and a suitcase carry with a
+// kettlebell. The chat offered the press's 37.5 → 40 kg on the side bends.
+describe('"same weight" — only in a metcon, and only from the same kind of load', () => {
+  const press = {
+    name: '4 Sets Press Strength', type: 'strength', loggingMode: 'strength', suggestedSets: 4,
+    movements: [
+      { name: 'Strict Press', reps: 6, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' },
+      { name: 'Band Pull Apart', reps: 15, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+      { name: 'Standing Side Bend', reps: 10, perSide: true, inputType: 'weight', equipment: 'other', countingMode: 'per_round' },
+      { name: 'Suitcase Carry', distance: 10, unit: 'm', perSide: true, inputType: 'weight', equipment: 'other', implementCount: 1, countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const metcon = {
+    name: '5 Rounds For Time', type: 'wod', loggingMode: 'for_time', prescription: '5 RFT',
+    movements: [
+      { name: 'Thruster', reps: 10, rxWeights: { male: 43, female: 30, unit: 'kg' }, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' },
+      { name: 'Weighted Step-up', reps: 20, inputType: 'weight', equipment: 'other', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const give = (rs: StoryExerciseResult[], id: string, w: number): StoryExerciseResult[] =>
+    applyAnswer(rs, openSlots(rs, new Set()).find((s) => s.id === id)!, answer(id, { weight: w })).results;
+  const fresh = (ex: ParsedExercise, mode: 'strength' | 'for_time'): StoryExerciseResult[] =>
+    initStoryResults({ type: mode, exercises: [ex] } as unknown as ParsedWorkout, [mode], 'female', undefined, { blankAnswers: true, weightUnit: 'kg' });
+  const slot = (rs: StoryExerciseResult[], id: string) => openSlots(rs, new Set()).find((s) => s.id === id)!;
+
+  it('a strength block asks every lift its own weight — even two kettlebell movements in a row', () => {
+    const afterPress = give(fresh(press, 'strength'), '0.weight.strict press', 37.5);
+    expect(slot(afterPress, '0.weight.standing side bend').sameAs).toBeUndefined();
+    const rs = give(afterPress, '0.weight.standing side bend', 16);
+    expect(slot(rs, '0.weight.suitcase carry').sameAs).toBeUndefined();
+  });
+
+  it('in a metcon, a barbell total is never offered for a handheld movement', () => {
+    const rs = give(fresh(metcon, 'for_time'), '0.weight.thruster', 30);
+    expect(slot(rs, '0.weight.weighted step-up').sameAs).toBeUndefined();
+  });
+});
+
+// SNATCH RUN, 2026-10-18: 6 minutes of twin kettlebell snatch practice, then the metcon with the
+// same snatches. The chat asked the bells' weight twice, as if it had never heard the first answer.
+describe('a lift already weighed in an earlier part is one tap', () => {
+  const practice = {
+    name: 'Twin Kettlebell Snatch Practice', type: 'skill', loggingMode: 'strength', isSecondary: true,
+    movements: [{ name: 'Twin Kettlebell Snatch', inputType: 'weight', equipment: 'kettlebell', implementCount: 2 }],
+  } as unknown as ParsedExercise;
+  const metcon = {
+    name: 'Ladder For Time', type: 'wod', loggingMode: 'for_time', prescription: 'For time: 20-18-16-14-12-10',
+    movements: [
+      { name: 'Kettlebell Snatch', reps: 20, rxWeights: { male: 20, female: 12, unit: 'kg' }, inputType: 'weight', equipment: 'kettlebell', implementCount: 2, countingMode: 'per_round' },
+      { name: 'Sit-up', reps: 20, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const workout = { type: 'wod', exercises: [practice, metcon] } as unknown as ParsedWorkout;
+  const practiceId = '0.weight';
+  const metconId = '1.weight.kettlebell snatch';
+
+  it('the metcon offers the practice\'s 16 kg in the middle of its bell row', () => {
+    const fresh = initStoryResults(workout, ['strength', 'for_time'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
+    const practiceSlot = openSlots(fresh, new Set()).find((s) => s.id === practiceId)!;
+    const rs = applyAnswer(fresh, practiceSlot, answer(practiceId, { weight: 16 })).results;
+    const slots = openSlots(rs, new Set([practiceId, '1.time']));
+    const q = nextQuestion(slots, rs)!;
+    expect(q.text).toBe('What weight did you use for Kettlebell Snatch?');
+    expect(q.slotIds).toEqual([metconId]);
+    // The bell row sits around the practice's 16 kg — one tap, never picked for them.
+    expect(q.panel?.groups[0]).toMatchObject({ control: 'bells', sizes: [8, 12, 16, 20, 24], pair: true, kit: 'per bell', start: {} });
+    // Said the way the board writes a pair.
+    expect(panelAnswer(q.panel!, { [`${metconId}:weight`]: 16 }).label).toBe('2 × 16 kg');
+  });
+
+  const afterPractice = () => {
+    const fresh = initStoryResults(workout, ['strength', 'for_time'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
+    const practiceSlot = openSlots(fresh, new Set()).find((s) => s.id === practiceId)!;
+    return applyAnswer(fresh, practiceSlot, answer(practiceId, { weight: 16 })).results;
+  };
+
+  it('is said, not asked — the same lift, weighed a minute ago', () => {
+    const rs = afterPractice();
+    const carried = carriedLoads(openSlots(rs, new Set([practiceId, '1.time'])))!;
+    expect(carried.text).toBe('Kettlebell Snatch · 2 × 16 kg — same as earlier.');
+    expect(carried.answers).toEqual([expect.objectContaining({ id: metconId, weight: 16 })]);
+  });
+
+  it('waits its turn — the time on the metcon is asked first', () => {
+    expect(carriedLoads(openSlots(afterPractice(), new Set([practiceId])))).toBeNull();
+  });
+
+  it('a weight they tapped Change on is asked, on the bell row', () => {
+    const slots = openSlots(afterPractice(), new Set([practiceId, '1.time']));
+    expect(carriedLoads(slots, new Set([metconId]))).toBeNull();
   });
 });
 
@@ -532,12 +635,12 @@ describe('Tell Wodi — the order it asks in', () => {
     const rs = fresh();
     const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
     expect(q.panel?.title).toBe('Bench Press');
-    expect(q.panel?.last).toBe('Last · 60 → 65 kg');
-    expect(q.panel?.start).toEqual({ '0.weight:weight': 60, '0.weight:weightEnd': 65 });
+    expect(q.panel?.groups[0].last).toBe('Last · 60 → 65 kg');
+    expect(q.panel?.groups[0].start).toEqual({ '0.weight:weight': 60, '0.weight:weightEnd': 65 });
     // With last time to start on, the Rx isn't offered too — the card is the one likely answer.
-    expect(q.panel?.quick).toEqual([]);
+    expect(q.panel?.groups[0].quick).toEqual([]);
     // "Log 60 → 65 kg": the card's starting numbers, sent as they are.
-    const filled = panelAnswer(q.panel!, q.panel!.start);
+    const filled = panelAnswer(q.panel!, q.panel!.groups[0].start);
     expect(filled.label).toBe('60 → 65 kg');
     const slot = openSlots(rs, new Set()).find((s) => s.id === q.slotIds[0])!;
     const done = applyAnswer(rs, slot, filled.answers[0]).results;
@@ -561,15 +664,15 @@ describe('Tell Wodi — the order it asks in', () => {
     const q = nextQuestion(slots, rs, lastLoads)!;
     expect(q.text).toBe('What weight did you use for Power Clean?');
     expect(q.panel?.groups.map((g) => [g.control, g.fields.map((f) => f.field)])).toEqual([['weight', ['weight']]]);
-    expect(q.panel?.last).toBe('Last · 50 kg');
-    expect(q.panel?.start).toEqual({ '1.weight.power clean:weight': 50 });
+    expect(q.panel?.groups[0].last).toBe('Last · 50 kg');
+    expect(q.panel?.groups[0].start).toEqual({ '1.weight.power clean:weight': 50 });
     expect(q.chips).toEqual([]);
   });
 
   it('with no history, nothing is invented — the boxes and the Rx only', () => {
     const rs = fresh();
     const q = nextQuestion(openSlots(rs, new Set()), rs)!;
-    expect(q.panel?.quick).toEqual([]);
+    expect(q.panel?.groups[0].quick).toEqual([]);
   });
 
   it('finishes the bench before it asks about the metcon', () => {
@@ -705,5 +808,87 @@ describe('Tell Wodi — fixing an answer already given', () => {
     expect(swapped().length).toBeGreaterThan(0);
     results = applyAnswer(results, choice, answer(id, { choice: 'Double Under' })).results;
     expect(swapped()).toEqual([]);
+  });
+});
+
+// SNATCH RUN, 2026-10-18: "10 standing side bends" — done with a band. The board names no load and
+// no kit, so the reader asked a weight; "No weight" is the answer, and next time it starts there.
+describe('"No weight" — a load the board never weighed', () => {
+  const block = {
+    name: '4 Sets Press Strength', type: 'strength', loggingMode: 'strength', suggestedSets: 4,
+    movements: [
+      { name: 'Strict Press', reps: 6, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' },
+      { name: 'Standing Side Bend', reps: 10, perSide: true, inputType: 'weight', equipment: 'other', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const workout = { type: 'strength', exercises: [block] } as unknown as ParsedWorkout;
+  const pressId = '0.weight.strict press';
+  const bendId = '0.weight.standing side bend';
+  const fresh = () => initStoryResults(workout, ['strength'], 'female', undefined, { blankAnswers: true, weightUnit: 'kg' });
+  const askFor = (id: string, lastLoads?: Map<string, LastLoad>) => {
+    const rs = fresh();
+    const closed = new Set(openSlots(rs, new Set()).filter((s) => s.id !== id).map((s) => s.id));
+    return { rs, q: nextQuestion(openSlots(rs, closed), rs, lastLoads)! };
+  };
+
+  it('is offered on the side bends, never on the barbell press', () => {
+    expect(askFor(bendId).q.panel?.groups[0].noLoad).toEqual({ start: false });
+    expect(askFor(pressId).q.panel?.groups[0].noLoad).toBeUndefined();
+  });
+
+  it('answers the side bends: nothing to weigh, and the question is closed', () => {
+    const { rs, q } = askFor(bendId);
+    const said = panelAnswer(q.panel!, {}, new Set([bendId]));
+    expect(said.label).toBe('no weight');
+    const slot = openSlots(rs, new Set()).find((s) => s.id === bendId)!;
+    const { results, closed } = applyAnswer(rs, slot, said.answers[0]);
+    expect(closed).toBe(true);
+    const bend = results[0].movementResults!.find((m) => m.movement.name === 'Standing Side Bend')!;
+    expect(bend).toMatchObject({ loadMode: 'bodyweight' });
+    expect(bend.weight).toBeUndefined();
+    expect(openSlots(results, new Set()).some((s) => s.id === bendId)).toBe(false);
+  });
+
+  it('is saved on the movement, and next time the card starts on it', () => {
+    const { rs, q } = askFor(bendId);
+    const slot = openSlots(rs, new Set()).find((s) => s.id === bendId)!;
+    const answered = applyAnswer(rs, slot, panelAnswer(q.panel!, {}, new Set([bendId])).answers[0]).results;
+    const { builtExercises } = buildSavedExercises([toLegacyResult(answered[0])]);
+    expect(builtExercises[0].movements?.find((m) => m.name === 'Standing Side Bend')?.loggedWithoutLoad).toBe(true);
+    expect(builtExercises[0].movements?.find((m) => m.name === 'Strict Press')?.loggedWithoutLoad).toBeUndefined();
+
+    const last = buildLastLoadMap([{ id: 'w', userId: 'u', date: new Date('2026-10-18'), title: 'SNATCH RUN', type: 'strength', exercises: builtExercises, workloadBreakdown: { movements: [] } } as unknown as Workout]);
+    const next = askFor(bendId, last).q;
+    expect(next.panel?.groups[0]).toMatchObject({ last: 'Last · no weight', noLoad: { start: true }, start: {} });
+  });
+});
+
+// SNATCH RUN, 2026-10-18: the press was built 37.5 → 40; the side bends were one kettlebell for
+// all four sets. A strength block builds its barbell, never its accessories.
+describe('in a strength block, only the barbell is start → peak', () => {
+  const block = {
+    name: '4 Sets Press Strength', type: 'strength', loggingMode: 'strength', suggestedSets: 4,
+    movements: [
+      { name: 'Strict Press', reps: 6, inputType: 'weight', equipment: 'barbell', countingMode: 'per_round' },
+      { name: 'Standing Side Bend', reps: 10, perSide: true, inputType: 'weight', equipment: 'kettlebell', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const workout = { type: 'strength', exercises: [block] } as unknown as ParsedWorkout;
+  const card = (id: string) => {
+    const rs = initStoryResults(workout, ['strength'], 'female', undefined, { blankAnswers: true, weightUnit: 'kg' });
+    const closed = new Set(openSlots(rs, new Set()).filter((s) => s.id !== id).map((s) => s.id));
+    return nextQuestion(openSlots(rs, closed), rs)!;
+  };
+
+  it('the press: start and peak, and each set can be typed', () => {
+    const q = card('0.weight.strict press');
+    expect(q.panel?.groups[0].fields.map((f) => f.field)).toEqual(['weight', 'weightEnd']);
+    expect(q.placeholder).toBe('Or type each set: 60, 65, 70');
+  });
+
+  it('the side bends: one weight for every set', () => {
+    const q = card('0.weight.standing side bend');
+    expect(q.panel?.groups[0].fields.map((f) => f.field)).toEqual(['weight']);
+    expect(q.placeholder).toBeUndefined();
   });
 });

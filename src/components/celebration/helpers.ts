@@ -57,7 +57,7 @@ import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit, rxLoadUnit } from '../../utils/loadUnits';
 import { readRepsDisplay } from '../../utils/repsDisplay';
 import { isCoreTabataBlock, coreTabataDoseSeconds, doseMinutes, TABATA_PROTOCOL_LABEL } from '../../utils/coreTabata';
-import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
+import { namesAPair, stripMovementRolePrefix } from '../../utils/movementNameMatch';
 
 
 // Prescription↔breakdown joins live in movementResolution.ts; re-exported here because
@@ -1216,7 +1216,7 @@ function getMovementDisplayNameFromContext(
   const hasDb = /\b(?:db'?s?|dumbbells?)\b/i.test(source);
   const hasKb = /\b(?:kb'?s?|kettlebells?)\b/i.test(source);
   if (!ownsHandImplement || (!hasDb && !hasKb)) return name;
-  const isPair = movement.implementCount === 2 || /\b(?:twin|double|pair|two|2x|2\s*x)\b/i.test(source);
+  const isPair = movement.implementCount === 2 || namesAPair(source);
   const equipment = hasDb ? 'DB' : 'KB';
   const prefix = isPair ? `Twin ${equipment}` : equipment;
   return `${prefix} ${name}`;

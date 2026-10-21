@@ -12,8 +12,8 @@ export function readClockAnswer(text: string): number | null {
 
   let match = t.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
   if (match) return clock(Number(match[1]), Number(match[2]), Number(match[3]));
-  // mm:ss, mm.ss, mm ss, mm'ss
-  match = t.match(/^(\d{1,3})\s*[:.'\s]\s*(\d{2})$/);
+  // mm:ss, mm.ss, mm ss, mm'ss — and mm;ss / mm,ss, the keys beside the colon on a phone ("17;24", 2026-10-21)
+  match = t.match(/^(\d{1,3})\s*[:;.,'\s]\s*(\d{2})$/);
   if (match) return clock(0, Number(match[1]), Number(match[2]));
   // 3-4 digits with no separator — the last two are the seconds ("2130", "930")
   match = t.match(/^(\d{1,2})(\d{2})$/);

@@ -5,7 +5,8 @@ import { getEffectiveWorkoutDate } from './workoutDate';
 
 /**
  * The load the athlete last used for each movement, for Tell Wodi's pre-workout suggestions
- * ("Last time you snatched a DB: 17.5 kg, Sep 22").
+ * ("Last time you snatched a DB: 17.5 kg, Sep 22") — or that they used none ("no weight": a band,
+ * bodyweight), which is just as much theirs to start from.
  *
  * Read from each workout's SAVED breakdown — the one record the recap, EP and PRs read — never from
  * the prescription, so it can only ever quote a number the athlete actually logged.
@@ -18,7 +19,9 @@ import { getEffectiveWorkoutDate } from './workoutDate';
  * `workouts` must be newest-first (the order `useWorkouts` returns): the first load found wins.
  */
 
-export interface LastLoad {
+export type LastLoad = WeighedLoad | NoLoad;
+
+export interface WeighedLoad {
   /** As the poster prints a logged load: "17.5kg", "2×22.5kg", "100→110kg". */
   load: string;
   date: Date;
@@ -27,13 +30,21 @@ export interface LastLoad {
   /** Absent when every set was the same weight. */
   peak?: number;
   unit: 'kg' | 'lb';
+  noLoad?: undefined;
+}
+
+/** Last time they said there was no load on it — a band, bodyweight. */
+export interface NoLoad {
+  load: 'no weight';
+  date: Date;
+  noLoad: true;
 }
 
 /**
  * A saved row's load as an answer would give it. A pair of DBs/KBs is answered per hand, the way
  * the board writes it and the poster prints it — the row's `weight` is the pair's total.
  */
-function loggedNumbers(movement: MovementTotal): Pick<LastLoad, 'start' | 'peak' | 'unit'> | null {
+function loggedNumbers(movement: MovementTotal): Pick<WeighedLoad, 'start' | 'peak' | 'unit'> | null {
   const unit = movement.unit === 'lb' ? 'lb' : 'kg';
   const progression = movement.weightProgression?.filter((w) => w > 0) ?? [];
   if (progression.length > 0) {
@@ -61,6 +72,15 @@ export function buildLastLoadMap(workouts: Workout[]): Map<string, LastLoad> {
       const load = formatPosterLoad(movement);
       const numbers = loggedNumbers(movement);
       if (load && numbers) last.set(key, { load, date: getEffectiveWorkoutDate(workout), ...numbers });
+    }
+    // "No weight" leaves nothing in the breakdown — it's kept on the movement it was said about.
+    for (const exercise of workout.exercises ?? []) {
+      for (const movement of exercise.movements ?? []) {
+        const key = lastLoadKey(movement.name);
+        if (movement.loggedWithoutLoad && !last.has(key)) {
+          last.set(key, { load: 'no weight', date: getEffectiveWorkoutDate(workout), noLoad: true });
+        }
+      }
     }
   }
   return last;

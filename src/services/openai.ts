@@ -275,7 +275,9 @@ const RULES_METCON_STRUCTURE = `## ROUND / SECTION STRUCTURE (BUY-IN -> ROUNDS x
   "sections" entry per block, carrying that block's "label" and "rounds". What differs is only
   WHERE THE SCORE LIVES:
   - ONE score for the whole piece — a for-time piece under one "For time" header and one time cap
-    ("For time: A. 10 rounds: [block] B. 10 rounds: [block] C. 10 rounds: [block], 40 min T.C.").
+    ("For time: A. 10 rounds: [block] B. 10 rounds: [block] C. 10 rounds: [block], 40 min T.C."),
+    or blocks that each say their own rounds for time with no clock or rest of their own
+    ("Metcon / A. 6 RFT: [block] / B. 6 RFT: [block]") — the clock runs on through every block.
     The athlete logs one total time. Sections OMIT "scoreType".
   - ONE score PER BLOCK — an interval AMRAP whose blocks hold different movements
     ("[10:00 min AMRAP, 02:00 min REST] x 3 rounds:" over blocks A/B/C). The athlete walks away
@@ -403,7 +405,7 @@ Every movement MUST include "inputType":
 - "calories": cardio machines when the user must LOG calories (standalone cardio — "max cal", open-ended calorie target)
 - "distance": cardio when distance is NOT prescribed and user must enter it (e.g., "run" with no distance specified)
 - "none": bodyweight movements (pull-ups, push-ups, toes-to-bar, burpees, air squats, box jumps, double unders, sit-ups, muscle-ups, HSPU, rope climbs, pistols) AND movements where distance/calories are already prescribed (e.g., "7 cal Echo Bike", "500m Row" inside a WOD)
-- CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate (e.g. any squat, lunge, split squat, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature. Step-ups and box step-ups are bodyweight by nature: "none", unless the board loads them ("weighted box step-ups", "DB step-ups"). A weight vest worn for a whole piece ("Murph with a 20/14 lb vest") loads none of its movements: they keep their own inputType, and the vest stays in the prescription.
+- CRITICAL: classify by whether the movement is loaded BY NATURE — how it's normally performed in a gym — NOT by whether a weight is written. A missing weight does NOT make a loaded movement "none". If an athlete would ordinarily do it with a barbell/DB/KB/plate (e.g. any squat, lunge, split squat, RDL, good morning, press, clean, thruster, swing, row, carry), it is inputType "weight" even when the board shows only reps — that is exactly when the athlete must be asked what they used. Reserve "none" for movements that are bodyweight by nature. Step-ups and box step-ups are bodyweight by nature: "none", unless the board loads them ("weighted box step-ups", "DB step-ups"). The same holds for everything done on the body alone — pull-ups, chin-ups, dips, ring dips, push-ups, planks and holds, back extensions, GHD sit-ups: "none", unless the board loads them ("weighted pull-ups", "dips +10 kg", "plank with a plate"), and then "weight". A weight vest worn for a whole piece ("Murph with a 20/14 lb vest") loads none of its movements: they keep their own inputType, and the vest stays in the prescription.
 
 ## MOVEMENT EQUIPMENT
 Every movement performed with an external load MUST also include "equipment" — the implement the load is on (include it even when the board writes no weight):
@@ -1381,17 +1383,17 @@ function advancedExamplesFor(traits: readonly PartTrait[]): string {
     .join('\n');
 }
 
-// Kind-scoped prompt: a strength/accessory part skips the metcon structure rules and examples it
+// Kind-scoped prompt: every part but the WOD (strength, skill, accessory…) skips the metcon structure rules and examples it
 // can never use (~70% of the prompt's tokens). Beyond cost, this is what lets a multi-part
 // session structure its parts in PARALLEL without bursting through OpenAI's per-minute token
-// limit. No kind (single-pass fallback, corpus/check-wod scripts) gets the full prompt.
+// limit. No kind (corpus/check-wod scripts) gets the full prompt.
 //
 // `traits` (from the segmenter) narrows a metcon's advanced examples to the ones its structure
-// needs. Without traits — a re-parse, an older response, the single-pass fallback — every
+// needs. Without traits — a re-parse, an older response — every
 // example is sent, exactly as before. The always-sent part comes first, so calls share the
 // longest possible cached prefix.
 export function buildParsePrompt(kind?: WorkoutPartSegment['kind'], traits?: readonly PartTrait[]): string {
-  const liftOnly = kind === 'strength' || kind === 'accessory';
+  const liftOnly = kind !== undefined && kind !== 'metcon';
   const advanced = traits === undefined ? EXAMPLES_METCON_ADVANCED : advancedExamplesFor(traits);
   return [
     PARSE_INTRO,
@@ -1573,6 +1575,14 @@ export async function parseWorkoutImage(base64Image: string): Promise<ParsedWork
 // reading can leak into a sibling part, and the structuring prompt never has to juggle
 // multi-part bookkeeping.
 
+const PART_KINDS: readonly WorkoutPartKind[] = ['warmup', 'skill', 'strength', 'metcon', 'accessory', 'cooldown'];
+
+/** The training itself — everything but the warm-up and the cool-down around it. */
+const isTrainingPart = (kind: WorkoutPartKind): boolean => kind !== 'warmup' && kind !== 'cooldown';
+
+/** The piece the athlete trains for: the strength and the WOD. Every other section supports it. */
+const isMainPartKind = (kind: WorkoutPartKind): boolean => kind === 'strength' || kind === 'metcon';
+
 export interface WorkoutPartSegment {
   label?: string;
   kind: WorkoutPartKind;
@@ -1590,7 +1600,7 @@ const SEGMENT_SPEC = `Return ONLY valid JSON:
 {
   "title": "the session's own name if one is written on the board, else omit — see TITLE below",
   "parts": [
-    { "label": "A", "kind": "strength" | "metcon" | "accessory", "traits": ["intervals", "partner"], "text": "the part's lines, cleaned, newline-separated" }
+    { "label": "A", "kind": "warmup" | "skill" | "strength" | "metcon" | "accessory" | "cooldown", "traits": ["intervals", "partner"], "text": "the part's lines, cleaned, newline-separated" }
   ]
 }
 
@@ -1606,11 +1616,20 @@ TITLE:
 
 SEGMENTATION:
 - A session has 1-3+ parts, usually labeled (A./B./C.) or separated by headers (STRENGTH, METCON, WOD, Cool Down). Every input line belongs to EXACTLY ONE part.
-- The unit of a part is the SCORE, never the label. Before splitting on A./B./C. labels, check what governs the labeled blocks: a format/scoring header written ONCE above them ("For time:", "AMRAP 25", "Chipper") and/or a single time cap written once below covering all of them means the blocks run on ONE clock toward ONE score — they are ONE part, with the internal labels kept inside its text. The same holds for blocks joined by connectors ("Into:", "then", "A+B+C for time") and for a partner piece with one finish time. Example: "For time: / A. 10 rounds: [...] / B. 10 rounds: [...] / C. 10 rounds: [...] / 40 min T.C." is ONE metcon part.
-- Labels split into separate parts only when each labeled block is SEPARATELY LETTERED (its own A./B./C.) AND scored on its own — it carries its own format/scoring line ("A. Every 1:30 x 8: ...", "B. 16 min AMRAP: ..."), its own clock or time cap, or is a different kind of training. Blocks scored independently are separate parts even when unlabeled.
+- The unit of a part is the SECTION OF THE CLASS (the "kind" list below), never the label. Before splitting on A./B./C. labels, check what governs the labeled blocks:
+  - A section header written ONCE above them ("Metcon", "WOD", "Conditioning") makes them that ONE section — ONE part, with the internal labels kept inside its text — even when every block carries its own format line. Example: "Metcon / A. 6 RFT: [...] / B. 6 RFT: [...]" is ONE metcon part.
+  - A format/scoring header written ONCE above them ("For time:", "AMRAP 25", "Chipper") and/or a single time cap written once below covering all of them means the blocks run on ONE clock toward ONE score — ONE part. The same holds for blocks joined by connectors ("Into:", "then", "A+B+C for time") and for a partner piece with one finish time. Example: "For time: / A. 10 rounds: [...] / B. 10 rounds: [...] / C. 10 rounds: [...] / 40 min T.C." is ONE metcon part.
+- Labels split into separate parts only when nothing written once governs them AND each labeled block is SEPARATELY LETTERED (its own A./B./C.) AND scored on its own — it carries its own format/scoring line ("A. Every 1:30 x 8: ...", "B. 16 min AMRAP: ..."), its own clock or time cap, or is a different kind of training. Different sections of the class (strength, then the metcon) are always separate parts. Blocks scored independently are separate parts even when unlabeled.
 - Work done IN BETWEEN another block's sets ("In between sets: 3 x 15 band pull-aparts", "In between, 3 sets of: …") is part of THAT block — it happens in the gaps of those sets, so it stays inside the block's part, never a part of its own, even when it carries its own "N sets of" line.
 - A per-block cadence/scheme line alone does NOT promote a sub-block to its own part. What binds sub-blocks into ONE part is a SHARED GOVERNING SCOPE: they sit under a single top-level label (one "A."), or under one scoring header / one time cap. Sub-bullets or lines within that scope stay ONE part even when each repeats its own cadence/scheme line — and whether or not a connector ("Into:", "then", "immediately into") joins them. The connector is a hint, not the trigger; the trigger is the shared scope. Contrast: "A. 4 sets Every 1:30: 2 Push Press / Into: / 4 sets Every 1:30: 2 Push Jerk" is ONE strength part (both bullets share the single label A.) — do NOT split it into Push Press and Push Jerk parts; whereas "A. Every 1:30 x 8: [...] / B. 16 min AMRAP: [...]" is TWO parts (two separate top-level letters, each with its own scoring).
-- "kind" per part: "strength" = lifting sets/percentages work; "metcon" = the conditioning piece (for time / AMRAP / EMOM / intervals / chipper); "accessory" = warm-up, cool-down, mobility, activation, "body armor", and skill/technique practice ("movement focus of the day", "8 minutes practice"). A practice block is "accessory" even when it opens the session, headlines a movement, or drills something the metcon later uses — practising a movement is not the same as being scored on it. A pace cue ("for quality", "quality sets", "not for time") says how to move and can sit on any part — it never makes a part practice. Judge the part by its work: a loaded multi-movement piece on a clock ("Every 3:00 x 4 sets (for quality): 10 KB deadlifts, 10 KB swings, 10 push-ups") is a "metcon".
+- "kind" per part — the section of a CrossFit class it belongs to; every part is exactly one:
+  - "warmup": raising the heart rate and preparing to train — general warm-up, activation, mobility before the work, and practice the board itself calls a warm-up ("6 minutes practice & warm up").
+  - "skill": practising a movement or technique ("movement focus of the day", "8 minutes practice", "EMOM 8: double-under practice"). A practice block is "skill" even when it opens the session, headlines a movement, or drills something the metcon later uses — practising a movement is not the same as being scored on it.
+  - "strength": lifting sets/percentages work.
+  - "metcon": the WOD — the conditioning piece (for time / AMRAP / EMOM / intervals / chipper).
+  - "accessory": supporting strength after the main work — "body armor", prehab, core finishers, accessory sets.
+  - "cooldown": after the training — cool-down, stretching, mobility, foam rolling.
+  A pace cue ("for quality", "quality sets", "not for time") says how to move and can sit on any part — it never makes a part practice. Judge the part by its work: a loaded multi-movement piece on a clock ("Every 3:00 x 4 sets (for quality): 10 KB deadlifts, 10 KB swings, 10 push-ups") is a "metcon".
 - A footnote or shared note (e.g. "* Two groups, starting at different stations") belongs to the part it modifies — keep it inside that part's text.
 - A date written on the board goes into the FIRST part's text (a later step reads it from there).
 - Single-part boards return one part. Never invent parts that are not on the board.
@@ -1647,15 +1666,23 @@ ${SEGMENT_SPEC}`;
 // 'invalid' = malformed/empty response (a retry may succeed).
 type SegmentationOutcome = SegmentedWorkout | 'not_workout' | 'invalid';
 
-function validateSegmentedWorkout(data: unknown): SegmentationOutcome {
+export function validateSegmentedWorkout(data: unknown): SegmentationOutcome {
   const root = asRecord(data);
   if (!root) return 'invalid';
   if (typeof root.error === 'string') return 'not_workout';
-  const rawParts = Array.isArray(root.parts) ? root.parts : [];
+  const allParts = (Array.isArray(root.parts) ? root.parts : []).filter((entry) => asRecord(entry));
+  const kindOf = (entry: unknown): WorkoutPartKind => {
+    const kind = asRecord(entry)?.kind;
+    return PART_KINDS.find((k) => k === kind) ?? 'metcon';
+  };
+  // Wodi logs the training, not the class around it: a warm-up, mobility or cool-down is never
+  // asked about, postered or counted. A board that is nothing BUT one is still what they did.
+  const aroundTheClass = (entry: unknown): boolean => !isTrainingPart(kindOf(entry));
+  const rawParts = allParts.every(aroundTheClass) ? allParts : allParts.filter((entry) => !aroundTheClass(entry));
   const parts = rawParts.flatMap((entry): WorkoutPartSegment[] => {
     const part = asRecord(entry);
     if (!part || typeof part.text !== 'string' || part.text.trim().length === 0) return [];
-    const kind = part.kind === 'strength' || part.kind === 'accessory' ? part.kind : 'metcon';
+    const kind = kindOf(entry);
     // A list the model gave is an answer, even an empty one; no list at all is not, and that
     // part keeps the full prompt.
     const traits = Array.isArray(part.traits)
@@ -1693,29 +1720,37 @@ async function requestSegmentation(content: ParsePart[]): Promise<SegmentationOu
   }
 }
 
-async function segmentWorkoutText(text: string, athleteNote?: string): Promise<SegmentedWorkout | null> {
-  const outcome = await requestSegmentation([
+/**
+ * Split a board into its sections — the one way in for a photo and for typed words alike, so
+ * every part of every log belongs to a section. One retry on malformed output only: a "this
+ * isn't a workout" verdict is final, and a rate limit is surfaced, never read as a bad board.
+ */
+async function segmentWorkout(content: ParsePart[]): Promise<SegmentedWorkout | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const outcome = await requestSegmentation(content).catch((error): SegmentationOutcome => {
+      if (isRateLimitError(error)) throw new ParseRateLimitError(error);
+      return 'invalid';
+    });
+    if (typeof outcome === 'object') return outcome;
+    if (outcome === 'not_workout') return null;
+    console.warn(`[SEGMENT] segmentation attempt ${attempt + 1} returned invalid JSON`);
+  }
+  return null;
+}
+
+function segmentWorkoutText(text: string, athleteNote?: string): Promise<SegmentedWorkout | null> {
+  return segmentWorkout([
     { type: 'text', text: WORKOUT_SEGMENT_PROMPT },
     { type: 'text', text: `Here is the transcribed workout text:\n\n${text}` },
     ...(athleteNote ? [athleteContextBlock(athleteNote)] : []),
   ]);
-  return typeof outcome === 'object' ? outcome : null;
 }
 
-async function segmentWorkoutImage(base64Image: string): Promise<SegmentedWorkout | null> {
-  const content: ParsePart[] = [
+function segmentWorkoutImage(base64Image: string): Promise<SegmentedWorkout | null> {
+  return segmentWorkout([
     { type: 'text', text: IMAGE_SEGMENT_PROMPT },
     { type: 'image', mimeType: 'image/jpeg', base64: base64Image },
-  ];
-  // One retry on malformed output only — recapturing the photo is expensive for the user,
-  // but a "this isn't a workout" verdict is final.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const outcome = await requestSegmentation(content).catch((): SegmentationOutcome => 'invalid');
-    if (typeof outcome === 'object') return outcome;
-    if (outcome === 'not_workout') return null;
-    console.warn(`[SEGMENT] image segmentation attempt ${attempt + 1} returned invalid JSON`);
-  }
-  return null;
+  ]);
 }
 
 // ─── Stage 3: structure each part independently, then merge ──────────────────
@@ -1750,7 +1785,7 @@ function mergeSegmentedParses(
       // Kept so this part can later be re-parsed ALONE under the same prompt scope it was
       // first read with — the athlete's "Fix this part" never re-reads its siblings.
       partKind: part.kind,
-      ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
+      ...(isMainPartKind(part.kind) ? {} : { isSecondary: true }),
     }));
   });
 
@@ -1785,24 +1820,16 @@ function mergeSegmentedParses(
 
 /**
  * Full text→workout pipeline: segment the session into standalone parts, structure each part
- * with its own AI call (in parallel), and merge. Falls back to the single-pass parse when
- * segmentation is unavailable — never worse than the legacy behavior.
+ * with its own AI call (in parallel), and merge. The same split a photo goes through, so a typed
+ * workout's parts belong to sections too — and its warm-up is dropped the same way.
  */
 export async function parseWorkoutSession(
   text: string,
   sourceLabel: 'TEXT' | 'IMAGE' = 'TEXT',
   athleteNote?: string,
 ): Promise<ParsedWorkout> {
-  const segmented = await segmentWorkoutText(text, athleteNote).catch((error): null => {
-    console.warn('[SEGMENT] segmentation failed, falling back to single-pass parse:', error);
-    return null;
-  });
-
-  if (!segmented) {
-    const { parsed } = await parseWorkoutText(text, sourceLabel, undefined, athleteNote);
-    return withUserContext(parsed, athleteNote);
-  }
-
+  const segmented = await segmentWorkoutText(text, athleteNote);
+  if (!segmented) throw new Error('Could not parse workout from text');
   return withUserContext(await structureSegments(text, segmented, sourceLabel, athleteNote), athleteNote);
 }
 
@@ -1939,7 +1966,7 @@ function buildFreePartFallback(part: WorkoutPartSegment): ParsedWorkout {
       // A part that fell back to 'free' is the one MOST likely to be corrected — it must carry
       // its scope so "Fix this part" can retry the structuring it just failed.
       partKind: part.kind,
-      ...(part.kind === 'accessory' ? { isSecondary: true } : {}),
+      ...(isMainPartKind(part.kind) ? {} : { isSecondary: true }),
     }],
   };
 }

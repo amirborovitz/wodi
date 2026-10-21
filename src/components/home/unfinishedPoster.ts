@@ -18,7 +18,14 @@ export interface UnfinishedPoster {
   savedLabel: string;
   /** What the blank is for, in the board's own terms: "MY TIME" on a for-time, "MY ROUNDS" on an AMRAP. */
   result: { label: string; blank: string; add: string };
+  /**
+   * Saved two days ago or more and still blank: the tile asks "Did you do it?" — one tap logs it,
+   * one clears it. Recognising, never nagging: it's asked on the tile, not pushed into the chat.
+   */
+  asks: boolean;
 }
+
+const ASK_AFTER_MS = 48 * 60 * 60 * 1000;
 
 export const FORMAT_LABELS: Record<string, string> = {
   for_time: 'FOR TIME',
@@ -71,5 +78,6 @@ export function buildUnfinishedPoster(planned: PlannedWorkout, now: Date): Unfin
     moreLines: Math.max(0, all.length - MAX_LINES),
     savedLabel: `SAVED · ${dayLabel(planned.createdAt.getTime(), now)}`,
     result: resultFor(wod),
+    asks: now.getTime() - planned.createdAt.getTime() >= ASK_AFTER_MS,
   };
 }

@@ -99,6 +99,8 @@ export function buildSavedExercises(results: LegacyExerciseResult[]): { builtExe
         // resolveOccurrenceLoad already reads it first, listing rxWeights last precisely
         // because this bake was the only reason it ever held an athlete's number.
         ...(loggedWeights ? { loggedWeights } : {}),
+        // Assigned, like the swap: an edit that gave it a weight again must clear it.
+        loggedWithoutLoad: movementLookup(result.movementsWithoutLoad || {}, mk, mov.name) ? true : undefined,
         ...implementCountFor(mk, mov),
       };
     });

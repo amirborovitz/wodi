@@ -82,6 +82,27 @@
   transform: scale(0.98);
 }
 
+/* The session's other parts — they open with the poster, as its deck. */
+.more {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--wodi-line2);
+  border-radius: var(--r-pill);
+  background: var(--wodi-card);
+  color: var(--wodi-white);
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.more:active {
+  transform: scale(0.98);
+}
+
 /* The full-size copy the shared image is drawn from — laid out, never seen. */
 .offscreen {
   position: fixed;

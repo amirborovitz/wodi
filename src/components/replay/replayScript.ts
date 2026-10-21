@@ -8,8 +8,8 @@
 
 import { rowsOf } from '../celebration/faces/HandwrittenFace/posterData';
 import type { PosterLine, PosterWod } from '../celebration/faces/HandwrittenFace/posterData';
-import { MOVES, moveForMovement } from './figure/moves';
-import type { Frame, MoveId } from './figure/moves';
+import { MOVES, freeFarArm, moveForMovement } from './figure/moves';
+import type { Frame, Hands, MoveId } from './figure/moves';
 import type { MovementImplement } from '../../data/movementRegistry';
 import { blendPose, smooth } from './figure/skeleton';
 
@@ -21,6 +21,8 @@ export interface ReplayBeat {
   move: MoveId;
   /** What is in the hands for a held movement — the registry reads it off the line. */
   implement: MovementImplement;
+  /** One bell with the far arm free, a pair, or one load both hands share. */
+  hands: Hands;
   at: number;
   duration: number;
   /** Whole reps of the movement that fit the beat. */
@@ -41,6 +43,8 @@ export interface ReplayScript {
   eyebrow: string;
   title: string | null;
   beats: ReplayBeat[];
+  /** The lines' type size, in hundredths of the card's width — one size that fits the longest line. */
+  lineSize: number;
   hero: ReplayHero | null;
   /** When the figure starts celebrating — the hero lands here. */
   finishAt: number;
@@ -101,14 +105,53 @@ export function heroCountUp(value: string): (k: number) => string {
   return () => trimmed;
 }
 
+/**
+ * The caption is a fixed height so the athlete never moves; a line must fit it, never spill up
+ * over the athlete. Sizes are hundredths of the card's width (cqw), as in MoveReplay.module.css.
+ */
+export const CAPTION = {
+  /** The card's width less its side padding. */
+  width: 88,
+  /** Room for the line's own rows once the detail beneath it is placed. */
+  textHeight: 21.6,
+  lineHeight: 0.9,
+  maxSize: 12,
+  minSize: 5,
+  /** Barlow Condensed Black capitals run about half an em wide; a space about a quarter. */
+  glyph: 0.52,
+  space: 0.26,
+} as const;
+
+/** How many rows `text` wraps to at `size`, breaking between words as the browser does. */
+function rowsAt(text: string, size: number): number {
+  const width = CAPTION.width / size;
+  let rows = 1;
+  let used = 0;
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const w = word.length * CAPTION.glyph;
+    if (used > 0 && used + CAPTION.space + w > width) { rows++; used = w; } else { used += (used > 0 ? CAPTION.space : 0) + w; }
+    // A word wider than the card breaks inside itself (overflow-wrap: anywhere).
+    if (used > width) { rows += Math.floor(used / width); used %= width; }
+  }
+  return rows;
+}
+
+/** The largest size, in half steps, at which every line fits the caption. */
+export function lineSizeFor(texts: string[]): number {
+  for (let size = CAPTION.maxSize; size > CAPTION.minSize; size -= 0.5) {
+    if (texts.every((t) => rowsAt(t, size) * size * CAPTION.lineHeight <= CAPTION.textHeight)) return size;
+  }
+  return CAPTION.minSize;
+}
+
 /** A stretch of the replay with one movement: the warm-up stance, each line, the celebration. */
-interface Segment { at: number; move: MoveId; implement: MovementImplement; duration?: number; reps?: number }
+interface Segment { at: number; move: MoveId; implement: MovementImplement; hands: Hands; duration?: number; reps?: number }
 
 function segments(script: ReplayScript): Segment[] {
   return [
-    { at: 0, move: 'idle', implement: 'bodyweight' },
+    { at: 0, move: 'idle', implement: 'bodyweight', hands: 'shared' },
     ...script.beats,
-    { at: script.finishAt, move: 'celebrate', implement: 'bodyweight' },
+    { at: script.finishAt, move: 'celebrate', implement: 'bodyweight', hands: 'shared' },
   ];
 }
 
@@ -118,7 +161,8 @@ function frameIn(seg: Segment, local: number): Frame {
   const u = seg.duration && seg.reps
     ? ((Math.min(local, seg.duration - 1e-6) / seg.duration) * seg.reps) % 1
     : (local / move.cycle) % 1;
-  return move.frame(u);
+  const frame = move.frame(u);
+  return seg.hands === 'one' ? { ...frame, pose: freeFarArm(frame.pose) } : frame;
 }
 
 const HANDOVER = 0.3;
@@ -126,6 +170,7 @@ const HANDOVER = 0.3;
 export interface ReplayMoment {
   frame: Frame;
   implement: MovementImplement;
+  hands: Hands;
   /** Which line is on screen; -1 before the first and after the last. */
   beat: number;
   finished: boolean;
@@ -145,7 +190,7 @@ export function replayMomentAt(script: ReplayScript, t: number): ReplayMoment {
     frame = { ...frame, pose: blendPose(frameIn(prev, seg.at - prev.at).pose, frame.pose, smooth(local / handover)) };
   }
   const beat = i > 0 && i <= script.beats.length ? i - 1 : -1;
-  return { frame, implement: seg.implement, beat, finished: t >= script.end };
+  return { frame, implement: seg.implement, hands: seg.hands, beat, finished: t >= script.end };
 }
 
 export function buildReplayScript(wod: PosterWod): ReplayScript {
@@ -156,12 +201,14 @@ export function buildReplayScript(wod: PosterWod): ReplayScript {
     : 0;
 
   const beats: ReplayBeat[] = lines.map((line, i) => {
-    const { move, implement } = moveForMovement(line.rx);
+    // The printed weights say a pair ("2×16kg") even when the name doesn't.
+    const { move, implement, hands } = moveForMovement(line.rx, `${line.mine} ${line.load}`);
     return {
       text: line.rx.trim(),
       detail: (line.mine || line.load || '').trim(),
       move,
       implement,
+      hands,
       at: T.intro + i * duration,
       duration,
       reps: Math.max(1, Math.round(duration / MOVES[move].cycle)),
@@ -179,6 +226,7 @@ export function buildReplayScript(wod: PosterWod): ReplayScript {
     eyebrow: [wod.type, wod.format].filter(Boolean).join(' · '),
     title: wod.title,
     beats,
+    lineSize: lineSizeFor(beats.map((b) => b.text)),
     hero,
     finishAt,
     end: finishAt + T.count + T.hold,

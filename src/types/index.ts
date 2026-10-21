@@ -250,12 +250,13 @@ export interface WorkoutScores {
 }
 
 /**
- * Which kind-scoped parse prompt a board part was structured with. Persisted per exercise so a
- * single part can be RE-PARSED on its own later (the athlete's "Fix this part" correction) —
- * without it the re-parse would have to guess the prompt scope, or fall back to re-reading the
- * whole board and disturbing parts the athlete never complained about.
+ * The section of a CrossFit class a board part belongs to: warm-up → skill / strength → the WOD
+ * (metcon) → accessory → cool-down. Every part is exactly one. Warm-up and cool-down are the class
+ * around the training and are dropped when the board is split — they survive only on a board
+ * that is nothing else. Persisted per exercise so a single part can be RE-PARSED on its own
+ * later (the athlete's "Fix this part" correction) under the same prompt scope.
  */
-export type WorkoutPartKind = 'strength' | 'metcon' | 'accessory';
+export type WorkoutPartKind = 'warmup' | 'skill' | 'strength' | 'metcon' | 'accessory' | 'cooldown';
 
 export interface Exercise {
   id: string;
@@ -523,6 +524,9 @@ export interface ParsedMovement {
   // repeated lift merges into one entry carrying one smeared progression. Per-occurrence truth
   // belongs on the occurrence.
   loggedWeights?: number[];
+  // The athlete said there was NO load on it today — a band, bodyweight. Their answer, kept apart
+  // from `isBodyweight`, which is what the movement IS; this is what they did with it this time.
+  loggedWithoutLoad?: boolean;
   // The unit the ATHLETE's load is in — kept apart from `rxWeights.unit`, which is the coach's.
   // Set when the board wrote no load (from the athlete's profile, or their answer), or when the
   // athlete logged in the other unit. Absent on older docs: then the board's unit, else kg.

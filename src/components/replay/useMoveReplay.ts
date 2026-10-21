@@ -35,7 +35,7 @@ export function useMoveReplay(script: ReplayScript, onDone: (outcome: ReplayOutc
   const stageRef = useCallback((group: SVGGElement | null) => {
     painter.current = group ? createFigurePainter(group) : null;
     const first = replayMomentAt(script, 0);
-    painter.current?.paint(first.frame, first.implement);
+    painter.current?.paint(first.frame, first.implement, first.hands);
   }, [script]);
 
   const finish = useCallback((outcome: ReplayOutcome) => {
@@ -58,7 +58,7 @@ export function useMoveReplay(script: ReplayScript, onDone: (outcome: ReplayOutc
       t += last === null ? 0 : Math.min(0.05, (now - last) / 1000);
       last = now;
       const moment = replayMomentAt(script, t);
-      painter.current?.paint(moment.frame, moment.implement);
+      painter.current?.paint(moment.frame, moment.implement, moment.hands);
       if (moment.beat !== shownBeat) { shownBeat = moment.beat; setBeatIndex(moment.beat); }
       const hero = script.hero;
       const text = hero && t >= hero.at ? hero.countUp(easeOut(Math.min(1, (t - hero.at) / REPLAY_TIMING.count))) : null;

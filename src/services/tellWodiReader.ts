@@ -51,7 +51,7 @@ const READING_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'swapUnit', 'perInterval', 'unit'],
+          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'swapUnit', 'perInterval', 'unit', 'noLoad'],
           properties: {
             id: { type: 'string' },
             skipped: { type: 'boolean' },
@@ -67,6 +67,7 @@ const READING_SCHEMA = {
             swapUnit: { anyOf: [{ type: 'string', enum: ['reps', 'distance', 'calories'] }, { type: 'null' }] },
             perInterval: { type: 'boolean' },
             unit: { anyOf: [{ type: 'string', enum: ['kg', 'lb'] }, { type: 'null' }] },
+            noLoad: { type: 'boolean' },
           },
         },
       },
@@ -105,6 +106,8 @@ just finished a workout and is texting you about it. Your job has two parts.
      "same dumbbell for both", "17.5 for everything" answers every open weight question it covers.
      A weight question with "sameAs" asks whether they used the load an earlier movement got:
      "yes", "same", "same one" → copy its weight, weightEnd and weights. A number is a new answer.
+     No load at all — "no weight", "just a band", "bodyweight", "didn't use one" → noLoad = true,
+     every number null. That is an answer, never skipped. noLoad is false everywhere else.
      "Rx" / "as prescribed" is NOT a number — don't answer it.
      unit = "kg" or "lb" ONLY when THEY said it with the number ("53 lb", "24 kilos", "35 pounds",
      "16kg"); a bare "53" is null. Never take it from the board or from the question.

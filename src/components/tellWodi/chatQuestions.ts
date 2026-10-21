@@ -10,7 +10,7 @@ import { setLoadUnit } from '../logging/story/athleteLoadUnit';
 import { habitKey, type SwapHabit, type SwapUnit } from '../../services/wodiAgent/athleteHabits';
 import { personalIntervalCount } from '../logging/story/intervalRounds';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
-import type { MovementEquipment, ParsedWorkout, ParseUncertainty } from '../../types';
+import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 
@@ -61,6 +61,8 @@ export interface ChatSlot {
   unit?: LoadUnit;
   /** The implement a weight slot is for — sets the step between the one-tap answers. */
   equipment?: MovementEquipment;
+  /** A pair of dumbbells or kettlebells — the weight is answered per bell, and said "2 × 16 kg". */
+  pair?: boolean;
   /**
    * A weight slot after another movement in the same part already has its load: that load, so
    * "same" is one tap. Often the same kettlebell or dumbbell — often not, so it's asked, never copied.
@@ -103,6 +105,8 @@ export interface EarlierLoad {
   weight: number;
   weightEnd: number | null;
   weights: number[] | null;
+  /** The same lift, weighed in an earlier part of the session — carried over and said, not asked. */
+  sameLift?: boolean;
 }
 
 /** One answer, as the AI (or a tapped chip) gives it. Every value is nullable: blank is an answer. */
@@ -127,11 +131,13 @@ export interface SlotAnswer {
   perInterval: boolean;
   /** The weight unit, only when they said it ("53 lb", "pounds"). */
   unit: LoadUnit | null;
+  /** No load at all — a band, bodyweight, "no weight". An answer, not a skip. */
+  noLoad: boolean;
 }
 
 export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
   skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, weights: null,
-  choice: null, swapTo: null, swapAmount: null, swapUnit: null, perInterval: false, unit: null,
+  choice: null, swapTo: null, swapAmount: null, swapUnit: null, perInterval: false, unit: null, noLoad: false,
 };
 
 const isScoredKind = (r: StoryExerciseResult): boolean =>
@@ -198,17 +204,49 @@ function amountAtScale(mr: MovementResult, habit: SwapHabit): ChatSlot['usualAmo
   return value > 0 ? { value, unit: scale.to } : undefined;
 }
 
-/** The load the nearest earlier movement of the part was given, if any — the "same" a slot offers. */
-function earlierLoad(result: StoryExerciseResult, mr: MovementResult): EarlierLoad | undefined {
-  const loads = distinctLoadMovements(result);
-  const given = loads.slice(0, loads.indexOf(mr)).reverse().find((m) => m.weight != null && m.weight > 0);
-  if (!given?.weight) return undefined;
+/** A load as the results carry it — on the movement, or on the result for a single lift. */
+type GivenLoad = Pick<MovementResult, 'weight' | 'weightEnd' | 'loadMode' | 'setWeights'>;
+
+/** Each load a part asks for, in board order: its movement's name and kit, and what was given. */
+function partLoads(r: StoryExerciseResult): { movement: ParsedMovement; given: GivenLoad }[] {
+  if (usesResultLevelLoad(r)) {
+    const movement = r.movementResults?.[0]?.movement ?? { name: r.exercise.name };
+    return [{ movement, given: r }];
+  }
+  return distinctLoadMovements(r).map((mr) => ({ movement: mr.movement, given: mr }));
+}
+
+function asEarlier(name: string, given: GivenLoad): EarlierLoad | undefined {
+  if (!(given.weight != null && given.weight > 0)) return undefined;
   return {
-    movement: stripMovementRolePrefix(given.movement.name),
+    movement: stripMovementRolePrefix(name),
     weight: given.weight,
     weightEnd: given.loadMode === 'range' ? given.weightEnd ?? null : null,
     weights: given.loadMode === 'per_set' ? given.setWeights ?? null : null,
   };
+}
+
+/**
+ * The load a slot offers as "same", if any. First the same lift in an earlier part — a snatch
+ * practised before the metcon is usually the same bells. Then, in a metcon, the nearest earlier
+ * movement of the part: it is done with the implement you grabbed, so one weight often carries
+ * through. A block lifted in sets loads each lift on its own, so it never offers another lift's
+ * weight. And only from a load of the same kind: a barbell's number is the whole bar, never what a
+ * kettlebell or dumbbell weighs.
+ */
+function earlierLoad(earlierParts: readonly StoryExerciseResult[], result: StoryExerciseResult, movement: ParsedMovement): EarlierLoad | undefined {
+  const lift = lastLoadKey(movement.name);
+  for (const part of [...earlierParts].reverse()) {
+    const same = partLoads(part).reverse().find((l) => lastLoadKey(l.movement.name) === lift);
+    const offer = same && asEarlier(same.movement.name, same.given);
+    if (offer) return { ...offer, sameLift: true };
+  }
+  if (result.kind === 'load') return undefined;
+  const loads = partLoads(result);
+  const onABar = (m: ParsedMovement): boolean => m.equipment === 'barbell';
+  const before = loads.slice(0, loads.findIndex((l) => l.movement.name === movement.name)).reverse();
+  const near = before.find((l) => onABar(l.movement) === onABar(movement) && asEarlier(l.movement.name, l.given));
+  return near && asEarlier(near.movement.name, near.given);
 }
 
 /** A single-lift block keeps its load on the result, not on a movement (see toLegacyResult). */
@@ -221,6 +259,10 @@ function rxPair(mr: MovementResult | undefined): number[] | undefined {
   const distinct = [...new Set(values)].sort((a, b) => a - b);
   return distinct.length > 0 ? distinct : undefined;
 }
+
+/** Two dumbbells or two kettlebells. A barbell is never a pair, whatever count the reader stamped. */
+const isPair = (m: ParsedMovement | undefined): boolean =>
+  (m?.equipment === 'dumbbell' || m?.equipment === 'kettlebell') && (m.implementCount ?? 1) > 1;
 
 const KETTLEBELLS: Record<string, number[]> = {
   kg: [4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40, 48],
@@ -289,6 +331,7 @@ export function openSlots(
     const loads: ChatSlot[] = [];
     const choices: ChatSlot[] = [];
     const i = r.exerciseIndex;
+    const earlierParts = results.slice(0, results.indexOf(r));
     const part = multiPart ? r.exercise.name : 'the workout';
     const push = (list: ChatSlot[], slot: ChatSlot): void => {
       if (!closed.has(slot.id)) list.push(slot);
@@ -321,21 +364,25 @@ export function openSlots(
     if (usesResultLevelLoad(r)) {
       if (toAsk(`${i}.weight`, (r.weight ?? 0) > 0) && r.loadMode !== 'bodyweight') {
         const mr = r.movementResults?.[0];
+        const sameAs = earlierLoad(earlierParts, r, mr?.movement ?? { name: r.exercise.name });
         push(loads, {
           id: `${i}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
           movementNames: [mr?.movement.name ?? r.exercise.name],
           rxWeights: rxPair(mr), unit: knownLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
+          ...(isPair(mr?.movement) ? { pair: true } : {}),
+          ...(sameAs ? { sameAs } : {}),
         });
       }
     } else {
       for (const mr of distinctLoadMovements(r)) {
         const id = `${i}.weight.${mr.movement.name.toLowerCase()}`;
         if (!toAsk(id, loadAnswered(mr))) continue;
-        const sameAs = earlierLoad(r, mr);
+        const sameAs = earlierLoad(earlierParts, r, mr.movement);
         push(loads, {
           id, kind: 'weight', exerciseIndex: i,
           subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
           rxWeights: rxPair(mr), unit: knownLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
+          ...(isPair(mr.movement) ? { pair: true } : {}),
           ...(sameAs ? { sameAs } : {}),
         });
       }
@@ -467,9 +514,9 @@ function patchMovements(
 }
 
 interface LoadAnswer {
-  weight: number;
-  weightEnd: number;
-  loadMode: 'same' | 'range' | 'per_set';
+  weight: number | undefined;
+  weightEnd: number | undefined;
+  loadMode: 'same' | 'range' | 'per_set' | 'bodyweight';
   setWeights: number[] | undefined;
 }
 
@@ -479,6 +526,8 @@ interface LoadAnswer {
  * another never leaves a stale per-set list behind.
  */
 function loadPatch(answer: SlotAnswer): LoadAnswer | null {
+  // No load at all: answered, with nothing to weigh — any number given before is gone.
+  if (answer.noLoad) return { weight: undefined, weightEnd: undefined, loadMode: 'bodyweight', setWeights: undefined };
   const listed = (answer.weights ?? []).filter((w) => w > 0);
   if (listed.length >= 3 && new Set(listed).size > 1) {
     return { weight: listed[0], weightEnd: listed[listed.length - 1], loadMode: 'per_set', setWeights: listed };
@@ -678,7 +727,7 @@ export function applyAnswer(
 export interface ChatChip {
   label: string;
   answers: SlotAnswer[];
-  /** A chip that answers nothing yet and asks this instead ("Different weight" → "What weight…?"). */
+  /** A chip that answers nothing yet and asks this instead ("Something else" → "What did you do instead…?"). */
   then?: ChatQuestion;
 }
 
@@ -704,8 +753,9 @@ export interface ChatQuestion {
 /** One box: the slot it answers and which number of that answer it holds. */
 export interface ChatPanelField {
   slotId: string;
-  field: 'weight' | 'weightEnd' | 'count';
-  /** Under the box: "start", "peak", "reps". */
+  /** `minutes` and `seconds` are one clock reading — the answer's `seconds`, said "17:24". */
+  field: 'weight' | 'weightEnd' | 'count' | 'minutes' | 'seconds';
+  /** Over the box: "start", "peak", "reps", "min", "sec". */
   label: string;
   unit: string;
 }
@@ -715,35 +765,53 @@ export interface ChatPanelGroup {
   title: string;
   /**
    * `weight`: −/+ pills, start → peak for a lift in sets (the peak suggested from the start by
-   * the standard screen's own rule, utils/peakSuggestion), one pill otherwise. `boxes`: plain
-   * typed numbers.
+   * the standard screen's own rule, utils/peakSuggestion), one pill otherwise. `bells`: a
+   * kettlebell, picked from the sizes a gym has (`sizes`). `boxes`: plain typed numbers.
+   * `clock`: a finish time, minutes : seconds on −/+ pills.
    */
-  control: 'weight' | 'boxes';
+  control: 'weight' | 'bells' | 'boxes' | 'clock';
+  /** A `bells` load's sizes, lightest first — five around the one it starts on or the board's Rx. */
+  sizes?: number[];
+  /** What it's lifted on, beside its name: "barbell", "per bell" for a pair. */
+  kit?: string;
+  /** A pair — the answer is per bell, said "2 × 16 kg". */
+  pair?: boolean;
   /** What one −/+ moves a weight by — the standard screen's step for this implement and unit. */
   step?: number;
   /** Where + starts from on an empty pill: the board's lightest Rx. Never shown as a value. */
   base?: number;
   /** The unit the answer carries when nothing else said it — last time's, shown on the card. */
   answerUnit?: LoadUnit;
-  joiner: '→' | '@';
+  joiner: '→' | '@' | ':';
   /** How the athlete's reply starts ("max 20 reps @ 50 kg"). */
   prefix: string;
   fields: ChatPanelField[];
+  /** "Last · 60 → 65 kg" beside the load — what it starts on, said where it shows. */
+  last?: string;
+  /**
+   * Where the boxes start, by field (panelFieldKey): the athlete's own last load for this lift,
+   * never a guess. The commit button names it ("Log 60 → 65 kg"), so one tap saves exactly what
+   * it says. Empty when there's no history.
+   */
+  start: Readonly<Record<string, number>>;
+  /**
+   * This load's likely answers, one tap each: the load an earlier movement or part was given
+   * ("Same · 16 kg"), and the board's Rx when there's no last time to start on. On a card of one
+   * load the tap is the answer; on a card of several it fills this load's pills.
+   */
+  quick: ChatChip[];
+  /**
+   * "No weight" is an answer for this load — a band, bodyweight — offered beside the pills.
+   * `start`: last time had none, so the card starts on it and the button says so.
+   */
+  noLoad?: { start: boolean };
 }
 
 export interface ChatPanel {
   /** What the boxes are about, on the card itself — the question above can scroll away. */
   title: string;
-  /** "Last · 60 → 65 kg" beside the title — what the card starts on, said where it shows. */
-  last?: string;
-  /**
-   * The card's starting numbers, by field (panelFieldKey): the athlete's own last load for this
-   * lift, never a guess. The commit button names them ("Log 60 → 65 kg"), so one tap saves
-   * exactly what it says. Empty when there's no history.
-   */
-  start: Readonly<Record<string, number>>;
-  /** The likely answers, one tap each — the board's Rx, when there's no last time to start on. */
-  quick: ChatChip[];
+  /** Beside the title: what the part is — "For time · 6 rds". */
+  meta?: string;
   groups: ChatPanelGroup[];
 }
 
@@ -751,17 +819,37 @@ export const panelFieldKey = (field: ChatPanelField): string => `${field.slotId}
 
 /**
  * What the boxes say, as the answers a chip would carry and the words of the athlete's reply.
- * Every group answers one slot. A group left empty is a skip — they saw the boxes and moved on,
+ * Every group answers one slot; a group in `unloaded` (by slot) is "no weight". A group left empty is a skip — they saw the boxes and moved on,
  * and asking again would be nagging. A peak with no start is one weight for every set.
  */
 export function panelAnswer(
   panel: ChatPanel,
   values: Readonly<Record<string, number | undefined>>,
+  unloaded: ReadonlySet<string> = NO_IDS,
 ): { label: string; answers: SlotAnswer[] } {
   const answers: SlotAnswer[] = [];
   const said: string[] = [];
   for (const group of panel.groups) {
     const slotId = group.fields[0].slotId;
+    if (unloaded.has(slotId)) {
+      answers.push({ id: slotId, ...EMPTY_ANSWER, noLoad: true });
+      said.push('no weight');
+      continue;
+    }
+    if (group.control === 'clock') {
+      const part = (field: ChatPanelField['field']): number => {
+        const box = group.fields.find((f) => f.field === field);
+        return (box ? values[panelFieldKey(box)] : undefined) ?? 0;
+      };
+      const seconds = part('minutes') * 60 + part('seconds');
+      if (seconds > 0) {
+        answers.push({ id: slotId, ...EMPTY_ANSWER, seconds });
+        said.push(formatClock(seconds));
+      } else {
+        answers.push({ id: slotId, ...EMPTY_ANSWER, skipped: true });
+      }
+      continue;
+    }
     const given = group.fields
       .map((field) => ({ field, value: values[panelFieldKey(field)] }))
       .filter((entry): entry is { field: ChatPanelField; value: number } => entry.value != null && entry.value > 0);
@@ -770,7 +858,8 @@ export function panelAnswer(
       continue;
     }
     const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER, ...(group.answerUnit ? { unit: group.answerUnit } : {}) };
-    for (const { field, value } of given) answer[field.field] = value;
+    // Minutes only come in a clock, read whole above.
+    for (const { field, value } of given) if (field.field !== 'minutes') answer[field.field] = value;
     if (answer.weight == null && answer.weightEnd != null) answer.weight = answer.weightEnd;
     if (answer.weightEnd === answer.weight) answer.weightEnd = null;
     answers.push(answer);
@@ -787,8 +876,10 @@ export function panelAnswer(
 }
 
 /**
- * The boxes for a lift logged in sets: where the weight went (start → peak), and the max set's
- * reps and bar when the block ends on one — asked together, as one step.
+ * The boxes for a lift logged in sets: where the weight went, and the max set's reps and bar when
+ * the block ends on one — asked together, as one step. A barbell is built up set to set, so it's
+ * start → peak; anything else in the block — the side bends, the carry, a dumbbell accessory — is
+ * one weight for every set.
  */
 function liftPanelQuestion(
   weight: ChatSlot | undefined,
@@ -798,13 +889,16 @@ function liftPanelQuestion(
   likely: LikelyLoads,
 ): ChatQuestion {
   const groups: ChatPanelGroup[] = [];
-  if (weight) groups.push(weightGroup(weight, name, unit, maxSet ? 'Working sets' : 'Weight', true, likely));
+  const builds = weight?.equipment === 'barbell';
+  if (weight) groups.push(weightGroup(weight, name, unit, maxSet ? 'Working sets' : 'Weight', builds, likely));
   if (maxSet) {
     groups.push({
       title: 'Max set',
       control: 'boxes',
       joiner: '@',
       prefix: 'max ',
+      start: {},
+      quick: [],
       fields: [
         { slotId: maxSet.id, field: 'count', label: 'reps', unit: 'reps' },
         { slotId: maxSet.id, field: 'weight', label: 'weight', unit },
@@ -817,64 +911,90 @@ function liftPanelQuestion(
       : weight ? `What did you lift on the ${name}?`
       : `And the max set on the ${name}?`,
     // A weight for each set has no pill of its own — it's typed, and the message box says how.
-    ...(weight ? { placeholder: `Or type each set: ${unit === 'lb' ? '135, 145, 155' : '60, 65, 70'}` } : {}),
+    ...(builds ? { placeholder: `Or type each set: ${unit === 'lb' ? '135, 145, 155' : '60, 65, 70'}` } : {}),
     slotIds: ids,
     // Skip is on the card itself.
     chips: [],
-    panel: panelFor(name, groups, weight ? likely : NO_LIKELY),
+    panel: { title: name, groups },
   };
 }
 
-/** What a weight card starts on and offers: last time (the card's starting numbers), else the Rx. */
+/**
+ * What a load starts on and offers: last time (its starting numbers), the load an earlier
+ * movement or part was given, and the board's Rx.
+ */
 interface LikelyLoads {
   last: LastLoad | undefined;
-  rx: ChatChip[];
+  rx: number[];
+  same?: EarlierLoad;
 }
 const NO_LIKELY: LikelyLoads = { last: undefined, rx: [] };
 
+function likelyFor(slot: ChatSlot, lastLoads: ReadonlyMap<string, LastLoad>): LikelyLoads {
+  return {
+    last: lastLoadFor(slot, lastLoads),
+    rx: slot.rxWeights ? weightChoices(slot.rxWeights, slot.unit ?? 'kg', slot.equipment) : [],
+    ...(slot.sameAs ? { same: slot.sameAs } : {}),
+  };
+}
+
 /**
  * The weight pills for one load: start → peak for a lift done in sets, one weight otherwise —
- * in last time's unit when nothing else has said one.
+ * in last time's unit when nothing else has said one. With history it starts on last time's load
+ * and says so beside it; without, it starts empty and its likely loads are one tap each.
  */
 function weightGroup(slot: ChatSlot, name: string, unit: string, title: string, inSets: boolean, likely: LikelyLoads): ChatPanelGroup {
-  const answerUnit = !slot.unit && likely.last ? likely.last.unit : undefined;
+  const weighed = likely.last && !likely.last.noLoad ? likely.last : undefined;
+  const answerUnit = !slot.unit && weighed ? weighed.unit : undefined;
   const shown = answerUnit ?? unit;
+  const fields: ChatPanelField[] = inSets
+    ? [
+        { slotId: slot.id, field: 'weight', label: 'start', unit: shown },
+        { slotId: slot.id, field: 'weightEnd', label: 'peak', unit: shown },
+      ]
+    : [{ slotId: slot.id, field: 'weight', label: 'weight', unit: shown }];
+  const [startField, peakField] = fields;
+  const last = likely.last;
+  const same = likely.same;
+  // A load the board never weighed, on kit that isn't a weight by nature (a band, a plate, "other")
+  // — "No weight" is an answer here. A barbell, dumbbell or kettlebell always carries a weight.
+  const mayBeUnloaded = !slot.rxWeights?.length && !WEIGHTED_KIT.has(slot.equipment ?? 'other');
+  // A load given as a weight per set has no pill to land in; a build from one weight to another
+  // lands only where there's a peak to hold it.
+  const sameFits = same && !same.weights?.length && (inSets || same.weightEnd == null);
+  // A kettlebell is one of the sizes a gym has — picked from them, not stepped to.
+  const bells = !inSets && slot.equipment === 'kettlebell';
+  const kit = KIT_LABEL[slot.equipment ?? ''];
   return {
     title,
-    control: 'weight',
+    control: bells ? 'bells' : 'weight',
+    // Centered on the likeliest bell — last time's, the one an earlier part used, the board's —
+    // so it is one tap; never picked for them.
+    ...(bells ? { sizes: bellSizes(shown, weighed?.start ?? (sameFits ? same?.weight : undefined) ?? (slot.rxWeights?.length ? Math.min(...slot.rxWeights) : undefined)) } : {}),
+    ...(kit ? { kit: slot.pair ? kit.pair : kit.one } : {}),
+    ...(slot.pair ? { pair: true } : {}),
     step: getWeightStep(name, slot.equipment, shown === 'lb' ? 'lb' : 'kg'),
     ...(slot.rxWeights?.length ? { base: Math.min(...slot.rxWeights) } : {}),
     ...(answerUnit ? { answerUnit } : {}),
     joiner: '→',
-    prefix: '',
-    fields: inSets
-      ? [
-          { slotId: slot.id, field: 'weight', label: 'start', unit: shown },
-          { slotId: slot.id, field: 'weightEnd', label: 'peak', unit: shown },
-        ]
-      : [{ slotId: slot.id, field: 'weight', label: 'weight', unit: shown }],
-  };
-}
-
-/**
- * The card: with history it starts on last time's load and says so beside the title; without,
- * it starts empty and the board's Rx loads are one tap each.
- */
-function panelFor(title: string, groups: ChatPanelGroup[], likely: LikelyLoads): ChatPanel {
-  const load = groups.find((g) => g.control === 'weight');
-  const last = likely.last;
-  if (!load || !last) return { title, start: {}, quick: likely.rx, groups };
-  const [startField, peakField] = load.fields;
-  const unit = startField.unit;
-  return {
-    title,
-    last: `Last · ${last.start}${last.peak ? ` → ${last.peak}` : ''} ${unit}`,
-    start: {
-      [panelFieldKey(startField)]: last.start,
-      ...(peakField ? { [panelFieldKey(peakField)]: last.peak ?? last.start } : {}),
-    },
-    quick: [],
-    groups,
+    prefix: slot.pair ? '2 × ' : '',
+    fields,
+    ...(last ? { last: last.noLoad ? 'Last · no weight' : `Last · ${last.start}${last.peak ? ` → ${last.peak}` : ''} ${shown}` } : {}),
+    start: weighed
+      ? {
+          [panelFieldKey(startField)]: weighed.start,
+          ...(peakField ? { [panelFieldKey(peakField)]: weighed.peak ?? weighed.start } : {}),
+        }
+      : {},
+    ...(mayBeUnloaded ? { noLoad: { start: Boolean(last?.noLoad) } } : {}),
+    // The bell row already holds every likely size.
+    quick: bells ? [] : [
+      ...(sameFits && same ? [{
+        label: `Same · ${describeLoad(same, shown)}`,
+        answers: [{ id: slot.id, ...EMPTY_ANSWER, weight: same.weight, weightEnd: same.weightEnd }],
+      }] : []),
+      ...(last ? [] : likely.rx.map((w) => ({ label: `${w} ${shown}`, answers: [{ id: slot.id, ...EMPTY_ANSWER, weight: w }] }))),
+    ],
   };
 }
 
@@ -888,7 +1008,32 @@ const NO_LAST_LOADS: ReadonlyMap<string, LastLoad> = new Map();
 function lastLoadFor(slot: ChatSlot, lastLoads: ReadonlyMap<string, LastLoad>): LastLoad | undefined {
   const name = slot.movementNames?.[0];
   const last = name ? lastLoads.get(lastLoadKey(name)) : undefined;
-  return !last || (slot.unit && slot.unit !== last.unit) ? undefined : last;
+  if (!last || last.noLoad) return last;
+  return slot.unit && slot.unit !== last.unit ? undefined : last;
+}
+
+const WEIGHTED_KIT: ReadonlySet<string> = new Set(['barbell', 'dumbbell', 'kettlebell']);
+
+const KIT_LABEL: Record<string, { one: string; pair: string }> = {
+  barbell: { one: 'barbell', pair: 'barbell' },
+  dumbbell: { one: 'dumbbell', pair: 'per dumbbell' },
+  kettlebell: { one: 'kettlebell', pair: 'per bell' },
+};
+
+const BELL_ROW = 5;
+
+/**
+ * Five kettlebell sizes around the likeliest one (last time, an earlier part's, the board's lightest
+ * Rx, else a common middle bell) — a size the gym doesn't stock still shows, so the card never
+ * starts on a bell it can't point at.
+ */
+function bellSizes(unit: string, around: number | undefined): number[] {
+  const kit = KETTLEBELLS[unit === 'lb' ? 'lb' : 'kg'];
+  const anchor = around ?? (unit === 'lb' ? 35 : 16);
+  const all = [...new Set([...kit, anchor])].sort((a, b) => a - b);
+  const at = all.indexOf(anchor);
+  const from = Math.max(0, Math.min(at - Math.floor(BELL_ROW / 2), all.length - BELL_ROW));
+  return all.slice(from, from + BELL_ROW);
 }
 
 const skipChip = (ids: string[]): ChatChip => ({
@@ -900,6 +1045,15 @@ function formatClock(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * "For time · 6 rds" — what the part is, beside its name on the time card. The rounds only when
+ * the part is one block; blocks each carry their own and are named in the poster, not here.
+ */
+function partMeta(result: StoryExerciseResult): string {
+  const { sections, suggestedSets } = result.exercise;
+  return `For time${!sections?.length && suggestedSets > 1 ? ` · ${suggestedSets} rds` : ''}`;
 }
 
 /** The unit the board wrote this movement in — the first positive quantity. */
@@ -921,11 +1075,31 @@ function describeLoad(load: EarlierLoad, unit: string): string {
   return `${load.weight} ${unit}`;
 }
 
+const slotName = (slot: ChatSlot): string => stripMovementRolePrefix(slot.movementNames?.[0] ?? slot.subject);
+
 /**
- * The next question, in words. Each loaded movement is its own question: the first names its
- * weight, every later one in the part offers the earlier load as one tap ("Same 20 kg on the
- * Weighted Step-up?") — often the same implement, not always, so it's asked, never assumed.
- * "20 for both" up front still answers them all: the reader fills every open slot it covers.
+ * A lift already weighed in an earlier part of the session — the snatch practised, then the
+ * metcon's snatches — isn't asked again: the athlete said it a minute ago, for the same lift. Its
+ * weight is carried over and said ("Kettlebell Snatch · 2 × 16 kg — same as earlier"), with Change
+ * on it. Only when it's the next thing to ask, so it lands where the question would have; never
+ * for a weight they're changing (`reopened`), and never for a DIFFERENT movement — that is asked.
+ */
+export function carriedLoads(slots: ChatSlot[], reopened: ReadonlySet<string> = NO_IDS): { answers: SlotAnswer[]; text: string } | null {
+  const first = slots.find((s) => s.asked);
+  const carries = (s: ChatSlot): boolean => s.asked && s.kind === 'weight' && Boolean(s.sameAs?.sameLift) && !reopened.has(s.id);
+  if (!first || !carries(first)) return null;
+  const carried = slots.filter((s) => carries(s) && s.exerciseIndex === first.exerciseIndex);
+  return {
+    answers: carried.map((s) => ({ id: s.id, ...EMPTY_ANSWER, weight: s.sameAs!.weight, weightEnd: s.sameAs!.weightEnd, weights: s.sameAs!.weights })),
+    text: `${carried.map((s) => `${slotName(s)} · ${s.pair ? '2 × ' : ''}${describeLoad(s.sameAs!, s.unit ?? 'kg')}`).join(', ')} — same as earlier.`,
+  };
+}
+
+/**
+ * The next question, in words. A metcon's loads are one card — every weight the part needs, each
+ * with its likely loads one tap away, an earlier load among them ("Same · 20 kg") — often the
+ * same implement, not always, so it's offered, never assumed. A lift in sets keeps its own card.
+ * "20 for both" typed still answers them all: the reader fills every open slot it covers.
  */
 export function nextQuestion(
   slots: ChatSlot[],
@@ -952,14 +1126,33 @@ export function nextQuestion(
       };
     }
     case 'time': {
+      // Minutes : seconds on one card, starting empty — a metcon has no last time to start on,
+      // and a guess would be a time nobody did. The cap is one tap; typing "17:24" still works.
       const cap = first.cap;
       return {
         text: `What was your time${onPart}?`,
+        placeholder: 'Or type it — e.g. 17:24',
         slotIds: [first.id],
-        chips: [
-          ...(cap ? [{ label: `Hit the cap (${formatClock(cap)})`, answers: [{ id: first.id, ...EMPTY_ANSWER, seconds: cap }] }] : []),
-          skipChip([first.id]),
-        ],
+        // Skip is on the card itself.
+        chips: [],
+        panel: {
+          title: result?.exercise.name ?? first.subject,
+          ...(result ? { meta: partMeta(result) } : {}),
+          groups: [{
+            title: 'Time',
+            control: 'clock',
+            joiner: ':',
+            prefix: '',
+            // + on an empty minutes pill starts at the cap: below it, a few taps down.
+            ...(cap ? { base: Math.floor(cap / 60) } : {}),
+            start: {},
+            quick: cap ? [{ label: `Hit the cap · ${formatClock(cap)}`, answers: [{ id: first.id, ...EMPTY_ANSWER, seconds: cap }] }] : [],
+            fields: [
+              { slotId: first.id, field: 'minutes', label: 'min', unit: 'min' },
+              { slotId: first.id, field: 'seconds', label: 'sec', unit: 'sec' },
+            ],
+          }],
+        },
       };
     }
     case 'rounds':
@@ -973,39 +1166,22 @@ export function nextQuestion(
     case 'duration':
       return { text: `How long did you hold ${first.subject}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
     case 'weight': {
-      const unit = first.unit ?? 'kg';
-      const name = stripMovementRolePrefix(first.movementNames?.[0] ?? first.subject);
-      const same = first.sameAs;
-      // Last time starts the card; without it, the board's Rx loads and every real weight between
-      // them are one tap each.
-      const likely: LikelyLoads = {
-        last: lastLoadFor(first, lastLoads),
-        rx: (first.rxWeights ? weightChoices(first.rxWeights, unit, first.equipment) : [])
-          .map((w) => ({ label: `${w} ${unit}`, answers: [{ id: first.id, ...EMPTY_ANSWER, weight: w }] })),
-      };
+      const nameOf = (slot: ChatSlot): string => stripMovementRolePrefix(slot.movementNames?.[0] ?? slot.subject);
       // A lift logged in sets is answered in boxes — start, peak, and the max set if there is one.
-      const strength = result?.kind === 'load' && result.setsTotal > 1;
-      const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && s.exerciseIndex === first.exerciseIndex);
-      const ask: ChatQuestion = strength
-        ? liftPanelQuestion(first, maxSet, name, unit, likely)
-        : {
-            text: `What weight did you use for ${name}?`,
-            slotIds: [first.id],
-            chips: [],
-            panel: panelFor(name, [weightGroup(first, name, unit, 'Weight', false, likely)], likely),
-          };
-      if (!same) return ask;
-      const load = describeLoad(same, unit);
+      if (result?.kind === 'load' && result.setsTotal > 1) {
+        const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && s.exerciseIndex === first.exerciseIndex);
+        return liftPanelQuestion(first, maxSet, nameOf(first), first.unit ?? 'kg', likelyFor(first, lastLoads));
+      }
+      // Every load the part still needs, on one card: one answer, the button naming each weight.
+      const loads = slots.filter((s) => s.asked && s.kind === 'weight' && s.exerciseIndex === first.exerciseIndex);
+      const groups = loads.map((s) => weightGroup(s, nameOf(s), s.unit ?? 'kg', nameOf(s), false, likelyFor(s, lastLoads)));
+      const one = loads.length === 1;
       return {
-        text: `Same ${load} on the ${name}, or a different weight?`,
-        slotIds: [first.id],
-        chips: [
-          {
-            label: `Same — ${load}`,
-            answers: [{ id: first.id, ...EMPTY_ANSWER, weight: same.weight, weightEnd: same.weightEnd, weights: same.weights }],
-          },
-          { label: 'Different weight', answers: [], then: ask },
-        ],
+        text: one ? `What weight did you use for ${nameOf(first)}?` : `What weights did you use${onPart}?`,
+        slotIds: loads.map((s) => s.id),
+        // Skip is on the card itself.
+        chips: [],
+        panel: { title: one ? nameOf(first) : results.length > 1 && result ? result.exercise.name : 'Weights', groups },
       };
     }
     case 'choice': {
@@ -1129,6 +1305,7 @@ export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | nul
     case 'distance':
       return answer.count ? `${answer.count} m` : null;
     case 'weight': {
+      if (answer.noLoad) return 'no weight';
       if (answer.weight == null) return null;
       const unit = answer.unit ?? slot.unit ?? '';
       return describeLoad({ movement: '', weight: answer.weight, weightEnd: answer.weightEnd, weights: answer.weights }, unit).trim();

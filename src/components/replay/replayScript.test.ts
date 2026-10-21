@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PosterLine, PosterRow, PosterWod } from '../celebration/faces/HandwrittenFace/posterData';
 import { MOVES, moveForMovement } from './figure/moves';
-import { REPLAY_TIMING, buildReplayScript, heroCountUp, replayMomentAt } from './replayScript';
+import { REPLAY_TIMING, buildReplayScript, heroCountUp, lineSizeFor, replayMomentAt } from './replayScript';
 
 const line = (rx: string, extra: Partial<PosterLine> = {}): PosterLine =>
   ({ kind: 'line', rx, load: '', mine: '', team: '', ...extra });
@@ -81,6 +81,23 @@ describe('buildReplayScript', () => {
   });
 });
 
+describe('lineSizeFor', () => {
+  it('keeps short lines at full size', () => {
+    expect(lineSizeFor(['15 Thruster', '400m Run'])).toBe(12);
+  });
+
+  it('shrinks a long movement name to two rows instead of spilling over the athlete', () => {
+    const size = lineSizeFor(['20 Single Dumbbell Hang Clean and Jerks']);
+    expect(size).toBeLessThan(12);
+    expect(size).toBeGreaterThanOrEqual(8);
+  });
+
+  it('sizes every line of a replay by its longest, so the type never jumps between lines', () => {
+    const script = buildReplayScript(wod([line('10 Pull-up'), line('20 Single Dumbbell Hang Clean and Jerks')]));
+    expect(script.lineSize).toBe(lineSizeFor(['20 Single Dumbbell Hang Clean and Jerks']));
+  });
+});
+
 describe('heroCountUp', () => {
   it('counts a time through its seconds and ends exactly on it', () => {
     const count = heroCountUp('9:42');
@@ -141,12 +158,50 @@ describe('moveForMovement', () => {
     ['20 Air Squats', 'squat', 'bodyweight'],
     ['DB Thrusters', 'thruster', 'dumbbell'],
   ])('a squat or a lift is held where the board puts the load: %s', (name, move, implement) => {
-    expect(moveForMovement(name)).toEqual({ move, implement });
+    expect(moveForMovement(name)).toMatchObject({ move, implement });
+  });
+
+  it.each([
+    ['KB Snatch', 'kbSnatch', 'kettlebell'],
+    ['Single Arm Kettlebell Snatch', 'kbSnatch', 'kettlebell'],
+    ['DB Snatch', 'dbSnatch', 'dumbbell'],
+    ['Alternating Dumbbell Snatches', 'dbSnatch', 'dumbbell'],
+    ['Hang Power Snatch', 'snatch', 'barbell'],
+  ])('a snatch is drawn the way its implement is lifted: %s', (name, move, implement) => {
+    expect(moveForMovement(name)).toMatchObject({ move, implement });
+  });
+
+  it.each([
+    ['KB Snatch', '', 'one'],
+    ['DB Snatch', '22.5kg', 'one'],
+    ['Double KB Snatch', '', 'pair'],
+    ['Twin DB Snatch', '', 'pair'],
+    ['DB Snatch', '2×22.5kg', 'pair'],
+    ['DB Thrusters', '', 'one'],
+    ['Power Snatch', '60kg', 'shared'],
+    ['KB Swings', '24kg', 'shared'],
+    ['Goblet Squat', '', 'shared'],
+  ])('one bell works one arm, a pair works both: %s %s → %s', (name, load, hands) => {
+    expect(moveForMovement(name, load).hands).toBe(hands);
   });
 });
 
 describe('replayMomentAt', () => {
   const script = buildReplayScript(wod([line('15 Thruster'), line('10 Pull-up')]));
+
+  it('leaves the far arm free on a one-bell line and works both arms on a pair', () => {
+    const at = (rx: string, mine: string) => {
+      const s = buildReplayScript(wod([line(rx, { mine })]));
+      // Mid-beat, the snatch has the bell overhead.
+      return replayMomentAt(s, s.beats[0].at + s.beats[0].duration * 0.6 / s.beats[0].reps);
+    };
+    const single = at('10 KB Snatch', '24kg');
+    const pair = at('10 KB Snatch', '2×24kg');
+    expect(single.hands).toBe('one');
+    expect(single.frame.pose.uaB).toBeLessThan(0);
+    expect(pair.hands).toBe('pair');
+    expect(pair.frame.pose.uaB).toBeGreaterThan(90);
+  });
 
   it('shows no line during the warm-up stance and after the last beat', () => {
     expect(replayMomentAt(script, 0).beat).toBe(-1);

@@ -147,6 +147,12 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                 </button>
               )}
               <Receipts ids={message.receipts} thread={thread} onOpenWorkout={onOpenWorkout} />
+              {message.earned && (
+                <div className={styles.earned}>
+                  <span className={styles.ep}>+{Math.round(message.earned.ep)} EP</span>
+                  {message.earned.pr && <span className={styles.pr}>PR</span>}
+                </div>
+              )}
               {(() => {
                 const cheered = cheeredWorkout(message.headline);
                 return cheered ? <ChatPoster workout={cheered} onOpen={() => onOpenWorkout(cheered)} /> : null;
@@ -168,6 +174,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                   panel={message.panel}
                   disabled={busy != null}
                   onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); pinToEnd(); }}
+                  {...(message.cardChip ? { secondary: { label: message.cardChip.label, onClick: () => { tapChip(message.id, message.cardChip!); pinToEnd(); } } } : {})}
                 />
               )}
               {message.chips && !message.answered && (

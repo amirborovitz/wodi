@@ -44,6 +44,8 @@ export interface LegacyExerciseResult {
   completionTime?: number;
   notes?: string;
   movementWeights?: Record<string, number>;
+  /** Loaded movements the athlete did with no load today (a band, bodyweight), by movement key. */
+  movementsWithoutLoad?: Record<string, true>;
   // Per-movement start->peak weight (sequential complex: each block builds its own weight).
   movementWeightProgressions?: Record<string, number[]>;
   movementAlternatives?: Record<string, string>;
@@ -253,9 +255,10 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
           mr: Record<string, number> = {}, mc: Record<string, number> = {},
           ic: Record<string, number> = {}, ma: Record<string, string> = {},
           mdpr: Record<string, number> = {}, mwp: Record<string, number[]> = {},
-          ms: Record<string, MovementSubstitution> = {};
+          ms: Record<string, MovementSubstitution> = {}, nl: Record<string, true> = {};
     for (const m of r.movementResults ?? []) {
       const n = m.movementKey || m.movement.name;
+      if (m.kind === 'load' && m.loadMode === 'bodyweight') nl[n] = true;
       if (m.kind === 'load' && m.weight != null && m.weight > 0) {
         mw[n] = m.weight;
         // Per-movement start->peak progression (sequential complex: each block builds its own
@@ -321,6 +324,7 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       ...(Object.keys(ic).length > 0 ? { implementCounts: ic } : {}),
       ...(Object.keys(ma).length > 0 ? { movementAlternatives: ma } : {}),
       ...(Object.keys(ms).length > 0 ? { movementSubstitutions: ms } : {}),
+      ...(Object.keys(nl).length > 0 ? { movementsWithoutLoad: nl } : {}),
     };
   }
 
@@ -449,7 +453,11 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
         sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: prescribed, actualReps: sr, weight, completed: true });
       }
       if (hasMax && (r.maxReps || r.maxRepsWeight)) sets.push({ id: `set-${pc}`, setNumber: pc + 1, actualReps: r.maxReps ?? 0, weight: r.maxRepsWeight ?? r.weightEnd ?? r.weight, isMax: true, completed: true });
-      return { exercise: r.exercise, sets, notes: r.notes, ...(r.implementCount ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}) };
+      return {
+        exercise: r.exercise, sets, notes: r.notes,
+        ...(r.implementCount ? { implementCounts: r.exercise.movements?.reduce((a, m) => { a[m.name] = r.implementCount!; return a; }, {} as Record<string, number>) } : {}),
+        ...(r.loadMode === 'bodyweight' ? { movementsWithoutLoad: Object.fromEntries((r.exercise.movements ?? []).map((m) => [m.name, true as const])) } : {}),
+      };
     }
     case 'reps': {
       for (let i = 0; i < setsCount; i++) sets.push({ id: `set-${i}`, setNumber: i + 1, targetReps: r.exercise.suggestedReps, actualReps: r.repsPerSet ?? r.repsTotal ?? r.exercise.suggestedReps, completed: true });

@@ -18,6 +18,7 @@ import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
 import { DeleteActionSheet } from '../components/ui/DeleteActionSheet';
 import { AddToHomeScreenSheet } from '../components/ui/AddToHomeScreenSheet';
 import type { PlannedWorkout } from '../types';
+import { track } from '../services/analytics';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
 
@@ -195,6 +196,13 @@ export function HomeScreen({
     onLogPlannedWorkout?.(waitingBoard);
   };
 
+  // Asked on the tile two days on — they never did it. Cleared at once: the tile asked, they answered.
+  const handleDidntDoWaitingBoard = () => {
+    if (consumeSavedLongPress() || !waitingBoard) return;
+    track('saved_board_dropped', { where: 'today' });
+    void deleteSavedWod(waitingBoard.id);
+  };
+
   const handleLogSavedWod = (saved: PlannedWorkout) => {
     setSavedSheetOpen(false);
     onLogPlannedWorkout?.(saved);
@@ -350,6 +358,7 @@ export function HomeScreen({
                     onOpen={handleOpenWaitingBoard}
                     more={planned.length - 1}
                     onOpenMore={handleOpenSavedSheet}
+                    onDidntDoIt={handleDidntDoWaitingBoard}
                     pressHandlers={savedLongPressHandlers(waitingBoard.id)}
                   />
                 </div>

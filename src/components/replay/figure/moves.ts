@@ -11,7 +11,7 @@
 
 import type { MovementFamilyId, MovementImplement } from '../../../data/movementRegistry';
 import { resolveMovement } from '../../../data/movementRegistry';
-import { isRowErgName } from '../../../utils/movementNameMatch';
+import { isRowErgName, namesAPair } from '../../../utils/movementNameMatch';
 import {
   BONES, STAGE, add, angleOf, keyframes, lerpRecord, plant, reachArm, reachLeg, skeleton, vec,
 } from './skeleton';
@@ -19,6 +19,7 @@ import type { Angles, Point, Pose } from './skeleton';
 
 export type MoveId =
   | 'thruster' | 'squat' | 'frontSquat' | 'backSquat' | 'overheadSquat' | 'gobletSquat' | 'wallBall' | 'deadlift' | 'clean' | 'snatch' | 'jerk' | 'swing'
+  | 'kbSnatch' | 'dbSnatch'
   | 'pullUp' | 'toesToBar' | 'pushUp' | 'burpee' | 'boxJump' | 'jumpRope' | 'lunge' | 'sitUp'
   | 'run' | 'row' | 'bike' | 'ski'
   | 'work' | 'idle' | 'celebrate';
@@ -44,7 +45,22 @@ export interface Move {
   /** Seconds one rep takes at a natural tempo. A beat fits whole reps into its time. */
   cycle: number;
   frame: (u: number) => Frame;
+  /**
+   * Each hand can hold a load of its own. Drawn with a dumbbell or kettlebell, the movement then
+   * works one arm unless the poster says a pair. Without it the hands share one load — a bar, a
+   * swung bell, a goblet.
+   */
+  grip?: 'each';
 }
+
+/**
+ * What the hands hold: one load in the near hand with the far arm free, a load in each hand, or
+ * one load both hands share.
+ */
+export type Hands = 'one' | 'pair' | 'shared';
+
+/** The far arm hangs loose while the near one works — the arm a one-handed lift leaves free. */
+export const freeFarArm = (pose: Pose): Pose => ({ ...pose, uaB: -10, faB: 6 });
 
 const G = STAGE.ground;
 const CX = STAGE.centerX;
@@ -69,6 +85,7 @@ const planted = (list: readonly (readonly [number, Angles])[], props: Props = {}
 
 const thruster: Move = {
   cycle: 1.5,
+  grip: 'each',
   frame: planted([
     [0, RACK],
     [0.4, { torso: 160, thF: 84, shF: -26, thB: 80, shB: -30, uaF: 40, faF: 180, uaB: 36, faB: 176 }],
@@ -81,6 +98,7 @@ const thruster: Move = {
 
 const deadlift: Move = {
   cycle: 1.5,
+  grip: 'each',
   frame: planted([
     [0, FLOOR_PULL],
     [0.42, { torso: 182, ...LEGS, uaF: -4, faF: -2, uaB: -6, faB: -4 }],
@@ -91,6 +109,7 @@ const deadlift: Move = {
 
 const clean: Move = {
   cycle: 1.8,
+  grip: 'each',
   frame: planted([
     [0, FLOOR_PULL],
     [0.32, EXTEND],
@@ -103,6 +122,7 @@ const clean: Move = {
 
 const snatch: Move = {
   cycle: 1.8,
+  grip: 'each',
   frame: planted([
     [0, FLOOR_PULL],
     [0.3, EXTEND],
@@ -115,6 +135,7 @@ const snatch: Move = {
 
 const jerk: Move = {
   cycle: 1.4,
+  grip: 'each',
   frame: planted([
     [0, RACK],
     [0.2, { ...RACK, thF: 32, shF: -14, thB: 28, shB: -16 }],
@@ -142,9 +163,9 @@ const BACK_RACK: Angles = { torso: 180, ...LEGS, uaF: -60, faF: 160, uaB: -64, f
 const GOBLET: Angles = { torso: 180, ...LEGS, uaF: 18, faF: 140, uaB: 14, faB: 136 };
 
 const squat = squatHeld(STAND, { torso: 152, thF: 0, shF: 0, thB: 0, shB: 0, uaF: 82, faF: 92, uaB: 78, faB: 88 });
-const frontSquat = squatHeld(RACK, { ...RACK, torso: 166, uaF: 46, faF: 186, uaB: 42, faB: 182 }, { held: true });
+const frontSquat: Move = { ...squatHeld(RACK, { ...RACK, torso: 166, uaF: 46, faF: 186, uaB: 42, faB: 182 }, { held: true }), grip: 'each' };
 const backSquat = squatHeld(BACK_RACK, { ...BACK_RACK, torso: 146, uaF: -94, faF: 126, uaB: -98, faB: 122 }, { held: true });
-const overheadSquat = squatHeld(OVERHEAD, { ...OVERHEAD, torso: 165, uaF: 168, faF: 172, uaB: 164, faB: 168 }, { held: true });
+const overheadSquat: Move = { ...squatHeld(OVERHEAD, { ...OVERHEAD, torso: 165, uaF: 168, faF: 172, uaB: 164, faB: 168 }, { held: true }), grip: 'each' };
 const gobletSquat = squatHeld(GOBLET, { ...GOBLET, torso: 158, uaF: 2, faF: 122, uaB: -2, faB: 118 }, { held: true });
 
 const WALL_BALL: readonly (readonly [number, Angles])[] = [
@@ -172,6 +193,45 @@ const swing: Move = {
     [0.45, { torso: 184, ...LEGS, uaF: 168, faF: 172, uaB: 164, faB: 168 }],
     [0.55, { torso: 184, ...LEGS, uaF: 168, faF: 172, uaB: 164, faB: 168 }],
     [1, { torso: 122, thF: 38, shF: -12, thB: 34, shB: -14, uaF: -28, faF: -32, uaB: -30, faB: -34 }],
+  ], { held: true }),
+};
+
+/** The bell hiked back between the legs — where a swing and a kettlebell snatch both start. */
+const HIKE: Angles = { torso: 122, thF: 38, shF: -12, thB: 34, shB: -14, uaF: -28, faF: -32, uaB: -30, faB: -34 };
+
+/**
+ * Hiked back, driven up by the hips with the bell kept close, punched through to lockout, then
+ * dropped back between the legs. Nothing stops at the chest — that's the clean.
+ */
+const kbSnatch: Move = {
+  cycle: 1.6,
+  grip: 'each',
+  frame: planted([
+    [0, HIKE],
+    [0.24, { torso: 184, ...LEGS, uaF: 34, faF: 70, uaB: 30, faB: 66 }],
+    [0.38, { torso: 183, ...LEGS, uaF: 118, faF: 196, uaB: 114, faB: 192 }],
+    [0.5, OVERHEAD],
+    [0.66, OVERHEAD],
+    [0.82, { torso: 180, ...LEGS, uaF: 58, faF: 44, uaB: 54, faB: 40 }],
+    [1, HIKE],
+  ], { held: true }),
+};
+
+/**
+ * Off the floor between the feet to overhead in one pull: the hips open, the elbow rides high,
+ * the arm punches up as the knees dip under it, then stand tall and set it back down.
+ */
+const dbSnatch: Move = {
+  cycle: 1.7,
+  grip: 'each',
+  frame: planted([
+    [0, FLOOR_PULL],
+    [0.26, EXTEND],
+    [0.4, { torso: 182, thF: 14, shF: -6, thB: 10, shB: -8, uaF: 118, faF: 196, uaB: 114, faB: 192 }],
+    [0.52, { ...OVERHEAD, thF: 34, shF: -14, thB: 30, shB: -16 }],
+    [0.66, OVERHEAD],
+    [0.78, OVERHEAD],
+    [1, FLOOR_PULL],
   ], { held: true }),
 };
 
@@ -472,6 +532,7 @@ const celebrate: Move = {
 
 export const MOVES: Record<MoveId, Move> = {
   thruster, squat, frontSquat, backSquat, overheadSquat, gobletSquat, wallBall, deadlift, clean, snatch, jerk, swing,
+  kbSnatch, dbSnatch,
   pullUp, toesToBar, pushUp, burpee, boxJump, jumpRope, lunge, sitUp,
   run, row, bike, ski,
   work, idle, celebrate,
@@ -486,7 +547,6 @@ const FAMILY_MOVES: Partial<Record<MovementFamilyId, MoveId>> = {
   sumo_deadlift_high_pull: 'deadlift',
   clean: 'clean',
   clean_and_jerk: 'clean',
-  snatch: 'snatch',
   shoulder_to_overhead: 'jerk',
   swing: 'swing',
   lunge: 'lunge',
@@ -518,17 +578,41 @@ function squatFor(variant: string | null, implement: MovementImplement): MoveId 
   return 'squat';
 }
 
+/** A kettlebell snatch is swung up from between the legs; a dumbbell one is pulled off the floor. */
+function snatchFor(implement: MovementImplement): MoveId {
+  if (implement === 'kettlebell') return 'kbSnatch';
+  if (implement === 'dumbbell') return 'dbSnatch';
+  return 'snatch';
+}
+
+function moveIdFor(name: string, familyId: MovementFamilyId | null, implement: MovementImplement, variant: string | null): MoveId {
+  // "Row" is two families — a barbell row and the erg; the rower check is the one owner of that call.
+  if (familyId === 'strength_row' && isRowErgName(name)) return 'row';
+  if (familyId === 'squat') return squatFor(variant, implement);
+  if (familyId === 'snatch') return snatchFor(implement);
+  return (familyId && FAMILY_MOVES[familyId]) || 'work';
+}
+
+/** A dumbbell or kettlebell in a lift each hand can do alone is one, unless the poster says two. */
+function handsFor(move: MoveId, implement: MovementImplement, text: string): Hands {
+  if (MOVES[move].grip !== 'each' || (implement !== 'dumbbell' && implement !== 'kettlebell')) return 'shared';
+  return namesAPair(text) ? 'pair' : 'one';
+}
+
 export interface DrawnMovement {
   move: MoveId;
   /** What's in the hands. The registry's answer: "Front Squat" is a barbell unless the board says DB or KB. */
   implement: MovementImplement;
+  hands: Hands;
 }
 
-/** The drawn movement for a line of the board, read from the movement's own name. */
-export function moveForMovement(name: string): DrawnMovement {
-  const { familyId, implement, variant } = resolveMovement(name);
-  // "Row" is two families — a barbell row and the erg; the rower check is the one owner of that call.
-  if (familyId === 'strength_row' && isRowErgName(name)) return { move: 'row', implement: 'machine' };
-  if (familyId === 'squat') return { move: squatFor(variant, implement), implement };
-  return { move: (familyId && FAMILY_MOVES[familyId]) || 'work', implement };
+/**
+ * The drawn movement for a line of the poster, read from the movement's own name; `load` is the
+ * line's weight as printed, which says "2×16kg" when the athlete held a pair.
+ */
+export function moveForMovement(name: string, load: string = ''): DrawnMovement {
+  const { familyId, implement: resolved, variant } = resolveMovement(name);
+  const move = moveIdFor(name, familyId, resolved, variant);
+  const implement = move === 'row' ? 'machine' : resolved;
+  return { move, implement, hands: handsFor(move, implement, `${name} ${load}`) };
 }

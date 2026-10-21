@@ -432,3 +432,31 @@
 .board {
   margin-top: var(--sp-2);
 }
+
+/* What a log just made in the chat earned, between Wodi's cheer and its poster. */
+.earned {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.ep,
+.pr {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.ep {
+  border: 1px solid var(--wodi-line2);
+  color: var(--wodi-white);
+}
+
+/* A PR is one of the chat's three yellows (with the camera and Wodi's number). */
+.pr {
+  background: var(--wodi-yellow);
+  color: #0c0d0f;
+}

@@ -57,11 +57,13 @@ export function isMaxEffortPractice(ex: Exercise): boolean {
  */
 function posterPartKind(ex: Exercise): WorkoutPartKind {
   if (ex.partKind) return ex.partKind;
-  if (ex.isSecondary === true || ex.type === 'skill') return 'accessory';
+  if (ex.type === 'skill') return 'skill';
+  if (ex.isSecondary === true) return 'accessory';
   return isStrengthPagePart(ex) ? 'strength' : 'metcon';
 }
 
-const POSTER_RANK: Record<WorkoutPartKind, number> = { metcon: 0, strength: 1, accessory: 2 };
+// Warm-up and cool-down only reach a poster from a board that is nothing else.
+const POSTER_RANK: Record<WorkoutPartKind, number> = { metcon: 0, strength: 1, skill: 2, accessory: 3, warmup: 4, cooldown: 5 };
 
 /**
  * The order a session's posters are shown in: the metcon, then strength, then practice — board
