@@ -355,23 +355,30 @@ interface WeekTilesProps {
 }
 
 /**
- * Machine totals, side by side.
+ * Machine totals, one tile per machine.
  *
  * Tiles and not bars: the board's bars compare reps to reps, and there is no
- * honest bar between 30 km and 280 cal. They are different measurements over
- * different sessions, so they sit next to each other as separate facts.
+ * honest bar between 30 km and 280 cal. A machine measured both ways shows both
+ * figures at full size in one tile, which takes the wider column — see
+ * `WeekPosterTile`.
  */
 export function WeekTiles({ tiles, border, num, label, fill = 'transparent' }: WeekTilesProps): React.JSX.Element {
+  const columns = tiles.map((t) => (t.parts.length > 1 ? 'minmax(0,1.9fr)' : 'minmax(0,1fr)')).join(' ');
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tiles.length}, 1fr)`, gap: 24 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: columns, gap: 24 }}>
       {tiles.map((t) => (
         <div
-          key={`${t.source}-${t.unit}`}
+          key={t.source}
           style={{ border: `1.5px solid ${border}`, background: fill, borderRadius: 20, padding: '28px 30px 24px' }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 11 }}>
-            <span style={{ fontFamily: fD, fontWeight: 900, fontSize: 88, lineHeight: 0.86, color: num }}>{t.value}</span>
-            <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 27, letterSpacing: '0.14em', color: num }}>{t.unit}</span>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 11, whiteSpace: 'nowrap' }}>
+            {t.parts.map((p, i) => (
+              <React.Fragment key={p.unit}>
+                {i > 0 && <span style={{ fontFamily: fD, fontWeight: 700, fontSize: 64, lineHeight: 0.86, color: label, margin: '0 6px' }}>+</span>}
+                <span style={{ fontFamily: fD, fontWeight: 900, fontSize: 88, lineHeight: 0.86, color: num }}>{p.value}</span>
+                <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 27, letterSpacing: '0.14em', color: num }}>{p.unit}</span>
+              </React.Fragment>
+            ))}
           </div>
           <div style={{ marginTop: 14, fontFamily: fB, fontWeight: 800, fontSize: 21, letterSpacing: '0.22em', color: label }}>
             {t.source}

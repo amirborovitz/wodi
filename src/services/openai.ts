@@ -199,6 +199,8 @@ Return ONLY valid JSON:
       //   "EMOM 16" / "on the minute" → 60      "E2MOM x 10" / "Q2M" → 120
       //   "Every 01:15 minutes x 8" → 75        "Every 90 sec x 12" → 90
       //   "1.50 MIN X 16 ROUNDS" → 90           "[3:00 AMRAP / 1:00 REST] x 5" → 180
+      //   "EMOM (50:10)" / "40 on, 20 off" → 50 / 40 — the minute is SPLIT: the work part is the
+      //   window and the rest part is intervalRestSeconds (10 / 20). Never 60 with a rest on top.
       // intervalRestSeconds is ONE rest window (the 1:00 above → 60); omit when no prescribed rest.
       // These are PER WINDOW. workDuration/restDuration stay CUMULATIVE — both are needed and
       // they answer different questions. Emit whenever the board states a cadence at all.
@@ -393,7 +395,7 @@ Cardio machines are NEVER measured in "reps". They use calories or distance:
 - NEVER put calorie or distance values in the "reps" field for cardio machines
 
 ## TIMED HOLDS / STATIC POSITIONS
-Isometric holds are measured in TIME, not reps. When a movement prescribes a duration (plank, wall sit, hollow hold, L-sit, dead hang, handstand hold, superman hold, ring support hold, etc.), set "time" to the duration in SECONDS and "inputType": "none". NEVER put the hold duration in the "reps" field, and NEVER leave a hold with no time — losing the duration erases the whole movement.
+Holds and other work done for TIME rather than counted (plank, wall sit, hollow hold, L-sit, dead hang, handstand hold, superman hold, ring support hold, flutter kicks, hollow rocks, etc.) are measured in TIME, not reps. Set "time" in SECONDS and "inputType": "none": the duration the board writes — or, when it writes none and the movement fills a work window ("EMOM 50:10", "40 on / 20 off"), that window's work time. Nobody counts these, so NEVER write "max" for one and NEVER put the duration in "reps"; never leave one with no time — losing the duration erases the whole movement. Only a count the board itself writes ("20 flutter kicks") is reps.
 - "45 sec plank hold" → { "name": "Plank Hold", "time": 45, "inputType": "none" }
 - "1 min plank" → { "name": "Plank", "time": 60, "inputType": "none" }
 - "30s hollow hold" → { "name": "Hollow Hold", "time": 30, "inputType": "none" }
@@ -477,6 +479,8 @@ means THE COACH PRESCRIBED IT. Use the slot the work is measured in: "reps": "ma
   ("calories": "max" for the bike, "reps": "max" for the other four). A "1" on any of them is a
   parse failure: it reads downstream as a real prescription, the athlete is never asked what they
   actually did, and 25 minutes of work logs as one rep per round.
+  Except work done for TIME (holds, flutter kicks…): its window is its "time", never "max" — see
+  the holds rule.
 - Untimed block (strength / sets / bodyweight / skill) → the count is simply open. Leave the
   quantity null and do NOT write "max"; an open weight is not an earned score.
 CONSISTENCY: movements in the same block that are all max-effort must share ONE "scoreEntryMode".
@@ -604,7 +608,7 @@ When an AMRAP workout has a strictly ascending rep sequence, set ladderReps to t
 - "(6 each)" on a round count is each athlete's OWN rounds → personalRounds: 6. The round count itself stays the TEAM's ("30 RFT (6 each)" → suggestedSets: 30, personalRounds: 6).
 - CRITICAL: For partner workouts with sections, sections.rounds = TOTAL rounds (e.g., "6 rounds (3 each)" → sections.rounds: 6, personalRounds: 3). The app computes each athlete's share from the two. Never pre-divide a round count by team size.
 - HOW EACH MOVEMENT IS SHARED: on a partner or team part, EVERY movement — buy-in and cash-out included — answers "share": "split" when the athletes divide its amount between them; "each" when every athlete does the full written amount on their own; "together" when they do it at the same time. "(together)", "(each)"/"(ea)" and "sync"/"synchro"/"in sync" on the board settle it — also set "sharedLabel" to the word the board used ("together" | "each" | "sync") so the poster can echo the board's own notation. When nothing on the board settles how a movement is shared, that is "ambiguous": leave "share" null and ask (see WHAT YOU CANNOT SETTLE). Off a partner part, "share" is null. Examples: "600m run (together)" → distance: 600, share: "together", sharedLabel: "together". "6 HSPU (EACH)" → reps: 6, share: "each", sharedLabel: "each". "12 Sync Dual DB Thrusters" → reps: 12, share: "together", sharedLabel: "sync".
-- WORKING TIME: on a partner or team part, "activeShare" is how much of the clock each athlete is actually working, 0–1. One works while the others wait → 1 ÷ team size. Turns that overlap (the next athlete starts before the last one finishes, a partner joins halfway) → more, by how much they overlap. Side by side the whole time → 1. When the board doesn't settle how the work is arranged, that is "ambiguous": leave it null and ask. Off a partner part, null.
+- WORKING TIME: on a partner or team part, "activeShare" is how much of the clock each athlete is actually working, 0–1. One works while the others wait → 1 ÷ team size. Turns that overlap (the next athlete starts before the last one finishes, a partner joins halfway) → more, by how much they overlap. Side by side the whole time → 1. Only the split work is shared: a movement every athlete does "together" or "each" is working time for all of them, so a part that mixes the two sits above 1 ÷ team size, by how much of the clock goes on the unsplit work. When the board doesn't settle how the work is arranged, that is "ambiguous": leave it null and ask. Off a partner part, null.
 - "(each)" ATTACHED TO A MOVEMENT is a no-split marker (above). "(N each)" attached to a ROUND COUNT ("6 rounds (3 each)") is a per-person round count. Same word, opposite meaning — read what the "(each)" is attached to.
 - MULTI-SECTION WORKOUTS: If ANY section of the workout uses partner/team language (e.g., "B. METCON: In pairs, I go you go…"), set partnerWorkout: true and teamSize at the TOP LEVEL of the parsed output, not just on the exercise. This ensures the partner factor is applied correctly for the entire session.
 - CRITICAL PARTNER SPLIT DISTINCTION: There are two partner workout shapes. Use partnerSplit: "rounds" only when partners explicitly trade/own complete rounds, e.g. "6 rounds (3 each)", "alternate full rounds", or a single total round target completed round-by-round. For sectioned for-time partner workouts ("In pairs: 3 rounds ... then 3 rounds ... then buy-out/cash-out"), use partnerSplit: "reps" even if the instructions say "I go you go" or "split however"; each exercise inside the section is shared/split unless that movement is marked together. Keep section.rounds as the prescribed section repeat count.
@@ -1659,6 +1663,7 @@ TRANSCRIPTION (do this first — fidelity is the whole job):
 - Include every line, even a short line that repeats one you already transcribed (e.g. a connector like "200m run" appearing multiple times, once before each of several movements).
 - A period inside an abbreviation (S.T.O.H., D.U., T.T.B., K.B.S., A.M.R.A.P.) is NOT a line or sentence terminator — do not let it cause you to skip or merge the line that follows it. The single most commonly dropped line is a short repeating connector immediately before the LAST movement in a round — verify that exact position.
 - Before answering, recount the visible lines in the image and verify every one of them appears in exactly one part.
+- A board in another language or script: name each movement by what ITS OWN WORDS say, word for word — never by which movement usually comes next in a workout like this. A word you cannot make out with confidence stays in its original script, exactly as you see it, for the next step to ask about; a plausible-looking guess is a wrong movement the athlete logs.
 
 ${SEGMENT_SPEC}`;
 

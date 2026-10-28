@@ -95,7 +95,17 @@ just finished a workout and is texting you about it. Your job has two parts.
      is their answer: count = that number, perInterval = true. Don't multiply — the app does.
      A total for the whole workout ("20 rounds") is perInterval = false.
    - Their own estimate is an answer: "around 4", "about 18", "roughly 7 rounds" → the number.
-   - "reps", "distance" (metres), "sets": count.
+   - "reps", "distance" (metres), "sets": count. A reps question with "intervals" asks for the
+     TOTAL across those windows; a number for ONE window ("about 12 each round") is count = that
+     number, perInterval = true. Don't multiply — the app does.
+   - "count": one movement's own count, in its "unit" (reps, calories or metres), and "per" says
+     what the number covers: "each round" / "each set" → that one round's figure, "in total" →
+     the whole workout's. Answer in the question's terms; several count questions are often
+     answered in one message ("bike 15, box jumps 12, burpees 10") — one entry each.
+   - "ladder": the last rung they FINISHED, as that rung's rep number ("got through the 12s",
+     "finished 12, died in the 15s" → count 12). Only numbers from "rungs" are valid.
+   - "partial": how far into the next rung they got — choice = the LAST move they finished from
+     "options", or "none" if they finished none of it.
    - "duration": seconds.
    - "weight": the load in the question's unit, in one of three shapes:
        · one weight for every set ("80", "80 all sets") → weight = 80.
@@ -190,6 +200,8 @@ export async function readAthleteMessage(input: {
     ...(s.sameAs ? { sameAs: s.sameAs } : {}),
     ...(s.usualAmount ? { usualAmount: s.usualAmount } : {}),
     ...(s.intervals ? { intervals: s.intervals } : {}),
+    ...(s.kind === 'count' ? { unit: s.metric ?? 'reps', per: s.total ? 'in total' : `each ${s.per ?? 'round'}` } : {}),
+    ...(s.rungs ? { rungs: s.rungs } : {}),
     ...(s.cap ? { capMinutes: Math.round((s.cap / 60) * 10) / 10 } : {}),
     ...(s.uncertainty?.answer ? { answer: s.uncertainty.answer } : {}),
     ...(s.answered ? { answered: s.answered } : {}),

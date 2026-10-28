@@ -12,6 +12,11 @@ interface ChatPanelCardProps {
   onSubmit: (label: string, answers: SlotAnswer[]) => void;
   /** The quiet button in Skip's place — "Didn't do it" on a saved board's first question. */
   secondary?: { label: string; onClick: () => void };
+  /**
+   * Answered: the card stays where it was, exactly as it was sent — every box, the side picked
+   * on an either/or — dimmed and out of reach. Nothing the athlete was shown disappears.
+   */
+  locked?: boolean;
 }
 
 const PILL_LABEL: Record<string, string> = { start: 'Start weight', peak: 'Peak weight', weight: 'Weight', min: 'Minutes', sec: 'Seconds' };
@@ -23,8 +28,8 @@ const PILL_LABEL: Record<string, string> = { start: 'Start weight', peak: 'Peak 
  * loads together. With history a load starts on last time, so the likely answer is that one tap;
  * without, it starts empty and its likely loads are one tap each. Skip lives on the card.
  */
-export function ChatPanelCard({ panel, disabled, onSubmit, secondary }: ChatPanelCardProps) {
-  const { values, drafts, setField, setDraft, commitLabel, canSubmit, answer, skip, tapQuick, unloaded, tapNoLoad, startedOnLast } = usePanelDraft(panel);
+export function ChatPanelCard({ panel, disabled, onSubmit, secondary, locked = false }: ChatPanelCardProps) {
+  const { values, drafts, setField, setDraft, commitLabel, canSubmit, answer, skip, tapQuick, unloaded, tapNoLoad, startedOnLast, picked, pick } = usePanelDraft(panel);
   const send = (filled: { label: string; answers: SlotAnswer[] }): void => onSubmit(filled.label, filled.answers);
   const several = panel.groups.length > 1;
   const quick = (group: ChatPanelGroup) => (group.quick.length > 0 || group.noLoad) && (
@@ -63,10 +68,11 @@ export function ChatPanelCard({ panel, disabled, onSubmit, secondary }: ChatPane
   );
   return (
     <form
-      className={styles.card}
+      className={`${styles.card} ${locked ? styles.cardLocked : ''}`}
+      inert={locked}
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSubmit && !disabled) send(answer());
+        if (canSubmit && !disabled && !locked) send(answer());
       }}
     >
       <div className={styles.head}>
@@ -84,6 +90,27 @@ export function ChatPanelCard({ panel, disabled, onSubmit, secondary }: ChatPane
             </legend>
           )}
           {several && quick(group)}
+          {/* The board's either/or, picked beside the number it changes. */}
+          {group.choice && (
+            <div className={styles.quick} role="group" aria-label={`${group.title}: which one`}>
+              {group.choice.options.map((option, index) => {
+                const on = (picked[group.choice!.slotId] ?? group.choice!.options[0]) === option;
+                return (
+                  <motion.button
+                    key={option}
+                    type="button"
+                    className={`${styles.quickChip} ${on ? styles.quickChipOn : ''}`}
+                    aria-pressed={on}
+                    disabled={disabled}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => pick(group, option)}
+                  >
+                    {group.choice!.labels[index]}
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
           {group.control === 'bells' ? (
             <div className={styles.bells}>
               {group.pair && <em className={styles.bellsPair}>2 ×</em>}
@@ -157,7 +184,7 @@ export function ChatPanelCard({ panel, disabled, onSubmit, secondary }: ChatPane
           )}
         </fieldset>
       ))}
-      <div className={styles.actions}>
+      {!locked && <div className={styles.actions}>
         <motion.button
           type="submit"
           className={styles.log}
@@ -175,7 +202,7 @@ export function ChatPanelCard({ panel, disabled, onSubmit, secondary }: ChatPane
         >
           {secondary?.label ?? 'Skip'}
         </motion.button>
-      </div>
+      </div>}
     </form>
   );
 }

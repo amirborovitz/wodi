@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults, type StoryExerciseResult } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, carriedLoads, chatCannotLog, describeAnswer, isComplete, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, carriedLoads, describeAnswer, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import { buildSavedExercises } from '../../services/buildSavedExercises';
 import type { ParsedWorkout, Workout } from '../../types';
@@ -39,6 +39,8 @@ const ladder = {
 
 const blank = () => [createBlankResult(ladder, 0, 'for_time', 'male', undefined, true, { blankAnswers: true })];
 const answer = (id: string, fields: Partial<SlotAnswer>): SlotAnswer => ({ id, ...EMPTY_ANSWER, ...fields });
+/** Nothing left to ask out loud. */
+const nothingAsked = (slots: { asked: boolean }[]): boolean => !slots.some((s) => s.asked);
 
 describe('Tell Wodi — what the chat asks', () => {
   it('pre-fills nothing the athlete has to answer', () => {
@@ -87,9 +89,9 @@ describe('Tell Wodi — what the chat asks', () => {
       ['15 kg', '17.5 kg', '20 kg', '22.5 kg'],
       ['15 kg', '17.5 kg', '20 kg', '22.5 kg'],
     ]);
-    // One answer for both — the button names each weight it saves.
+    // One answer for both — the reply names each weight it saves.
     const filled = panelAnswer(weights.panel!, { '0.weight.alt dumbbell snatch:weight': 17.5, '0.weight.weighted alt box step-up:weight': 15 });
-    expect(filled.label).toBe('17.5 kg · 15 kg');
+    expect(filled.label).toBe('Alt Dumbbell Snatch 17.5 kg · Weighted Alt Box Step-up 15 kg');
     expect(filled.answers.map((a) => [a.id, a.weight])).toEqual([
       ['0.weight.alt dumbbell snatch', 17.5],
       ['0.weight.weighted alt box step-up', 15],
@@ -115,7 +117,7 @@ describe('Tell Wodi — what the chat asks', () => {
     give(answer('0.weight.weighted alt box step-up', { weight: 17.5 }));
     give(answer('0.choice.double under', { choice: 'Single Under' }));
 
-    expect(isComplete(openSlots(results, closed))).toBe(true);
+    expect(nothingAsked(openSlots(results, closed))).toBe(true);
     const saved = toLegacyResult(results[0]);
     expect(saved.completionTime).toBe(1320);
     expect(saved.movementWeights?.['Alt Dumbbell Snatch']).toBe(17.5);
@@ -188,8 +190,10 @@ describe('Tell Wodi — what the chat asks', () => {
       const slots = openSlots(results, closedUpTo, scaled);
       const question = nextQuestion(slots, results)!;
       expect(question.text).toBe('Echo Bike again instead of the Run?');
-      expect(question.chips.map((c) => c.label)).toEqual(['Echo Bike · 10 cal', 'Echo Bike · different amount', 'Something else', 'Did the Run']);
+      // The runs are 200 / 300 / 600 m: the tap says the bike's range, never just the first piece.
+      expect(question.chips.map((c) => c.label)).toEqual(['Echo Bike · 10–30 cal', 'Echo Bike · different amount', 'Something else', 'Did the Run']);
       expect(question.chips[1].then?.text).toBe('How much Echo Bike instead of the Run?');
+      expect(question.chips[1].then?.hint).toBe('For the first 200 m Run — the others follow at the same scale. Last time\'s would be 10 cal.');
 
       const after = applyAnswer(results, slots.find((s) => s.id === '0.swap.run')!, question.chips[0].answers[0]).results;
       const bike = after[0].movementResults!.find((mr) => mr.substitution?.selectedName === 'Echo Bike');
@@ -198,6 +202,22 @@ describe('Tell Wodi — what the chat asks', () => {
       const workout = { title: 'L', type: 'for_time', format: 'for_time', exercises: [ladder], rawText: '' } as unknown as ParsedWorkout;
       const saved = buildWorkloadBreakdownFromResults([toLegacyResult({ ...after[0], timeSeconds: 1320 })] as unknown as ExerciseResult[], workout, 1);
       expect(saved.movements.find((m) => m.name === 'Echo Bike')).toMatchObject({ totalCalories: 90 });
+    });
+
+    it('a chipper that writes the run at several lengths says the bike as its range', () => {
+      // משה בסגנון, 2026-10-23: 400 / 800 / 1200 / 1600 m of run, the button said only "1200 m".
+      const chipper = {
+        name: 'For Time', type: 'wod', loggingMode: 'for_time', prescription: 'For time', rawText: '', suggestedSets: 1,
+        movements: [400, 800, 1200, 1600].map((distance) => ({ name: 'Run', distance, inputType: 'distance', equipment: 'none' })),
+      } as unknown as ParsedExercise;
+      const bike = new Map([[habitKey('Run'), {
+        movement: 'Run', usually: 'Echo Bike', times: 3, seen: 4, lastDate: '2026-10-20',
+        scale: { from: 'distance' as const, to: 'distance' as const, ratio: 3 },
+      }]]);
+      const results = [createBlankResult(chipper, 0, 'for_time', 'male', undefined, true, { blankAnswers: true })];
+      const slots = openSlots(results, new Set(['0.time']), bike);
+      const question = nextQuestion(slots, results)!;
+      expect(question.chips[0].label).toBe('Echo Bike · 1200–4800 m');
     });
 
     it('the habit is never a fence: "Something else" asks what they did instead', () => {
@@ -220,7 +240,7 @@ describe('Tell Wodi — what the chat asks', () => {
       expect(question.slotIds).toEqual(['0.amount.run']);
 
       results = applyAnswer(results, slots.find((s) => s.id === '0.amount.run')!, answer('0.amount.run', { count: 60 })).results;
-      expect(isComplete(openSlots(results, new Set([...closed, '0.amount.run']), bikeHabit))).toBe(true);
+      expect(nothingAsked(openSlots(results, new Set([...closed, '0.amount.run']), bikeHabit))).toBe(true);
       const workout = { title: 'L', type: 'for_time', format: 'for_time', exercises: [ladder], rawText: '' } as unknown as ParsedWorkout;
       const saved = buildWorkloadBreakdownFromResults([toLegacyResult({ ...results[0], timeSeconds: 1320 })] as unknown as ExerciseResult[], workout, 1);
       // 60 per 200m: 3×60 + 2×90 + 1×180, all reps — none of the run's metres left behind.
@@ -362,7 +382,7 @@ describe('the weight unit — asked only when nothing says it', () => {
     expect(question.chips.map((c) => c.label)).toEqual(['kg', 'lb', 'Skip']);
     const after = applyAnswer(rs, slots.find((s) => s.id === 'unit')!, answer('unit', { unit: 'lb' })).results;
     expect(swing(after).loadUnit).toBe('lb');
-    expect(isComplete(openSlots(after, new Set(['0.time', '0.weight.kettlebell swing', 'unit'])))).toBe(true);
+    expect(nothingAsked(openSlots(after, new Set(['0.time', '0.weight.kettlebell swing', 'unit'])))).toBe(true);
   });
 
   it('"53 lb" says the unit too — no unit question', () => {
@@ -552,7 +572,6 @@ describe('Tell Wodi — a strength block that ends on a max set stays in the cha
 
   it('asks the working weights and the max set in ONE panel of boxes — never "open the form"', () => {
     const results = fresh();
-    expect(chatCannotLog(results[0])).toBe(false);
     const slots = openSlots(results, new Set());
     expect(slots.filter((s) => s.asked).map((s) => s.id)).toEqual(['0.weight', '0.maxset']);
     const q = nextQuestion(slots, results)!;
@@ -568,7 +587,7 @@ describe('Tell Wodi — a strength block that ends on a max set stays in the cha
     const slots = openSlots(results, new Set());
     const q = nextQuestion(slots, results)!;
     const filled = panelAnswer(q.panel!, { '0.weight:weight': 70, '0.weight:weightEnd': 85, '0.maxset:count': 20, '0.maxset:weight': 50 });
-    expect(filled.label).toBe('70 → 85 kg · max 20 reps @ 50 kg');
+    expect(filled.label).toBe('Working sets 70 → 85 kg · Max set 20 reps @ 50 kg');
     for (const a of filled.answers) {
       const outcome = applyAnswer(results, slots.find((s) => s.id === a.id)!, a);
       expect(outcome.closed).toBe(true);
@@ -584,7 +603,8 @@ describe('Tell Wodi — a strength block that ends on a max set stays in the cha
     const results = fresh();
     const q = nextQuestion(openSlots(results, new Set()), results)!;
     const filled = panelAnswer(q.panel!, { '0.weight:weight': 80 });
-    expect(filled.label).toBe('80 kg');
+    // The empty box is said, never dropped: the reply is what stays of the card.
+    expect(filled.label).toBe('Working sets 80 kg · Max set —');
     expect(filled.answers).toEqual([
       { id: '0.weight', ...EMPTY_ANSWER, weight: 80 },
       { id: '0.maxset', ...EMPTY_ANSWER, skipped: true },

@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { getLadderRungValue } from '../../../utils/ladderRungs';
 import { AnimatePresence } from 'framer-motion';
 import type { ParsedWorkout, ParsedExercise, ExerciseLoggingMode, ExerciseSet, MovementSubstitution } from '../../../types';
 import { isTeamPrescribedExercise } from '../../../services/workloadCalculation';
@@ -190,16 +191,6 @@ interface StoryLogResultsProps {
    * "Done for today".
    */
   isEditing?: boolean;
-}
-
-// ─── Ladder helper ───────────────────────────────────────────────
-
-function getLadderRungValue(ladderReps: number[], rungIdx: number): number {
-  if (rungIdx < ladderReps.length) return ladderReps[rungIdx];
-  const step = ladderReps.length >= 2
-    ? ladderReps[ladderReps.length - 1] - ladderReps[ladderReps.length - 2]
-    : 2;
-  return ladderReps[ladderReps.length - 1] + step * (rungIdx - ladderReps.length + 1);
 }
 
 // ─── Convert story result → legacy ExerciseResult ───────────────
@@ -476,7 +467,9 @@ function buildLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
       return { exercise: r.exercise, sets, notes: r.notes };
     case 'distance':
       sets.push({ id: 'set-0', setNumber: 1, distance: r.distanceValue, completed: true });
-      return { exercise: r.exercise, sets, notes: r.notes, totalDistance: r.distanceValue, distanceUnit: r.distanceUnit as 'm' | 'km' | 'mi' | undefined };
+      // The movement's own numbers travel too: a cardio piece scored in the unit the board left
+      // open ("30 min bike, max calories") carries its count on the movement, not in metres.
+      return { exercise: r.exercise, sets, notes: r.notes, totalDistance: r.distanceValue, distanceUnit: r.distanceUnit as 'm' | 'km' | 'mi' | undefined, ...buildMaps() };
     case 'score_time':
       sets.push({ id: 'set-0', setNumber: 1, time: r.timeSeconds, completed: true });
       return { exercise: r.exercise, sets, completionTime: r.timeSeconds, rounds: effectiveSetsTotal > 1 ? effectiveSetsTotal : undefined, notes: r.notes };

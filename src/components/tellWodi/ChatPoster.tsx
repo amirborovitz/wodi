@@ -8,6 +8,7 @@ import { ActionMenuSheet } from '../ui/ActionMenuSheet';
 import { MoveReplay } from '../replay/MoveReplay';
 import { ReplayIcon } from '../replay/ReplayIcon';
 import { usePosterReplay } from '../replay/usePosterReplay';
+import { CHAT_ANCHOR } from './useChatViewport';
 import styles from './ChatPoster.module.css';
 
 interface ChatPosterProps {
@@ -18,7 +19,7 @@ interface ChatPosterProps {
 /**
  * The poster just logged, big under Wodi's cheer, with Share right there — the moment you're
  * proud of is where you share. A session of several parts shows its lead poster (the WOD first —
- * orderPosterParts) and "+N more", which opens the whole deck; the chat never stacks posters. The first time it shows, the athlete performs the board and the
+ * orderPosterParts) and "+1 poster" — the session's other parts — which opens the whole deck; the chat never stacks posters. The first time it shows, the athlete performs the board and the
  * card gives way to the poster; Replay plays it again. Sharing is the poster screen's own
  * (usePosterShare); the image is drawn off-screen at the poster's full width so it is as sharp
  * as one shared from the poster.
@@ -45,7 +46,7 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
   if (!payload) return null;
   const more = payload.wods.length - 1;
   return (
-    <div className={styles.wrap}>
+    <div className={styles.wrap} {...{ [CHAT_ANCHOR]: '' }}>
       <div className={styles.posterBox}>
         <motion.button
           type="button"
@@ -71,7 +72,7 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
         )}
         <button type="button" className={styles.share} onClick={() => setCapturing(true)}>Share</button>
         {more > 0 && (
-          <button type="button" className={styles.more} onClick={onOpen}>+{more} more</button>
+          <button type="button" className={styles.more} onClick={onOpen}>+{more} {more === 1 ? 'poster' : 'posters'}</button>
         )}
       </div>
 

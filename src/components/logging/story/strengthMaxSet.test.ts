@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { ParsedWorkout, ParsedMovement } from '../../../types';
 import { postProcessParsedWorkout } from '../../../services/workoutPostProcessor';
-import { createBlankResult } from './types';
+import { createBlankResult, initStoryResults } from './types';
 import { usesSupersetInput } from './inputRouting';
 import { toLegacyResult } from './StoryLogResults';
+import { hasMaxSet } from '../../../services/blockScore';
+import { EMPTY_ANSWER, applyAnswer, nextQuestion, openSlots } from '../../tellWodi/chatQuestions';
+import { buildWorkloadBreakdownFromResults } from '../../../services/workloadFromResults';
 
 /**
  * "Back Squat — 4 sets x 5 reps @~80%, + max reps @60%."
@@ -154,5 +157,62 @@ describe('a strength block whose last set is a max effort', () => {
     const { exercise: processed, result } = logged(workout);
     expect(processed.movements).toHaveLength(2);
     expect(usesSupersetInput(result)).toBe(true);
+  });
+});
+
+/**
+ * "4 sets: 5 strict chest to bar pull ups, 6 tempo good morning, max tempo dips @B.W."
+ *
+ * A circuit. The dips are max in EVERY set — that is a property of a movement, not a closing set
+ * the block ends on. Reading "a movement says max" as "the block has a max set" asked the athlete
+ * for a "Max set: reps @ weight" on the good mornings, and the save then wrote three working sets
+ * plus a phantom fourth "max set" (2026-10-21).
+ */
+describe('a circuit with a movement taken to max every set', () => {
+  const pullUp = { name: 'Strict Chest to Bar Pull-up', reps: 5, inputType: 'reps', equipment: 'bodyweight' } as unknown as ParsedMovement;
+  const goodMorning = { name: 'Tempo Good Morning', reps: 6, inputType: 'weight', equipment: 'barbell', implementCount: 1 } as unknown as ParsedMovement;
+  const dips = { name: 'Tempo Dips', reps: null, repsDisplay: 'max', inputType: 'reps', equipment: 'bodyweight', isMaxReps: true, maxMetric: 'reps' } as unknown as ParsedMovement;
+  const text = 'STRENGTH\n4 sets:\n5 strict chest to bar pull ups @0-1 R.I.R\n6 tempo good morning @R.P.E 7-8\nMax tempo dips @B.W.';
+
+  function circuit(withSections: boolean): ParsedWorkout {
+    return {
+      title: 'STRENGTH', type: 'strength', format: 'strength', scoreType: 'load', sets: 4, rawText: text,
+      exercises: [{
+        name: 'Strength', type: 'strength', loggingMode: 'strength', scoreType: 'load',
+        prescription: '4 sets: 5 strict chest to bar pull ups, 6 tempo good morning, Max tempo dips @B.W.',
+        rawText: text, suggestedSets: 4, suggestedReps: null, suggestedRepsPerSet: null,
+        movements: [pullUp, goodMorning, dips],
+        sections: withSections ? [{ sectionType: 'rounds', rounds: 4, movements: [pullUp, goodMorning, dips] }] : undefined,
+      }],
+    } as unknown as ParsedWorkout;
+  }
+
+  it.each([['with a sections list', true], ['without one', false]])('has no max set %s', (_label, withSections) => {
+    const exercise = postProcessParsedWorkout(circuit(withSections)).exercises[0];
+    expect(hasMaxSet(exercise)).toBe(false);
+    expect(createBlankResult(exercise, 0, 'strength').setsTotal).toBe(4);
+  });
+  // The chat, on the board as the owner logged it: the good mornings are a weight that builds,
+  // the dips a count each set — and nothing asks for a max set.
+  it.each([['with a sections list', true], ['without one', false]])('asks the dips each set, and saves them %s', (_label, withSections) => {
+    const parsed = postProcessParsedWorkout(circuit(withSections));
+    let results = initStoryResults(parsed, ['strength'], 'male', undefined, { blankAnswers: true, weightUnit: 'kg' });
+    const cards: string[] = [];
+    const closed = new Set<string>();
+    for (let guard = 0; guard < 10; guard += 1) {
+      const slots = openSlots(results, closed);
+      const question = nextQuestion(slots, results);
+      if (!question) break;
+      cards.push(question.text);
+      for (const id of question.slotIds) {
+        const slot = slots.find((s) => s.id === id)!;
+        closed.add(id);
+        const value = slot.kind === 'count' ? { count: 9 } : slot.kind === 'weight' ? { weight: 30, weightEnd: 40 } : null;
+        if (value) results = applyAnswer(results, slot, { id, ...EMPTY_ANSWER, ...value }).results;
+      }
+    }
+    expect(cards).toEqual(['What did you lift on the Tempo Good Morning?', 'How many tempo dips each set?']);
+    const dips = buildWorkloadBreakdownFromResults([toLegacyResult(results[0])], parsed).movements.find((m) => m.name === 'Tempo Dips');
+    expect(dips?.totalReps).toBe(36);
   });
 });

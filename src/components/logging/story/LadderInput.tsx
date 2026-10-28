@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { getLadderRungValue } from '../../../utils/ladderRungs';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { StoryExerciseResult } from './types';
 import { PartialRoundChecklist, type PartialRow } from './PartialRoundChecklist';
@@ -7,18 +8,6 @@ import styles from './LadderInput.module.css';
 interface LadderInputProps {
   result: StoryExerciseResult;
   onChange: (patch: Partial<StoryExerciseResult>) => void;
-}
-
-/**
- * Get the rep value for a ladder rung, extrapolating beyond the prescribed array.
- * E.g., ladderReps=[4,6,8,10,12], rungIdx=5 → step=2 → 14.
- */
-function getRungValue(ladderReps: number[], rungIdx: number): number {
-  if (rungIdx < ladderReps.length) return ladderReps[rungIdx];
-  const step = ladderReps.length >= 2
-    ? ladderReps[ladderReps.length - 1] - ladderReps[ladderReps.length - 2]
-    : 2;
-  return ladderReps[ladderReps.length - 1] + step * (rungIdx - ladderReps.length + 1);
 }
 
 /**
@@ -43,7 +32,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
   const movementCount = laddered.length || 1;
 
   // The rung the athlete is currently climbing into (next incomplete one).
-  const nextRungVal = getRungValue(ladderReps, step);
+  const nextRungVal = getLadderRungValue(ladderReps, step);
 
   // Show extra rungs beyond prescribed if athlete is fast.
   const EXTRA_RUNGS = 3;
@@ -68,7 +57,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
   // Full rungs completed, summed per movement then across the laddered movements.
   const fullPerMovement = useMemo(() => {
     let sum = 0;
-    for (let j = 0; j < step; j++) sum += getRungValue(ladderReps, j);
+    for (let j = 0; j < step; j++) sum += getLadderRungValue(ladderReps, j);
     return sum;
   }, [ladderReps, step]);
   const totalReps = fullPerMovement * movementCount + partialTotal;
@@ -119,7 +108,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
-          Completed through the {getRungValue(ladderReps, step - 1)}s
+          Completed through the {getLadderRungValue(ladderReps, step - 1)}s
           {(checkedCount > 0 || legacyReps > 0) && ` · into the ${nextRungVal}s`}
         </motion.div>
       )}
@@ -127,7 +116,7 @@ export function LadderInput({ result, onChange }: LadderInputProps) {
       {/* Step track: tap the last completed rung */}
       <div className={styles.stepTrack}>
         {Array.from({ length: visibleRungs }).map((_, rungIdx) => {
-          const rungVal = getRungValue(ladderReps, rungIdx);
+          const rungVal = getLadderRungValue(ladderReps, rungIdx);
           const isCompleted = rungIdx < step;
           const isCurrent = rungIdx === step - 1;
           const isExtrapolated = rungIdx >= ladderReps.length;

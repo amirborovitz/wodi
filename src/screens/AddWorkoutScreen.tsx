@@ -418,7 +418,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const { calculateRewardData } = useRewardData();
   // The whole log — useWorkouts reads every doc and slices after, so this costs no extra read.
   // Ask Wodi answers from all of it; the recent-workout helpers below keep their 50.
-  const { workouts: allWorkouts, loading: workoutsLoading } = useWorkouts(Number.MAX_SAFE_INTEGER);
+  const { workouts: allWorkouts, loading: workoutsLoading, refresh: refreshWorkouts } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const recentWorkouts = useMemo(() => allWorkouts.slice(0, 50), [allWorkouts]);
   const ask = useAskWodi(allWorkouts);
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
@@ -1882,6 +1882,9 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       // A log finished in the chat ends there: its poster goes into the conversation under Wodi's
       // cheer, with the EP and any PR — what the flash and the poster screen said, said in place.
       if (inChat) {
+        // The log is read once, when the screen opens: the chat finds the poster it shows, and
+        // Wodi writes the cheer for it, only once the workout just saved is in it.
+        void refreshWorkouts();
         tellWodi.posterReady({ workoutId: persistedWorkoutId, ep: finalEP, pr: Boolean(finalHasPR) });
         return;
       }

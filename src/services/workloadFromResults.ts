@@ -193,6 +193,22 @@ export function entersTotalValue(movement: ParsedMovement, unprescribedInThisUni
 }
 
 /**
+ * Is the athlete's own count for this movement, in this unit, the block's TOTAL — or one round's
+ * (one set's) work that the save repeats? The one answer to that, for the save that multiplies and
+ * for the chat that asks: a question that says "each round" over a number the save stores as the
+ * total is a 5× error nothing downstream can catch.
+ *
+ * Reps follow the parse's entry scope alone. Distance and calories also read as a total where the
+ * board left that unit unprescribed (see entersTotalValue), and a relay pacer's metres are always
+ * its own trips added up — never a per-round figure.
+ */
+export function loggedAsTotal(movement: ParsedMovement, metric: 'reps' | 'distance' | 'calories'): boolean {
+  if (metric === 'reps') return movement.scoreEntryMode === 'total';
+  if (metric === 'distance') return movement.relay === true || entersTotalValue(movement, (movement.distance ?? 0) <= 0);
+  return entersTotalValue(movement, (movement.calories ?? 0) <= 0);
+}
+
+/**
  * Exported for tests only — this is a pure function trapped in a screen component. It owns the
  * save-time breakdown (every stored total and therefore every workout's EP), so it needs a
  * regression net; it belongs in src/services/ alongside calculateWorkloadBreakdown.
@@ -521,11 +537,9 @@ export function buildWorkloadBreakdownFromResults(
       // stored as entered; a per-round figure repeats by rounds.
       // Relay pacer movements log a TOTAL (trip stepper writes trips × per-trip) whose trip
       // count is independent of the AMRAP round count — never multiply it by rounds.
-      const useUserTotalsDirectly = mov.scoreEntryMode === 'total';
-      const useDistanceAsTotal = userDistance !== undefined
-        && (mov.relay === true || entersTotalValue(mov, (mov.distance ?? 0) <= 0));
-      const useCaloriesAsTotal = userCalories !== undefined
-        && entersTotalValue(mov, (mov.calories ?? 0) <= 0);
+      const useUserTotalsDirectly = loggedAsTotal(mov, 'reps');
+      const useDistanceAsTotal = userDistance !== undefined && loggedAsTotal(mov, 'distance');
+      const useCaloriesAsTotal = userCalories !== undefined && loggedAsTotal(mov, 'calories');
 
       // The prescription takes the block's partner factor; an entered figure takes whatever
       // enteredQuantityFactor says its split leaves it. "Together" movements (everyone does the

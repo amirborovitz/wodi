@@ -11,7 +11,7 @@
  */
 
 import { useMemo } from 'react';
-import type { RecapData, RecapLift, RecapMoveStat } from './useRecapData';
+import type { RecapData, RecapEngineCell, RecapLift, RecapMoveStat } from './useRecapData';
 import { isLoadedImplement } from '../data/movementRegistry';
 
 /**
@@ -30,12 +30,28 @@ export interface WeekPosterMove {
   reps: number;
 }
 
-export interface WeekPosterTile {
+/** One figure in one unit: "23" + "KM". */
+export interface WeekPosterTilePart {
   /** "30" · "280" — formatted, because the unit it was formatted for travels with it. */
   value: string;
   /** "KM" · "M" · "CAL" */
   unit: string;
-  /** "ECHO BIKE" — the machine that put the figure up. */
+}
+
+/**
+ * One machine's week — ONE tile per machine, never two.
+ *
+ * A bike ridden for metres on some days and for calories on others used to get a
+ * tile per unit, and "5.1 KM · ECHO BIKE" beside "707 CAL · ECHO BIKE" reads as one
+ * ride: that far, and that much burned doing it. Now the machine gets one tile with
+ * both figures at equal weight, "23 KM + 108 CAL", and the session count under them
+ * says it was the whole week on that machine. Each figure keeps its own unit —
+ * never converted into the other.
+ */
+export interface WeekPosterTile {
+  /** Hero-first. One part for a machine measured one way; two when it was measured both. */
+  parts: WeekPosterTilePart[];
+  /** "ECHO BIKE" · "ECHO BIKE · 6 SESSIONS" — the count only on a tile with both units. */
   source: string;
 }
 
@@ -134,6 +150,26 @@ function takeBoardRows(candidates: RecapMoveStat[]): RecapMoveStat[] {
 }
 
 /**
+ * The engine cells, folded to one tile per machine.
+ *
+ * The cells arrive hero-first, so machines keep the engine card's order and a
+ * machine's own figures keep it too (kilometres before calories).
+ */
+function buildTiles(cells: RecapEngineCell[]): WeekPosterTile[] {
+  const byMachine = new Map<string, RecapEngineCell[]>();
+  for (const cell of cells) byMachine.set(cell.machine, [...(byMachine.get(cell.machine) ?? []), cell]);
+
+  return [...byMachine.values()].slice(0, MAX_TILES).map((group) => {
+    const { machine, machineSessions } = group[0];
+    const count = group.length > 1 ? ` · ${machineSessions} ${machineSessions === 1 ? 'SESSION' : 'SESSIONS'}` : '';
+    return {
+      parts: group.map((c) => ({ value: c.value, unit: c.unit })),
+      source: `${machine.toUpperCase()}${count}`,
+    };
+  });
+}
+
+/**
  * The pure builder behind the hook.
  *
  * Split out for the same reason `buildRecaps` is: every question this file answers
@@ -166,11 +202,7 @@ export function buildWeekPosterData(data: RecapData): WeekPosterData {
   const moves = takeBoardRows(data.moveMinutes > 0 ? board : rest)
     .map((m) => ({ name: m.name, reps: m.reps }));
 
-  const tiles = (data.aerobic?.cells ?? []).slice(0, MAX_TILES).map((c) => ({
-    value: c.value,
-    unit: c.unit,
-    source: c.machine.toUpperCase(),
-  }));
+  const tiles = buildTiles(data.aerobic?.cells ?? []);
 
   // One handwritten line, and tonnage owns it when there was any. A cardio-only
   // week gets the aerobic comparison there instead of an empty slot — never both,

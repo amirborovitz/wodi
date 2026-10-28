@@ -31,7 +31,19 @@ export interface PanelDraft {
    * several it marks that load (or unmarks it) and the button sends them all.
    */
   tapNoLoad: (group: ChatPanelGroup) => { label: string; answers: SlotAnswer[] } | null;
+  /** The side picked on each either/or, by its choice slot — the board's side until tapped. */
+  picked: Readonly<Record<string, string>>;
+  pick: (group: ChatPanelGroup, option: string) => void;
 }
+
+/**
+ * A card of more than this many answers says how many it logs, not each number: the numbers are
+ * on the card right above it, and a button reading "Log 12 cal · 16 reps · 21 reps · 5…" says
+ * nothing a person can read. The reply bubble still spells every one of them out.
+ */
+const NAMED_ANSWERS = 2;
+
+const NO_SLOTS: ReadonlySet<string> = new Set();
 
 /** "72,5" and "72.5" are the same number; anything that isn't a positive number is empty. */
 function readNumber(text: string | undefined): number | undefined {
@@ -48,6 +60,7 @@ function readNumber(text: string | undefined): number | undefined {
 export function usePanelDraft(panel: ChatPanel): PanelDraft {
   const [loads, setLoads] = useState<Record<string, number | undefined>>(() => Object.assign({}, ...panel.groups.map((g) => g.start)));
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [picked, setPicked] = useState<Record<string, string>>({});
   const [peakTouched, setPeakTouched] = useState<boolean>(() => panel.groups.some((g) => Object.keys(g.start).length > 0));
   // Last time had no load: the card starts on "No weight", and the button says so.
   const [unloaded, setUnloaded] = useState<ReadonlySet<string>>(() => new Set(
@@ -60,7 +73,10 @@ export function usePanelDraft(panel: ChatPanel): PanelDraft {
     ...Object.fromEntries(Object.entries(drafts).map(([key, text]) => [key, readNumber(text)])),
     ...loads,
   };
-  const filled = panelAnswer(panel, values, unloaded);
+  const filled = panelAnswer(panel, values, unloaded, picked);
+  const answered = panel.groups.filter((g) => unloaded.has(g.fields[0].slotId)
+    || g.fields.some((f) => (values[panelFieldKey(f)] ?? 0) > 0)).length;
+  const total = panel.groups.length;
   const canSubmit = unloaded.size > 0 || Object.values(values).some((value) => value != null && value > 0);
 
   return {
@@ -79,10 +95,12 @@ export function usePanelDraft(panel: ChatPanel): PanelDraft {
       }));
     },
     setDraft: (key, text) => setDrafts((prev) => ({ ...prev, [key]: text })),
-    commitLabel: canSubmit ? `Log ${filled.label}` : 'Log it',
+    commitLabel: !canSubmit ? 'Log it'
+      : total <= NAMED_ANSWERS ? `Log ${filled.label}`
+      : answered === total ? `Log all ${total}` : `Log ${answered} of ${total}`,
     canSubmit,
     answer: () => filled,
-    skip: () => panelAnswer(panel, {}),
+    skip: () => panelAnswer(panel, {}, NO_SLOTS, picked),
     tapQuick: (group, chip) => {
       if (panel.groups.length === 1) return { label: chip.label, answers: chip.answers };
       const given = chip.answers[0];
@@ -98,7 +116,7 @@ export function usePanelDraft(panel: ChatPanel): PanelDraft {
     startedOnLast: panel.groups.some((g) => Object.keys(g.start).length > 0 || g.noLoad?.start === true),
     tapNoLoad: (group) => {
       const slot = slotOf(group);
-      if (panel.groups.length === 1) return panelAnswer(panel, {}, new Set([slot]));
+      if (panel.groups.length === 1) return panelAnswer(panel, {}, new Set([slot]), picked);
       if (unloaded.has(slot)) {
         withoutSlot(slot);
         return null;
@@ -107,6 +125,10 @@ export function usePanelDraft(panel: ChatPanel): PanelDraft {
       // Its pills empty: "no weight" and a number can't both be the answer.
       setLoads((prev) => ({ ...prev, ...Object.fromEntries(group.fields.map((f) => [panelFieldKey(f), undefined])) }));
       return null;
+    },
+    picked,
+    pick: (group, option) => {
+      if (group.choice) setPicked((prev) => ({ ...prev, [group.choice!.slotId]: option }));
     },
   };
 }

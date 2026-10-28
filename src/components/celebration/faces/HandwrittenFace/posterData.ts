@@ -9,7 +9,7 @@
  */
 
 import type { CelebrationData } from '../../../../hooks/useCelebrationData';
-import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult } from '../../types';
+import type { ArtifactSection, ArtifactRow, StoryMovementLine, HeroResult, LinePart } from '../../types';
 import type { Exercise, MovementTotal, Achievement } from '../../../../types';
 // Value import from helpers directly (not the useCelebrationData re-export): the hook module
 // transitively initializes Firebase, which the Node poster-corpus harness must never load.
@@ -123,6 +123,8 @@ export interface PosterLine {
   // Ascending-ladder AMRAP bar-chart track — see ArtifactRow.ladderTrack. When present, skins
   // render the normal rx/load/mine row AND additionally render this chart right below it.
   ladderTrack?: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
+  // The movements this line names when it names several (ArtifactRow.parts). Absent: one.
+  parts?: LinePart[];
 }
 
 export type PosterRow = PosterBlock | PosterLine;
@@ -1140,6 +1142,7 @@ function artifactRowToPosterLine(row: ArtifactRow, mineMap?: Map<string, string>
     roundLabel: stationChip ?? row.roundLabel,
     ...(stationChip ? { station: true } : {}),
     ladderTrack: row.ladderTrack,
+    ...(row.parts ? { parts: row.parts } : {}),
   };
 }
 

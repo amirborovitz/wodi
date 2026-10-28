@@ -6,6 +6,8 @@
  * Now these live here; WorkoutScreen re-exports them for backward compat during migration.
  */
 
+import { getLadderRungValue } from '../../utils/ladderRungs';
+import { pluralizeMovementLabel } from '../../utils/movementPlural';
 import type {
   Exercise,
   ExerciseSet,
@@ -21,6 +23,7 @@ import type {
   ArtifactSection,
   HeroResult,
   HighlightStampData,
+  LinePart,
   StoryMovementLine,
 } from './types';
 import {
@@ -304,11 +307,7 @@ export function getSectionedForTimeLabel(exercise?: Exercise | null): string | u
 
 // ─── Ladder helpers ───────────────────────────────────────────────────────────
 
-export function getLadderRungValue(reps: number[], idx: number): number {
-  if (idx < reps.length) return reps[idx];
-  const step = reps.length >= 2 ? reps[reps.length - 1] - reps[reps.length - 2] : 2;
-  return reps[reps.length - 1] + step * (idx - reps.length + 1);
-}
+export { getLadderRungValue };
 
 // Total reps across the laddered movements — the same figure the logging screen leads with
 // (Σ completed rungs (+ partial) × scaling-movement count). Prefers the logged combined total
@@ -1641,22 +1640,6 @@ export function abbreviateMovementForPoster(name: string): string {
 
 const MAX_FULL_POSTER_MOVEMENT_NAME_LENGTH = 24;
 
-function pluralizeMovementLabel(name: string): string {
-  const cleaned = name.replace(/\s+/g, ' ').trim();
-  if (!cleaned) return cleaned;
-  if (/^(?:HSPU|T2B|TTB|C2B|DU|BOB|BOR|AKS)$/i.test(cleaned)) return cleaned;
-
-  const lastWordMatch = cleaned.match(/([A-Za-z][A-Za-z-]*)$/);
-  if (!lastWordMatch) return cleaned;
-
-  const lastWord = lastWordMatch[1];
-  if (/ss$/i.test(lastWord)) return cleaned.replace(/ss$/i, (match) => `${match}es`); // Press → Presses
-  if (/s$/i.test(lastWord)) return cleaned; // already plural (Dips, Push Ups, Burpees)
-  if (/[^aeiou]y$/i.test(lastWord)) return cleaned.replace(/y$/i, (match) => (match === 'Y' ? 'IES' : 'ies'));
-  if (/(?:x|z|ch|sh)$/i.test(lastWord)) return cleaned.replace(new RegExp(`${lastWord}$`), `${lastWord}es`);
-  return `${cleaned}s`;
-}
-
 function formatRepMovementNameForPoster(name: string, reps?: number): string {
   const fullName = reps != null && reps !== 1 ? pluralizeMovementLabel(name) : name;
   if (fullName.length <= MAX_FULL_POSTER_MOVEMENT_NAME_LENGTH) return fullName;
@@ -1670,14 +1653,14 @@ function formatProgressiveMovementData(
   prevNames: Set<string>,
   diffOnly: boolean,
   plusPrefix: boolean = false,
-): { movement: string; weight?: string } {
+): { movement: string; weight?: string; parts: LinePart[] } {
   const toShow = diffOnly ? movements.filter((m) => !prevNames.has(m.name.toLowerCase())) : movements;
-  if (toShow.length === 0) return { movement: '' };
+  if (toShow.length === 0) return { movement: '', parts: [] };
 
-  const parts = toShow.map((m) => {
+  const parts = toShow.map((m): LinePart => {
     const qty = m.reps ? `${m.reps}` : m.calories ? `${m.calories}cal` : m.distance ? `${m.distance}m` : '';
     const name = formatRepMovementNameForPoster(m.name, m.reps || undefined);
-    return qty ? `${qty} ${name}` : name;
+    return { text: qty ? `${qty} ${name}` : name, movement: m.name };
   });
 
   const weightedMov = toShow.find((m) => m.rxWeights?.male != null);
@@ -1685,7 +1668,7 @@ function formatProgressiveMovementData(
     ? `${weightedMov.rxWeights.male}${rxLoadUnit(weightedMov)}`
     : undefined;
 
-  return { movement: (plusPrefix ? '+ ' : '') + parts.join(' · '), weight };
+  return { movement: (plusPrefix ? '+ ' : '') + parts.map((p) => p.text).join(' · '), weight, parts };
 }
 
 function buildProgressiveChipperRows(
@@ -1707,19 +1690,19 @@ function buildProgressiveChipperRows(
       (m) => resolveSubstitution(m, section.rounds ?? 1).movement,
     );
     if (section.sectionType === 'buy_in') {
-      const { movement, weight } = formatProgressiveMovementData(movements, new Set(), false);
-      rows.push({ roundLabel: 'BUY-IN', name: 'buy-in', primary: movement, subNote: weight, accent: 'yellow' });
+      const { movement, weight, parts } = formatProgressiveMovementData(movements, new Set(), false);
+      rows.push({ roundLabel: 'BUY-IN', name: 'buy-in', primary: movement, subNote: weight, accent: 'yellow', parts });
     } else if (section.sectionType === 'cash_out') {
-      const { movement, weight } = formatProgressiveMovementData(movements, new Set(), false);
-      rows.push({ roundLabel: 'CASH-OUT', name: 'cash-out', primary: movement, subNote: weight, accent: 'yellow' });
+      const { movement, weight, parts } = formatProgressiveMovementData(movements, new Set(), false);
+      rows.push({ roundLabel: 'CASH-OUT', name: 'cash-out', primary: movement, subNote: weight, accent: 'yellow', parts });
     } else {
       const isFirst = roundIndex === 1;
       const isLast = roundIndex === totalRounds;
       // Building chipper: R1 full, R2…R(n-1) diff with + prefix, Rn full cumulative
       // Pyramid chipper (showAllMovements): always show full movements per section
       const diffOnly = !showAllMovements && !isFirst && !isLast;
-      const { movement, weight } = formatProgressiveMovementData(movements, prevMovNames, diffOnly, diffOnly);
-      rows.push({ roundLabel: `R${roundIndex}`, name: `round-${roundIndex}`, primary: movement, subNote: weight, accent: 'magenta' });
+      const { movement, weight, parts } = formatProgressiveMovementData(movements, prevMovNames, diffOnly, diffOnly);
+      rows.push({ roundLabel: `R${roundIndex}`, name: `round-${roundIndex}`, primary: movement, subNote: weight, accent: 'magenta', parts });
       prevMovNames = new Set(movements.map((m) => m.name.toLowerCase()));
       roundIndex++;
     }
@@ -1808,23 +1791,23 @@ function buildBlockLineRows(
   // "@ 24/16kg" on every block is the repetition this layout exists to remove.
   const rxStated = new Set<string>();
   const blockRows = sections.flatMap(({ section, rounds, movements: sectionMovements }): ArtifactRow[] => {
-    const line = sectionMovements
-      .map((movement) => {
+    const parts = sectionMovements
+      .map((movement): LinePart => {
         const part = formatBlockLinePart(movement);
         const key = movement.name.toLowerCase();
-        if (!part || sharedRx || rxStated.has(key)) return part;
+        if (!part || sharedRx || rxStated.has(key)) return { text: part, movement: stripMovementRolePrefix(movement.name) };
         rxStated.add(key);
         const rx = rxLoadOf(movement);
-        return rx ? `${part} @ ${rx}` : part;
+        return { text: rx ? `${part} @ ${rx}` : part, movement: stripMovementRolePrefix(movement.name) };
       })
-      .filter(Boolean)
-      .join(' · ');
+      .filter((part) => part.text);
+    const line = parts.map((part) => part.text).join(' · ');
     if (!line) return [];
     const roundLabel = section.sectionType === 'buy_in' ? 'BUY-IN'
       : section.sectionType === 'cash_out' ? 'CASH-OUT'
       : roundsAreScored ? 'AMRAP'
       : `×${rounds}`;
-    return [{ roundLabel, name: '', primary: line, suppressMine: true, accent: 'magenta' }];
+    return [{ roundLabel, name: '', primary: line, suppressMine: true, accent: 'magenta', parts }];
   });
 
   const totals = orderMovementTotalsByPrescription(exercise, movements);
@@ -1841,16 +1824,17 @@ function buildBlockLineRows(
       primary: sharedRx,
       ...(sharedLoad ? { mineOverride: sharedLoad } : { suppressMine: true }),
       accent: 'yellow',
+      parts: [],
     }]
     : [];
 
-  const totalsLine = totals
-    .map((total, i) => {
+  const totalParts = totals
+    .map((total, i): LinePart => {
       const part = formatBlockTotalPart(total);
-      return part && loads[i] && !sharedLoad ? `${part} @ ${loads[i]}` : part;
+      return { text: part && loads[i] && !sharedLoad ? `${part} @ ${loads[i]}` : part, movement: stripMovementRolePrefix(total.name) };
     })
-    .filter(Boolean)
-    .join(' · ');
+    .filter((part) => part.text);
+  const totalsLine = totalParts.map((part) => part.text).join(' · ');
   if (!totalsLine) return [...blockRows, ...rxRows];
   return [
     ...blockRows,
@@ -1861,6 +1845,7 @@ function buildBlockLineRows(
       primary: totalsLine,
       ...(sharedLoad && !sharedRx ? { mineOverride: sharedLoad } : { suppressMine: true }),
       accent: 'yellow',
+      parts: totalParts,
     },
   ];
 }

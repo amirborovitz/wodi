@@ -10,6 +10,7 @@ import { rowsOf } from '../celebration/faces/HandwrittenFace/posterData';
 import type { PosterLine, PosterWod } from '../celebration/faces/HandwrittenFace/posterData';
 import { MOVES, freeFarArm, moveForMovement } from './figure/moves';
 import type { Frame, Hands, MoveId } from './figure/moves';
+import { resolveMovement } from '../../data/movementRegistry';
 import type { MovementImplement } from '../../data/movementRegistry';
 import { blendPose, smooth } from './figure/skeleton';
 
@@ -64,15 +65,26 @@ export const REPLAY_TIMING = {
 
 const isLine = (row: ReturnType<typeof rowsOf>[number]): row is PosterLine => row.kind === 'line';
 
-/** Each movement once, in the poster's order — a 5-round board's repeats are the same movement. */
-function distinctLines(wod: PosterWod): PosterLine[] {
+/** One movement as the poster prints it, and the line it sits on. */
+interface PosterMovement { text: string; movement: string; line: PosterLine }
+
+/**
+ * Each movement once, in the poster's order. A line that names several ("6 Pull-ups · 12 DB
+ * Snatches") is each of them; a 5-round board's repeats, and a totals line after the board, are
+ * movements already played.
+ */
+function distinctMovements(wod: PosterWod): PosterMovement[] {
   const seen = new Set<string>();
-  return rowsOf(wod).filter(isLine).filter((line) => {
-    const key = line.rx.trim().toLowerCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return rowsOf(wod).filter(isLine)
+    .flatMap((line) => (line.parts ?? [{ text: line.rx, movement: line.rx }]).map((part) => ({ ...part, line })))
+    .filter(({ text, movement }) => {
+      // The identity names a movement the registry knows; anything else is only its own words.
+      const resolved = resolveMovement(movement);
+      const key = text.trim() && (resolved.familyId ? resolved.identity : text.trim()).toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 const clockText = (seconds: number): string =>
@@ -195,16 +207,16 @@ export function replayMomentAt(script: ReplayScript, t: number): ReplayMoment {
 
 export function buildReplayScript(wod: PosterWod): ReplayScript {
   const T = REPLAY_TIMING;
-  const lines = distinctLines(wod).slice(0, T.maxBeats);
-  const duration = lines.length
-    ? Math.min(T.maxBeat, Math.max(T.minBeat, T.beatsBudget / lines.length))
+  const movements = distinctMovements(wod).slice(0, T.maxBeats);
+  const duration = movements.length
+    ? Math.min(T.maxBeat, Math.max(T.minBeat, T.beatsBudget / movements.length))
     : 0;
 
-  const beats: ReplayBeat[] = lines.map((line, i) => {
+  const beats: ReplayBeat[] = movements.map(({ text, movement, line }, i) => {
     // The printed weights say a pair ("2×16kg") even when the name doesn't.
-    const { move, implement, hands } = moveForMovement(line.rx, `${line.mine} ${line.load}`);
+    const { move, implement, hands } = moveForMovement(movement, `${line.mine} ${line.load}`);
     return {
-      text: line.rx.trim(),
+      text: text.trim(),
       detail: (line.mine || line.load || '').trim(),
       move,
       implement,

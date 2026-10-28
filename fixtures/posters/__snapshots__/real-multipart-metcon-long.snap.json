@@ -49,28 +49,83 @@
             "name": "",
             "primary": "600m Echo Bike · 10 Push Presses · 10 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "600m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "10 Push Presses",
+                "movement": "Push Press"
+              },
+              {
+                "text": "10 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "×5",
             "name": "",
             "primary": "10 Dips / Push-ups · 10 Sumo Deadlift High Pulls · 20 Air Squats",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "10 Dips / Push-ups",
+                "movement": "Dip"
+              },
+              {
+                "text": "10 Sumo Deadlift High Pulls",
+                "movement": "Sumo Deadlift High Pull"
+              },
+              {
+                "text": "20 Air Squats",
+                "movement": "Air Squat"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "35/50kg",
             "mineOverride": "35kg",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "3km Echo Bike · 50 Push Presses · 50 T2B · 50 Dips · 50 Sumo Deadlift High Pulls · 100 Air Squats",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "3km Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "50 Push Presses",
+                "movement": "Push Press"
+              },
+              {
+                "text": "50 T2B",
+                "movement": "Toes to Bar"
+              },
+              {
+                "text": "50 Dips",
+                "movement": "Dip"
+              },
+              {
+                "text": "50 Sumo Deadlift High Pulls",
+                "movement": "Sumo Deadlift High Pull"
+              },
+              {
+                "text": "100 Air Squats",
+                "movement": "Air Squat"
+              }
+            ]
           }
         ]
       }
@@ -210,7 +265,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×5"
+          "roundLabel": "×5",
+          "parts": [
+            {
+              "text": "600m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "10 Push Presses",
+              "movement": "Push Press"
+            },
+            {
+              "text": "10 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -218,7 +287,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×5"
+          "roundLabel": "×5",
+          "parts": [
+            {
+              "text": "10 Dips / Push-ups",
+              "movement": "Dip"
+            },
+            {
+              "text": "10 Sumo Deadlift High Pulls",
+              "movement": "Sumo Deadlift High Pull"
+            },
+            {
+              "text": "20 Air Squats",
+              "movement": "Air Squat"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -226,7 +309,8 @@
           "load": "",
           "mine": "35kg",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -234,7 +318,33 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "3km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "50 Push Presses",
+              "movement": "Push Press"
+            },
+            {
+              "text": "50 T2B",
+              "movement": "Toes to Bar"
+            },
+            {
+              "text": "50 Dips",
+              "movement": "Dip"
+            },
+            {
+              "text": "50 Sumo Deadlift High Pulls",
+              "movement": "Sumo Deadlift High Pull"
+            },
+            {
+              "text": "100 Air Squats",
+              "movement": "Air Squat"
+            }
+          ]
         }
       ]
     ]

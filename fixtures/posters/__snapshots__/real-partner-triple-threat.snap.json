@@ -85,28 +85,84 @@
             "name": "",
             "primary": "50 Wall Ball Shots @ 20/14kg · 100 DU",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "50 Wall Ball Shots @ 20/14kg",
+                "movement": "Wall Ball Shot"
+              },
+              {
+                "text": "100 DU",
+                "movement": "Double Under"
+              }
+            ]
           },
           {
             "roundLabel": "×3",
             "name": "",
             "primary": "50 cal Machine · 20 Devil Presses @ 2x22.5/15kg",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "50 cal Machine",
+                "movement": "Machine"
+              },
+              {
+                "text": "20 Devil Presses @ 2x22.5/15kg",
+                "movement": "Devil Press"
+              }
+            ]
           },
           {
             "roundLabel": "×3",
             "name": "",
             "primary": "30 Dual DB Box Step up Overs @ 2x22.5/15kg · 20 Bar Muscle-ups",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+                "movement": "Dual Dumbbell Box Step up Over"
+              },
+              {
+                "text": "20 Bar Muscle-ups",
+                "movement": "Bar Muscle-up"
+              }
+            ]
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "150 Wall Ball Shots @ 17.5kg · 300 DU · 150 cal Machine · 60 Devil Presses @ 2×17.5kg · 90 Dual DB Box Step up Overs @ 2×17.5kg · 60 Bar Muscle-ups",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "150 Wall Ball Shots @ 17.5kg",
+                "movement": "Wall Ball Shot"
+              },
+              {
+                "text": "300 DU",
+                "movement": "Double Under"
+              },
+              {
+                "text": "150 cal Machine",
+                "movement": "Machine"
+              },
+              {
+                "text": "60 Devil Presses @ 2×17.5kg",
+                "movement": "Devil Press"
+              },
+              {
+                "text": "90 Dual DB Box Step up Overs @ 2×17.5kg",
+                "movement": "Dual Dumbbell Box Step up Over"
+              },
+              {
+                "text": "60 Bar Muscle-ups",
+                "movement": "Bar Muscle-up"
+              }
+            ]
           }
         ]
       }
@@ -273,7 +329,17 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×3"
+          "roundLabel": "×3",
+          "parts": [
+            {
+              "text": "50 Wall Ball Shots @ 20/14kg",
+              "movement": "Wall Ball Shot"
+            },
+            {
+              "text": "100 DU",
+              "movement": "Double Under"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -281,7 +347,17 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×3"
+          "roundLabel": "×3",
+          "parts": [
+            {
+              "text": "50 cal Machine",
+              "movement": "Machine"
+            },
+            {
+              "text": "20 Devil Presses @ 2x22.5/15kg",
+              "movement": "Devil Press"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -289,7 +365,17 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×3"
+          "roundLabel": "×3",
+          "parts": [
+            {
+              "text": "30 Dual DB Box Step up Overs @ 2x22.5/15kg",
+              "movement": "Dual Dumbbell Box Step up Over"
+            },
+            {
+              "text": "20 Bar Muscle-ups",
+              "movement": "Bar Muscle-up"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -297,7 +383,33 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "150 Wall Ball Shots @ 17.5kg",
+              "movement": "Wall Ball Shot"
+            },
+            {
+              "text": "300 DU",
+              "movement": "Double Under"
+            },
+            {
+              "text": "150 cal Machine",
+              "movement": "Machine"
+            },
+            {
+              "text": "60 Devil Presses @ 2×17.5kg",
+              "movement": "Devil Press"
+            },
+            {
+              "text": "90 Dual DB Box Step up Overs @ 2×17.5kg",
+              "movement": "Dual Dumbbell Box Step up Over"
+            },
+            {
+              "text": "60 Bar Muscle-ups",
+              "movement": "Bar Muscle-up"
+            }
+          ]
         }
       ]
     ]

@@ -84,11 +84,6 @@ export function getScoredBlocks(exercise: ParsedExercise): ScoredBlock[] {
   return blocks;
 }
 
-/** True when this exercise is logged as several separately-scored block pages. */
-export function isBlockScored(exercise: ParsedExercise): boolean {
-  return getScoredBlocks(exercise).length > 1;
-}
-
 /**
  * Narrows a whole-exercise result down to ONE block: that block's movements, that block's
  * score, and a synthetic single-block exercise so the input components see a coherent,

@@ -13,6 +13,11 @@
   border-radius: var(--r-lg);
 }
 
+/* Answered — kept as it was sent, dimmed like every answered question in the thread. */
+.cardLocked {
+  opacity: 0.6;
+}
+
 /* The lift's name, said once — with the keyboard up, Wodi's question scrolls off above it. */
 .head {
   display: flex;

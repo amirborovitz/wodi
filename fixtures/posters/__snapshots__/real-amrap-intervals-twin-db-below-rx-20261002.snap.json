@@ -31,28 +31,59 @@
             "name": "",
             "primary": "600m Echo Bike",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "600m Echo Bike",
+                "movement": "Echo Bike"
+              }
+            ]
           },
           {
             "roundLabel": "AMRAP",
             "name": "",
             "primary": "6 DB Thrusters / Kettlebell Thrusters · 6 Box Jumps",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "6 DB Thrusters / Kettlebell Thrusters",
+                "movement": "Dumbbell Thruster"
+              },
+              {
+                "text": "6 Box Jumps",
+                "movement": "Box Jump"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "2x12.5/20kg",
             "mineOverride": "2×15kg",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "3km Echo Bike · 120 DB Thrusters · 120 Box Jumps",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "3km Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "120 DB Thrusters",
+                "movement": "Dumbbell Thruster"
+              },
+              {
+                "text": "120 Box Jumps",
+                "movement": "Box Jump"
+              }
+            ]
           }
         ]
       }
@@ -146,7 +177,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "BUY-IN"
+          "roundLabel": "BUY-IN",
+          "parts": [
+            {
+              "text": "600m Echo Bike",
+              "movement": "Echo Bike"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -154,7 +191,17 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "AMRAP"
+          "roundLabel": "AMRAP",
+          "parts": [
+            {
+              "text": "6 DB Thrusters / Kettlebell Thrusters",
+              "movement": "Dumbbell Thruster"
+            },
+            {
+              "text": "6 Box Jumps",
+              "movement": "Box Jump"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -162,7 +209,8 @@
           "load": "",
           "mine": "2×15kg",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -170,7 +218,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "3km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "120 DB Thrusters",
+              "movement": "Dumbbell Thruster"
+            },
+            {
+              "text": "120 Box Jumps",
+              "movement": "Box Jump"
+            }
+          ]
         }
       ]
     ]

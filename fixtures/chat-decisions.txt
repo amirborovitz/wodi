@@ -1,0 +1,275 @@
+alternating-stations-amrap
+  part 1 · 02:00 min AMRAP x 6 · score_open_reps
+    asks: How many rounds did you get on B.1?
+    asks: How many single dumbbell alternating devil presses each round?
+    asks: What weight did you use for Single Dumbbell Alternating Devil Press?
+    asks: How many rounds did you get on B.2?
+    asks: How many sit-ups each round?
+    asks: Double Under or Single Under?
+
+bare-movement-station-emom
+  part 1 · Core & Stability · load
+  part 2 · EMOM 25 · score_open_reps
+    asks: What did you lift on the Kettlebell Windmill?
+    asks: What did you lift on the Suitcase Carry?
+    asks: What did you lift on the Weighted Plank Hold?
+    asks: How many at each one, each round?
+    asks: What weight did you use for Renegade Row?
+
+board-amrap-cal-row-gendered
+  part 1 · AMRAP 12 · score_rounds
+    asks: How many rounds did you get?
+    asks: What weight did you use for American Kettlebell Swing?
+
+board-ascending-ladder-amrap
+  part 1 · 10 min AMRAP · score_rounds
+    asks: Which rung did you finish?
+    asks: And into the 12s — how far did you get?
+    asks: What weight did you use for Thruster?
+
+board-bodyweight-rounds
+  part 1 · 5 Rounds · score_time
+    asks: What was your time?
+
+board-buyin-cashout-mile
+  part 1 · 3 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Deadlift?
+
+board-carries-and-holds
+  part 1 · 3 Sets · load
+    asks: What did you lift on the Farmer Carry?
+    asks: What did you lift on the Single-arm Kettlebell Press?
+
+board-chipper-descending
+  part 1 · Chipper For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+board-death-by-burpees
+  part 1 · Burpee EMOM Ladder · score_open_reps
+    asks: How many burpees did you get?
+
+board-e2mom-complex
+  part 1 · Barbell Complex · load
+    asks: What did you lift on the Power Clean?
+    asks: What did you lift on the Front Squat?
+    asks: What did you lift on the Split Jerk?
+
+board-emom-4-stations
+  part 1 · EMOM 16 · intervals
+    asks: What weight did you use for American Kettlebell Swing?
+
+board-emom-odd-even-max
+  part 1 · EMOM 12 · score_open_reps
+    asks: How many double unders in total?
+
+board-every-3-max-pushups
+  part 1 · Every 3:00 x 5 · score_open_reps
+    asks: How many push-ups in total?
+
+board-every-90s-sets
+  part 1 · Every 90s x 8 · intervals
+    asks: What weight did you use for Hang Power Snatch?
+
+board-five-three-one-and-metcon
+  part 1 · Front Squat · load
+  part 2 · 8 min AMRAP · score_rounds
+    asks: What did you lift on the Front Squat?
+    asks: How many rounds did you get on 8 min AMRAP?
+    asks: What weight did you use for Alt Dumbbell Lunge?
+
+board-fran-style-lbs
+  part 1 · 21-15-9 For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Thruster?
+
+board-grace
+  part 1 · 30 Clean and Jerk For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Clean and Jerk?
+
+board-hyrox-sim
+  part 1 · 4 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+board-intervals-for-time-each-set
+  part 1 · 5 Sets For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for American Kettlebell Swing?
+
+board-kb-circuit-per-side
+  part 1 · 5 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+board-max-cj-window
+  part 1 · Clean and Jerk 1RM · load
+    asks: What weight did you use for Clean and Jerk?
+
+board-murph-partitioned
+  part 1 · MURPH For Time · score_time
+    asks: What was your time?
+
+board-named-benchmark-only
+  part 1 · 20 min AMRAP · score_rounds
+    asks: How many rounds did you get?
+
+board-partner-amrap-igug
+  part 1 · Partner AMRAP 20 · score_rounds
+    asks: How many rounds did you get?
+    asks: What weight did you use for Power Clean?
+
+board-partner-synchro
+  part 1 · 5 Rounds For Time · score_time
+    asks: What was your time?
+
+board-partner-ygig-chipper
+  part 1 · Partner Chipper For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+board-skill-hs-walk
+  part 1 · EMOM 10 Skill · intervals
+    asks: Handstand Walk or Wall Walk?
+
+board-sled-push-intervals
+  part 1 · Sled Push · load
+    asks: What did you lift on the Sled Push?
+
+board-strength-bench-band-between-sets
+  part 1 · Bench Press · load
+    asks: What did you lift on the Bench Press?
+
+board-strength-build-heavy-single
+  part 1 · Back Squat · load
+    asks: What did you lift on the Back Squat?
+
+board-superset-a1-a2-rpe
+  part 1 · Dumbbell Bench Press / Bent Over Row Superset · load
+    asks: What did you lift on the Dumbbell Bench Press?
+    asks: What did you lift on the Bent Over Row?
+
+board-tabata-squats
+  part 1 · Tabata Air Squat · score_open_reps
+    asks: How many air squats in total?
+
+board-team-of-3-relay
+  part 1 · Team Relay 18 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Front Squat?
+
+board-team-of-5-30rft-6-each
+  part 1 · 2 Sets Shoulder Body Armor · reps
+  part 2 · Strict Press · load
+  part 3 · 30 Rounds For Time (6 each) · score_time
+    asks: What did you lift on the Strict Press?
+    asks: What was your time on 30 Rounds For Time (6 each)?
+    asks: What weight did you use for Touch-and-Go Clean and Jerk?
+
+board-tempo-strength
+  part 1 · Strict Press · load
+    asks: What did you lift on the Strict Press?
+
+board-two-pieces-rest-between
+  part 1 · 2 Rounds + 2 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+board-two-scored-metcons
+  part 1 · 6 min AMRAP x 2 · score_rounds
+    asks: How many rounds did you get on BLOCK A?
+    asks: What weight did you use for Deadlift?
+    asks: How many rounds did you get on BLOCK B?
+    asks: What weight did you use for Wall Ball?
+
+board-wendler-531-plus
+  part 1 · Deadlift 5/3/1+ · load
+    asks: What did you lift on the Deadlift?
+
+board-zone2-bike
+  part 1 · 30 min Zone 2 · distance
+    asks: How many calories on the Bike in total?
+
+into-connected-emom-complex
+  part 1 · Weightlifting · load
+  part 2 · 6 Rounds For Time · score_time
+    asks: What did you lift on the Push Press?
+    asks: What did you lift on the Push Jerk?
+    asks: What was your time on 6 Rounds For Time?
+    asks: What weights did you use on Russian Kettlebell Swing?
+
+ladder-321-tiered-rounds
+  part 1 · 3-2-1 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+    asks: Cash-out: Double Under or Single Under?
+
+lettered-blocks-one-score
+  part 1 · 30 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for American Kettlebell Swing?
+    asks: Double Under or Single Under?
+
+multipart-emom-amrap
+  part 1 · Alternating Cleans · load
+  part 2 · 16 min AMRAP · score_rounds
+    asks: What did you lift on the Power Clean / Squat Clean?
+    asks: How many rounds did you get on 16 min AMRAP?
+    asks: What weight did you use for Deadlift?
+
+pair-paced-amrap
+  part 1 · Front Squat · load
+  part 2 · Pairs AMRAP 12 · score_rounds
+  part 3 · Skill Practice · reps
+    asks: What did you lift on the Front Squat?
+    asks: How many rounds did you get on Pairs AMRAP 12?
+    asks: What weight did you use for Thruster?
+
+palindrome-partner-chipper
+  part 1 · Core 3 Sets · load
+  part 2 · Partner Chipper For Time · score_time
+    asks: What did you lift on the Kettlebell Front Rack Carry?
+    asks: What was your time on Partner Chipper For Time?
+    asks: What weights did you use on Twin Kettlebell Clean and Jerk?
+    asks: Bar Muscle-up or Chest to Bar Pull-up?
+
+per-movement-ladder-flat-collapse
+  part 1 · Pyramid Push For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Twin Dumbbell Push Press?
+
+plain-for-time-control
+  part 1 · 4 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+
+rx-alternative-ring-row
+  part 1 · 5 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weights did you use?
+    asks: Pull-up or Ring Row?
+
+station-emom-cycles-encoding
+  part 1 · EMOM 15 · intervals
+    asks: What weight did you use for Alternating Kettlebell Swing?
+
+station-emom-flutter-kick-time
+  part 1 · 4 Sets Strength · load
+  part 2 · EMOM 20 · score_open_reps
+    asks: What did you lift on the Tempo Good Morning?
+    asks: How many tempo dips each set?
+    asks: How many at each one, each round?
+    asks: What weights did you use on Weighted Step-up?
+
+station-emom-rep-ranges
+  part 1 · EMOM 15 · intervals
+    asks: What weight did you use for Alternating Kettlebell Swing?
+
+thrust-interval-amrap-run-buyin
+  part 1 · Back Squat · load
+  part 2 · 3:00 AMRAP x 5 · score_rounds
+    asks: What did you lift on the Back Squat?
+    asks: How many rounds did you get on 3:00 AMRAP x 5?
+    asks: What weight did you use for Dumbbell/Kettlebell Thruster?

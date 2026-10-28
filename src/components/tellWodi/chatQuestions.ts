@@ -1,9 +1,12 @@
 import { readClockAnswer } from '../../utils/clockAnswer';
 import type { StoryExerciseResult, MovementResult } from '../logging/story/types';
-import { getWeightStep, openStationResults } from '../logging/story/types';
+import { getWeightStep } from '../logging/story/types';
 import { alternativeSubstitution, buildSubstitutionPatch, namedSwap } from '../logging/story/substitutionPatch';
-import { isBlockScored } from '../logging/story/blockScoping';
-import { hasMaxSet } from '../../services/blockScore';
+import { getScoredBlocks, mergeBlockPatch, scopeResultToBlock } from '../logging/story/blockScoping';
+import { findOpenMovement, findOpenMovements, hasMaxSet, maxSetMovements, openQuantitySlot, resolveBlockScore } from '../../services/blockScore';
+import { loggedAsTotal } from '../../services/workloadFromResults';
+import { getLadderRungValue } from '../../utils/ladderRungs';
+import { pluralizeMovementLabel } from '../../utils/movementPlural';
 import { parseTimeCapSeconds } from '../../utils/timeCap';
 import { knownLoadUnit, type LoadUnit } from '../../utils/loadUnits';
 import { setLoadUnit } from '../logging/story/athleteLoadUnit';
@@ -32,7 +35,10 @@ const NO_IDS: ReadonlySet<string> = new Set();
 export type ChatSlotKind =
   | 'time'      // finish time, seconds
   | 'rounds'    // rounds completed (+ extra reps)
-  | 'reps'      // an open max-reps count
+  | 'reps'      // an open max-reps count — the part's score, or a practice block's max test
+  | 'count'     // one open movement's own count, when it isn't the score: a station, the dips in a circuit
+  | 'ladder'    // the last rung of a ladder they finished ("through the 12s")
+  | 'partial'   // how far into the next rung they got — the moves they finished, in board order
   | 'weight'    // a load, optionally a start→end build
   | 'maxset'    // the set a strength block ends on, taken to max reps: its reps and its bar
   | 'distance'  // a distance the athlete covered
@@ -49,6 +55,20 @@ export interface ChatSlot {
   id: string;
   kind: ChatSlotKind;
   exerciseIndex: number;
+  /**
+   * The section this slot belongs to, when the part is several separately scored blocks. The
+   * block is asked as a part of its own (scopeResultToBlock) and its answers fold back into the
+   * part (mergeBlockPatch) — the same two steps the form's block pages take.
+   */
+  block?: number;
+  /** A 'count' slot's unit: the quantity the board left open on that movement. */
+  metric?: 'reps' | 'calories' | 'distance';
+  /** A 'count' slot: the number is the block's total, not one round's or set's (loggedAsTotal). */
+  total?: boolean;
+  /** A 'count' slot: what one repeat of the block is called — "round" or "set". */
+  per?: 'round' | 'set';
+  /** A 'ladder' slot: the rungs to offer, in order — the board's and a few beyond it. */
+  rungs?: number[];
   /** What the slot is about, in words the athlete and the AI both read. */
   subject: string;
   /** Movement names the slot writes to (weight / choice). */
@@ -92,9 +112,11 @@ export interface ChatSlot {
   usually?: string;
   /**
    * A swap habit's amount for today's board, at last time's scale ("900 m" of bike for a 300m run)
-   * — so the usual swap AND its usual amount are one tap. Offered, never filled in.
+   * — so the usual swap AND its usual amount are one tap. Offered, never filled in. `value` is the
+   * first time the movement comes up; `range` its smallest and biggest, when the board writes it at
+   * several lengths (400 / 800 / 1200 / 1600 m of run is 1200–4800 m of bike, never just "1200 m").
    */
-  usualAmount?: { value: number; unit: SwapUnit };
+  usualAmount?: { value: number; unit: SwapUnit; range?: { low: number; high: number } };
   /** A 'clarify' slot's flag: the question, how it's answered, and the field the answer goes in. */
   uncertainty?: ParseUncertainty;
 }
@@ -143,17 +165,27 @@ export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
 const isScoredKind = (r: StoryExerciseResult): boolean =>
   r.kind === 'score_time' || r.kind === 'score_rounds' || r.kind === 'score_open_reps';
 
+/** Rungs offered past the board's last one — for the athlete who climbed further than it wrote. */
+const LADDER_EXTRA_RUNGS = 3;
+
+/** A 'partial' answer meaning they finished no move of the next rung. */
+const NONE_FINISHED = 'none';
+
+/** `total` over `parts` whole numbers that add back up to it: 22 over 5 is 5, 5, 4, 4, 4. */
+function spreadEvenly(total: number, parts: number): number[] {
+  const base = Math.floor(total / parts);
+  return Array.from({ length: parts }, (_, index) => base + (index < total - base * parts ? 1 : 0));
+}
+
 /**
- * Parts the chat can't finish yet, so it hands them to the form with everything already filled.
- * Each is a shape whose answer is more than one number the chat knows how to ask for.
+ * The result a slot is about — the part, or for a block's slot the block scoped to a part of its
+ * own, which is what the question was built from.
  */
-export function chatCannotLog(result: StoryExerciseResult): boolean {
-  // A/B/C blocks, each scored — the form's own test, so the chat never hands over a board the
-  // form logs on one ordinary page (a lone scored section, like a strength block's max set).
-  if (isBlockScored(result.exercise)) return true;
-  if (result.kind === 'score_rounds' && (result.exercise.ladderReps?.length ?? 0) > 0) return true;
-  if (result.kind === 'score_open_reps' && openStationResults(result).length > 0) return true;
-  return false;
+function slotResult(results: readonly StoryExerciseResult[], slot: ChatSlot): StoryExerciseResult | undefined {
+  const whole = results.find((r) => r.exerciseIndex === slot.exerciseIndex);
+  if (!whole || slot.block == null) return whole;
+  const block = getScoredBlocks(whole.exercise).find((b) => b.sectionIndex === slot.block);
+  return block ? scopeResultToBlock(whole, block) : whole;
 }
 
 /** Load movements, one entry per distinct movement name (a lift that recurs is one barbell). */
@@ -195,13 +227,32 @@ const loadAnswered = (mr: MovementResult): boolean =>
  * Today's board amount at the habit's last scale — 300m of run at "600m run → 1800m bike" is 900m.
  * Only when the board writes this movement in the unit last time's swap was measured from.
  */
-function amountAtScale(mr: MovementResult, habit: SwapHabit): ChatSlot['usualAmount'] {
+function amountAtScale(movement: ParsedMovement, habit: SwapHabit): ChatSlot['usualAmount'] {
   const scale = habit.scale;
   if (!scale) return undefined;
-  const board = { reps: mr.movement.reps, distance: mr.movement.distance, calories: mr.movement.calories }[scale.from];
+  const board = { reps: movement.reps, distance: movement.distance, calories: movement.calories }[scale.from];
   if (!board || board <= 0) return undefined;
   const value = Math.round(board * scale.ratio);
   return value > 0 ? { value, unit: scale.to } : undefined;
+}
+
+/** The habit's amount the first time the movement comes up, and its range when the lengths differ. */
+function usualAmountFor(r: StoryExerciseResult, first: MovementResult, habit: SwapHabit): ChatSlot['usualAmount'] {
+  const amount = amountAtScale(first.movement, habit);
+  if (!amount) return undefined;
+  const name = first.movement.name.toLowerCase();
+  // Every place the board writes it: a flat list repeats the row, a ladder's tiers keep their own.
+  const written = [
+    ...(r.movementResults ?? []).map((mr) => mr.movement),
+    ...(r.exercise.sections ?? []).flatMap((section) => section.movements ?? []),
+  ];
+  const all = written
+    .filter((movement) => movement.name.toLowerCase() === name)
+    .map((movement) => amountAtScale(movement, habit)?.value ?? 0)
+    .filter((v) => v > 0);
+  const low = Math.min(amount.value, ...all);
+  const high = Math.max(amount.value, ...all);
+  return high > low ? { ...amount, range: { low, high } } : amount;
 }
 
 /** A load as the results carry it — on the movement, or on the result for a single lift. */
@@ -323,50 +374,87 @@ export function openSlots(
   const asked: ChatSlot[] = [];
   const optional: ChatSlot[] = [];
 
-  for (const r of results) {
-    if (r.skipped || chatCannotLog(r) || r.kind === 'fixed_dose' || r.kind === 'note') continue;
+  /**
+   * One part's questions. A block of a part scored block by block arrives already scoped to a
+   * part of its own (scopeResultToBlock), so it is asked exactly as a part would be — `key`
+   * keeps its ids apart from its sibling blocks', `block` sends its answers back to it.
+   */
+  const askPart = (r: StoryExerciseResult, earlierParts: readonly StoryExerciseResult[], key: string, part: string, block?: number): void => {
     // One part at a time, in board order — its score, its loads, its choices — so the chat never
     // jumps from the metcon's rounds to the strength's weights and back to the metcon's bar.
     const scores: ChatSlot[] = [];
     const loads: ChatSlot[] = [];
     const choices: ChatSlot[] = [];
     const i = r.exerciseIndex;
-    const earlierParts = results.slice(0, results.indexOf(r));
-    const part = multiPart ? r.exercise.name : 'the workout';
     const push = (list: ChatSlot[], slot: ChatSlot): void => {
-      if (!closed.has(slot.id)) list.push(slot);
+      if (!closed.has(slot.id)) list.push(block != null ? { ...slot, block } : slot);
     };
+    const ladder = r.kind === 'score_rounds' ? r.exercise.ladderReps ?? [] : [];
+    const blockScore = isScoredKind(r) ? resolveBlockScore(r.exercise) : undefined;
+    const openScore = blockScore?.type === 'open_reps' ? blockScore : undefined;
+    // The open movement whose count IS the part's score. Several open movements are each their
+    // own count (a station board), never one score.
+    const scoreMovement = r.kind === 'score_open_reps' && openScore?.movements.length === 1 ? openScore.movements[0] : undefined;
 
-    if (r.kind === 'score_time' && toAsk(`${i}.time`, (r.timeSeconds ?? 0) > 0)) {
+    if (r.kind === 'score_time' && toAsk(`${key}.time`, (r.timeSeconds ?? 0) > 0)) {
       const cap = parseTimeCapSeconds(r.exercise.prescription);
-      push(scores, { id: `${i}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true, ...(cap ? { cap } : {}) });
+      push(scores, { id: `${key}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true, ...(cap ? { cap } : {}) });
     }
-    if (r.kind === 'score_rounds' && toAsk(`${i}.rounds`, (r.rounds ?? 0) > 0)) {
+    if (r.kind === 'score_rounds' && ladder.length === 0 && toAsk(`${key}.rounds`, (r.rounds ?? 0) > 0)) {
       const intervals = personalIntervalCount(r, teamSize);
       push(scores, {
-        id: `${i}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
+        id: `${key}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
         ...(intervals && intervals > 1 ? { intervals } : {}),
       });
     }
-    if (r.kind === 'score_open_reps' && toAsk(`${i}.reps`, (r.maxReps ?? 0) > 0)) {
-      push(scores, { id: `${i}.reps`, kind: 'reps', exerciseIndex: i, subject: part, asked: true });
+    // A ladder is scored by how far up it they got: the last rung finished, then how far into
+    // the next one — the moves done, in order. Asked once the rung is known.
+    if (ladder.length > 0) {
+      const step = r.ladderStep ?? 0;
+      if (toAsk(`${key}.ladder`, step > 0)) {
+        push(scores, {
+          id: `${key}.ladder`, kind: 'ladder', exerciseIndex: i, subject: part, asked: true,
+          rungs: Array.from({ length: Math.max(ladder.length, step + 1) + LADDER_EXTRA_RUNGS }, (_, n) => getLadderRungValue(ladder, n)),
+        });
+      } else if (toAsk(`${key}.partial`, (r.partialMovements?.length ?? 0) > 0)) {
+        push(scores, {
+          id: `${key}.partial`, kind: 'partial', exerciseIndex: i, subject: part, asked: true,
+          options: (r.exercise.movements ?? []).filter((m) => m.perRound !== false).map((m) => m.name),
+        });
+      }
     }
-    if (r.kind === 'free_score' && toAsk(`${i}.score`, Boolean(r.timeSeconds || r.rounds || r.repsTotal || r.weight))) {
-      push(scores, { id: `${i}.score`, kind: 'score', exerciseIndex: i, subject: part, asked: true });
+    const isOpenScore = r.kind === 'score_open_reps' && !(openScore && openScore.movements.length > 1);
+    // A practice block's max test, or a block whose score is its reps: one number for the part.
+    const isMaxTest = r.kind === 'reps'
+      && (block != null || ((r.movementResults?.length ?? 0) <= 1 && findOpenMovement(r.exercise) != null));
+    if ((isOpenScore || isMaxTest) && toAsk(`${key}.reps`, (r.maxReps ?? 0) > 0)) {
+      const named = scoreMovement ?? (isMaxTest ? findOpenMovement(r.exercise) : undefined);
+      push(scores, {
+        id: `${key}.reps`, kind: 'reps', exerciseIndex: i, subject: part, asked: true,
+        ...(named ? { movementNames: [named.name] } : {}),
+        ...(openScore && openScore.intervals > 1 ? { intervals: openScore.intervals } : {}),
+      });
     }
-    if (r.kind === 'distance' && toAsk(`${i}.distance`, (r.distanceValue ?? 0) > 0)) {
-      push(scores, { id: `${i}.distance`, kind: 'distance', exerciseIndex: i, subject: r.exercise.name, asked: true });
+    if (r.kind === 'free_score' && toAsk(`${key}.score`, Boolean(r.timeSeconds || r.rounds || r.repsTotal || r.weight))) {
+      push(scores, { id: `${key}.score`, kind: 'score', exerciseIndex: i, subject: part, asked: true });
     }
-    if (r.kind === 'duration' && toAsk(`${i}.duration`, (r.durationSeconds ?? 0) > 0)) {
-      push(scores, { id: `${i}.duration`, kind: 'duration', exerciseIndex: i, subject: r.exercise.name, asked: true });
+    // A cardio piece is asked in the unit the board left open. "30 min bike, max calories" is a
+    // count of calories — the movement's own (asked below), never a distance nobody was measuring.
+    const openUnits = findOpenMovements(r.exercise).map(openQuantitySlot);
+    const cardioInMetres = !openUnits.some((unit) => unit != null && unit !== 'distance');
+    if (r.kind === 'distance' && cardioInMetres && toAsk(`${key}.distance`, (r.distanceValue ?? 0) > 0)) {
+      push(scores, { id: `${key}.distance`, kind: 'distance', exerciseIndex: i, subject: r.exercise.name, asked: true });
+    }
+    if (r.kind === 'duration' && toAsk(`${key}.duration`, (r.durationSeconds ?? 0) > 0)) {
+      push(scores, { id: `${key}.duration`, kind: 'duration', exerciseIndex: i, subject: r.exercise.name, asked: true });
     }
 
     if (usesResultLevelLoad(r)) {
-      if (toAsk(`${i}.weight`, (r.weight ?? 0) > 0) && r.loadMode !== 'bodyweight') {
+      if (toAsk(`${key}.weight`, (r.weight ?? 0) > 0) && r.loadMode !== 'bodyweight') {
         const mr = r.movementResults?.[0];
         const sameAs = earlierLoad(earlierParts, r, mr?.movement ?? { name: r.exercise.name });
         push(loads, {
-          id: `${i}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
+          id: `${key}.weight`, kind: 'weight', exerciseIndex: i, subject: r.exercise.name,
           movementNames: [mr?.movement.name ?? r.exercise.name],
           rxWeights: rxPair(mr), unit: knownLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
           ...(isPair(mr?.movement) ? { pair: true } : {}),
@@ -375,7 +463,7 @@ export function openSlots(
       }
     } else {
       for (const mr of distinctLoadMovements(r)) {
-        const id = `${i}.weight.${mr.movement.name.toLowerCase()}`;
+        const id = `${key}.weight.${mr.movement.name.toLowerCase()}`;
         if (!toAsk(id, loadAnswered(mr))) continue;
         const sameAs = earlierLoad(earlierParts, r, mr.movement);
         push(loads, {
@@ -390,21 +478,44 @@ export function openSlots(
 
     // The set the block ends on, taken to max reps — asked right after the working weights, so
     // the two land in one panel ("4 sets, 5th max reps").
-    if (r.kind === 'load' && hasMaxSet(r.exercise) && toAsk(`${i}.maxset`, (r.maxReps ?? 0) > 0)) {
+    if (r.kind === 'load' && hasMaxSet(r.exercise) && toAsk(`${key}.maxset`, (r.maxReps ?? 0) > 0)) {
       const mr = r.movementResults?.[0];
       push(loads, {
-        id: `${i}.maxset`, kind: 'maxset', exerciseIndex: i, subject: r.exercise.name,
+        id: `${key}.maxset`, kind: 'maxset', exerciseIndex: i, subject: r.exercise.name,
         movementNames: [mr?.movement.name ?? r.exercise.name],
         unit: knownLoadUnit(mr?.movement), equipment: mr?.movement.equipment, asked: true,
       });
     }
 
+    // Every other movement the board left open is counted on its own: each station of a station
+    // board, the max dips inside every set of a circuit. Not the part's score (asked above), not
+    // a closing max set (asked with the lift), and not a lone lift's or practice's — that number
+    // lives on the result itself (usesResultLevelLoad), so it's the part's own question.
+    const counted = new Set(findOpenMovements(r.exercise).map((m) => m.name.toLowerCase()));
+    if (scoreMovement) counted.delete(scoreMovement.name.toLowerCase());
+    if (isMaxTest) { const tested = findOpenMovement(r.exercise); if (tested) counted.delete(tested.name.toLowerCase()); }
+    // The metres of a cardio piece are its own distance question, asked above.
+    if (r.kind === 'distance') findOpenMovements(r.exercise).filter((m) => openQuantitySlot(m) === 'distance').forEach((m) => counted.delete(m.name.toLowerCase()));
+    if (r.kind === 'load') maxSetMovements(r.exercise).forEach((m) => counted.delete(m.name.toLowerCase()));
+    const resultLevel = (r.kind === 'load' || r.kind === 'reps') && (r.movementResults?.length ?? 0) <= 1;
+    for (const mr of resultLevel ? [] : distinctMovements(r)) {
+      if (!counted.has(mr.movement.name.toLowerCase())) continue;
+      const metric = openQuantitySlot(mr.movement) ?? 'reps';
+      const id = `${key}.count.${mr.movement.name.toLowerCase()}`;
+      if (!toAsk(id, (mr[metric] ?? 0) > 0)) continue;
+      push(isScoredKind(r) ? scores : loads, {
+        id, kind: 'count', exerciseIndex: i,
+        subject: stripMovementRolePrefix(mr.substitution?.selectedName ?? mr.movement.name), movementNames: [mr.movement.name],
+        metric, total: loggedAsTotal(mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
+      });
+    }
+
     for (const mr of distinctChoiceMovements(r)) {
-      if (!toAsk(`${i}.choice.${mr.movement.name.toLowerCase()}`, Boolean(mr.substitution))) continue;
+      if (!toAsk(`${key}.choice.${mr.movement.name.toLowerCase()}`, Boolean(mr.substitution))) continue;
       const alternative = mr.movement.alternative!.name;
       const habit = habits.get(habitKey(mr.movement.name));
       push(choices, {
-        id: `${i}.choice.${mr.movement.name.toLowerCase()}`, kind: 'choice', exerciseIndex: i,
+        id: `${key}.choice.${mr.movement.name.toLowerCase()}`, kind: 'choice', exerciseIndex: i,
         subject: mr.sectionType === 'cash_out' ? 'Cash-out' : mr.sectionType === 'buy_in' ? 'Buy-in' : mr.movement.name,
         movementNames: [mr.movement.name],
         options: [mr.movement.name, alternative], asked: true,
@@ -419,19 +530,20 @@ export function openSlots(
     for (const mr of distinctMovements(r)) {
       if (mr.substitution) {
         // A swap nothing converts (300m of run → singles) has no number of its own — asked, so the
-        // row never saves the run's metres under the singles' name.
-        if (mr.substitution.adjustedValue == null) {
+        // row never saves the run's metres under the singles' name. A board that wrote no number
+        // ("max double-unders") has nothing to convert: the count they give is the swap's own.
+        if (mr.substitution.adjustedValue == null && (mr.substitution.originalValue ?? 0) > 0) {
           push(choices, {
-            id: `${i}.amount.${mr.movement.name.toLowerCase()}`, kind: 'amount', exerciseIndex: i,
+            id: `${key}.amount.${mr.movement.name.toLowerCase()}`, kind: 'amount', exerciseIndex: i,
             subject: mr.substitution.selectedName, movementNames: [mr.movement.name], asked: true,
           });
         }
         continue;
       }
       const habit = mr.movement.alternative?.name ? undefined : habits.get(habitKey(mr.movement.name));
-      const usualAmount = habit ? amountAtScale(mr, habit) : undefined;
+      const usualAmount = habit ? usualAmountFor(r, mr, habit) : undefined;
       push(habit ? choices : optional, {
-        id: `${i}.swap.${mr.movement.name.toLowerCase()}`, kind: 'swap', exerciseIndex: i,
+        id: `${key}.swap.${mr.movement.name.toLowerCase()}`, kind: 'swap', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name], asked: !!habit,
         ...(habit ? { usually: habit.usually } : {}),
         ...(usualAmount ? { usualAmount } : {}),
@@ -440,20 +552,32 @@ export function openSlots(
 
     // Done as written unless they say otherwise — toLegacyResult already reads a blank as "all".
     if (!isScoredKind(r) && r.setsCompleted == null && r.intervalsCompleted == null && r.setsTotal > 1) {
-      push(optional, { id: `${i}.sets`, kind: 'sets', exerciseIndex: i, subject: r.exercise.name, asked: false });
+      push(optional, { id: `${key}.sets`, kind: 'sets', exerciseIndex: i, subject: r.exercise.name, asked: false });
     }
-    if (r.kind === 'score_rounds' && toAsk(`${i}.extra`, (r.partialReps ?? 0) > 0)) {
+    if (r.kind === 'score_rounds' && ladder.length === 0 && toAsk(`${key}.extra`, (r.partialReps ?? 0) > 0)) {
       // The extra reps ride on the rounds answer; listed so a later "…plus 12" still lands.
-      push(optional, { id: `${i}.extra`, kind: 'rounds', exerciseIndex: i, subject: `${part} (extra reps)`, asked: false });
+      push(optional, { id: `${key}.extra`, kind: 'rounds', exerciseIndex: i, subject: `${part} (extra reps)`, asked: false });
     }
     asked.push(...scores, ...loads, ...choices);
+  };
+
+  for (const r of results) {
+    if (r.skipped || r.kind === 'fixed_dose' || r.kind === 'note') continue;
+    const earlierParts = results.slice(0, results.indexOf(r));
+    // A part made of separately scored blocks is asked block by block — each its own score.
+    const blocks = getScoredBlocks(r.exercise);
+    if (blocks.length > 1) {
+      for (const b of blocks) askPart(scopeResultToBlock(r, b), earlierParts, `${r.exerciseIndex}.b${b.sectionIndex}`, b.displayName, b.sectionIndex);
+    } else {
+      askPart(r, earlierParts, `${r.exerciseIndex}`, multiPart ? r.exercise.name : 'the workout');
+    }
   }
 
   // A weight was given and nothing says kg or lb — not the board, not their profile, not them.
   // One question for the workout: the answer is the unit they lift in, so it moves every load the
   // board left silent (setLoadUnit). Only ever reached by an athlete with no profile unit yet.
   const unsure = results
-    .filter((r) => !r.skipped && !chatCannotLog(r))
+    .filter((r) => !r.skipped)
     .flatMap((r) => (r.movementResults ?? [])
       .filter((mr) => mr.kind === 'load' && !knownLoadUnit(mr.movement)
         && ((usesResultLevelLoad(r) ? r.weight : mr.weight) ?? 0) > 0)
@@ -468,7 +592,7 @@ export function openSlots(
   return [...asked, ...optional];
 }
 
-/** True when nothing the chat asks out loud is still open. */
+
 /**
  * What the board reader couldn't settle, as questions — asked before anything else, because the
  * answer can change what the rest of the questions are (a clock length, who did which part). The
@@ -484,10 +608,6 @@ export function clarifySlots(workout: ParsedWorkout | null | undefined): ChatSlo
     asked: true,
     uncertainty: flag,
   }));
-}
-
-export function isComplete(slots: ChatSlot[]): boolean {
-  return !slots.some((s) => s.asked);
 }
 
 // ─── Applying an answer ──────────────────────────────────────────
@@ -592,6 +712,21 @@ export function applyAnswer(
   if (slot.kind === 'clarify') return { results, closed: false };
   const i = slot.exerciseIndex;
 
+  // A block's answer is applied to the block as a part of its own, then folded back into the
+  // part — the form's block pages take the same two steps, so both save it the same way.
+  if (slot.block != null) {
+    const whole = results.find((r) => r.exerciseIndex === i);
+    const block = whole && getScoredBlocks(whole.exercise).find((b) => b.sectionIndex === slot.block);
+    if (!whole || !block) return { results, closed: false };
+    const scoped = scopeResultToBlock(whole, block);
+    const outcome = applyAnswer([scoped], { ...slot, block: undefined }, answer);
+    const after = outcome.results[0];
+    const changed = Object.fromEntries(
+      Object.entries(after).filter(([field, value]) => scoped[field as keyof StoryExerciseResult] !== value),
+    ) as Partial<StoryExerciseResult>;
+    return { results: patchResult(results, i, () => mergeBlockPatch(whole, block, changed)), closed: outcome.closed };
+  }
+
   switch (slot.kind) {
     case 'time':
       if (!answer.seconds || answer.seconds <= 0) return { results, closed: false };
@@ -616,9 +751,65 @@ export function applyAnswer(
       };
     }
 
-    case 'reps':
+    case 'reps': {
       if (!answer.count || answer.count <= 0) return { results, closed: false };
-      return { results: patchResult(results, i, () => ({ maxReps: Math.round(answer.count!) })), closed: true };
+      const n = Math.round(answer.count);
+      return {
+        results: patchResult(results, i, (r) => {
+          if (r.kind !== 'score_open_reps') return { maxReps: n };
+          // Window by window — the field the save reads (toLegacyResult) and the form's per-window
+          // input writes. A total is spread evenly; the poster prints only the sum, with its "~".
+          const windows = Math.max(1, slot.intervals ?? 1);
+          const perWindow = answer.perInterval
+            ? Array.from({ length: windows }, () => n)
+            : spreadEvenly(n, windows);
+          return { maxRepsPerInterval: perWindow, maxReps: perWindow.reduce((sum, v) => sum + v, 0) };
+        }),
+        closed: true,
+      };
+    }
+
+    case 'count': {
+      if (answer.count == null || answer.count < 0) return { results, closed: false };
+      const metric = slot.metric ?? 'reps';
+      const value = metric === 'distance' ? answer.count : Math.round(answer.count);
+      return {
+        results: patchResult(results, i, (r) => patchMovements(r, slot.movementNames ?? [], () => ({ [metric]: value }))),
+        closed: true,
+      };
+    }
+
+    case 'ladder': {
+      // Their answer is the rung's own number ("the 12s"); the result keeps how many rungs that is.
+      const rung = answer.count;
+      const rungs = slot.rungs ?? [];
+      const at = rung != null ? rungs.indexOf(Math.round(rung)) : -1;
+      if (at < 0) return { results, closed: false };
+      return {
+        results: patchResult(results, i, () => ({ ladderStep: at + 1, partialMovements: undefined, partialReps: undefined })),
+        closed: true,
+      };
+    }
+
+    case 'partial': {
+      // "Through the thrusters": every move up to and including it, each at the next rung's reps.
+      const options = slot.options ?? [];
+      const picked = answer.choice?.trim().toLowerCase();
+      if (picked == null) return { results, closed: false };
+      const upTo = options.findIndex((o) => o.toLowerCase() === picked);
+      if (picked !== NONE_FINISHED && upTo < 0) return { results, closed: false };
+      const done = upTo < 0 ? [] : options.slice(0, upTo + 1);
+      return {
+        results: patchResult(results, i, (r) => {
+          const next = getLadderRungValue(r.exercise.ladderReps ?? [], r.ladderStep ?? 0);
+          return {
+            partialMovements: done.length > 0 ? done : undefined,
+            partialReps: done.length > 0 ? done.length * next : undefined,
+          };
+        }),
+        closed: true,
+      };
+    }
 
     case 'distance':
       if (!answer.count || answer.count <= 0) return { results, closed: false };
@@ -805,6 +996,12 @@ export interface ChatPanelGroup {
    * `start`: last time had none, so the card starts on it and the button says so.
    */
   noLoad?: { start: boolean };
+  /**
+   * The board's own either/or for this movement ("Double unders / singles"), picked on the card
+   * beside its number. Starts on the board's side — Rx unless they say otherwise. It answers the
+   * movement's 'choice' slot, so the choice is never asked again on a card of its own.
+   */
+  choice?: { slotId: string; options: string[]; labels: string[] };
 }
 
 export interface ChatPanel {
@@ -826,14 +1023,32 @@ export function panelAnswer(
   panel: ChatPanel,
   values: Readonly<Record<string, number | undefined>>,
   unloaded: ReadonlySet<string> = NO_IDS,
+  picked: Readonly<Record<string, string>> = {},
 ): { label: string; answers: SlotAnswer[] } {
   const answers: SlotAnswer[] = [];
   const said: string[] = [];
+  // The reply is what stays of the card — a reopened chat keeps only the words — so a card of
+  // several names each one, the side picked on an either/or, and a box left empty ("Double
+  // Under —"). One group is the question's own subject: its number alone says it.
+  const several = panel.groups.length > 1;
+  let gave = false;
   for (const group of panel.groups) {
     const slotId = group.fields[0].slotId;
+    // The either/or first: a count typed for singles lands on the singles, not the double unders.
+    let name = several ? group.title : '';
+    if (group.choice) {
+      const choice = picked[group.choice.slotId] ?? group.choice.options[0];
+      answers.push({ id: group.choice.slotId, ...EMPTY_ANSWER, choice });
+      const at = group.choice.options.indexOf(choice);
+      if (at > 0 || several) name = group.choice.labels[at];
+      // The other side is a choice made — said even with its box left empty.
+      if (at > 0) gave = true;
+    }
+    const side = name ? `${name} ` : '';
     if (unloaded.has(slotId)) {
       answers.push({ id: slotId, ...EMPTY_ANSWER, noLoad: true });
-      said.push('no weight');
+      said.push(`${side}no weight`);
+      gave = true;
       continue;
     }
     if (group.control === 'clock') {
@@ -844,9 +1059,11 @@ export function panelAnswer(
       const seconds = part('minutes') * 60 + part('seconds');
       if (seconds > 0) {
         answers.push({ id: slotId, ...EMPTY_ANSWER, seconds });
-        said.push(formatClock(seconds));
+        said.push(side + formatClock(seconds));
+        gave = true;
       } else {
         answers.push({ id: slotId, ...EMPTY_ANSWER, skipped: true });
+        if (several) said.push(`${side}—`);
       }
       continue;
     }
@@ -855,8 +1072,10 @@ export function panelAnswer(
       .filter((entry): entry is { field: ChatPanelField; value: number } => entry.value != null && entry.value > 0);
     if (given.length === 0) {
       answers.push({ id: slotId, ...EMPTY_ANSWER, skipped: true });
+      if (several) said.push(`${side}—`);
       continue;
     }
+    gave = true;
     const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER, ...(group.answerUnit ? { unit: group.answerUnit } : {}) };
     // Minutes only come in a clock, read whole above.
     for (const { field, value } of given) if (field.field !== 'minutes') answer[field.field] = value;
@@ -865,14 +1084,14 @@ export function panelAnswer(
     answers.push(answer);
     // A peak equal to the start is one weight, said once.
     const shown = given.filter(({ field, value }) => !(field.field === 'weightEnd' && answer.weightEnd == null && value === answer.weight && given.length > 1));
-    said.push(group.prefix + shown
+    said.push(side + group.prefix + shown
       .map(({ field, value }, index) => {
         const next = shown[index + 1];
         return next && next.field.unit === field.unit ? `${value}` : `${value} ${field.unit}`;
       })
       .join(` ${group.joiner} `));
   }
-  return { label: said.join(' · ') || 'Skip', answers };
+  return { label: gave ? said.join(' · ') : 'Skip', answers };
 }
 
 /**
@@ -896,7 +1115,7 @@ function liftPanelQuestion(
       title: 'Max set',
       control: 'boxes',
       joiner: '@',
-      prefix: 'max ',
+      prefix: '',
       start: {},
       quick: [],
       fields: [
@@ -1057,6 +1276,13 @@ function partMeta(result: StoryExerciseResult): string {
 }
 
 /** The unit the board wrote this movement in — the first positive quantity. */
+/** "400 m", "20 cal", "15 reps" — the movement's own number on the board. Null when it has none. */
+function boardAmount(mr: MovementResult): string | null {
+  const unit = boardUnit(mr);
+  const value = { distance: mr.movement.distance, calories: mr.movement.calories, reps: mr.movement.reps }[unit];
+  return typeof value === 'number' && value > 0 ? formatSwapAmount(value, unit) : null;
+}
+
 function boardUnit(mr: MovementResult): SwapUnit {
   if ((mr.movement.distance ?? 0) > 0) return 'distance';
   if ((mr.movement.calories ?? 0) > 0) return 'calories';
@@ -1068,12 +1294,20 @@ function formatSwapAmount(value: number, unit: SwapUnit): string {
   return unit === 'distance' ? `${value} m` : unit === 'calories' ? `${value} cal` : `${value} reps`;
 }
 
+/** "1200–4800 m": the smallest and biggest piece of a swap the board writes at several lengths. */
+function formatSwapRange(low: number, high: number, unit: SwapUnit): string {
+  return unit === 'distance' ? `${low}–${high} m` : unit === 'calories' ? `${low}–${high} cal` : `${low}–${high} reps`;
+}
+
 /** "20 kg", "60 to 80 kg", "60, 65, 70 kg" — an earlier load the way the athlete gave it. */
 function describeLoad(load: EarlierLoad, unit: string): string {
   if (load.weights && load.weights.length > 0) return `${load.weights.join(', ')} ${unit}`;
   if (load.weightEnd != null) return `${load.weight} to ${load.weightEnd} ${unit}`;
   return `${load.weight} ${unit}`;
 }
+
+/** Same part, and the same block of it. */
+const sameSpot = (a: ChatSlot, b: ChatSlot): boolean => a.exerciseIndex === b.exerciseIndex && a.block === b.block;
 
 const slotName = (slot: ChatSlot): string => stripMovementRolePrefix(slot.movementNames?.[0] ?? slot.subject);
 
@@ -1088,7 +1322,7 @@ export function carriedLoads(slots: ChatSlot[], reopened: ReadonlySet<string> = 
   const first = slots.find((s) => s.asked);
   const carries = (s: ChatSlot): boolean => s.asked && s.kind === 'weight' && Boolean(s.sameAs?.sameLift) && !reopened.has(s.id);
   if (!first || !carries(first)) return null;
-  const carried = slots.filter((s) => carries(s) && s.exerciseIndex === first.exerciseIndex);
+  const carried = slots.filter((s) => carries(s) && sameSpot(s, first));
   return {
     answers: carried.map((s) => ({ id: s.id, ...EMPTY_ANSWER, weight: s.sameAs!.weight, weightEnd: s.sameAs!.weightEnd, weights: s.sameAs!.weights })),
     text: `${carried.map((s) => `${slotName(s)} · ${s.pair ? '2 × ' : ''}${describeLoad(s.sameAs!, s.unit ?? 'kg')}`).join(', ')} — same as earlier.`,
@@ -1108,8 +1342,9 @@ export function nextQuestion(
 ): ChatQuestion | null {
   const first = slots.find((s) => s.asked);
   if (!first) return null;
-  const result = results.find((r) => r.exerciseIndex === first.exerciseIndex);
-  const onPart = results.length > 1 ? ` on ${first.subject}` : '';
+  const result = slotResult(results, first);
+  // A block is named even on a one-part board: two blocks asked the same words read as one question twice.
+  const onPart = results.length > 1 || first.block != null ? ` on ${first.subject}` : '';
 
   switch (first.kind) {
     case 'clarify': {
@@ -1157,8 +1392,87 @@ export function nextQuestion(
     }
     case 'rounds':
       return { text: `How many rounds did you get${onPart}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
-    case 'reps':
-      return { text: `How many reps did you get${onPart}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
+    case 'reps': {
+      const name = first.movementNames?.[0];
+      const what = name ? pluralizeMovementLabel(stripMovementRolePrefix(name)).toLowerCase() : 'reps';
+      const windows = first.intervals ?? 1;
+      return {
+        text: windows > 1 ? `How many ${what} in total${onPart}?` : `How many ${what} did you get${onPart}?`,
+        // "About 4 each round" is an answer too: the app multiplies (applyAnswer).
+        ...(windows > 1 ? { placeholder: `Or how many each round — e.g. about 12` } : {}),
+        slotIds: [first.id],
+        chips: [skipChip([first.id])],
+      };
+    }
+    case 'count': {
+      // Every open movement of the part on one card, a box each — a station board is one answer.
+      const counts = slots.filter((s) => s.asked && s.kind === 'count' && sameSpot(s, first));
+      // A station with the board's own either/or picks its side right beside its number.
+      const choiceFor = (s: ChatSlot): ChatSlot | undefined => slots.find((c) => c.asked && c.kind === 'choice'
+        && sameSpot(c, s) && c.movementNames?.[0] === s.movementNames?.[0] && (c.options?.length ?? 0) > 1);
+      const choices = counts.map(choiceFor).filter((c): c is ChatSlot => c != null);
+      const how = (s: ChatSlot): string => (s.total ? 'in total' : `each ${s.per ?? 'round'}`);
+      const unitOf = (s: ChatSlot): string => (s.metric === 'calories' ? 'cal' : s.metric === 'distance' ? 'm' : 'reps');
+      const sameHow = counts.every((s) => how(s) === how(first));
+      const one = counts.length === 1;
+      return {
+        text: !one ? `How many at each one${sameHow ? `, ${how(first)}` : ''}?`
+          : first.metric === 'calories' ? `How many calories on the ${slotName(first)} ${how(first)}?`
+          : first.metric === 'distance' ? `How far on the ${slotName(first)} ${how(first)}?`
+          : `How many ${pluralizeMovementLabel(slotName(first)).toLowerCase()} ${how(first)}?`,
+        hint: 'Roughly is fine — nobody counts perfectly mid-workout.',
+        // A swap the board didn't offer is said, not picked — the box below says so.
+        placeholder: 'Did something else? Say it — e.g. lunges instead of step-ups',
+        slotIds: [...counts.map((s) => s.id), ...choices.map((c) => c.id)],
+        // Skip is on the card itself.
+        chips: [],
+        panel: {
+          title: one ? slotName(first) : result?.exercise.name ?? first.subject,
+          groups: counts.map((s): ChatPanelGroup => {
+            const either = choiceFor(s);
+            return {
+              title: sameHow ? slotName(s) : `${slotName(s)} · ${how(s)}`,
+              control: 'boxes',
+              joiner: '@',
+              prefix: '',
+              start: {},
+              quick: [],
+              fields: [{ slotId: s.id, field: 'count', label: unitOf(s), unit: unitOf(s) }],
+              ...(either?.options ? { choice: { slotId: either.id, options: either.options, labels: either.options.map(stripMovementRolePrefix) } } : {}),
+            };
+          }),
+        },
+      };
+    }
+    case 'ladder': {
+      const rungs = first.rungs ?? [];
+      return {
+        text: `Which rung did you finish${onPart}?`,
+        hint: 'The last one you got all the way through.',
+        slotIds: [first.id],
+        chips: [
+          ...rungs.map((rung) => ({ label: `${rung}s`, answers: [{ id: first.id, ...EMPTY_ANSWER, count: rung }] })),
+          skipChip([first.id]),
+        ],
+      };
+    }
+    case 'partial': {
+      // Moves are done in order, so "how far into the next rung" is one tap: the last move finished.
+      const options = first.options ?? [];
+      const next = result ? getLadderRungValue(result.exercise.ladderReps ?? [], result.ladderStep ?? 0) : undefined;
+      return {
+        text: `And into the ${next ?? 'next'}s — how far did you get?`,
+        slotIds: [first.id],
+        chips: [
+          { label: 'None of it', answers: [{ id: first.id, ...EMPTY_ANSWER, choice: NONE_FINISHED }] },
+          // Through the last move is the whole rung — that's the rung answer, not a partial one.
+          ...options.slice(0, -1).map((option) => ({
+            label: `Through ${stripMovementRolePrefix(option)}`,
+            answers: [{ id: first.id, ...EMPTY_ANSWER, choice: option }],
+          })),
+        ],
+      };
+    }
     case 'score':
       return { text: `What was your score${onPart}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
     case 'distance':
@@ -1169,11 +1483,11 @@ export function nextQuestion(
       const nameOf = (slot: ChatSlot): string => stripMovementRolePrefix(slot.movementNames?.[0] ?? slot.subject);
       // A lift logged in sets is answered in boxes — start, peak, and the max set if there is one.
       if (result?.kind === 'load' && result.setsTotal > 1) {
-        const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && s.exerciseIndex === first.exerciseIndex);
+        const maxSet = slots.find((s) => s.kind === 'maxset' && s.asked && sameSpot(s, first));
         return liftPanelQuestion(first, maxSet, nameOf(first), first.unit ?? 'kg', likelyFor(first, lastLoads));
       }
       // Every load the part still needs, on one card: one answer, the button naming each weight.
-      const loads = slots.filter((s) => s.asked && s.kind === 'weight' && s.exerciseIndex === first.exerciseIndex);
+      const loads = slots.filter((s) => s.asked && s.kind === 'weight' && sameSpot(s, first));
       const groups = loads.map((s) => weightGroup(s, nameOf(s), s.unit ?? 'kg', nameOf(s), false, likelyFor(s, lastLoads)));
       const one = loads.length === 1;
       return {
@@ -1235,12 +1549,17 @@ export function nextQuestion(
       }
       // Their usual swap at their usual scale is ONE tap; another amount is asked, then typed.
       const howMuch = formatSwapAmount(amount.value, amount.unit);
+      // Several lengths are said as their range, so the tap plainly covers every one of them.
+      const said = amount.range ? formatSwapRange(amount.range.low, amount.range.high, amount.unit) : howMuch;
+      // A typed amount is for the first piece (swapMovement scales the rest), so that one is named.
+      const firstPiece = amount.range ? result?.movementResults?.find((m) => m.movement.name === first.movementNames?.[0]) : undefined;
+      const board = firstPiece ? boardAmount(firstPiece) : null;
       return {
         text: `${usual} again instead of the ${first.subject}?`,
         slotIds: [first.id],
         chips: [
           {
-            label: `${usual} · ${howMuch}`,
+            label: `${usual} · ${said}`,
             answers: [{ id: first.id, ...EMPTY_ANSWER, swapTo: usual, swapAmount: amount.value, swapUnit: amount.unit }],
           },
           {
@@ -1248,7 +1567,9 @@ export function nextQuestion(
             answers: [],
             then: {
               text: `How much ${usual} instead of the ${first.subject}?`,
-              hint: `Last time's scale would be ${howMuch} — type yours, e.g. 20 cal or 900 m.`,
+              hint: board
+                ? `For the first ${board} ${first.subject} — the others follow at the same scale. Last time's would be ${howMuch}.`
+                : `Last time's scale would be ${howMuch} — type yours, e.g. 20 cal or 900 m.`,
               slotIds: [first.id],
               chips: [],
             },
@@ -1301,7 +1622,14 @@ export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | nul
       if (!answer.count) return null;
       return `${answer.count} round${answer.count === 1 ? '' : 's'}${answer.extraReps ? ` + ${answer.extraReps} reps` : ''}`;
     case 'reps':
-      return answer.count ? `${answer.count} reps` : null;
+      return answer.count ? `${answer.count} reps${answer.perInterval ? ' each round' : ''}` : null;
+    case 'count': {
+      if (answer.count == null) return null;
+      const unit = slot.metric === 'calories' ? 'cal' : slot.metric === 'distance' ? 'm' : 'reps';
+      return `${answer.count} ${unit} ${slot.total ? 'in total' : `each ${slot.per ?? 'round'}`}`;
+    }
+    case 'ladder':
+      return answer.count ? `through the ${answer.count}s` : null;
     case 'distance':
       return answer.count ? `${answer.count} m` : null;
     case 'weight': {
@@ -1354,6 +1682,12 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
       return m ? answer({ count: Number(m[1]), extraReps: m[2] ? Number(m[2]) : null }) : null;
     case 'reps':
       m = t.match(/^(\d{1,4})(?: ?reps?)?$/);
+      return m ? answer({ count: Number(m[1]) }) : null;
+    case 'count':
+      m = t.match(/^(\d{1,5}(?:[.,]\d+)?)(?: ?(?:reps?|cals?|calories|m|meters?|metres?))?$/);
+      return m ? answer({ count: toNum(m[1]) }) : null;
+    case 'ladder':
+      m = t.match(/^(?:the )?(\d{1,3})(?:'?s)?$/);
       return m ? answer({ count: Number(m[1]) }) : null;
     case 'distance':
       m = t.match(/^(\d{1,6})(?: ?(?:m|meters?|metres?))?$/);

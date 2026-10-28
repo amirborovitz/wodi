@@ -42,56 +42,135 @@
             "name": "",
             "primary": "300m Run",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "300m Run",
+                "movement": "Run"
+              }
+            ]
           },
           {
             "roundLabel": "×3",
             "name": "",
             "primary": "20 Russian KB Swings · 15 Goblet Squats · 10 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "20 Russian KB Swings",
+                "movement": "Russian Kettlebell Swing"
+              },
+              {
+                "text": "15 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "10 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "BUY-IN",
             "name": "",
             "primary": "300m Run",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "300m Run",
+                "movement": "Run"
+              }
+            ]
           },
           {
             "roundLabel": "×2",
             "name": "",
             "primary": "20 Russian KB Swings · 15 Goblet Squats · 10 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "20 Russian KB Swings",
+                "movement": "Russian Kettlebell Swing"
+              },
+              {
+                "text": "15 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "10 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "BUY-IN",
             "name": "",
             "primary": "300m Run",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "300m Run",
+                "movement": "Run"
+              }
+            ]
           },
           {
             "roundLabel": "×1",
             "name": "",
             "primary": "20 Russian KB Swings · 15 Goblet Squats · 10 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "20 Russian KB Swings",
+                "movement": "Russian Kettlebell Swing"
+              },
+              {
+                "text": "15 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "10 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "24/16kg",
             "mineOverride": "20kg",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "900m Run · 120 Russian KB Swings · 90 Goblet Squats · 60 T2B",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "900m Run",
+                "movement": "Run"
+              },
+              {
+                "text": "120 Russian KB Swings",
+                "movement": "Russian Kettlebell Swing"
+              },
+              {
+                "text": "90 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "60 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           }
         ]
       }
@@ -213,7 +292,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "BUY-IN"
+          "roundLabel": "BUY-IN",
+          "parts": [
+            {
+              "text": "300m Run",
+              "movement": "Run"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -221,7 +306,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×3"
+          "roundLabel": "×3",
+          "parts": [
+            {
+              "text": "20 Russian KB Swings",
+              "movement": "Russian Kettlebell Swing"
+            },
+            {
+              "text": "15 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "10 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -229,7 +328,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "BUY-IN"
+          "roundLabel": "BUY-IN",
+          "parts": [
+            {
+              "text": "300m Run",
+              "movement": "Run"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -237,7 +342,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×2"
+          "roundLabel": "×2",
+          "parts": [
+            {
+              "text": "20 Russian KB Swings",
+              "movement": "Russian Kettlebell Swing"
+            },
+            {
+              "text": "15 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "10 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -245,7 +364,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "BUY-IN"
+          "roundLabel": "BUY-IN",
+          "parts": [
+            {
+              "text": "300m Run",
+              "movement": "Run"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -253,7 +378,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×1"
+          "roundLabel": "×1",
+          "parts": [
+            {
+              "text": "20 Russian KB Swings",
+              "movement": "Russian Kettlebell Swing"
+            },
+            {
+              "text": "15 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "10 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -261,7 +400,8 @@
           "load": "",
           "mine": "20kg",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -269,7 +409,25 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "900m Run",
+              "movement": "Run"
+            },
+            {
+              "text": "120 Russian KB Swings",
+              "movement": "Russian Kettlebell Swing"
+            },
+            {
+              "text": "90 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "60 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         }
       ]
     ]

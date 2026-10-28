@@ -9,35 +9,112 @@
           "name": "",
           "primary": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "20 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "20 Alt Weighted Box Step Ups",
+              "movement": "Alt Weighted Box Step Up"
+            }
+          ]
         },
         {
           "roundLabel": "×2",
           "name": "",
           "primary": "1800m Echo Bike · 20 Push-ups · 20 T2B",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "20 Push-ups",
+              "movement": "Push-up"
+            },
+            {
+              "text": "20 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "roundLabel": "×2",
           "name": "",
           "primary": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "20 Burpees",
+              "movement": "Burpee"
+            },
+            {
+              "text": "20 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "40 DU / 80 Single Unders",
+              "movement": "Double Under"
+            }
+          ]
         },
         {
           "roundLabel": "RX",
           "name": "",
           "primary": "22.5/15kg",
           "mineOverride": "17.5kg",
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": []
         },
         {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
           "suppressMine": true,
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": [
+            {
+              "text": "7.2km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "40 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "40 Alt Weighted Box Step Ups",
+              "movement": "Alt Weighted Box Step Up"
+            },
+            {
+              "text": "40 Push-ups",
+              "movement": "Push-up"
+            },
+            {
+              "text": "40 T2B",
+              "movement": "Toes to Bar"
+            },
+            {
+              "text": "40 Burpees",
+              "movement": "Burpee"
+            },
+            {
+              "text": "40 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "80 DU",
+              "movement": "Double Under"
+            }
+          ]
         }
       ]
     }
@@ -53,35 +130,112 @@
             "name": "",
             "primary": "1800m Echo Bike · 20 Alt DB Snatches · 20 Alt Weighted Box Step Ups",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "1800m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "20 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "20 Alt Weighted Box Step Ups",
+                "movement": "Alt Weighted Box Step Up"
+              }
+            ]
           },
           {
             "roundLabel": "×2",
             "name": "",
             "primary": "1800m Echo Bike · 20 Push-ups · 20 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "1800m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "20 Push-ups",
+                "movement": "Push-up"
+              },
+              {
+                "text": "20 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "×2",
             "name": "",
             "primary": "20 Burpees · 20 Goblet Squats · 40 DU / 80 Single Unders",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "20 Burpees",
+                "movement": "Burpee"
+              },
+              {
+                "text": "20 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "40 DU / 80 Single Unders",
+                "movement": "Double Under"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "22.5/15kg",
             "mineOverride": "17.5kg",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "7.2km Echo Bike · 40 Alt DB Snatches · 40 Alt Weighted Box Step Ups · 40 Push-ups · 40 T2B · 40 Burpees · 40 Goblet Squats · 80 DU",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "7.2km Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "40 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "40 Alt Weighted Box Step Ups",
+                "movement": "Alt Weighted Box Step Up"
+              },
+              {
+                "text": "40 Push-ups",
+                "movement": "Push-up"
+              },
+              {
+                "text": "40 T2B",
+                "movement": "Toes to Bar"
+              },
+              {
+                "text": "40 Burpees",
+                "movement": "Burpee"
+              },
+              {
+                "text": "40 Goblet Squats",
+                "movement": "Goblet Squat"
+              },
+              {
+                "text": "80 DU",
+                "movement": "Double Under"
+              }
+            ]
           }
         ]
       }
@@ -205,7 +359,21 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×2"
+        "roundLabel": "×2",
+        "parts": [
+          {
+            "text": "1800m Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "20 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "20 Alt Weighted Box Step Ups",
+            "movement": "Alt Weighted Box Step Up"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -213,7 +381,21 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×2"
+        "roundLabel": "×2",
+        "parts": [
+          {
+            "text": "1800m Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "20 Push-ups",
+            "movement": "Push-up"
+          },
+          {
+            "text": "20 T2B",
+            "movement": "Toes to Bar"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -221,7 +403,21 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×2"
+        "roundLabel": "×2",
+        "parts": [
+          {
+            "text": "20 Burpees",
+            "movement": "Burpee"
+          },
+          {
+            "text": "20 Goblet Squats",
+            "movement": "Goblet Squat"
+          },
+          {
+            "text": "40 DU / 80 Single Unders",
+            "movement": "Double Under"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -229,7 +425,8 @@
         "load": "",
         "mine": "17.5kg",
         "team": "",
-        "roundLabel": "RX"
+        "roundLabel": "RX",
+        "parts": []
       },
       {
         "kind": "line",
@@ -237,7 +434,41 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "TOTAL"
+        "roundLabel": "TOTAL",
+        "parts": [
+          {
+            "text": "7.2km Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "40 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "40 Alt Weighted Box Step Ups",
+            "movement": "Alt Weighted Box Step Up"
+          },
+          {
+            "text": "40 Push-ups",
+            "movement": "Push-up"
+          },
+          {
+            "text": "40 T2B",
+            "movement": "Toes to Bar"
+          },
+          {
+            "text": "40 Burpees",
+            "movement": "Burpee"
+          },
+          {
+            "text": "40 Goblet Squats",
+            "movement": "Goblet Squat"
+          },
+          {
+            "text": "80 DU",
+            "movement": "Double Under"
+          }
+        ]
       }
     ],
     "pages": [
@@ -253,7 +484,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×2"
+          "roundLabel": "×2",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "20 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "20 Alt Weighted Box Step Ups",
+              "movement": "Alt Weighted Box Step Up"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -261,7 +506,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×2"
+          "roundLabel": "×2",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "20 Push-ups",
+              "movement": "Push-up"
+            },
+            {
+              "text": "20 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -269,7 +528,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×2"
+          "roundLabel": "×2",
+          "parts": [
+            {
+              "text": "20 Burpees",
+              "movement": "Burpee"
+            },
+            {
+              "text": "20 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "40 DU / 80 Single Unders",
+              "movement": "Double Under"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -277,7 +550,8 @@
           "load": "",
           "mine": "17.5kg",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -285,7 +559,41 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "7.2km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "40 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "40 Alt Weighted Box Step Ups",
+              "movement": "Alt Weighted Box Step Up"
+            },
+            {
+              "text": "40 Push-ups",
+              "movement": "Push-up"
+            },
+            {
+              "text": "40 T2B",
+              "movement": "Toes to Bar"
+            },
+            {
+              "text": "40 Burpees",
+              "movement": "Burpee"
+            },
+            {
+              "text": "40 Goblet Squats",
+              "movement": "Goblet Squat"
+            },
+            {
+              "text": "80 DU",
+              "movement": "Double Under"
+            }
+          ]
         }
       ]
     ]

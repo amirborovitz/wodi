@@ -226,3 +226,33 @@ describe('replayMomentAt', () => {
     }
   });
 });
+
+describe('a line naming several movements', () => {
+  const block = (parts: [string, string][], extra: Partial<PosterLine> = {}): PosterLine =>
+    line(parts.map(([text]) => text).join(' · '), { parts: parts.map(([text, movement]) => ({ text, movement })), ...extra });
+
+  it('plays each movement of a block line, then skips the totals line that repeats them (2026-10-20 "Endurance")', () => {
+    const script = buildReplayScript(wod([
+      block([['6 Pull-ups', 'Pull-up'], ['12 Alt DB Snatches', 'Alt Dumbbell Snatch'], ['16 Alt Lunges', 'Alt Lunge'], ['100 Single Unders', 'Single Under']], { roundLabel: '×6' }),
+      block([['600m Echo Bike', 'Echo Bike'], ['6 Single DB Thrusters', 'Single Dumbbell Thruster'], ['8 T2B', 'Toes to Bar']], { roundLabel: '×6' }),
+      block([['36 Pull-ups', 'Pull-up'], ['72 Alt DB Snatches', 'Alt Dumbbell Snatch'], ['48 T2B', 'Toes to Bar']], { roundLabel: 'TOTAL', mine: '17.5kg' }),
+    ]));
+    expect(script.beats.map((b) => [b.text, b.move])).toEqual([
+      ['6 Pull-ups', 'pullUp'],
+      ['12 Alt DB Snatches', 'dbSnatch'],
+      ['16 Alt Lunges', 'lunge'],
+      ['100 Single Unders', 'jumpRope'],
+      ['600m Echo Bike', 'bike'],
+      ['6 Single DB Thrusters', 'thruster'],
+      ['8 T2B', 'toesToBar'],
+    ]);
+  });
+
+  it('an RX weight line is not a movement', () => {
+    const script = buildReplayScript(wod([
+      block([['10 Push Presses', 'Push Press']], { roundLabel: '×5' }),
+      line('35/50kg', { roundLabel: 'RX', parts: [] }),
+    ]));
+    expect(script.beats.map((b) => b.text)).toEqual(['10 Push Presses']);
+  });
+});

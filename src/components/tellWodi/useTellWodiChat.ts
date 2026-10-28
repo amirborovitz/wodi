@@ -9,11 +9,9 @@ import type { ThreadMessage } from '../../services/wodiAgent/threadItems';
 import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
 import {
   applyAnswer,
-  chatCannotLog,
   clarifySlots,
   carriedLoads,
   describeAnswer,
-  isComplete,
   nextQuestion,
   openSlots,
   readAnswerLocally,
@@ -35,7 +33,7 @@ import { buildUnfinishedPoster, type UnfinishedPoster } from '../home/unfinished
  */
 
 /** How the athlete got from the chat to the standard logging screen — measured (analytics.ts). */
-export type FormHandoff = 'typed' | 'chip' | 'wodi_handoff';
+export type FormHandoff = 'typed' | 'chip';
 
 export interface ChatChipView {
   label: string;
@@ -197,7 +195,7 @@ const NOT_DONE_CHIP: ChatChipView = { label: "Didn't do it", action: 'not-done' 
  * What a "Change" can reopen: a value the athlete gave. A swap rewrites the movement itself, so
  * undoing one is a fix for the standard screen, not a question asked again.
  */
-const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 'reps', 'distance', 'duration', 'score', 'weight', 'maxset', 'choice', 'unit']);
+const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 'reps', 'distance', 'duration', 'score', 'weight', 'maxset', 'count', 'ladder', 'partial', 'choice', 'unit']);
 
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;
@@ -355,7 +353,17 @@ export function useTellWodiChat({
     return { ...saved, messages: [...priorRef.current, ...saved.messages] };
   };
 
+  // A chat the athlete has left keeps nothing. A board photo still being read when they open a
+  // saved board instead (2026-10-23: sent 10:20:14, saved board opened 10:20:26) finished in
+  // the closed chat and kept the board for later as a second copy — one the log never cleared.
+  const leftRef = useRef(false);
+  useEffect(() => {
+    leftRef.current = false;
+    return () => { leftRef.current = true; };
+  }, []);
+
   const commit = useCallback((next: ChatMessage[]): void => {
+    if (leftRef.current) return;
     messagesRef.current = next;
     setMessages(next);
     if (workoutRef.current) callbacks.current.onPersist(boardChat(next, waitingRef.current), workoutRef.current);
@@ -542,14 +550,6 @@ export function useTellWodiChat({
     const question = nextQuestion(slots, resultsRef.current, callbacks.current.lastLoads);
     if (question) {
       askQuestion(question, prefix, extra);
-      return;
-    }
-    if (isComplete(slots) && resultsRef.current.some(chatCannotLog)) {
-      push({
-        from: 'wodi',
-        text: 'One part of this board is easier to fill in yourself — I\'ll bring over everything you told me.',
-        chips: [{ label: 'Fill it in myself', action: 'forms', handoff: 'wodi_handoff' }],
-      });
       return;
     }
     finish();

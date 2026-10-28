@@ -3,6 +3,7 @@
  */
 
 import React, { useContext } from 'react';
+import { getLadderRungValue } from '../../../../utils/ladderRungs';
 import { BRAND, VIBE, LIGHT_VIBE, fD, fB, fH, fM } from './brand';
 import type { VibeKey } from './brand';
 import type { PosterWod, PosterLine, PosterRow, PosterHeroScore } from './posterData';
@@ -413,13 +414,6 @@ export function shouldShowPairsLegend(wod: PosterWod, rows: PosterRow[]): boolea
 
 // ─── Ladder track ───────────────────────────────────────────────────────────
 
-/** Mirrors getLadderRungValue in celebration/helpers.ts — extrapolates beyond the prescribed array. */
-function ladderRungValue(reps: number[], idx: number): number {
-  if (idx < reps.length) return reps[idx];
-  const step = reps.length >= 2 ? reps[reps.length - 1] - reps[reps.length - 2] : 2;
-  return reps[reps.length - 1] + step * (idx - reps.length + 1);
-}
-
 export interface LadderTrackChartProps {
   track: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
   /** Filled bar / lit rung color (the skin's accent — yellow on dark skins, ink on the
@@ -496,7 +490,7 @@ export function LadderTrackChart({
   const barGap = barCount <= 7 ? 5 : 4;
   const bars = Array.from({ length: endIdx - startIdx + 1 }, (_, i) => {
     const idx = startIdx + i;
-    return { idx, value: ladderRungValue(reps, idx), completed: idx < step, isNext: idx === step };
+    return { idx, value: getLadderRungValue(reps, idx), completed: idx < step, isNext: idx === step };
   });
   const maxVal = Math.max(...bars.map((b) => b.value), 1);
   const MAX_H = 32;

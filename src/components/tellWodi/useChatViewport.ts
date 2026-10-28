@@ -24,18 +24,50 @@ export interface ChatViewport {
 /** Within this many pixels of the bottom counts as "reading the latest". */
 const PINNED_SLACK = 80;
 
+/**
+ * Marks something in the thread too important to land half off-screen — the poster. Following
+ * the thread stops at its top the first time it appears rather than scrolling it past.
+ */
+export const CHAT_ANCHOR = 'data-chat-anchor';
+/** Room left above an anchor, so the cheer line over it stays in view. */
+const ANCHOR_MARGIN = 56;
+
 export function useChatViewport(contentKey: unknown): ChatViewport {
   const threadRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const pinnedRef = useRef(true);
 
+  const revealedRef = useRef(new WeakSet<Element>());
+
   const scrollToEnd = useCallback((): void => {
     const el = threadRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    // A poster is taller than what's left of a phone screen: following the thread's end showed its
+    // bottom half and Share, and the poster — and the replay over it — scrolled past above the fold.
+    // So a newly arrived anchor stops the follow at its own top when the rest won't fit below it,
+    // once; after that the athlete is reading, not pinned.
+    const anchors = contentRef.current?.querySelectorAll(`[${CHAT_ANCHOR}]`);
+    const anchor = anchors && anchors.length > 0 ? anchors[anchors.length - 1] : null;
+    if (anchor && !revealedRef.current.has(anchor)) {
+      const box = anchor.getBoundingClientRect();
+      const top = box.top - el.getBoundingClientRect().top + el.scrollTop - ANCHOR_MARGIN;
+      if (top < el.scrollHeight - el.clientHeight) {
+        revealedRef.current.add(anchor);
+        pinnedRef.current = false;
+        el.scrollTop = top;
+        return;
+      }
+      // It fits whole at the end — seen, so later messages are followed as usual. Only once it is
+      // drawn: a poster is taller than wide, and it sizes itself a frame after it mounts.
+      if (box.height > box.width) revealedRef.current.add(anchor);
+    }
+    el.scrollTop = el.scrollHeight;
   }, []);
 
   const pinToEnd = useCallback((): void => {
     pinnedRef.current = true;
+    // Your own send goes past every poster already up.
+    contentRef.current?.querySelectorAll(`[${CHAT_ANCHOR}]`).forEach((a) => revealedRef.current.add(a));
     scrollToEnd();
   }, [scrollToEnd]);
 

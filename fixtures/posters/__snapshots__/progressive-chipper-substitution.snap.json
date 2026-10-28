@@ -9,21 +9,47 @@
           "roundLabel": "R1",
           "name": "round-1",
           "primary": "Ski Erg",
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "Ski Erg",
+              "movement": "Ski Erg"
+            }
+          ]
         },
         {
           "roundLabel": "R2",
           "name": "round-2",
           "primary": "+ 10 Wall Balls",
           "subNote": "9kg",
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "10 Wall Balls",
+              "movement": "Wall Ball"
+            }
+          ]
         },
         {
           "roundLabel": "R3",
           "name": "round-3",
           "primary": "Ski Erg · 10 Wall Balls · 10 Burpees",
           "subNote": "9kg",
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "Ski Erg",
+              "movement": "Ski Erg"
+            },
+            {
+              "text": "10 Wall Balls",
+              "movement": "Wall Ball"
+            },
+            {
+              "text": "10 Burpees",
+              "movement": "Burpees"
+            }
+          ]
         }
       ]
     }
@@ -39,21 +65,47 @@
             "roundLabel": "R1",
             "name": "round-1",
             "primary": "Ski Erg",
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "Ski Erg",
+                "movement": "Ski Erg"
+              }
+            ]
           },
           {
             "roundLabel": "R2",
             "name": "round-2",
             "primary": "+ 10 Wall Balls",
             "subNote": "9kg",
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "10 Wall Balls",
+                "movement": "Wall Ball"
+              }
+            ]
           },
           {
             "roundLabel": "R3",
             "name": "round-3",
             "primary": "Ski Erg · 10 Wall Balls · 10 Burpees",
             "subNote": "9kg",
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "Ski Erg",
+                "movement": "Ski Erg"
+              },
+              {
+                "text": "10 Wall Balls",
+                "movement": "Wall Ball"
+              },
+              {
+                "text": "10 Burpees",
+                "movement": "Burpees"
+              }
+            ]
           }
         ]
       }
@@ -150,7 +202,13 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "R1"
+        "roundLabel": "R1",
+        "parts": [
+          {
+            "text": "Ski Erg",
+            "movement": "Ski Erg"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -158,7 +216,13 @@
         "load": "9kg",
         "mine": "9kg",
         "team": "",
-        "roundLabel": "R2"
+        "roundLabel": "R2",
+        "parts": [
+          {
+            "text": "10 Wall Balls",
+            "movement": "Wall Ball"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -166,7 +230,21 @@
         "load": "9kg",
         "mine": "9kg",
         "team": "",
-        "roundLabel": "R3"
+        "roundLabel": "R3",
+        "parts": [
+          {
+            "text": "Ski Erg",
+            "movement": "Ski Erg"
+          },
+          {
+            "text": "10 Wall Balls",
+            "movement": "Wall Ball"
+          },
+          {
+            "text": "10 Burpees",
+            "movement": "Burpees"
+          }
+        ]
       }
     ],
     "pages": [
@@ -182,7 +260,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "R1"
+          "roundLabel": "R1",
+          "parts": [
+            {
+              "text": "Ski Erg",
+              "movement": "Ski Erg"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -190,7 +274,13 @@
           "load": "9kg",
           "mine": "9kg",
           "team": "",
-          "roundLabel": "R2"
+          "roundLabel": "R2",
+          "parts": [
+            {
+              "text": "10 Wall Balls",
+              "movement": "Wall Ball"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -198,7 +288,21 @@
           "load": "9kg",
           "mine": "9kg",
           "team": "",
-          "roundLabel": "R3"
+          "roundLabel": "R3",
+          "parts": [
+            {
+              "text": "Ski Erg",
+              "movement": "Ski Erg"
+            },
+            {
+              "text": "10 Wall Balls",
+              "movement": "Wall Ball"
+            },
+            {
+              "text": "10 Burpees",
+              "movement": "Burpees"
+            }
+          ]
         }
       ]
     ]

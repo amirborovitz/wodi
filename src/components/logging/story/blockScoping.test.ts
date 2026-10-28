@@ -4,7 +4,6 @@ import type { StoryExerciseResult } from './types';
 import {
   applyBlockScoresToSections,
   getScoredBlocks,
-  isBlockScored,
   mergeBlockPatch,
   scopeResultToBlock,
 } from './blockScoping';
@@ -48,13 +47,11 @@ const result = {
 describe('getScoredBlocks', () => {
   it('finds only sections that declare their own score', () => {
     expect(getScoredBlocks(exercise).map((b) => b.sectionIndex)).toEqual([0, 1]);
-    expect(isBlockScored(exercise)).toBe(true);
   });
 
   it('leaves an ordinary sectioned exercise alone, so it still logs as one page', () => {
     const plain = { ...exercise, sections: exercise.sections!.map(({ ...s }) => ({ ...s, scoreType: undefined })) };
     expect(getScoredBlocks(plain)).toEqual([]);
-    expect(isBlockScored(plain)).toBe(false);
   });
 
   it('prefixes a bare letter label but keeps a descriptive one', () => {

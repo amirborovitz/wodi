@@ -9,28 +9,59 @@
           "name": "",
           "primary": "1000m Row",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "1000m Row",
+              "movement": "Row"
+            }
+          ]
         },
         {
           "roundLabel": "×5",
           "name": "",
           "primary": "25 Pull-ups · 7 Push Jerks",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "25 Pull-ups",
+              "movement": "Pull-up"
+            },
+            {
+              "text": "7 Push Jerks",
+              "movement": "Push Jerk"
+            }
+          ]
         },
         {
           "roundLabel": "RX",
           "name": "",
           "primary": "135lb",
           "mineOverride": "135lb",
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": []
         },
         {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
           "suppressMine": true,
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": [
+            {
+              "text": "1km Row",
+              "movement": "Row"
+            },
+            {
+              "text": "125 Pull-ups",
+              "movement": "Pull-up"
+            },
+            {
+              "text": "35 Push Jerks",
+              "movement": "Push Jerk"
+            }
+          ]
         }
       ]
     }
@@ -46,28 +77,59 @@
             "name": "",
             "primary": "1000m Row",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "1000m Row",
+                "movement": "Row"
+              }
+            ]
           },
           {
             "roundLabel": "×5",
             "name": "",
             "primary": "25 Pull-ups · 7 Push Jerks",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "25 Pull-ups",
+                "movement": "Pull-up"
+              },
+              {
+                "text": "7 Push Jerks",
+                "movement": "Push Jerk"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "135lb",
             "mineOverride": "135lb",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "1km Row · 125 Pull-ups · 35 Push Jerks",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "1km Row",
+                "movement": "Row"
+              },
+              {
+                "text": "125 Pull-ups",
+                "movement": "Pull-up"
+              },
+              {
+                "text": "35 Push Jerks",
+                "movement": "Push Jerk"
+              }
+            ]
           }
         ]
       }
@@ -119,7 +181,13 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "BUY-IN"
+        "roundLabel": "BUY-IN",
+        "parts": [
+          {
+            "text": "1000m Row",
+            "movement": "Row"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -127,7 +195,17 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×5"
+        "roundLabel": "×5",
+        "parts": [
+          {
+            "text": "25 Pull-ups",
+            "movement": "Pull-up"
+          },
+          {
+            "text": "7 Push Jerks",
+            "movement": "Push Jerk"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -135,7 +213,8 @@
         "load": "",
         "mine": "135lb",
         "team": "",
-        "roundLabel": "RX"
+        "roundLabel": "RX",
+        "parts": []
       },
       {
         "kind": "line",
@@ -143,7 +222,21 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "TOTAL"
+        "roundLabel": "TOTAL",
+        "parts": [
+          {
+            "text": "1km Row",
+            "movement": "Row"
+          },
+          {
+            "text": "125 Pull-ups",
+            "movement": "Pull-up"
+          },
+          {
+            "text": "35 Push Jerks",
+            "movement": "Push Jerk"
+          }
+        ]
       }
     ],
     "pages": [
@@ -159,7 +252,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "BUY-IN"
+          "roundLabel": "BUY-IN",
+          "parts": [
+            {
+              "text": "1000m Row",
+              "movement": "Row"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -167,7 +266,17 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×5"
+          "roundLabel": "×5",
+          "parts": [
+            {
+              "text": "25 Pull-ups",
+              "movement": "Pull-up"
+            },
+            {
+              "text": "7 Push Jerks",
+              "movement": "Push Jerk"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -175,7 +284,8 @@
           "load": "",
           "mine": "135lb",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -183,7 +293,21 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "1km Row",
+              "movement": "Row"
+            },
+            {
+              "text": "125 Pull-ups",
+              "movement": "Pull-up"
+            },
+            {
+              "text": "35 Push Jerks",
+              "movement": "Push Jerk"
+            }
+          ]
         }
       ]
     ]

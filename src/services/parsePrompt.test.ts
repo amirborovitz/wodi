@@ -15,10 +15,10 @@ describe('buildParsePrompt — the full prompt is unchanged', () => {
       accessory: hash(buildParsePrompt('accessory')),
     }).toMatchInlineSnapshot(`
       {
-        "accessory": "e249dda4b96c7ecd",
-        "metcon": "9e6c63890aa8d536",
-        "none": "9e6c63890aa8d536",
-        "strength": "e249dda4b96c7ecd",
+        "accessory": "70c78578d5731f43",
+        "metcon": "e68d71e14f149c58",
+        "none": "e68d71e14f149c58",
+        "strength": "70c78578d5731f43",
       }
     `);
   });

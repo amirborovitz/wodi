@@ -1,4 +1,5 @@
 import type { Exercise, ExerciseLoggingMode, ParsedExercise, ParsedMovement, ParsedSection } from '../types';
+import { movementIdentity } from '../data/movementRegistry';
 
 /**
  * What a block is actually scored by — read from the block, never from the format name.
@@ -197,15 +198,53 @@ export function hasMaxSet(
   // its open count is the block's SCORE and resolveBlockScore already owns it.
   if (!LOAD_LOGGED_MODES.has(exercise.loggingMode as ExerciseLoggingMode)) return false;
 
-  const sectionMovements = exercise.sections?.flatMap((s: ParsedSection) => s.movements) ?? [];
-  if ([...(exercise.movements ?? []), ...sectionMovements].some(statesMaxEffort)) return true;
+  const all = blockMovements(exercise);
+  // A movement taken to max is a max SET only when it is a set of its own — never when it is one
+  // of the movements done in every set. "4 sets: 5 C2B, 6 good mornings, max dips" is a circuit
+  // whose dips are open each set; reading it as a block that ENDS on a max set asked for a max
+  // set's reps and bar on the good mornings and saved the fourth set as one (2026-10-21).
+  if (all.some(statesMaxEffort)) return maxSetMovements(exercise).length > 0;
 
   // A rep scheme that runs out before the sets do IS the max set: "[8-6-4-2-max]" writes four
   // numbers across five sets. This is the shape the app has always read correctly.
   const scheme = exercise.suggestedRepsPerSet;
   if (scheme && scheme.length > 0 && (exercise.suggestedSets ?? 0) > scheme.length) return true;
 
+  // The word "max" is backfill for docs parsed before movements carried the stamp. A movement
+  // that does carry it has answered the question — the dips' own "max" is not a max set.
+  if (all.some((m) => m.isMaxReps === true)) return false;
   return /\bmax\b/i.test(`${exercise.name ?? ''} ${exercise.prescription ?? ''}`);
+}
+
+const blockMovements = (exercise: { movements?: ParsedMovement[]; sections?: ParsedSection[] }): ParsedMovement[] =>
+  [...(exercise.movements ?? []), ...(exercise.sections ?? []).flatMap((s: ParsedSection) => s.movements)];
+
+/**
+ * The open movements that are a closing max set — the set the block ENDS on, its reps earned —
+ * as opposed to a movement taken to max inside every set (the dips in a circuit), whose count is
+ * that movement's own, set by set. The chat asks the two differently and the save stores them
+ * differently, so both read this one answer.
+ */
+export function maxSetMovements(exercise: { movements?: ParsedMovement[]; sections?: ParsedSection[] }): ParsedMovement[] {
+  const all = blockMovements(exercise);
+  const sections = exercise.sections ?? [];
+  return all.filter((m) => statesMaxEffort(m) && isOwnSet(m, all, sections));
+}
+
+/**
+ * Is this open movement a set by itself, rather than one leg of every set? The board says so one
+ * of two ways: the parse gives it a section where nothing is prescribed ("+ max reps @60%" as its
+ * own round), or it repeats a lift the block already works ("Back Squat 4x5 … Back Squat max").
+ * A block of nothing but the open movement is all max sets.
+ */
+function isOwnSet(movement: ParsedMovement, all: ParsedMovement[], sections: ParsedSection[]): boolean {
+  const key = movement.name.toLowerCase();
+  const home = sections.find((s) => s.movements.some((m) => m.name.toLowerCase() === key && statesMaxEffort(m)));
+  if (home) return home.movements.every(statesMaxEffort);
+  const worked = all.filter((m) => !statesMaxEffort(m));
+  if (worked.length === 0) return true;
+  const identity = movementIdentity(movement.name);
+  return worked.some((m) => movementIdentity(m.name) === identity);
 }
 
 /**

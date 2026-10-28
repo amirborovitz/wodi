@@ -51,7 +51,7 @@ interface AnalyticsEvents {
    * ('plus_menu' was the "+" sheet, removed 2026-10-14 — older events still carry it.)
    * `board`: whether a workout was already read (its answers go along).
    */
-  standard_screen_from_chat: { how: 'typed' | 'chip' | 'wodi_handoff'; board: 'yes' | 'no' };
+  standard_screen_from_chat: { how: 'typed' | 'chip'; board: 'yes' | 'no' };
   /** A saved board was cleared without a log — "Didn't do it" in its chat, or on its Today tile. */
   saved_board_dropped: { where: 'chat' | 'today' };
   /** A saved workout was fixed and re-saved. */

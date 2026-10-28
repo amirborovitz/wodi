@@ -9,42 +9,125 @@
           "name": "",
           "primary": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "600m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "8 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "8 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "8 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "roundLabel": "×2",
           "name": "",
           "primary": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "900m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "12 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "12 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "12 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "roundLabel": "×1",
           "name": "",
           "primary": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "24 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "24 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "24 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "roundLabel": "CASH-OUT",
           "name": "",
           "primary": "200 DU / 400 Single Unders",
           "suppressMine": true,
-          "accent": "magenta"
+          "accent": "magenta",
+          "parts": [
+            {
+              "text": "200 DU / 400 Single Unders",
+              "movement": "Double Under"
+            }
+          ]
         },
         {
           "roundLabel": "RX",
           "name": "",
           "primary": "15/22.5kg",
           "mineOverride": "17.5kg",
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": []
         },
         {
           "roundLabel": "TOTAL",
           "name": "",
           "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
           "suppressMine": true,
-          "accent": "yellow"
+          "accent": "yellow",
+          "parts": [
+            {
+              "text": "5.4km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "72 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "72 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "72 T2B",
+              "movement": "Toes to Bar"
+            },
+            {
+              "text": "200 DU",
+              "movement": "Double Under"
+            }
+          ]
         }
       ]
     }
@@ -60,42 +143,125 @@
             "name": "",
             "primary": "600m Echo Bike · 8 Alt DB Snatches · 8 Weighted Alt Box Step-ups · 8 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "600m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "8 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "8 Weighted Alt Box Step-ups",
+                "movement": "Weighted Alt Box Step-up"
+              },
+              {
+                "text": "8 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "×2",
             "name": "",
             "primary": "900m Echo Bike · 12 Alt DB Snatches · 12 Weighted Alt Box Step-ups · 12 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "900m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "12 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "12 Weighted Alt Box Step-ups",
+                "movement": "Weighted Alt Box Step-up"
+              },
+              {
+                "text": "12 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "×1",
             "name": "",
             "primary": "1800m Echo Bike · 24 Alt DB Snatches · 24 Weighted Alt Box Step-ups · 24 T2B",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "1800m Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "24 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "24 Weighted Alt Box Step-ups",
+                "movement": "Weighted Alt Box Step-up"
+              },
+              {
+                "text": "24 T2B",
+                "movement": "Toes to Bar"
+              }
+            ]
           },
           {
             "roundLabel": "CASH-OUT",
             "name": "",
             "primary": "200 DU / 400 Single Unders",
             "suppressMine": true,
-            "accent": "magenta"
+            "accent": "magenta",
+            "parts": [
+              {
+                "text": "200 DU / 400 Single Unders",
+                "movement": "Double Under"
+              }
+            ]
           },
           {
             "roundLabel": "RX",
             "name": "",
             "primary": "15/22.5kg",
             "mineOverride": "17.5kg",
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": []
           },
           {
             "roundLabel": "TOTAL",
             "name": "",
             "primary": "5.4km Echo Bike · 72 Alt DB Snatches · 72 Weighted Alt Box Step-ups · 72 T2B · 200 DU",
             "suppressMine": true,
-            "accent": "yellow"
+            "accent": "yellow",
+            "parts": [
+              {
+                "text": "5.4km Echo Bike",
+                "movement": "Echo Bike"
+              },
+              {
+                "text": "72 Alt DB Snatches",
+                "movement": "Alt Dumbbell Snatch"
+              },
+              {
+                "text": "72 Weighted Alt Box Step-ups",
+                "movement": "Weighted Alt Box Step-up"
+              },
+              {
+                "text": "72 T2B",
+                "movement": "Toes to Bar"
+              },
+              {
+                "text": "200 DU",
+                "movement": "Double Under"
+              }
+            ]
           }
         ]
       }
@@ -258,7 +424,25 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×3"
+        "roundLabel": "×3",
+        "parts": [
+          {
+            "text": "600m Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "8 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "8 Weighted Alt Box Step-ups",
+            "movement": "Weighted Alt Box Step-up"
+          },
+          {
+            "text": "8 T2B",
+            "movement": "Toes to Bar"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -266,7 +450,25 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×2"
+        "roundLabel": "×2",
+        "parts": [
+          {
+            "text": "900m Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "12 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "12 Weighted Alt Box Step-ups",
+            "movement": "Weighted Alt Box Step-up"
+          },
+          {
+            "text": "12 T2B",
+            "movement": "Toes to Bar"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -274,7 +476,25 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "×1"
+        "roundLabel": "×1",
+        "parts": [
+          {
+            "text": "1800m Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "24 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "24 Weighted Alt Box Step-ups",
+            "movement": "Weighted Alt Box Step-up"
+          },
+          {
+            "text": "24 T2B",
+            "movement": "Toes to Bar"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -282,7 +502,13 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "CASH-OUT"
+        "roundLabel": "CASH-OUT",
+        "parts": [
+          {
+            "text": "200 DU / 400 Single Unders",
+            "movement": "Double Under"
+          }
+        ]
       },
       {
         "kind": "line",
@@ -290,7 +516,8 @@
         "load": "",
         "mine": "17.5kg",
         "team": "",
-        "roundLabel": "RX"
+        "roundLabel": "RX",
+        "parts": []
       },
       {
         "kind": "line",
@@ -298,7 +525,29 @@
         "load": "",
         "mine": "",
         "team": "",
-        "roundLabel": "TOTAL"
+        "roundLabel": "TOTAL",
+        "parts": [
+          {
+            "text": "5.4km Echo Bike",
+            "movement": "Echo Bike"
+          },
+          {
+            "text": "72 Alt DB Snatches",
+            "movement": "Alt Dumbbell Snatch"
+          },
+          {
+            "text": "72 Weighted Alt Box Step-ups",
+            "movement": "Weighted Alt Box Step-up"
+          },
+          {
+            "text": "72 T2B",
+            "movement": "Toes to Bar"
+          },
+          {
+            "text": "200 DU",
+            "movement": "Double Under"
+          }
+        ]
       }
     ],
     "pages": [
@@ -314,7 +563,25 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×3"
+          "roundLabel": "×3",
+          "parts": [
+            {
+              "text": "600m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "8 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "8 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "8 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -322,7 +589,25 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×2"
+          "roundLabel": "×2",
+          "parts": [
+            {
+              "text": "900m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "12 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "12 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "12 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -330,7 +615,25 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "×1"
+          "roundLabel": "×1",
+          "parts": [
+            {
+              "text": "1800m Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "24 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "24 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "24 T2B",
+              "movement": "Toes to Bar"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -338,7 +641,13 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "CASH-OUT"
+          "roundLabel": "CASH-OUT",
+          "parts": [
+            {
+              "text": "200 DU / 400 Single Unders",
+              "movement": "Double Under"
+            }
+          ]
         },
         {
           "kind": "line",
@@ -346,7 +655,8 @@
           "load": "",
           "mine": "17.5kg",
           "team": "",
-          "roundLabel": "RX"
+          "roundLabel": "RX",
+          "parts": []
         },
         {
           "kind": "line",
@@ -354,7 +664,29 @@
           "load": "",
           "mine": "",
           "team": "",
-          "roundLabel": "TOTAL"
+          "roundLabel": "TOTAL",
+          "parts": [
+            {
+              "text": "5.4km Echo Bike",
+              "movement": "Echo Bike"
+            },
+            {
+              "text": "72 Alt DB Snatches",
+              "movement": "Alt Dumbbell Snatch"
+            },
+            {
+              "text": "72 Weighted Alt Box Step-ups",
+              "movement": "Weighted Alt Box Step-up"
+            },
+            {
+              "text": "72 T2B",
+              "movement": "Toes to Bar"
+            },
+            {
+              "text": "200 DU",
+              "movement": "Double Under"
+            }
+          ]
         }
       ]
     ]

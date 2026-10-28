@@ -169,9 +169,10 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                   />
                 </div>
               )}
-              {message.panel && !message.answered && (
+              {message.panel && (
                 <ChatPanelCard
                   panel={message.panel}
+                  locked={message.answered === true}
                   disabled={busy != null}
                   onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); pinToEnd(); }}
                   {...(message.cardChip ? { secondary: { label: message.cardChip.label, onClick: () => { tapChip(message.id, message.cardChip!); pinToEnd(); } } } : {})}

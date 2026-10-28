@@ -123,6 +123,12 @@ export interface RecapCardioStat {
   distance: number;
   /** Workouts that measured this machine in distance. */
   distanceSessions: number;
+  /**
+   * Workouts on this machine in either unit. Not the sum of the two above: a
+   * workout that rode the bike for metres in one part and calories in another is
+   * one session.
+   */
+  sessions: number;
 }
 
 /**
@@ -157,6 +163,8 @@ export interface RecapEngineCell {
    * printing one machine twice, or double-counting it.
    */
   sessions: number;
+  /** Workouts on this machine in either unit — what a tile showing both units at once counts. */
+  machineSessions: number;
 }
 
 export interface RecapAerobicStat {
@@ -1086,6 +1094,7 @@ function buildCardioStats(ws: WorkoutWithStats[]): RecapCardioStat[] {
         name: family,
         calories: 0, calorieSessions: 0,
         distance: 0, distanceSessions: 0,
+        sessions: 0,
       };
       entry.calories += calories;
       entry.distance += distance;
@@ -1102,6 +1111,7 @@ function buildCardioStats(ws: WorkoutWithStats[]): RecapCardioStat[] {
 
     for (const family of calorieHits) map.get(family)!.calorieSessions += 1;
     for (const family of distanceHits) map.get(family)!.distanceSessions += 1;
+    for (const family of new Set([...calorieHits, ...distanceHits])) map.get(family)!.sessions += 1;
   }
 
   return [...map.values()]
@@ -1131,6 +1141,8 @@ interface AerobicEntry {
   label: string;
   /** Workouts that measured THIS machine in THIS unit. */
   sessions: number;
+  /** Workouts on this machine in either unit. */
+  machineSessions: number;
 }
 
 /** "3 sessions" · "1 session" — the count, never bare. */
@@ -1209,14 +1221,14 @@ function buildAerobicStat(cardio: RecapCardioStat[]): RecapAerobicStat | null {
       const { value, unit } = formatDistance(stat.distance);
       entries.push({
         machine: stat.name, unit: 'distance', amount: stat.distance,
-        value, label: unit, sessions: stat.distanceSessions,
+        value, label: unit, sessions: stat.distanceSessions, machineSessions: stat.sessions,
       });
     }
     if (stat.calories > 0) {
       entries.push({
         machine: stat.name, unit: 'calories', amount: stat.calories,
         value: Math.round(stat.calories).toLocaleString(), label: 'CAL',
-        sessions: stat.calorieSessions,
+        sessions: stat.calorieSessions, machineSessions: stat.sessions,
       });
     }
   }
@@ -1241,7 +1253,9 @@ function buildAerobicStat(cardio: RecapCardioStat[]): RecapAerobicStat | null {
     rest: rest.length > 0
       ? `+ ${rest.map(e => `${e.machine} ${e.value} ${e.label.toLowerCase()} (${sessionCount(e.sessions)})`).join(' · ')}`
       : null,
-    cells: entries.map(e => ({ machine: e.machine, value: e.value, unit: e.label, sessions: e.sessions })),
+    cells: entries.map(e => ({
+      machine: e.machine, value: e.value, unit: e.label, sessions: e.sessions, machineSessions: e.machineSessions,
+    })),
   };
 }
 

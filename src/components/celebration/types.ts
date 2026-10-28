@@ -145,6 +145,19 @@ export interface ArtifactRow {
   // rung's movements were finished, out of the total. `partial` is the legacy per-movement
   // rep count kept only for old docs saved before the checklist.
   ladderTrack?: { reps: number[]; step: number; partial?: number; partialMoves?: { done: number; total: number }; cadence?: string; complete?: boolean };
+  /**
+   * The movements a line naming several of them states — "6 Pull-ups · 12 DB Snatches" is two.
+   * Absent: the line is one movement. Empty: it names none (an RX weight line). Carried as data
+   * because the joined text is display: anything that needs each movement reads this, never a
+   * split of `primary`.
+   */
+  parts?: LinePart[];
+}
+
+/** One movement of a line that names several: its words as printed, and the movement's own name. */
+export interface LinePart {
+  text: string;
+  movement: string;
 }
 
 export interface ArtifactSection {

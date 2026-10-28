@@ -51,6 +51,17 @@ function sayOnce(userId: string, occasion: WodiOccasion): Promise<ThreadMessage>
   return job;
 }
 
+/**
+ * The poster's result as Wodi says it. A bare number means nothing without the words printed
+ * under it — "588" is "588 total reps" — while "5:42" or "5+12" already says what it is.
+ */
+function saidResult(result: { label: string; value: string }): string | null {
+  const value = result.value.trim();
+  if (!value) return null;
+  const label = result.label.trim().toLowerCase();
+  return /^\d[\d,.]*$/.test(value) && label ? `${value} ${label}` : value;
+}
+
 function startOfToday(): number {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -72,7 +83,7 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
   // The last workout is said with its poster's own result — the same number the poster prints.
   const latestPoster = usePosterPayload(latest);
   const lead = latestPoster?.wods[0];
-  const latestResult = lead && !lead.result.scores ? lead.result.value || null : null;
+  const latestResult = lead && !lead.result.scores ? saidResult(lead.result) : null;
 
   // What Wodi has already said on its own, by id. Null until read.
   const [said, setSaid] = useState<Map<string, ThreadMessage> | null>(null);

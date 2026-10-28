@@ -83,3 +83,35 @@ describe('useWeekPosterData — the board keeps the week honest in both directio
     expect(poster.moves.length).toBeGreaterThan(0);
   });
 });
+
+describe('useWeekPosterData — one tile per machine', () => {
+  it('puts a bike ridden in metres and in calories in ONE tile, both figures, the whole week counted', () => {
+    const poster = week([
+      workout('a', [{ name: 'Echo Bike', totalDistance: 3000 }]),
+      workout('b', [{ name: 'Echo Bike', totalDistance: 2100 }]),
+      workout('c', [{ name: 'Echo Bike', totalCalories: 400 }]),
+    ]);
+    expect(poster.tiles).toEqual([
+      { parts: [{ value: '5.1', unit: 'KM' }, { value: '400', unit: 'CAL' }], source: 'ECHO BIKE · 3 SESSIONS' },
+    ]);
+  });
+
+  it('counts a workout that rode the bike both ways as one session', () => {
+    const poster = week([
+      workout('a', [{ name: 'Echo Bike', totalDistance: 3000 }, { name: 'Echo Bike', totalCalories: 50 }]),
+      workout('b', [{ name: 'Echo Bike', totalCalories: 60 }]),
+    ]);
+    expect(poster.tiles[0].source).toBe('ECHO BIKE · 2 SESSIONS');
+  });
+
+  it('gives a machine measured one way a plain tile', () => {
+    const poster = week([
+      workout('a', [{ name: 'Row', totalDistance: 6000 }]),
+      workout('b', [{ name: 'Echo Bike', totalCalories: 80 }]),
+    ]);
+    expect(poster.tiles).toEqual([
+      { parts: [{ value: '6.0', unit: 'KM' }], source: 'ROW' },
+      { parts: [{ value: '80', unit: 'CAL' }], source: 'ECHO BIKE' },
+    ]);
+  });
+});

@@ -4,7 +4,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import type { ParsedWorkout, Workout } from './types';
 import { initStoryResults, type StoryExerciseResult } from './components/logging/story/types';
 import { storyTeamSize } from './components/logging/story/StoryLogResults';
-import { openSlots, applyAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
+import { openSlots, applyAnswer, nextQuestion, panelAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
 import { getExerciseLoggingMode } from './services/exerciseLoggingMode';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from './services/savedWorkout';
 import { reopenLogged } from './services/loggedRecord';
@@ -38,14 +38,24 @@ function asWritten(slot: ChatSlot): SlotAnswer | null {
     case 'duration': return answer({ seconds: 60 });
     case 'weight': return answer({ weight: 50 });
     case 'maxset': return answer({ count: 10, weight: 50 });
+    case 'count': return answer({ count: 10 });
+    case 'ladder': return slot.rungs?.[2] ? answer({ count: slot.rungs[2] }) : null;
+    case 'partial': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
     case 'choice': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
     case 'unit': return answer({ unit: 'kg' });
     default: return null;
   }
 }
 
-/** The chat, played to the end by an athlete who did the board as written. */
-function logAsWritten(parsed: ParsedWorkout): StoryExerciseResult[] {
+/**
+ * The chat, played to the end by an athlete who did the board as written. `asked` hears each
+ * question card as the athlete would see it — what the decisions snapshot records.
+ */
+function logAsWritten(
+  parsed: ParsedWorkout,
+  asked?: (text: string) => void,
+  answerFor: (slot: ChatSlot) => SlotAnswer | null = asWritten,
+): StoryExerciseResult[] {
   const context = { format: parsed.format, scoreType: parsed.scoreType, exerciseCount: parsed.exercises.length };
   let results = initStoryResults(
     parsed,
@@ -56,11 +66,20 @@ function logAsWritten(parsed: ParsedWorkout): StoryExerciseResult[] {
   );
   const closed = new Set<string>();
   for (let guard = 0; guard < 60; guard += 1) {
-    const slot = openSlots(results, closed, new Map(), parsed.teamSize).find((s) => s.asked);
-    if (!slot) break;
-    const answer = asWritten(slot);
-    closed.add(slot.id);
-    if (answer) results = applyAnswer(results, slot, answer).results;
+    const slots = openSlots(results, closed, new Map(), parsed.teamSize);
+    const question = nextQuestion(slots, results);
+    if (!question) break;
+    asked?.(question.text);
+    // One card can answer several slots at once (a lift's start, peak and max set).
+    for (const id of question.slotIds) {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) continue;
+      const answer = answerFor(slot);
+      closed.add(slot.id);
+      if (answer) results = applyAnswer(results, slot, answer).results;
+    }
+    // A card that names no open slot would be asked forever.
+    if (!question.slotIds.some((id) => closed.has(id))) throw new Error(`"${question.text}" answers nothing`);
   }
   return results;
 }
@@ -145,6 +164,27 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     expect(wrong).toEqual([]);
   });
 
+  // WHAT THE CHAT ASKS, board by board, frozen in a file a person can read. A rule change that
+  // alters any board's questions shows up here as a diff — the max-dips board asked "Max set:
+  // reps @ weight" on the good mornings for days before anyone saw it (2026-10-21). Update with
+  // `npx vitest run src/corpusSave.test.ts -u` and say in the commit why each board changed.
+  it('asks every board the questions frozen in chat-decisions.txt', async () => {
+    const lines: string[] = [];
+    for (const { name, parsed } of boards) {
+      lines.push(name);
+      const cards: string[] = [];
+      const results = logAsWritten(parsed, (text) => cards.push(text));
+      results.forEach((r) => {
+        const how = r.skipped ? 'skipped' : r.kind;
+        lines.push(`  part ${r.exerciseIndex + 1} · ${r.exercise.name} · ${how}`);
+      });
+      cards.forEach((text) => lines.push(`    asks: ${text}`));
+      if (cards.length === 0) lines.push('    asks nothing');
+      lines.push('');
+    }
+    await expect(lines.join('\n')).toMatchFileSnapshot('../fixtures/chat-decisions.txt');
+  });
+
   it('an edit reopens exactly what was logged, and saving it untouched changes nothing', () => {
     // Every board, every kind — AMRAPs and max tests too: the round trip isn't about the totals
     // being right, it's about an edit never turning one log into a different one.
@@ -173,6 +213,161 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     expect(drifted).toEqual([]);
     // A Firestore doc holds 1 MiB; the record must stay a small part of it.
     expect(largest).toBeLessThan(200_000);
+  });
+
+  // ─── Every shape the old screen logged, logged in the chat ─────────────────────────
+  // Until 2026-10-22 the chat handed four of these boards to the standard screen ("easier to
+  // fill in yourself"). Each test plays the chat with real answers and reads what the SAVE holds.
+
+  /** The chat, played with the given answers by slot kind; anything else as written. */
+  const play = (name: string, answers: Partial<Record<ChatSlot['kind'], (slot: ChatSlot) => Partial<SlotAnswer>>>) => {
+    const board = boards.find((b) => b.name === name);
+    if (!board) throw new Error(`no corpus board ${name}`);
+    const cards: string[] = [];
+    const results = logAsWritten(board.parsed, (text) => cards.push(text), (slot) => {
+      const given = answers[slot.kind];
+      return given ? { id: slot.id, ...EMPTY_ANSWER, ...given(slot) } : asWritten(slot);
+    });
+    const saved = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor);
+    const row = (movement: string) => saved.breakdownFromResults.movements.find((m) => m.name === movement);
+    return { results, cards, saved, row };
+  };
+
+  it('work done for time is never counted: flutter kicks fill their 50 s window, no box', () => {
+    // Owner board 2026-10-21: "5. Flutter Kick" in an EMOM 50:10 — nobody counts flutter kicks.
+    const counted: string[] = [];
+    const { row } = play('station-emom-flutter-kick-time', {
+      count: (slot) => {
+        counted.push(...(slot.movementNames ?? []));
+        return { count: 12 };
+      },
+    });
+    expect(counted).toContain('Echo Bike');
+    expect(counted).not.toContain('Flutter Kick');
+    expect(row('Flutter Kick')?.totalReps ?? 0).toBe(0);
+  });
+
+  it('a swap typed on the station card, off the board\'s own either/or, lands as said', () => {
+    // "Did crossovers instead of the double unders, about 25 each round" — the reader answers the
+    // station's swap question, with or without the number on its count. Either way: 4 × 25.
+    const board = boards.find((b) => b.name === 'station-emom-flutter-kick-time')!;
+    const said: Array<Array<Partial<SlotAnswer> & { kind: ChatSlot['kind'] }>> = [
+      [{ kind: 'swap', swapTo: 'Crossover', swapAmount: 25, swapUnit: 'reps' }],
+      [{ kind: 'swap', swapTo: 'Crossover' }, { kind: 'count', count: 25 }],
+      [{ kind: 'count', count: 25 }, { kind: 'swap', swapTo: 'Crossover' }],
+    ];
+    for (const answers of said) {
+      // The card logged with the double-unders box left for the sentence…
+      let results = logAsWritten(board.parsed, undefined, (slot) => (
+        slot.kind === 'count' && slot.movementNames?.[0] === 'Double Under' ? null : asWritten(slot)
+      ));
+      // …and the sentence, read: every answer it carries, in the reader's order.
+      const slots = openSlots(results, new Set());
+      for (const { kind, ...fields } of answers) {
+        const slot = slots.find((s) => s.kind === kind && s.movementNames?.[0] === 'Double Under' && s.exerciseIndex === 1)!;
+        expect(slot, `${kind} slot for Double Under`).toBeDefined();
+        results = applyAnswer(results, slot, { id: slot.id, ...EMPTY_ANSWER, ...fields }).results;
+      }
+      const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+      expect(rows.find((m) => m.name === 'Crossover')?.totalReps, JSON.stringify(answers)).toBe(100);
+      expect(rows.find((m) => m.name === 'Double Under')).toBeUndefined();
+      // Nothing to convert on a "max" station — the number is the crossovers' own.
+      expect(openSlots(results, new Set()).some((s) => s.asked && s.kind === 'amount')).toBe(false);
+    }
+  });
+
+  it('a max-reps score typed in the chat reaches the save (it was saved as zero)', () => {
+    // "Every 3:00 x 5: 400m run, max push-ups. Score = total push-ups."
+    const { row, results } = play('board-every-3-max-pushups', { reps: () => ({ count: 87 }) });
+    expect(results[0].maxReps).toBe(87);
+    expect(row('Push-up')?.totalReps).toBe(87);
+  });
+
+  it('"about 15 each round" is fifteen in every window', () => {
+    const { row } = play('board-every-3-max-pushups', { reps: () => ({ count: 15, perInterval: true }) });
+    expect(row('Push-up')?.totalReps).toBe(75);
+  });
+
+  it('a station EMOM asks every station on one card and saves each one', () => {
+    // EMOM (50:10) x 25 min, five stations, every one "max" — five visits each.
+    const { cards, row } = play('bare-movement-station-emom', { count: () => ({ count: 12 }) });
+    expect(cards).toContain('How many at each one, each round?');
+    expect(row('Echo Bike')?.totalCalories).toBe(60);
+    for (const station of ['Bar Muscle-up', 'Box Jump', 'Renegade Row', 'Burpee']) {
+      expect(row(station)?.totalReps).toBe(60);
+    }
+  });
+
+  it('a station with the board\'s either/or picks its side on the station card', () => {
+    // "Bar Muscle-up / Pull-up" is one of the five stations: picked on the card, beside its count.
+    const board = boards.find((b) => b.name === 'bare-movement-station-emom')!;
+    const context = { format: board.parsed.format, scoreType: board.parsed.scoreType, exerciseCount: board.parsed.exercises.length };
+    let results = initStoryResults(board.parsed, board.parsed.exercises.map((e) => getExerciseLoggingMode(e, context)), 'male', storyTeamSize(board.parsed), { blankAnswers: true, weightUnit: 'kg' });
+    const closed = new Set<string>();
+    let card = null as ReturnType<typeof nextQuestion>;
+    for (let guard = 0; guard < 20; guard += 1) {
+      const slots = openSlots(results, closed);
+      const question = nextQuestion(slots, results);
+      if (!question) break;
+      if (question.panel?.groups.some((g) => g.choice)) {
+        card = question;
+        const group = question.panel.groups.find((g) => g.choice)!;
+        const values = Object.fromEntries(question.panel.groups.map((g) => [`${g.fields[0].slotId}:count`, 10]));
+        const { label, answers } = panelAnswer(question.panel, values, new Set(), { [group.choice!.slotId]: group.choice!.options[1] });
+        expect(label).toContain('Pull-up 10 reps');
+        // Every station named in the reply, a box left empty said as empty, the pick kept even
+        // with no number — the reply is what stays of the card when the chat is reopened.
+        const echo = question.panel.groups.find((g) => g.title === 'Echo Bike')!;
+        const sparse = panelAnswer(question.panel, { [`${echo.fields[0].slotId}:count`]: 12 }, new Set(), { [group.choice!.slotId]: group.choice!.options[1] });
+        expect(sparse.label).toContain('Echo Bike 12 cal');
+        expect(sparse.label).toContain('Pull-up —');
+        expect(panelAnswer(question.panel, {}, new Set(), { [group.choice!.slotId]: group.choice!.options[1] }).label).toContain('Pull-up —');
+        for (const a of answers) {
+          const slot = slots.find((s) => s.id === a.id)!;
+          results = applyAnswer(results, slot, a).results;
+          closed.add(a.id);
+        }
+        break;
+      }
+      question.slotIds.forEach((id) => closed.add(id));
+    }
+    expect(card?.panel?.groups.find((g) => g.choice)?.choice?.labels).toEqual(['Bar Muscle-up', 'Pull-up']);
+    // The choice is answered on the card — never asked again on its own.
+    expect(openSlots(results, closed).some((s) => s.asked && s.kind === 'choice')).toBe(false);
+    // The board wrote no number for the station, so there's nothing to convert: the count typed
+    // beside the pick IS the pull-ups — never "how many Pull-up for each Bar Muscle-up?".
+    expect(openSlots(results, closed).some((s) => s.asked && s.kind === 'amount')).toBe(false);
+    const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+    expect(rows.find((m) => m.name === 'Pull-up')?.totalReps).toBe(50);
+    expect(rows.find((m) => m.name === 'Bar Muscle-up')).toBeUndefined();
+  });
+
+  it('a ladder AMRAP is the rung finished, then how far into the next', () => {
+    const { results, cards } = play('board-ascending-ladder-amrap', {
+      ladder: (slot) => ({ count: slot.rungs![3] }),
+      partial: (slot) => ({ choice: slot.options![0] }),
+    });
+    expect(cards[0]).toBe('Which rung did you finish?');
+    expect(results[0].ladderStep).toBe(4);
+    expect(results[0].partialMovements).toHaveLength(1);
+  });
+
+  it('a cardio piece scored in calories asks calories, and saves them', () => {
+    // "30 min Zone 2, Bike or Row" — the AI reads it as max calories, so the question is calories.
+    const { cards, row } = play('board-zone2-bike', { count: () => ({ count: 310 }) });
+    expect(cards).toContain('How many calories on the Bike in total?');
+    expect(cards.some((text) => text.startsWith('How far'))).toBe(false);
+    expect(row('Bike')?.totalCalories).toBe(310);
+  });
+
+  it('two separately scored AMRAPs are asked by name and saved as two scores', () => {
+    let next = 6;
+    const { results, cards } = play('board-two-scored-metcons', { rounds: () => ({ count: next-- }) });
+    expect(cards.filter((text) => text.startsWith('How many rounds'))).toEqual([
+      'How many rounds did you get on BLOCK A?',
+      'How many rounds did you get on BLOCK B?',
+    ]);
+    expect(results[0].blockScores?.filter(Boolean).map((b) => b!.value)).toEqual([6, 5]);
   });
 });
 
