@@ -1,0 +1,57 @@
+/* A poster reduced to thumbnail size (wodi Today v6): the skin's colours, title on top, the
+   result big at the foot, the wordmark's colour as a strip. Sized by --mini-w (set it on a parent); the rest follows. */
+.tile {
+  width: var(--mini-w, 58px);
+  aspect-ratio: 50 / 64;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--mini-w, 58px) * 0.11) calc(var(--mini-w, 58px) * 0.11) 0;
+  border-radius: calc(var(--mini-w, 58px) * 0.13);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.pending {
+  background: var(--wodi-card2);
+}
+
+/* Takes the free height, so the result and the strip always sit at the foot. */
+.title {
+  flex: 1 1 auto;
+  min-height: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: calc(var(--mini-w, 58px) * 0.2);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  /* Two lines, so a movement name ("WALL BALL +2") reads whole instead of ending in "…". */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.result {
+  margin-bottom: calc(var(--mini-w, 58px) * 0.1);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* The result's size by its length (useMiniPoster), so a long time never runs off the tile. */
+.lg { font-size: calc(var(--mini-w, 58px) * 0.42); }
+.md { font-size: calc(var(--mini-w, 58px) * 0.36); }
+.sm { font-size: calc(var(--mini-w, 58px) * 0.3); }
+.xs { font-size: calc(var(--mini-w, 58px) * 0.23); }
+
+.strip {
+  margin: 0 calc(var(--mini-w, 58px) * -0.11);
+  height: calc(var(--mini-w, 58px) * 0.12);
+  flex-shrink: 0;
+}

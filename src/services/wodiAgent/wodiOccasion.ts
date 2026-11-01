@@ -8,18 +8,19 @@ import type { ThreadMessage } from './threadItems';
  * and gathers the facts; the model only finds the words (wodiLine.ts). Pure, so every rule below
  * is pinned by tests.
  *
- * A buddy, not a tracker (owner, 2026-10-05: "cheer up after workouts … proactive sometimes"):
- * - a workout just logged gets a cheer, always;
- * - otherwise at most ONE new thing a day, and only when there's a real reason — the morning after
- *   a hard one, the week's rhythm, a year-ago anniversary, coming back after a break, or a check-in
- *   on something the athlete asked Wodi to remember.
+ * A buddy, not a tracker. Wodi speaks in the chat when you speak to it — and otherwise only:
+ * - to cheer a workout just logged, always;
+ * - to check in, once, on something the athlete asked Wodi to remember (an answer to them too).
+ * No lines of its own beyond that (owner, 2026-10-31, on "You just passed 250 dips" opening the
+ * chat: "i dont think this should be in the chat") — the welcome-back, the morning-after check-in,
+ * the year-ago and the week's-rhythm lines were removed with it.
  *
  * It only ever recognises (see wodiMessage.ts): no gaps, no "N days since", no targets. Each
  * occasion has a stable key — the thread message id it is kept under — so it is said once and
  * every surface reads the same words.
  */
 
-export type OccasionKind = 'cheer' | 'check_in' | 'week' | 'anniversary' | 'welcome_back' | 'note';
+export type OccasionKind = 'cheer' | 'note';
 
 export type FactValue = string | number | boolean;
 
@@ -59,14 +60,9 @@ export type OccasionPick =
 
 /** A workout is news for three days; past that its cheer gives way. Matches wodiMessage.ts. */
 const FRESH_DAYS = 3;
-/** Away this long and coming back is worth a "good to see you" — never a count of the days. */
-const AWAY_DAYS = 10;
 /** A note is checked on once, after it has had time to change — and not once it's old news. */
 const NOTE_SETTLE_DAYS = 7;
 const NOTE_STALE_DAYS = 30;
-/** Long enough that the next morning is worth asking about. */
-const BIG_MINUTES = 30;
-const HARD_FELT: readonly PosterVibeKey[] = ['cooked', 'smoked', 'wrecked'];
 
 const DAY_MS = 86_400_000;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -116,7 +112,8 @@ function cheerOccasion(w: OccasionWorkout, input: OccasionInput): WodiOccasion {
   if (w.teamSize > 1) facts.team_size = w.teamSize;
   const { milestone } = input;
   if (milestone?.justCrossed != null && milestone.crossedOn === w.trained) {
-    facts.milestone_just_passed = `${Math.round(milestone.justCrossed).toLocaleString()} ${milestone.unit === 'km' ? 'km of' : ''} ${milestone.movement}`.replace(/\s+/g, ' ');
+    // "all time" in the fact itself: a lifetime count said without it reads as this workout's.
+    facts.milestone_just_passed = `${Math.round(milestone.justCrossed).toLocaleString()} ${milestone.unit === 'km' ? 'km of' : ''} ${milestone.movement}, all time`.replace(/\s+/g, ' ');
   }
   const tied = input.chase.find((f) => f.kind === 'TIED' && f.on === w.trained);
   if (tied) facts.matched_best = tied.raw;
@@ -142,86 +139,24 @@ export interface OccasionInput {
   todayStartMs: number;
 }
 
-/** The day-to-day things Wodi may bring up, first that applies wins. Each is said once. */
-function proactiveOccasions(input: OccasionInput): WodiOccasion[] {
-  const { workouts, today, notes } = input;
-  const latest = workouts[0];
-  const out: WodiOccasion[] = [];
-  if (!latest) return out;
-  const ago = daysBetween(latest.trained, today);
-
-  if (ago >= AWAY_DAYS) {
-    out.push({
-      key: `back:${latest.id}`,
-      kind: 'welcome_back',
-      facts: { last_workout: titleOf(latest) },
-      fallback: 'Good to see you. What are we doing today?',
-      workoutId: null,
-    });
-  }
-
-  if (ago === 1 && ((latest.minutes ?? 0) >= BIG_MINUTES || (latest.felt != null && HARD_FELT.includes(latest.felt)))) {
-    const facts: Record<string, FactValue> = { workout: titleOf(latest), when: 'yesterday' };
-    if (latest.felt) facts.felt = FELT_WORDS[latest.felt];
-    out.push({
-      key: `checkin:${latest.id}`,
-      kind: 'check_in',
-      facts,
-      fallback: `How's the body after ${titleOf(latest)} yesterday?`,
-      workoutId: latest.id,
-    });
-  }
-
-  const [, month, day] = today.split('-');
-  const yearAgo = workouts.find((w) => w.trained.slice(5) === `${month}-${day}` && w.trained.slice(0, 4) < today.slice(0, 4));
-  if (yearAgo) {
-    const years = Number(today.slice(0, 4)) - Number(yearAgo.trained.slice(0, 4));
-    const facts: Record<string, FactValue> = { workout: titleOf(yearAgo), years_ago: years };
-    if (yearAgo.result) facts.result = yearAgo.result;
-    out.push({
-      key: `anniversary:${yearAgo.id}:${today.slice(0, 4)}`,
-      kind: 'anniversary',
-      facts,
-      fallback: `${years === 1 ? 'A year' : `${years} years`} ago today: ${titleOf(yearAgo)}${yearAgo.result ? ` — ${yearAgo.result}` : ''}.`,
-      workoutId: yearAgo.id,
-    });
-  }
-
-  // Sunday looks at the week that's ending; Monday at the one just gone.
-  const weekday = dateOf(today).getDay();
-  if (weekday === 0 || weekday === 1) {
-    const yesterday = new Date(dateOf(today).getTime() - DAY_MS);
-    const start = weekday === 0 ? weekStart(today) : weekStart(isoOf(yesterday));
-    const count = workouts.filter((w) => weekStart(w.trained) === start).length;
-    if (count >= 2) {
-      const which = weekday === 0 ? 'this week' : 'last week';
-      out.push({
-        key: `week:${start}`,
-        kind: 'week',
-        facts: { sessions: count, week: which },
-        fallback: `${count} workouts ${which}. Lovely rhythm.`,
-        workoutId: null,
-      });
-    }
-  }
-
+/** A remembered note, checked on once — after it has had time to change, before it is old news. */
+function noteOccasion(input: OccasionInput): WodiOccasion | null {
+  const { notes, today, said } = input;
   const settled = notes.find((n) => {
     const age = daysBetween(n.createdAt, today);
-    return age >= NOTE_SETTLE_DAYS && age <= NOTE_STALE_DAYS && !input.said.has(`note:${n.id}`);
+    return age >= NOTE_SETTLE_DAYS && age <= NOTE_STALE_DAYS && !said.has(`note:${n.id}`);
   });
-  if (settled) {
-    out.push({
-      key: `note:${settled.id}`,
-      kind: 'note',
-      facts: { remembered: settled.text },
-      fallback: `You told me "${settled.text}" — how's that going?`,
-      workoutId: null,
-    });
-  }
-
-  return out;
+  if (!settled) return null;
+  return {
+    key: `note:${settled.id}`,
+    kind: 'note',
+    facts: { remembered: settled.text },
+    fallback: `You told me "${settled.text}" — how's that going?`,
+    workoutId: null,
+  };
 }
 
+// Lines kept from before 2026-10-31 still carry the removed prefixes; they're still Wodi's own.
 const OCCASION_PREFIXES = ['cheer:', 'checkin:', 'week:', 'anniversary:', 'back:', 'note:'];
 
 /** One of Wodi's own lines (not an answer to a question). */
@@ -246,15 +181,15 @@ export function pickOccasion(input: OccasionInput): OccasionPick {
   // A workout just logged is cheered — that beats anything else said today.
   if (fresh && !said.has(`cheer:${fresh.id}`)) return { kind: 'new', occasion: cheerOccasion(fresh, input) };
 
-  // One new thing a day: whatever Wodi already said today stays today's message.
+  // Whatever Wodi already said today stays today's message.
   const live = new Set(workouts.map((w) => w.id));
   const saidToday = [...said.values()]
     .filter((m) => isOccasionMessage(m) && m.at >= todayStartMs && !isAboutDeletedWorkout(m, live))
     .sort((a, b) => b.at - a.at)[0];
   if (saidToday) return { kind: 'said', message: saidToday };
 
-  const next = proactiveOccasions(input).find((o) => !said.has(o.key));
-  if (next) return { kind: 'new', occasion: next };
+  const note = noteOccasion(input);
+  if (note) return { kind: 'new', occasion: note };
 
   // Nothing new: a recent workout's cheer, as it was said.
   const cheer = fresh ? said.get(`cheer:${fresh.id}`) : undefined;

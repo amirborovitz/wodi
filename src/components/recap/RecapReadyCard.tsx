@@ -1,37 +1,34 @@
 import React, { useState } from 'react';
-import { VIBE, fD, fB } from '../celebration/faces/HandwrittenFace/brand';
-import { W2MiniFace } from './wrapped/W2MiniFace';
-import { getTopMoveLine } from '../../hooks/useRecapData';
+import { fD, fB, fH } from '../celebration/faces/HandwrittenFace/brand';
 import type { RecapData } from '../../hooks/useRecapData';
 import styles from './RecapReadyCard.module.css';
 
 interface RecapReadyCardProps {
   data: RecapData;
   onOpen: () => void;
-  onDismissStart?: () => void;
   onDismiss?: () => void;
 }
 
-/** Per-scope card copy. A week says "week", not "WEEK 33" — that's a filing reference. */
-const DROP_COPY: Record<RecapData['scope'], { pill: string; cta: string }> = {
-  week: { pill: 'WEEK DROP', cta: 'See my week' },
-  month: { pill: 'NEW DROP', cta: 'See my recap' },
-  season: { pill: 'SEASON DROP', cta: 'See my season' },
+/** Per-scope pill. A week says "week", not "WEEK 33" — that's a filing reference. */
+const DROP_PILL: Record<RecapData['scope'], string> = {
+  week: 'WEEK DROP',
+  month: 'NEW DROP',
+  season: 'SEASON DROP',
 };
 
-export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: RecapReadyCardProps): React.JSX.Element {
+/**
+ * Today's surprise slot when a recap has dropped (wodi Today v6): a slim banner ABOVE the hero,
+ * so it lands in the first glance without pushing the athlete's own poster below the fold. A small
+ * tilted "wrapped." keepsake, the drop pill, one line, and × to put it away.
+ */
+export function RecapReadyCard({ data, onOpen, onDismiss }: RecapReadyCardProps): React.JSX.Element {
   const [closing, setClosing] = useState(false);
-  const copy = DROP_COPY[data.scope];
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   const headline = data.scope === 'week' ? 'Your week is ready' : `Your ${cap(data.period)} is ready`;
-  const metaLine = data.felt.length > 0
-    ? `${getTopMoveLine(data)} - mostly ${VIBE[data.felt[0].vibe].label.toLowerCase()}`
-    : `${getTopMoveLine(data)} - ${data.workouts} workouts`;
 
   const handleDismissClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (!onDismiss || closing) return;
-    onDismissStart?.();
     setClosing(true);
   };
 
@@ -47,51 +44,32 @@ export function RecapReadyCard({ data, onOpen, onDismissStart, onDismiss }: Reca
       onTransitionEnd={handleTransitionEnd}
     >
       <div className={styles.collapseInner}>
-        <div className={styles.card}>
-
-          <div className={styles.body} onClick={onOpen} role="button" aria-label={`Open ${data.period} recap`}>
-            <div className={styles.headerRow}>
-              <span className={styles.pill} style={{ fontFamily: fB }}>
-                <span className={styles.dot} />
-                {copy.pill}
-              </span>
-              <span style={{ flex: 1 }} />
-              {onDismiss && (
-                <button
-                  type="button"
-                  className={styles.dismissBtn}
-                  onClick={handleDismissClick}
-                  aria-label="Dismiss recap"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            <div className={styles.mainRow}>
-              <div className={styles.peek}>
-                <W2MiniFace data={data} />
-              </div>
-              <div className={styles.copy}>
-                <div className={styles.headline} style={{ fontFamily: fD }}>
-                  {headline}
-                </div>
-                <div className={styles.meta} style={{ fontFamily: fB }}>
-                  {metaLine}
-                </div>
-                <div className={styles.inlineCta} style={{ fontFamily: fB }}>
-                  {copy.cta}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="13 6 19 12 13 18" />
-                  </svg>
-                </div>
-              </div>
-            </div>
+        <div className={styles.card} onClick={onOpen} role="button" aria-label={`Open ${data.period} recap`}>
+          <div className={styles.tile} aria-hidden="true">
+            <span className={styles.tilePeriod} style={{ fontFamily: fD }}>{data.period}</span>
+            <span className={styles.tileWrapped} style={{ fontFamily: fH }}>wrapped.</span>
+            <span className={styles.tileCount} style={{ fontFamily: fD }}>{data.workouts}</span>
           </div>
+          <div className={styles.copy}>
+            <span className={styles.pill} style={{ fontFamily: fB }}>
+              <span className={styles.dot} />
+              {DROP_PILL[data.scope]}
+            </span>
+            <span className={styles.headline} style={{ fontFamily: fD }}>{headline}</span>
+          </div>
+          {onDismiss && (
+            <button
+              type="button"
+              className={styles.dismissBtn}
+              onClick={handleDismissClick}
+              aria-label="Dismiss recap"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

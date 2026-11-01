@@ -4,14 +4,13 @@ import { useMilestone } from './useMilestone';
 import { useChase } from './useChase';
 import { usePosterPayload } from './usePosterPayload';
 import type { WorkoutWithStats } from './useWorkouts';
-import { buildWodiMessage, type WodiMessage } from '../services/wodiAgent/wodiMessage';
+import { OPENER_MESSAGE, type WodiMessage } from '../services/wodiAgent/wodiMessage';
 import { pickOccasion, whenWord, type OccasionWorkout, type WodiOccasion } from '../services/wodiAgent/wodiOccasion';
 import { writeWodiLine } from '../services/wodiAgent/wodiLine';
 import { appendThread, fetchRecentThread } from '../services/wodiAgent/threadStore';
 import type { ThreadMessage } from '../services/wodiAgent/threadItems';
 import { firstMeasured } from '../services/wodiAgent/wodiVoice';
 import { getEffectiveWorkoutDate, toIsoDate } from '../utils/workoutDate';
-import { liftFamilyKey } from '../utils/lastLoadHistory';
 
 export interface WodiMessageData extends WodiMessage {
   /** The poster the message's day points at — tapping that word opens it. */
@@ -146,9 +145,8 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
     }
     if (ownLine) return ownLineMessage(ownLine, workouts);
 
-    const message = buildWodiMessage({ milestone, chase: chase.facts, today: toIsoDate(new Date()) });
-    return { ...message, dayWorkout: dayWorkoutFor(message, workouts), pending: false, threadId: null, cheered: null };
-  }, [pick, written, userId, milestone, chase.facts, workouts]);
+    return { ...OPENER_MESSAGE, dayWorkout: null, pending: false, threadId: null, cheered: null };
+  }, [pick, written, userId, workouts]);
 }
 
 /**
@@ -174,18 +172,4 @@ function ownLineMessage(line: ThreadMessage, workouts: readonly WorkoutWithStats
     day: label ? { label, iso: trained, subject: null, workoutId: workout.id } : null,
     dayWorkout: label ? workout : null,
   };
-}
-
-/** The poster a plain message's day points at. */
-function dayWorkoutFor(message: WodiMessage, workouts: readonly WorkoutWithStats[]): WorkoutWithStats | null {
-  const day = message.day;
-  if (!day) return null;
-  if (day.workoutId) return workouts.find((w) => w.id === day.workoutId) ?? null;
-  const sameDay = workouts.filter((w) => toIsoDate(getEffectiveWorkoutDate(w)) === day.iso);
-  // The session that has the lift the message is about; a day with one session is that one.
-  const subject = day.subject ?? '';
-  const family = liftFamilyKey(subject);
-  return sameDay.find((w) => (w.workloadBreakdown?.movements ?? [])
-    .some((m) => liftFamilyKey(m.name) === family || m.name.toLowerCase().includes(subject.toLowerCase())))
-    ?? (sameDay.length === 1 ? sameDay[0] : null);
 }

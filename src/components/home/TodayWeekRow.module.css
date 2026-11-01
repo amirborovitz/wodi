@@ -1,0 +1,95 @@
+.week {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: rgba(243, 241, 234, 0.44);
+}
+
+/* Newest at the left; a big week scrolls sideways rather than shrinking the tiles. */
+.row {
+  --mini-w: 72px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 8px;  /* room for the PR star, which sits proud of the tile corner */
+  margin: -8px;
+}
+
+.row::-webkit-scrollbar {
+  display: none;
+}
+
+.tile {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.tile:active {
+  transform: scale(0.96);
+}
+
+.poster {
+  position: relative;
+  display: flex;
+}
+
+/* A PR in this workout: rare and true, so it gets the yellow. */
+.pr {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  box-shadow: 0 0 0 2px #0b0c0e;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.day {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: rgba(243, 241, 234, 0.44);
+}
+
+/* Quiet, not yellow: a day's worth, learned by seeing it every day — never a score to beat. */
+.ep {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: rgba(243, 241, 234, 0.86);
+  font-variant-numeric: tabular-nums;
+}
+

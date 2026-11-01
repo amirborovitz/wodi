@@ -31,6 +31,8 @@ import type { WodiNote } from '../../types';
  */
 export interface UpcomingWorkout {
   board: string;
+  /** The app's reading of the board — its parts, clocks, windows, open stations (boardReading.ts). */
+  reading: string;
   /** Their logged loads on the board's movements, in words (the chat's load card). Empty = none. */
   loads: string;
   sex?: string;
@@ -95,16 +97,19 @@ They are about to do this workout — they haven't done it yet:
 """
 ${upcoming.board.trim()}
 """
+How the app read it — trust this for the structure (the parts, the clock, the windows, which work is open-ended) over your own reading of the text above:
+${upcoming.reading.trim() || '(not read — work from the text)'}
 Athlete: ${sex} (female = the lighter number when the board writes two).
 Their logged loads on its movements, looked up by the app: ${upcoming.loads.trim() || '(none logged)'}
 
 Answer with a game plan for it, built from their log:
-- First look up their past workouts with the same movements (find_workouts by movement — a few calls is fine) and read each part's finishTime, capped or rounds against its board and timeCapMinutes. Note what they swapped (insteadOf) — that's what they'll likely do again.
-- A target: one finish time or a range no wider than 2 minutes, and a pace per round when the piece has rounds. Reason it from those past results — the target is your projection, the past times it rests on are theirs — and name the day you anchored on, so its poster comes with the answer.
+- First look up their past workouts with the same movements (find_workouts by movement — a few calls is fine). Note what they swapped (insteadOf) — that's what they'll likely do again.
+- A target for each part, in the units that part is scored in: a finish time (a range no wider than 2 minutes) for work done for time; rounds + reps for an AMRAP; for open-ended work inside a window (max reps or calories in each interval or station), a number to aim for at each station in each window ("box jumps: 12–14 every 1:15", "echo bike: 14–16 cal"). Never turn windows of open work into a round time to beat.
+- Reason each target from their own numbers on the same movement — reps or calories in a window of similar length, a time on a similar piece — and name the day you anchored on, so its poster comes with the answer. Only anchor on a piece of the same shape: a for-time result says nothing about an interval's windows.
 - Where to hold back and where to push — one line.
 - Never name a weight. The card above your answer already shows their logged loads and the board's Rx — the app's numbers. A weight from you could exceed what they can lift.
 - If nothing in their log is close enough, say so in a few words and pace it from the board alone. Never make up a past time.
-This answer may run to 6 short lines.`;
+This answer may run to 8 short lines.`;
 }
 
 function systemPrompt(now: Date, notes: readonly WodiNote[], upcoming: UpcomingWorkout | null): string {

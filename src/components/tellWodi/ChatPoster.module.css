@@ -1,10 +1,11 @@
 /* The poster just logged, under Wodi's cheer: big enough to read, one Share under it. Share is
-   white, not yellow — the camera below is the composer's one yellow action. */
+   white, not yellow — the camera below is the composer's one yellow action. Today shows the same
+   poster as its big card, at full width (--chat-poster-w). */
 .wrap {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
-  width: min(240px, 70%);
+  width: var(--chat-poster-w, min(240px, 70%));
   margin-top: var(--sp-2);
 }
 

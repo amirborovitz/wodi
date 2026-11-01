@@ -65,7 +65,7 @@ interface AnalyticsEvents {
    * A poster's move replay ended. `surface`: under the cheer in the chat, or on the poster screen.
    * `trigger`: played by itself after logging, or the Replay button. `outcome`: ran to the poster, or tapped away.
    */
-  poster_replayed: { surface: 'chat' | 'poster'; trigger: 'auto' | 'tap'; outcome: 'watched' | 'skipped' };
+  poster_replayed: { surface: 'chat' | 'poster' | 'today'; trigger: 'auto' | 'tap'; outcome: 'watched' | 'skipped' };
 }
 
 export type AnalyticsEventName = keyof AnalyticsEvents;

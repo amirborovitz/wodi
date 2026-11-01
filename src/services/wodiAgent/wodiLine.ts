@@ -12,10 +12,6 @@ export type WriteFn = (system: string, user: string) => Promise<string>;
 
 const WHAT_TO_SAY: Record<OccasionKind, string> = {
   cheer: 'They just logged this workout. Cheer them on for it. If the facts hold a personal record, a matched best or a milestone, that is the headline. If they said how it felt, react to that like a friend would (wrecked → they earned the rest). Mention the result if there is one.',
-  check_in: 'They trained hard yesterday. Ask, lightly, how they are feeling today. One question, no advice.',
-  week: 'Celebrate the rhythm of their week. Warm, not a report.',
-  anniversary: 'On this day in an earlier year they did this workout. Bring it back like a fond memory.',
-  welcome_back: 'They are back after a while. Be glad to see them and ask what they are doing today. Never mention how long they were away or what they missed.',
   note: 'They asked you to remember this. Check in on it with one gentle question. No medical advice.',
 };
 

@@ -23,6 +23,7 @@ import {
 import { answerUncertainty, uncertaintyValue } from '../../services/parseUncertainty';
 import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
 import { routeMessage, routeWorkoutWords } from './chatRouting';
+import { boardReading } from '../../services/wodiAgent/boardReading';
 import { buildUnfinishedPoster, type UnfinishedPoster } from '../home/unfinishedPoster';
 
 /**
@@ -579,7 +580,7 @@ export function useTellWodiChat({
       const plan = await callbacks.current.ask(
         question || 'Give me a game plan for this one.',
         last?.from === 'me' && last.text === question ? recent.slice(0, -1) : recent,
-        { board: workoutRef.current?.rawText ?? '', loads: suggestionsAsText(suggestions), sex },
+        { board: workoutRef.current?.rawText ?? '', reading: boardReading(workoutRef.current), loads: suggestionsAsText(suggestions), sex },
       );
       if (plan.kind === 'answer' && plan.text) {
         planned = true;

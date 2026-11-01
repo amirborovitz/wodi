@@ -1,0 +1,95 @@
+/* First open, nothing yet (wodi Today v6 · E). */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px 0;
+}
+
+.hello {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 0.9;
+}
+
+.text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(243, 241, 234, 0.68);
+}
+
+/* Three sample posters fanned out — the collection, not the stats. --i is -1, 0, 1. */
+.samples {
+  position: relative;
+  height: 200px;
+  margin-top: 4px;
+}
+
+.sample {
+  --mini-w: 104px;
+  position: absolute;
+  left: calc(50% - 52px + var(--i) * 92px);
+  top: calc(22px - (1 - var(--i) * var(--i)) * 22px);
+  transform: rotate(calc(var(--i) * 7deg));
+}
+
+.actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: #16181c;
+  border-radius: 24px;
+}
+
+.snap {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  font-family: 'Barlow', sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.snap:active {
+  transform: scale(0.98);
+}
+
+.alt {
+  padding: 4px 0 6px;
+  border: 0;
+  background: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(243, 241, 234, 0.44);
+  cursor: pointer;
+}
+
+.alt u {
+  color: rgba(243, 241, 234, 0.68);
+  text-underline-offset: 3px;
+}
+
+.hiddenInput {
+  display: none;
+}

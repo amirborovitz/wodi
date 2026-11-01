@@ -1320,17 +1320,6 @@ export function getPersona(data: RecapData): RecapPersona {
   return { ...PERSONAS[dominant.vibe], vibe: dominant.vibe, count: dominant.count };
 }
 
-/**
- * The one-line teaser for a recap tile: the movement that defined the period.
- * A rep count only means something attached to a movement — "1,240 reps" is a
- * number, "Kettlebell Swing 551" is a month. Falls back to the session count
- * when nothing in the period resolved to a known family.
- */
-export function getTopMoveLine(data: RecapData): string {
-  if (!data.topMove) return `${data.workouts} workout${data.workouts === 1 ? '' : 's'}`;
-  return `${data.topMove.name} ${moveStatMeasure(data.topMove)}`;
-}
-
 const RECAP_VIEWED_PREFIX = 'wodi_recap_viewed_';
 
 export function isRecapViewed(data: RecapData): boolean {

@@ -10,7 +10,7 @@ const line = (rx: string, extra: Partial<PosterLine> = {}): PosterLine =>
 function wod(rows: PosterRow[], result: PosterWod['result'] = { label: 'MY TIME', value: '9:42' }): PosterWod {
   const base: PosterWod = {
     type: 'FOR TIME', title: null, date: 'OCT 17 26', format: '3 ROUNDS', sub: '',
-    blocks: [], result, rx: null, totals: [], ep: 148, teamSize: 1, isPartnerConfirmed: false, split: 'reps',
+    blocks: [], result, rx: null, totals: [], ep: 148, wodName: null, movementNames: [], teamSize: 1, isPartnerConfirmed: false, split: 'reps',
   };
   return Object.assign(base, { _rows: rows });
 }

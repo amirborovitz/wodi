@@ -187,7 +187,10 @@ Return ONLY valid JSON:
       // intervalCount: how many WORK WINDOWS the clock has — how many times it starts, NOT how
       // many rounds the athlete completes and NOT how many stations there are.
       // Examples: "AMRAP 3:00 x 4" → 4, "Every 4:00 x 3 AMRAP" → 3.
-      // "EMOM for 16 minutes (4 rounds), min 1..min 4" → 16 (sixteen minutes start), NEVER 4.
+      // "EMOM for 16 minutes (4 rounds), min 1..min 4" → 16 (sixteen one-minute windows), NEVER 4.
+      // "Every 01:15 for 24 minutes (4 rounds)" with 5 stations → 20 (4 rounds x 5 stations), NEVER 24:
+      // minutes are windows only when a window IS a minute. Otherwise the board's rounds x stations
+      // is the count (24 min ÷ 1:15 is 19.2 — the coach rounded the clock, not the rounds).
       // Omit for single-block pieces (a plain "AMRAP 12" has no intervals).
       "intervalCount": 4,
       // rounds: how many times the athlete gets through the WHOLE rotation — the board's own

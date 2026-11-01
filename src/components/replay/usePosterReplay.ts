@@ -5,7 +5,7 @@ import { buildReplayScript } from './replayScript';
 import type { ReplayScript } from './replayScript';
 import type { ReplayOutcome } from './useMoveReplay';
 
-export type ReplaySurface = 'chat' | 'poster';
+export type ReplaySurface = 'chat' | 'poster' | 'today';
 type Trigger = 'auto' | 'tap';
 
 export interface PosterReplay {

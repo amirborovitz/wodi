@@ -55,6 +55,12 @@ export interface PosterWod {
   rx: string | null;    // "RX'D" | "PR" | null
   totals: PosterTotal[]; // Supporting stats for the brand strip
   ep: number;            // Effort Points — shown in brand strip
+  // What this piece IS, for surfaces too small to print the card: the name the coach gave it
+  // (the model's wodName, never invented) and the board's movements in order. `title` cannot
+  // serve — an unnamed interval piece is titled by its clock ("[1:15] × 15"), which says how
+  // it ran, not what it was.
+  wodName: string | null;
+  movementNames: string[];
   teamSize: number;      // Partner workout team size (1 = solo) — SESSION-level, set once by the
                          // AI for the whole multi-part workout. Never use this alone to decide
                          // whether THIS page/card shows partner UI — a sibling part being
@@ -1191,6 +1197,11 @@ export function posterPageFormat(
   return sessionFormat ?? 'for_time';
 }
 
+/** The board's movements, in the order the coach wrote them — the model's names as given. */
+function movementNamesOf(exercise: Exercise | undefined): string[] {
+  return (exercise?.movements ?? []).map((m) => m.name.trim()).filter((name) => name.length > 0);
+}
+
 export function buildPosterWodFromPage(
   data: CelebrationData,
   pageIndex: number,
@@ -1419,6 +1430,8 @@ export function buildPosterWodFromPage(
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),
+    wodName,
+    movementNames: movementNamesOf(page.exercise),
     teamSize,
     isPartnerConfirmed: isPartnerPage,
     split,
@@ -1559,6 +1572,8 @@ export function buildPosterWod(
     rx,
     totals,
     ep: Math.round(data.totalEP ?? 0),
+    wodName: soloWodName,
+    movementNames: movementNamesOf(mainEx),
     teamSize,
     isPartnerConfirmed,
     split,

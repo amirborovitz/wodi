@@ -1,0 +1,214 @@
+/* Today's one big card (wodi Today v6): a card surface holding the poster and its one action. */
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: #16181c;
+  border-radius: 24px;
+}
+
+/* Trained today: the chat's own poster, at full width. */
+.posterHero {
+  --chat-poster-w: 100%;
+}
+
+/* "+260 EP" rises once from the buttons into the poster's corner, then fades — momentary. */
+.epBurst {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  z-index: 5;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 28px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The one yellow action on the screen. */
+.primary {
+  height: 50px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  font-family: 'Barlow', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.primary:active {
+  transform: scale(0.98);
+}
+
+/* ── Last time: the same board done before, tucked beside the blank ── */
+.lastTime {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px 0 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.keepsake {
+  width: 62px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 7px 6px;
+  border-radius: 7px;
+  background: #121315;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 18px rgba(0, 0, 0, 0.5);
+  transform: rotate(5deg);
+  opacity: 0.8;
+  text-align: left;
+}
+
+.keepsakeTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  color: rgba(243, 241, 234, 0.55);
+  text-transform: uppercase;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.keepsakeResult {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: rgba(243, 241, 234, 0.7);
+}
+
+.keepsakeBar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(243, 241, 234, 0.18);
+}
+
+.lastTimeText {
+  display: flex;
+  flex-direction: column;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.06em;
+  color: rgba(243, 241, 234, 0.44);
+  white-space: nowrap;
+}
+
+.lastTimeText strong {
+  font-weight: 500;
+  color: rgba(243, 241, 234, 0.68);
+}
+
+/* ── Nothing yet today: a viewfinder — the empty card as "about to be a picture" ── */
+.viewfinder {
+  position: relative;
+  height: 268px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 16px;
+  background: #101114;
+  color: var(--wodi-white);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.viewfinder:active .shutter {
+  transform: scale(0.95);
+}
+
+.corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 0 solid rgba(243, 241, 234, 0.4);
+}
+
+.cornerA { top: 16px; left: 16px; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 10px; }
+.cornerB { top: 16px; right: 16px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 10px; }
+.cornerC { bottom: 16px; left: 16px; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 10px; }
+.cornerD { bottom: 16px; right: 16px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 10px; }
+
+.shutter {
+  width: 108px;
+  height: 108px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--wodi-yellow);
+  color: #0b0c0e;
+  box-shadow: 0 0 0 8px rgba(245, 194, 0, 0.14), 0 0 0 18px rgba(245, 194, 0, 0.05);
+  transition: transform 0.12s ease;
+}
+
+.snapTitle {
+  margin-top: 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: 0.005em;
+  text-align: center;
+}
+
+.snapText {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(243, 241, 234, 0.68);
+  text-align: center;
+}
+
+/* "No board? Type it in" — the quiet second way, the chat. */
+.alt {
+  padding: 4px 0 6px;
+  border: 0;
+  background: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(243, 241, 234, 0.44);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.alt u {
+  color: rgba(243, 241, 234, 0.68);
+  text-underline-offset: 3px;
+}
+
+.hiddenInput {
+  display: none;
+}

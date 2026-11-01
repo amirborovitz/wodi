@@ -60,37 +60,22 @@ describe('a workout just logged gets a cheer', () => {
   });
 });
 
-describe('some days Wodi speaks first — once a day, only with a reason', () => {
+describe('otherwise Wodi speaks when spoken to — no lines of its own', () => {
   const cheered = (id: string): [string, ThreadMessage] => said(`cheer:${id}`, TODAY_START - 86_400_000);
 
-  it('the morning after a long or hard one, it asks how they feel', () => {
-    expect(newKey({ workouts: [workout('w1', '2026-10-06', { minutes: 45 })], said: new Map([cheered('w1')]) })).toBe('checkin:w1');
-    expect(newKey({ workouts: [workout('w1', '2026-10-06', { minutes: 10, felt: 'cooked' })], said: new Map([cheered('w1')]) })).toBe('checkin:w1');
+  it('the morning after a long, hard one: no check-in, the cheer as it was said', () => {
+    const pick = pickOccasion(input({ workouts: [workout('w1', '2026-10-06', { minutes: 45, felt: 'wrecked' })], said: new Map([cheered('w1')]) }));
+    expect(pick).toMatchObject({ kind: 'said', message: { id: 'cheer:w1' } });
   });
 
-  it('a short easy one gets no check-in', () => {
-    const pick = pickOccasion(input({ workouts: [workout('w1', '2026-10-06', { minutes: 10, felt: 'chill' })], said: new Map([cheered('w1')]) }));
-    expect(pick.kind).toBe('said'); // the cheer, as it was said
-  });
-
-  it('back after a break: glad to see you — and the line never carries a day count', () => {
-    const pick = pickOccasion(input({ workouts: [workout('w1', '2026-09-20')] }));
-    expect(pick.kind).toBe('new');
-    if (pick.kind !== 'new') return;
-    expect(pick.occasion.kind).toBe('welcome_back');
-    expect(Object.values(pick.occasion.facts).join(' ')).not.toMatch(/\d/);
-  });
-
-  it('a year ago today', () => {
-    expect(newKey({ workouts: [workout('w1', '2026-09-20'), workout('old', '2025-10-07')], said: new Map([said('back:w1', 0)]) }))
-      .toBe('anniversary:old:2026');
-  });
-
-  it('on Monday, last week\'s rhythm when there were two or more', () => {
+  it('back after a break, a year-ago workout, a Monday after a busy week: nothing new to say', () => {
+    expect(pickOccasion(input({ workouts: [workout('w1', '2026-09-20'), workout('old', '2025-10-07')] })).kind).toBe('none');
     const monday = '2026-10-05';
     const workouts = [workout('a', '2026-10-01'), workout('b', '2026-09-29')];
-    const pick = pickOccasion(input({ workouts, today: monday, todayStartMs: new Date(2026, 9, 5).getTime(), said: new Map([said('cheer:a', new Date(2026, 9, 1).getTime())]) }));
-    expect(pick).toMatchObject({ kind: 'new', occasion: { key: 'week:2026-09-28', facts: { sessions: 2, week: 'last week' } } });
+    expect(pickOccasion(input({
+      workouts, today: monday, todayStartMs: new Date(2026, 9, 5).getTime(),
+      said: new Map([said('cheer:a', new Date(2026, 9, 1).getTime())]),
+    })).kind).toBe('none'); // never "2 workouts last week"
   });
 
   it('checks on a remembered note once, after a week and before it is old news', () => {

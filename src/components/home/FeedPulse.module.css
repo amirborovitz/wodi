@@ -1,10 +1,9 @@
 /* Same chrome as HomeScreen's For Later row, deliberately: both are "tap to go
    somewhere else" rows, and Home should have one row idiom rather than two. */
-/* Spacing lives here rather than on a wrapper in HomeScreen: the row renders
-   nothing when the window is empty, and a wrapper would leave its margin behind
-   as phantom space. Fades in because the feed subscription resolves after mount. */
+/* No wrapper and no margin: Today's stack gap spaces it, and the row renders
+   nothing when the window is empty, so a quiet day leaves no phantom space.
+   Fades in because the feed subscription resolves after mount. */
 .row {
-  margin-top: 22px;
   animation: pulseRowIn 0.3s ease both;
   width: 100%;
   min-height: 58px;

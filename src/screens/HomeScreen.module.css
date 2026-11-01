@@ -26,6 +26,8 @@
   margin-inline: auto;
   padding: 0 20px;
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  /* Full height, so the welcome can sit its one action at the foot. */
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -50,8 +52,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* fix #4: tighten header bottom gap */
-  padding: 14px 0 14px;
+  /* 44px tall with the 36px avatar (wodi Today v6): the header plus a recap banner, the snap
+     card and this week must fit one phone screen above the dock without scrolling. */
+  padding: 4px 0;
 }
 
 .greetingBlock {
@@ -74,18 +77,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.streakChip {
-  font-family: 'Barlow', sans-serif;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #f3f1ea;
-  border: 1px solid rgba(243, 241, 234, 0.28);
-  border-radius: 999px;
-  padding: 4px 10px;
-  white-space: nowrap;
-  line-height: 1.3;
 }
 
 .avatarBtn {
@@ -156,117 +147,30 @@
   text-transform: uppercase;
 }
 
-/* ── Gallery ──────────────────────────────────────────────────── */
-.gallery {
+/* ── Today's stack: the hero, this week, one surprise ─────────────── */
+.stack {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.recapSlot {
-  margin-top: 0;
+  gap: 10px;
 }
 
 /* `overflow: hidden` so the collapse on dismiss clips the card instead of spilling it. */
 .installSlot {
-  margin-top: 16px;
   overflow: hidden;
 }
 
-.galleryHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.galleryTitle {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 14px;
-  font-weight: 800;
-  color: #f2f2f0;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.galleryAll {
-  min-height: 44px;
-  padding: 0 2px;
-  border: none;
-  background: none;
-  font-family: 'Barlow', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.72);
-  cursor: pointer;
-}
-
-.galleryScroll {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  overflow-y: visible;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  margin: 0 -20px;
-  padding-left: 20px;
-  padding-right: 20px;
-}
-
-.galleryScroll::-webkit-scrollbar {
-  display: none;
-}
-
-.posterItem {
-  flex-shrink: 0;
-}
-
-/* ── Loading skeletons ────────────────────────────────────────── */
-.gallerySkeletons {
-  display: flex;
-  gap: 10px;
-  overflow: hidden;
-}
-
-.skeleton {
-  /* Tracks .frame in PosterThumbnail.module.css so the rail does not resize once
-     the real posters replace the skeletons. */
-  width: clamp(120px, 42vw, 176px);
-  aspect-ratio: 120 / 168;
+/* Holds the hero's place while the workouts load, so nothing jumps when it arrives. */
+.heroSkeleton {
+  height: 320px;
   background: #16181c;
-  border-radius: 10px;
-  flex-shrink: 0;
+  border-radius: 24px;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.55; }
   50%       { opacity: 0.25; }
-}
-
-/* ── Empty state ──────────────────────────────────────────────── */
-.emptyCard {
-  width: 100%;
-  background: #16181c;
-  border: 1px dashed rgba(243, 241, 234, 0.13);
-  border-radius: 12px;
-  padding: 32px 20px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.emptyCard:active {
-  border-color: rgba(245, 194, 0, 0.35);
-}
-
-.emptyCardText {
-  font-family: 'Barlow', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  color: rgba(243, 241, 234, 0.45);
-  line-height: 1.4;
 }
 
 .savedSheetBackdrop {

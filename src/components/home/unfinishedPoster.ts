@@ -58,11 +58,11 @@ function movementLine(m: ParsedMovement): string {
 /** The blank the athlete fills in — named by what the board scores, never a guess at the number. */
 function resultFor(wod: ParsedWorkout | undefined): UnfinishedPoster['result'] {
   switch (wod?.format) {
-    case 'for_time': return { label: 'MY TIME', blank: '–:––', add: 'Add time' };
+    case 'for_time': return { label: 'MY TIME', blank: '–:––', add: 'Add your time' };
     case 'amrap':
-    case 'amrap_intervals': return { label: 'MY ROUNDS', blank: '–', add: 'Add rounds' };
-    case 'strength': return { label: 'MY LIFT', blank: '– kg', add: 'Add weights' };
-    default: return { label: 'MY RESULT', blank: '–', add: 'Add result' };
+    case 'amrap_intervals': return { label: 'MY ROUNDS', blank: '–', add: 'Add your rounds' };
+    case 'strength': return { label: 'MY LIFT', blank: '– kg', add: 'Add your weights' };
+    default: return { label: 'MY RESULT', blank: '–', add: 'Add your result' };
   }
 }
 

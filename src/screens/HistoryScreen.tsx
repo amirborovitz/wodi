@@ -115,7 +115,7 @@ export function HistoryScreen({ onSelectWorkout }: HistoryScreenProps) {
                   className={workout.isTest ? styles.testCard : undefined}
                 >
                   {workout.isTest && <span className={styles.testBadge}>TEST</span>}
-                  <PosterThumbnail workout={workout} fullWidth onClick={() => handleSelect(workout)} />
+                  <PosterThumbnail workout={workout} onClick={() => handleSelect(workout)} />
                 </motion.div>
               ))}
             </div>

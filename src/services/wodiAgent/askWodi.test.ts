@@ -143,7 +143,12 @@ describe('askWodi', () => {
       message: 'how should I pace it?',
       recent: [],
       notes: [],
-      upcoming: { board: '3 RFT: 10 Deadlift @100/140kg, 400m run', loads: 'Deadlift · last time 140kg (24 Sep)', sex: 'male' },
+      upcoming: {
+        board: '3 RFT: 10 Deadlift @100/140kg, 400m run',
+        reading: 'Part 1 · 3 RFT (wod) — 3 sets/rounds, scored by time',
+        loads: 'Deadlift · last time 140kg (24 Sep)',
+        sex: 'male',
+      },
       loadContext: async () => CTX,
       complete: async (messages, offered, mustAnswer) => {
         tools.push(offered.map((t) => (t.type === 'function' ? t.function.name : '')));
@@ -154,6 +159,9 @@ describe('askWodi', () => {
     const system = String(seen[0].messages[0].content);
     expect(system).toContain('3 RFT: 10 Deadlift @100/140kg, 400m run');
     expect(system).toContain('Deadlift · last time 140kg (24 Sep)');
+    // The structure comes from the app's reading: an interval piece was planned as a round time.
+    expect(system).toContain('Part 1 · 3 RFT (wod) — 3 sets/rounds, scored by time');
+    expect(system).toContain('Never turn windows of open work into a round time to beat');
     // Weights are the app's (the load card), never the plan's: a run on 2026-10-10 told an
     // athlete to clean 60 kg for 2-minute sprints — above their one-rep max.
     expect(system).toContain('Never name a weight');
