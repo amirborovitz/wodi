@@ -955,10 +955,10 @@ export interface ChatPanelField {
 export interface ChatPanelGroup {
   title: string;
   /**
-   * `weight`: −/+ pills, start → peak for a lift in sets (the peak suggested from the start by
-   * the standard screen's own rule, utils/peakSuggestion), one pill otherwise. `bells`: a
-   * kettlebell, picked from the sizes a gym has (`sizes`). `boxes`: plain typed numbers.
-   * `clock`: a finish time, minutes : seconds on −/+ pills.
+   * `weight`: start → peak for a lift in sets (the peak suggested from the start by the standard
+   * screen's own rule, utils/peakSuggestion), one weight otherwise. `bells`: a kettlebell, picked
+   * from the sizes a gym has (`sizes`). `boxes`: plain numbers. `clock`: a finish time, typed
+   * "1724" for 17:24. All answered on the dock's pad (usePanelDock).
    */
   control: 'weight' | 'bells' | 'boxes' | 'clock';
   /** A `bells` load's sizes, lightest first — five around the one it starts on or the board's Rx. */
@@ -967,10 +967,12 @@ export interface ChatPanelGroup {
   kit?: string;
   /** A pair — the answer is per bell, said "2 × 16 kg". */
   pair?: boolean;
-  /** What one −/+ moves a weight by — the standard screen's step for this implement and unit. */
-  step?: number;
-  /** Where + starts from on an empty pill: the board's lightest Rx. Never shown as a value. */
-  base?: number;
+  /**
+   * A start → peak build's −/+ on the pad: what one press moves the weight by (the standard
+   * screen's step for this implement and unit), and where + starts on an empty weight (the
+   * board's lightest Rx — never shown as a value).
+   */
+  stepper?: { step: number; base?: number };
   /** The unit the answer carries when nothing else said it — last time's, shown on the card. */
   answerUnit?: LoadUnit;
   joiner: '→' | '@' | ':';
@@ -1158,7 +1160,7 @@ function likelyFor(slot: ChatSlot, lastLoads: ReadonlyMap<string, LastLoad>): Li
 }
 
 /**
- * The weight pills for one load: start → peak for a lift done in sets, one weight otherwise —
+ * The weights for one load: start → peak for a lift done in sets, one weight otherwise —
  * in last time's unit when nothing else has said one. With history it starts on last time's load
  * and says so beside it; without, it starts empty and its likely loads are one tap each.
  */
@@ -1192,8 +1194,12 @@ function weightGroup(slot: ChatSlot, name: string, unit: string, title: string, 
     ...(bells ? { sizes: bellSizes(shown, weighed?.start ?? (sameFits ? same?.weight : undefined) ?? (slot.rxWeights?.length ? Math.min(...slot.rxWeights) : undefined)) } : {}),
     ...(kit ? { kit: slot.pair ? kit.pair : kit.one } : {}),
     ...(slot.pair ? { pair: true } : {}),
-    step: getWeightStep(name, slot.equipment, shown === 'lb' ? 'lb' : 'kg'),
-    ...(slot.rxWeights?.length ? { base: Math.min(...slot.rxWeights) } : {}),
+    ...(inSets ? {
+      stepper: {
+        step: getWeightStep(name, slot.equipment, shown === 'lb' ? 'lb' : 'kg'),
+        ...(slot.rxWeights?.length ? { base: Math.min(...slot.rxWeights) } : {}),
+      },
+    } : {}),
     ...(answerUnit ? { answerUnit } : {}),
     joiner: '→',
     prefix: slot.pair ? '2 × ' : '',
@@ -1306,6 +1312,23 @@ function describeLoad(load: EarlierLoad, unit: string): string {
   return `${load.weight} ${unit}`;
 }
 
+/**
+ * A metcon count's likely answers on the pad, one tap each (the Stations design: 10 · 12 · 15 · 18
+ * cal) — the round numbers a station's work usually lands on, by what's counted. An open count has
+ * no board number to offer (that's why it's asked), so these are taps only, never where the pad
+ * starts. A total over the whole piece has no usual size, so it gets none.
+ */
+const LIKELY_COUNTS: Record<'reps' | 'calories' | 'distance', number[]> = {
+  calories: [10, 12, 15, 18],
+  reps: [8, 10, 12, 15],
+  distance: [100, 150, 200, 250],
+};
+
+function countChips(slot: ChatSlot): ChatChip[] {
+  if (slot.total) return [];
+  return LIKELY_COUNTS[slot.metric ?? 'reps'].map((n) => ({ label: String(n), answers: [{ id: slot.id, ...EMPTY_ANSWER, count: n }] }));
+}
+
 /** Same part, and the same block of it. */
 const sameSpot = (a: ChatSlot, b: ChatSlot): boolean => a.exerciseIndex === b.exerciseIndex && a.block === b.block;
 
@@ -1378,8 +1401,6 @@ export function nextQuestion(
             control: 'clock',
             joiner: ':',
             prefix: '',
-            // + on an empty minutes pill starts at the cap: below it, a few taps down.
-            ...(cap ? { base: Math.floor(cap / 60) } : {}),
             start: {},
             quick: cap ? [{ label: `Hit the cap · ${formatClock(cap)}`, answers: [{ id: first.id, ...EMPTY_ANSWER, seconds: cap }] }] : [],
             fields: [
@@ -1436,7 +1457,7 @@ export function nextQuestion(
               joiner: '@',
               prefix: '',
               start: {},
-              quick: [],
+              quick: countChips(s),
               fields: [{ slotId: s.id, field: 'count', label: unitOf(s), unit: unitOf(s) }],
               ...(either?.options ? { choice: { slotId: either.id, options: either.options, labels: either.options.map(stripMovementRolePrefix) } } : {}),
             };

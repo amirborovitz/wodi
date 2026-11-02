@@ -3,9 +3,8 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { ParsedWorkout, Workout } from './types';
 import { initStoryResults, type StoryExerciseResult } from './components/logging/story/types';
-import { storyTeamSize } from './components/logging/story/StoryLogResults';
+import { boardResults, type BoardAthlete } from './components/tellWodi/boardResults';
 import { openSlots, applyAnswer, nextQuestion, panelAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
-import { getExerciseLoggingMode } from './services/exerciseLoggingMode';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from './services/savedWorkout';
 import { reopenLogged } from './services/loggedRecord';
 import { removeUndefined } from './utils/firestoreUtils';
@@ -25,7 +24,8 @@ import { removeUndefined } from './utils/firestoreUtils';
  * they disagree the board decides. AMRAPs and max tests are skipped — there the score IS the work.
  */
 
-const FIXED_WORK_KINDS = new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
+const ATHLETE: BoardAthlete = { sex: 'male', weightUnit: 'kg' };
+const FIXED_WORK_KINDS =new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
 
 /** The answer an athlete who did the board as written gives to each question. */
 function asWritten(slot: ChatSlot): SlotAnswer | null {
@@ -56,14 +56,7 @@ function logAsWritten(
   asked?: (text: string) => void,
   answerFor: (slot: ChatSlot) => SlotAnswer | null = asWritten,
 ): StoryExerciseResult[] {
-  const context = { format: parsed.format, scoreType: parsed.scoreType, exerciseCount: parsed.exercises.length };
-  let results = initStoryResults(
-    parsed,
-    parsed.exercises.map((exercise) => getExerciseLoggingMode(exercise, context)),
-    'male',
-    storyTeamSize(parsed),
-    { blankAnswers: true, weightUnit: 'kg' },
-  );
+  let results = boardResults(parsed, ATHLETE);
   const closed = new Set<string>();
   for (let guard = 0; guard < 60; guard += 1) {
     const slots = openSlots(results, closed, new Map(), parsed.teamSize);
@@ -298,11 +291,20 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     }
   });
 
+  it('each station of a station EMOM offers its likely numbers on the pad, one tap each', () => {
+    const board = boards.find((b) => b.name === 'bare-movement-station-emom')!;
+    const results = boardResults(board.parsed, ATHLETE);
+    // The station counts' own card (the board asks its weights and choices around it).
+    const q = nextQuestion(openSlots(results, new Set()).filter((s) => s.kind === 'count'), results);
+    const quick = new Map(q?.panel?.groups.map((g) => [g.title, g.quick.map((c) => c.label)]) ?? []);
+    expect(quick.get('Echo Bike')).toEqual(['10', '12', '15', '18']);
+    expect(quick.get('Burpee')).toEqual(['8', '10', '12', '15']);
+  });
+
   it('a station with the board\'s either/or picks its side on the station card', () => {
     // "Bar Muscle-up / Pull-up" is one of the five stations: picked on the card, beside its count.
     const board = boards.find((b) => b.name === 'bare-movement-station-emom')!;
-    const context = { format: board.parsed.format, scoreType: board.parsed.scoreType, exerciseCount: board.parsed.exercises.length };
-    let results = initStoryResults(board.parsed, board.parsed.exercises.map((e) => getExerciseLoggingMode(e, context)), 'male', storyTeamSize(board.parsed), { blankAnswers: true, weightUnit: 'kg' });
+    let results = boardResults(board.parsed, ATHLETE);
     const closed = new Set<string>();
     let card = null as ReturnType<typeof nextQuestion>;
     for (let guard = 0; guard < 20; guard += 1) {

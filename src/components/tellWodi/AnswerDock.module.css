@@ -1,0 +1,392 @@
+/* The dock (design: "wodi Dock"): in the keyboard's place while a card is open, under the message
+   box that tops it (TellWodiChat's .composerDocked draws the surface). One answer at a time — a
+   big number, its likely answers one tap each, and Next where the thumb already is. Yellow only
+   on progress and Next. */
+.dock {
+  margin: 0 calc(-1 * var(--sp-4));
+  padding: 10px var(--sp-4) calc(env(safe-area-inset-bottom, 0px) + var(--sp-3));
+}
+
+.ticks {
+  display: flex;
+  gap: 6px;
+  margin: 0 -2px 6px;
+}
+
+/* A tall target around a thin line. */
+.tickHit {
+  flex: 1 1 0;
+  height: 16px;
+  padding: 6px 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.tick {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2c31;
+  transition: background 0.2s;
+}
+
+/* Grey, never yellow: yellow is the win colour, and Next is the one yellow thing on the dock. */
+.tickOn {
+  background: rgba(242, 240, 235, 0.4);
+}
+
+.tickActive {
+  background: var(--wodi-white);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: 40px;
+}
+
+.back {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  background: #1f2125;
+  border: 0;
+  color: var(--wodi-white);
+  cursor: pointer;
+}
+
+.back:disabled {
+  color: var(--wodi-dim2);
+  cursor: default;
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--wodi-white);
+}
+
+.position {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--wodi-dim);
+}
+
+/* Double Under / Single Under — a segmented switch in the header, beside the number it changes. */
+.choice {
+  flex: none;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: #1f2125;
+}
+
+.choiceOption {
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(242, 240, 235, 0.6);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.choiceOn {
+  background: var(--wodi-white);
+  color: #0c0d0f;
+}
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  height: 66px;
+}
+
+/* ── One lift, start → peak: two weights side by side ── */
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pairArrow {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--wodi-dim);
+}
+
+/* Each weight: its number (tap = the pad types here) over its own −/+. */
+.weight {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(242, 240, 235, 0.12);
+}
+
+.weightOn {
+  border-color: var(--wodi-yellow);
+}
+
+.weightPick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.weightLabel {
+  font-family: var(--font-mono, 'DM Mono', monospace);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--wodi-dim);
+}
+
+.weightNumber,
+.weightEmpty {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.weightNumber {
+  color: var(--wodi-white);
+}
+
+.weightEmpty {
+  color: rgba(242, 240, 235, 0.22);
+}
+
+.weightUnit {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--wodi-dim);
+}
+
+.weightSteps {
+  display: flex;
+  gap: 6px;
+}
+
+/* A plain click, never pointer-down: scrolling past can't change a weight. */
+.step {
+  flex: 1;
+  height: 36px;
+  border-radius: var(--r-pill);
+  border: 1px solid rgba(242, 240, 235, 0.28);
+  background: transparent;
+  color: var(--wodi-white);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.step:disabled {
+  opacity: 0.4;
+}
+
+.number,
+.numberEmpty {
+  font-family: var(--font-display);
+  font-size: 60px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.number {
+  color: var(--wodi-white);
+}
+
+.numberEmpty {
+  color: rgba(242, 240, 235, 0.22);
+}
+
+.unit {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--wodi-dim);
+}
+
+/* Likely answers, one tap each — scrolls sideways rather than wrapping, so the pad never moves. */
+.chips {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  margin: 0 calc(-1 * var(--sp-4)) 10px;
+  padding: 0 var(--sp-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: none;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-pill);
+  background: transparent;
+  border: 1px solid rgba(242, 240, 235, 0.28);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chipOn {
+  background: var(--wodi-white);
+  border-color: var(--wodi-white);
+  color: #0c0d0f;
+}
+
+.skip {
+  flex: none;
+  height: 40px;
+  margin-left: auto;
+  padding: 0 6px;
+  background: none;
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wodi-dim);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* "Didn't do it" clears the whole board — a different act from Skip (this answer only), so it
+   looks different: an outlined pill, first in the row. */
+.secondary {
+  flex: none;
+  height: 36px;
+  margin-left: auto;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  background: none;
+  border: 1px solid rgba(242, 240, 235, 0.28);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.secondary + .skip {
+  margin-left: 0;
+}
+
+/* 1 2 3 ⌫ / 4 5 6 Next / 7 8 9 Next / . 0 0 Next — the digits auto-fill the free cells. */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-areas:
+    '. . . del'
+    '. . . next'
+    '. . . next'
+    'dot zero zero next';
+  grid-auto-rows: 48px;
+  gap: 8px;
+}
+
+.key {
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: #222428;
+  font-family: var(--font-display);
+  font-size: 27px;
+  font-weight: 700;
+  color: var(--wodi-white);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.key:disabled {
+  color: var(--wodi-dim2);
+  cursor: default;
+}
+
+.keyQuiet {
+  background: #1a1c1f;
+  color: rgba(242, 240, 235, 0.72);
+}
+
+.keyDot { grid-area: dot; }
+.keyZero { grid-area: zero; }
+.keyDel { grid-area: del; }
+
+.next {
+  grid-area: next;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--wodi-yellow);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #0b0c0e;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.next:disabled {
+  opacity: 0.5;
+}

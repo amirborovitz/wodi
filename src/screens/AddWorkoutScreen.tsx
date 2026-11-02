@@ -41,7 +41,8 @@ import {
   getDefaultEasierAlternative,
   getDistanceMultiplier,
 } from '../data/exerciseDefinitions';
-import { StoryLogResults, storyTeamSize } from '../components/logging/story/StoryLogResults';
+import { StoryLogResults } from '../components/logging/story/StoryLogResults';
+import { boardLoggingModes, boardResults } from '../components/tellWodi/boardResults';
 import { TellWodiChat } from '../components/tellWodi/TellWodiChat';
 import { chatForSavedBoard, useTellWodiChat, type FormHandoff } from '../components/tellWodi/useTellWodiChat';
 import { useAskWodi } from '../components/tellWodi/useAskWodi';
@@ -52,7 +53,7 @@ import { useWodiNotes } from '../hooks/useWodiNotes';
 import { useFavoriteSkin } from '../hooks/useFavoriteSkin';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
-import { initStoryResults, movementToKind } from '../components/logging/story/types';
+import { movementToKind } from '../components/logging/story/types';
 import { unitToRemember } from '../components/logging/story/athleteLoadUnit';
 import { computeWorkoutEP, DEFAULT_BW } from '../utils/xpCalculations';
 import { removeUndefined } from '../utils/firestoreUtils';
@@ -1352,14 +1353,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   };
 
   // Which logging mode each part is logged in — the one rule the form and the chat both read.
-  const loggingModesFor = (workout: ParsedWorkout): ExerciseLoggingMode[] => {
-    const workoutCtx = {
-      format: workout.format,
-      scoreType: workout.scoreType,
-      exerciseCount: workout.exercises.length,
-    };
-    return workout.exercises.map((ex, i) => modeOverrides[i] ?? getExerciseLoggingMode(ex, workoutCtx));
-  };
+  const loggingModesFor = (workout: ParsedWorkout): ExerciseLoggingMode[] => boardLoggingModes(workout, modeOverrides);
 
   // How the athlete said it felt, from the chat. A ref, not state: the chat hands over its results
   // and this is read by the save in the same tick, before any re-render could deliver state.
@@ -1467,13 +1461,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       addSavedWorkout(workout);
       return workout;
     },
-    buildResults: (workout) => initStoryResults(
-      workout,
-      loggingModesFor(workout),
-      user?.sex,
-      storyTeamSize(workout),
-      { blankAnswers: true, weightUnit: user?.weightUnit },
-    ),
+    buildResults: (workout) => boardResults(workout, { sex: user?.sex, weightUnit: user?.weightUnit }, modeOverrides),
     lastLoads,
     history: loadHistory,
     athleteSex: user?.sex,

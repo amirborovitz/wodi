@@ -69,7 +69,7 @@ describe('Tell Wodi — what the chat asks', () => {
     expect(first.text).toBe('What was your time?');
     // A card: minutes : seconds, starting empty — never a guessed time — with the cap one tap.
     const clock = first.panel!.groups[0];
-    expect(clock).toMatchObject({ control: 'clock', joiner: ':', start: {}, base: 25 });
+    expect(clock).toMatchObject({ control: 'clock', joiner: ':', start: {} });
     expect(clock.quick.map((c) => c.label)).toEqual(['Hit the cap · 25:00']);
     expect(first.chips).toEqual([]);
     const typed = panelAnswer(first.panel!, { '0.time:minutes': 17, '0.time:seconds': 24 });
@@ -668,12 +668,14 @@ describe('Tell Wodi — the order it asks in', () => {
     expect(done[0].weightEnd).toBe(65);
   });
 
-  it('the bench is −/+ pills, start and peak, in plate steps; Skip is on the card', () => {
+  it('the bench is a weight card, start and peak; Skip is on the card', () => {
     const rs = fresh();
     const q = nextQuestion(openSlots(rs, new Set()), rs, lastLoads)!;
-    expect(q.panel?.groups[0]).toMatchObject({ control: 'weight', step: 2.5 });
+    expect(q.panel?.groups[0]).toMatchObject({ control: 'weight' });
     expect(q.panel?.groups[0].fields.map((f) => f.field)).toEqual(['weight', 'weightEnd']);
     expect(q.chips).toEqual([]);
+    // Start → peak gets −/+ on the pad, by the barbell's 2.5 kg.
+    expect(q.panel?.groups[0].stepper?.step).toBe(2.5);
     // Each set different is typed — the message box says how, not another line in the bubble.
     expect(q.placeholder).toBe('Or type each set: 60, 65, 70');
   });
@@ -910,5 +912,23 @@ describe('in a strength block, only the barbell is start → peak', () => {
     const q = card('0.weight.standing side bend');
     expect(q.panel?.groups[0].fields.map((f) => f.field)).toEqual(['weight']);
     expect(q.placeholder).toBeUndefined();
+  });
+});
+
+describe('a metcon count on the pad', () => {
+  const stations = {
+    name: 'Stations', type: 'wod', loggingMode: 'emom', prescription: 'Every 1:15 x 24 min, max effort each station', suggestedSets: 4,
+    movements: [
+      { name: 'Echo Bike', isMaxReps: true, maxMetric: 'calories', inputType: 'calories', equipment: 'machine', countingMode: 'per_round' },
+      { name: 'Tuck-up', isMaxReps: true, maxMetric: 'reps', inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+
+  it('a count over the whole piece has no usual size, so no chips', () => {
+    const results = [createBlankResult(stations, 0, 'emom', 'male', undefined, true, { blankAnswers: true })];
+    const q = nextQuestion(openSlots(results, new Set()), results);
+    const bike = q?.panel?.groups.find((g) => g.title.startsWith('Echo Bike'));
+    expect(bike?.title).toBe('Echo Bike · in total');
+    expect(bike?.quick).toEqual([]);
   });
 });

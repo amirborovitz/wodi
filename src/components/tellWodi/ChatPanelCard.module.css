@@ -1,16 +1,12 @@
-/* One compact card under Wodi's question (design: "wodi Chat Today" frame 04, ~190px tall): the
-   lift named once with last time beside it, −/+ pills, and one button that names what it saves.
-   Neutral throughout — yellow in the chat is kept for the camera, Wodi's number and a PR. */
+/* The card in the thread while the dock asks (design: "wodi Dock" — the EMOM card): the part
+   named once, a line per movement filling in live, the one being answered marked with the
+   app's one yellow. Nothing on it is typed into — it never moves under the athlete's thumb. */
 .card {
-  width: min(100%, 330px);
-  margin: 0;
-  padding: var(--sp-3) var(--sp-3) var(--sp-3) 14px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
+  width: min(100%, 360px);
+  padding: var(--sp-4) var(--sp-4) var(--sp-2);
   background: #17181b;
-  border: 1px solid var(--wodi-line);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--wodi-line2);
+  border-radius: var(--r-xl);
 }
 
 /* Answered — kept as it was sent, dimmed like every answered question in the thread. */
@@ -18,12 +14,12 @@
   opacity: 0.6;
 }
 
-/* The lift's name, said once — with the keyboard up, Wodi's question scrolls off above it. */
 .head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
 }
 
 .heading {
@@ -33,345 +29,94 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.03em;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--wodi-white);
 }
 
-/* "Last · 60 → 65 kg" — what the card starts on, quiet beside the name. */
-.last {
+/* "For time · 6 rds" — what the part is, quiet beside its name. */
+.meta {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--wodi-dim);
 }
 
-/* A load's likely answers, one tap each: the same load as earlier, the board's Rx. */
-.quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-.quickChip {
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: var(--r-pill);
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: var(--wodi-white);
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* "No weight" picked for this load. */
-.quickChipOn {
-  background: var(--wodi-white);
-  border-color: var(--wodi-white);
-  color: #0c0d0f;
-}
-
-.group {
+.rows {
   margin: 0;
   padding: 0;
-  border: 0;
-  min-width: 0;
+  list-style: none;
 }
 
-/* Only when the card asks several things: "POWER SNATCH · BARBELL", "TWIN KB SNATCH · PER BELL"
-   (design: "wodi Unfinished Poster Flow", the weights card). */
-.groupTitle {
-  padding: 0;
-  margin-bottom: 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-/* A load's chips sit between its name and its pills. */
-.group .quick {
-  margin-bottom: 6px;
-}
-
-/* A kettlebell: "2 ×", the five sizes around the likely one, "kg". */
-.bells {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.bellsPair {
-  flex: none;
-  margin-right: 2px;
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 700;
-  font-style: normal;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.bell {
-  flex: 1 1 0;
-  min-width: 0;
-  height: 44px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 12px;
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 800;
-  color: var(--wodi-white);
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.bellOn {
-  background: var(--wodi-white);
-  border-color: var(--wodi-white);
-  color: #0c0d0f;
-}
-
-.bellsUnit {
-  flex: none;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.56);
+.rows li + li .row {
+  border-top: 1px solid var(--wodi-line);
 }
 
 .row {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--sp-2);
-}
-
-.col {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.colLabel {
-  padding-left: 4px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-.joiner {
-  flex: none;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-body);
-  font-size: 16px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-/* − 60 kg + */
-.pill {
-  height: 44px;
+  position: relative;
+  width: 100%;
+  min-height: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #1e2023;
-  border: 1px solid var(--wodi-line);
-  border-radius: var(--r-pill);
-}
-
-.pill:focus-within {
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.pillStep {
-  flex: none;
-  /* 32, not 40: two pills share a 330px card, and every pixel here is one the number lacks. */
-  width: 32px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  padding: 0;
+  gap: var(--sp-3);
+  padding: 0 2px 0 var(--sp-4);
   background: none;
   border: 0;
-  font-family: var(--font-body);
-  font-size: 20px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  text-align: left;
+  color: rgba(242, 240, 235, 0.56);
   cursor: pointer;
-  /* No double-tap zoom on a control tapped several times in a row. */
   touch-action: manipulation;
 }
 
-.pillStep:disabled {
-  color: rgba(255, 255, 255, 0.24);
+.row:disabled {
   cursor: default;
 }
 
-.pillValue {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2px;
+.rowActive {
+  color: var(--wodi-white);
 }
 
-/* The number's own width: a hidden copy of it holds the space, the input lies over it — so the
-   number and its unit sit centered in the pill, as wide as they read. */
-.pillNumber {
-  position: relative;
-  min-width: 0;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.pillNumber[data-long] {
-  font-size: 19px;
-}
-
-.pillMeasure {
-  visibility: hidden;
-  white-space: pre;
-}
-
-.pillInput {
+/* Slides from row to row as the dock moves on. */
+.bar {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  outline: none;
-  text-align: center;
-  font: inherit;
-  color: var(--wodi-white);
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--wodi-yellow);
 }
 
-.pillInput::placeholder {
-  color: rgba(255, 255, 255, 0.28);
-}
-
-/* The pill's border shows focus; the app-wide yellow ring would draw a second frame. */
-.pillInput:focus-visible {
-  outline: none;
-}
-
-.pillUnit {
-  flex: none;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-/* A plain number box — the max set's reps and bar. */
-.box {
-  height: 44px;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2px;
-  padding: 0 var(--sp-3);
-  background: #1e2023;
-  border: 1px solid var(--wodi-line);
-  border-radius: var(--r-pill);
-}
-
-.box:focus-within {
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.input {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 100%;
-  height: 42px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  outline: none;
-  text-align: right;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--wodi-white);
-}
-
-.input:focus-visible {
-  outline: none;
-}
-
-.unit {
-  flex: none;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.56);
-}
-
-.actions {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-.log,
-.skip {
-  height: 40px;
-  padding: 0 16px;
-  border-radius: var(--r-pill);
-  font-family: var(--font-body);
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-/* Names what it saves ("Log 60 → 65 kg"), so one tap is a choice, not a habit. */
-.log {
-  flex: 1;
+.rowTitle {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: var(--wodi-white);
-  border: 1px solid var(--wodi-white);
-  color: #0b0c0e;
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
 }
 
-.log:disabled {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: transparent;
-  color: rgba(255, 255, 255, 0.35);
-  cursor: default;
+.rowValue,
+.rowEmpty {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
-.skip {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.rowValue {
   color: var(--wodi-white);
 }
 
-.skip:disabled {
-  opacity: 0.5;
+.rowEmpty {
+  color: var(--wodi-dim2);
 }

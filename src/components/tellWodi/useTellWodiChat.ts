@@ -182,6 +182,8 @@ export interface TellWodiChat {
   hasBoard: boolean;
   /** The message box's placeholder: the open question's way to answer by typing, if it has one. */
   placeholder: string;
+  /** The card being answered right now, if any — its dock takes the composer's place. */
+  openPanelId: string | null;
 }
 
 
@@ -922,6 +924,8 @@ export function useTellWodiChat({
   const placeholder = [...messages].reverse().find((m) => m.from === 'wodi' && !m.answered && m.placeholder)?.placeholder
     ?? 'Message Wodi…';
 
+  const openPanelId = [...messages].reverse().find((m) => m.panel && !m.answered)?.id ?? null;
+
   const posterReady = useCallback((saved: SavedPoster): void => setAwaitingCheer(saved), []);
 
   const saveFailed = useCallback((): void => {
@@ -930,5 +934,5 @@ export function useTellWodiChat({
     push({ from: 'wodi', text: "Couldn't save that — check your connection and try again.", chips: [DONE_CHIP] });
   }, [push]);
 
-  return { messages, busy, send, tapChip, resume, changeAnswer, finished, logged, posterReady, saveFailed, hasBoard, placeholder };
+  return { messages, busy, send, tapChip, resume, changeAnswer, finished, logged, posterReady, saveFailed, hasBoard, placeholder, openPanelId };
 }

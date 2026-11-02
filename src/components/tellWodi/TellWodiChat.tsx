@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWodiChat';
-import { useChatViewport } from './useChatViewport';
+import { CHAT_ANCHOR, useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
@@ -36,7 +36,12 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
     if (file) setPhoto(file);
     e.target.value = '';
   };
-  const { messages, busy, send, tapChip, changeAnswer, finished, placeholder, hasBoard } = chat;
+  const { messages, busy, send, tapChip, changeAnswer, finished, placeholder, hasBoard, openPanelId } = chat;
+  // The open card's dock sits under the message box — one surface, the pad in the keyboard's place.
+  const [dockHost, setDockHost] = useState<HTMLDivElement | null>(null);
+  // Typing instead of the pad (the message box tapped), for this card only: the next card opens on its pad.
+  const [typingFor, setTypingFor] = useState<string | null>(null);
+  const docked = openPanelId != null && typingFor !== openPanelId;
   // The board you still owe, one tap away however far the thread scrolls — not while this chat is on a board.
   const pinned = hasBoard ? null : thread.pinned;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
@@ -88,6 +93,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
             <motion.div
               key={message.id}
               className={message.from === 'me' ? styles.rowMe : styles.rowWodi}
+              // The question over an open card stays in view: the thread stops at it, not under the card.
+              {...(message.id === openPanelId ? { [CHAT_ANCHOR]: '' } : {})}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
@@ -174,6 +181,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
                   panel={message.panel}
                   locked={message.answered === true}
                   disabled={busy != null}
+                  dockHost={dockHost}
+                  dockHidden={typingFor === message.id}
                   onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); pinToEnd(); }}
                   {...(message.cardChip ? { secondary: { label: message.cardChip.label, onClick: () => { tapChip(message.id, message.cardChip!); pinToEnd(); } } } : {})}
                 />
@@ -217,7 +226,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
         </div>
       </div>
 
-      <footer className={styles.composer}>
+      <footer className={`${styles.composer} ${docked ? styles.composerDocked : ''}`}>
         {pinned && (
           <button type="button" className={styles.pinned} onClick={() => onOpenPlanned(pinned.board)}>
             {/* The unfinished poster in miniature — the same one that leads Today's rail. */}
@@ -236,17 +245,28 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
           </div>
         )}
         <div className={styles.composerRow}>
-          <button
-            type="button"
-            className={styles.iconButton}
-            onClick={() => libraryInputRef.current?.click()}
-            aria-label="Send Wodi a board from your photos"
-            disabled={busy === 'saving'}
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M9 2v14M2 9h14" />
-            </svg>
-          </button>
+          {docked ? null : openPanelId ? (
+            // Typing instead of a card's pad — one tap back to it.
+            <button type="button" className={styles.iconButton} onClick={() => setTypingFor(null)} aria-label="Back to the number pad">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" aria-hidden="true">
+                <circle cx="4" cy="4" r="1.6" /><circle cx="9" cy="4" r="1.6" /><circle cx="14" cy="4" r="1.6" />
+                <circle cx="4" cy="9" r="1.6" /><circle cx="9" cy="9" r="1.6" /><circle cx="14" cy="9" r="1.6" />
+                <circle cx="4" cy="14" r="1.6" /><circle cx="9" cy="14" r="1.6" /><circle cx="14" cy="14" r="1.6" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={styles.iconButton}
+              onClick={() => libraryInputRef.current?.click()}
+              aria-label="Send Wodi a board from your photos"
+              disabled={busy === 'saving'}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M9 2v14M2 9h14" />
+              </svg>
+            </button>
+          )}
           <input
             ref={photoInputRef}
             type="file"
@@ -256,12 +276,17 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
             onChange={attachPicked}
           />
           <input ref={libraryInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={attachPicked} />
+          <span className={styles.inputWrap}>
           <textarea
             className={styles.input}
             rows={1}
-            placeholder={placeholder}
+            placeholder={docked ? 'Tell Wodi something…' : placeholder}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            // Tapping the box is typing: the keyboard comes up, the pad steps aside — and comes back
+            // when the keyboard goes away with nothing written.
+            onFocus={() => { if (openPanelId) setTypingFor(openPanelId); }}
+            onBlur={() => { if (!draft.trim()) setTypingFor(null); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -269,8 +294,10 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
               }
             }}
           />
-          {canSend ? (
-            <motion.button type="button" className={styles.primaryAction} onClick={submit} whileTap={{ scale: 0.94 }} aria-label="Send">
+          </span>
+          {/* On a board the message box is for answers — send, never the camera. */}
+          {docked ? null : canSend || hasBoard ? (
+            <motion.button type="button" className={styles.primaryAction} onClick={submit} disabled={!canSend} whileTap={{ scale: 0.94 }} aria-label="Send">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -291,6 +318,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
             </motion.button>
           )}
         </div>
+        <div ref={setDockHost} />
       </footer>
     </div>
   );

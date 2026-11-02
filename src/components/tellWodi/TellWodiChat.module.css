@@ -251,6 +251,24 @@
   background: var(--wodi-bg);
 }
 
+/* A card is open: the message box is the top of the dock (design: "wodi Dock") — one raised
+   surface, the box, then the pad in the keyboard's place. The dock carries the bottom inset. */
+.composerDocked {
+  padding: var(--sp-3) var(--sp-4) 0;
+  border-top-color: var(--wodi-line2);
+  border-radius: 22px 22px 0 0;
+  background: #141518;
+}
+
+.inputWrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+}
+
+/* "ABC" — the box is where letters go; the pad below is for numbers. */
+
 .attachment {
   display: flex;
   align-items: center;
@@ -301,6 +319,7 @@
 
 .input {
   flex: 1;
+  min-width: 0;
   min-height: 44px;
   max-height: 120px;
   padding: 11px 16px;
