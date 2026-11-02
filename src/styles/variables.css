@@ -20,6 +20,10 @@
      stretching — a poster reads at one size everywhere. Bottom sheets track it
      too, or they detach from the column they belong to. Change it here only. */
   --app-column: 520px;
+  /* The fade the docked chat bar draws ABOVE itself, so content scrolling under it dissolves.
+     A screen with the bar reserves the bar's height PLUS this — or its last line ends inside the
+     fade and can never be scrolled clear (Today's day/EP captions did). */
+  --dock-fade: 32px;
   /* The width a poster is DESIGNED at — POSTER_REFERENCE_WIDTH in PosterCard.
      PosterCard scales the skin to whatever width its container gives it, so a
      wider container does not merely fit the poster, it magnifies it: inside the

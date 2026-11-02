@@ -1,9 +1,8 @@
 /* THE scroll container for this screen — and it has to be a real one. `min-height`
    is only a floor, so with `overflow-y: auto` the element just grew to fit its
    content and the DOCUMENT scrolled instead. Everything that reads or writes
-   `scrollTop` here — the pull-to-refresh "am I at the top?" guard, the
-   recap-dismiss scroll correction — was addressing an element whose scrollTop was
-   permanently 0. `height` is what makes the scrollport exist.
+   `scrollTop` here — the pull-to-refresh "am I at the top?" guard — was addressing
+   an element whose scrollTop was permanently 0. `height` is what makes the scrollport exist.
 
    `overscroll-behavior-y: none` rather than `contain`: contain only stops the
    scroll chaining to the document, and the container's own rubber-band would still
@@ -13,10 +12,10 @@
   background: #0b0c0e;
   overflow-y: auto;
   overscroll-behavior-y: none;
-  /* Clearance for the docked surface, and no more: border 1 + composer row 54 (10 top + 44)
-     + tab row 70 = 125. Any slack past the dock's real height is what made a page that fits
-     scroll anyway — the padding alone pushed it past 100dvh. */
-  padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+  /* Clearance for the docked surface: border 1 + composer row 54 (10 top + 44) + tab row 70 =
+     125 (→128), plus the fade the dock draws above itself — without it the page's last line
+     always ended inside the fade, unreadable. */
+  padding-bottom: calc(128px + var(--dock-fade) + env(safe-area-inset-bottom, 0px));
 }
 
 /* Constrained here rather than on .screen so the screen's background still
@@ -26,8 +25,6 @@
   margin-inline: auto;
   padding: 0 20px;
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  /* Full height, so the welcome can sit its one action at the foot. */
-  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -52,9 +49,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* 44px tall with the 36px avatar (wodi Today v6): the header plus a recap banner, the snap
-     card and this week must fit one phone screen above the dock without scrolling. */
-  padding: 4px 0;
+  /* fix #4: tighten header bottom gap */
+  padding: 14px 0 14px;
 }
 
 .greetingBlock {
@@ -77,6 +73,18 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.streakChip {
+  font-family: 'Barlow', sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f3f1ea;
+  border: 1px solid rgba(243, 241, 234, 0.28);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  line-height: 1.3;
 }
 
 .avatarBtn {
@@ -147,30 +155,118 @@
   text-transform: uppercase;
 }
 
-/* ── Today's stack: the hero, this week, one surprise ─────────────── */
-.stack {
-  flex: 1;
+/* ── Gallery ──────────────────────────────────────────────────── */
+.gallery {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+}
+
+/* The recap banner, between the header and the posters. */
+.recapSlot {
+  margin-bottom: 14px;
 }
 
 /* `overflow: hidden` so the collapse on dismiss clips the card instead of spilling it. */
 .installSlot {
+  margin-top: 16px;
   overflow: hidden;
 }
 
-/* Holds the hero's place while the workouts load, so nothing jumps when it arrives. */
-.heroSkeleton {
-  height: 320px;
+.galleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.galleryTitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f2f2f0;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.galleryAll {
+  min-height: 44px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.galleryScroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -20px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.galleryScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.posterItem {
+  flex-shrink: 0;
+}
+
+/* ── Loading skeletons ────────────────────────────────────────── */
+.gallerySkeletons {
+  display: flex;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.skeleton {
+  /* Tracks .frame in PosterThumbnail.module.css so the rail does not resize once
+     the real posters replace the skeletons. */
+  width: clamp(120px, 42vw, 176px);
+  aspect-ratio: 120 / 168;
   background: #16181c;
-  border-radius: 24px;
+  border-radius: 10px;
+  flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 0.55; }
   50%       { opacity: 0.25; }
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.emptyCard {
+  width: 100%;
+  background: #16181c;
+  border: 1px dashed rgba(243, 241, 234, 0.13);
+  border-radius: 12px;
+  padding: 32px 20px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emptyCard:active {
+  border-color: rgba(245, 194, 0, 0.35);
+}
+
+.emptyCardText {
+  font-family: 'Barlow', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.45);
+  line-height: 1.4;
 }
 
 .savedSheetBackdrop {

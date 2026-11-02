@@ -14,8 +14,6 @@ import styles from './ChatPoster.module.css';
 interface ChatPosterProps {
   workout: WorkoutWithStats;
   onOpen: () => void;
-  /** Where it shows — Today's big card uses the same poster (and counts its replays apart). */
-  surface?: 'chat' | 'today';
 }
 
 /**
@@ -26,10 +24,10 @@ interface ChatPosterProps {
  * (usePosterShare); the image is drawn off-screen at the poster's full width so it is as sharp
  * as one shared from the poster.
  */
-export function ChatPoster({ workout, onOpen, surface = 'chat' }: ChatPosterProps): React.ReactElement | null {
+export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactElement | null {
   const payload = usePosterPayload(workout);
   const share = usePosterShare(() => workout.title || 'Workout');
-  const replay = usePosterReplay({ workoutId: workout.id, wod: payload?.wods[0], surface, autoPlay: true });
+  const replay = usePosterReplay({ workoutId: workout.id, wod: payload?.wods[0], surface: 'chat', autoPlay: true });
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
 

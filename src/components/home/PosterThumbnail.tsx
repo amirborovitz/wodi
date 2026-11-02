@@ -9,6 +9,9 @@ import styles from './PosterThumbnail.module.css';
 interface PosterThumbnailProps {
   workout: WorkoutWithStats;
   onClick: () => void;
+  fullWidth?: boolean;
+  /** The workout's EP, printed beside its day — Home's rail passes it; the Gallery grid doesn't. */
+  ep?: number;
 }
 
 function formatPosterDate(date: Date): string {
@@ -30,8 +33,7 @@ function getRelativeLabel(date: Date): string {
   return formatPosterDate(date);
 }
 
-/** A poster in the Gallery grid: the real skin, scaled to the cell. */
-export function PosterThumbnail({ workout, onClick }: PosterThumbnailProps): React.ReactElement {
+export function PosterThumbnail({ workout, onClick, fullWidth, ep }: PosterThumbnailProps): React.ReactElement {
   const frameRef = useRef<HTMLButtonElement>(null);
   // A poster is the full skin at small scale — building one per card for a whole history would
   // stall the Gallery on open. Build it only once the card is about to scroll into view.
@@ -43,20 +45,22 @@ export function PosterThumbnail({ workout, onClick }: PosterThumbnailProps): Rea
   const relativeLabel = getRelativeLabel(getEffectiveWorkoutDate(workout));
 
   return (
-    <div className={`${styles.wrapper} ${styles.wrapperFull}`}>
+    <div className={`${styles.wrapper} ${fullWidth ? styles.wrapperFull : ''}`}>
       <button
         ref={frameRef}
         type="button"
-        className={`${styles.frame} ${payload ? '' : styles.framePending}`}
+        className={`${styles.frame} ${fullWidth ? styles.frameFull : ''} ${payload ? '' : styles.framePending}`}
         onClick={onClick}
         aria-label={`Open ${workout.title} workout`}
       >
         {payload && <PosterCard payload={payload} />}
       </button>
+      {/* A PR is rare and true — pinned on the poster's corner, where it can't be missed. */}
+      {workout.isPR && <span className={styles.prBadge}>★ PR</span>}
 
       <div className={styles.label}>
-        {workout.isPR && <span className={styles.labelPR}>PR</span>}
         <span className={styles.labelDate}>{relativeLabel}</span>
+        {ep != null && <span className={styles.labelEP}>+{ep} EP</span>}
       </div>
     </div>
   );

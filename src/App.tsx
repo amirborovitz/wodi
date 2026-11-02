@@ -34,8 +34,6 @@ function AppContent() {
   const { user, loading, refreshUser, signOut } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
   const [homeRingsKey, setHomeRingsKey] = useState(0);
-  // The chat bar's words on Today — Today decides them (useTodayHome), the docked bar shows them.
-  const [todayComposerHint, setTodayComposerHint] = useState('Message Wodi…');
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   // Add Workout opens on the Tell Wodi chat rather than the capture step.
   const [startInChat, setStartInChat] = useState(false);
@@ -92,6 +90,16 @@ function AppContent() {
     setEditingWorkout(null);
     setNavDir(null);
     setCurrentScreen('workout-detail');
+  };
+
+  // Today's ways in — shared by the Wodi message, the empty poster card and the docked composer.
+  const openForm = (): void => {
+    setEditingWorkout(null);
+    setPendingImage(null);
+    setPendingPlannedWorkout(null);
+    setShowRecentWorkoutsOnOpen(false);
+    setStartInChat(false);
+    setCurrentScreen('add-workout');
   };
 
   /** The Wodi thread — with a board photo already sent, when given. */
@@ -317,9 +325,7 @@ function AppContent() {
       default:
         return (
           <HomeScreen
-            onTellWodi={() => openWodi()}
-            onPhoto={(file) => openWodi(file)}
-            onComposerHint={setTodayComposerHint}
+            onAddWorkout={openForm}
             onOpenProfile={() => setCurrentScreen('profile')}
             onSelectWorkout={(workout, sortedList) => {
               setNavDir(null);
@@ -331,6 +337,7 @@ function AppContent() {
             onLogPlannedWorkout={(planned) => handleLogPlannedWorkout(planned, true)}
             onOpenRecap={handleOpenRecap}
             onOpenFeed={() => setCurrentScreen('feed')}
+            onOpenGallery={() => setCurrentScreen('history')}
             ringsKey={homeRingsKey}
           />
         );
@@ -358,7 +365,6 @@ function AppContent() {
             <TodayComposer
               onTellWodi={() => openWodi()}
               onPhoto={(file) => openWodi(file)}
-              placeholder={todayComposerHint}
             />
           ) : undefined}
         />

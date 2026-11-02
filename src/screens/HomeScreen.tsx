@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
@@ -8,11 +8,11 @@ import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
 import { useRecapData } from '../hooks/useRecapData';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
-import { useTodayHome } from '../hooks/useTodayHome';
+import { usePosterEP } from '../hooks/usePosterEP';
+import { PosterThumbnail } from '../components/home/PosterThumbnail';
 import { OnDeckCard } from '../components/home/OnDeckCard';
-import { TodayHeroCard } from '../components/home/TodayHeroCard';
-import { TodayWeekRow } from '../components/home/TodayWeekRow';
-import { TodayWelcome } from '../components/home/TodayWelcome';
+import { UnfinishedPosterTile } from '../components/home/UnfinishedPosterTile';
+import { buildUnfinishedPoster } from '../components/home/unfinishedPoster';
 import { RecapReadyCard } from '../components/recap/RecapReadyCard';
 import { FeedPulse } from '../components/home/FeedPulse';
 import { AddToHomeScreenCard } from '../components/home/AddToHomeScreenCard';
@@ -23,21 +23,26 @@ import { track } from '../services/analytics';
 import type { RecapData } from '../hooks/useRecapData';
 import styles from './HomeScreen.module.css';
 
+const GALLERY_MAX = 7;
 const PULL_REFRESH_TRIGGER = 72;
 
 interface HomeScreenProps {
-  /** The chat — "Type it in". */
-  onTellWodi: () => void;
-  /** A board photo picked on Today — the chat, with it already sent. */
-  onPhoto: (file: File) => void;
-  /** The docked chat bar's words, which follow the waiting board. */
-  onComposerHint?: (hint: string) => void;
+  onAddWorkout: () => void;
   onOpenProfile?: () => void;
   onSelectWorkout?: (workout: WorkoutWithStats, sortedList: WorkoutWithStats[]) => void;
   onLogPlannedWorkout?: (planned: PlannedWorkout) => void;
   onOpenRecap?: (data: RecapData) => void;
   onOpenFeed?: () => void;
+  /** "All" beside Your posters. */
+  onOpenGallery?: () => void;
   ringsKey?: number; // kept for API compatibility — unused
+}
+
+function getStartOfWeek(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
 }
 
 function getSavedTitle(saved: PlannedWorkout): string {
@@ -47,25 +52,22 @@ function getSavedTitle(saved: PlannedWorkout): string {
 }
 
 export function HomeScreen({
-  onTellWodi,
-  onPhoto,
-  onComposerHint,
+  onAddWorkout,
   onOpenProfile,
   onSelectWorkout,
   onLogPlannedWorkout,
   onOpenRecap,
   onOpenFeed,
+  onOpenGallery,
 }: HomeScreenProps): React.ReactElement {
   const { user, isAdmin } = useAuth();
   // EVERY workout, not a recent window: the recap cards and the milestone below are totals over
   // whole periods and a whole history. Capped at 100, the Spring card counted 33 workouts where
   // the same recap on Me counted 59 — one recap, two answers. The query fetches the full list
-  // either way (the cap only ever sliced it).
+  // either way (the cap only ever sliced it); the rail trims to what it shows (GALLERY_MAX).
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
   const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
-  const today = useTodayHome(workouts, planned, user?.weight);
-  useEffect(() => { onComposerHint?.(today.composerHint); }, [onComposerHint, today.composerHint]);
   const profile = useProfileCompleteness();
   // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
   const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
@@ -91,7 +93,7 @@ export function HomeScreen({
   const recapDismissedKey = recapForToday
     ? `wodi_recap_dismissed_${recapForToday.id}`
     : null;
-  // Ids dismissed in THIS session, so the card collapses the moment it's dismissed.
+  // Ids dismissed in THIS session, so the card collapses the moment it's swiped.
   const [dismissedIds, setDismissedIds] = useState<readonly string[]>([]);
   // Re-read whenever the key changes rather than once at mount: workouts arrive
   // after the first render, so an initializer would have run while the key was
@@ -127,9 +129,22 @@ export function HomeScreen({
 
   const firstName = user?.displayName?.split(' ')[0] ?? 'Athlete';
 
-  // The newest saved board is Today's big card while it waits; any others wait in the For Later
-  // sheet, one tap from its caption.
-  const waitingBoard = today.hero.kind === 'board' ? today.hero.board : null;
+  const weekStart = useMemo(() => getStartOfWeek(), []);
+
+  const weekCount = useMemo(
+    () => workouts.filter(w => w.date >= weekStart).length,
+    [workouts, weekStart],
+  );
+
+  const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
+  const posterEP = usePosterEP(galleryWorkouts, user?.weight);
+  // The newest saved board leads the rail as the poster it will become; any others wait in the
+  // For Later sheet, one tap from its caption. One tile, never a shelf pushing the posters away.
+  const waitingBoard = planned[0] ?? null;
+  const unfinishedPoster = useMemo(
+    () => (waitingBoard ? buildUnfinishedPoster(waitingBoard, new Date()) : null),
+    [waitingBoard],
+  );
 
   const actionSheetWorkout = deleteSheet.targetId
     ? workouts.find((w) => w.id === deleteSheet.targetId) ?? null
@@ -257,6 +272,9 @@ export function HomeScreen({
             <span className={styles.greetingName}>{firstName}</span>
           </div>
           <div className={styles.headerRight}>
+            {weekCount >= 2 && (
+              <span className={styles.streakChip}>{weekCount} this week</span>
+            )}
             {onOpenProfile && (
               <button
                 type="button"
@@ -282,62 +300,94 @@ export function HomeScreen({
           </div>
         </motion.header>
 
+        {/* Week / month / season drop: a slim banner ABOVE the posters, so it's seen on the first
+            glance. Holds its slot until dismissed (×) or replaced by the next drop. */}
+        {showRecapCard && recapForToday && (
+          <div className={styles.recapSlot}>
+            <RecapReadyCard data={recapForToday} onOpen={handleOpenRecap} onDismiss={markRecapDismissed} />
+          </div>
+        )}
 
-        <div className={styles.stack}>
-          {/* The surprise slot — one at a time, only when true, and ABOVE the hero as a slim banner
-              so it is seen in the first glance, never below the fold (wodi Today v6). The week /
-              month / season drop first (it holds its slot until dismissed or replaced), else the box
-              today. The box row renders nothing when no one else trained, so a quiet day costs no
-              space. A brand-new athlete gets neither: nothing to show is nothing shown. */}
-          {!loading && today.hero.kind !== 'welcome' && (
-            showRecapCard && recapForToday ? (
-              <RecapReadyCard data={recapForToday} onOpen={handleOpenRecap} onDismiss={markRecapDismissed} />
-            ) : (
-              onOpenFeed && <FeedPulse userId={user?.id} onOpenFeed={onOpenFeed} />
-            )
-          )}
+        {/* ── Poster gallery ── */}
+        {/* No `layout` here: this section contains the horizontal poster rail, and layout
+            projection re-measures/transforms it on every re-render (the pull-to-refresh
+            indicator re-renders per frame), fighting the rail's native scroll. */}
+        <motion.section
+          className={styles.gallery}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.12, duration: 0.3 }}
+        >
+          <div className={styles.galleryHeader}>
+            <span className={styles.galleryTitle}>Your posters</span>
+            {onOpenGallery && workouts.length > 0 && (
+              <button type="button" className={styles.galleryAll} onClick={onOpenGallery}>All</button>
+            )}
+          </div>
 
           {loading ? (
-            <div className={styles.heroSkeleton} />
-          ) : today.hero.kind === 'welcome' ? (
-            <TodayWelcome firstName={firstName} onPhoto={onPhoto} onTellWodi={onTellWodi} />
+            <div className={styles.gallerySkeletons}>
+              {[0, 1, 2].map(i => (
+                <div key={i} className={styles.skeleton} />
+              ))}
+            </div>
+          ) : workouts.length === 0 && !unfinishedPoster ? (
+            <button type="button" className={styles.emptyCard} onClick={onAddWorkout}>
+              <span className={styles.emptyCardText}>
+                Your first poster is one workout away →
+              </span>
+            </button>
           ) : (
-            <>
-              <TodayHeroCard
-                hero={today.hero}
-                onPhoto={onPhoto}
-                onTellWodi={onTellWodi}
-                onOpenBoard={handleOpenWaitingBoard}
-                onOpenWorkout={handleSelectWorkout}
-                moreBoards={planned.length - 1}
-                onOpenMoreBoards={handleOpenSavedSheet}
-                onDidntDoBoard={handleDidntDoWaitingBoard}
-                boardPressHandlers={waitingBoard ? savedLongPressHandlers(waitingBoard.id) : {}}
-              />
-              <TodayWeekRow week={today.week} onOpen={handleSelectWorkout} pressHandlers={longPressHandlers} />
-            </>
+            <div className={styles.galleryScroll}>
+              {unfinishedPoster && waitingBoard && (
+                <div className={styles.posterItem}>
+                  <UnfinishedPosterTile
+                    poster={unfinishedPoster}
+                    onOpen={handleOpenWaitingBoard}
+                    more={planned.length - 1}
+                    onOpenMore={handleOpenSavedSheet}
+                    onDidntDoIt={handleDidntDoWaitingBoard}
+                    pressHandlers={savedLongPressHandlers(waitingBoard.id)}
+                  />
+                </div>
+              )}
+              {galleryWorkouts.map(workout => (
+                <div key={workout.id} className={styles.posterItem} {...longPressHandlers(workout.id)}>
+                  <PosterThumbnail
+                    workout={workout}
+                    ep={posterEP.get(workout.id)}
+                    onClick={() => handleSelectWorkout(workout)}
+                  />
+                </div>
+              ))}
+            </div>
           )}
+        </motion.section>
 
-          {/* Home-screen nudge. Below the athlete's own work — it is the one
-              thing on Today that isn't about their training. */}
-          <AnimatePresence initial={false}>
-            {homeScreenInstall.teaserVisible && (
-              <motion.div
-                key="add-to-home-screen"
-                className={styles.installSlot}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.22 }}
-              >
-                <AddToHomeScreenCard
-                  onOpen={homeScreenInstall.openSheet}
-                  onDismiss={homeScreenInstall.dismissTeaser}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Home-screen nudge. Below the athlete's own work — it is the one thing on Today that
+            isn't about their training. */}
+        <AnimatePresence initial={false}>
+          {homeScreenInstall.teaserVisible && (
+            <motion.div
+              key="add-to-home-screen"
+              className={styles.installSlot}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.22 }}
+            >
+              <AddToHomeScreenCard
+                onOpen={homeScreenInstall.openSheet}
+                onDismiss={homeScreenInstall.dismissTeaser}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* The gym's heartbeat, last so it never competes with the athlete's own work
+            above it or with a recap drop. It renders nothing when the 24h window holds
+            no one else, so a quiet day costs no space. */}
+        {onOpenFeed && <FeedPulse userId={user?.id} onOpenFeed={onOpenFeed} />}
       </div>
 
       <DeleteActionSheet

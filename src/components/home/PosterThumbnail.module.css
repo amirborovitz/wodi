@@ -1,4 +1,5 @@
 .wrapper {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -20,9 +21,12 @@
 }
 
 /* ── Poster card frame — scales the real poster without cropping ───────── */
-/* Fills its Gallery grid cell. */
+/* Viewport-relative so the rail scales with the phone: a big screen gets a poster
+   you can actually read, a small one keeps its cards compact so the recap card
+   below the gallery is not pushed past the fold. */
 .frame {
-  width: 100%;
+  /* The latest posters are the hero of Today — about three across a swipe, ~30% larger than before. */
+  width: clamp(150px, 53vw, 206px);
   border-radius: 10px;
   overflow: hidden;
   /* Safari doesn't clip a scaled (transformed) skin to the rounded frame without its own layer,
@@ -52,6 +56,9 @@
   transform: scale(0.97);
 }
 
+.frameFull {
+  width: 100%;
+}
 
 /* Holds the card's place until its poster is built — same shape as Home's loading skeleton. */
 .framePending {
@@ -62,21 +69,42 @@
 /* ── Label below the card ─────────────────────────────────────── */
 .label {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
   padding: 0 2px;
 }
 
-.labelPR {
+/* On the poster's top-left corner: a PR is the one thing that must read at a glance. Inside the
+   corner, not proud of it — the rail scrolls sideways and would clip anything outside. Ringed in
+   the page ink so it separates from any skin. */
+.prBadge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: 999px;
   background: #f5c200;
   color: #0b0c0e;
+  box-shadow: 0 0 0 2px #0b0c0e;
   font-family: 'Barlow', sans-serif;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 900;
-  letter-spacing: 0.05em;
-  border-radius: 999px;
-  padding: 1px 5px;
-  line-height: 1.4;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* The workout's EP beside its day — white and bold so it reads, never yellow: a day's worth to
+   learn the scale by, not a score to beat. */
+.labelEP {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #f3f1ea;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .labelDate {
