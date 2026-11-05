@@ -1,18 +1,10 @@
 import { completeParse, type ParsePart } from './parseModel';
-import OpenAI from 'openai';
 import type { ParsedWorkout, ParsedExercise, WorkoutType, WorkoutFormat, ScoreType, ExerciseType, RxWeights, ParsedMovement, MeasurementUnit, ExerciseLoggingMode, ParsedSection, ParsedSectionType, BlockScoreType, SharedWorkLabel, WorkoutPartKind, ParseUncertainty, UncertaintyAnswer, UncertaintyKind, UncertaintyOption } from '../types';
 import { postProcessParsedWorkout, applyTitlePartnerOverride } from './workoutPostProcessor';
 import { fitAnswerToSchema, refuseGuessesOnUncertainFields, shiftUncertaintyPaths, toAppLayout, type PartLayout } from './parseUncertainty';
 import { resolveSourceDate } from './sourceDateResolution';
 import { PARSE_RESPONSE_SCHEMA } from './parseSchema';
 import { readRepsDisplay } from '../utils/repsDisplay';
-
-const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-
-const openai = new OpenAI({
-  apiKey: env?.VITE_OPENAI_API_KEY ?? process.env.VITE_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // Required for client-side usage
-});
 
 /**
  * The model that reads every workout — the photo, then each part's structure. One place, so a
@@ -28,8 +20,6 @@ const openai = new OpenAI({
 export const PARSE_MODEL = 'gpt-5.5';
 export const PARSE_REASONING_EFFORT = 'none' as const;
 
-/** The one client — other services (the Tell Wodi chat) call the model through it, not a second. */
-export { openai as openaiClient };
 
 /**
  * The parse hit OpenAI's rate limit (429), not a workout the parser couldn't read.
@@ -52,6 +42,14 @@ function errorFields(error: unknown): { status?: unknown; statusCode?: unknown; 
 }
 
 /**
+ * The athlete used up today's AI calls (the wodiModel function's per-athlete limit). It arrives as a
+ * 429, but waiting minutes won't clear it — it resets tomorrow.
+ */
+export function isDailyLimitError(error: unknown): boolean {
+  return errorFields(error).code === 'wodi_daily_limit';
+}
+
+/**
  * The API key is out of credit. OpenAI returns this as a 429 too, but unlike a rate limit it
  * never clears on its own — so it must never be reported as "try again in a few minutes".
  */
@@ -63,7 +61,7 @@ export function isQuotaExhaustedError(error: unknown): boolean {
 /** True for OpenAI 429s, however they surface (SDK APIError, fetch Response, or bare message). */
 export function isRateLimitError(error: unknown): boolean {
   if (error instanceof ParseRateLimitError) return true;
-  if (!error || typeof error !== 'object') return false;
+  if (!error || typeof error !== 'object' || isDailyLimitError(error)) return false;
   const { status, statusCode, code, message } = errorFields(error);
   if (status === 429 || statusCode === 429) return true;
   if (code === 'rate_limit_exceeded') return true;

@@ -1,4 +1,5 @@
-import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from './openai';
+import { PARSE_MODEL, PARSE_REASONING_EFFORT } from './openai';
+import { modelClient } from './modelClient';
 import type { PosterVibeKey, WodiNote } from '../types';
 import { notesForPrompt } from './wodiAgent/athleteNotes';
 import type { ChatSlot, SlotAnswer } from '../components/tellWodi/chatQuestions';
@@ -210,7 +211,7 @@ export async function readAthleteMessage(input: {
     .map((t) => `${t.from === 'wodi' ? 'Wodi' : 'Athlete'}: ${t.text}`)
     .join('\n');
 
-  const response = await openaiClient.chat.completions.create({
+  const response = await modelClient.chat.completions.create({
     model: PARSE_MODEL,
     reasoning_effort: PARSE_REASONING_EFFORT,
     temperature: 0,

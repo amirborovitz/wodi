@@ -1,4 +1,5 @@
-import OpenAI from 'openai';
+import type { ChatCompletionContentPart } from 'openai/resources/chat/completions';
+import { modelClient } from './modelClient';
 import { getAI, getGenerativeModel, GoogleAIBackend, ThinkingLevel, type ThinkingConfig } from 'firebase/ai';
 
 /**
@@ -58,22 +59,13 @@ export interface ParseResponse {
   usage: ParseUsage;
 }
 
-let openaiClient: OpenAI | null = null;
-function openai(): OpenAI {
-  openaiClient ??= new OpenAI({
-    apiKey: envValue('VITE_OPENAI_API_KEY') ?? envValue('OPENAI_API_KEY'),
-    dangerouslyAllowBrowser: true, // Required for client-side usage
-  });
-  return openaiClient;
-}
-
 async function completeWithOpenAI(request: ParseRequest, model: string): Promise<ParseResponse> {
-  const response = await openai().chat.completions.create({
+  const response = await modelClient.chat.completions.create({
     model,
     reasoning_effort: 'none',
     messages: [{
       role: 'user',
-      content: request.parts.map((part): OpenAI.Chat.Completions.ChatCompletionContentPart => (
+      content: request.parts.map((part): ChatCompletionContentPart => (
         part.type === 'text'
           ? { type: 'text', text: part.text }
           : { type: 'image_url', image_url: { url: `data:${part.mimeType};base64,${part.base64}`, detail: 'high' } }

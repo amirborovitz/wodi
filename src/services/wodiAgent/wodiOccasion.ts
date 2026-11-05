@@ -2,6 +2,7 @@ import type { Milestone } from '../../hooks/useMilestone';
 import type { ChaseFact } from '../chase/chaseFacts';
 import type { PosterVibeKey, WodiNote } from '../../types';
 import type { ThreadMessage } from './threadItems';
+import type { CheerStory } from './cheerStory';
 
 /**
  * When Wodi has something to say on its own — and what it is about. The APP decides the moment
@@ -9,18 +10,21 @@ import type { ThreadMessage } from './threadItems';
  * is pinned by tests.
  *
  * A buddy, not a tracker. Wodi speaks in the chat when you speak to it — and otherwise only:
- * - to cheer a workout just logged, always;
- * - to check in, once, on something the athlete asked Wodi to remember (an answer to them too).
+ * - to cheer a workout just logged, always — about THAT workout (cheerStory.ts), never "nice work";
+ * - to check in, once, on something the athlete asked Wodi to remember (an answer to them too);
+ * - once a week, to suggest one thing worth trying (owner, 2026-11-05: "a real digital workout
+ *   assistant … offer proactively what to try to work on this week") — an invitation drawn from
+ *   the athlete's own Chase threads, never a target or a deficit.
  * No lines of its own beyond that (owner, 2026-10-31, on "You just passed 250 dips" opening the
  * chat: "i dont think this should be in the chat") — the welcome-back, the morning-after check-in,
  * the year-ago and the week's-rhythm lines were removed with it.
  *
- * It only ever recognises (see wodiMessage.ts): no gaps, no "N days since", no targets. Each
+ * Cheers and check-ins only recognise (see wodiMessage.ts): no gaps, no "N days since". Each
  * occasion has a stable key — the thread message id it is kept under — so it is said once and
  * every surface reads the same words.
  */
 
-export type OccasionKind = 'cheer' | 'note';
+export type OccasionKind = 'cheer' | 'note' | 'focus';
 
 export type FactValue = string | number | boolean;
 
@@ -48,6 +52,8 @@ export interface OccasionWorkout {
   felt: PosterVibeKey | null;
   isPR: boolean;
   teamSize: number;
+  /** What happened in it and how it compares with last time — the cheer's specifics. */
+  story?: CheerStory | null;
 }
 
 export type OccasionPick =
@@ -117,13 +123,17 @@ function cheerOccasion(w: OccasionWorkout, input: OccasionInput): WodiOccasion {
   }
   const tied = input.chase.find((f) => f.kind === 'TIED' && f.on === w.trained);
   if (tied) facts.matched_best = tied.raw;
+  Object.assign(facts, w.story?.facts);
   const sessionsThisWeek = input.workouts.filter((x) => weekStart(x.trained) === weekStart(w.trained) && x.trained <= w.trained).length;
   if (sessionsThisWeek >= 2) facts.sessions_this_week = sessionsThisWeek;
 
+  // The plain line is specific too: what happened, and the one true thing worth saying about it.
   const title = titleOf(w);
-  const fallback = w.isPR ? `A new PR in ${title} ${when}. Huge.`
-    : w.result ? `${title} ${when} — ${w.result}. Strong work.`
-    : `${title} ${when}. Nice work.`;
+  const detail = w.story?.detail;
+  const head = w.isPR ? `A new PR in ${title} ${when}.`
+    : w.result ? `${title} ${when} — ${w.result}.`
+    : `${title} ${when} is on the board.`;
+  const fallback = detail ? `${head} ${detail}` : head;
   return { key: `cheer:${w.id}`, kind: 'cheer', facts, fallback, workoutId: w.id };
 }
 
@@ -137,6 +147,37 @@ export interface OccasionInput {
   today: string; // YYYY-MM-DD
   /** Start of today, ms — what "said today" means. */
   todayStartMs: number;
+}
+
+/** Chase threads that make a good week's focus — something to go and try, not a record to admire. */
+const FOCUS_KINDS: ReadonlySet<ChaseFact['kind']> = new Set(['CEILING', 'STALE', 'REMATCH', 'QUIET']);
+/** A week's focus is for someone training — after a long break, a suggestion reads as pressure. */
+const FOCUS_ACTIVE_DAYS = 14;
+const MAX_FOCUS_IDEAS = 3;
+
+function focusFallback(fact: ChaseFact): string {
+  switch (fact.kind) {
+    case 'CEILING': return `One idea for this week: ${fact.subject} — your top set's been the same twice, so try a little more.`;
+    case 'STALE': return `One idea for this week: take a shot at your ${fact.subject} best.`;
+    case 'REMATCH': return `One idea for this week: run ${fact.subject} again.`;
+    default: return `One idea for this week: get some ${fact.subject} back in.`;
+  }
+}
+
+/** This week's one suggestion, from the athlete's own Chase threads. */
+function focusOccasion(input: OccasionInput): WodiOccasion | null {
+  const { workouts, chase, today } = input;
+  const latest = workouts[0];
+  if (!latest || daysBetween(latest.trained, today) > FOCUS_ACTIVE_DAYS) return null;
+  const ideas = chase.filter((f) => FOCUS_KINDS.has(f.kind)).slice(0, MAX_FOCUS_IDEAS);
+  if (ideas.length === 0) return null;
+  return {
+    key: `focus:${weekStart(today)}`,
+    kind: 'focus',
+    facts: Object.fromEntries(ideas.map((f, i) => [`idea_${i + 1}`, [f.raw, ...f.facts].join(' · ')])),
+    fallback: focusFallback(ideas[0]),
+    workoutId: null,
+  };
 }
 
 /** A remembered note, checked on once — after it has had time to change, before it is old news. */
@@ -157,7 +198,7 @@ function noteOccasion(input: OccasionInput): WodiOccasion | null {
 }
 
 // Lines kept from before 2026-10-31 still carry the removed prefixes; they're still Wodi's own.
-const OCCASION_PREFIXES = ['cheer:', 'checkin:', 'week:', 'anniversary:', 'back:', 'note:'];
+const OCCASION_PREFIXES = ['cheer:', 'checkin:', 'week:', 'anniversary:', 'back:', 'note:', 'focus:'];
 
 /** One of Wodi's own lines (not an answer to a question). */
 export function isOccasionMessage(m: ThreadMessage): boolean {
@@ -191,9 +232,14 @@ export function pickOccasion(input: OccasionInput): OccasionPick {
   const note = noteOccasion(input);
   if (note) return { kind: 'new', occasion: note };
 
-  // Nothing new: a recent workout's cheer, as it was said.
+  const focus = focusOccasion(input);
+  if (focus && !said.has(focus.key)) return { kind: 'new', occasion: focus };
+
+  // Nothing new: a recent workout's cheer as it was said, else this week's focus.
   const cheer = fresh ? said.get(`cheer:${fresh.id}`) : undefined;
-  return cheer ? { kind: 'said', message: cheer } : { kind: 'none' };
+  const focusSaid = focus ? said.get(focus.key) : undefined;
+  const standing = cheer ?? focusSaid;
+  return standing ? { kind: 'said', message: standing } : { kind: 'none' };
 }
 
 /**

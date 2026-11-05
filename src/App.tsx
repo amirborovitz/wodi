@@ -21,6 +21,7 @@ import { WeekDropPage } from './components/recap/WeekDropPage';
 import type { Screen, PlannedWorkout } from './types';
 import type { WorkoutWithStats } from './hooks/useWorkouts';
 import { useAppVersion } from './hooks/useAppVersion';
+import { usePushDevice, usePushLink } from './hooks/useWodiNotifications';
 import { markRecapViewed } from './hooks/useRecapData';
 import type { RecapData } from './hooks/useRecapData';
 import { track } from './services/analytics';
@@ -111,6 +112,10 @@ function AppContent() {
     setStartInChat(true);
     setCurrentScreen('add-workout');
   };
+
+  // A tapped notification opens the thread; where nudges are on, this phone's push address stays fresh.
+  usePushLink(() => openWodi(), Boolean(user) && !needsOnboarding);
+  usePushDevice(user?.id ?? null);
 
   const handleLogPlannedWorkout = (planned: PlannedWorkout, fromToday: boolean) => {
     setPendingPlannedWorkout(planned);

@@ -1,4 +1,5 @@
-import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from '../openai';
+import { PARSE_MODEL, PARSE_REASONING_EFFORT } from '../openai';
+import { modelClient } from '../modelClient';
 import { usesOnlyFactNumbers, type OccasionKind, type WodiOccasion } from './wodiOccasion';
 
 /**
@@ -11,25 +12,40 @@ import { usesOnlyFactNumbers, type OccasionKind, type WodiOccasion } from './wod
 export type WriteFn = (system: string, user: string) => Promise<string>;
 
 const WHAT_TO_SAY: Record<OccasionKind, string> = {
-  cheer: 'They just logged this workout. Cheer them on for it. If the facts hold a personal record, a matched best or a milestone, that is the headline. If they said how it felt, react to that like a friend would (wrecked → they earned the rest). Mention the result if there is one.',
+  cheer: `They just logged this workout. React to THIS workout like a friend who watched it: pick the one most interesting true thing in the facts and say it plainly.
+- A personal record, a matched best, a heavier load or a faster time than last time is the headline. Say the change ("up from 95kg").
+- A lighter load, a slower time, a time cap or a scaled movement: be honest. Don't call it a PR or pretend it was faster. Find the real positive in it (they showed up on a hard day, kept moving under the cap, the scale kept the intensity, a lighter day after heavy ones is smart).
+- How it felt (wrecked, chill) is worth reacting to when nothing else stands out.`,
   note: 'They asked you to remember this. Check in on it with one gentle question. No medical advice.',
+  focus: `It's the start of their week. Suggest ONE thing to try this week, picked from the ideas in the facts: the one you'd pick as their buddy. Say what to try and the one fact that makes it a good idea ("your top set's been 100kg twice, so try a little more"). An invitation, never an order or a deficit: no "you haven't", no "you need to", no "behind".`,
 };
 
-function systemPrompt(kind: OccasionKind): string {
-  return `You are Wodi, the athlete's CrossFit buddy, texting them first.
+/** Stock praise says nothing about the workout. A line built on it is not said. */
+const STOCK_PRAISE = /\b(nice|great|good|strong|solid|awesome|amazing) (work|job|session|effort)\b|\bwell done\b|\b(crushed|killed|smashed|nailed) it\b|\bway to go\b|\bproud of you\b/i;
+
+export function isStockPraise(line: string): boolean {
+  return STOCK_PRAISE.test(line);
+}
+
+function systemPrompt(kind: OccasionKind, recent: readonly string[]): string {
+  const avoid = recent.length > 0
+    ? `\n- Your last messages are below. Don't start the same way or reuse their phrases:\n${recent.map((r) => `  "${r}"`).join('\n')}`
+    : '';
+  return `You are Wodi, the athlete's CrossFit buddy, texting them first. You know the sport, you notice details, and you tell the truth, always on their side.
 
 ${WHAT_TO_SAY[kind]}
 
 How you text:
-- ONE short message: at most 2 short sentences, under 25 words.
-- Warm, specific, a friend at the gym. Plain text, no markdown, no hashtags, at most one emoji.
+- ONE short message: at most 2 short sentences, under 30 words. Sound like a person texting, not an app.
+- Be specific: name the movement, the load or the time. Never generic praise: no "nice work", "great job", "well done", "crushed it", "strong session".
+- Honest and always positive: never invent a win, never make them feel bad.
+- Plain text, no markdown, no hashtags, at most one emoji, and only when it fits.
 - Use a number only if it appears in the facts, written exactly as there. Never invent or work out a number.
-- Never point at a gap: no "still", no targets, nothing left to do, no days missed, no comparing them with anyone.
-- Don't open with "Hey" or their name.`;
+- Never compare them with anyone else. Don't open with "Hey" or their name.${avoid}`;
 }
 
 const defaultWrite: WriteFn = async (system, user) => {
-  const response = await openaiClient.chat.completions.create({
+  const response = await modelClient.chat.completions.create({
     model: PARSE_MODEL,
     reasoning_effort: PARSE_REASONING_EFFORT,
     temperature: 0.9,
@@ -39,12 +55,17 @@ const defaultWrite: WriteFn = async (system, user) => {
   return response.choices[0]?.message?.content ?? '';
 };
 
-export async function writeWodiLine(occasion: WodiOccasion, write: WriteFn = defaultWrite): Promise<string> {
+/** `recent`: Wodi's last few lines, newest first, so this one doesn't sound like them. */
+export async function writeWodiLine(
+  occasion: WodiOccasion,
+  write: WriteFn = defaultWrite,
+  recent: readonly string[] = [],
+): Promise<string> {
   try {
-    const raw = await write(systemPrompt(occasion.kind), `Facts:\n${JSON.stringify(occasion.facts, null, 2)}`);
+    const raw = await write(systemPrompt(occasion.kind, recent), `Facts:\n${JSON.stringify(occasion.facts, null, 2)}`);
     const line = raw.trim().replace(/^["“]|["”]$/g, '').trim();
-    if (!line || !usesOnlyFactNumbers(line, occasion.facts)) {
-      if (line) console.warn('[WodiLine] a number outside the facts — saying the plain line', { line, facts: occasion.facts });
+    if (!line || !usesOnlyFactNumbers(line, occasion.facts) || isStockPraise(line)) {
+      if (line) console.warn('[WodiLine] off the facts or stock praise, saying the plain line', { line, facts: occasion.facts });
       return occasion.fallback;
     }
     return line;

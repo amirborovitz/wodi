@@ -1,7 +1,7 @@
 // Firebase imports reserved for future use
 // import { collection, doc, getDoc, setDoc, addDoc, query, where, getDocs, increment as firestoreIncrement, serverTimestamp } from 'firebase/firestore';
 // import { db } from './firebase';
-import OpenAI from 'openai';
+import { modelClient } from './modelClient';
 import type {
   ParsedExercise,
   WorkoutFormat,
@@ -12,10 +12,6 @@ import type {
   LoggingGuidanceResponse,
 } from '../types';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
 
 // ============================================
 // EXPLICIT RULES (highest confidence)
@@ -285,7 +281,7 @@ export async function getLoggingGuidanceFromAI(
       .replace('{prescription}', request.prescription)
       .replace('{rawText}', request.workoutContext || '');
 
-    const response = await openai.chat.completions.create({
+    const response = await modelClient.chat.completions.create({
       model: 'gpt-4o-mini', // Use cheaper model for classification
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,

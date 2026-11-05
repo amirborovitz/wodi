@@ -5,7 +5,8 @@ import { askWodi, receiptsFor, TOOLS, type CompleteFn } from './askWodi';
 import type { TrainingContext } from './trainingFacts';
 
 // The loop is tested against a scripted model — never the network.
-vi.mock('../openai', () => ({ openaiClient: {}, PARSE_MODEL: 'test', PARSE_REASONING_EFFORT: 'none' }));
+vi.mock('../openai', () => ({ PARSE_MODEL: 'test', PARSE_REASONING_EFFORT: 'none' }));
+vi.mock('../modelClient', () => ({ modelClient: {} }));
 
 const DAY = new Date(2026, 8, 24);
 const DEADLIFT_DAY: Workout = {

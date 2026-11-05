@@ -3,7 +3,8 @@ import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions';
-import { openaiClient, PARSE_MODEL, PARSE_REASONING_EFFORT } from '../openai';
+import { PARSE_MODEL, PARSE_REASONING_EFFORT } from '../openai';
+import { modelClient } from '../modelClient';
 import type { ChatTurn } from '../tellWodiReader';
 import { findWorkouts, personalRecords, trainingTotals, type FoundWorkout, type TrainingContext } from './trainingFacts';
 import { toIsoDate } from '../../utils/workoutDate';
@@ -202,7 +203,7 @@ function readNoteText(rawArgs: string): string | null {
 }
 
 const defaultComplete: CompleteFn = async (messages, tools, mustAnswer) => {
-  const response = await openaiClient.chat.completions.create({
+  const response = await modelClient.chat.completions.create({
     model: PARSE_MODEL,
     reasoning_effort: PARSE_REASONING_EFFORT,
     temperature: 0.3,

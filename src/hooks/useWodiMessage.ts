@@ -5,7 +5,8 @@ import { useChase } from './useChase';
 import { usePosterPayload } from './usePosterPayload';
 import type { WorkoutWithStats } from './useWorkouts';
 import { OPENER_MESSAGE, type WodiMessage } from '../services/wodiAgent/wodiMessage';
-import { pickOccasion, whenWord, type OccasionWorkout, type WodiOccasion } from '../services/wodiAgent/wodiOccasion';
+import { isOccasionMessage, pickOccasion, whenWord, type OccasionWorkout, type WodiOccasion } from '../services/wodiAgent/wodiOccasion';
+import { cheerStory } from '../services/wodiAgent/cheerStory';
 import { writeWodiLine } from '../services/wodiAgent/wodiLine';
 import { appendThread, fetchRecentThread } from '../services/wodiAgent/threadStore';
 import type { ThreadMessage } from '../services/wodiAgent/threadItems';
@@ -25,6 +26,8 @@ export interface WodiMessageData extends WodiMessage {
 
 /** How far back "already said" looks. Wodi says a line or two a day; questions add a few more. */
 const SAID_LOOKBACK = 200;
+/** How many of Wodi's own lines the next one is told not to sound like. */
+const RECENT_LINES = 4;
 
 /**
  * One write per occasion, even when Today and the chat both ask at once — and it finishes even if
@@ -32,10 +35,10 @@ const SAID_LOOKBACK = 200;
  */
 const writing = new Map<string, Promise<ThreadMessage>>();
 
-function sayOnce(userId: string, occasion: WodiOccasion): Promise<ThreadMessage> {
+function sayOnce(userId: string, occasion: WodiOccasion, recent: readonly string[]): Promise<ThreadMessage> {
   const running = writing.get(occasion.key);
   if (running) return running;
-  const job = writeWodiLine(occasion).then(async (text) => {
+  const job = writeWodiLine(occasion, undefined, recent).then(async (text) => {
     const message: ThreadMessage = {
       id: occasion.key,
       from: 'wodi',
@@ -83,6 +86,7 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
   const latestPoster = usePosterPayload(latest);
   const lead = latestPoster?.wods[0];
   const latestResult = lead && !lead.result.scores ? saidResult(lead.result) : null;
+  const latestStory = useMemo(() => (latest ? cheerStory(latest, workouts.slice(1)) : null), [latest, workouts]);
 
   // What Wodi has already said on its own, by id. Null until read.
   const [said, setSaid] = useState<Map<string, ThreadMessage> | null>(null);
@@ -110,6 +114,8 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
       felt: w.posterVibe ?? null,
       isPR: Boolean(w.isPR),
       teamSize: w.teamSize ?? 1,
+      // Only the newest can be cheered; its story compares it with everything before.
+      story: i === 0 ? latestStory : null,
     }));
     return pickOccasion({
       workouts: occasionWorkouts,
@@ -120,7 +126,7 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
       today,
       todayStartMs: startOfToday(),
     });
-  }, [said, workouts, latestResult, milestone, chase.facts, notes]);
+  }, [said, workouts, latestResult, latestStory, milestone, chase.facts, notes]);
 
   // A new occasion is written once and kept; until then Wodi is typing.
   const [written, setWritten] = useState<ThreadMessage | null>(null);
@@ -128,7 +134,13 @@ export function useWodiMessage(workouts: readonly WorkoutWithStats[]): WodiMessa
   useEffect(() => {
     if (!newOccasion || !userId) return;
     let live = true;
-    void sayOnce(userId, newOccasion).then((message) => {
+    // Wodi's last few lines, so the new one doesn't open the same way.
+    const recent = [...(said?.values() ?? [])]
+      .filter(isOccasionMessage)
+      .sort((a, b) => b.at - a.at)
+      .slice(0, RECENT_LINES)
+      .map((m) => m.text);
+    void sayOnce(userId, newOccasion, recent).then((message) => {
       if (!live) return;
       setWritten(message);
       setSaid((prev) => new Map(prev ?? []).set(message.id, message));

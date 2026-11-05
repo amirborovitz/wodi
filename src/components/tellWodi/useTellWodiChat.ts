@@ -25,6 +25,8 @@ import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
 import { routeMessage, routeWorkoutWords } from './chatRouting';
 import { boardReading } from '../../services/wodiAgent/boardReading';
 import { buildUnfinishedPoster, type UnfinishedPoster } from '../home/unfinishedPoster';
+import type { ChatNudges } from '../../hooks/useWodiNotifications';
+import type { EnableResult } from '../../services/pushNotifications';
 
 /**
  * The Tell Wodi conversation: the athlete sends a board and words, Wodi fills the same per-block
@@ -39,7 +41,7 @@ export type FormHandoff = 'typed' | 'chip';
 export interface ChatChipView {
   label: string;
   answers?: SlotAnswer[];
-  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done';
+  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done' | 'nudge';
   /** A 'forms' chip: which offer of the standard screen this is. */
   handoff?: FormHandoff;
   /** The note a 'remember' chip saves — exactly the words the athlete was shown. */
@@ -130,6 +132,8 @@ interface UseTellWodiChatArgs {
   onTakeBoard: (planned: PlannedWorkout) => void;
   /** They never did the saved board this chat reopened: it's cleared from Today. */
   onDropBoard: () => void;
+  /** Wodi's nudges on this phone — offered once, when a board is left for later. */
+  nudges: ChatNudges;
 }
 
 /** A workout the chat just saved — its poster, and what it earned. */
@@ -193,6 +197,12 @@ const DONE_CHIP: ChatChipView = { label: 'Done — log it', action: 'done' };
 const STANDARD_SCREEN_CHIP: ChatChipView = { label: 'Fill it in myself', action: 'forms', handoff: 'chip' };
 // A saved board reopened can be one they never got to — one tap clears it, no poster made.
 const NOT_DONE_CHIP: ChatChipView = { label: "Didn't do it", action: 'not-done' };
+const NUDGE_CHIP: ChatChipView = { label: 'Nudge me if I forget', action: 'nudge' };
+const NUDGE_REPLY: Record<EnableResult, string> = {
+  on: "Done — if it's still here tomorrow morning, I'll nudge you.",
+  blocked: 'Your phone has notifications off for Wodi — you can turn them on in its settings.',
+  failed: "Couldn't turn them on just now. No stress — it's on Today either way.",
+};
 
 /**
  * What a "Change" can reopen: a value the athlete gave. A swap rewrites the movement itself, so
@@ -265,7 +275,7 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard, nudges,
 }: UseTellWodiChatArgs): TellWodiChat {
   const [messages, setMessages] = useState<ChatMessage[]>(() => (
     opening ? [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }] : []
@@ -288,8 +298,8 @@ export function useTellWodiChat({
   // about training — belongs to the ongoing thread, not to the poster this board becomes.
   const boardStartRef = useRef(0);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges }; });
   // A waiting board taken on mid-chat already has a conversation (the photo, "Doing it later", the
   // plan). It isn't redrawn here — the athlete is mid-sentence — but it's kept ahead of this one.
   const priorRef = useRef<SavedChatMessage[]>([]);
@@ -507,7 +517,7 @@ export function useTellWodiChat({
   const finish = (): void => {
     waitingRef.current = false;
     setFinished(true);
-    push({ from: 'wodi', text: "Got it all — nice work. Making your poster…" });
+    push({ from: 'wodi', text: 'Got it all. Making your poster…' });
     setBusy('saving');
     callbacks.current.onFinished(resultsRef.current, vibeRef.current, boardChat(messagesRef.current, false));
   };
@@ -601,7 +611,16 @@ export function useTellWodiChat({
     }
     waitingRef.current = true;
     if (firstTime) {
-      push({ from: 'wodi', text: "Go get it. It's on Today too — when you're done, tap below or just tell me your time.", chips: [DONE_CHIP] });
+      // Once per phone, Wodi offers to nudge them if the board is still waiting tomorrow.
+      const offer = callbacks.current.nudges.takeOffer();
+      push({
+        from: 'wodi',
+        text: "Go get it. It's on Today too — when you're done, tap below or just tell me your time.",
+        chips: offer === 'ask' ? [DONE_CHIP, NUDGE_CHIP] : [DONE_CHIP],
+      });
+      if (offer === 'install-first') {
+        push({ from: 'wodi', text: "Add Wodi to your Home Screen (Share → Add to Home Screen) and I can nudge you if it's still waiting tomorrow." });
+      }
     } else if (!planned) {
       push({ from: 'wodi', text: "Back here when you're done.", chips: [DONE_CHIP] });
     }
@@ -847,6 +866,12 @@ export function useTellWodiChat({
     }
     if (chip.action === 'later') {
       void parkBeforeWorkout('');
+      return;
+    }
+    if (chip.action === 'nudge') {
+      void callbacks.current.nudges.turnOn().then((result) => {
+        push({ from: 'wodi', text: NUDGE_REPLY[result], chips: [DONE_CHIP] });
+      });
       return;
     }
     if (chip.action === 'not-done') {

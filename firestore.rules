@@ -18,6 +18,11 @@ service cloud.firestore {
       match /wodiThread/{messageId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // The phones Wodi can reach (services/pushNotifications.ts). Read by functions/src/wodiPush.ts.
+      match /devices/{deviceId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // Users can read/write their own workouts
@@ -130,6 +135,16 @@ service cloud.firestore {
 
     // Email sign-in codes (functions/src/index.ts). Only the server touches them.
     match /loginCodes/{emailHash} {
+      allow read, write: if false;
+    }
+
+    // AI calls + tokens per athlete per day (functions/src/wodiModel.ts). Only the server touches them.
+    match /aiUsage/{uidDay} {
+      allow read, write: if false;
+    }
+
+    // When Wodi last spoke first, per athlete (functions/src/wodiPush.ts). Only the server touches them.
+    match /wodiNudges/{uid} {
       allow read, write: if false;
     }
 

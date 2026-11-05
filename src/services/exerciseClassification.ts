@@ -1,12 +1,8 @@
 // Firebase imports reserved for future use
 // import { collection, doc, getDoc, setDoc, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 // import { db } from './firebase';
-import OpenAI from 'openai';
+import { modelClient } from './modelClient';
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
 
 // Types for exercise classification
 export type ExerciseMetricType = 'weight_reps' | 'reps_only' | 'calories' | 'distance' | 'time';
@@ -74,7 +70,7 @@ Examples:
 Return ONLY valid JSON, no explanation.`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await modelClient.chat.completions.create({
       model: 'gpt-4o-mini', // Use cheaper model for classification
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,

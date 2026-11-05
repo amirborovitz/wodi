@@ -4,7 +4,7 @@ import { buildSavedWorkoutTotals, sessionPartnerScope } from '../services/savedW
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ActionMenuSheet, Button, Card } from '../components/ui';
-import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError } from '../services/openai';
+import { parseWorkoutImage, parseWorkoutSession, reparseWorkoutPart, isRateLimitError, isQuotaExhaustedError, isDailyLimitError } from '../services/openai';
 import { track } from '../services/analytics';
 import type { ExerciseResult } from '../services/workloadFromResults';
 import { resolveSaveTarget } from '../services/saveTarget';
@@ -50,6 +50,7 @@ import { useWodiThread } from '../components/tellWodi/useWodiThread';
 import { useWodiMessage } from '../hooks/useWodiMessage';
 import { swapHabits } from '../services/wodiAgent/athleteHabits';
 import { useWodiNotes } from '../hooks/useWodiNotes';
+import { useChatNudges } from '../hooks/useWodiNotifications';
 import { useFavoriteSkin } from '../hooks/useFavoriteSkin';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -120,6 +121,9 @@ interface SessionWorkout {
 // arrives as a 429 too but never clears, so it gets its own line — telling someone to wait
 // for a dead API key is worse than saying nothing.
 function parseFailureMessage(error: unknown, fallback: string): string {
+  if (isDailyLimitError(error)) {
+    return "That's a lot of Wodi for one day — you've hit today's AI limit. Save the WOD; it resets tomorrow.";
+  }
   if (isQuotaExhaustedError(error)) {
     return "Wodi's AI credit has run out — this won't fix itself. Save the WOD and check billing.";
   }
@@ -424,6 +428,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   const ask = useAskWodi(allWorkouts);
   const habits = useMemo(() => swapHabits(allWorkouts), [allWorkouts]);
   const wodiNotes = useWodiNotes();
+  const nudges = useChatNudges(user?.id ?? null);
   const favoriteSkin = useFavoriteSkin();
   // The same newest message as Today's, so the thread ends where Today begins.
   const wodiMessage = useWodiMessage(allWorkouts);
@@ -1502,6 +1507,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       if (planned.parsedWorkout) setParsedWorkout(planned.parsedWorkout);
     },
     onDropBoard: dropWaitingBoard,
+    nudges,
   });
 
   /**

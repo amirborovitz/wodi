@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pickOccasion, usesOnlyFactNumbers, type OccasionInput, type OccasionWorkout } from './wodiOccasion';
 import { writeWodiLine } from './wodiLine';
 import type { ThreadMessage } from './threadItems';
+import type { ChaseFact } from '../chase/chaseFacts';
 
 // 2026-10-07 is a Wednesday.
 const TODAY = '2026-10-07';
@@ -125,5 +126,55 @@ describe('the model chooses words, never figures', () => {
     expect(await writeWodiLine(occasion, async () => 'Fran in 4:59, wow')).toBe(occasion.fallback);
     expect(await writeWodiLine(occasion, async () => { throw new Error('offline'); })).toBe(occasion.fallback);
     expect(await writeWodiLine(occasion, async () => '"5:42 on Fran. That\'s moving."')).toBe("5:42 on Fran. That's moving.");
+  });
+});
+
+describe('once a week, one thing worth trying', () => {
+  const ceiling: ChaseFact = {
+    id: 'c1', kind: 'CEILING', subject: 'Squat', raw: 'Squat: top set 100kg on 1 OCT 26 and 24 SEP 26',
+    facts: ['100KG TOP SET · 1 OCT 26', '100KG TOP SET · 24 SEP 26'], hero: { value: '100', word: 'kg' }, numbers: [100], on: '2026-10-01',
+  };
+  const milestone: ChaseFact = { ...ceiling, id: 'm1', kind: 'MILESTONE', subject: 'Burpee', raw: '900 Burpee · 100 to 1,000' };
+  // Trained Monday; nothing fresh enough left to cheer that hasn't been said.
+  const trained = [workout('w1', '2026-10-05')];
+  const cheered = new Map([said('cheer:w1', TODAY_START - 2 * 86_400_000)]);
+
+  it('suggests from a Chase thread, keyed to the week', () => {
+    const pick = pickOccasion(input({ workouts: trained, said: cheered, chase: [ceiling] }));
+    expect(pick.kind).toBe('new');
+    if (pick.kind !== 'new') return;
+    expect(pick.occasion).toMatchObject({ key: 'focus:2026-10-05', kind: 'focus', workoutId: null });
+    expect(pick.occasion.facts.idea_1).toContain('100KG TOP SET');
+    expect(pick.occasion.fallback).toMatch(/^One idea for this week: Squat/);
+  });
+
+  it('never makes a milestone the week\'s focus — that is a trophy', () => {
+    expect(newKey({ workouts: trained, said: cheered, chase: [milestone] })).toBeNull();
+  });
+
+  it('is said once a week, then stands', () => {
+    const both = new Map([...cheered, said('focus:2026-10-05', TODAY_START - 86_400_000, 'Try 102.5 on squat.')]);
+    expect(pickOccasion(input({ workouts: trained, said: both, chase: [ceiling] })))
+      .toMatchObject({ kind: 'said', message: { id: 'cheer:w1' } });
+  });
+
+  it('stays quiet for someone on a long break', () => {
+    expect(newKey({ workouts: [workout('w1', '2026-09-01')], chase: [ceiling] })).toBeNull();
+  });
+});
+
+describe('no stock praise', () => {
+  it('a "nice work" line is not said — the plain, specific line is', async () => {
+    const occasion = { key: 'cheer:w1', kind: 'cheer' as const, facts: { workout: 'Fran' }, fallback: 'Fran today is on the board.', workoutId: 'w1' };
+    expect(await writeWodiLine(occasion, async () => 'Fran today. Nice work!')).toBe(occasion.fallback);
+    expect(await writeWodiLine(occasion, async () => 'Crushed it on Fran')).toBe(occasion.fallback);
+    expect(await writeWodiLine(occasion, async () => 'Fran without breaking the thrusters? That grip held up.')).toBe('Fran without breaking the thrusters? That grip held up.');
+  });
+
+  it('tells the model what it said lately, so it doesn\'t repeat itself', async () => {
+    let system = '';
+    const occasion = { key: 'cheer:w1', kind: 'cheer' as const, facts: { workout: 'Fran' }, fallback: 'x', workoutId: 'w1' };
+    await writeWodiLine(occasion, async (s) => { system = s; return 'Fran done.'; }, ['Back squat up to 100kg.']);
+    expect(system).toContain('"Back squat up to 100kg."');
   });
 });
