@@ -39,3 +39,6 @@ wodi_store_launch_pack/
 
 # Codex tooling placeholder
 .codex_keep
+
+# Local secrets — never committed (the OpenAI key once was; it has been rotated)
+.env
