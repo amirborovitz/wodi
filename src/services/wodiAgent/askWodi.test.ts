@@ -60,7 +60,7 @@ describe('askWodi', () => {
       said('140kg for 15 on 24 Sep.'),
     );
     const reply = await askWodi({ message: 'what did I deadlift last?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null, receipts: ['w1'] });
+    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null, receipts: ['w1'], gap: null });
 
     const toolResult = seen[1].messages.find((m) => m.role === 'tool');
     expect(JSON.parse(String(toolResult?.content))).toMatchObject({
@@ -85,7 +85,7 @@ describe('askWodi', () => {
     const lookup = calls({ name: 'training_totals', args: { from: null, to: null } });
     const { complete, seen } = scripted(lookup, lookup, lookup, lookup, said('You trained once.'));
     const reply = await askWodi({ message: 'how much?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null, receipts: [] });
+    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null, receipts: [], gap: null });
     expect(seen.map((s) => s.mustAnswer)).toEqual([false, false, false, false, true]);
   });
 
@@ -144,11 +144,14 @@ describe('askWodi', () => {
       message: 'how should I pace it?',
       recent: [],
       notes: [],
-      upcoming: {
-        board: '3 RFT: 10 Deadlift @100/140kg, 400m run',
-        reading: 'Part 1 · 3 RFT (wod) — 3 sets/rounds, scored by time',
-        loads: 'Deadlift · last time 140kg (24 Sep)',
-        sex: 'male',
+      situation: {
+        kind: 'upcoming',
+        workout: {
+          board: '3 RFT: 10 Deadlift @100/140kg, 400m run',
+          reading: 'Part 1 · 3 RFT (wod) — 3 sets/rounds, scored by time',
+          loads: 'Deadlift · last time 140kg (24 Sep)',
+          sex: 'male',
+        },
       },
       loadContext: async () => CTX,
       complete: async (messages, offered, mustAnswer) => {
@@ -168,7 +171,56 @@ describe('askWodi', () => {
     expect(system).toContain('Never name a weight');
     expect(system).not.toContain('call log_workout');
     expect(tools[0]).not.toContain('log_workout');
+    expect(tools[0]).not.toContain('create_workout');
     expect(tools[0]).toContain('find_workouts');
+  });
+
+  it('asked for a workout, it writes one as a board, with why', async () => {
+    const { complete, seen } = scripted(
+      calls({ name: 'find_workouts', args: { from: '2026-09-14', to: null, movement: null, title: null, limit: null } }),
+      calls({ name: 'create_workout', args: { board: 'Open Gym Grind\nAMRAP 15:\n10 DB Snatch 22.5/15kg\n10 Pull-ups', why: 'Deadlifts on 24 Sep, so no hinge today.' } }),
+    );
+    const reply = await askWodi({ message: 'give me an open gym wod', recent: [], notes: [], loadContext: async () => CTX, complete, now: DAY });
+    expect(reply).toEqual({
+      kind: 'workout',
+      board: 'Open Gym Grind\nAMRAP 15:\n10 DB Snatch 22.5/15kg\n10 Pull-ups',
+      why: 'Deadlifts on 24 Sep, so no hinge today.',
+      gap: null,
+    });
+    expect(String(seen[0].messages[0].content)).toContain('call create_workout');
+  });
+
+  it('says what it can\'t do yet, and hands the request back to be recorded', async () => {
+    const { complete } = scripted(
+      calls({ name: 'note_gap', args: { request: 'remind me Friday to do deadlifts' } }),
+      said("I can't set reminders yet. Want me to write you a deadlift session for Friday?"),
+    );
+    const reply = await askWodi({ message: 'remind me Friday to do deadlifts', recent: [], notes: [], loadContext: async () => CTX, complete });
+    expect(reply).toMatchObject({ kind: 'answer', gap: 'remind me Friday to do deadlifts' });
+  });
+
+  it('mid-log, an aside is answered — never logged or written over the open board', async () => {
+    const tools: string[][] = [];
+    const { complete, seen } = scripted(
+      // A model that reaches for a tool it wasn't offered is not obeyed.
+      calls({ name: 'create_workout', args: { board: 'Something else', why: '' } }),
+      said('140kg on 24 Sep.'),
+    );
+    const reply = await askWodi({
+      message: 'what did I deadlift last time?',
+      recent: [],
+      notes: [],
+      situation: { kind: 'logging', board: 'Fran: 21-15-9 thrusters, pull-ups' },
+      loadContext: async () => CTX,
+      complete: async (messages, offered, mustAnswer) => {
+        tools.push(offered.map((t) => (t.type === 'function' ? t.function.name : '')));
+        return complete(messages, offered, mustAnswer);
+      },
+    });
+    expect(reply).toMatchObject({ kind: 'answer', text: '140kg on 24 Sep.' });
+    expect(tools[0]).not.toContain('create_workout');
+    expect(tools[0]).not.toContain('log_workout');
+    expect(String(seen[0].messages[0].content)).toContain('the logging carries on after you');
   });
 
   it('without a workout ahead, a logged workout is still handed to logging', () => {

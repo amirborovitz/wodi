@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchPersonalRecords } from '../../hooks/usePRs';
-import { askWodi, type AskWodiReply, type UpcomingWorkout } from '../../services/wodiAgent/askWodi';
+import { askWodi, type AskSituation, type AskWodiReply } from '../../services/wodiAgent/askWodi';
 import type { ChatTurn } from '../../services/tellWodiReader';
 import type { TrainingContext } from '../../services/wodiAgent/trainingFacts';
 import { DEFAULT_BW } from '../../utils/xpCalculations';
 import type { PersonalRecord, Workout } from '../../types';
 
-/** `upcoming`: the workout they're heading into — the answer is then its game plan. */
-export type AskFn = (message: string, recent: ChatTurn[], upcoming?: UpcomingWorkout) => Promise<AskWodiReply>;
+/** `situation`: between workouts (default), logging a board, or heading into one (its game plan). */
+export type AskFn = (message: string, recent: ChatTurn[], situation?: AskSituation) => Promise<AskWodiReply>;
 
 /**
  * Ask Wodi, wired to this athlete's log: the workouts already loaded for the screen, and their
@@ -33,7 +33,7 @@ export function useAskWodi(workouts: readonly Workout[]): AskFn {
   }, []);
 
   return useCallback<AskFn>(
-    (message, recent, upcoming) => askWodi({ message, recent, loadContext, upcoming, notes: latest.current.user?.wodiNotes ?? [] }),
+    (message, recent, situation) => askWodi({ message, recent, loadContext, situation, notes: latest.current.user?.wodiNotes ?? [] }),
     [loadContext],
   );
 }

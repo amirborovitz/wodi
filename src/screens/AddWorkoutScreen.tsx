@@ -51,6 +51,7 @@ import { useWodiMessage } from '../hooks/useWodiMessage';
 import { swapHabits } from '../services/wodiAgent/athleteHabits';
 import { useWodiNotes } from '../hooks/useWodiNotes';
 import { useChatNudges } from '../hooks/useWodiNotifications';
+import { recordAgentGap } from '../services/wodiAgent/agentGaps';
 import { useFavoriteSkin } from '../hooks/useFavoriteSkin';
 import { uploadBoardPhoto } from '../services/feed/feedPhoto';
 import type { StoryExerciseResult } from '../components/logging/story/types';
@@ -1508,6 +1509,11 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
     },
     onDropBoard: dropWaitingBoard,
     nudges,
+    onGap: (request, message) => {
+      track('wodi_gap', {});
+      if (!user?.id) return;
+      recordAgentGap(user.id, request, message).catch((err: unknown) => console.error('[TellWodi] could not keep the request', err));
+    },
   });
 
   /**

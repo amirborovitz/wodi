@@ -54,6 +54,8 @@ interface AnalyticsEvents {
   standard_screen_from_chat: { how: 'typed' | 'chip'; board: 'yes' | 'no' };
   /** A saved board was cleared without a log — "Didn't do it" in its chat, or on its Today tile. */
   saved_board_dropped: { where: 'chat' | 'today' };
+  /** Wodi was asked for something it can't do yet (the request itself is in agentGaps). */
+  wodi_gap: Record<string, never>;
   /** A saved workout was fixed and re-saved. */
   workout_edited: { format: WorkoutFormat | 'unknown'; parts: number };
   /** A workout was deleted. */

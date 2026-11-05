@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { asksForStandardScreen, routeMessage, routeWorkoutWords } from './chatRouting';
+import { asksForStandardScreen, routeMessage, routeReading, routeWorkoutWords } from './chatRouting';
 
 describe('routeMessage — where a chat message goes', () => {
   it('a photo before there is a board is the board', () => {
@@ -64,5 +64,19 @@ describe('asksForStandardScreen — the words that open the standard logging scr
     'the form said 20 cal but I did 15 on the echo bike, legs were done after round two',
   ])('"%s" does not', (text) => {
     expect(asksForStandardScreen(text)).toBe(false);
+  });
+});
+
+describe('routeReading — a message while a board is open', () => {
+  it('a report of what they did answers the board\'s questions', () => {
+    expect(routeReading({ messageIs: 'answer' })).toBe('answers');
+  });
+
+  it('before the workout, Wodi plans it and waits', () => {
+    expect(routeReading({ messageIs: 'before-workout' })).toBe('park');
+  });
+
+  it("a question or request that isn't about this board goes to Wodi, and the logging waits", () => {
+    expect(routeReading({ messageIs: 'for-wodi' })).toBe('ask-wodi');
   });
 });

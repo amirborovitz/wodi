@@ -18,8 +18,12 @@ import type { ChatSlot, SlotAnswer } from '../components/tellWodi/chatQuestions'
 
 export interface ChatReading {
   reaction: string;
-  /** They haven't done it yet — they're asking ahead of the workout, not reporting on it. */
-  beforeWorkout: boolean;
+  /**
+   * What the message IS: an answer about the workout they did; something said before doing it
+   * (heading in, what weight to use); or something for Wodi that isn't about this board at all
+   * (a question about their training, a request). The chat routes on it (routeReading).
+   */
+  messageIs: MessageIs;
   vibe: PosterVibeKey | null;
   answers: SlotAnswer[];
   /** Something lasting they said about themselves, for the chat to OFFER to remember. Never saved here. */
@@ -31,6 +35,9 @@ export interface ChatTurn {
   text: string;
 }
 
+const MESSAGE_KINDS = ['answer', 'before-workout', 'for-wodi'] as const;
+export type MessageIs = typeof MESSAGE_KINDS[number];
+
 const VIBES: PosterVibeKey[] = ['chill', 'solid', 'sweaty', 'cooked', 'smoked', 'wrecked'];
 
 const nullableNumber = { anyOf: [{ type: 'number' }, { type: 'null' }] };
@@ -41,10 +48,10 @@ const READING_SCHEMA = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['reaction', 'beforeWorkout', 'vibe', 'answers', 'remember'],
+    required: ['reaction', 'messageIs', 'vibe', 'answers', 'remember'],
     properties: {
       reaction: { type: 'string' },
-      beforeWorkout: { type: 'boolean' },
+      messageIs: { type: 'string', enum: MESSAGE_KINDS },
       vibe: { anyOf: [{ type: 'string', enum: VIBES }, { type: 'null' }] },
       remember: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       answers: {
@@ -167,10 +174,16 @@ just finished a workout and is texting you about it. Your job has two parts.
    just an answer ("singles"), a tiny acknowledgement is enough ("Got it.").
    Never say it is logged, saved or done — the app saves AFTER its questions, and says so itself.
 
-Set "beforeWorkout" to true ONLY when the message makes clear they haven't done the workout yet —
-they're heading in, asking what weight to use, planning ("what should I go with today?", "about to
-do this", "later tonight"). Reporting anything they did ("22 min", "singles", "it was brutal") is
-false. When it's true, answer no questions and react like a friend wishing them luck.
+Set "messageIs" to what the message is:
+- "answer": anything about the workout they did — an answer, a correction, how it went ("22 min",
+  "singles", "it was brutal"). This is almost every message.
+- "before-workout": ONLY when the message makes clear they haven't done this workout yet — they're
+  heading in, asking what weight to use, planning ("what should I go with today?", "about to do
+  this", "later tonight"). Answer no questions and react like a friend wishing them luck.
+- "for-wodi": the message isn't about this workout at all — a question about their other training
+  ("what did I squat last month?"), a request ("give me a workout for tomorrow", "remind me Friday"),
+  or anything else for their buddy. Answer no questions and leave "reaction" empty: Wodi answers it
+  separately.
 
 Also set "vibe" if they said how it felt, mapping to the closest of:
 chill (easy, relaxed) · solid (good, strong) · sweaty (worked hard) · cooked (tired, spent) ·
@@ -238,7 +251,8 @@ export async function readAthleteMessage(input: {
   const known = new Set(input.slots.map((s) => s.id));
   return {
     reaction: typeof data.reaction === 'string' ? data.reaction.trim() : '',
-    beforeWorkout: data.beforeWorkout === true,
+    // An unknown value is read as an answer — the chat then asks its question again, never loses it.
+    messageIs: data.messageIs && MESSAGE_KINDS.includes(data.messageIs) ? data.messageIs : 'answer',
     vibe: data.vibe && VIBES.includes(data.vibe) ? data.vibe : null,
     // Only ids the app asked about — the model answering a question nobody asked is dropped.
     answers: (data.answers ?? []).filter((a): a is SlotAnswer => !!a && known.has(a.id)),

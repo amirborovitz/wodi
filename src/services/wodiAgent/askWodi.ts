@@ -23,6 +23,11 @@ import type { WodiNote } from '../../types';
  * A message that is a workout rather than a question ("Fran 5:40", a pasted board) isn't answered
  * here: the model calls `log_workout` and the chat hands the words to the same board reading the
  * forms use. Which of the two a message is, is the model's call — there is no keyword list.
+ *
+ * It is the chat's one brain (docs/plans/2026-11-05-wodi-assistant.md). Besides answering, it can
+ * write the athlete a workout (`create_workout`); the app then reads it like any board, so it logs
+ * and gets a poster like a coach's. And it says plainly what it can't do yet, recording the request
+ * (`note_gap`), so what people actually ask decides what Wodi learns next.
  */
 
 /**
@@ -42,8 +47,20 @@ export interface UpcomingWorkout {
 export type AskWodiReply =
   /** `proposedNote`: something lasting they said, for the chat to OFFER to remember — never saved here. */
   /** `receipts`: ids of the workouts the answer quotes, so the chat can attach their posters. */
-  | { kind: 'answer'; text: string; proposedNote: string | null; receipts: string[] }
-  | { kind: 'log' };
+  /** `gap`: something they asked for that Wodi can't do yet, for the chat to record (agentGaps). */
+  | { kind: 'answer'; text: string; proposedNote: string | null; receipts: string[]; gap: string | null }
+  | { kind: 'log' }
+  /** A workout Wodi wrote for them: the board in whiteboard words, and one line on why this one. */
+  | { kind: 'workout'; board: string; why: string; gap: string | null };
+
+/** Where the athlete is when they ask. It decides which tools make sense. */
+export type AskSituation =
+  /** No board open: anything goes. A question, a workout to log, a workout to write. */
+  | { kind: 'between' }
+  /** Mid-log, an aside ("what did I squat last time?"): answered, then the logging carries on. */
+  | { kind: 'logging'; board: string }
+  /** Heading into this workout: the answer is its game plan. */
+  | { kind: 'upcoming'; workout: UpcomingWorkout };
 
 /** One model turn. Injectable so the loop can be tested without the network. */
 export type CompleteFn = (
@@ -87,6 +104,13 @@ export const TOOLS: ChatCompletionTool[] = [
     text: { type: 'string' },
   }),
   tool('log_workout', 'The athlete\'s message is a workout to log — a board, or what they did ("Fran 5:40", "did the ladder, 22 min") — not a question. Call this and nothing else.', {}),
+  tool('create_workout', 'They asked you for a workout to do ("give me an open gym WOD", "20 min, dumbbells only", "something for my weak spot"). Look at their recent training first, then write ONE session the way a coach writes a whiteboard. It is shown to them as their board; they can take it or ask for another. Calling this ends your turn.', {
+    board: { type: 'string', description: 'The whiteboard: a title on the first line, then each part with its clock ("AMRAP 15:", "For time, 20 min cap:", "EMOM 12:", "5x5 heavy") and its movements with reps; loads only as a standard Rx male/female pair ("22.5/15kg"). Plain lines, no markdown.' },
+    why: { type: 'string', description: 'One short sentence on why this one, from what you found ("No pulling since Monday, and your squat has been 100kg twice"). Numbers only from the tools.' },
+  }),
+  tool('note_gap', 'They asked for something you can\'t do yet (set a reminder, plan several days, change a past log, change a setting, anything outside training). Record it in a few words, then still answer them.', {
+    request: { type: 'string' },
+  }),
 ];
 
 /** What a game plan is made of — only when there's a workout ahead of them. */
@@ -113,12 +137,34 @@ Answer with a game plan for it, built from their log:
 This answer may run to 8 short lines.`;
 }
 
-function systemPrompt(now: Date, notes: readonly WodiNote[], upcoming: UpcomingWorkout | null): string {
+/** Writing them a workout. Only between workouts. */
+const CREATE_SECTION = `
+If they ask you for a workout to do, call create_workout:
+- First look at their last 10 days (find_workouts from 10 days ago) so it balances what they've done. Don't hand them heavy squats the day after heavy squats.
+- Fit what they asked (time, equipment, focus) and what they told you to remember (injuries, kit at home).
+- One session, written like a CrossFit coach's board. Loads only as a standard Rx pair ("22.5/15kg"), never a weight of your own for them: the app shows their logged loads beside the board.
+- "why" is one short sentence grounded in what you found.`;
+
+/** A question asked while they're logging a board. */
+function loggingSection(board: string): string {
+  return `
+
+They're in the middle of logging this workout:
+"""
+${board.trim()}
+"""
+Their message is an aside, not an answer to the logging questions. Answer it in 1–2 short lines; the logging carries on after you.`;
+}
+
+function systemPrompt(now: Date, notes: readonly WodiNote[], situation: AskSituation): string {
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
   return `You are Wodi, the athlete's CrossFit buddy, texting with them. Today is ${weekday} ${toIsoDate(now)}. Weeks start on Monday.
-${upcoming ? '' : `
+${situation.kind === 'between' ? `
 If their message is a workout to log rather than a question, call log_workout and nothing else.
-`}
+${CREATE_SECTION}
+` : ''}
+What you can't do yet: set reminders, plan several days at once, change a past log, change settings, anything outside training. Asked for one of those, call note_gap, say so plainly in a few words, and offer the closest thing you can.
+
 Answer from their own training log, which you can only see through the tools:
 - Every number about THEIR training — a weight, a time, a date, a count, EP, a record — must come from a tool result. Never invent one, never estimate one, never do your own EP or volume maths; training_totals has it. Comparing two numbers the tools gave you is fine ("up 20kg since August").
 - Look things up before answering. If the tools come back empty, say plainly that you don't see it in their log — don't fill the gap.
@@ -129,11 +175,17 @@ Answer from their own training log, which you can only see through the tools:
 What they've told you to remember (confirmed by them — use it, and never re-propose what's already here):
 ${notesForPrompt(notes)}
 
-How you text: warm, short, specific — like a friend at the gym. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never compare them with anyone else, no lectures, no safety boilerplate.${upcoming ? upcomingSection(upcoming) : ''}`;
+How you text: warm, short, specific — like a friend at the gym who tells the truth. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never generic praise ("nice work", "great job"). Never compare them with anyone else, no lectures, no safety boilerplate.${situation.kind === 'upcoming' ? upcomingSection(situation.workout) : situation.kind === 'logging' ? loggingSection(situation.board) : ''}`;
 }
 
-/** Ahead of a workout the chat already knows it isn't one to log — that tool isn't offered. */
-const PLAN_TOOLS = TOOLS.filter((t) => t.type === 'function' && t.function.name !== 'log_workout');
+/**
+ * Between workouts, every tool. With a board open (logging it or heading into it) the message is
+ * never a new workout to log or to write: the open board stays the one board.
+ */
+function toolsFor(situation: AskSituation): ChatCompletionTool[] {
+  if (situation.kind === 'between') return TOOLS;
+  return TOOLS.filter((t) => t.type !== 'function' || (t.function.name !== 'log_workout' && t.function.name !== 'create_workout'));
+}
 
 function runTool(name: string, rawArgs: string, ctx: TrainingContext): unknown {
   let args: Record<string, unknown>;
@@ -193,10 +245,11 @@ export function receiptsFor(answer: string, found: readonly FoundWorkout[], now:
   return hits.sort((a, b) => a.at - b.at).slice(0, MAX_RECEIPTS).map((h) => h.id);
 }
 
-function readNoteText(rawArgs: string): string | null {
+/** One string argument of a tool call, trimmed. Null when missing or empty. */
+function readArg(rawArgs: string, key: string): string | null {
   try {
-    const { text } = JSON.parse(rawArgs || '{}') as { text?: unknown };
-    return typeof text === 'string' && text.trim() ? text.trim() : null;
+    const value = (JSON.parse(rawArgs || '{}') as Record<string, unknown>)[key];
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   } catch {
     return null;
   }
@@ -224,15 +277,16 @@ export async function askWodi(input: {
   loadContext: () => Promise<TrainingContext>;
   /** Their confirmed notes — small and already in memory, so always in the prompt. */
   notes: readonly WodiNote[];
-  /** A workout they're heading into — the answer becomes its game plan. */
-  upcoming?: UpcomingWorkout | null;
+  /** Where they are: between workouts (the default), logging a board, or heading into one. */
+  situation?: AskSituation;
   now?: Date;
   complete?: CompleteFn;
 }): Promise<AskWodiReply> {
-  const { message, recent, loadContext, notes, upcoming = null, now = new Date(), complete = defaultComplete } = input;
-  const tools = upcoming ? PLAN_TOOLS : TOOLS;
+  const { message, recent, loadContext, notes, situation = { kind: 'between' }, now = new Date(), complete = defaultComplete } = input;
+  const tools = toolsFor(situation);
+  const offered = new Set(tools.flatMap((t) => (t.type === 'function' ? [t.function.name] : [])));
   const messages: ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt(now, notes, upcoming) },
+    { role: 'system', content: systemPrompt(now, notes, situation) },
     ...recent.map((turn): ChatCompletionMessageParam => (
       turn.from === 'wodi' ? { role: 'assistant', content: turn.text } : { role: 'user', content: turn.text }
     )),
@@ -241,6 +295,7 @@ export async function askWodi(input: {
 
   let ctx: TrainingContext | null = null;
   let proposedNote: string | null = null;
+  let gap: string | null = null;
   const found: FoundWorkout[] = [];
   for (let step = 0; ; step += 1) {
     // After MAX_LOOKUPS rounds of looking things up, it answers with what it has.
@@ -249,16 +304,23 @@ export async function askWodi(input: {
     const calls = mustAnswer ? [] : (reply.tool_calls ?? []).filter((call) => call.type === 'function');
     if (calls.length === 0) {
       const text = reply.content?.trim() ?? '';
-      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found, now) };
+      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found, now), gap };
     }
-    if (calls.some((call) => call.function.name === 'log_workout')) return { kind: 'log' };
+    // A tool it wasn't offered is never acted on: no workout logged or written over an open board.
+    if (calls.some((call) => call.function.name === 'log_workout' && offered.has('log_workout'))) return { kind: 'log' };
+    const created = calls.find((call) => call.function.name === 'create_workout' && offered.has('create_workout'));
+    const board = created ? readArg(created.function.arguments, 'board') : null;
+    if (created && board) return { kind: 'workout', board, why: readArg(created.function.arguments, 'why') ?? '', gap };
 
     messages.push({ role: 'assistant', content: reply.content ?? null, tool_calls: calls });
     for (const call of calls) {
       let result: unknown;
       if (call.function.name === 'propose_note') {
-        proposedNote = readNoteText(call.function.arguments) ?? proposedNote;
+        proposedNote = readArg(call.function.arguments, 'text') ?? proposedNote;
         result = { status: 'The athlete will be asked to confirm. Not saved yet.' };
+      } else if (call.function.name === 'note_gap') {
+        gap = readArg(call.function.arguments, 'request') ?? gap;
+        result = { status: 'Noted. Now answer them: say plainly you can\'t do that yet, and offer the closest thing you can.' };
       } else {
         ctx ??= await loadContext();
         result = runTool(call.function.name, call.function.arguments, ctx);

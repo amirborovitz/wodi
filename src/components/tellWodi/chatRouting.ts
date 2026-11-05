@@ -51,3 +51,20 @@ export function asksForStandardScreen(text: string): boolean {
   if (!t || t.split(/\s+/).length > 10) return false;
   return STANDARD_SCREEN.test(t);
 }
+
+/**
+ * Where a message goes once a board is open, by what the reader said it IS:
+ * - `answers`: it answers the board's questions (or corrects one) — applied, then the next question.
+ * - `park`:    they haven't done it yet — the game plan, and the chat waits for them.
+ * - `ask-wodi`: it isn't about this board (a question, a request) — Wodi answers it, then the
+ *               logging carries on where it was.
+ */
+export type ReadingRoute = 'answers' | 'park' | 'ask-wodi';
+
+export function routeReading(reading: { messageIs: 'answer' | 'before-workout' | 'for-wodi' }): ReadingRoute {
+  switch (reading.messageIs) {
+    case 'before-workout': return 'park';
+    case 'for-wodi': return 'ask-wodi';
+    default: return 'answers';
+  }
+}

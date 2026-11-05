@@ -22,10 +22,11 @@ import {
 } from './chatQuestions';
 import { answerUncertainty, uncertaintyValue } from '../../services/parseUncertainty';
 import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
-import { routeMessage, routeWorkoutWords } from './chatRouting';
+import { routeMessage, routeReading, routeWorkoutWords } from './chatRouting';
 import { boardReading } from '../../services/wodiAgent/boardReading';
 import { buildUnfinishedPoster, type UnfinishedPoster } from '../home/unfinishedPoster';
 import type { ChatNudges } from '../../hooks/useWodiNotifications';
+import type { AskSituation } from '../../services/wodiAgent/askWodi';
 import type { EnableResult } from '../../services/pushNotifications';
 
 /**
@@ -41,7 +42,7 @@ export type FormHandoff = 'typed' | 'chip';
 export interface ChatChipView {
   label: string;
   answers?: SlotAnswer[];
-  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done' | 'nudge';
+  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done' | 'nudge' | 'another';
   /** A 'forms' chip: which offer of the standard screen this is. */
   handoff?: FormHandoff;
   /** The note a 'remember' chip saves — exactly the words the athlete was shown. */
@@ -134,6 +135,8 @@ interface UseTellWodiChatArgs {
   onDropBoard: () => void;
   /** Wodi's nudges on this phone — offered once, when a board is left for later. */
   nudges: ChatNudges;
+  /** They asked for something Wodi can't do yet: kept, so what people ask decides what's next. */
+  onGap: (request: string, message: string) => void;
 }
 
 /** A workout the chat just saved — its poster, and what it earned. */
@@ -198,6 +201,8 @@ const STANDARD_SCREEN_CHIP: ChatChipView = { label: 'Fill it in myself', action:
 // A saved board reopened can be one they never got to — one tap clears it, no poster made.
 const NOT_DONE_CHIP: ChatChipView = { label: "Didn't do it", action: 'not-done' };
 const NUDGE_CHIP: ChatChipView = { label: 'Nudge me if I forget', action: 'nudge' };
+/** A workout Wodi wrote, swapped for a different one. */
+const ANOTHER_CHIP: ChatChipView = { label: 'Something else', action: 'another' };
 const NUDGE_REPLY: Record<EnableResult, string> = {
   on: "Done — if it's still here tomorrow morning, I'll nudge you.",
   blocked: 'Your phone has notifications off for Wodi — you can turn them on in its settings.',
@@ -275,7 +280,7 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard, nudges,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap,
 }: UseTellWodiChatArgs): TellWodiChat {
   const [messages, setMessages] = useState<ChatMessage[]>(() => (
     opening ? [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }] : []
@@ -298,8 +303,8 @@ export function useTellWodiChat({
   // about training — belongs to the ongoing thread, not to the poster this board becomes.
   const boardStartRef = useRef(0);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap }; });
   // A waiting board taken on mid-chat already has a conversation (the photo, "Doing it later", the
   // plan). It isn't redrawn here — the athlete is mid-sentence — but it's kept ahead of this one.
   const priorRef = useRef<SavedChatMessage[]>([]);
@@ -592,7 +597,7 @@ export function useTellWodiChat({
       const plan = await callbacks.current.ask(
         question || 'Give me a game plan for this one.',
         last?.from === 'me' && last.text === question ? recent.slice(0, -1) : recent,
-        { board: workoutRef.current?.rawText ?? '', reading: boardReading(workoutRef.current), loads: suggestionsAsText(suggestions), sex },
+        { kind: 'upcoming', workout: { board: workoutRef.current?.rawText ?? '', reading: boardReading(workoutRef.current), loads: suggestionsAsText(suggestions), sex } },
       );
       if (plan.kind === 'answer' && plan.text) {
         planned = true;
@@ -655,10 +660,19 @@ export function useTellWodiChat({
         notes: callbacks.current.notes,
       });
       settleQuestions();
-      if (reading.beforeWorkout) {
+      const route = routeReading(reading);
+      if (route === 'park') {
         // The advice is the answer; a "good luck" line before it is noise.
         offerToRemember(reading.remember);
         await parkBeforeWorkout(text);
+        return;
+      }
+      if (route === 'ask-wodi') {
+        // An aside: Wodi answers it, then the logging carries on where it was. A board waiting for
+        // them stays waiting, with its way back in on the answer.
+        const waiting = waitingRef.current;
+        await askWodiFor(text, sentId, { kind: 'logging', board: workout.rawText ?? '' }, waiting ? [DONE_CHIP] : []);
+        if (!waiting) askNext();
         return;
       }
       if (reading.vibe) vibeRef.current = reading.vibe;
@@ -695,26 +709,39 @@ export function useTellWodiChat({
   };
 
   /**
-   * Words before any board: a question about their training gets its answer here; a workout
-   * returns false and goes on to the board reader. True means the message has been dealt with.
+   * Wodi, the chat's one brain: it answers, writes them a workout, or says what it can't do yet.
+   * `'log'` means the words were a workout to log — the caller reads them as a board.
+   * `chips`: offered on the answer (a parked board's way back in).
    */
-  const answerQuestion = async (text: string, sent: ChatMessage): Promise<boolean> => {
+  const askWodiFor = async (
+    text: string,
+    sentId: string,
+    situation: AskSituation,
+    chips: ChatChipView[] = [],
+  ): Promise<'answered' | 'log'> => {
     setBusy('thinking');
     try {
       // The message itself was just pushed; Ask Wodi takes it separately from the history.
-      const reply = await callbacks.current.ask(text, recentTurns().slice(0, -1));
-      if (reply.kind === 'log') return false;
+      const reply = await callbacks.current.ask(text, recentTurns().slice(0, -1), situation);
+      if (reply.kind === 'log') return 'log';
+      if (reply.gap) callbacks.current.onGap(reply.gap, text);
+      if (reply.kind === 'workout') {
+        await readNewBoard(reply.board, null, sentId, { why: reply.why });
+        return 'answered';
+      }
       const answer = push({
         from: 'wodi',
         text: reply.text || "I couldn't find that in your log.",
         ...(reply.receipts.length ? { receipts: reply.receipts } : {}),
+        ...(chips.length ? { chips } : {}),
       });
+      const sent = messagesRef.current.find((m) => m.id === sentId) ?? null;
       keepIfBetweenWorkouts(sent, answer, offerToRemember(reply.proposedNote));
-      return true;
+      return 'answered';
     } catch (err) {
       console.error('[TellWodi] ask failed', err);
-      push({ from: 'wodi', text: 'My connection dropped for a sec — say that again?' });
-      return true;
+      push({ from: 'wodi', text: 'My connection dropped for a sec — say that again?', ...(chips.length ? { chips } : {}) });
+      return 'answered';
     } finally {
       setBusy(null);
     }
@@ -747,7 +774,7 @@ export function useTellWodiChat({
         return;
       }
       if (route === 'ask-wodi') {
-        if (await answerQuestion(text, sent)) return;
+        if (await askWodiFor(text, sentId, { kind: 'between' }) === 'answered') return;
         // It was a workout, not a question.
         const board = callbacks.current.waitingBoard;
         if (board && routeWorkoutWords({ hasWaitingBoard: !!board.parsedWorkout }) === 'confirm-board') {
@@ -761,8 +788,12 @@ export function useTellWodiChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commit, push]);
 
-  /** A new board from this message — a photo, or words that are the board and its results at once. */
-  const readNewBoard = async (text: string, file: File | null, sentId: string): Promise<void> => {
+  /**
+   * A new board from this message — a photo, or words that are the board and its results at once.
+   * `suggested`: Wodi wrote this board for them (create_workout) — they haven't done it, so it's
+   * offered to take on or swap, never asked about as a result.
+   */
+  const readNewBoard = async (text: string, file: File | null, sentId: string, suggested: { why: string } | null = null): Promise<void> => {
     // This message starts the workout's own chat.
     boardStartRef.current = Math.max(0, messagesRef.current.findIndex((m) => m.id === sentId));
     priorRef.current = [];
@@ -778,6 +809,10 @@ export function useTellWodiChat({
       return;
     }
     setBusy(null);
+    if (suggested) {
+      offerSuggestedBoard(text, suggested.why);
+      return;
+    }
     if (!text) {
       const title = workoutRef.current?.title?.trim();
       // Just the board — it could be before class or after. Ask rather than assume.
@@ -789,6 +824,26 @@ export function useTellWodiChat({
       return;
     }
     await readWords(text, sentId);
+  };
+
+  /** The workout Wodi just wrote, drawn as its board: take it on, or ask for another. */
+  const offerSuggestedBoard = (board: string, why: string): void => {
+    const workout = workoutRef.current;
+    const planned: PlannedWorkout = { id: 'suggested', userId: '', status: 'parsed', raw: board, parsedWorkout: workout ?? undefined, createdAt: new Date() };
+    push({
+      from: 'wodi',
+      text: why || 'Here\'s one for you.',
+      board: buildUnfinishedPoster(planned, new Date()),
+      chips: [{ label: "Let's do it", action: 'later' }, ANOTHER_CHIP],
+    });
+  };
+
+  /** "Something else": the written board is let go and Wodi writes a different one. */
+  const anotherWorkout = async (sentId: string): Promise<void> => {
+    const title = workoutRef.current?.title?.trim();
+    releaseBoard();
+    const reply = await askWodiFor(`Write me a different workout${title ? ` than "${title}"` : ''}.`, sentId, { kind: 'between' });
+    if (reply === 'log') push({ from: 'wodi', text: 'Tell me what you\'re after — time, kit or focus — and I\'ll write one.' });
   };
 
   /** "Is this the one?" — the waiting board drawn as its poster, so it's recognised by sight. */
@@ -823,6 +878,12 @@ export function useTellWodiChat({
    * kept on it, and the next words start fresh. Wodi doesn't make anything of it.
    */
   const dropBoard = (): void => {
+    releaseBoard();
+    push({ from: 'wodi', text: 'No worries — cleared it.' });
+  };
+
+  /** The chat lets go of its board: cleared from Today, and the next words start fresh. */
+  const releaseBoard = (): void => {
     callbacks.current.onDropBoard();
     workoutRef.current = null;
     resultsRef.current = [];
@@ -832,7 +893,6 @@ export function useTellWodiChat({
     waitingRef.current = false;
     priorRef.current = [];
     setHasBoard(false);
-    push({ from: 'wodi', text: 'No worries — cleared it.' });
   };
 
   /** Over to the standard screen — everything said so far goes along when there's a board. */
@@ -866,6 +926,10 @@ export function useTellWodiChat({
     }
     if (chip.action === 'later') {
       void parkBeforeWorkout('');
+      return;
+    }
+    if (chip.action === 'another') {
+      void anotherWorkout(said.id);
       return;
     }
     if (chip.action === 'nudge') {

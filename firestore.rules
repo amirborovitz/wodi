@@ -133,6 +133,14 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // What athletes asked Wodi for that it can't do yet (services/wodiAgent/agentGaps.ts).
+    // Append-only for the athlete who asked; only admin reads the list. Same shape as feedReports.
+    match /agentGaps/{gapId} {
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.userId;
+      allow read, update, delete: if isAdmin();
+    }
+
     // Email sign-in codes (functions/src/index.ts). Only the server touches them.
     match /loginCodes/{emailHash} {
       allow read, write: if false;
