@@ -296,6 +296,43 @@ describe('Tell Wodi — what the chat asks', () => {
 });
 
 
+// PLATE STORM, 2026-11-03: a 35-minute AMRAP saved as "8 rounds" — the chat never asked about the
+// round they were part-way through, because extra reps were only read if typed as "8+12".
+describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
+  const storm = {
+    name: '35 minutes AMRAP', type: 'wod', loggingMode: 'amrap',
+    prescription: '35 minutes AMRAP: 300m run, 18 Sit-up, 15 plate Ground to Overhead, 12 alt\' Overhead Lunge (plate), 9 Burpee to plate',
+    workDuration: 2100,
+    movements: [
+      { name: 'Run', distance: 300, inputType: 'distance', equipment: 'none', countingMode: 'per_round' },
+      { name: 'Sit-up', reps: 18, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+      { name: 'Burpee to Plate', reps: 9, inputType: 'none', equipment: 'none', countingMode: 'per_round' },
+    ],
+  } as unknown as ParsedExercise;
+  const results = () => [createBlankResult(storm, 0, 'amrap', 'male', undefined, true, { blankAnswers: true })];
+
+  it('asks rounds, then extra reps, on one card — "full rounds only" is one tap', () => {
+    const rs = results();
+    const question = nextQuestion(openSlots(rs, new Set()), rs)!;
+    expect(question.text).toBe('How many rounds did you get?');
+    const [group] = question.panel!.groups;
+    expect(group.fields.map((f) => [f.field, f.label])).toEqual([['count', 'rounds'], ['extraReps', 'extra reps']]);
+    expect(group.fields[1].none).toBe('Full rounds only');
+    expect(group.start).toEqual({});
+
+    const both = panelAnswer(question.panel!, { '0.rounds:count': 8, '0.rounds:extraReps': 12 });
+    expect(both.label).toBe('8 rounds + 12 reps');
+    const slot = openSlots(rs, new Set()).find((s) => s.id === '0.rounds')!;
+    const saved = applyAnswer(rs, slot, both.answers[0]);
+    expect(saved.closed).toBe(true);
+    expect(saved.results[0]).toMatchObject({ rounds: 8, partialReps: 12 });
+
+    const whole = panelAnswer(question.panel!, { '0.rounds:count': 8 });
+    expect(whole.label).toBe('8 rounds');
+    expect(applyAnswer(rs, slot, whole.answers[0]).results[0].partialReps).toBeFalsy();
+  });
+});
+
 // THRUST, 2026-10-02: [3:00 AMRAP / 1:00 rest] x 5 — 200m run, then 6 DB thrusters @12.5/20kg x2, 6 box jumps.
 describe('Tell Wodi — THRUST (AMRAP intervals)', () => {
   const thrust = {
@@ -316,6 +353,11 @@ describe('Tell Wodi — THRUST (AMRAP intervals)', () => {
     const outcome = applyAnswer(results(), slot, answer(slot.id, { count: 4, perInterval: true }));
     expect(outcome.closed).toBe(true);
     expect(outcome.results[0].rounds).toBe(20);
+  });
+
+  it('asks the rounds on the pad — no extra reps: they can\'t be spread across windows', () => {
+    const question = nextQuestion(openSlots(results(), new Set()), results())!;
+    expect(question.panel!.groups[0].fields.map((f) => f.field)).toEqual(['count']);
   });
 
   it('a whole-workout total is kept as said', () => {

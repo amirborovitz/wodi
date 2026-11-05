@@ -206,6 +206,15 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
     const firstOfGroup = step.field == null || step.field === group.fields[0];
     const fillAndMove = (next: PanelDraftState): void => go(next, nextGroupStep());
     const chipOf = (chip: ChatChip): DockChip => ({ label: chip.label, on: false, tap: () => fillAndMove(withChip(state, group, chip)) });
+    if (!firstOfGroup && step.field?.none) {
+      // A box that's usually nothing: that answer is one tap — left empty, and on.
+      const field = step.field;
+      return [{
+        label: field.none!,
+        on: false,
+        tap: () => go(withField(state, group, field.field, undefined), active + 1),
+      }];
+    }
     if (!firstOfGroup) {
       // The peak: one weight for every set is one tap.
       const startField = group.fields.find((f) => f.field === 'weight');

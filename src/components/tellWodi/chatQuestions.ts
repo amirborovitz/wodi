@@ -945,10 +945,15 @@ export interface ChatQuestion {
 export interface ChatPanelField {
   slotId: string;
   /** `minutes` and `seconds` are one clock reading — the answer's `seconds`, said "17:24". */
-  field: 'weight' | 'weightEnd' | 'count' | 'minutes' | 'seconds';
+  field: 'weight' | 'weightEnd' | 'count' | 'extraReps' | 'minutes' | 'seconds';
   /** Over the box: "start", "peak", "reps", "min", "sec". */
   label: string;
   unit: string;
+  /**
+   * A box that is usually nothing ("Full rounds only"): that answer is one tap on the pad,
+   * leaving it empty and moving on.
+   */
+  none?: string;
 }
 
 /** Boxes read together, left to right with the joiner between them: "70 → 85", "20 @ 50". */
@@ -975,7 +980,7 @@ export interface ChatPanelGroup {
   stepper?: { step: number; base?: number };
   /** The unit the answer carries when nothing else said it — last time's, shown on the card. */
   answerUnit?: LoadUnit;
-  joiner: '→' | '@' | ':';
+  joiner: '→' | '@' | ':' | '+';
   /** How the athlete's reply starts ("max 20 reps @ 50 kg"). */
   prefix: string;
   fields: ChatPanelField[];
@@ -1411,8 +1416,35 @@ export function nextQuestion(
         },
       };
     }
-    case 'rounds':
-      return { text: `How many rounds did you get${onPart}?`, slotIds: [first.id], chips: [skipChip([first.id])] };
+    case 'rounds': {
+      // Rounds, then the reps into the round they didn't finish — asked, never left to "8+12"
+      // typed (PLATE STORM, 2026-11-03). Extra reps can't be spread across windows, so a part on
+      // several windows asks the rounds alone; "about 4 each round" can still be typed.
+      const windows = first.intervals ?? 1;
+      return {
+        text: `How many rounds did you get${onPart}?`,
+        placeholder: windows > 1 ? 'Or how many each round — e.g. about 4' : 'Or type it — e.g. 8 + 12',
+        slotIds: [first.id],
+        // Skip is on the card itself.
+        chips: [],
+        panel: {
+          title: result?.exercise.name ?? first.subject,
+          ...(result ? { meta: partMeta(result) } : {}),
+          groups: [{
+            title: 'Rounds',
+            control: 'boxes',
+            joiner: '+',
+            prefix: '',
+            start: {},
+            quick: [],
+            fields: [
+              { slotId: first.id, field: 'count', label: 'rounds', unit: 'rounds' },
+              ...(windows > 1 ? [] : [{ slotId: first.id, field: 'extraReps' as const, label: 'extra reps', unit: 'reps', none: 'Full rounds only' }]),
+            ],
+          }],
+        },
+      };
+    }
     case 'reps': {
       const name = first.movementNames?.[0];
       const what = name ? pluralizeMovementLabel(stripMovementRolePrefix(name)).toLowerCase() : 'reps';
