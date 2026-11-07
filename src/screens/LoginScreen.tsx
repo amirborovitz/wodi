@@ -64,10 +64,11 @@ export function LoginScreen() {
           <h1 className={styles.heading}>
             <img className={styles.wordmarkLogo} src="/wodi-logo.svg" alt="wodi" />
           </h1>
-          <p className={styles.tagline}>Track. Lift. Show Up.</p>
+          <p className={styles.tagline}>Your personal assistant for workouts.</p>
           <p className={styles.intro}>
-            Your CrossFit workout assistant. Log your sessions, scores and weights, keep your whole
-            training history, and turn every workout into a WOD poster worth sharing.
+            Send Wodi a photo of your CrossFit board, or just tell it what you did. It logs the
+            workout, answers questions about your training, and turns every session into a poster
+            worth sharing.
           </p>
         </motion.div>
 
