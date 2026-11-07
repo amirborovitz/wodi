@@ -96,7 +96,8 @@ interface AddWorkoutScreenProps {
    */
   onWorkoutUpdated?: (workout: import('../hooks/useWorkouts').WorkoutWithStats) => void;
   /** A poster card in the Wodi thread was tapped. */
-  onOpenWorkout?: (workout: import('../hooks/useWorkouts').WorkoutWithStats, list: import('../hooks/useWorkouts').WorkoutWithStats[]) => void;
+  /** `justLogged`: the chat's celebration — the poster performs itself as it opens. */
+  onOpenWorkout?: (workout: import('../hooks/useWorkouts').WorkoutWithStats, list: import('../hooks/useWorkouts').WorkoutWithStats[], justLogged?: boolean) => void;
   /** A board parked mid-chat was tapped in the thread — reopen its chat. */
   onOpenPlanned?: (planned: import('../types').PlannedWorkout) => void;
   plannedWorkout?: import('../types').PlannedWorkout | null; // A saved board — opens in its chat
@@ -2315,6 +2316,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
           thread={thread}
           onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday, logged: tellWodi.logged }))}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
+          onCelebrate={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts, true)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}
         />
       )}

@@ -4,7 +4,8 @@ import type { PosterCustomizationUpdate } from '../../../hooks/usePosterCustomiz
 
 export interface CelebrationFaceProps {
   data: CelebrationData;
-  mode: 'reward' | 'detail';
+  /** Just logged: the poster performs itself once as it opens (the replay). */
+  performOnOpen: boolean;
   onBack?: () => void;
   onDone?: () => void;
   onEdit?: () => void;

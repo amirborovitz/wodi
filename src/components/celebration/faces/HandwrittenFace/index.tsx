@@ -128,7 +128,7 @@ const STICKER_DEFAULT_POS = { x: 50, y: 46 };
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function HandwrittenFace({
-  data, mode, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
+  data, performOnOpen, onBack, onDone, onEdit, onPosterCustomizationChange, onCorrection, onViewConversation,
 }: CelebrationFaceProps): React.JSX.Element {
   const favoriteSkin = useFavoriteSkin();
   // The row's order: last chosen first, taken fresh each time the Style row opens — so the skin
@@ -192,7 +192,7 @@ export function HandwrittenFace({
     workoutId: data.workoutId,
     wod: isCarousel && pageWods ? pageWods[carouselPage] : singleWod,
     surface: 'poster',
-    autoPlay: mode === 'reward',
+    autoPlay: performOnOpen,
   });
   const replayOverlay = (
     <AnimatePresence>

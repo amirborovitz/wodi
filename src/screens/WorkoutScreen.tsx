@@ -31,6 +31,8 @@ interface WorkoutScreenProps {
 
   // Detail mode
   workout?: WorkoutWithStats;
+  /** Opened right after logging (the chat's celebration): the poster performs itself once. */
+  justLogged?: boolean;
   onBack?: () => void;
   onEditWorkout?: () => void;
 
@@ -122,6 +124,7 @@ export function WorkoutScreen({
   onEditWorkout,
   onPrevWorkout,
   onNextWorkout,
+  justLogged = false,
 }: WorkoutScreenProps) {
   // Vertical nav swipe (TikTok-style, detail mode only)
   // Starts off-screen when arriving from a swipe, so the first frame is already at the edge —
@@ -140,6 +143,8 @@ export function WorkoutScreen({
   }, []);
 
   const isReward = mode === 'reward';
+  // Fresh off a log, by either path: the form's reward screen or the chat's celebration.
+  const performOnOpen = isReward || justLogged;
   const [stickerConfig, setStickerConfig] = useState<CelebrationStickerConfig>(DEFAULT_CELEBRATION_STICKER_CONFIG);
 
   useEffect(() => {
@@ -243,7 +248,7 @@ export function WorkoutScreen({
         )}
         <FaceComponent
           data={celebrationData}
-          mode={mode}
+          performOnOpen={performOnOpen}
           onBack={isReward ? onDone : onBack}
           onDone={onDone}
           onEdit={isReward ? onEdit : onEditWorkout}

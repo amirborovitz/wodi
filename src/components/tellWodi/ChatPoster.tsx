@@ -19,15 +19,16 @@ interface ChatPosterProps {
 /**
  * The poster just logged, big under Wodi's cheer, with Share right there — the moment you're
  * proud of is where you share. A session of several parts shows its lead poster (the WOD first —
- * orderPosterParts) and "+1 poster" — the session's other parts — which opens the whole deck; the chat never stacks posters. The first time it shows, the athlete performs the board and the
- * card gives way to the poster; Replay plays it again. Sharing is the poster screen's own
+ * orderPosterParts) and "+1 poster" — the session's other parts — which opens the whole deck; the chat never stacks posters. Right after
+ * logging the full poster screen takes over and performs the board there (useCelebrationTakeover), so
+ * this card never plays by itself; Replay plays it here. Sharing is the poster screen's own
  * (usePosterShare); the image is drawn off-screen at the poster's full width so it is as sharp
  * as one shared from the poster.
  */
 export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactElement | null {
   const payload = usePosterPayload(workout);
   const share = usePosterShare(() => workout.title || 'Workout');
-  const replay = usePosterReplay({ workoutId: workout.id, wod: payload?.wods[0], surface: 'chat', autoPlay: true });
+  const replay = usePosterReplay({ workoutId: workout.id, wod: payload?.wods[0], surface: 'chat', autoPlay: false });
   const [capturing, setCapturing] = useState(false);
   const captureRef = useRef<HTMLDivElement>(null);
 

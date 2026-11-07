@@ -5,6 +5,7 @@ import { CHAT_ANCHOR, useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
+import { useCelebrationTakeover } from './useCelebrationTakeover';
 import { WodiText } from './WodiText';
 import { UnfinishedPosterTile } from '../home/UnfinishedPosterTile';
 import type { WodiThread } from './useWodiThread';
@@ -18,6 +19,8 @@ interface TellWodiChatProps {
   thread: WodiThread;
   onBack: () => void;
   onOpenWorkout: (workout: WorkoutWithStats) => void;
+  /** A workout just logged here: its poster takes the screen once, Back returns to the chat. */
+  onCelebrate: (workout: WorkoutWithStats) => void;
   onOpenPlanned: (planned: PlannedWorkout) => void;
 }
 
@@ -25,7 +28,7 @@ interface TellWodiChatProps {
  * The Tell Wodi screen: a message thread and a composer. Renders what useTellWodiChat returns and
  * nothing more — every decision about what to ask lives in the hook.
  */
-export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanned }: TellWodiChatProps) {
+export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate, onOpenPlanned }: TellWodiChatProps) {
   const [draft, setDraft] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -71,6 +74,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onOpenPlanne
   /** A cheer for a workout just logged carries that poster, big, with Share. */
   const cheeredWorkout = (headline: ChatMessage['headline']): WorkoutWithStats | undefined =>
     (headline?.posterId ? thread.workoutById(headline.posterId) : undefined);
+  useCelebrationTakeover(messages, (m) => cheeredWorkout(m.headline), onCelebrate);
 
   const typingLabel = busy === 'reading-board' ? 'Reading the board…' : busy === 'thinking' ? null : undefined;
 

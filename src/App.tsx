@@ -53,6 +53,8 @@ function AppContent() {
   // rather than replacing it: the conversation lives in memory, so leaving the screen lost the
   // board, the game plan and every answer so far. Back closes the poster and the chat is as it was.
   const [posterOverChat, setPosterOverChat] = useState(false);
+  // The workout the chat just logged and opened as its celebration — its poster performs itself.
+  const [justLoggedId, setJustLoggedId] = useState<string | null>(null);
   const [pendingRecapData, setPendingRecapData] = useState<RecapData | null>(null);
   // Installed from the home screen there is no browser chrome and so no reload
   // gesture; this is the app's only route onto a newer deploy.
@@ -170,6 +172,7 @@ function AppContent() {
         mode="detail"
         enterFrom={enterFrom}
         workout={workout}
+        justLogged={workout.id === justLoggedId}
         onBack={() => { setNavDir(null); onBack(); }}
         onEditWorkout={() => handleEditWorkout(workout)}
         onPrevWorkout={selectedIdx > 0 ? () => {
@@ -194,8 +197,9 @@ function AppContent() {
             // A parked board opened from the thread is a different chat: start it fresh. So is an
             // edit begun from a poster opened over the chat — the screen doesn't change for that.
             key={editingWorkout?.id ?? pendingPlannedWorkout?.id ?? `new-${chatSession}`}
-            onOpenWorkout={(workout, list) => {
+            onOpenWorkout={(workout, list, justLogged) => {
               setNavDir(null);
+              setJustLoggedId(justLogged ? workout.id : null);
               setSelectedWorkout(workout);
               setWorkoutList(list);
               // Where an edit begun from this poster returns to, once the chat has given way to it.
@@ -243,7 +247,7 @@ function AppContent() {
           />
           {posterOverChat && selectedWorkout && (
             <div className={styles.posterOverChat}>
-              {renderPoster(selectedWorkout, () => setPosterOverChat(false))}
+              {renderPoster(selectedWorkout, () => { setPosterOverChat(false); setJustLoggedId(null); })}
             </div>
           )}
           </>
