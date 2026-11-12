@@ -12,6 +12,7 @@ import { knownLoadUnit, type LoadUnit } from '../../utils/loadUnits';
 import { setLoadUnit } from '../logging/story/athleteLoadUnit';
 import { habitKey, type SwapHabit, type SwapUnit } from '../../services/wodiAgent/athleteHabits';
 import { personalIntervalCount } from '../logging/story/intervalRounds';
+import { buildPartialRows } from '../logging/story/partialRoundRows';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
@@ -168,8 +169,20 @@ const isScoredKind = (r: StoryExerciseResult): boolean =>
 /** Rungs offered past the board's last one — for the athlete who climbed further than it wrote. */
 const LADDER_EXTRA_RUNGS = 3;
 
-/** A 'partial' answer meaning they finished no move of the next rung. */
+/** A 'partial' answer meaning they finished no move of the next rung or round. */
 const NONE_FINISHED = 'none';
+
+/**
+ * The moves of the rung or round they didn't finish, in board order, each with what finishing it
+ * adds: a ladder's next rung, or an AMRAP round's own reps — the form's checklist rows. Moves are
+ * done in order, so "how far did you get" is the last one finished.
+ */
+function partialMoves(r: StoryExerciseResult): { name: string; reps: number }[] {
+  const ladder = r.exercise.ladderReps ?? [];
+  if (ladder.length === 0) return buildPartialRows(r.movementResults);
+  const next = getLadderRungValue(ladder, r.ladderStep ?? 0);
+  return (r.exercise.movements ?? []).filter((m) => m.perRound !== false).map((m) => ({ name: m.name, reps: next }));
+}
 
 /** `total` over `parts` whole numbers that add back up to it: 22 over 5 is 5, 5, 4, 4, 4. */
 function spreadEvenly(total: number, parts: number): number[] {
@@ -400,26 +413,28 @@ export function openSlots(
       const cap = parseTimeCapSeconds(r.exercise.prescription);
       push(scores, { id: `${key}.time`, kind: 'time', exerciseIndex: i, subject: part, asked: true, ...(cap ? { cap } : {}) });
     }
-    if (r.kind === 'score_rounds' && ladder.length === 0 && toAsk(`${key}.rounds`, (r.rounds ?? 0) > 0)) {
-      const intervals = personalIntervalCount(r, teamSize);
-      push(scores, {
-        id: `${key}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
-        ...(intervals && intervals > 1 ? { intervals } : {}),
-      });
-    }
-    // A ladder is scored by how far up it they got: the last rung finished, then how far into
-    // the next one — the moves done, in order. Asked once the rung is known.
-    if (ladder.length > 0) {
+    // Rounds (or a ladder's last rung finished), then how far into the next one — the moves done,
+    // in order, as the form's checklist asks. Never "how many extra reps": a round of several
+    // moves has no one rep count. A part on several windows has no single unfinished round.
+    if (r.kind === 'score_rounds') {
       const step = r.ladderStep ?? 0;
-      if (toAsk(`${key}.ladder`, step > 0)) {
+      const intervals = personalIntervalCount(r, teamSize);
+      const moves = partialMoves(r);
+      const partialAsked = (r.partialMovements?.length ?? 0) > 0 || (r.partialReps ?? 0) > 0;
+      if (ladder.length > 0 && toAsk(`${key}.ladder`, step > 0)) {
         push(scores, {
           id: `${key}.ladder`, kind: 'ladder', exerciseIndex: i, subject: part, asked: true,
           rungs: Array.from({ length: Math.max(ladder.length, step + 1) + LADDER_EXTRA_RUNGS }, (_, n) => getLadderRungValue(ladder, n)),
         });
-      } else if (toAsk(`${key}.partial`, (r.partialMovements?.length ?? 0) > 0)) {
+      } else if (ladder.length === 0 && toAsk(`${key}.rounds`, (r.rounds ?? 0) > 0)) {
+        push(scores, {
+          id: `${key}.rounds`, kind: 'rounds', exerciseIndex: i, subject: part, asked: true,
+          ...(intervals && intervals > 1 ? { intervals } : {}),
+        });
+      } else if ((ladder.length > 0 || (moves.length > 1 && !(intervals && intervals > 1))) && toAsk(`${key}.partial`, partialAsked)) {
         push(scores, {
           id: `${key}.partial`, kind: 'partial', exerciseIndex: i, subject: part, asked: true,
-          options: (r.exercise.movements ?? []).filter((m) => m.perRound !== false).map((m) => m.name),
+          options: moves.map((m) => m.name),
         });
       }
     }
@@ -792,7 +807,7 @@ export function applyAnswer(
     }
 
     case 'partial': {
-      // "Through the thrusters": every move up to and including it, each at the next rung's reps.
+      // "Through the thrusters": every move up to and including it, each adding its own reps.
       const options = slot.options ?? [];
       const picked = answer.choice?.trim().toLowerCase();
       if (picked == null) return { results, closed: false };
@@ -801,10 +816,10 @@ export function applyAnswer(
       const done = upTo < 0 ? [] : options.slice(0, upTo + 1);
       return {
         results: patchResult(results, i, (r) => {
-          const next = getLadderRungValue(r.exercise.ladderReps ?? [], r.ladderStep ?? 0);
+          const reps = partialMoves(r).filter((m) => done.includes(m.name)).reduce((sum, m) => sum + m.reps, 0);
           return {
             partialMovements: done.length > 0 ? done : undefined,
-            partialReps: done.length > 0 ? done.length * next : undefined,
+            partialReps: reps > 0 ? reps : undefined,
           };
         }),
         closed: true,
@@ -945,15 +960,10 @@ export interface ChatQuestion {
 export interface ChatPanelField {
   slotId: string;
   /** `minutes` and `seconds` are one clock reading — the answer's `seconds`, said "17:24". */
-  field: 'weight' | 'weightEnd' | 'count' | 'extraReps' | 'minutes' | 'seconds';
+  field: 'weight' | 'weightEnd' | 'count' | 'minutes' | 'seconds';
   /** Over the box: "start", "peak", "reps", "min", "sec". */
   label: string;
   unit: string;
-  /**
-   * A box that is usually nothing ("Full rounds only"): that answer is one tap on the pad,
-   * leaving it empty and moving on.
-   */
-  none?: string;
 }
 
 /** Boxes read together, left to right with the joiner between them: "70 → 85", "20 @ 50". */
@@ -973,14 +983,14 @@ export interface ChatPanelGroup {
   /** A pair — the answer is per bell, said "2 × 16 kg". */
   pair?: boolean;
   /**
-   * A start → peak build's −/+ on the pad: what one press moves the weight by (the standard
-   * screen's step for this implement and unit), and where + starts on an empty weight (the
-   * board's lightest Rx — never shown as a value).
+   * −/+ on the pad for every box of this answer: what one press moves a weight by (the standard
+   * screen's step for this implement and unit; reps move by one), and where + starts on an empty
+   * weight (the board's lightest Rx — never shown as a value). Every weight has it; a bell picks.
    */
-  stepper?: { step: number; base?: number };
+  stepper?: { step: number; altStep: number; base?: number };
   /** The unit the answer carries when nothing else said it — last time's, shown on the card. */
   answerUnit?: LoadUnit;
-  joiner: '→' | '@' | ':' | '+';
+  joiner: '→' | '@' | ':';
   /** How the athlete's reply starts ("max 20 reps @ 50 kg"). */
   prefix: string;
   fields: ChatPanelField[];
@@ -1031,6 +1041,8 @@ export function panelAnswer(
   values: Readonly<Record<string, number | undefined>>,
   unloaded: ReadonlySet<string> = NO_IDS,
   picked: Readonly<Record<string, string>> = {},
+  /** kg or lb switched on the pad, by slot. */
+  units: Readonly<Record<string, LoadUnit>> = {},
 ): { label: string; answers: SlotAnswer[] } {
   const answers: SlotAnswer[] = [];
   const said: string[] = [];
@@ -1083,7 +1095,10 @@ export function panelAnswer(
       continue;
     }
     gave = true;
-    const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER, ...(group.answerUnit ? { unit: group.answerUnit } : {}) };
+    const unit = units[slotId] ?? group.answerUnit;
+    const answer: SlotAnswer = { id: slotId, ...EMPTY_ANSWER, ...(unit ? { unit } : {}) };
+    // A weight box reads in the unit switched to, if any.
+    const unitFor = (field: ChatPanelField): string => (units[slotId] && (field.field === 'weight' || field.field === 'weightEnd') ? units[slotId] : field.unit);
     // Minutes only come in a clock, read whole above.
     for (const { field, value } of given) if (field.field !== 'minutes') answer[field.field] = value;
     if (answer.weight == null && answer.weightEnd != null) answer.weight = answer.weightEnd;
@@ -1094,7 +1109,7 @@ export function panelAnswer(
     said.push(side + group.prefix + shown
       .map(({ field, value }, index) => {
         const next = shown[index + 1];
-        return next && next.field.unit === field.unit ? `${value}` : `${value} ${field.unit}`;
+        return next && unitFor(next.field) === unitFor(field) ? `${value}` : `${value} ${unitFor(field)}`;
       })
       .join(` ${group.joiner} `));
   }
@@ -1121,6 +1136,8 @@ function liftPanelQuestion(
     groups.push({
       title: 'Max set',
       control: 'boxes',
+      // Reps move by one, the weight by its implement's step.
+      stepper: weightStepper(name, maxSet.equipment, unit, maxSet.rxWeights),
       joiner: '@',
       prefix: '',
       start: {},
@@ -1142,6 +1159,17 @@ function liftPanelQuestion(
     // Skip is on the card itself.
     chips: [],
     panel: { title: name, groups },
+  };
+}
+
+/** A weight's −/+: the standard screen's step for this implement and unit; + on an empty box starts at the board's lightest Rx. */
+function weightStepper(name: string, equipment: ChatSlot['equipment'], unit: string, rx: number[] | undefined): { step: number; altStep: number; base?: number } {
+  const lb = unit === 'lb';
+  return {
+    step: getWeightStep(name, equipment, lb ? 'lb' : 'kg'),
+    // The step after kg ↔ lb is switched on the pad.
+    altStep: getWeightStep(name, equipment, lb ? 'kg' : 'lb'),
+    ...(rx?.length ? { base: Math.min(...rx) } : {}),
   };
 }
 
@@ -1199,12 +1227,9 @@ function weightGroup(slot: ChatSlot, name: string, unit: string, title: string, 
     ...(bells ? { sizes: bellSizes(shown, weighed?.start ?? (sameFits ? same?.weight : undefined) ?? (slot.rxWeights?.length ? Math.min(...slot.rxWeights) : undefined)) } : {}),
     ...(kit ? { kit: slot.pair ? kit.pair : kit.one } : {}),
     ...(slot.pair ? { pair: true } : {}),
-    ...(inSets ? {
-      stepper: {
-        step: getWeightStep(name, slot.equipment, shown === 'lb' ? 'lb' : 'kg'),
-        ...(slot.rxWeights?.length ? { base: Math.min(...slot.rxWeights) } : {}),
-      },
-    } : {}),
+    // Every weight gets −/+: it starts on last time, which is close, so one or two taps beat typing
+    // (owner, 2026-11-08). A bell is picked from its sizes instead.
+    ...(bells ? {} : { stepper: weightStepper(name, slot.equipment, shown, slot.rxWeights) }),
     ...(answerUnit ? { answerUnit } : {}),
     joiner: '→',
     prefix: slot.pair ? '2 × ' : '',
@@ -1417,13 +1442,13 @@ export function nextQuestion(
       };
     }
     case 'rounds': {
-      // Rounds, then the reps into the round they didn't finish — asked, never left to "8+12"
-      // typed (PLATE STORM, 2026-11-03). Extra reps can't be spread across windows, so a part on
-      // several windows asks the rounds alone; "about 4 each round" can still be typed.
+      // Full rounds only. How far into the next one is its own question — the moves finished
+      // ('partial'), never a rep count across different moves. "About 4 each round" can be typed.
       const windows = first.intervals ?? 1;
       return {
         text: `How many rounds did you get${onPart}?`,
-        placeholder: windows > 1 ? 'Or how many each round — e.g. about 4' : 'Or type it — e.g. 8 + 12',
+        ...(windows > 1 ? {} : { hint: 'Full rounds — the one you didn’t finish comes next.' }),
+        placeholder: windows > 1 ? 'Or how many each round — e.g. about 4' : 'Or type it — e.g. 8',
         slotIds: [first.id],
         // Skip is on the card itself.
         chips: [],
@@ -1433,14 +1458,11 @@ export function nextQuestion(
           groups: [{
             title: 'Rounds',
             control: 'boxes',
-            joiner: '+',
+            joiner: '@',
             prefix: '',
             start: {},
             quick: [],
-            fields: [
-              { slotId: first.id, field: 'count', label: 'rounds', unit: 'rounds' },
-              ...(windows > 1 ? [] : [{ slotId: first.id, field: 'extraReps' as const, label: 'extra reps', unit: 'reps', none: 'Full rounds only' }]),
-            ],
+            fields: [{ slotId: first.id, field: 'count', label: 'rounds', unit: 'rounds' }],
           }],
         },
       };
@@ -1510,11 +1532,16 @@ export function nextQuestion(
       };
     }
     case 'partial': {
-      // Moves are done in order, so "how far into the next rung" is one tap: the last move finished.
+      // Moves are done in order, so "how far into the next rung / round" is one tap: the last move
+      // finished.
       const options = first.options ?? [];
-      const next = result ? getLadderRungValue(result.exercise.ladderReps ?? [], result.ladderStep ?? 0) : undefined;
+      const ladder = result?.exercise.ladderReps ?? [];
+      const into = !result ? 'the next one'
+        : ladder.length > 0 ? `the ${getLadderRungValue(ladder, result.ladderStep ?? 0)}s`
+        : `round ${(result.rounds ?? 0) + 1}`;
       return {
-        text: `And into the ${next ?? 'next'}s — how far did you get?`,
+        text: `And into ${into} — how far did you get?`,
+        hint: 'The last move you finished.',
         slotIds: [first.id],
         chips: [
           { label: 'None of it', answers: [{ id: first.id, ...EMPTY_ANSWER, choice: NONE_FINISHED }] },

@@ -107,6 +107,53 @@ export function hasSameMovementsEveryRound(exercise: { sections?: SectionLike[] 
 }
 
 /**
+ * The round a board repeats, one entry per pass — when the piece IS one round template whose
+ * movements stay the same and only their quantities change ("4 sets: 5-4-3-2 Strict C2B / 25s
+ * Front Raise Hold / 20-25 Pike Leg Raise"). Null for anything else.
+ *
+ * The parse can hand that board over in two spellings, and the poster must read both the same way:
+ *  - one single-pass `rounds` section per pass (the per-movement-scheme rule in the prompt), or
+ *  - the passes written out end to end in ONE list — flat, or inside a single single-pass section.
+ *
+ * A flat list counts only when it is that template repeated exactly: at least two movements per
+ * pass, the same names in the same order every pass. A chipper that revisits a movement (run · C&J
+ * · BJO · C&J · run) is not periodic and stays a list of its own lines.
+ */
+export function roundTemplateTiers<M extends MovementLike>(
+  exercise: { sections?: SectionLike<M>[]; movements?: M[] } | null | undefined,
+): M[][] | null {
+  const sections = exercise?.sections ?? [];
+  if (sections.length > 1) {
+    const shape = ladderTiers(exercise);
+    if (!shape?.foldsCleanly) return null;
+    const singlePass = sections
+      .filter((s) => s.sectionType === 'rounds')
+      .every((s) => (s.rounds ?? 1) === 1);
+    return singlePass && hasSameMovementsEveryRound(exercise) ? shape.tiers : null;
+  }
+  const [only] = sections;
+  const list = only
+    ? (only.sectionType === 'rounds' && (only.rounds ?? 1) <= 1 ? only.movements ?? [] : [])
+    : exercise?.movements ?? [];
+  return periodicPasses(list);
+}
+
+/** `list` cut into its repeating pass, when it is one pass of ≥2 movements written out ≥2 times. */
+function periodicPasses<M extends MovementLike>(list: M[]): M[][] | null {
+  const key = (m: M): string => m.name.toLowerCase().trim();
+  for (let width = 2; width <= list.length / 2; width++) {
+    if (list.length % width !== 0) continue;
+    const firstPass = list.slice(0, width).map(key);
+    if (new Set(firstPass).size !== width) continue;
+    if (!list.every((m, i) => key(m) === firstPass[i % width])) continue;
+    const passes: M[][] = [];
+    for (let i = 0; i < list.length; i += width) passes.push(list.slice(i, i + width));
+    return passes;
+  }
+  return null;
+}
+
+/**
  * True when the round sections run ONE AFTER ANOTHER — each block is a self-contained set count
  * the athlete finishes before starting the next ("4 sets Every 1:30: 2 Clean & Jerk, Into: 4 sets
  * Every 1:30: 1 Clean & Jerk"; "4 sets Push Press, Into: 4 sets Push Jerk").

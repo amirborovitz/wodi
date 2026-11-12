@@ -140,12 +140,59 @@ describe('moveForMovement', () => {
     expect(moveForMovement(name).move).toBe(move);
   });
 
-  it('draws a barbell row as the ready stance, not the rower', () => {
-    expect(moveForMovement('Bent-over Barbell Row').move).toBe('work');
+  it('draws a barbell row as a bent-over row, not the rower', () => {
+    expect(moveForMovement('Bent-over Barbell Row').move).toBe('bentOverRow');
   });
 
   it("draws a movement it doesn't know as the ready stance — never a different movement", () => {
-    expect(moveForMovement('Zercher Carry Something').move).toBe('work');
+    expect(moveForMovement('Tibialis Raise').move).toBe('work');
+    // "Core" names no drill, so there is no one movement to show.
+    expect(moveForMovement('Cash-out: Core').move).toBe('work');
+  });
+
+  // 2026-11-11: every family the registry knows is drawn — before, these all stood in the ready stance.
+  it.each([
+    ['Alt Weighted Box Step Up', 'stepUp'],
+    ['Farmer Carry', 'farmerCarry'],
+    ['Suitcase Carry', 'farmerCarry'],
+    ['Twin Kettlebells Front Rack Carry', 'rackCarry'],
+    ['Overhead Carry', 'overheadCarry'],
+    ['Yoke Carry', 'yokeCarry'],
+    ['Alt Single Dumbbell Devil Press', 'devilPress'],
+    ['Man Maker', 'manMaker'],
+    ['Turkish Get-up', 'turkishGetUp'],
+    ['Dips', 'dip'],
+    ['Ring Row', 'ringRow'],
+    ['Rope Climb', 'ropeClimb'],
+    ['Handstand Push-up', 'handstandPushUp'],
+    ['Handstand Walk', 'handstandWalk'],
+    ['Wall Walk', 'wallWalk'],
+    ['Bench Press', 'benchPress'],
+    ['Dumbbell Bench Press', 'benchPress'],
+    ['Floor Press', 'floorPress'],
+    ['DB Row', 'bentOverRow'],
+    ['Renegade Row', 'renegadeRow'],
+    ['Bicep Curl', 'curl'],
+    ['Prone Banded Hamstring Curl', 'hamstringCurl'],
+    ['Single Leg Hip Thrust', 'hipThrust'],
+    ['Glute Bridge', 'gluteBridge'],
+    ['Pistol', 'pistol'],
+    ['Cossack Squats Transitions', 'cossackSquat'],
+    ['Banded Shoulder External Rotation', 'bandPull'],
+    ['Face Pull', 'bandPull'],
+    ['Jefferson Curl', 'jeffersonCurl'],
+    ['Plank Hold', 'plank'],
+    ['Side Plank Hold', 'plank'],
+    ['Hollow Hold', 'hollowHold'],
+    ['Hollow Rock', 'hollowRock'],
+    ['Single Leg V-Up', 'vUp'],
+    ['Pike Leg Raises', 'legRaise'],
+    ['Flutter Kick', 'flutterKick'],
+    ['Russian Twist', 'russianTwist'],
+    ['Bicycle Crunch', 'bicycleCrunch'],
+    ['Swim', 'swim'],
+  ])('%s → %s', (name, move) => {
+    expect(moveForMovement(name).move).toBe(move);
   });
 
   it.each([

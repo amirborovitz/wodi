@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_ANSWER, type ChatPanel, type ChatPanelGroup } from './chatQuestions';
-import { initialDraft, replyOf, withChip, withField, withNoLoad, withoutGroup, withPick } from './panelDraft';
+import { initialDraft, replyOf, weightLadder, withChip, withField, withNoLoad, withoutGroup, withPick, withUnit } from './panelDraft';
 
 // The dock changed how a card's numbers are entered — never what the card sends. These pin the
 // answers the pad's steps make, through the same panelAnswer the old boxes used.
@@ -79,5 +79,31 @@ describe('the dock sends what the card always sent', () => {
     expect(s.unloaded.size).toBe(0);
     s = withoutGroup(s, group);
     expect(replyOf(band, s)).toEqual({ label: 'Skip', answers: [{ id: 'bench', ...EMPTY_ANSWER, skipped: true }] });
+  });
+});
+
+describe('weights on the pad (design C)', () => {
+  const snatch: ChatPanelGroup = {
+    title: 'Alt Dumbbell Snatch', control: 'weight', joiner: '→', prefix: '', quick: [],
+    stepper: { step: 2.5, altStep: 5 },
+    start: { 'snatch:weight': 40 },
+    fields: [{ slotId: 'snatch', field: 'weight', label: 'weight', unit: 'kg' }],
+  };
+  const panel: ChatPanel = { title: 'Alt Dumbbell Snatch', groups: [snatch] };
+
+  it('the chips sit two steps either side of last time', () => {
+    expect(weightLadder(40, 2.5)).toEqual([35, 37.5, 40, 42.5, 45]);
+    // Never a weight below zero.
+    expect(weightLadder(2.5, 2.5)).toEqual([2.5, 5, 7.5]);
+  });
+
+  it('last time as it started is one tap: Next sends 40 kg', () => {
+    expect(replyOf(panel, initialDraft(panel))).toMatchObject({ label: '40 kg', answers: [{ id: 'snatch', weight: 40 }] });
+  });
+
+  it('kg ↔ lb keeps the number and sends the unit they lifted in', () => {
+    const reply = replyOf(panel, withUnit(initialDraft(panel), snatch, 'lb'));
+    expect(reply.label).toBe('40 lb');
+    expect(reply.answers[0]).toMatchObject({ weight: 40, unit: 'lb' });
   });
 });

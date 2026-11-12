@@ -54,7 +54,7 @@ import {
 } from '../../services/celebrationStickerConfig';
 import { detectPartnerSplit, buildRoundLedger, type PartnerSplitInfo } from './partnerSplit';
 import { boardLineName, boardLineOfTotal, findMovementTotal, createSubstitutionResolver, resolveOccurrenceLoad, getExercisePeakLoad, formatPeakLoadValue, substitutedFromName } from './movementResolution';
-import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, sectionsEnumerateIntervals, sequentialBlockSetCount } from '../../utils/sectionShape';
+import { hasSameMovementsEveryRound, hasSequentialBlocks, ladderTiers, roundTemplateTiers, sectionsEnumerateIntervals, sequentialBlockSetCount } from '../../utils/sectionShape';
 import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit, rxLoadUnit } from '../../utils/loadUnits';
@@ -1869,10 +1869,13 @@ function windowScheduleLabel(exercise: Exercise): string {
 // 50-40-30, DB push press 30-20-10, box jumps a flat 15) — NOT expanded into Round 1/2/3, NOT
 // collapsed into a single shared 50-40-30. A movement whose reps are constant every round shows
 // that single value.
-function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal[]): ArtifactRow[] {
+function buildPerMovementLadderRows(
+  exercise: Exercise,
+  breakdown: MovementTotal[],
   // Tiers, not raw round sections — a per-tier lead-in is part of the tier it leads. Reading
   // `rounds` sections alone is what dropped the run a board opens each tier with.
-  const tiers = ladderTiers(exercise)?.tiers ?? [];
+  tiers: ParsedMovement[][] = ladderTiers(exercise)?.tiers ?? [],
+): ArtifactRow[] {
   const resolveSubstitution = createSubstitutionResolver(exercise, breakdown);
   const first = tiers[0] ?? [];
   return first.map((_, j): ArtifactRow => {
@@ -1881,17 +1884,26 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     const m0 = perRound[0];
     const isCal = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) > 0;
     const isDist = (m?: ParsedMovement) => m?.reps == null && (m?.calories ?? 0) === 0 && (m?.distance ?? 0) > 0;
-    const qtyOf = (m?: ParsedMovement) => m?.reps ?? m?.calories ?? m?.distance ?? 0;
+    const isHold = (m?: ParsedMovement) => m?.reps == null && !isCal(m) && !isDist(m) && (m?.time ?? 0) > 0;
+    const qtyOf = (m?: ParsedMovement) => m?.reps ?? m?.calories ?? m?.distance ?? m?.time ?? 0;
+    // Each pass in the coach's own notation: a range stays "20-25" (its midpoint only feeds
+    // totals), a hold reads "25s".
+    const passText = (m: ParsedMovement): string => (
+      isHold(m) ? formatHoldDuration(m.time ?? 0)
+        : m.reps != null ? (readRepsDisplay(m) ?? `${m.reps}`)
+        : `${qtyOf(m)}`
+    );
     // Saved tiers contain final logged quantities; no conversion belongs in the poster.
     const seq = perRound.map(qtyOf);
-    const allSame = seq.every((v) => v === seq[0]);
+    const texts = perRound.map(passText);
+    const allSame = texts.every((text) => text === texts[0]);
     const suffix = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
     // A movement the board leaves OPEN has no scheme to print — its emptiness IS the
     // prescription ("max V-ups in the time remaining"), and its total is the athlete's own count,
     // never a sum of prescribed reps. Printed as a blank row with no number before this.
     const isOpen = statesMaxEffort(m0);
     const schemeStr = isOpen ? 'Max'
-      : seq.every(value => value > 0) ? (allSame ? `${seq[0]}${suffix}` : `${seq.join('-')}${suffix}`)
+      : seq.every(value => value > 0) ? (allSame ? `${texts[0]}${suffix}` : `${texts.join('-')}${suffix}`)
       : '';
     const bd = breakdown.find((b) => b.name.toLowerCase() === m0.name.toLowerCase());
     // The SAVED total — the single truth the recap and EP read — in the unit the row counts. Never
@@ -1899,6 +1911,7 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     // An open (max) movement is the athlete's own count, and lands here the same way.
     const total = isCal(m0) ? (bd?.totalCalories ?? 0)
       : isDist(m0) ? (bd?.totalDistance ?? 0)
+      : isHold(m0) ? (bd?.totalTime ?? 0)
       : isOpen ? (bd?.totalReps ?? bd?.totalCalories ?? bd?.totalDistance ?? 0)
       : (bd?.totalReps ?? 0);
     // Load tag = the athlete's LOGGED weight when one exists (breakdown = movementWeights truth),
@@ -1916,9 +1929,12 @@ function buildPerMovementLadderRows(exercise: Exercise, breakdown: MovementTotal
     const totalUnitLabel = isCal(m0) ? ' cal' : isDist(m0) ? 'm' : '';
     return {
       primary: schemeStr,
-      name: formatRepMovementNameForPoster(m0.name, Math.max(...seq)),
+      // A hold is held, not counted — "Front Raise Hold", never "Front Raise Holds".
+      name: formatRepMovementNameForPoster(m0.name, isHold(m0) ? undefined : Math.max(...seq)),
       ...(hasWeight ? { subNote: implementCount > 1 ? `${implementCount}×${perImplementW}${unit}` : `${perImplementW}${unit}` } : {}),
-      totalNote: total > 0 ? `${total}${totalUnitLabel} total` : undefined,
+      totalNote: total > 0
+        ? (isHold(m0) ? `${formatHoldDuration(total)} total` : `${total}${totalUnitLabel} total`)
+        : undefined,
       mineKey: m0.name,
       substitutedFrom: substitutedFromName(bd, m0.alternative),
       accent: hasWeight ? 'yellow' : (bd?.color ?? 'magenta'),
@@ -3084,6 +3100,13 @@ export function buildPageArtifactSections(
   // Jerk"). Its story is one row per block, so both the header and the rows below take a
   // different shape from a single-block lift.
   const isStrengthBlocks = isStrength && !hasStations && hasSequentialBlocks(exercise);
+  // SAY THE ROUND ONCE, for every piece that is one round template — however the parse spelled the
+  // passes (a section each, or written out end to end). "4 sets: 5-4-3-2 Strict C2B / 25s hold /
+  // 20-25 pike leg raise" is three board lines; printed pass by pass it was twelve. The for-time
+  // and interval shapes are claimed by their own branches above; this is everyone else.
+  const templateTiers = !hasStations && !splitInfo && !isStrengthBlocks && !hasBlockScoredSections(exercise)
+    ? roundTemplateTiers(exercise)
+    : null;
 
   let blueprint: string | undefined;
   if (hasStations) {
@@ -3168,6 +3191,7 @@ export function buildPageArtifactSections(
       const loggedSets = exercise.sets?.filter((set) => set.completed).length || exercise.sets?.length;
       const endsOnMaxSet = exercise.sets?.some((set) => set.isMax) ?? false;
       const setCount = (isStrengthBlocks ? sequentialBlockSetCount(exercise) : 0)
+        || (templateTiers?.length ?? 0)
         || (endsOnMaxSet ? loggedSets : 0)
         || repeatCount
         || loggedSets
@@ -3405,6 +3429,8 @@ export function buildPageArtifactSections(
     && hasIntraRoundRepeat(prescribedMovements);
   const rows = isStrengthBlocks
     ? buildStrengthBlockRows(exercise, movements)
+    : templateTiers
+    ? buildPerMovementLadderRows(exercise, movements, templateTiers)
     : isFlatOccurrenceList
     ? buildSequentialMovementRows(prescribedMovements, movements, {
         maxSet: exercise.sets?.find((set) => set.isMax),

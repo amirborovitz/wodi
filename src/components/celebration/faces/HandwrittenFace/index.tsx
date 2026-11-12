@@ -9,6 +9,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, animate as fmAnimate } from 'framer-motion';
 import type { CelebrationFaceProps } from '../types';
+import { usePosterPrint } from '../../../replay/usePosterPrint';
 import type { VibeKey } from './brand';
 import { VIBE, VIBE_KEYS } from './brand';
 import { buildPosterWod, buildPosterWodPages } from './posterData';
@@ -199,7 +200,18 @@ export function HandwrittenFace({
       {replay.replaying && replay.script && <MoveReplay key="replay" script={replay.script} onDone={replay.finish} />}
     </AnimatePresence>
   );
-  const posterLayerClass = `${styles.stickerLayer} ${replay.replaying ? styles.stickerLayerReplaying : ''}`;
+  // Just logged: after the replay, the poster comes out of a slot like a print.
+  const print = usePosterPrint(performOnOpen, replay.replaying);
+  const posterLayerClass = [
+    styles.stickerLayer,
+    replay.replaying ? styles.stickerLayerReplaying : '',
+    print.printing ? styles.stickerLayerPrinting : '',
+  ].filter(Boolean).join(' ');
+  const printSlot = print.printing ? <div className={styles.printSlot} aria-hidden="true" /> : null;
+  // Only the poster's own print counts — a stamp or sticker animating inside it bubbles here too.
+  const printEnded = (e: React.AnimationEvent<HTMLDivElement>): void => {
+    if (e.target === e.currentTarget) print.done();
+  };
 
   // Slide that holds the PR's part — pages are already in deck order, so it's the page index.
   const prSlideIndex = isCarousel ? data.prCelebration?.pageIndex ?? null : null;
@@ -768,7 +780,12 @@ export function HandwrittenFace({
                     transform: i === carouselPage ? `scale(${carouselScale})` : undefined,
                   }}
                 >
-                  <div ref={i === carouselPage ? shareCardRef : undefined} className={i === carouselPage ? posterLayerClass : styles.stickerLayer}>
+                  {i === carouselPage && printSlot}
+                  <div
+                    ref={i === carouselPage ? shareCardRef : undefined}
+                    className={i === carouselPage ? posterLayerClass : styles.stickerLayer}
+                    onAnimationEnd={i === carouselPage ? printEnded : undefined}
+                  >
                     <PosterDateContext.Provider value={i === carouselPage ? posterDate.editor : null}>
                       <Skin
                         wod={pageWod}
@@ -854,10 +871,12 @@ export function HandwrittenFace({
           ].filter(Boolean).join(' ')}
           style={{ transform: `scale(${cardScale})` }}
         >
+          {printSlot}
           {/* Only the poster itself flips the style — not the empty space around it. */}
           <div
             ref={shareCardRef}
             className={posterLayerClass}
+            onAnimationEnd={printEnded}
             onClick={(e) => stepSkinFromTap(e.clientX, e.currentTarget)}
             role="button"
             aria-label="Tap left for previous style, right for next style"

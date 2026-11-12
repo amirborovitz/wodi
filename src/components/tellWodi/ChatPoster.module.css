@@ -1,17 +1,22 @@
-/* The poster just logged, under Wodi's cheer: big enough to read, one Share under it. Share is
-   white, not yellow — the camera below is the composer's one yellow action. */
+/* The poster just logged, full width in Wodi's bubble under the cheer ("wodi Poster Reveal Flow",
+   step 3): Wodi's bubble shape, the poster inside it, Share in yellow right on it — the one win
+   action on this card. */
 .wrap {
+  align-self: flex-start;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
-  width: min(240px, 70%);
+  gap: 10px;
+  width: 82%;
   margin-top: var(--sp-2);
+  padding: 10px;
+  border-radius: 22px 22px 22px 6px;
+  background: var(--wodi-card2);
 }
 
 /* The poster's own box — the replay plays exactly over it, then hands back to it. */
 .posterBox {
   position: relative;
-  --replay-radius: 10px;
+  --replay-radius: var(--r-lg);
 }
 
 .poster {
@@ -19,7 +24,7 @@
   width: 100%;
   padding: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   background: none;
   /* The <button> UA sheet overrides inherited typography; skins style themselves from the page. */
@@ -44,7 +49,7 @@
   padding: 0;
   border: 1px solid var(--wodi-line2);
   border-radius: var(--r-pill);
-  background: var(--wodi-card);
+  background: none;
   color: var(--wodi-white);
   cursor: pointer;
   touch-action: manipulation;
@@ -68,12 +73,12 @@
   flex: 1;
   height: 44px;
   border: none;
-  border-radius: var(--r-pill);
-  background: var(--wodi-white);
-  color: #0c0d0f;
+  border-radius: 14px;
+  background: var(--wodi-yellow);
+  color: var(--wodi-bg);
   font-family: 'Barlow', sans-serif;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -82,25 +87,38 @@
   transform: scale(0.98);
 }
 
-/* The session's other parts — they open with the poster, as its deck. */
-.more {
+/* Edit: the poster screen, where its style and felt change. */
+.edit {
   flex: 0 0 auto;
   height: 44px;
   padding: 0 16px;
   border: 1px solid var(--wodi-line2);
-  border-radius: var(--r-pill);
-  background: var(--wodi-card);
+  border-radius: 14px;
+  background: none;
   color: var(--wodi-white);
   font-family: 'Barlow', sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  white-space: nowrap;
   cursor: pointer;
   touch-action: manipulation;
 }
 
-.more:active {
+.edit:active {
   transform: scale(0.98);
+}
+
+/* The session's other parts — a quiet link; they open with the poster, as its deck. */
+.more {
+  align-self: flex-start;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: var(--wodi-dim);
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 /* The full-size copy the shared image is drawn from — laid out, never seen. */

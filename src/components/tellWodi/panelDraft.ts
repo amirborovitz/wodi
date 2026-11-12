@@ -1,5 +1,6 @@
 import { suggestPeak } from '../../utils/peakSuggestion';
 import { panelAnswer, panelFieldKey, type ChatChip, type ChatPanel, type ChatPanelField, type ChatPanelGroup, type SlotAnswer } from './chatQuestions';
+import type { LoadUnit } from '../../utils/loadUnits';
 
 /**
  * What's entered on a chat card until it's sent — plain data, changed only by the pure steps
@@ -15,6 +16,8 @@ export interface PanelDraftState {
   picked: Readonly<Record<string, string>>;
   /** The peak was set by hand (or started on last time): the start stops suggesting it. */
   peakTouched: boolean;
+  /** kg or lb switched on the pad, by slot — the box's own unit until tapped. */
+  units: Readonly<Record<string, LoadUnit>>;
 }
 
 export type PanelReply = { label: string; answers: SlotAnswer[] };
@@ -34,6 +37,7 @@ export function initialDraft(panel: ChatPanel): PanelDraftState {
     unloaded: new Set(panel.groups.filter((g) => g.noLoad?.start).map(slotOf)),
     picked: {},
     peakTouched: panel.groups.some((g) => Object.keys(g.start).length > 0),
+    units: {},
   };
 }
 
@@ -98,13 +102,33 @@ export function withNoLoad(state: PanelDraftState, group: ChatPanelGroup): Panel
   return { ...emptied, unloaded: new Set([...emptied.unloaded, slotOf(group)]) };
 }
 
+/** kg or lb switched on the pad: the number stays as typed — it's the unit they lifted in. */
+export function withUnit(state: PanelDraftState, group: ChatPanelGroup, unit: LoadUnit): PanelDraftState {
+  return { ...state, units: { ...state.units, [slotOf(group)]: unit } };
+}
+
+/** A weight box's unit as it reads now: switched on the pad, else the box's own. */
+export function unitOf(state: PanelDraftState, group: ChatPanelGroup, field: ChatPanelField): string {
+  const isWeight = field.field === 'weight' || field.field === 'weightEnd';
+  return (isWeight ? state.units[slotOf(group)] : undefined) ?? field.unit;
+}
+
+/**
+ * The chips around a weight ("35 · 37.5 · 40 LAST · 42.5 · 45"): two steps either side of where the
+ * box started (last time, else the board's Rx), so a nearby weight is one tap. Never below zero.
+ */
+export function weightLadder(center: number, step: number): number[] {
+  const round = (n: number): number => Math.round(n * 100) / 100;
+  return [-2, -1, 0, 1, 2].map((k) => round(center + k * step)).filter((n) => n > 0);
+}
+
 export function withPick(state: PanelDraftState, group: ChatPanelGroup, option: string): PanelDraftState {
   return group.choice ? { ...state, picked: { ...state.picked, [group.choice.slotId]: option } } : state;
 }
 
 /** The card as an answer: the words of the athlete's reply, and what it fills in. */
 export function replyOf(panel: ChatPanel, state: PanelDraftState): PanelReply {
-  return panelAnswer(panel, state.values, state.unloaded, state.picked);
+  return panelAnswer(panel, state.values, state.unloaded, state.picked, state.units);
 }
 
 /** Has this group an answer — a number in any box, or "No weight"? */

@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { PanelDock } from './usePanelDock';
+import type { DockWeight, PanelDock } from './usePanelDock';
+import { useHoldStep } from './useHoldStep';
 import styles from './AnswerDock.module.css';
 
 interface AnswerDockProps {
@@ -10,6 +11,45 @@ interface AnswerDockProps {
 }
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
+
+/** −/+ : a tap is one step, a hold is two (useHoldStep — scroll-safe). */
+function StepButton({ weight, direction, disabled, className }: { weight: DockWeight; direction: 1 | -1; disabled: boolean; className: string }) {
+  const handlers = useHoldStep(direction > 0 ? weight.plus : weight.minus, () => weight.jump(direction));
+  return (
+    <motion.button
+      type="button"
+      className={className}
+      whileTap={{ scale: 0.9 }}
+      disabled={disabled}
+      aria-label={`${direction > 0 ? 'More' : 'Less'} ${weight.label}`}
+      {...handlers}
+    >
+      {direction > 0 ? '+' : '−'}
+    </motion.button>
+  );
+}
+
+/** kg | lb beside the weight: the unit they lifted in. */
+function UnitSwitch({ dock, disabled }: { dock: PanelDock; disabled: boolean }) {
+  const units = dock.unitSwitch;
+  if (!units) return null;
+  return (
+    <div className={styles.units} role="group" aria-label="Unit">
+      {units.options.map((unit) => (
+        <button
+          key={unit}
+          type="button"
+          className={`${styles.unitOption} ${unit === units.on ? styles.unitOn : ''}`}
+          aria-pressed={unit === units.on}
+          disabled={disabled}
+          onClick={() => units.pick(unit)}
+        >
+          {unit}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /**
  * The bottom of the chat while a card is open, in the keyboard's place, under the message box
@@ -76,28 +116,41 @@ export function AnswerDock({ dock, disabled, secondary }: AnswerDockProps) {
               </button>
             ))}
           </div>
+        ) : dock.pair && dock.pair.length > 1 && dock.unitSwitch ? (
+          <UnitSwitch dock={dock} disabled={disabled} />
         ) : (
           <span className={styles.position}>{dock.position}</span>
         )}
       </div>
 
-      {dock.pair ? (
-        // One lift, start → peak: both weights side by side, the pad typing into the one tapped.
+      {dock.pair?.length === 1 ? (
+        // One weight ("wodi weights", design C): −/+ beside the number, kg | lb beside it.
+        <div className={styles.single} aria-live="polite">
+          <StepButton weight={dock.pair[0]} direction={-1} disabled={disabled} className={styles.stepRound} />
+          <div className={styles.singleValue}>
+            <span className={dock.pair[0].display ? styles.singleNumber : styles.singleEmpty}>{dock.pair[0].display || dock.placeholder}</span>
+            <span className={styles.caret} aria-hidden="true" />
+            {dock.unitSwitch ? <UnitSwitch dock={dock} disabled={disabled} /> : <span className={styles.unit}>{dock.pair[0].unit}</span>}
+          </div>
+          <StepButton weight={dock.pair[0]} direction={1} disabled={disabled} className={styles.stepRound} />
+        </div>
+      ) : dock.pair ? (
+        // One answer, its boxes side by side (start → peak, reps @ weight), the pad typing into the one tapped.
         <div className={styles.pair} aria-live="polite">
           {dock.pair.map((weight, index) => (
             <Fragment key={weight.label}>
-              {index > 0 && <span className={styles.pairArrow} aria-hidden="true">→</span>}
+              {index > 0 && <span className={styles.pairArrow} aria-hidden="true">{dock.pairJoiner}</span>}
               <div className={`${styles.weight} ${weight.active ? styles.weightOn : ''}`}>
                 <button type="button" className={styles.weightPick} onClick={weight.select} disabled={disabled} aria-pressed={weight.active}>
                   <span className={styles.weightLabel}>{weight.label}</span>
                   <span className={weight.display ? styles.weightNumber : styles.weightEmpty}>
                     {weight.display || dock.placeholder}
-                    {dock.unit && <span className={styles.weightUnit}>{dock.unit}</span>}
+                    {weight.unit && <span className={styles.weightUnit}>{weight.unit}</span>}
                   </span>
                 </button>
                 <div className={styles.weightSteps}>
-                  <motion.button type="button" className={styles.step} whileTap={{ scale: 0.9 }} disabled={disabled} onClick={weight.minus} aria-label={`Lighter ${weight.label}`}>−</motion.button>
-                  <motion.button type="button" className={styles.step} whileTap={{ scale: 0.9 }} disabled={disabled} onClick={weight.plus} aria-label={`Heavier ${weight.label}`}>+</motion.button>
+                  <StepButton weight={weight} direction={-1} disabled={disabled} className={styles.step} />
+                  <StepButton weight={weight} direction={1} disabled={disabled} className={styles.step} />
                 </div>
               </div>
             </Fragment>
@@ -119,6 +172,20 @@ export function AnswerDock({ dock, disabled, secondary }: AnswerDockProps) {
       )}
 
       <div className={styles.chips}>
+        {dock.ladder.map((rung) => (
+          <motion.button
+            key={`ladder-${rung.label}`}
+            type="button"
+            className={`${styles.chip} ${styles.rung} ${rung.on ? styles.chipOn : ''}`}
+            aria-pressed={rung.on}
+            disabled={disabled}
+            whileTap={{ scale: 0.94 }}
+            onClick={rung.tap}
+          >
+            {rung.label}
+            {rung.last && <span className={styles.rungLast}>last</span>}
+          </motion.button>
+        ))}
         {dock.chips.map((chip) => (
           <motion.button
             key={chip.label}
@@ -135,7 +202,6 @@ export function AnswerDock({ dock, disabled, secondary }: AnswerDockProps) {
         {secondary && (
           <button type="button" className={styles.secondary} disabled={disabled} onClick={secondary.onClick}>{secondary.label}</button>
         )}
-        <button type="button" className={styles.skip} disabled={disabled} onClick={dock.skip}>Skip</button>
       </div>
 
       <div className={styles.pad}>
@@ -165,6 +231,9 @@ export function AnswerDock({ dock, disabled, secondary }: AnswerDockProps) {
         </motion.button>
         <motion.button type="button" className={styles.next} whileTap={{ scale: 0.95 }} disabled={disabled} onClick={dock.next}>
           {dock.nextLabel}
+        </motion.button>
+        <motion.button type="button" className={`${styles.key} ${styles.keyQuiet} ${styles.keySkip}`} whileTap={{ scale: 0.92 }} disabled={disabled} onClick={dock.skip}>
+          Skip
         </motion.button>
       </div>
     </motion.section>

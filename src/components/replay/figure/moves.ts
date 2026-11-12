@@ -15,13 +15,18 @@ import { isRowErgName, namesAPair } from '../../../utils/movementNameMatch';
 import {
   BONES, STAGE, add, angleOf, keyframes, lerpRecord, plant, reachArm, reachLeg, skeleton, vec,
 } from './skeleton';
-import type { Angles, Point, Pose } from './skeleton';
+import type { Angles, Bend, Point, Pose } from './skeleton';
 
 export type MoveId =
   | 'thruster' | 'squat' | 'frontSquat' | 'backSquat' | 'overheadSquat' | 'gobletSquat' | 'wallBall' | 'deadlift' | 'clean' | 'snatch' | 'jerk' | 'swing'
-  | 'kbSnatch' | 'dbSnatch'
+  | 'kbSnatch' | 'dbSnatch' | 'devilPress' | 'manMaker' | 'turkishGetUp'
+  | 'benchPress' | 'floorPress' | 'bentOverRow' | 'renegadeRow' | 'curl' | 'hamstringCurl' | 'hipThrust' | 'gluteBridge'
+  | 'farmerCarry' | 'rackCarry' | 'overheadCarry' | 'yokeCarry'
+  | 'stepUp' | 'pistol' | 'cossackSquat' | 'bandPull' | 'jeffersonCurl'
   | 'pullUp' | 'toesToBar' | 'pushUp' | 'burpee' | 'boxJump' | 'jumpRope' | 'lunge' | 'sitUp'
-  | 'run' | 'row' | 'bike' | 'ski'
+  | 'dip' | 'ringRow' | 'ropeClimb' | 'handstandPushUp' | 'handstandWalk' | 'wallWalk'
+  | 'plank' | 'hollowHold' | 'hollowRock' | 'vUp' | 'legRaise' | 'flutterKick' | 'russianTwist' | 'bicycleCrunch'
+  | 'run' | 'row' | 'bike' | 'ski' | 'swim'
   | 'work' | 'idle' | 'celebrate';
 
 /** The kit a movement is done with. Only what the current movement uses is drawn. */
@@ -37,6 +42,18 @@ export interface Props {
   skiErg?: true;
   /** How far the floor has slid under a runner, for the passing floor marks. */
   floorScroll?: number;
+  /** A flat bench, its top at this height. */
+  bench?: number;
+  /** Parallel bars, held at this height. */
+  dipBars?: number;
+  /** A wall standing at this x. */
+  wall?: number;
+  /** Rings hanging from above, the hands on them here. */
+  rings?: Point;
+  /** A climbing rope hanging at this x. */
+  climbRope?: number;
+  /** The water's surface, and how far its ripples have moved. */
+  water?: { y: number; phase: number };
 }
 
 export interface Frame { pose: Pose; props: Props }
@@ -501,6 +518,524 @@ const ski: Move = {
   ], { skiErg: true }, 130),
 };
 
+// ── placed by its hands and feet ───────────────────────────────────────────
+
+/**
+ * A body placed by its hip, its lean and the points its hands and feet are on; the limbs are
+ * solved onto those points. For the movements whose contacts ARE the movement — a press off a
+ * bench, a dip between bars, a row under rings — so the hands stay on the bar while the body moves.
+ */
+interface Rig {
+  hx: number; hy: number; torso: number;
+  hFx: number; hFy: number; hBx: number; hBy: number;
+  fFx: number; fFy: number; fBx: number; fBy: number;
+}
+
+interface Bends { arms: Bend; legs: Bend }
+
+function solveRig(r: Rig, bends: Bends): Pose {
+  const hip: Point = [r.hx, r.hy];
+  const shoulder = add(hip, vec(r.torso, BONES.torso));
+  const [uaF, faF] = reachArm(shoulder, [r.hFx, r.hFy], bends.arms);
+  const [uaB, faB] = reachArm(shoulder, [r.hBx, r.hBy], bends.arms);
+  const [thF, shF] = reachLeg(hip, [r.fFx, r.fFy], bends.legs);
+  const [thB, shB] = reachLeg(hip, [r.fBx, r.fBy], bends.legs);
+  return {
+    hipX: r.hx, hipY: r.hy, torso: r.torso,
+    uaF: signed(uaF), faF: signed(faF), uaB: signed(uaB), faB: signed(faB),
+    thF: signed(thF), shF: signed(shF), thB: signed(thB), shB: signed(shB),
+  };
+}
+
+/** A rig from points: hip, lean, near and far hand, near and far foot. */
+const rig = (hip: Point, torso: number, hF: Point, hB: Point, fF: Point, fB: Point): Rig => ({
+  hx: hip[0], hy: hip[1], torso, hFx: hF[0], hFy: hF[1], hBx: hB[0], hBy: hB[1], fFx: fF[0], fFy: fF[1], fBx: fB[0], fBy: fB[1],
+});
+
+const rigged = (list: readonly (readonly [number, Rig])[], bends: Bends, props: Props = {}) =>
+  (u: number): Frame => ({ pose: solveRig(keyframes(list, u, lerpRecord<Rig>), bends), props });
+
+/** Where the near hand sits when its arm is solved onto `target` from the pose's own shoulder. */
+function armTo(p: Pose, side: 'F' | 'B', target: Point, bend: Bend): Pose {
+  const [ua, fa] = reachArm(skeleton(p).shoulder, target, bend);
+  return side === 'F' ? { ...p, uaF: signed(ua), faF: signed(fa) } : { ...p, uaB: signed(ua), faB: signed(fa) };
+}
+
+const posed = (list: readonly (readonly [number, Pose])[], props: Props = {}) =>
+  (u: number): Frame => ({ pose: keyframes(list, u, lerpRecord<Pose>), props });
+
+// ── on a bench, between bars, under rings ──────────────────────────────────
+
+const BENCH_TOP = G - 42;
+
+/** Lying on the bench (or the floor), feet planted, the bar pressed from the chest to lockout. */
+function lyingPress(back: number, bench?: number): Move {
+  const hip: Point = [128, back];
+  const shoulderX = hip[0] + BONES.torso;
+  const feet = (x: number): [Point, Point] => [[x, G], [x + 4, G]];
+  const [fF, fB] = feet(bench != null ? 96 : 108);
+  const top = rig(hip, 90, [shoulderX, back - 56], [shoulderX - 3, back - 56], fF, fB);
+  const low: Rig = { ...top, hFy: back - 12, hBy: back - 12 };
+  return {
+    cycle: 1.5,
+    grip: 'each',
+    frame: rigged([[0, top], [0.45, low], [0.55, low], [1, top]], { arms: 'down', legs: 'up' }, { held: true, ...(bench != null ? { bench } : {}) }),
+  };
+}
+
+const benchPress = lyingPress(BENCH_TOP - 8, BENCH_TOP);
+const floorPress = lyingPress(G - 9);
+
+/**
+ * Shoulders on the bench, feet on the floor, the hips driven up until the body is a table. The
+ * shoulders stay put, so the hip swings round them; the hands hold the load on the hips.
+ */
+function bridge(shoulder: Point, foot: number, low: number, high: number, bench?: number): Move {
+  const at = (a: number): Rig => {
+    const hip = add(shoulder, vec(a + 180, BONES.torso));
+    return rig(hip, a, [hip[0] + 4, hip[1] - 10], [hip[0] + 1, hip[1] - 10], [foot, G], [foot + 4, G]);
+  };
+  return {
+    cycle: 1.6,
+    frame: rigged([[0, at(low)], [0.45, at(high)], [0.6, at(high)], [1, at(low)]], { arms: 'down', legs: 'up' }, { held: true, ...(bench != null ? { bench } : {}) }),
+  };
+}
+
+const hipThrust = bridge([196, BENCH_TOP - 6], 100, 130, 90, BENCH_TOP);
+const gluteBridge = bridge([196, G - 9], 112, 90, 68);
+
+const DIP_BARS = 128;
+const dip: Move = {
+  cycle: 1.4,
+  frame: rigged([
+    [0, rig([152, 134], 176, [162, DIP_BARS], [159, DIP_BARS], [134, 194], [130, 196])],
+    [0.45, rig([139, 158], 160, [162, DIP_BARS], [159, DIP_BARS], [120, 216], [116, 216])],
+    [0.55, rig([139, 158], 160, [162, DIP_BARS], [159, DIP_BARS], [120, 216], [116, 216])],
+    [1, rig([152, 134], 176, [162, DIP_BARS], [159, DIP_BARS], [134, 194], [130, 196])],
+  ], { arms: 'back', legs: 'forward' }, { dipBars: DIP_BARS }),
+};
+
+/** Heels on the floor, body straight, hanging from the rings — then the chest pulled up to them. */
+const RINGS: Point = [200, 120];
+const ringRow: Move = {
+  cycle: 1.5,
+  frame: rigged([
+    [0, rig([164, 193], 110, RINGS, [RINGS[0] - 3, RINGS[1] + 1], [90, 219], [93, 219])],
+    [0.45, rig([157, 178], 122, RINGS, [RINGS[0] - 3, RINGS[1] + 1], [90, 219], [93, 219])],
+    [0.58, rig([157, 178], 122, RINGS, [RINGS[0] - 3, RINGS[1] + 1], [90, 219], [93, 219])],
+    [1, rig([164, 193], 110, RINGS, [RINGS[0] - 3, RINGS[1] + 1], [90, 219], [93, 219])],
+  ], { arms: 'down', legs: 'forward' }, { rings: RINGS }),
+};
+
+/** Feet clamped on the rope, stand up on them, reach higher — then slide back down for the next. */
+const ROPE_X = 172;
+const ropeClimb: Move = {
+  cycle: 2.6,
+  frame: rigged([
+    [0, rig([160, 160], 182, [ROPE_X, 46], [ROPE_X, 66], [168, 212], [170, 214])],
+    [0.3, rig([158, 156], 184, [ROPE_X, 46], [ROPE_X, 66], [168, 186], [170, 188])],
+    [0.55, rig([161, 126], 180, [ROPE_X, 46], [ROPE_X, 66], [168, 186], [170, 188])],
+    [0.75, rig([160, 122], 182, [ROPE_X, 14], [ROPE_X, 34], [168, 182], [170, 184])],
+    [1, rig([160, 160], 182, [ROPE_X, 46], [ROPE_X, 66], [168, 212], [170, 214])],
+  ], { arms: 'forward', legs: 'forward' }, { climbRope: ROPE_X }),
+};
+
+// ── upside down ────────────────────────────────────────────────────────────
+
+const HS_WALL = 230;
+const handstandPushUp: Move = {
+  cycle: 1.5,
+  frame: rigged([
+    [0, rig([214, 104], 0, [194, G], [197, G], [220, 26], [223, 28])],
+    [0.45, rig([214, 127], 0, [194, G], [197, G], [220, 49], [223, 51])],
+    [0.55, rig([214, 127], 0, [194, G], [197, G], [220, 49], [223, 51])],
+    [1, rig([214, 104], 0, [194, G], [197, G], [220, 26], [223, 28])],
+  ], { arms: 'back', legs: 'forward' }, { wall: HS_WALL }),
+};
+
+const handstandWalk: Move = {
+  cycle: 1.0,
+  frame: (u) => {
+    const p = 2 * Math.PI * u;
+    const step = (q: number): Point => [CX + 12 * Math.sin(q), G - 8 * Math.max(0, Math.cos(q))];
+    const sway = 3 * Math.sin(p);
+    return {
+      pose: solveRig(rig([CX + sway, 104], 0, step(p), step(p + Math.PI), [CX - 14 + sway, 30], [CX - 18 + sway, 34]), { arms: 'back', legs: 'forward' }),
+      props: { floorScroll: u * 40 },
+    };
+  },
+};
+
+/** Feet at the wall behind, from the top of a push-up the feet walk up and the hands walk in to it. */
+const WW_WALL = 60;
+const wallWalk: Move = {
+  cycle: 4.0,
+  frame: (() => {
+    const plankRig = rig([138, 189], 113, [197, G], [194, G], [WW_WALL + 6, G - 2], [WW_WALL + 9, G - 2]);
+    const pike = rig([112, 140], 60, [150, G], [146, G], [WW_WALL + 3, 170], [WW_WALL + 3, 176]);
+    const nose = rig([84, 102], 0, [88, G], [85, G], [WW_WALL + 6, 25], [WW_WALL + 8, 28]);
+    return rigged([[0, plankRig], [0.25, pike], [0.5, nose], [0.62, nose], [0.8, pike], [1, plankRig]], { arms: 'up', legs: 'up' }, { wall: WW_WALL });
+  })(),
+};
+
+// ── loaded walks ───────────────────────────────────────────────────────────
+
+type Arms = Pick<Angles, 'uaF' | 'faF' | 'uaB' | 'faB'>;
+const armsOf = ({ uaF, faF, uaB, faB }: Angles): Arms => ({ uaF, faF, uaB, faB });
+const SIDES: Arms = { uaF: 4, faF: 2, uaB: -4, faB: -6 };
+
+/** A walk, the load held wherever the carry puts it — the hold is the board's, never a guess. */
+function carry(hold: Arms): Move {
+  return {
+    cycle: 1.1,
+    grip: 'each',
+    frame: (u) => {
+      const p = 2 * Math.PI * u;
+      const leg = (q: number): [number, number] => {
+        const thigh = 22 * Math.sin(q);
+        return [thigh, thigh - (4 + 34 * Math.max(0, Math.cos(q)) ** 1.5)];
+      };
+      const [thF, shF] = leg(p);
+      const [thB, shB] = leg(p + Math.PI);
+      const a: Angles = { torso: 180, thF, shF, thB, shB, ...hold };
+      const s = skeleton({ ...a, hipX: 0, hipY: 0 });
+      return { pose: { ...a, hipX: CX, hipY: G - Math.max(s.footF[1], s.footB[1]) }, props: { held: true, floorScroll: u * 50 } };
+    },
+  };
+}
+
+const farmerCarry = carry(SIDES);
+const rackCarry = carry(armsOf(RACK));
+const overheadCarry = carry(armsOf(OVERHEAD));
+const yokeCarry = carry(armsOf(BACK_RACK));
+
+const stepUp: Move = {
+  cycle: 2.0,
+  grip: 'each',
+  frame: (u) => {
+    const r = keyframes<Rig>([
+      [0, rig([150, 144], 180, [0, 0], [0, 0], [153, G], [147, G])],
+      [0.14, rig([158, 144], 174, [0, 0], [0, 0], [190, 150], [149, G])],
+      [0.26, rig([168, 146], 168, [0, 0], [0, 0], [206, BOX_TOP], [150, G])],
+      [0.5, rig([205, 88], 180, [0, 0], [0, 0], [209, BOX_TOP], [203, BOX_TOP])],
+      [0.6, rig([205, 88], 180, [0, 0], [0, 0], [209, BOX_TOP], [203, BOX_TOP])],
+      [0.72, rig([196, 112], 176, [0, 0], [0, 0], [209, BOX_TOP], [180, 172])],
+      [0.82, rig([186, 146], 176, [0, 0], [0, 0], [209, BOX_TOP], [162, G])],
+      [0.9, rig([168, 146], 178, [0, 0], [0, 0], [188, 150], [155, G])],
+      [1, rig([150, 144], 180, [0, 0], [0, 0], [153, G], [147, G])],
+    ], u, lerpRecord<Rig>);
+    // The hands hang at the sides with whatever they carry; only the legs are solved.
+    return { pose: { ...solveRig(r, { arms: 'down', legs: 'forward' }), ...SIDES }, props: { box: true, held: true } };
+  },
+};
+
+// ── standing accessories ───────────────────────────────────────────────────
+
+const pistol: Move = {
+  cycle: 2.0,
+  frame: planted([
+    [0, { torso: 180, thF: 2, shF: 2, thB: 24, shB: 24, uaF: 60, faF: 70, uaB: 56, faB: 66 }],
+    [0.45, { torso: 146, thF: 98, shF: -36, thB: 86, shB: 88, uaF: 90, faF: 92, uaB: 86, faB: 88 }],
+    [0.55, { torso: 146, thF: 98, shF: -36, thB: 86, shB: 88, uaF: 90, faF: 92, uaB: 86, faB: 88 }],
+    [1, { torso: 180, thF: 2, shF: 2, thB: 24, shB: 24, uaF: 60, faF: 70, uaB: 56, faB: 66 }],
+  ]),
+};
+
+/** Low over one bent leg, the other straight out along the floor, then shifted across to the other side. */
+const cossackSquat: Move = {
+  cycle: 2.4,
+  frame: planted([
+    [0, { torso: 180, thF: 14, shF: 14, thB: -14, shB: -14, uaF: 70, faF: 80, uaB: 66, faB: 76 }],
+    [0.25, { torso: 150, thF: 96, shF: -36, thB: -70, shB: -70, uaF: 86, faF: 90, uaB: 82, faB: 86 }],
+    [0.35, { torso: 150, thF: 96, shF: -36, thB: -70, shB: -70, uaF: 86, faF: 90, uaB: 82, faB: 86 }],
+    [0.5, { torso: 180, thF: 14, shF: 14, thB: -14, shB: -14, uaF: 70, faF: 80, uaB: 66, faB: 76 }],
+    [0.75, { torso: 156, thF: 70, shF: 70, thB: 90, shB: -36, uaF: 86, faF: 90, uaB: 82, faB: 86 }],
+    [0.85, { torso: 156, thF: 70, shF: 70, thB: 90, shB: -36, uaF: 86, faF: 90, uaB: 82, faB: 86 }],
+    [1, { torso: 180, thF: 14, shF: 14, thB: -14, shB: -14, uaF: 70, faF: 80, uaB: 66, faB: 76 }],
+  ]),
+};
+
+const curl: Move = {
+  cycle: 1.4,
+  grip: 'each',
+  frame: planted([
+    [0, { ...STAND, uaF: 4, faF: 6, uaB: 0, faB: 2 }],
+    [0.45, { ...STAND, uaF: 8, faF: 158, uaB: 4, faB: 154 }],
+    [0.55, { ...STAND, uaF: 8, faF: 158, uaB: 4, faB: 154 }],
+    [1, { ...STAND, uaF: 4, faF: 6, uaB: 0, faB: 2 }],
+  ], { held: true }),
+};
+
+/** Hinged over, the load hanging from straight arms, then rowed to the hip. */
+const HINGE: Angles = { torso: 118, thF: 22, shF: -8, thB: 18, shB: -10, uaF: 2, faF: 0, uaB: -2, faB: -2 };
+const bentOverRow: Move = {
+  cycle: 1.4,
+  grip: 'each',
+  frame: planted([
+    [0, HINGE],
+    [0.42, { ...HINGE, uaF: -88, faF: -8, uaB: -92, faB: -12 }],
+    [0.56, { ...HINGE, uaF: -88, faF: -8, uaB: -92, faB: -12 }],
+    [1, HINGE],
+  ], { held: true }),
+};
+
+/** Elbows-high pull to the face against a band: the hands come back to the head. */
+const bandPull: Move = {
+  cycle: 1.5,
+  frame: (u) => {
+    const p = pose(STAND);
+    const shoulder = skeleton(p).shoulder;
+    const { reach: d } = keyframes([[0, { reach: 55 }], [0.45, { reach: 10 }], [0.6, { reach: 10 }], [1, { reach: 55 }]], u, lerpRecord<{ reach: number }>);
+    return {
+      pose: armTo(armTo(p, 'F', [shoulder[0] + d, shoulder[1] - 6], 'up'), 'B', [shoulder[0] + d - 3, shoulder[1] - 4], 'up'),
+      props: {},
+    };
+  },
+};
+
+/** Standing tall, rolled forward down to the toes with the load hanging, then stacked back up. */
+const jeffersonCurl: Move = {
+  cycle: 2.6,
+  frame: planted([
+    [0, { torso: 180, ...LEGS, uaF: 2, faF: 0, uaB: -2, faB: -2 }],
+    [0.45, { torso: 70, ...LEGS, uaF: 10, faF: 8, uaB: 8, faB: 6 }],
+    [0.6, { torso: 70, ...LEGS, uaF: 10, faF: 8, uaB: 8, faB: 6 }],
+    [1, { torso: 180, ...LEGS, uaF: 2, faF: 0, uaB: -2, faB: -2 }],
+  ], { held: true }),
+};
+
+// ── on the floor: lying, sitting, plank ────────────────────────────────────
+
+const PRONE: Pose = { hipX: 140, hipY: 213, torso: 105, uaF: 2, faF: 90, uaB: -2, faB: 88, thF: -88, shF: -90, thB: -90, shB: -92 };
+const hamstringCurl: Move = {
+  cycle: 1.5,
+  frame: posed([
+    [0, PRONE],
+    [0.45, { ...PRONE, shF: -200, shB: -202 }],
+    [0.55, { ...PRONE, shF: -200, shB: -202 }],
+    [1, PRONE],
+  ]),
+};
+
+/** On the forearms, straight from the heels to the head — a hold, so it only breathes. */
+const forearmPlank: Move = {
+  cycle: 2.4,
+  frame: (u) => {
+    const toe: Point = [80, G - 2];
+    const shoulderY = G - BONES.upperArm - 2;
+    const shoulder: Point = [toe[0] + Math.sqrt(BODY * BODY - (toe[1] - shoulderY) ** 2), shoulderY];
+    const along = (BONES.thigh + BONES.shin) / BODY;
+    const hip: Point = [toe[0] + (shoulder[0] - toe[0]) * along, toe[1] + (shoulder[1] - toe[1]) * along];
+    const leg = signed(angleOf(hip, toe));
+    const breath = Math.sin(2 * Math.PI * u) * 0.8;
+    return {
+      pose: {
+        hipX: hip[0], hipY: hip[1] + breath, torso: signed(angleOf(hip, shoulder)),
+        uaF: 0, faF: 90, uaB: -2, faB: 88,
+        thF: leg, shF: leg, thB: leg - 2, shB: leg - 2,
+      },
+      props: {},
+    };
+  },
+};
+
+const SUPINE_HIP: Point = [150, G - 10];
+const HOLLOW: Pose = { hipX: SUPINE_HIP[0], hipY: SUPINE_HIP[1], torso: 102, uaF: 102, faF: 102, uaB: 100, faB: 100, thF: -102, shF: -102, thB: -104, shB: -104 };
+
+const hollowHold: Move = {
+  cycle: 2.4,
+  frame: (u) => {
+    const shake = Math.sin(2 * Math.PI * u) * 0.8;
+    return { pose: { ...HOLLOW, torso: HOLLOW.torso + shake, thF: HOLLOW.thF - shake, shF: HOLLOW.shF - shake }, props: {} };
+  },
+};
+
+/** The hollow, rocked end to end as one rigid piece. */
+const hollowRock: Move = {
+  cycle: 1.0,
+  frame: (u) => {
+    const tilt = Math.sin(2 * Math.PI * u) * 8;
+    const lift = Math.abs(Math.sin(2 * Math.PI * u)) * 3;
+    const rocked: Pose = { ...HOLLOW, hipY: HOLLOW.hipY - lift };
+    for (const key of ['torso', 'uaF', 'faF', 'uaB', 'faB', 'thF', 'shF', 'thB', 'shB'] as const) rocked[key] = HOLLOW[key] + tilt;
+    return { pose: rocked, props: {} };
+  },
+};
+
+const FLAT: Pose = { hipX: SUPINE_HIP[0], hipY: SUPINE_HIP[1], torso: 92, uaF: 92, faF: 92, uaB: 90, faB: 90, thF: -92, shF: -92, thB: -94, shB: -94 };
+const vUp: Move = {
+  cycle: 1.6,
+  frame: posed([
+    [0, FLAT],
+    [0.45, { ...FLAT, torso: 138, uaF: 248, faF: 246, uaB: 244, faB: 242, thF: -138, shF: -138, thB: -140, shB: -140 }],
+    [0.55, { ...FLAT, torso: 138, uaF: 248, faF: 246, uaB: 244, faB: 242, thF: -138, shF: -138, thB: -140, shB: -140 }],
+    [1, FLAT],
+  ]),
+};
+
+/** Flat on the back, arms along the floor, straight legs lifted to vertical and lowered. */
+const LEGS_DOWN: Pose = { ...FLAT, torso: 90, uaF: -90, faF: -90, uaB: -88, faB: -88 };
+const legRaise: Move = {
+  cycle: 1.6,
+  frame: posed([
+    [0, LEGS_DOWN],
+    [0.45, { ...LEGS_DOWN, thF: -178, shF: -178, thB: -180, shB: -180 }],
+    [0.55, { ...LEGS_DOWN, thF: -178, shF: -178, thB: -180, shB: -180 }],
+    [1, LEGS_DOWN],
+  ]),
+};
+
+const flutterKick: Move = {
+  cycle: 0.8,
+  frame: (u) => {
+    const kick = Math.sin(2 * Math.PI * u) * 9;
+    return { pose: { ...LEGS_DOWN, torso: 96, thF: -104 + kick, shF: -104 + kick, thB: -104 - kick, shB: -104 - kick }, props: {} };
+  },
+};
+
+/** Sat back on the hips, feet up, the weight carried from one hip to the other. */
+const russianTwist: Move = {
+  cycle: 1.2,
+  frame: (u) => {
+    const swing = Math.sin(2 * Math.PI * u);
+    return {
+      pose: {
+        hipX: SUPINE_HIP[0], hipY: G - 12, torso: -152,
+        uaF: 112 + 26 * swing, faF: 70 + 26 * swing, uaB: 108 + 26 * swing, faB: 66 + 26 * swing,
+        thF: 128, shF: 62, thB: 124, shB: 58,
+      },
+      props: { held: true },
+    };
+  },
+};
+
+/** Shoulders up off the floor, the legs pedalling — each knee in while the other leg reaches long. */
+const bicycleCrunch: Move = {
+  cycle: 1.2,
+  frame: (u) => {
+    const k = (q: number): [number, number] => {
+      const tuck = (1 + Math.sin(q)) / 2;
+      return [-100 - 100 * tuck, -100 + 40 * tuck];
+    };
+    const [thF, shF] = k(2 * Math.PI * u);
+    const [thB, shB] = k(2 * Math.PI * u + Math.PI);
+    return {
+      pose: { hipX: SUPINE_HIP[0], hipY: SUPINE_HIP[1], torso: 110, uaF: 160, faF: 250, uaB: 156, faB: 246, thF, shF, thB, shB },
+      props: {},
+    };
+  },
+};
+
+/** Body flat in the water, arms turning over in a freestyle stroke while the legs flutter. */
+const WATER = 140;
+const swim: Move = {
+  cycle: 1.5,
+  frame: (u) => {
+    const a = 90 - 360 * u;
+    const kick = Math.sin(2 * Math.PI * 3 * u) * 7;
+    return {
+      pose: {
+        hipX: 112, hipY: WATER + 4, torso: 92,
+        uaF: a, faF: a + 12, uaB: a + 180, faB: a + 192,
+        thF: -90 + kick, shF: -90 + kick, thB: -90 - kick, shB: -90 - kick,
+      },
+      props: { water: { y: WATER, phase: u } },
+    };
+  },
+};
+
+// ── floor to standing, with a load ─────────────────────────────────────────
+
+/** The burpee's floor positions, reused by the movements that go to the floor and back up. */
+const [, [, CROUCH], [, PLANK_UP], [, PLANK_DOWN]] = BURPEE;
+
+/** Chest to the floor between the dumbbells, up, and the bells swung from the floor to overhead. */
+const devilPress: Move = {
+  cycle: 2.6,
+  grip: 'each',
+  frame: posed([
+    [0, pose(STAND)],
+    [0.12, CROUCH],
+    [0.24, PLANK_UP],
+    [0.34, PLANK_DOWN],
+    [0.44, PLANK_UP],
+    [0.56, CROUCH],
+    [0.64, pose(FLOOR_PULL)],
+    [0.74, pose(EXTEND)],
+    [0.84, pose(OVERHEAD)],
+    [0.9, pose(OVERHEAD)],
+    [1, pose(STAND)],
+  ], { held: true }),
+};
+
+/** A push-up, a row with each arm, then the bells cleaned and thrust overhead. */
+const manMaker: Move = {
+  cycle: 3.6,
+  grip: 'each',
+  frame: (() => {
+    const shoulder = skeleton(PLANK_UP).shoulder;
+    const rowed = (side: 'F' | 'B'): Pose => armTo(PLANK_UP, side, [shoulder[0] - 22, shoulder[1] + 20], 'up');
+    const rackBottom = pose({ ...RACK, torso: 160, thF: 84, shF: -26, thB: 80, shB: -30, uaF: 40, faF: 180, uaB: 36, faB: 176 });
+    return posed([
+      [0, pose(STAND)],
+      [0.08, CROUCH],
+      [0.16, PLANK_UP],
+      [0.22, PLANK_DOWN],
+      [0.28, PLANK_UP],
+      [0.35, rowed('F')],
+      [0.42, PLANK_UP],
+      [0.49, rowed('B')],
+      [0.56, PLANK_UP],
+      [0.63, CROUCH],
+      [0.69, pose(FLOOR_PULL)],
+      [0.75, pose(EXTEND)],
+      [0.81, pose(RACK)],
+      [0.88, rackBottom],
+      [0.95, pose(OVERHEAD)],
+      [1, pose(STAND)],
+    ], { held: true });
+  })(),
+};
+
+/** In a plank on the bells, each one rowed to the ribs in turn. */
+const renegadeRow: Move = {
+  cycle: 2.4,
+  frame: (() => {
+    const top = plank(PLANK_TOP, PUSH_TOE);
+    const shoulder = skeleton(top).shoulder;
+    const rowed = (side: 'F' | 'B'): Pose => armTo(top, side, [shoulder[0] - 22, shoulder[1] + 20], 'up');
+    return posed([[0, top], [0.22, rowed('F')], [0.44, top], [0.66, rowed('B')], [0.88, top], [1, top]], { held: true });
+  })(),
+};
+
+/**
+ * From lying with the bell pressed up, to the elbow, the hand, the hips up, the back leg swept
+ * under to a kneel, and standing — the bell straight overhead the whole way — then back down.
+ */
+const turkishGetUp: Move = {
+  cycle: 5.0,
+  frame: (() => {
+    const lying = rig([150, G - 10], -90, [0, 0], [112, G], [184, G], [216, G - 4]);
+    const elbow = rig([150, G - 10], -128, [0, 0], [96, G], [184, G], [216, G - 4]);
+    const hand = rig([150, G - 12], -150, [0, 0], [104, G], [184, G], [214, G - 2]);
+    const hips = rig([150, 176], -132, [0, 0], [108, G], [190, G], [212, G]);
+    const kneel = rig([150, 166], -180, [0, 0], [150, 180], [186, G], [104, G]);
+    const stand = rig([150, 144], -180, [0, 0], [150, 200], [153, G], [147, G]);
+    const list: readonly (readonly [number, Rig])[] = [
+      [0, lying], [0.12, elbow], [0.22, hand], [0.32, hips], [0.44, kneel], [0.54, stand], [0.62, stand],
+      [0.72, kneel], [0.82, hips], [0.88, hand], [0.94, elbow], [1, lying],
+    ];
+    return (u: number): Frame => {
+      const r = keyframes(list, u, lerpRecord<Rig>);
+      const p = solveRig(r, { arms: 'forward', legs: 'forward' });
+      // A foot behind the hip is the kneel's back leg: its knee goes down to the floor, not up.
+      const [thB, shB] = reachLeg([r.hx, r.hy], [r.fBx, r.fBy], r.fBx < r.hx ? 'down' : 'forward');
+      // The bell arm is straight up, always.
+      return { pose: { ...p, thB: signed(thB), shB: signed(shB), uaF: 180, faF: 180 }, props: { held: true } };
+    };
+  })(),
+};
+
 // ── no movement of its own ─────────────────────────────────────────────────
 
 /** A movement the library doesn't draw yet: an athlete ready to go — never a different movement. */
@@ -532,9 +1067,14 @@ const celebrate: Move = {
 
 export const MOVES: Record<MoveId, Move> = {
   thruster, squat, frontSquat, backSquat, overheadSquat, gobletSquat, wallBall, deadlift, clean, snatch, jerk, swing,
-  kbSnatch, dbSnatch,
+  kbSnatch, dbSnatch, devilPress, manMaker, turkishGetUp,
+  benchPress, floorPress, bentOverRow, renegadeRow, curl, hamstringCurl, hipThrust, gluteBridge,
+  farmerCarry, rackCarry, overheadCarry, yokeCarry,
+  stepUp, pistol, cossackSquat, bandPull, jeffersonCurl,
   pullUp, toesToBar, pushUp, burpee, boxJump, jumpRope, lunge, sitUp,
-  run, row, bike, ski,
+  dip, ringRow, ropeClimb, handstandPushUp, handstandWalk, wallWalk,
+  plank: forearmPlank, hollowHold, hollowRock, vUp, legRaise, flutterKick, russianTwist, bicycleCrunch,
+  run, row, bike, ski, swim,
   work, idle, celebrate,
 };
 
@@ -563,6 +1103,42 @@ const FAMILY_MOVES: Partial<Record<MovementFamilyId, MoveId>> = {
   row_erg: 'row',
   bike: 'bike',
   ski: 'ski',
+  swim: 'swim',
+  step_up: 'stepUp',
+  pistol: 'pistol',
+  devil_press: 'devilPress',
+  man_maker: 'manMaker',
+  turkish_get_up: 'turkishGetUp',
+  dip: 'dip',
+  ring_row: 'ringRow',
+  rope_climb: 'ropeClimb',
+  handstand_push_up: 'handstandPushUp',
+  handstand_walk: 'handstandWalk',
+  wall_walk: 'wallWalk',
+  shoulder_prehab: 'bandPull',
+};
+
+/**
+ * The family's variant decides how it is drawn, the way a squat's decides where the load sits.
+ * A variant not listed is the family's plain form; "Core" with no drill named stays the ready
+ * stance — there is no one movement to show.
+ */
+const VARIANT_MOVES: Partial<Record<MovementFamilyId, { plain: MoveId | null; variants: Record<string, MoveId> }>> = {
+  bench_press: { plain: 'benchPress', variants: { floor: 'floorPress' } },
+  strength_row: { plain: 'bentOverRow', variants: { renegade: 'renegadeRow' } },
+  curl: { plain: 'curl', variants: { 'prone hamstring': 'hamstringCurl', hamstring: 'hamstringCurl' } },
+  hip_thrust: { plain: 'hipThrust', variants: { 'glute bridge': 'gluteBridge' } },
+  carry: { plain: 'farmerCarry', variants: { 'front rack': 'rackCarry', sandbag: 'rackCarry', overhead: 'overheadCarry', yoke: 'yokeCarry' } },
+  core: {
+    plain: null,
+    variants: {
+      plank: 'plank', 'side plank': 'plank',
+      'hollow hold': 'hollowHold', 'hollow rock': 'hollowRock',
+      'v-up': 'vUp', 'leg raise': 'legRaise', 'pike leg raise': 'legRaise', 'flutter kick': 'flutterKick',
+      'russian twist': 'russianTwist', 'bicycle crunch': 'bicycleCrunch',
+      'jefferson curl': 'jeffersonCurl', 'cossack squat': 'cossackSquat',
+    },
+  },
 };
 
 /** Where a squat's load sits, from the registry's variant; a loaded squat the board doesn't place is a back squat. */
@@ -590,6 +1166,8 @@ function moveIdFor(name: string, familyId: MovementFamilyId | null, implement: M
   if (familyId === 'strength_row' && isRowErgName(name)) return 'row';
   if (familyId === 'squat') return squatFor(variant, implement);
   if (familyId === 'snatch') return snatchFor(implement);
+  const byVariant = familyId ? VARIANT_MOVES[familyId] : undefined;
+  if (byVariant) return (variant && byVariant.variants[variant.toLowerCase()]) || byVariant.plain || 'work';
   return (familyId && FAMILY_MOVES[familyId]) || 'work';
 }
 

@@ -17,9 +17,11 @@ interface ChatPosterProps {
 }
 
 /**
- * The poster just logged, big under Wodi's cheer, with Share right there — the moment you're
- * proud of is where you share. A session of several parts shows its lead poster (the WOD first —
- * orderPosterParts) and "+1 poster" — the session's other parts — which opens the whole deck; the chat never stacks posters. Right after
+ * The poster just logged, full width in Wodi's bubble under the cheer, with Share right on it — if
+ * the athlete skipped sharing on the full screen, it's still one tap away ("wodi Poster Reveal
+ * Flow", step 3). Edit opens the poster screen, where its style and felt change. A session of
+ * several parts shows its lead poster (the WOD first — orderPosterParts) and "+1 more poster" — the
+ * session's other parts — which opens the whole deck; the chat never stacks posters. Right after
  * logging the full poster screen takes over and performs the board there (useCelebrationTakeover), so
  * this card never plays by itself; Replay plays it here. Sharing is the poster screen's own
  * (usePosterShare); the image is drawn off-screen at the poster's full width so it is as sharp
@@ -71,11 +73,13 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
             <ReplayIcon />
           </button>
         )}
-        <button type="button" className={styles.share} onClick={() => setCapturing(true)}>Share</button>
-        {more > 0 && (
-          <button type="button" className={styles.more} onClick={onOpen}>+{more} {more === 1 ? 'poster' : 'posters'}</button>
-        )}
+        <button type="button" className={styles.share} onClick={() => setCapturing(true)}>Share <span aria-hidden="true">↗</span></button>
+        {/* The poster screen is where its style and felt are changed. */}
+        <button type="button" className={styles.edit} onClick={onOpen}>Edit</button>
       </div>
+      {more > 0 && (
+        <button type="button" className={styles.more} onClick={onOpen}>+{more} more {more === 1 ? 'poster' : 'posters'}</button>
+      )}
 
       {capturing && (
         <div className={styles.offscreen} aria-hidden="true">

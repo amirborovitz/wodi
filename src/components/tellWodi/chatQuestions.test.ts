@@ -311,25 +311,43 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
   } as unknown as ParsedExercise;
   const results = () => [createBlankResult(storm, 0, 'amrap', 'male', undefined, true, { blankAnswers: true })];
 
-  it('asks rounds, then extra reps, on one card — "full rounds only" is one tap', () => {
-    const rs = results();
+  // 2026-11-11: an "extra reps" box asked for one rep count across a run, sit-ups and burpees.
+  // The unfinished round is asked the way the form's checklist asks it: the moves finished.
+  it('asks full rounds, then how far into the next round — by move, never a rep count', () => {
+    let rs = results();
     const question = nextQuestion(openSlots(rs, new Set()), rs)!;
     expect(question.text).toBe('How many rounds did you get?');
     const [group] = question.panel!.groups;
-    expect(group.fields.map((f) => [f.field, f.label])).toEqual([['count', 'rounds'], ['extraReps', 'extra reps']]);
-    expect(group.fields[1].none).toBe('Full rounds only');
-    expect(group.start).toEqual({});
+    expect(group.fields.map((f) => [f.field, f.label])).toEqual([['count', 'rounds']]);
 
-    const both = panelAnswer(question.panel!, { '0.rounds:count': 8, '0.rounds:extraReps': 12 });
-    expect(both.label).toBe('8 rounds + 12 reps');
+    const rounds = panelAnswer(question.panel!, { '0.rounds:count': 8 });
+    expect(rounds.label).toBe('8 rounds');
+    const roundsSlot = openSlots(rs, new Set()).find((s) => s.id === '0.rounds')!;
+    rs = applyAnswer(rs, roundsSlot, rounds.answers[0]).results;
+    expect(rs[0].rounds).toBe(8);
+
+    const closed = new Set(['0.rounds']);
+    const partial = nextQuestion(openSlots(rs, closed), rs)!;
+    expect(partial.text).toBe('And into round 9 — how far did you get?');
+    expect(partial.chips.map((c) => c.label)).toEqual(['None of it', 'Through Run', 'Through Sit-up']);
+
+    const partialSlot = openSlots(rs, closed).find((s) => s.id === '0.partial')!;
+    const through = applyAnswer(rs, partialSlot, partial.chips[2].answers[0]);
+    expect(through.closed).toBe(true);
+    expect(through.results[0]).toMatchObject({ rounds: 8, partialMovements: ['Run', 'Sit-up'], partialReps: 18 });
+
+    const none = applyAnswer(rs, partialSlot, partial.chips[0].answers[0]);
+    expect(none.closed).toBe(true);
+    expect(none.results[0].partialMovements).toBeUndefined();
+    expect(none.results[0].partialReps).toBeUndefined();
+  });
+
+  it('a typed "8 + 12" still lands, and the next-round question is not asked again', () => {
+    let rs = results();
     const slot = openSlots(rs, new Set()).find((s) => s.id === '0.rounds')!;
-    const saved = applyAnswer(rs, slot, both.answers[0]);
-    expect(saved.closed).toBe(true);
-    expect(saved.results[0]).toMatchObject({ rounds: 8, partialReps: 12 });
-
-    const whole = panelAnswer(question.panel!, { '0.rounds:count': 8 });
-    expect(whole.label).toBe('8 rounds');
-    expect(applyAnswer(rs, slot, whole.answers[0]).results[0].partialReps).toBeFalsy();
+    rs = applyAnswer(rs, slot, readAnswerLocally(slot, '8 + 12')!).results;
+    expect(rs[0]).toMatchObject({ rounds: 8, partialReps: 12 });
+    expect(openSlots(rs, new Set(['0.rounds'])).some((s) => s.id === '0.partial' && s.asked)).toBe(false);
   });
 });
 
@@ -731,6 +749,17 @@ describe('Tell Wodi — the order it asks in', () => {
     expect(q.panel?.groups[0].last).toBe('Last · 50 kg');
     expect(q.panel?.groups[0].start).toEqual({ '1.weight.power clean:weight': 50 });
     expect(q.chips).toEqual([]);
+    // Every weight gets −/+: last time is close, so one or two taps beat typing (owner, 2026-11-08).
+    expect(q.panel?.groups[0].stepper?.step).toBeGreaterThan(0);
+  });
+
+  it('a max set steps too: reps @ weight, each with −/+', () => {
+    const maxSet = { id: '0.maxset', kind: 'maxset', exerciseIndex: 0, subject: 'Bench Press', movementNames: ['Bench Press'], equipment: 'barbell', asked: true } as const;
+    const rs = fresh();
+    const q = nextQuestion([maxSet as unknown as ReturnType<typeof openSlots>[number]], rs)!;
+    const group = q.panel!.groups.find((g) => g.title === 'Max set')!;
+    expect(group.fields.map((f) => f.field)).toEqual(['count', 'weight']);
+    expect(group.stepper?.step).toBe(2.5);
   });
 
   it('with no history, nothing is invented — the boxes and the Rx only', () => {

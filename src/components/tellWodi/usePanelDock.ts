@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { stepOnGrid } from '../../utils/stepGrid';
 import { panelFieldKey, type ChatChip, type ChatPanel, type ChatPanelField, type ChatPanelGroup } from './chatQuestions';
 import {
-  groupAnswered, initialDraft, replyOf, withChip, withField, withNoLoad, withoutGroup, withPick,
+  groupAnswered, initialDraft, replyOf, unitOf, weightLadder, withChip, withField, withNoLoad, withoutGroup, withPick, withUnit,
   type PanelDraftState, type PanelReply,
 } from './panelDraft';
+import type { LoadUnit } from '../../utils/loadUnits';
 
 /** One answer the dock asks for: a number, or a finish time read as one. */
 interface DockStep {
@@ -40,8 +41,10 @@ export interface DockChip {
 
 /** One weight of a start → peak build, beside the other. */
 export interface DockWeight {
-  /** "start", "peak". */
+  /** "start", "peak", "reps", "weight". */
   label: string;
+  /** This box's own unit ("kg", "reps") — boxes side by side can differ. */
+  unit: string;
   /** As typed or stepped; empty when there's none. */
   display: string;
   /** The one the pad types into. */
@@ -49,6 +52,17 @@ export interface DockWeight {
   select: () => void;
   minus: () => void;
   plus: () => void;
+  /** Held −/+: two steps at once ("±2.5, hold for 5"). */
+  jump: (direction: 1 | -1) => void;
+}
+
+/** A weight near where the box started, one tap to jump to it. */
+export interface DockLadderStep {
+  label: string;
+  /** Where the box started — last time's weight. */
+  last: boolean;
+  on: boolean;
+  tap: () => void;
 }
 
 export interface PanelDock {
@@ -67,10 +81,16 @@ export interface PanelDock {
   choice: { labels: string[]; on: number; pick: (index: number) => void } | null;
   chips: DockChip[];
   /**
-   * A start → peak build: its two weights side by side, each with −/+ — null on every other answer
-   * (one big number, the movement after it on the next step).
+   * A stepped answer (every weight, and the max set): its boxes side by side, each with −/+ — null
+   * on every other answer (one big number, the next on the next step).
    */
   pair: DockWeight[] | null;
+  /** What reads between the side-by-side boxes: "→" (start → peak), "@" (reps @ weight). */
+  pairJoiner: string;
+  /** The weights around last time's, for the weight being entered ("35 · 37.5 · 40 LAST · 42.5 · 45"). */
+  ladder: DockLadderStep[];
+  /** kg ↔ lb beside the weight — null when this answer has no weight. */
+  unitSwitch: { options: LoadUnit[]; on: LoadUnit; pick: (unit: LoadUnit) => void } | null;
   /** "." is a key: a weight can be 72.5. */
   decimal: boolean;
   press: (key: string) => void;
@@ -113,10 +133,11 @@ function groupValue(group: ChatPanelGroup, state: PanelDraftState): string | nul
   if (given.length === 0) return null;
   // A peak equal to the start is one weight, said once.
   const shown = given.length === 2 && given[0].v === given[1].v && given[1].f.field === 'weightEnd' ? [given[0]] : given;
-  const sameUnit = shown.every((x) => x.f.unit === shown[0].f.unit);
+  const unit = (f: ChatPanelField): string => unitOf(state, group, f);
+  const sameUnit = shown.every((x) => unit(x.f) === unit(shown[0].f));
   const numbers = sameUnit
-    ? `${shown.map((x) => x.v).join(` ${group.joiner} `)} ${shown[0].f.unit}`
-    : shown.map((x) => `${x.v} ${x.f.unit}`).join(` ${group.joiner} `);
+    ? `${shown.map((x) => x.v).join(` ${group.joiner} `)} ${unit(shown[0].f)}`
+    : shown.map((x) => `${x.v} ${unit(x.f)}`).join(` ${group.joiner} `);
   return `${group.prefix}${numbers}`;
 }
 
@@ -163,6 +184,14 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
     setActive(target);
     setEntry(null);
   };
+  /** A weight's step in the unit it reads in now — switched kg ↔ lb, the other unit's step. */
+  const weightStep = (group: ChatPanelGroup): number => {
+    const setup = group.stepper;
+    if (!setup) return 1;
+    const weightField = group.fields.find((f) => f.field === 'weight' || f.field === 'weightEnd');
+    const switched = weightField && state.units[weightField.slotId] && state.units[weightField.slotId] !== weightField.unit;
+    return switched ? setup.altStep : setup.step;
+  };
   const nextGroupStep = (): number => steps.findIndex((s) => s.groupIndex > step.groupIndex);
 
   const stepValue = (s: DockStep): number | undefined => (s.field ? state.values[panelFieldKey(s.field)] : undefined);
@@ -206,15 +235,6 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
     const firstOfGroup = step.field == null || step.field === group.fields[0];
     const fillAndMove = (next: PanelDraftState): void => go(next, nextGroupStep());
     const chipOf = (chip: ChatChip): DockChip => ({ label: chip.label, on: false, tap: () => fillAndMove(withChip(state, group, chip)) });
-    if (!firstOfGroup && step.field?.none) {
-      // A box that's usually nothing: that answer is one tap — left empty, and on.
-      const field = step.field;
-      return [{
-        label: field.none!,
-        on: false,
-        tap: () => go(withField(state, group, field.field, undefined), active + 1),
-      }];
-    }
     if (!firstOfGroup) {
       // The peak: one weight for every set is one tap.
       const startField = group.fields.find((f) => f.field === 'weight');
@@ -227,8 +247,9 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
       }];
     }
     const out: DockChip[] = [];
-    // Last time, one tap — what the card started on, put back and moved past.
-    if (group.last && Object.keys(group.start).length > 0) {
+    // Last time, one tap — what the card started on, put back and moved past. A weight with −/+ has
+    // it on its ladder instead, marked LAST.
+    if (group.last && Object.keys(group.start).length > 0 && !group.stepper) {
       out.push({
         label: group.last,
         on: false,
@@ -255,9 +276,10 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
     return out;
   })();
 
-  // A start → peak build is ONE lift: both weights side by side on one screen, each with −/+ on
-  // the grid it comes in (stepOnGrid); the pad types into the one tapped. An empty weight's + starts
-  // at the board's lightest Rx; its − does nothing. A metcon still goes movement by movement.
+  // A stepped answer is ONE screen: its boxes side by side (start → peak, reps @ weight, or one
+  // weight), each with −/+ — a weight on the grid it comes in (stepOnGrid), reps by one; the pad types
+  // into the one tapped. An empty weight's + starts at the board's lightest Rx; an empty box's − does
+  // nothing. A metcon still goes movement by movement.
   const pair = ((): DockWeight[] | null => {
     const setup = step?.group.stepper;
     if (!step || !setup) return null;
@@ -265,24 +287,55 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
       const index = steps.findIndex((s) => s.group === step.group && s.field === field);
       const here = steps[index] === step;
       const saved = state.values[panelFieldKey(field)];
-      const move = (direction: 1 | -1): void => {
+      const isWeight = field.field === 'weight' || field.field === 'weightEnd';
+      const by = isWeight ? weightStep(step.group) : 1;
+      const move = (direction: 1 | -1, times = 1): void => {
         const typed = here && entry ? Number(entry) : undefined;
         const current = typed != null && Number.isFinite(typed) && typed > 0 ? typed : saved;
         const next = current != null && current > 0
-          ? Math.max(0, stepOnGrid(current, direction, setup.step))
-          : direction > 0 ? setup.base ?? setup.step : undefined;
+          ? Math.max(0, isWeight ? stepOnGrid(current, direction, by * times) : current + direction * times)
+          : direction > 0 ? (isWeight ? setup.base ?? by : by) : undefined;
         setState(withField(state, step.group, field.field, next != null && next > 0 ? next : undefined));
         if (here) setEntry(null);
       };
       return {
         label: field.label,
+        unit: unitOf(state, step.group, field),
         display: here ? display : saved != null && saved > 0 ? String(saved) : '',
         active: here,
         select: () => { if (!here) go(state, index); },
         minus: () => move(-1),
         plus: () => move(1),
+        jump: (direction) => move(direction, 2),
       };
     });
+  })();
+
+  // The weights around where this weight started (last time, else the board's Rx): one tap jumps
+  // there and stays — Next moves on.
+  const ladder = ((): DockLadderStep[] => {
+    const field = step?.field;
+    if (!step || !field || !step.group.stepper || (field.field !== 'weight' && field.field !== 'weightEnd')) return [];
+    const last = step.group.start[panelFieldKey(field)];
+    const center = last ?? step.group.stepper.base;
+    if (center == null || center <= 0) return [];
+    const value = entry ? Number(entry) : state.values[panelFieldKey(field)];
+    return weightLadder(center, weightStep(step.group)).map((w) => ({
+      label: String(w),
+      last: last != null && w === last,
+      on: value === w,
+      tap: () => { setState(withField(state, step.group, field.field, w)); setEntry(null); },
+    }));
+  })();
+
+  // kg ↔ lb beside a weight: the unit they lifted in, the number unchanged.
+  const unitSwitch = ((): PanelDock['unitSwitch'] => {
+    const group = step?.group;
+    const weightField = group?.stepper ? group.fields.find((f) => f.field === 'weight' || f.field === 'weightEnd') : undefined;
+    if (!group || !weightField) return null;
+    const on = unitOf(state, group, weightField);
+    if (on !== 'kg' && on !== 'lb') return null;
+    return { options: ['kg', 'lb'], on, pick: (unit) => setState(withUnit(state, group, unit)) };
   })();
 
   // One tick per answer the athlete sees: a start → peak build is one, however many boxes it holds.
@@ -319,6 +372,9 @@ export function usePanelDock(panel: ChatPanel, onSubmit: (reply: PanelReply) => 
     } : null,
     chips,
     pair,
+    pairJoiner: step?.group.joiner ?? '→',
+    ladder,
+    unitSwitch,
     decimal,
     press: (key) => {
       if (!step) return;

@@ -74,6 +74,24 @@ export function createFigurePainter(root: SVGGElement): FigurePainter {
   segment(line(RIG, 6, skiErg), [210, STAGE.ground], [210, 18]);
   const cords = [line(KIT, 1.5, skiErg), line(KIT, 1.5, skiErg)];
 
+  const bench = group();
+  const benchTop = line(KIT, 6, bench);
+  const benchLegs = [line(RIG, 4, bench), line(RIG, 4, bench)];
+
+  const dipBars = group();
+  const dipRail = line(KIT, 4, dipBars);
+  const dipPosts = [line(RIG, 4, dipBars), line(RIG, 4, dipBars)];
+
+  const wall = line(RIG, 6);
+
+  const rings = group();
+  const strap = line(RIG, 2, rings);
+  const ring = make(rings, 'circle', { r: 6, 'stroke-width': 3 }, { fill: 'none', stroke: KIT });
+
+  const climbRope = line(KIT, 3);
+
+  const water = make(root, 'path', { 'stroke-width': 2, fill: 'none' }, { stroke: 'var(--wodi-dim)' });
+
   const rope = make(root, 'path', { 'stroke-width': 2, fill: 'none' }, { stroke: KIT });
   const shadow = make(root, 'ellipse', { cy: STAGE.ground + 1, rx: 26, ry: 4 }, { fill: 'var(--wodi-bg)' });
 
@@ -134,6 +152,44 @@ export function createFigurePainter(root: SVGGElement): FigurePainter {
 
     show(pullBar, !!props.pullBar);
     show(box, !!props.box);
+
+    show(bench, props.bench !== undefined);
+    if (props.bench !== undefined) {
+      const y = props.bench + 3;
+      segment(benchTop, [100, y], [224, y]);
+      segment(benchLegs[0], [112, y], [112, STAGE.ground]);
+      segment(benchLegs[1], [212, y], [212, STAGE.ground]);
+    }
+
+    show(dipBars, props.dipBars !== undefined);
+    if (props.dipBars !== undefined) {
+      const y = props.dipBars + 3;
+      segment(dipRail, [110, y], [214, y]);
+      segment(dipPosts[0], [118, y], [118, STAGE.ground]);
+      segment(dipPosts[1], [206, y], [206, STAGE.ground]);
+    }
+
+    show(wall, props.wall !== undefined);
+    if (props.wall !== undefined) segment(wall, [props.wall, STAGE.ground], [props.wall, 8]);
+
+    show(rings, !!props.rings);
+    if (props.rings) {
+      const [x, y] = props.rings;
+      segment(strap, [x, 0], [x, y - 6]);
+      set(ring, { cx: x, cy: y });
+    }
+
+    show(climbRope, props.climbRope !== undefined);
+    if (props.climbRope !== undefined) segment(climbRope, [props.climbRope, 0], [props.climbRope, STAGE.ground]);
+
+    show(water, !!props.water);
+    if (props.water) {
+      const { y, phase } = props.water;
+      const crest = (x: number): number => y + 2.5 * Math.sin((x / 22 + phase) * 2 * Math.PI);
+      let d = `M30,${crest(30)}`;
+      for (let x = 36; x <= 270; x += 6) d += ` L${x},${crest(x)}`;
+      set(water, { d });
+    }
 
     show(rope, !!props.rope);
     if (props.rope) {

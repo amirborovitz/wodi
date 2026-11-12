@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { StoryExerciseResult, MovementResult } from './types';
-import { PartialRoundChecklist, type PartialRow } from './PartialRoundChecklist';
+import type { StoryExerciseResult } from './types';
+import { PartialRoundChecklist } from './PartialRoundChecklist';
+import { buildPartialRows } from './partialRoundRows';
 import { StepperInput } from './StepperInput';
 import styles from './ScoreInputs.module.css';
 
@@ -164,36 +165,8 @@ function formatRoundsDisplay(rounds: number): string {
 // consumes (+1 effective round per checked movement); partialReps is
 // the derived rep count shown on pills and stored on the set. The pill +
 // checklist UI is the shared PartialRoundChecklist; this file just builds
-// the rows from the AMRAP's per-round movements.
-
-// Only per-round work is checkable: buy-in/cash-out sections and
-// once/per-interval/per-station movements don't repeat with the round,
-// so finishing them says nothing about progress into the next round.
-function buildPartialRows(movementResults: MovementResult[] | undefined): PartialRow[] {
-  const rows: PartialRow[] = [];
-  const seen = new Set<string>();
-  for (const mr of movementResults ?? []) {
-    if (mr.sectionType != null && mr.sectionType !== 'rounds') continue;
-    const counting = mr.movement.countingMode;
-    if (counting != null && counting !== 'per_round') continue;
-    if (seen.has(mr.movement.name)) continue;
-    seen.add(mr.movement.name);
-
-    const reps = mr.reps ?? mr.movement.reps;
-    const calories = mr.calories ?? mr.movement.calories;
-    const distance = mr.distance ?? mr.movement.distance;
-    if (reps != null && reps > 0) {
-      rows.push({ name: mr.movement.name, quantityLabel: `${reps} reps`, reps });
-    } else if (calories != null && calories > 0) {
-      rows.push({ name: mr.movement.name, quantityLabel: `${calories} cal`, reps: calories });
-    } else if (distance != null && distance > 0) {
-      rows.push({ name: mr.movement.name, quantityLabel: `${distance}m`, reps: 0 });
-    } else {
-      rows.push({ name: mr.movement.name, quantityLabel: '', reps: 0 });
-    }
-  }
-  return rows;
-}
+// the rows from the AMRAP's per-round movements (buildPartialRows, shared
+// with the chat's "how far into the next round?").
 
 function PartialRoundControl({ result, onChange }: ScoreRoundsInputProps) {
   const rows = useMemo(() => buildPartialRows(result.movementResults), [result.movementResults]);

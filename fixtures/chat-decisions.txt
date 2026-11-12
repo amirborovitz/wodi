@@ -1,9 +1,11 @@
 alternating-stations-amrap
   part 1 · 02:00 min AMRAP x 6 · score_open_reps
     asks: How many rounds did you get on B.1?
+    asks: And into round 6 — how far did you get?
     asks: How many single dumbbell alternating devil presses each round?
     asks: What weight did you use for Single Dumbbell Alternating Devil Press?
     asks: How many rounds did you get on B.2?
+    asks: And into round 6 — how far did you get?
     asks: How many sit-ups each round?
     asks: Double Under or Single Under?
 
@@ -19,6 +21,7 @@ bare-movement-station-emom
 board-amrap-cal-row-gendered
   part 1 · AMRAP 12 · score_rounds
     asks: How many rounds did you get?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for American Kettlebell Swing?
 
 board-ascending-ladder-amrap
@@ -77,6 +80,7 @@ board-five-three-one-and-metcon
   part 2 · 8 min AMRAP · score_rounds
     asks: What did you lift on the Front Squat?
     asks: How many rounds did you get on 8 min AMRAP?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Alt Dumbbell Lunge?
 
 board-fran-style-lbs
@@ -115,10 +119,12 @@ board-murph-partitioned
 board-named-benchmark-only
   part 1 · 20 min AMRAP · score_rounds
     asks: How many rounds did you get?
+    asks: And into round 6 — how far did you get?
 
 board-partner-amrap-igug
   part 1 · Partner AMRAP 20 · score_rounds
     asks: How many rounds did you get?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Power Clean?
 
 board-partner-synchro
@@ -180,8 +186,10 @@ board-two-pieces-rest-between
 board-two-scored-metcons
   part 1 · 6 min AMRAP x 2 · score_rounds
     asks: How many rounds did you get on BLOCK A?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Deadlift?
     asks: How many rounds did you get on BLOCK B?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Wall Ball?
 
 board-wendler-531-plus
@@ -217,6 +225,7 @@ multipart-emom-amrap
   part 2 · 16 min AMRAP · score_rounds
     asks: What did you lift on the Power Clean / Squat Clean?
     asks: How many rounds did you get on 16 min AMRAP?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Deadlift?
 
 pair-paced-amrap
@@ -225,6 +234,7 @@ pair-paced-amrap
   part 3 · Skill Practice · reps
     asks: What did you lift on the Front Squat?
     asks: How many rounds did you get on Pairs AMRAP 12?
+    asks: And into round 6 — how far did you get?
     asks: What weight did you use for Thruster?
 
 palindrome-partner-chipper
