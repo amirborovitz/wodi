@@ -155,7 +155,7 @@ export interface ChatOpening {
   highlight: string | null;
   /** The day it's about ("30 Jun") and the poster that day opens. */
   link: { label: string; workoutId: string } | null;
-  /** A cheer for a workout just logged: its poster, drawn big under the line with Share. */
+  /** The workout this line cheers: its poster under the line — full size only when it was just logged in this chat. */
   posterId: string | null;
 }
 

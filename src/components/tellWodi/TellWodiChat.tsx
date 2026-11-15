@@ -71,7 +71,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
     return headline?.link && workout ? { text: headline.link.label, onOpen: () => onOpenWorkout(workout) } : undefined;
   };
 
-  /** A cheer for a workout just logged carries that poster, big, with Share. */
+  /** A cheer carries its workout's poster — full size with Share only while just logged here (takeover.fullPosterId). */
   const cheeredWorkout = (headline: ChatMessage['headline']): WorkoutWithStats | undefined =>
     (headline?.posterId ? thread.workoutById(headline.posterId) : undefined);
   const takeover = useCelebrationTakeover(messages, (m) => cheeredWorkout(m.headline), onCelebrate);
@@ -167,7 +167,11 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
               {(() => {
                 const cheered = cheeredWorkout(message.headline);
                 // A poster about to take the screen isn't drawn here first — no small poster jumping to full screen.
-                return cheered && !takeover.waiting(cheered.id) ? <ChatPoster workout={cheered} onOpen={() => onOpenWorkout(cheered)} /> : null;
+                if (!cheered || takeover.waiting(cheered.id)) return null;
+                // Full size only for the workout just logged here; any other cheer carries its poster as a small card.
+                return message.id === takeover.fullPosterId
+                  ? <ChatPoster workout={cheered} onOpen={() => onOpenWorkout(cheered)} />
+                  : <Receipts ids={[cheered.id]} thread={thread} onOpenWorkout={onOpenWorkout} />;
               })()}
               {message.board && (
                 <div className={styles.board}>

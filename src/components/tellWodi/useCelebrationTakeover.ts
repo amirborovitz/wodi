@@ -16,9 +16,25 @@ export function celebrationTarget(
   return workout && !shown.has(workout.id) ? workout : undefined;
 }
 
+/**
+ * The one cheer whose poster the chat draws full size: a workout logged in this chat (`earned`),
+ * until the athlete says something after it. Every other cheer — the chat's opening line about an
+ * earlier workout, or a log they've since moved on from — shows its poster as a small card, so the
+ * chat opens where you type and a question never lands under a screen-high poster.
+ */
+export function fullPosterMessageId(messages: readonly ChatMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].from === 'me') return null;
+    if (messages[i].earned) return messages[i].id;
+  }
+  return null;
+}
+
 export interface CelebrationTakeover {
   /** This poster is about to take the screen — the chat doesn't draw it yet. */
   waiting: (workoutId: string) => boolean;
+  /** The message whose poster is drawn full size (see fullPosterMessageId); every other is a small card. */
+  fullPosterId: string | null;
 }
 
 /**
@@ -44,5 +60,5 @@ export function useCelebrationTakeover(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workout?.id]);
 
-  return { waiting: (workoutId) => workout?.id === workoutId };
+  return { waiting: (workoutId) => workout?.id === workoutId, fullPosterId: fullPosterMessageId(messages) };
 }
