@@ -269,31 +269,6 @@
 
 /* "ABC" — the box is where letters go; the pad below is for numbers. */
 
-.attachment {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 var(--sp-1) var(--sp-2);
-  padding: 6px 12px;
-  border-radius: var(--r-md);
-  background: var(--wodi-card);
-  font-size: 0.875rem;
-}
-
-.attachmentName {
-  color: var(--wodi-white);
-}
-
-.attachmentRemove {
-  min-width: 32px;
-  min-height: 32px;
-  background: none;
-  border: none;
-  color: var(--wodi-dim);
-  font-size: 1.25rem;
-  cursor: pointer;
-}
-
 .composerRow {
   display: flex;
   align-items: flex-end;

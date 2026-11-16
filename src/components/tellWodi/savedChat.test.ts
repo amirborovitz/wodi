@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chatForSavedBoard, resumeGreeting, toSavedChat, type ChatMessage } from './useTellWodiChat';
+import { buildBoardPreview } from './boardPreview';
 import type { ParsedWorkout, PlannedWorkout } from '../../types';
 
 const msg = (id: string, from: 'wodi' | 'me', text: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -30,7 +31,6 @@ describe('every saved board opens in the chat', () => {
   const board = (extra: Partial<PlannedWorkout> = {}): PlannedWorkout => ({
     id: 'b1', userId: 'u1', status: 'parsed', raw: '', createdAt: new Date(), ...extra,
   });
-  const wod = { title: 'SNATCH CLIMB' } as ParsedWorkout;
 
   it('a board saved from the standard screen opens as a chat waiting for its result', () => {
     expect(chatForSavedBoard(board())).toEqual({ messages: [], waitingForWorkout: true });
@@ -41,9 +41,37 @@ describe('every saved board opens in the chat', () => {
     expect(chatForSavedBoard(board({ chat }))).toBe(chat);
   });
 
-  it('back from the workout, Wodi asks how that board went, by name', () => {
-    expect(resumeGreeting(wod, true)).toBe("How'd SNATCH CLIMB go?");
-    expect(resumeGreeting({} as ParsedWorkout, true)).toBe("How'd it go?");
-    expect(resumeGreeting(wod, false)).toBe('Picking up where we left off.');
+  it('a reopened board is shown before anything is asked — Wodi never assumes it was done', () => {
+    expect(resumeGreeting(true)).toBe("Here's the board you saved.");
+    expect(resumeGreeting(false)).toBe('Picking up where we left off.');
+  });
+
+  it('the reopened board is shown whole — every part and every movement, nothing cut', () => {
+    const preview = buildBoardPreview({
+      title: 'SNATCH CLIMB',
+      format: 'for_time',
+      exercises: [
+        { name: 'Warm-up', prescription: '3 rounds', movements: [{ name: 'Row', calories: 10 }, { name: 'Air Squat', reps: 10 }] },
+        {
+          name: 'Metcon',
+          prescription: 'For time, 12 min cap',
+          movements: Array.from({ length: 7 }, (_, i) => ({ name: `Move ${i + 1}`, reps: 10 + i })),
+        },
+      ],
+    } as unknown as ParsedWorkout);
+    expect(preview.title).toBe('SNATCH CLIMB');
+    expect(preview.format).toBe('FOR TIME');
+    expect(preview.parts.map((p) => p.name)).toEqual(['Warm-up', 'Metcon']);
+    expect(preview.parts[1].prescription).toBe('For time, 12 min cap');
+    expect(preview.parts[1].lines).toHaveLength(7);
+    expect(preview.parts[0].lines.map((l) => `${l.qty} ${l.name}`)).toEqual(['10 cal Row', '10 Air Squat']);
+  });
+
+  it('a one-part board is named by its title alone', () => {
+    const preview = buildBoardPreview({
+      title: 'FRAN', format: 'for_time',
+      exercises: [{ name: 'Fran', prescription: '21-15-9', movements: [{ name: 'Thruster', reps: 21 }] }],
+    } as unknown as ParsedWorkout);
+    expect(preview.parts[0].name).toBeNull();
   });
 });

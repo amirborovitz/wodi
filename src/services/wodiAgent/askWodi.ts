@@ -10,6 +10,7 @@ import { findWorkouts, personalRecords, trainingTotals, type FoundWorkout, type 
 import { toIsoDate } from '../../utils/workoutDate';
 import { swapHabits } from './athleteHabits';
 import { notesForPrompt } from './athleteNotes';
+import { recentLoadLines, RECENT_DAYS } from './recentLoad';
 import type { WodiNote } from '../../types';
 
 /**
@@ -44,11 +45,20 @@ export interface UpcomingWorkout {
   sex?: string;
 }
 
+/** What Wodi knows about the athlete's body from their profile. */
+export interface AthleteBody {
+  /** Kilograms, as the profile stores it. Null = not in their profile. */
+  bodyweightKg: number | null;
+  /** How they read weights. */
+  weightUnit: 'kg' | 'lb';
+}
+
 export type AskWodiReply =
   /** `proposedNote`: something lasting they said, for the chat to OFFER to remember — never saved here. */
   /** `receipts`: ids of the workouts the answer quotes, so the chat can attach their posters. */
   /** `gap`: something they asked for that Wodi can't do yet, for the chat to record (agentGaps). */
-  | { kind: 'answer'; text: string; proposedNote: string | null; receipts: string[]; gap: string | null }
+  /** `bodyweightKg`: they told Wodi their body weight — for the chat to write to their profile. */
+  | { kind: 'answer'; text: string; proposedNote: string | null; receipts: string[]; gap: string | null; bodyweightKg: number | null }
   | { kind: 'log' }
   /** A workout Wodi wrote for them: the board in whiteboard words, and one line on why this one. */
   | { kind: 'workout'; board: string; why: string; gap: string | null };
@@ -103,6 +113,10 @@ export const TOOLS: ChatCompletionTool[] = [
   tool('propose_note', 'They told you something lasting about themselves that should shape future advice — an injury or niggle, a goal or event, the kit they have at home, how they like to train or be talked to. Propose ONE short note in the third person ("Left shoulder sore — avoiding overhead"). The athlete is asked to confirm it; it is not saved yet, so never say it is.', {
     text: { type: 'string' },
   }),
+  tool('save_body_weight', 'They told you their own current body weight — often answering your question ("70", "I\'m 154 lb"). Saves it to their profile, where all your advice reads it from. Only their body weight, said by them: never a lift, a kettlebell, or a guess.', {
+    value: { type: 'number' },
+    unit: { type: 'string', enum: ['kg', 'lb'], description: 'The unit they said; when they gave a bare number, their usual unit.' },
+  }),
   tool('log_workout', 'The athlete\'s message is a workout to log — a board, or what they did ("Fran 5:40", "did the ladder, 22 min") — not a question. Call this and nothing else.', {}),
   tool('create_workout', 'They asked you for a workout to do ("give me an open gym WOD", "20 min, dumbbells only", "something for my weak spot"). Look at their recent training first, then write ONE session the way a coach writes a whiteboard. It is shown to them as their board; they can take it or ask for another. Calling this ends your turn.', {
     board: { type: 'string', description: 'The whiteboard: a title on the first line, then each part with its clock ("AMRAP 15:", "For time, 20 min cap:", "EMOM 12:", "5x5 heavy") and its movements with reps; loads only as a standard Rx male/female pair ("22.5/15kg"). Plain lines, no markdown.' },
@@ -114,7 +128,7 @@ export const TOOLS: ChatCompletionTool[] = [
 ];
 
 /** What a game plan is made of — only when there's a workout ahead of them. */
-function upcomingSection(upcoming: UpcomingWorkout): string {
+function upcomingSection(upcoming: UpcomingWorkout, recent: readonly string[]): string {
   const sex = upcoming.sex === 'female' ? 'female' : upcoming.sex === 'male' ? 'male' : 'not specified';
   return `
 
@@ -126,15 +140,21 @@ How the app read it — trust this for the structure (the parts, the clock, the 
 ${upcoming.reading.trim() || '(not read — work from the text)'}
 Athlete: ${sex} (female = the lighter number when the board writes two).
 Their logged loads on its movements, looked up by the app: ${upcoming.loads.trim() || '(none logged)'}
+What they trained in the last ${RECENT_DAYS} days, from their log (newest first):
+${recent.length ? recent.map((line) => `- ${line}`).join('\n') : '(nothing — they come in fresh)'}
 
-Answer with a game plan for it, built from their log:
+Answer what they asked, like a coach who knows their log. Asked for a game plan (or nothing specific), give the whole plan; asked one thing ("which weight?", "how should I pace it?"), answer that thing first and fully.
 - First look up their past workouts with the same movements (find_workouts by movement — a few calls is fine). Note what they swapped (insteadOf) — that's what they'll likely do again.
-- A target for each part, in the units that part is scored in: a finish time (a range no wider than 2 minutes) for work done for time; rounds + reps for an AMRAP; for open-ended work inside a window (max reps or calories in each interval or station), a number to aim for at each station in each window ("box jumps: 12–14 every 1:15", "echo bike: 14–16 cal"). Never turn windows of open work into a round time to beat.
-- Reason each target from their own numbers on the same movement — reps or calories in a window of similar length, a time on a similar piece — and name the day you anchored on, so its poster comes with the answer. Only anchor on a piece of the same shape: a for-time result says nothing about an interval's windows.
+- The board's totals are yours to count: "6 rounds of 20 lunges" is 120 lunges. Say the totals that decide the plan — they are what make a weight heavy.
+- A weight for each loaded movement, as a coach would pick it, in three: the one to start with, one for a tired day, one for a strong day — one line per movement ("- **Goblet lunges:** 16 kg · tired 12 · strong 20"). Kettlebells and dumbbells step by the next bell or pair; a barbell by about 5–10%. Reason it from their own log — the heaviest they've used on that movement or a close one, and how many reps it was for — against this board's total reps and what else is in it. Name the day you anchored on, so its poster comes with the answer. With nothing close in their log, start from the board's Rx (and their body weight, if you know it), say plainly it's a starting point, and give the sign that it's right ("swings unbroken, lunges in no more than two sets").
+- Fatigue decides the one to start with. Read the last ${RECENT_DAYS} days above: the same body areas worked yesterday or the day before, a long session, or heavy loads on the same lifts mean they start nearer the tired weight — say so in a few words and name the day ("legs from yesterday's squats — start at 16"). Fresh, or other areas worked, and they start at the plain weight. If they said how they feel ("I'm wrecked", "feeling strong"), that outranks the log: lead with that weight.
+- The ceiling on any weight you name — the strong weight too, checked before you say it: look up their record on that lift (personal_records) and what they've used on it (find_workouts). Never at or above their record for anything but a single. For work done for reps or under a clock, stay well under it — the more total reps and the longer the piece, the further under. Never above the board's Rx unless their log shows them doing more on that movement. A barbell lift with no record and nothing logged: give no number — say to build to a weight they can move for the reps unbroken, and ask what they've done on it.
+- A target for each part, in the units that part is scored in: a finish time (a range no wider than 10 minutes, tighter when their log is close) for work done for time; rounds + reps for an AMRAP; for open-ended work inside a window (max reps or calories in each interval or station), a number to aim for at each station in each window ("box jumps: 12–14 every 1:15", "echo bike: 14–16 cal"). Never turn windows of open work into a round time to beat.
+- Reason each target from their own numbers on the same movement — reps or calories in a window of similar length, a time on a similar piece — and name the day you anchored on. Only anchor on a piece of the same shape: a for-time result says nothing about an interval's windows.
+- What they told you to remember shapes the plan: an injury is named where it matters ("with your lower back, don't go up if the swings start pulling on it").
 - Where to hold back and where to push — one line.
-- Never name a weight. The card above your answer already shows their logged loads and the board's Rx — the app's numbers. A weight from you could exceed what they can lift.
-- If nothing in their log is close enough, say so in a few words and pace it from the board alone. Never make up a past time.
-This answer may run to 8 short lines.`;
+- If nothing in their log is close enough, say so in a few words. Never make up a past time or a past weight.
+This answer may run to 12 short lines, with a "- " line per movement.`;
 }
 
 /** Writing them a workout. Only between workouts. */
@@ -156,7 +176,16 @@ ${board.trim()}
 Their message is an aside, not an answer to the logging questions. Answer it in 1–2 short lines; the logging carries on after you.`;
 }
 
-function systemPrompt(now: Date, notes: readonly WodiNote[], situation: AskSituation): string {
+/** Their body weight as their profile has it — or the one question worth asking for it. */
+function bodySection(body: AthleteBody): string {
+  if (body.bodyweightKg == null) {
+    return `Their body weight: not in their profile. When an answer would be better for it (picking a weight, sizing a target), ask for it in one short question at the end of your answer ("What do you weigh? I'll keep it for next time."). Ask at most once in a conversation. When they tell you, call save_body_weight.`;
+  }
+  const shown = body.weightUnit === 'lb' ? `${Math.round(body.bodyweightKg * 2.20462)} lb` : `${Math.round(body.bodyweightKg * 10) / 10} kg`;
+  return `Their body weight: ${shown} (their profile). They read weights in ${body.weightUnit}. If they tell you a new body weight, call save_body_weight.`;
+}
+
+function systemPrompt(now: Date, notes: readonly WodiNote[], situation: AskSituation, body: AthleteBody, recent: readonly string[]): string {
   const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' });
   return `You are Wodi, the athlete's CrossFit buddy, texting with them. Today is ${weekday} ${toIsoDate(now)}. Weeks start on Monday.
 ${situation.kind === 'between' ? `
@@ -166,7 +195,8 @@ ${CREATE_SECTION}
 What you can't do yet: set reminders, plan several days at once, change a past log, change settings, anything outside training. Asked for one of those, call note_gap, say so plainly in a few words, and offer the closest thing you can.
 
 Answer from their own training log, which you can only see through the tools:
-- Every number about THEIR training — a weight, a time, a date, a count, EP, a record — must come from a tool result. Never invent one, never estimate one, never do your own EP or volume maths; training_totals has it. Comparing two numbers the tools gave you is fine ("up 20kg since August").
+- Every number about what they HAVE done — a weight, a time, a date, a count, EP, a record — must come from a tool result. Never invent one, never estimate one, never do your own EP or volume maths on their log; training_totals has it. Comparing two numbers the tools gave you is fine ("up 20kg since August").
+- A weight or a target you recommend for what they're ABOUT to do is advice, not a fact about their log — give it, and say what it's based on.
 - Look things up before answering. If the tools come back empty, say plainly that you don't see it in their log — don't fill the gap.
 - Turn "last month", "this week", "since summer" into dates yourself.
 - Weights are per implement; "implementCount: 2" means one in each hand.
@@ -175,7 +205,9 @@ Answer from their own training log, which you can only see through the tools:
 What they've told you to remember (confirmed by them — use it, and never re-propose what's already here):
 ${notesForPrompt(notes)}
 
-How you text: warm, short, specific — like a friend at the gym who tells the truth. At most 4 short lines. Plain text, no markdown, no bullet symbols. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never generic praise ("nice work", "great job"). Never compare them with anyone else, no lectures, no safety boilerplate.${situation.kind === 'upcoming' ? upcomingSection(situation.workout) : situation.kind === 'logging' ? loggingSection(situation.board) : ''}`;
+${bodySection(body)}
+
+How you text: warm, short, specific — like a friend at the gym who tells the truth. At most 4 short lines unless told otherwise below. The chat shows two marks and nothing else: **bold** for the one or two things to take away, and a line starting "- " for a list item. No headings, no other markdown. Dates like "24 Sep". When you mention a workout, name its day ("yesterday, 3 Oct", "24 Sep") — that is how its poster gets attached to your answer. Never generic praise ("nice work", "great job"). Never compare them with anyone else, no lectures, no safety boilerplate.${situation.kind === 'upcoming' ? upcomingSection(situation.workout, recent) : situation.kind === 'logging' ? loggingSection(situation.board) : ''}`;
 }
 
 /**
@@ -255,20 +287,42 @@ function readArg(rawArgs: string, key: string): string | null {
   }
 }
 
-const defaultComplete: CompleteFn = async (messages, tools, mustAnswer) => {
-  const response = await modelClient.chat.completions.create({
-    model: PARSE_MODEL,
-    reasoning_effort: PARSE_REASONING_EFFORT,
-    temperature: 0.3,
-    max_completion_tokens: 600,
-    messages,
-    tools,
-    tool_choice: mustAnswer ? 'none' : 'auto',
-  });
-  const message = response.choices[0]?.message;
-  if (!message) throw new Error('Ask Wodi: empty response');
-  return message;
-};
+/**
+ * One model turn. A coach's call before a workout — weights against a board's totals, a target from
+ * their log — is worth thinking about, so `upcoming` reasons; everything else answers at once.
+ * With reasoning on the model takes no temperature, and its thinking counts against the output cap.
+ */
+function completeFor(situation: AskSituation): CompleteFn {
+  const thinks = situation.kind === 'upcoming';
+  return async (messages, tools, mustAnswer) => {
+    const response = await modelClient.chat.completions.create({
+      model: PARSE_MODEL,
+      ...(thinks
+        ? { reasoning_effort: 'low' as const, max_completion_tokens: 4000 }
+        : { reasoning_effort: PARSE_REASONING_EFFORT, temperature: 0.3, max_completion_tokens: 600 }),
+      messages,
+      tools,
+      tool_choice: mustAnswer ? 'none' : 'auto',
+    });
+    const message = response.choices[0]?.message;
+    if (!message) throw new Error('Ask Wodi: empty response');
+    return message;
+  };
+}
+
+/** A body weight anyone could have: anything else is a misread, and is asked again. */
+const BODYWEIGHT_KG = { min: 30, max: 250 };
+
+function readBodyweightKg(rawArgs: string): number | null {
+  try {
+    const { value, unit } = JSON.parse(rawArgs || '{}') as { value?: unknown; unit?: unknown };
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    const kg = unit === 'lb' ? value / 2.20462 : value;
+    return kg >= BODYWEIGHT_KG.min && kg <= BODYWEIGHT_KG.max ? Math.round(kg * 10) / 10 : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function askWodi(input: {
   message: string;
@@ -279,23 +333,29 @@ export async function askWodi(input: {
   notes: readonly WodiNote[];
   /** Where they are: between workouts (the default), logging a board, or heading into one. */
   situation?: AskSituation;
+  /** Their body weight from the profile. Omitted = not known. */
+  body?: AthleteBody;
   now?: Date;
   complete?: CompleteFn;
 }): Promise<AskWodiReply> {
-  const { message, recent, loadContext, notes, situation = { kind: 'between' }, now = new Date(), complete = defaultComplete } = input;
+  const { message, recent, loadContext, notes, situation = { kind: 'between' }, body = { bodyweightKg: null, weightUnit: 'kg' }, now = new Date() } = input;
+  const complete = input.complete ?? completeFor(situation);
   const tools = toolsFor(situation);
   const offered = new Set(tools.flatMap((t) => (t.type === 'function' ? [t.function.name] : [])));
+  // Before a workout, fatigue is part of the question: the last few days are read up front.
+  let ctx: TrainingContext | null = situation.kind === 'upcoming' ? await loadContext().catch(() => null) : null;
+  const recentDays = ctx ? recentLoadLines(ctx.workouts, now) : [];
   const messages: ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt(now, notes, situation) },
+    { role: 'system', content: systemPrompt(now, notes, situation, body, recentDays) },
     ...recent.map((turn): ChatCompletionMessageParam => (
       turn.from === 'wodi' ? { role: 'assistant', content: turn.text } : { role: 'user', content: turn.text }
     )),
     { role: 'user', content: message },
   ];
 
-  let ctx: TrainingContext | null = null;
   let proposedNote: string | null = null;
   let gap: string | null = null;
+  let bodyweightKg: number | null = null;
   const found: FoundWorkout[] = [];
   for (let step = 0; ; step += 1) {
     // After MAX_LOOKUPS rounds of looking things up, it answers with what it has.
@@ -304,7 +364,7 @@ export async function askWodi(input: {
     const calls = mustAnswer ? [] : (reply.tool_calls ?? []).filter((call) => call.type === 'function');
     if (calls.length === 0) {
       const text = reply.content?.trim() ?? '';
-      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found, now), gap };
+      return { kind: 'answer', text, proposedNote, receipts: receiptsFor(text, found, now), gap, bodyweightKg };
     }
     // A tool it wasn't offered is never acted on: no workout logged or written over an open board.
     if (calls.some((call) => call.function.name === 'log_workout' && offered.has('log_workout'))) return { kind: 'log' };
@@ -318,6 +378,12 @@ export async function askWodi(input: {
       if (call.function.name === 'propose_note') {
         proposedNote = readArg(call.function.arguments, 'text') ?? proposedNote;
         result = { status: 'The athlete will be asked to confirm. Not saved yet.' };
+      } else if (call.function.name === 'save_body_weight') {
+        const kg = readBodyweightKg(call.function.arguments);
+        bodyweightKg = kg ?? bodyweightKg;
+        result = kg != null
+          ? { status: 'Saved to their profile. Say so in a few words (they can change it under Me), then answer with it.' }
+          : { error: "That doesn't read as a body weight. Ask them again in a few words." };
       } else if (call.function.name === 'note_gap') {
         gap = readArg(call.function.arguments, 'request') ?? gap;
         result = { status: 'Noted. Now answer them: say plainly you can\'t do that yet, and offer the closest thing you can.' };

@@ -184,6 +184,8 @@ Set "messageIs" to what the message is:
   ("what did I squat last month?"), a request ("give me a workout for tomorrow", "remind me Friday"),
   or anything else for their buddy. Answer no questions and leave "reaction" empty: Wodi answers it
   separately.
+Their own body weight ("70", "I'm 154 lb" — usually answering Wodi's "What do you weigh?") is never
+about the workout: "before-workout" while they haven't done it yet, otherwise "for-wodi".
 
 Also set "vibe" if they said how it felt, mapping to the closest of:
 chill (easy, relaxed) · solid (good, strong) · sweaty (worked hard) · cooked (tired, spent) ·

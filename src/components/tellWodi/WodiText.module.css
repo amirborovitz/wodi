@@ -28,3 +28,32 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* An answer's lines (wodiMarkup): each its own line, a blank one a short gap, a list line hung on a dot. */
+.line {
+  display: block;
+}
+
+.gap {
+  display: block;
+  height: 0.6em;
+}
+
+.item {
+  display: block;
+  position: relative;
+  padding-left: 1em;
+  margin-top: 2px;
+}
+
+.item::before {
+  content: '•';
+  position: absolute;
+  left: 0.15em;
+  color: var(--wodi-dim);
+}
+
+.bold {
+  font-weight: 800;
+  color: var(--wodi-white);
+}

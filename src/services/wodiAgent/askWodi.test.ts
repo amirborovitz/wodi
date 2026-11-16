@@ -60,7 +60,7 @@ describe('askWodi', () => {
       said('140kg for 15 on 24 Sep.'),
     );
     const reply = await askWodi({ message: 'what did I deadlift last?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null, receipts: ['w1'], gap: null });
+    expect(reply).toEqual({ kind: 'answer', text: '140kg for 15 on 24 Sep.', proposedNote: null, receipts: ['w1'], gap: null, bodyweightKg: null });
 
     const toolResult = seen[1].messages.find((m) => m.role === 'tool');
     expect(JSON.parse(String(toolResult?.content))).toMatchObject({
@@ -85,7 +85,7 @@ describe('askWodi', () => {
     const lookup = calls({ name: 'training_totals', args: { from: null, to: null } });
     const { complete, seen } = scripted(lookup, lookup, lookup, lookup, said('You trained once.'));
     const reply = await askWodi({ message: 'how much?', recent: [], notes: [], loadContext: async () => CTX, complete });
-    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null, receipts: [], gap: null });
+    expect(reply).toEqual({ kind: 'answer', text: 'You trained once.', proposedNote: null, receipts: [], gap: null, bodyweightKg: null });
     expect(seen.map((s) => s.mustAnswer)).toEqual([false, false, false, false, true]);
   });
 
@@ -166,13 +166,60 @@ describe('askWodi', () => {
     // The structure comes from the app's reading: an interval piece was planned as a round time.
     expect(system).toContain('Part 1 · 3 RFT (wod) — 3 sets/rounds, scored by time');
     expect(system).toContain('Never turn windows of open work into a round time to beat');
-    // Weights are the app's (the load card), never the plan's: a run on 2026-10-10 told an
-    // athlete to clean 60 kg for 2-minute sprints — above their one-rep max.
-    expect(system).toContain('Never name a weight');
+    // It names a weight now (2026-11-16, the owner's call: "which weight?" deserves an answer) —
+    // under a ceiling, because a run on 2026-10-10 told an athlete to clean 60 kg for 2-minute
+    // sprints, above their one-rep max. The record caps every weight; no log on a lift, no number.
+    expect(system).toContain('Never at or above their record for anything but a single');
+    expect(system).toContain('A barbell lift with no record and nothing logged: give no number');
+    expect(system).toContain('120 lunges');
     expect(system).not.toContain('call log_workout');
     expect(tools[0]).not.toContain('log_workout');
     expect(tools[0]).not.toContain('create_workout');
     expect(tools[0]).toContain('find_workouts');
+  });
+
+  it('their body weight, said in the chat, comes back for the profile — in kg', async () => {
+    const { complete, seen } = scripted(
+      calls({ name: 'save_body_weight', args: { value: 154, unit: 'lb' } }),
+      said('Saved — 154 lb. Change it under Me anytime.'),
+    );
+    const reply = await askWodi({ message: '154', recent: [{ from: 'wodi', text: 'What do you weigh?' }], notes: [], loadContext: async () => CTX, complete });
+    expect(reply).toMatchObject({ kind: 'answer', bodyweightKg: 69.9 });
+    expect(String(seen[1].messages.find((m) => m.role === 'tool')?.content)).toContain('Saved to their profile');
+  });
+
+  it('a number that is no body weight is never saved — Wodi asks again', async () => {
+    const { complete, seen } = scripted(
+      calls({ name: 'save_body_weight', args: { value: 7, unit: 'kg' } }),
+      said('Sorry — what do you weigh?'),
+    );
+    const reply = await askWodi({ message: '7', recent: [], notes: [], loadContext: async () => CTX, complete });
+    expect(reply).toMatchObject({ kind: 'answer', bodyweightKg: null });
+    expect(String(seen[1].messages.find((m) => m.role === 'tool')?.content)).toContain('Ask them again');
+  });
+
+  it('knows their body weight from the profile, or asks for it once', async () => {
+    const known = scripted(said('ok'));
+    await askWodi({ message: 'hi', recent: [], notes: [], loadContext: async () => CTX, complete: known.complete, body: { bodyweightKg: 70, weightUnit: 'kg' } });
+    expect(String(known.seen[0].messages[0].content)).toContain('Their body weight: 70 kg (their profile)');
+    const unknown = scripted(said('ok'));
+    await askWodi({ message: 'hi', recent: [], notes: [], loadContext: async () => CTX, complete: unknown.complete });
+    expect(String(unknown.seen[0].messages[0].content)).toContain('Ask at most once in a conversation');
+  });
+
+  it('before a workout it reads the last days for fatigue, and gives a tired and a strong weight', async () => {
+    const { complete, seen } = scripted(said('ok'));
+    await askWodi({
+      message: 'which weight?', recent: [], notes: [], now: new Date(2026, 8, 25, 18),
+      situation: { kind: 'upcoming', workout: { board: '5 RFT: 10 Deadlift', reading: '', loads: '', sex: 'male' } },
+      loadContext: async () => CTX, complete,
+    });
+    const system = String(seen[0].messages[0].content);
+    expect(system).toContain('- yesterday: Deadlift day');
+    expect(system).toContain('loads Deadlift 140kg ×15');
+    expect(system).toContain('tired 12 · strong 20');
+    expect(system).toContain('that outranks the log');
+    expect(system).toContain('the strong weight too');
   });
 
   it('asked for a workout, it writes one as a board, with why', async () => {

@@ -5,6 +5,7 @@ import { CHAT_MESSAGE_ATTR, useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
+import { ChatBoardPreview } from './ChatBoardPreview';
 import { useCelebrationTakeover } from './useCelebrationTakeover';
 import { WodiText } from './WodiText';
 import { UnfinishedPosterTile } from '../home/UnfinishedPosterTile';
@@ -30,16 +31,18 @@ interface TellWodiChatProps {
  */
 export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate, onOpenPlanned }: TellWodiChatProps) {
   const [draft, setDraft] = useState('');
-  const [photo, setPhoto] = useState<File | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const libraryInputRef = useRef<HTMLInputElement>(null);
-  // A picked or shot board is attached, not sent — words can go with it.
-  const attachPicked = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const file = e.target.files?.[0];
-    if (file) setPhoto(file);
-    e.target.value = '';
-  };
   const { messages, busy, send, tapChip, changeAnswer, finished, placeholder, hasBoard, openPanelId } = chat;
+  // A picked or shot board goes straight to Wodi, the same as picking one on Today — with
+  // whatever was already typed in the box riding along.
+  const sendPicked = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    send(draft, file);
+    setDraft('');
+  };
   // The open card's dock sits under the message box — one surface, the pad in the keyboard's place.
   const [dockHost, setDockHost] = useState<HTMLDivElement | null>(null);
   // Typing instead of the pad (the message box tapped), for this card only: the next card opens on its pad.
@@ -53,13 +56,12 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
   const warming = !thread.ready || messages.length === 0;
   const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(messages);
 
-  const canSend = (draft.trim().length > 0 || photo != null) && busy !== 'saving';
+  const canSend = draft.trim().length > 0 && busy !== 'saving';
   const submit = (): void => {
     if (!canSend) return;
     // Your message goes to the top of the screen and the reply fills in under it (useChatViewport).
-    send(draft, photo);
+    send(draft);
     setDraft('');
-    setPhoto(null);
   };
 
   /** The opening's day opens its poster here too — the same message as on Today. */
@@ -181,6 +183,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                   />
                 </div>
               )}
+              {message.preview && <ChatBoardPreview preview={message.preview} />}
               {message.panel && (
                 <ChatPanelCard
                   panel={message.panel}
@@ -245,12 +248,6 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
             <span className={styles.pinnedAction}>{pinned.add}</span>
           </button>
         )}
-        {photo && (
-          <div className={styles.attachment}>
-            <span className={styles.attachmentName}>Board photo attached</span>
-            <button type="button" className={styles.attachmentRemove} onClick={() => setPhoto(null)} aria-label="Remove photo">×</button>
-          </div>
-        )}
         <div className={styles.composerRow}>
           {docked ? null : openPanelId ? (
             // Typing instead of a card's pad — one tap back to it.
@@ -280,9 +277,9 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
             accept="image/*"
             capture="environment"
             className={styles.hiddenInput}
-            onChange={attachPicked}
+            onChange={sendPicked}
           />
-          <input ref={libraryInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={attachPicked} />
+          <input ref={libraryInputRef} type="file" accept="image/*" className={styles.hiddenInput} onChange={sendPicked} />
           <span className={styles.inputWrap}>
           <textarea
             className={styles.input}

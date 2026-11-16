@@ -1508,6 +1508,8 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       if (planned.parsedWorkout) setParsedWorkout(planned.parsedWorkout);
     },
     onDropBoard: dropWaitingBoard,
+    // Runs after the hook has returned — "Not yet" is a tap, never during this render.
+    onNotYet: () => backOutOfChat(),
     nudges,
     onGap: (request, message) => {
       track('wodi_gap', {});
@@ -1515,6 +1517,11 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       recordAgentGap(user.id, request, message).catch((err: unknown) => console.error('[TellWodi] could not keep the request', err));
     },
   });
+
+  /** Leaving the chat — its Back button, and "Not yet" on a reopened board, go the same way. */
+  const backOutOfChat = (): void => {
+    goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday, logged: tellWodi.logged }));
+  };
 
   /**
    * The Save button. A NEW log of a board the athlete already logged in the last couple of days
@@ -2303,7 +2310,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         <TellWodiChat
           chat={tellWodi}
           thread={thread}
-          onBack={() => goBack(backFromChat({ boardOpen: tellWodi.hasBoard, boardFromToday: plannedFromToday, logged: tellWodi.logged }))}
+          onBack={backOutOfChat}
           onOpenWorkout={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts)}
           onCelebrate={(workout: WorkoutWithStats) => onOpenWorkout?.(workout, allWorkouts, true)}
           onOpenPlanned={(planned: PlannedWorkout) => onOpenPlanned?.(planned)}

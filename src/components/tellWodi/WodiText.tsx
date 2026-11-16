@@ -1,4 +1,5 @@
 import { headlineSegments, voiceSegments, type VoiceSegment } from '../../services/wodiAgent/wodiVoice';
+import { parseMarkup } from '../../services/wodiAgent/wodiMarkup';
 import styles from './WodiText.module.css';
 
 interface WodiTextProps {
@@ -28,9 +29,40 @@ function withLink(segments: VoiceSegment[], linkText: string | undefined): (Voic
   });
 }
 
-/** Wodi's words with its numbers set like a training log (see wodiVoice). */
+/** A stretch of an answer, its numbers set like a training log. */
+function Voice({ text }: { text: string }) {
+  return (
+    <>
+      {voiceSegments(text).map((segment, i) => (
+        segment.number
+          ? <span key={i} className={styles.number}>{segment.text}</span>
+          : <span key={i}>{segment.text}</span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Wodi's words with its numbers set like a training log (see wodiVoice). An answer may carry
+ * **bold** and "- " list lines (wodiMarkup); the headline is one plain line with its key value.
+ */
 export function WodiText({ text, highlight, link }: WodiTextProps) {
-  const segments = highlight === undefined ? voiceSegments(text) : headlineSegments(text, highlight);
+  if (highlight === undefined) {
+    return (
+      <>
+        {parseMarkup(text).map((line, i) => (
+          <span key={i} className={line.runs.length === 0 ? styles.gap : line.item ? styles.item : styles.line}>
+            {line.runs.map((run, j) => (
+              run.bold
+                ? <strong key={j} className={styles.bold}><Voice text={run.text} /></strong>
+                : <Voice key={j} text={run.text} />
+            ))}
+          </span>
+        ))}
+      </>
+    );
+  }
+  const segments = headlineSegments(text, highlight);
   return (
     <>
       {withLink(segments, link?.text).map((segment, i) => {

@@ -25,6 +25,7 @@ import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
 import { routeMessage, routeReading, routeWorkoutWords } from './chatRouting';
 import { boardReading } from '../../services/wodiAgent/boardReading';
 import { buildUnfinishedPoster, type UnfinishedPoster } from '../home/unfinishedPoster';
+import { buildBoardPreview, type BoardPreview } from './boardPreview';
 import type { ChatNudges } from '../../hooks/useWodiNotifications';
 import type { AskSituation } from '../../services/wodiAgent/askWodi';
 import type { EnableResult } from '../../services/pushNotifications';
@@ -42,7 +43,7 @@ export type FormHandoff = 'typed' | 'chip';
 export interface ChatChipView {
   label: string;
   answers?: SlotAnswer[];
-  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done' | 'nudge' | 'another';
+  action?: 'forms' | 'done' | 'later' | 'remember' | 'not-now' | 'this-board' | 'new-board' | 'not-done' | 'not-yet' | 'nudge' | 'another';
   /** A 'forms' chip: which offer of the standard screen this is. */
   handoff?: FormHandoff;
   /** The note a 'remember' chip saves — exactly the words the athlete was shown. */
@@ -81,6 +82,8 @@ export interface ChatMessage {
   suggestions?: LoadSuggestion[];
   /** A board saved for later, drawn as its unfinished poster — how the athlete recognises it. */
   board?: UnfinishedPoster;
+  /** A saved board reopened, drawn in full — what's in it, before deciding what to do with it. */
+  preview?: BoardPreview;
   /** What the workout just logged here earned — said beside its poster (the EP, a PR). */
   earned?: { ep: number; pr: boolean };
   /** My message answered these questions — tapping "Change" on it asks them again. */
@@ -133,6 +136,8 @@ interface UseTellWodiChatArgs {
   onTakeBoard: (planned: PlannedWorkout) => void;
   /** They never did the saved board this chat reopened: it's cleared from Today. */
   onDropBoard: () => void;
+  /** "Not yet" on a reopened board: it stays saved and the chat closes, the same as Back. */
+  onNotYet: () => void;
   /** Wodi's nudges on this phone — offered once, when a board is left for later. */
   nudges: ChatNudges;
   /** They asked for something Wodi can't do yet: kept, so what people ask decides what's next. */
@@ -200,6 +205,8 @@ const DONE_CHIP: ChatChipView = { label: 'Done — log it', action: 'done' };
 const STANDARD_SCREEN_CHIP: ChatChipView = { label: 'Fill it in myself', action: 'forms', handoff: 'chip' };
 // A saved board reopened can be one they never got to — one tap clears it, no poster made.
 const NOT_DONE_CHIP: ChatChipView = { label: "Didn't do it", action: 'not-done' };
+/** A saved board reopened before it was done: it stays saved, and the chat steps aside. */
+const NOT_YET_CHIP: ChatChipView = { label: 'Not yet', action: 'not-yet' };
 const NUDGE_CHIP: ChatChipView = { label: 'Nudge me if I forget', action: 'nudge' };
 /** A workout Wodi wrote, swapped for a different one. */
 const ANOTHER_CHIP: ChatChipView = { label: 'Something else', action: 'another' };
@@ -249,11 +256,12 @@ export function chatForSavedBoard(planned: PlannedWorkout): SavedChat {
   return planned.chat ?? { messages: [], waitingForWorkout: true };
 }
 
-/** What Wodi says on reopening: back from the workout, it asks how this board went — by name. */
-export function resumeGreeting(workout: ParsedWorkout, waitingForWorkout: boolean): string {
-  if (!waitingForWorkout) return 'Picking up where we left off.';
-  const title = workout.title?.trim();
-  return title ? `How'd ${title} go?` : "How'd it go?";
+/**
+ * What Wodi says over a reopened board. It never assumes the workout was done — the board is
+ * shown in full under these words, and the athlete says whether they did it.
+ */
+export function resumeGreeting(waitingForWorkout: boolean): string {
+  return waitingForWorkout ? "Here's the board you saved." : 'Picking up where we left off.';
 }
 
 /** "Echo Bike instead of Run, 600m a round" — what a swap will save, in words. */
@@ -280,7 +288,7 @@ function suggestionsAsText(suggestions: LoadSuggestion[]): string {
 }
 
 export function useTellWodiChat({
-  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap,
+  readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, opening, waitingBoard, onTakeBoard, onDropBoard, onNotYet, nudges, onGap,
 }: UseTellWodiChatArgs): TellWodiChat {
   const [messages, setMessages] = useState<ChatMessage[]>(() => (
     opening ? [{ id: nextId(), from: 'wodi', text: opening.text, headline: opening, at: Date.now() }] : []
@@ -303,8 +311,8 @@ export function useTellWodiChat({
   // about training — belongs to the ongoing thread, not to the poster this board becomes.
   const boardStartRef = useRef(0);
   const messagesRef = useRef<ChatMessage[]>(messages);
-  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap });
-  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, nudges, onGap }; });
+  const callbacks = useRef({ readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, onNotYet, nudges, onGap });
+  useEffect(() => { callbacks.current = { readBoard, buildResults, lastLoads, history, athleteSex, onPersist, onBoardChanged, onFinished, onOpenForms, onUseForm, ask, habits, notes, onRemember, uploadPhoto, keepInThread, waitingBoard, onTakeBoard, onDropBoard, onNotYet, nudges, onGap }; });
   // A waiting board taken on mid-chat already has a conversation (the photo, "Doing it later", the
   // plan). It isn't redrawn here — the athlete is mid-sentence — but it's kept ahead of this one.
   const priorRef = useRef<SavedChatMessage[]>([]);
@@ -902,7 +910,13 @@ export function useTellWodiChat({
   };
 
   const tapChip = useCallback((messageId: string, chip: ChatChipView): void => {
+    // Not yet: nothing said, nothing asked — the board stays saved, waiting, and the chat closes.
+    if (chip.action === 'not-yet') waitingRef.current = true;
     commit(messagesRef.current.map((m) => (m.id === messageId ? { ...m, answered: true } : m)));
+    if (chip.action === 'not-yet') {
+      callbacks.current.onNotYet();
+      return;
+    }
     if (chip.action === 'forms') {
       openStandardScreen(chip.handoff ?? 'chip');
       return;
@@ -977,9 +991,17 @@ export function useTellWodiChat({
     boardStartRef.current = 0;
     messagesRef.current = kept;
     setMessages(kept);
-    // Answers aren't kept on a waiting board (see SavedChat), so everything still open is asked —
-    // the first question with a way out for a board they never got to.
-    askNext(resumeGreeting(workout, chat.waitingForWorkout), chat.waitingForWorkout, [NOT_DONE_CHIP]);
+    // The board first, in full — then they say what happened. Nothing is asked until "Done":
+    // answers aren't kept on a waiting board (see SavedChat), so the questions start from there.
+    // `asks` keeps this line out of the saved transcript until it's answered, so reopening again
+    // shows it once, not stacked.
+    push({
+      from: 'wodi',
+      text: resumeGreeting(chat.waitingForWorkout),
+      preview: buildBoardPreview(workout),
+      asks: true,
+      chips: [DONE_CHIP, NOT_YET_CHIP, NOT_DONE_CHIP],
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
