@@ -8,7 +8,6 @@ import { ActionMenuSheet } from '../ui/ActionMenuSheet';
 import { MoveReplay } from '../replay/MoveReplay';
 import { ReplayIcon } from '../replay/ReplayIcon';
 import { usePosterReplay } from '../replay/usePosterReplay';
-import { CHAT_ANCHOR } from './useChatViewport';
 import styles from './ChatPoster.module.css';
 
 interface ChatPosterProps {
@@ -49,7 +48,7 @@ export function ChatPoster({ workout, onOpen }: ChatPosterProps): React.ReactEle
   if (!payload) return null;
   const more = payload.wods.length - 1;
   return (
-    <div className={styles.wrap} {...{ [CHAT_ANCHOR]: '' }}>
+    <div className={styles.wrap}>
       <div className={styles.posterBox}>
         <motion.button
           type="button"

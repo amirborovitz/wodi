@@ -14,6 +14,7 @@ import {
   type MovementImplement,
   type ResolvedMovement,
 } from '../data/movementRegistry';
+import { bodyAreaSessions, type BodyAreaSessions } from '../data/bodyAreas';
 import { flagMovement } from '../services/movementRegistryService';
 import { getEffectiveWorkoutDate } from '../utils/workoutDate';
 import { toKg } from '../utils/loadUnits';
@@ -287,6 +288,8 @@ export interface RecapData {
    * estimate, and a week with no times at all reports 0 rather than a guess.
    */
   moveMinutes: number;
+  /** Sessions that worked each part of the body — what the week poster's figure lights. */
+  bodyAreas: BodyAreaSessions;
   heaviest: { move: string; value: string } | null;
   /**
    * The week's heaviest barbell moments, asked the way a CrossFitter asks them:
@@ -366,6 +369,19 @@ export interface UseRecapDataResult {
    * owns the Firestore side effect.
    */
   unknownMovements: RecapUnknownMovement[];
+  /** The week in progress, Monday to now. Null until the first session of the week. */
+  weekSoFar: WeekSoFar | null;
+}
+
+/**
+ * The current week while it is still being built — what Home shows growing until
+ * Monday's recap replaces it. The same measures the finished week leads with,
+ * counted the same way, so the strip and the poster can never disagree.
+ */
+export interface WeekSoFar {
+  sessions: number;
+  moveMinutes: number;
+  bodyAreas: BodyAreaSessions;
 }
 
 const MONTH_NAMES = [
@@ -681,6 +697,7 @@ function buildRecap(
     prCount,
     epTotal: Math.round(epTotal),
     moveMinutes,
+    bodyAreas: bodyAreaSessions(ws),
     heaviest,
     lifts,
     prPrevious,
@@ -1354,8 +1371,10 @@ export function buildRecaps(
   const weekBuckets = new Map<string, { monday: Date; ws: WorkoutWithStats[] }>();
   const monthBuckets = new Map<string, { y: number; m: number; ws: WorkoutWithStats[] }>();
   const seasonBuckets = new Map<string, { y: number; q: number; ws: WorkoutWithStats[] }>();
+  const thisWeek: WorkoutWithStats[] = [];
   for (const w of workouts) {
     const trained = getEffectiveWorkoutDate(w);
+    if (trained >= curWeekStart) thisWeek.push(w);
     const y = trained.getFullYear();
     const m = trained.getMonth();
     if (trained < curWeekStart) {
@@ -1429,7 +1448,14 @@ export function buildRecaps(
     .filter((d): d is RecapData => d !== null && !isRecapViewed(d))
     .map(d => d.id);
 
-  return { recaps, weekRecap, monthRecap, seasonRecap, newRecapIds, unknownMovements };
+  const weekSoFar: WeekSoFar | null = thisWeek.length === 0 ? null : {
+    sessions: thisWeek.length,
+    // Same rule as the finished week's `moveMinutes`: round the sum once.
+    moveMinutes: Math.round(thisWeek.reduce((s, w) => s + (w.duration ?? 0), 0)),
+    bodyAreas: bodyAreaSessions(thisWeek),
+  };
+
+  return { recaps, weekRecap, monthRecap, seasonRecap, newRecapIds, unknownMovements, weekSoFar };
 }
 
 /**

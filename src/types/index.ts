@@ -784,23 +784,6 @@ export interface Achievement {
   icon: AchievementIcon;
 }
 
-// Muscle group types
-export type MuscleGroup =
-  | 'shoulders'
-  | 'chest'
-  | 'back'
-  | 'biceps'
-  | 'triceps'
-  | 'core'
-  | 'quads'
-  | 'hamstrings'
-  | 'glutes'
-  | 'calves'
-  | 'forearms'
-  | 'full_body';
-
-export type BodyRegion = 'upper' | 'lower' | 'core' | 'full_body';
-
 // Complete reward screen data
 export interface RewardData {
   rings: RingMetric[];
@@ -819,11 +802,6 @@ export interface RewardData {
   exercises: Exercise[];      // Full exercise data with logged sets
   /** The board's cap, seconds — what effort minutes measure the finish against. */
   timeCap?: number;
-  muscleGroups?: {
-    muscles: MuscleGroup[];
-    byRegion: Record<BodyRegion, MuscleGroup[]>;
-    summary: string;
-  };
   workloadBreakdown?: WorkloadBreakdown;  // Per-movement totals for display
   workoutContext?: string;
   workoutRawText?: string;

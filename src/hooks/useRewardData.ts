@@ -3,7 +3,7 @@ import { collection, query, where, getDocs, orderBy, limit } from 'firebase/fire
 import { db } from '../services/firebase';
 import { calculateAllRings, getWeekStart } from '../services/rewardCalculations';
 import { detectBestAchievement, detectAllAchievements } from '../services/achievementDetection';
-import type { RewardData, Exercise, PersonalRecord, Workout, WorkoutType, WorkoutFormat, MuscleGroup, BodyRegion } from '../types';
+import type { RewardData, Exercise, PersonalRecord, Workout, WorkoutType, WorkoutFormat } from '../types';
 
 interface WorkoutSummaryInput {
   title: string;
@@ -14,11 +14,6 @@ interface WorkoutSummaryInput {
   actualTimeMinutes?: number; // Actual completion time (for intensity EP when < programmed time)
   totalVolume: number;
   totalReps: number;
-  muscleGroups?: {
-    muscles: MuscleGroup[];
-    byRegion: Record<BodyRegion, MuscleGroup[]>;
-    summary: string;
-  };
 }
 
 interface CalculateRewardResult {
@@ -170,7 +165,6 @@ export function useRewardData(): UseRewardDataResult {
           totalReps: workout.totalReps,
         },
         exercises: workout.exercises,
-        muscleGroups: workout.muscleGroups,
       };
 
       setRewardData(data);

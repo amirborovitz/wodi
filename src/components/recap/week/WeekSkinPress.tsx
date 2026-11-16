@@ -6,10 +6,10 @@
 
 import React from 'react';
 import { BRAND, fH } from '../../celebration/faces/HandwrittenFace/brand';
-import { WeekCanvas, WeekBody, WeekMasthead, WeekHeroPair, WeekMoveList, WeekLiftBlock, WeekTiles, WeekFooter } from './WeekPosterParts';
+import { WeekCanvas, WeekBody, WeekMasthead, WeekHeroPair, WeekMoveList, WeekLiftBlock, WeekTiles, WeekBodyHero, WeekBodyTally, WeekFooter } from './WeekPosterParts';
 import type { WeekSkinProps } from './types';
 
-export function WeekSkinPress({ week }: WeekSkinProps): React.JSX.Element {
+export function WeekSkinPress({ week, page }: WeekSkinProps): React.JSX.Element {
   const ink = '#1b1a17';
   const bone = '#e8e3d5';
   return (
@@ -18,31 +18,41 @@ export function WeekSkinPress({ week }: WeekSkinProps): React.JSX.Element {
       <WeekBody style={{ padding: '82px 76px 0' }}>
         <div>
           <WeekMasthead tag={week.tag} weekNo={week.weekNo} dates={week.dates} ink={ink} dim="rgba(27,26,23,0.58)" tagColor={ink} />
-          <div style={{ marginTop: 46 }}>
-            <WeekHeroPair hero={week.hero} heroUnit={week.heroUnit} sessions={week.sessions} num={ink} label="rgba(27,26,23,0.6)" rule="rgba(27,26,23,0.2)" numberStyle={{ letterSpacing: '-0.03em' }} overprint={BRAND.yellow} />
+          {page === 'week' ? (
+            <>
+              <div style={{ marginTop: 46 }}>
+                <WeekHeroPair hero={week.hero} heroUnit={week.heroUnit} sessions={week.sessions} num={ink} label="rgba(27,26,23,0.6)" rule="rgba(27,26,23,0.2)" numberStyle={{ letterSpacing: '-0.03em' }} overprint={BRAND.yellow} />
+              </div>
+              {week.moves.length > 0 && (
+                <div style={{ marginTop: 66 }}>
+                  <WeekMoveList moves={week.moves} ink={ink} dim="rgba(27,26,23,0.45)" accent={ink} rule="rgba(27,26,23,0.16)" inkSoft="rgba(27,26,23,0.82)" />
+                </div>
+              )}
+            </>
+          ) : week.body && (
+            <WeekBodyHero body={week.body} sessions={week.sessionCount} ramp={['rgba(27,26,23,0.10)', 'rgba(27,26,23,0.32)', 'rgba(27,26,23,0.6)', ink]} ink={ink} dim="rgba(27,26,23,0.58)" rule="rgba(27,26,23,0.24)" />
+          )}
+        </div>
+        {page === 'week' ? (
+          <div style={{ paddingBottom: 18 }}>
+            {week.lifts.length > 0 && (
+              <WeekLiftBlock lifts={week.lifts} ink={ink} dim="rgba(27,26,23,0.58)" accent={ink} rule="rgba(27,26,23,0.24)" prFill={BRAND.yellow} prColor={ink} plate={BRAND.yellow} />
+            )}
+            {week.brag && (
+              <div style={{ marginTop: 30, position: 'relative', alignSelf: 'flex-start', display: 'inline-block' }}>
+                <div style={{ position: 'absolute', left: -10, right: -14, top: 16, height: 58, background: BRAND.yellow, mixBlendMode: 'multiply', transform: 'rotate(-0.6deg)' }} />
+                <div style={{ position: 'relative', fontFamily: fH, fontWeight: 700, fontSize: 62, lineHeight: 1.08 }}>{week.brag}</div>
+              </div>
+            )}
+            {week.tiles.length > 0 && (
+              <div style={{ marginTop: 32 }}>
+                <WeekTiles tiles={week.tiles} border="rgba(27,26,23,0.24)" num={ink} label="rgba(27,26,23,0.5)" />
+              </div>
+            )}
           </div>
-          {week.moves.length > 0 && (
-            <div style={{ marginTop: 66 }}>
-              <WeekMoveList moves={week.moves} ink={ink} dim="rgba(27,26,23,0.45)" accent={ink} rule="rgba(27,26,23,0.16)" inkSoft="rgba(27,26,23,0.82)" />
-            </div>
-          )}
-        </div>
-        <div style={{ paddingBottom: 18 }}>
-          {week.lifts.length > 0 && (
-            <WeekLiftBlock lifts={week.lifts} ink={ink} dim="rgba(27,26,23,0.58)" accent={ink} rule="rgba(27,26,23,0.24)" prFill={BRAND.yellow} prColor={ink} plate={BRAND.yellow} />
-          )}
-          {week.brag && (
-            <div style={{ marginTop: 30, position: 'relative', alignSelf: 'flex-start', display: 'inline-block' }}>
-              <div style={{ position: 'absolute', left: -10, right: -14, top: 16, height: 58, background: BRAND.yellow, mixBlendMode: 'multiply', transform: 'rotate(-0.6deg)' }} />
-              <div style={{ position: 'relative', fontFamily: fH, fontWeight: 700, fontSize: 62, lineHeight: 1.08 }}>{week.brag}</div>
-            </div>
-          )}
-          {week.tiles.length > 0 && (
-            <div style={{ marginTop: 32 }}>
-              <WeekTiles tiles={week.tiles} border="rgba(27,26,23,0.24)" num={ink} label="rgba(27,26,23,0.5)" />
-            </div>
-          )}
-        </div>
+        ) : week.body ? (
+          <WeekBodyTally body={week.body} ramp={['rgba(27,26,23,0.10)', 'rgba(27,26,23,0.32)', 'rgba(27,26,23,0.6)', ink]} ink={ink} dim="rgba(27,26,23,0.58)" rule="rgba(27,26,23,0.24)" />
+        ) : <div />}
       </WeekBody>
       <WeekFooter ep={week.ep} border="3px solid rgba(27,26,23,0.85)" epColor={ink} epBorder="rgba(27,26,23,0.3)" wordColor={ink} />
     </WeekCanvas>

@@ -62,7 +62,7 @@ interface AnalyticsEvents {
   workout_deleted: Record<string, never>;
 
   /** A poster left the app — the workout poster, the weekly drop, or a Wrapped page. */
-  poster_shared: { poster: 'workout' | 'week' | 'wrapped'; method: ShareMethod };
+  poster_shared: { poster: 'workout' | 'week' | 'week_body' | 'wrapped'; method: ShareMethod };
   /**
    * A poster's move replay ended. `surface`: under the cheer in the chat, or on the poster screen.
    * `trigger`: played by itself after logging, or the Replay button. `outcome`: ran to the poster, or tapped away.

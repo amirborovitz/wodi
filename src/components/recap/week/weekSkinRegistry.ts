@@ -1,9 +1,8 @@
 /**
- * Week skin registry — the single list WeekDropPage flips through.
+ * Week skin registry — the surfaces a week can be drawn on.
  *
- * Ids deliberately match the WOD poster's skins of the same name: someone who
- * picked Chalk for their posters should find their week in Chalk too, and a
- * shared id is what lets that hold if the two ever sync.
+ * Ids match the WOD poster's skins of the same name: someone who picked Chalk for
+ * their posters finds their week in Chalk too (weekSkinFor).
  */
 
 import type { ComponentType } from 'react';
@@ -31,39 +30,15 @@ export const WEEK_SKINS: WeekSkin[] = [
   { id: 'hazard', name: 'Hazard', Comp: WeekSkinHazard },
 ];
 
-const SKIN_KEY = 'wodi.week.skin';
-const FLIPPED_KEY = 'wodi.week.flipped';
-
-/** The skin they left it on. Index, not id, because the stage steps through the list. */
-export function loadWeekSkinIndex(): number {
-  try {
-    const id = window.localStorage.getItem(SKIN_KEY);
-    const i = WEEK_SKINS.findIndex((s) => s.id === id);
-    return i >= 0 ? i : 0;
-  } catch {
-    return 0;
+/**
+ * The week is drawn in the athlete's own poster style — the first style in their order
+ * that has a week version — so it arrives looking like their posters, with nothing to
+ * pick. Slab when none of theirs does.
+ */
+export function weekSkinFor(order: readonly PosterSkinId[]): WeekSkin {
+  for (const id of order) {
+    const skin = WEEK_SKINS.find((s) => s.id === id);
+    if (skin) return skin;
   }
-}
-
-export function saveWeekSkinIndex(index: number): void {
-  const skin = WEEK_SKINS[index];
-  if (!skin) return;
-  try {
-    window.localStorage.setItem(SKIN_KEY, skin.id);
-  } catch { /* private mode: they pick it again next week */ }
-}
-
-/** The tap hint is a one-time teach — once they've flipped, they know. */
-export function hasFlippedWeekSkin(): boolean {
-  try {
-    return window.localStorage.getItem(FLIPPED_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function markWeekSkinFlipped(): void {
-  try {
-    window.localStorage.setItem(FLIPPED_KEY, '1');
-  } catch { /* private mode: they see the hint again */ }
+  return WEEK_SKINS[0];
 }

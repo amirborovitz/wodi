@@ -1,17 +1,15 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { fB } from '../celebration/faces/HandwrittenFace/brand';
 import { elementToCanvas, canvasToBlob, shareImage, downloadBlob } from '../../utils/shareUtils';
 import { track } from '../../services/analytics';
 import { useWeekPosterData } from '../../hooks/useWeekPosterData';
+import { useFavoriteSkin } from '../../hooks/useFavoriteSkin';
+import { useSwipeDeck } from '../../hooks/useSwipeDeck';
 import type { RecapData } from '../../hooks/useRecapData';
 import { WEEK_POSTER_WIDTH, WEEK_POSTER_HEIGHT } from './week/WeekPosterParts';
-import {
-  WEEK_SKINS,
-  loadWeekSkinIndex,
-  saveWeekSkinIndex,
-  hasFlippedWeekSkin,
-  markWeekSkinFlipped,
-} from './week/weekSkinRegistry';
+import { weekSkinFor } from './week/weekSkinRegistry';
+import type { WeekPage } from './week/types';
 import styles from './WeekDropPage.module.css';
 
 interface WeekDropPageProps {
@@ -26,35 +24,35 @@ function nextPaint(): Promise<void> {
   });
 }
 
-/** How long the outgoing skin stays mounted under the incoming one. Matches .flipIn. */
-const CROSSFADE_MS = 300;
+/** Space between the two posters while one is dragged over the other, in screen px. */
+const PAGE_GAP = 16;
+
+const PAGE_NAME: Record<WeekPage, string> = { week: 'The week', body: 'What you worked' };
 
 /**
- * The week, as a poster.
+ * The week, as posters.
  *
- * Deliberately not a short Wrapped: no card deck, no goals, no comparison to the
- * week before. It is the same object as a WOD poster — one 9:16 artifact, the same
- * skins, the same tap-to-flip gesture — because a week worth sharing should not
- * arrive looking like a different app's report screen.
+ * Deliberately not a short Wrapped: no card deck of stats, no goals, no comparison to
+ * the week before. Two posters at most — the week, and the body it worked — swiped like
+ * a WOD poster's parts, in the athlete's own poster style. Nothing to pick here: it
+ * arrives finished, and the one action is Share.
  *
  * The 1080×1920 canvas is authoritative and never re-flows for the phone: the stage
  * scales it down to fit, which is also why the share export is a true story frame.
  */
 export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.Element {
   const week = useWeekPosterData(data);
+  const { Comp: Skin } = weekSkinFor(useFavoriteSkin().order);
+  const pages: WeekPage[] = week.body ? ['week', 'body'] : ['week'];
 
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const posterRef = useRef<HTMLDivElement | null>(null);
-  const chipRowRef = useRef<HTMLDivElement | null>(null);
-
+  const posterRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [scale, setScale] = useState(0);
   const [sharing, setSharing] = useState(false);
-  const [idx, setIdx] = useState<number>(loadWeekSkinIndex);
-  // The outgoing skin, cross-faded under the incoming one. Without it, a flip from
-  // Chalk to Slab shows a frame of bare background between two light surfaces.
-  const [prev, setPrev] = useState<number | null>(null);
-  const [flipCount, setFlipCount] = useState(0);
-  const [showHint, setShowHint] = useState(() => !hasFlippedWeekSkin());
+
+  const frameWidth = WEEK_POSTER_WIDTH * scale;
+  const deck = useSwipeDeck(pages.length, frameWidth + PAGE_GAP);
+  const { x, page, goTo } = deck;
 
   // The poster is a fixed canvas, so fitting it is one number: whatever fraction of
   // the stage it can occupy without either axis overflowing.
@@ -75,47 +73,15 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
     return () => ro.disconnect();
   }, []);
 
+  // A resize changes the distance between pages; keep the current one in place.
   useEffect(() => {
-    if (prev === null) return;
-    const t = window.setTimeout(() => setPrev(null), CROSSFADE_MS);
-    return () => window.clearTimeout(t);
-  }, [prev, flipCount]);
-
-  const goToSkin = (next: number): void => {
-    if (next === idx) return;
-    setPrev(idx);
-    setIdx(next);
-    setFlipCount((n) => n + 1);
-    saveWeekSkinIndex(next);
-    if (showHint) {
-      setShowHint(false);
-      markWeekSkinFlipped();
-    }
-  };
-
-  // Left half steps back, right half steps forward — the WOD poster's gesture.
-  const flipFromTap = (e: React.MouseEvent<HTMLDivElement>): void => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const direction = e.clientX < rect.left + rect.width / 2 ? -1 : 1;
-    goToSkin((idx + direction + WEEK_SKINS.length) % WEEK_SKINS.length);
-  };
-
-  // Keep the active chip in view when the poster is flipped by tapping it — the
-  // chip row is the only thing that says which surface you're now on.
-  useEffect(() => {
-    chipRowRef.current?.children[idx]?.scrollIntoView({
-      block: 'nearest',
-      inline: 'center',
-      behavior: flipCount === 0 ? 'auto' : 'smooth',
-    });
-    // flipCount only picks the animation — idx is the trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx]);
+    x.set(-page * (frameWidth + PAGE_GAP));
+  }, [frameWidth, page, x]);
 
   const handleShare = async (): Promise<void> => {
-    const poster = posterRef.current;
+    const poster = posterRefs.current[page];
     if (!poster || sharing) return;
-    // `sharing` also drops the fit-scale off the layer, so html2canvas measures the
+    // `sharing` also drops the fit-scale off the live page, so html2canvas measures the
     // canvas at its own 1080×1920 rather than at whatever fraction the phone shows.
     // It has to be state and not a DOM poke: the re-render this triggers would put
     // the transform straight back mid-capture.
@@ -128,9 +94,10 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
         height: WEEK_POSTER_HEIGHT,
       });
       const blob = await canvasToBlob(canvas, 'png');
-      const shared = await shareImage(blob, `wodi ${data.period.toLowerCase()}`);
-      if (!shared) downloadBlob(blob, `wodi-${data.id}.png`);
-      track('poster_shared', { poster: 'week', method: shared ? 'share_sheet' : 'download' });
+      const body = pages[page] === 'body';
+      const shared = await shareImage(blob, `wodi ${data.period.toLowerCase()}${body ? ' worked' : ''}`);
+      if (!shared) downloadBlob(blob, `wodi-${data.id}${body ? '-worked' : ''}.png`);
+      track('poster_shared', { poster: body ? 'week_body' : 'week', method: shared ? 'share_sheet' : 'download' });
     } catch (err) {
       console.error('[WeekDrop] share failed:', err);
     } finally {
@@ -138,57 +105,58 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
     }
   };
 
-  const Skin = WEEK_SKINS[idx].Comp;
-  const Prev = prev !== null ? WEEK_SKINS[prev].Comp : null;
-
   return (
     <div className={styles.root}>
       <div className={styles.stage} ref={stageRef}>
-        {/* Tap to flip — the same gesture, on the same artifact, as the WOD poster. */}
         <div
           className={styles.frame}
-          onClick={flipFromTap}
+          {...deck.handlers}
           style={{
-            width: WEEK_POSTER_WIDTH * scale,
+            width: frameWidth,
             height: WEEK_POSTER_HEIGHT * scale,
             borderRadius: Math.round(26 * scale),
             visibility: scale > 0 ? 'visible' : 'hidden',
           }}
         >
-          {Prev && (
-            <div className={styles.layer} style={{ transform: `scale(${scale})` }}>
-              <Prev week={week} />
-            </div>
-          )}
-          <div
-            key={flipCount}
-            className={`${styles.layer} ${styles.layerLive}`}
-            style={{ transform: sharing ? 'none' : `scale(${scale})` }}
-          >
-            <div ref={posterRef}>
-              <Skin week={week} />
-            </div>
-          </div>
+          <motion.div className={styles.slider} style={{ x, gap: PAGE_GAP }}>
+            {pages.map((p, i) => (
+              <div
+                key={p}
+                className={styles.page}
+                style={{ width: frameWidth, height: WEEK_POSTER_HEIGHT * scale, borderRadius: Math.round(26 * scale) }}
+                aria-hidden={i !== page}
+              >
+                <div
+                  className={styles.layer}
+                  style={{ transform: sharing && i === page ? 'none' : `scale(${scale})` }}
+                >
+                  <div ref={(el) => { posterRefs.current[i] = el; }}>
+                    <Skin week={week} page={p} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
         </div>
       </div>
 
-      <div className={styles.skinLabel} style={{ fontFamily: fB }}>
-        <span className={styles.skinName}>{WEEK_SKINS[idx].name}</span>
-        {showHint && <span className={styles.hint}>tap left/right to change style</span>}
-      </div>
-
-      <div className={styles.chipRow} ref={chipRowRef}>
-        {WEEK_SKINS.map((s, i) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`${styles.chip} ${i === idx ? styles.chipActive : ''}`}
-            onClick={() => goToSkin(i)}
-          >
-            {s.name}
-          </button>
-        ))}
-      </div>
+      {pages.length > 1 && (
+        <div className={styles.pager} role="tablist" aria-label="Week posters">
+          {pages.map((p, i) => (
+            <button
+              key={p}
+              type="button"
+              role="tab"
+              aria-selected={i === page}
+              aria-label={PAGE_NAME[p]}
+              className={styles.pagerHit}
+              onClick={() => goTo(i)}
+            >
+              <span className={`${styles.pagerMark} ${i === page ? styles.pagerMarkActive : ''}`} />
+            </button>
+          ))}
+        </div>
+      )}
 
       <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close week recap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
@@ -214,7 +182,7 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
                 <polyline points="16 6 12 2 8 6" />
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
-              Share my week
+              {pages[page] === 'body' ? 'Share what I worked' : 'Share my week'}
             </>
           )}
         </button>

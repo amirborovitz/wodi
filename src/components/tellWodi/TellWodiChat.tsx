@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWodiChat';
-import { CHAT_ANCHOR, useChatViewport } from './useChatViewport';
+import { CHAT_MESSAGE_ATTR, useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
@@ -51,16 +51,13 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
   // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
   // Everything then lands in one step — no opener swapped out, no history pushing it down.
   const warming = !thread.ready || messages.length === 0;
-  const { threadRef, contentRef, onThreadScroll, pinToEnd, screenStyle } = useChatViewport(
-    `${messages.length}:${messages.filter((m) => m.answered).length}:${busy}`,
-  );
+  const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(messages);
 
   const canSend = (draft.trim().length > 0 || photo != null) && busy !== 'saving';
   const submit = (): void => {
     if (!canSend) return;
+    // Your message goes to the top of the screen and the reply fills in under it (useChatViewport).
     send(draft, photo);
-    // Your own message always brings you back to the bottom, even if you'd scrolled up.
-    pinToEnd();
     setDraft('');
     setPhoto(null);
   };
@@ -97,8 +94,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
             <motion.div
               key={message.id}
               className={message.from === 'me' ? styles.rowMe : styles.rowWodi}
-              // The question over an open card stays in view: the thread stops at it, not under the card.
-              {...(message.id === openPanelId ? { [CHAT_ANCHOR]: '' } : {})}
+              {...{ [CHAT_MESSAGE_ATTR]: message.id }}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18 }}
@@ -152,7 +148,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                   type="button"
                   className={styles.change}
                   disabled={busy != null}
-                  onClick={() => { changeAnswer(message.id); pinToEnd(); }}
+                  onClick={() => { changeAnswer(message.id); }}
                 >
                   Change
                 </button>
@@ -180,7 +176,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                     poster={message.board}
                     onOpen={() => {
                       const yes = message.chips?.find((c) => c.action === 'this-board');
-                      if (yes && !message.answered && busy == null) { tapChip(message.id, yes); pinToEnd(); }
+                      if (yes && !message.answered && busy == null) { tapChip(message.id, yes); }
                     }}
                   />
                 </div>
@@ -192,8 +188,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                   disabled={busy != null}
                   dockHost={dockHost}
                   dockHidden={typingFor === message.id}
-                  onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); pinToEnd(); }}
-                  {...(message.cardChip ? { secondary: { label: message.cardChip.label, onClick: () => { tapChip(message.id, message.cardChip!); pinToEnd(); } } } : {})}
+                  onSubmit={(label, answers) => { tapChip(message.id, { label, answers }); }}
+                  {...(message.cardChip ? { secondary: { label: message.cardChip.label, onClick: () => { tapChip(message.id, message.cardChip!); } } } : {})}
                 />
               )}
               {message.chips && !message.answered && (
@@ -209,7 +205,7 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                       }
                       whileTap={{ scale: 0.97 }}
                       disabled={busy != null}
-                      onClick={() => { tapChip(message.id, chip); pinToEnd(); }}
+                      onClick={() => { tapChip(message.id, chip); }}
                     >
                       {chip.label}
                     </motion.button>
@@ -233,6 +229,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
           )}
         </AnimatePresence>
         </div>
+        {/* Room under the newest turn so it can sit at the top while the reply fills in. */}
+        <div ref={spacerRef} aria-hidden="true" />
       </div>
 
       <footer className={`${styles.composer} ${docked ? styles.composerDocked : ''}`}>

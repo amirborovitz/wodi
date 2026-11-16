@@ -5,6 +5,11 @@ import styles from './RecapReadyCard.module.css';
 
 interface RecapReadyCardProps {
   data: RecapData;
+  /**
+   * Not opened yet. Only then does the banner announce itself as a drop — once read, it
+   * stays as a quiet way back in until the next one replaces it, and stops claiming to be new.
+   */
+  fresh: boolean;
   onOpen: () => void;
   onDismiss?: () => void;
 }
@@ -16,15 +21,23 @@ const DROP_PILL: Record<RecapData['scope'], string> = {
   season: 'SEASON DROP',
 };
 
+/** The same pill once it's been opened: what it is, without the "new". */
+const SEEN_PILL: Record<RecapData['scope'], string> = {
+  week: 'LAST WEEK',
+  month: 'LAST MONTH',
+  season: 'LAST SEASON',
+};
+
 /**
  * Today's surprise slot when a recap has dropped (wodi Today v6): a slim banner ABOVE the hero,
  * so it lands in the first glance without pushing the athlete's own poster below the fold. A small
  * tilted "wrapped." keepsake, the drop pill, one line, and × to put it away.
  */
-export function RecapReadyCard({ data, onOpen, onDismiss }: RecapReadyCardProps): React.JSX.Element {
+export function RecapReadyCard({ data, fresh, onOpen, onDismiss }: RecapReadyCardProps): React.JSX.Element {
   const [closing, setClosing] = useState(false);
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-  const headline = data.scope === 'week' ? 'Your week is ready' : `Your ${cap(data.period)} is ready`;
+  const period = data.scope === 'week' ? 'week' : cap(data.period);
+  const headline = fresh ? `Your ${period} is ready` : `Your ${period}, wrapped`;
 
   const handleDismissClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -51,9 +64,9 @@ export function RecapReadyCard({ data, onOpen, onDismiss }: RecapReadyCardProps)
             <span className={styles.tileCount} style={{ fontFamily: fD }}>{data.workouts}</span>
           </div>
           <div className={styles.copy}>
-            <span className={styles.pill} style={{ fontFamily: fB }}>
-              <span className={styles.dot} />
-              {DROP_PILL[data.scope]}
+            <span className={fresh ? styles.pill : styles.pillSeen} style={{ fontFamily: fB }}>
+              {fresh && <span className={styles.dot} />}
+              {fresh ? DROP_PILL[data.scope] : SEEN_PILL[data.scope]}
             </span>
             <span className={styles.headline} style={{ fontFamily: fD }}>{headline}</span>
           </div>

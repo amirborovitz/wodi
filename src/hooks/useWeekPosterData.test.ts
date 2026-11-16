@@ -115,3 +115,37 @@ describe('useWeekPosterData — one tile per machine', () => {
     ]);
   });
 });
+
+describe('useWeekPosterData — the board says why it is in that order', () => {
+  it('marks lifted and bodyweight rows, lifted first, so 70 swings above 204 lunges reads as a rule', () => {
+    const poster = week([
+      workout('a', [
+        { name: 'Dumbbell Snatch', totalReps: 240 },
+        { name: 'Russian Kettlebell Swing', totalReps: 70 },
+        { name: 'Walking Lunge', totalReps: 204 },
+      ]),
+    ]);
+    expect(poster.moves.map(m => [m.reps, m.weighted])).toEqual([[240, true], [70, true], [204, false]]);
+  });
+
+  it('carries the body the week worked, and none when nothing resolved', () => {
+    expect(week([workout('a', [{ name: 'Back Squat', totalReps: 50 }])]).body?.tally.map(r => r.label)).toEqual(['Glutes', 'Quads']);
+    expect(week([workout('a', [{ name: 'Zorbleflip', totalReps: 50 }])]).body).toBeNull();
+  });
+});
+
+describe('weekSoFar — the week in progress, for Home', () => {
+  it('counts this week only, with its time and body', () => {
+    const lastWeek = workout('old', [{ name: 'Deadlift', totalReps: 15 }]);
+    const today = { ...workout('new', [{ name: 'Pull-up', totalReps: 60 }]), date: NOW } as WorkoutWithStats;
+    const { weekSoFar } = buildRecaps([lastWeek, today], NOW);
+    expect(weekSoFar?.sessions).toBe(1);
+    expect(weekSoFar?.moveMinutes).toBe(40);
+    expect(weekSoFar?.bodyAreas.back).toBe(1);
+    expect(weekSoFar?.bodyAreas.hamstrings).toBe(0);
+  });
+
+  it('is absent before the week has a workout', () => {
+    expect(buildRecaps([workout('old', [{ name: 'Deadlift', totalReps: 15 }])], NOW).weekSoFar).toBeNull();
+  });
+});

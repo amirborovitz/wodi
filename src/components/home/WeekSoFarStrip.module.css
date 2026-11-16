@@ -1,0 +1,77 @@
+/* A quiet card under the posters: the posters stay the stage, this is the week growing. */
+.strip {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: #16181c;
+  box-shadow: inset 0 0 0 1px rgba(243, 241, 234, 0.12);
+}
+
+.top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.numbers {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eyebrow {
+  font-family: 'Barlow', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(243, 241, 234, 0.38);
+}
+
+.heroRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.hero {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #f5c200;
+}
+
+.heroUnit {
+  font-family: 'Barlow', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(243, 241, 234, 0.6);
+  white-space: nowrap;
+}
+
+/* The session count, set like the time beside it — off-white, because yellow is the clock's. */
+.count {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: #f3f1ea;
+}
+
+/* The figure and the list of what it lit, side by side. */
+.body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(243, 241, 234, 0.08);
+}

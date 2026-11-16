@@ -99,6 +99,13 @@
   margin-bottom: 2px;
 }
 
+/* Already opened: the same pill, quiet, so nothing on it reads as new. */
+.pillSeen {
+  composes: pill;
+  border-color: rgba(243, 241, 234, 0.24);
+  color: rgba(243, 241, 234, 0.5);
+}
+
 .dot {
   width: 5px;
   height: 5px;

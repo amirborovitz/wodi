@@ -13,6 +13,8 @@
 import React from 'react';
 import { fD, fB, fM } from '../../celebration/faces/HandwrittenFace/brand';
 import { Wordmark } from '../../celebration/faces/HandwrittenFace/PosterComponents';
+import { BodyFigure, BodyTally, type BodyRamp } from '../../body/BodyFigure';
+import type { BodyWorked } from '../../../data/bodyAreas';
 import type { RecapLift } from '../../../hooks/useRecapData';
 import type { WeekPosterMove, WeekPosterTile } from '../../../hooks/useWeekPosterData';
 
@@ -201,6 +203,52 @@ export function WeekLiftBlock({ lifts, ink, dim, accent, rule, prFill, prColor, 
   );
 }
 
+/** The colours the body page is drawn in — the skin's own ink, and its ramp for the figure. */
+export interface WeekBodyColors {
+  /** [untouched, 1, 2, 3+ sessions]. Yellow on dark skins; ink where yellow can't carry a fill. */
+  ramp: BodyRamp;
+  ink: string;
+  dim: string;
+  rule: string;
+}
+
+interface WeekBodyHeroProps extends WeekBodyColors {
+  body: BodyWorked;
+  sessions: number;
+}
+
+/**
+ * The body page's picture: the week's figure, front and back, as big as the frame allows.
+ *
+ * Its own page because the week poster is full — a body squeezed in beside the lifts
+ * pushed the footer off the frame on a busy week. Here the figure is the hero.
+ */
+export function WeekBodyHero({ body, sessions, ramp, ink, dim }: WeekBodyHeroProps): React.JSX.Element {
+  return (
+    <div style={{ marginTop: 64 }}>
+      <div style={{ fontFamily: fD, fontWeight: 900, fontSize: 92, lineHeight: 0.9, textTransform: 'uppercase', color: ink }}>What you worked</div>
+      <div style={{ marginTop: 18, fontFamily: fB, fontWeight: 800, fontSize: 26, letterSpacing: '0.24em', color: dim }}>
+        {sessions} {sessions === 1 ? 'SESSION' : 'SESSIONS'}
+      </div>
+      <div style={{ marginTop: 56, display: 'flex', justifyContent: 'center' }}>
+        <BodyFigure sessions={body.sessions} height={610} ramp={ramp} labelFont={fM} labelSize={26} labelColor={dim} />
+      </div>
+    </div>
+  );
+}
+
+/** The body page's count: every trained part, most sessions first, one bar per session. */
+export function WeekBodyTally({ body, ramp, ink, dim, rule }: { body: BodyWorked } & WeekBodyColors): React.JSX.Element {
+  return (
+    <div style={{ paddingBottom: 18 }}>
+      <div style={{ borderTop: `1px solid ${rule}`, paddingTop: 30 }}>
+        <div style={{ fontFamily: fB, fontWeight: 800, fontSize: 21, letterSpacing: '0.24em', color: dim, marginBottom: 24 }}>SESSIONS PER PART</div>
+        <BodyTally rows={body.tally} nameFont={fD} nameSize={58} nameColor={ink} pipWidth={104} pipHeight={26} ramp={ramp} gap={22} spread />
+      </div>
+    </div>
+  );
+}
+
 interface WeekHeroPairProps {
   hero: string;
   heroUnit: string;
@@ -285,7 +333,11 @@ interface WeekMoveListProps {
 }
 
 /**
- * The week's movements, ranked.
+ * The week's movements, lifted work first, then bodyweight — each group under its own
+ * label. Without the labels the rule read as a mistake: 70 swings above 204 lunges,
+ * because swings were lifted and lunges were not. The label says why, and it is where
+ * the poster says these numbers are reps. No rank numbers: across two groups a "3"
+ * would claim an order the board doesn't have.
  *
  * A setlist, not a bar chart. Each row used to carry a track underneath sized as a
  * share of the leader's reps, which asserted that a step-up rep and a clean rep are
@@ -301,19 +353,25 @@ interface WeekMoveListProps {
 export function WeekMoveList({ moves, ink, dim, accent, rule, inkSoft }: WeekMoveListProps): React.JSX.Element {
   return (
     <div>
-      {moves.map((m, i) => (
+      {moves.map((m, i) => {
+        // Each group opens with its own label, which is also where the unit is said once.
+        const opensGroup = i === 0 || moves[i - 1].weighted !== m.weighted;
+        const closesGroup = i === moves.length - 1 || moves[i + 1].weighted !== m.weighted;
+        return (
         <div
           key={m.name}
           style={{
-            paddingBottom: 22,
-            marginBottom: 22,
-            borderBottom: i < moves.length - 1 ? `1px solid ${rule}` : 'none',
+            paddingBottom: 18,
+            marginBottom: closesGroup && i < moves.length - 1 ? 30 : 18,
+            borderBottom: closesGroup ? 'none' : `1px solid ${rule}`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 22 }}>
-            <div style={{ fontFamily: fM, fontSize: 23, color: dim, width: 34, flexShrink: 0, paddingTop: 4 }}>
-              {i + 1}
+          {opensGroup && (
+            <div style={{ fontFamily: fM, fontSize: 22, letterSpacing: '0.18em', color: dim, marginBottom: 14 }}>
+              {m.weighted ? 'LIFTED' : 'BODYWEIGHT'} · REPS
             </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 22 }}>
             <div
               style={{
                 flex: 1,
@@ -341,7 +399,8 @@ export function WeekMoveList({ moves, ink, dim, accent, rule, inkSoft }: WeekMov
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

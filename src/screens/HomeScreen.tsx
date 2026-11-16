@@ -5,7 +5,9 @@ import { useWorkouts, type WorkoutWithStats } from '../hooks/useWorkouts';
 import { useLongPress } from '../hooks/useLongPress';
 import { useDeleteSheet } from '../hooks/useDeleteSheet';
 import { usePlannedWorkouts } from '../hooks/usePlannedWorkouts';
-import { useRecapData } from '../hooks/useRecapData';
+import { isRecapViewed, useRecapData } from '../hooks/useRecapData';
+import { useWeekSoFarStrip } from '../hooks/useWeekSoFarStrip';
+import { WeekSoFarStrip } from '../components/home/WeekSoFarStrip';
 import { useProfileCompleteness } from '../hooks/useProfileCompleteness';
 import { useHomeScreenInstall } from '../hooks/useHomeScreenInstall';
 import { usePosterEP } from '../hooks/usePosterEP';
@@ -38,13 +40,6 @@ interface HomeScreenProps {
   ringsKey?: number; // kept for API compatibility — unused
 }
 
-function getStartOfWeek(): Date {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(now.getFullYear(), now.getMonth(), diff, 0, 0, 0, 0);
-}
-
 function getSavedTitle(saved: PlannedWorkout): string {
   return saved.parsedWorkout?.title?.trim()
     || saved.parsedWorkout?.exercises?.find((exercise) => exercise.name?.trim())?.name
@@ -67,7 +62,8 @@ export function HomeScreen({
   // either way (the cap only ever sliced it); the rail trims to what it shows (GALLERY_MAX).
   const { workouts, loading, refresh, deleteWorkout, setWorkoutTest } = useWorkouts(Number.MAX_SAFE_INTEGER);
   const { planned, deleteSavedWod } = usePlannedWorkouts();
-  const { weekRecap, monthRecap, seasonRecap } = useRecapData(workouts, user?.id, user?.weight);
+  const { weekRecap, monthRecap, seasonRecap, weekSoFar } = useRecapData(workouts, user?.id, user?.weight);
+  const weekStrip = useWeekSoFarStrip(weekSoFar);
   const profile = useProfileCompleteness();
   // Waits for the first logged workout, so the ask comes after the athlete has seen a poster.
   const homeScreenInstall = useHomeScreenInstall(!loading && workouts.length > 0);
@@ -128,13 +124,6 @@ export function HomeScreen({
   const [pullDistance, setPullDistance] = useState(0);
 
   const firstName = user?.displayName?.split(' ')[0] ?? 'Athlete';
-
-  const weekStart = useMemo(() => getStartOfWeek(), []);
-
-  const weekCount = useMemo(
-    () => workouts.filter(w => w.date >= weekStart).length,
-    [workouts, weekStart],
-  );
 
   const galleryWorkouts = useMemo(() => workouts.slice(0, GALLERY_MAX), [workouts]);
   const posterEP = usePosterEP(galleryWorkouts, user?.weight);
@@ -272,9 +261,6 @@ export function HomeScreen({
             <span className={styles.greetingName}>{firstName}</span>
           </div>
           <div className={styles.headerRight}>
-            {weekCount >= 2 && (
-              <span className={styles.streakChip}>{weekCount} this week</span>
-            )}
             {onOpenProfile && (
               <button
                 type="button"
@@ -304,7 +290,7 @@ export function HomeScreen({
             glance. Holds its slot until dismissed (×) or replaced by the next drop. */}
         {showRecapCard && recapForToday && (
           <div className={styles.recapSlot}>
-            <RecapReadyCard data={recapForToday} onOpen={handleOpenRecap} onDismiss={markRecapDismissed} />
+            <RecapReadyCard data={recapForToday} fresh={!isRecapViewed(recapForToday)} onOpen={handleOpenRecap} onDismiss={markRecapDismissed} />
           </div>
         )}
 
@@ -363,6 +349,14 @@ export function HomeScreen({
             </div>
           )}
         </motion.section>
+
+        {/* The week in progress, under the posters it's made of. Appears with the week's first
+            workout; Monday's recap drop takes over from it. */}
+        {weekStrip && (
+          <div className={styles.weekSlot}>
+            <WeekSoFarStrip week={weekStrip} />
+          </div>
+        )}
 
         {/* Home-screen nudge. Below the athlete's own work — it is the one thing on Today that
             isn't about their training. */}

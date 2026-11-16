@@ -29,7 +29,6 @@ import { syncRecordsForWorkout } from '../services/personalRecordSync';
 import { useWorkouts } from '../hooks/useWorkouts';
 import type { WorkoutWithStats } from '../hooks/useWorkouts';
 import { WorkoutScreen } from './WorkoutScreen';
-import { getWorkoutMuscleGroups, getMuscleGroupSummary } from '../services/muscleGroups';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, RewardData, WorkloadBreakdown, PosterVibeKey, SavedChat, PlannedWorkout } from '../types';
 import { buildLastLoadMap, recentLoads } from '../utils/lastLoadHistory';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
@@ -1697,15 +1696,6 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
         }
       }
 
-      // Calculate muscle groups from exercise names
-      const exerciseNames = exercises.map(e => e.name);
-      const muscleData = getWorkoutMuscleGroups(exerciseNames);
-      const muscleGroups = {
-        muscles: muscleData.muscles,
-        byRegion: muscleData.byRegion,
-        summary: getMuscleGroupSummary(exerciseNames),
-      };
-
       const workloadBreakdown: WorkloadBreakdown | undefined = breakdownFromResults;
 
       const formatLabelMap: Record<string, string> = {
@@ -1743,7 +1733,6 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
           actualTimeMinutes,
           totalVolume,
           totalReps,
-          muscleGroups,
         },
         user.stats?.currentStreak || 0,
         totalWorkoutsForReward,

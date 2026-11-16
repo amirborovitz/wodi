@@ -1,16 +1,6 @@
-/* The week poster stage: one fixed 1080×1920 artifact, scaled to the phone, with
-   the flip chrome under it. Nothing here paints the poster — the skins own that
-   entirely, so this file can never fight a surface for a colour. */
-
-@keyframes flipIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes hintPulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
+/* The week posters stage: one or two fixed 1080×1920 artifacts side by side, scaled
+   to the phone, swiped like a WOD poster's parts. Nothing here paints a poster — the
+   skins own that entirely, so this file can never fight a surface for a colour. */
 
 .root {
   position: fixed;
@@ -23,7 +13,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 18px 16px 0;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -39,14 +29,30 @@
   justify-content: center;
 }
 
+/* The window onto the deck. `pan-y` leaves vertical gestures to the browser and hands
+   every horizontal one to the swipe. */
 .frame {
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
-  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+}
+
+.page {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
   background: #0b0c0e;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
-  -webkit-tap-highlight-color: transparent;
 }
 
 /* The fit-scale lives here and nowhere else — the poster inside stays at its own
@@ -58,67 +64,45 @@
   transform-origin: top left;
 }
 
-.layerLive {
-  animation: flipIn 0.26s linear;
+/* Which poster you're on: the current one is a yellow bar, the other a dot. The marks
+   are small; the buttons around them are a full thumb wide. */
+.pager {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
 }
 
-.skinLabel {
-  flex-shrink: 0;
+.pagerHit {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 18px;
-}
-
-.skinName {
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: rgba(243, 241, 234, 0.5);
-}
-
-.hint {
-  font-family: 'DM Mono', monospace;
-  font-size: 10.5px;
-  color: #f5c200;
-  animation: hintPulse 1.8s ease-in-out infinite;
-}
-
-.chipRow {
-  flex-shrink: 0;
-  display: flex;
-  gap: 7px;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-}
-
-.chipRow::-webkit-scrollbar {
-  display: none;
-}
-
-.chip {
-  flex-shrink: 0;
-  padding: 7px 15px;
-  border-radius: 999px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(243, 241, 234, 0.85);
+  justify-content: center;
   cursor: pointer;
-  font-family: 'Barlow', sans-serif;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  transition: background 0.18s, color 0.18s;
   -webkit-tap-highlight-color: transparent;
 }
 
-.chipActive {
+.pagerMark {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(243, 241, 234, 0.28);
+  transition:
+    width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pagerMarkActive {
+  width: 26px;
   background: #f5c200;
-  color: #0b0c0e;
+}
+
+.pagerHit:focus-visible .pagerMark {
+  outline: 2px solid #f3f1ea;
+  outline-offset: 3px;
 }
 
 .closeBtn {
@@ -155,7 +139,7 @@
 .shareBar {
   flex-shrink: 0;
   width: 100%;
-  padding: 12px 0 calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 4px 0 calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 .shareBtn {
@@ -174,7 +158,7 @@
   justify-content: center;
   gap: 9px;
   -webkit-tap-highlight-color: transparent;
-  transition: opacity 0.12s;
+  transition: opacity 0.12s, transform 0.12s;
   background: linear-gradient(100deg, #f5c200, #ffe14d 60%, #f5c200);
 }
 
@@ -185,6 +169,7 @@
 
 .shareBtn:not(:disabled):active {
   opacity: 0.88;
+  transform: scale(0.98);
 }
 
 .shareBtn:focus-visible {

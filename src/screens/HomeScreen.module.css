@@ -75,18 +75,6 @@
   gap: 8px;
 }
 
-.streakChip {
-  font-family: 'Barlow', sans-serif;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #f3f1ea;
-  border: 1px solid rgba(243, 241, 234, 0.28);
-  border-radius: 999px;
-  padding: 4px 10px;
-  white-space: nowrap;
-  line-height: 1.3;
-}
-
 .avatarBtn {
   position: relative;
   width: 36px;
@@ -165,6 +153,11 @@
 /* The recap banner, between the header and the posters. */
 .recapSlot {
   margin-bottom: 14px;
+}
+
+/* "This week", under the posters. */
+.weekSlot {
+  margin-top: 16px;
 }
 
 /* `overflow: hidden` so the collapse on dismiss clips the card instead of spilling it. */

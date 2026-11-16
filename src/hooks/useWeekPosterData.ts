@@ -13,6 +13,10 @@
 import { useMemo } from 'react';
 import type { RecapData, RecapEngineCell, RecapLift, RecapMoveStat } from './useRecapData';
 import { isLoadedImplement } from '../data/movementRegistry';
+import { bodyWorked, type BodyWorked } from '../data/bodyAreas';
+
+/** Rows in the body page's list — what fits under the figure. */
+const MAX_BODY_ROWS = 5;
 
 /**
  * Three rows is a ranking; six is a spreadsheet.
@@ -28,6 +32,12 @@ const MAX_TILES = 2;
 export interface WeekPosterMove {
   name: string;
   reps: number;
+  /**
+   * Done with a barbell, dumbbell or kettlebell. The board lists lifted work first on
+   * purpose (96 cleans outrank 150 step-ups), and the poster labels the two groups so
+   * that order reads as a rule rather than a mistake.
+   */
+  weighted: boolean;
 }
 
 /** One figure in one unit: "23" + "KM". */
@@ -89,6 +99,10 @@ export interface WeekPosterData {
    * heavy numbers, and these are the engine ones.
    */
   tiles: WeekPosterTile[];
+  /** Every session the week held — the body page says what they added up to. */
+  sessionCount: number;
+  /** The body the week worked: the figure and its list, for the body page. Null when nothing resolved to a body part. */
+  body: BodyWorked | null;
   /** The one handwritten line. Null when the week has nothing to brag with. */
   brag: string | null;
   ep: number;
@@ -97,7 +111,7 @@ export interface WeekPosterData {
 /**
  * Minutes as the athlete would say them: "2:26" past the hour, plain minutes below it.
  */
-function formatMoveTime(minutes: number): { value: string; unit: string } {
+export function formatMoveTime(minutes: number): { value: string; unit: string } {
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
@@ -200,7 +214,10 @@ export function buildWeekPosterData(data: RecapData): WeekPosterData {
   // When the biggest move is already the hero the board starts at the next one,
   // rather than printing the same fact twice.
   const moves = takeBoardRows(data.moveMinutes > 0 ? board : rest)
-    .map((m) => ({ name: m.name, reps: m.reps }));
+    .map((m) => ({ name: m.name, reps: m.reps, weighted: isLoadedImplement(m.implement) }))
+    // Lifted rows, then bodyweight rows, each keeping the board's order — the poster
+    // labels the two groups, so a group must never be split by a row of the other.
+    .sort((a, b) => Number(b.weighted) - Number(a.weighted));
 
   const tiles = buildTiles(data.aerobic?.cells ?? []);
 
@@ -221,6 +238,8 @@ export function buildWeekPosterData(data: RecapData): WeekPosterData {
     sessions,
     moves,
     lifts: data.lifts,
+    sessionCount: data.workouts,
+    body: bodyWorked(data.bodyAreas, MAX_BODY_ROWS),
     tiles,
     brag,
     ep: data.epTotal,
