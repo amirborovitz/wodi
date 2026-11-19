@@ -204,9 +204,34 @@
   color: #0b0c0e;
 }
 
-.chipTick {
-  font-size: 13px;
-  line-height: 1;
+/* The moves, then the confirm under them. */
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+/* The pick's confirm: full width and squared off, so it reads as the action, not one more chip. */
+.confirm {
+  width: 100%;
+  min-height: 54px;
+  border: none;
+  border-radius: 14px;
+  background: #f2f2f0;
+  color: #0b0c0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.confirm:disabled {
+  opacity: 0.5;
 }
 
 .chipSkip {

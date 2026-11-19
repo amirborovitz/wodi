@@ -67,6 +67,7 @@ describe('Tell Wodi — what the chat asks', () => {
 
     const first = nextQuestion(slots, results)!;
     expect(first.text).toBe('What was your time?');
+    expect(first.panel!.meta).toBe('FOR TIME');
     // A card: minutes : seconds, starting empty — never a guessed time — with the cap one tap.
     const clock = first.panel!.groups[0];
     expect(clock).toMatchObject({ control: 'clock', joiner: ':', start: {} });
@@ -317,6 +318,8 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
     let rs = results();
     const question = nextQuestion(openSlots(rs, new Set()), rs)!;
     expect(question.text).toBe('How many rounds did you get?');
+    // The card says what the part is — an AMRAP, never "For time" (GRIND, 2026-11-19).
+    expect(question.panel!.meta).toBe('AMRAP');
     const [group] = question.panel!.groups;
     expect(group.fields.map((f) => [f.field, f.label])).toEqual([['count', 'rounds']]);
 
@@ -338,7 +341,7 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
     const partialSlot = openSlots(rs, closed).find((s) => s.id === '0.partial')!;
     // Started the round on the sit-ups: the run before them was never done.
     const sitUps = pickAnswer(pick, ['Sit-up']);
-    expect(sitUps.button).toBe('Done · 1 move');
+    expect(sitUps.button).toBe('Confirm 1 move');
     expect(sitUps.chip.label).toBe('Sit-up');
     const later = applyAnswer(rs, partialSlot, sitUps.chip.answers[0]);
     expect(later.closed).toBe(true);
@@ -349,7 +352,7 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
     expect(applyAnswer(rs, partialSlot, twoMoves.chip.answers[0]).results[0]).toMatchObject({ partialMovements: ['Run', 'Sit-up'], partialReps: 18 });
 
     const none = pickAnswer(pick, []);
-    expect(none.button).toBe('None of it');
+    expect(none.button).toBe('Just 8 rounds');
     const nothing = applyAnswer(rs, partialSlot, none.chip.answers[0]);
     expect(nothing.closed).toBe(true);
     expect(nothing.results[0].partialMovements).toBeUndefined();
@@ -357,7 +360,7 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
 
     // Every move ticked is one more round, nothing left over.
     const all = pickAnswer(pick, moves);
-    expect(all.button).toBe('Done · full round');
+    expect(all.button).toBe("That's 9 full rounds");
     expect(applyAnswer(rs, partialSlot, all.chip.answers[0]).results[0]).toMatchObject({ rounds: 9, partialMovements: undefined, partialReps: undefined });
   });
 

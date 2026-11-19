@@ -18,6 +18,7 @@ import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty
 import { askableUncertainty } from '../../services/parseUncertainty';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 import { resolveMovement } from '../../data/movementRegistry';
+import { FORMAT_LABELS } from '../home/unfinishedPoster';
 
 const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -1001,23 +1002,28 @@ export interface ChatPick {
   slotId: string;
   /** In board order. `value` is the answer; `label` is what the athlete reads. */
   options: { value: string; label: string }[];
+  /** What confirming with nothing ticked means, in the score's own words — "Just 6 rounds". */
+  none: string;
+  /** What every move ticked means — "That's 7 full rounds". */
+  all: string;
 }
 
 /**
- * The confirm under a pick, for what's ticked. `button`: "None of it" with nothing, "Done · 2 moves",
- * or "Done · full round" when every move is (one more round, not a partial one). `chip` is the
- * answer, said in the thread as the moves themselves — "Echo Bike + Box Step-up".
+ * The confirm under a pick, for what's ticked — said as what it saves: "Just 6 rounds" with
+ * nothing, "Confirm 2 moves", "That's 7 full rounds" with every move (one more round, not a
+ * partial one). `chip` is the answer; in the thread a partial is said as the moves themselves,
+ * "Echo Bike + Box Step-up".
  */
 export function pickAnswer(pick: ChatPick, ticked: readonly string[]): { button: string; chip: ChatChip } {
   const done = pick.options.filter((o) => ticked.includes(o.value));
   const all = done.length > 0 && done.length === pick.options.length;
-  const button = done.length === 0 ? 'None of it'
-    : all ? 'Done · full round'
-    : `Done · ${done.length} ${done.length === 1 ? 'move' : 'moves'}`;
+  const button = done.length === 0 ? pick.none
+    : all ? pick.all
+    : `Confirm ${done.length} ${done.length === 1 ? 'move' : 'moves'}`;
   return {
     button,
     chip: {
-      label: done.length === 0 ? 'None of it' : all ? 'The whole round' : done.map((o) => o.label).join(' + '),
+      label: done.length === 0 ? pick.none : all ? pick.all : done.map((o) => o.label).join(' + '),
       answers: [{ id: pick.slotId, ...EMPTY_ANSWER, moves: done.map((o) => o.value) }],
     },
   };
@@ -1371,12 +1377,17 @@ function formatClock(seconds: number): string {
 }
 
 /**
- * "For time · 6 rds" — what the part is, beside its name on the time card. The rounds only when
- * the part is one block; blocks each carry their own and are named in the poster, not here.
+ * What the part is, beside its name on its card — "AMRAP", "For time · 6 rds" — in the poster's
+ * own words (FORMAT_LABELS). It was "For time" on every card, so an AMRAP's rounds card said
+ * FOR TIME (GRIND, 2026-11-19). The rounds only for a for-time part of one block: an AMRAP's
+ * rounds are its score, and blocks each carry their own. Null when the part names no format.
  */
-function partMeta(result: StoryExerciseResult): string {
-  const { sections, suggestedSets } = result.exercise;
-  return `For time${!sections?.length && suggestedSets > 1 ? ` · ${suggestedSets} rds` : ''}`;
+function partMeta(result: StoryExerciseResult): string | null {
+  const { sections, suggestedSets, loggingMode } = result.exercise;
+  const label = FORMAT_LABELS[loggingMode ?? ''];
+  if (!label) return null;
+  const rounds = loggingMode === 'for_time' && !sections?.length && suggestedSets > 1 ? ` · ${suggestedSets} rds` : '';
+  return `${label}${rounds}`;
 }
 
 /** The unit the board wrote this movement in — the first positive quantity. */
@@ -1485,6 +1496,7 @@ export function nextQuestion(
       // Minutes : seconds on one card, starting empty — a metcon has no last time to start on,
       // and a guess would be a time nobody did. The cap is one tap; typing "17:24" still works.
       const cap = first.cap;
+      const meta = result ? partMeta(result) : null;
       return {
         text: `What was your time${onPart}?`,
         placeholder: 'Or type it — e.g. 17:24',
@@ -1493,7 +1505,7 @@ export function nextQuestion(
         chips: [],
         panel: {
           title: result?.exercise.name ?? first.subject,
-          ...(result ? { meta: partMeta(result) } : {}),
+          ...(meta ? { meta } : {}),
           groups: [{
             title: 'Time',
             control: 'clock',
@@ -1513,6 +1525,7 @@ export function nextQuestion(
       // Full rounds only. How far into the next one is its own question — the moves finished
       // ('partial'), never a rep count across different moves. "About 4 each round" can be typed.
       const windows = first.intervals ?? 1;
+      const meta = result ? partMeta(result) : null;
       return {
         text: `How many rounds did you get${onPart}?`,
         ...(windows > 1 ? {} : { hint: 'Full rounds — the one you didn’t finish comes next.' }),
@@ -1522,7 +1535,7 @@ export function nextQuestion(
         chips: [],
         panel: {
           title: result?.exercise.name ?? first.subject,
-          ...(result ? { meta: partMeta(result) } : {}),
+          ...(meta ? { meta } : {}),
           groups: [{
             title: 'Rounds',
             control: 'boxes',
@@ -1603,9 +1616,14 @@ export function nextQuestion(
       // Each move is tapped on its own, in any order — people start a round on different moves,
       // so "everything up to X" is a guess (GRIND, 2026-11-18: two moves done, one could be said).
       const ladder = result?.exercise.ladderReps ?? [];
-      const into = !result ? 'the next one'
-        : ladder.length > 0 ? `the ${getLadderRungValue(ladder, result.ladderStep ?? 0)}s`
-        : `round ${(result.rounds ?? 0) + 1}`;
+      const rounds = result?.rounds ?? 0;
+      const rung = ladder.length > 0 ? getLadderRungValue(ladder, result?.ladderStep ?? 0) : null;
+      const into = !result ? 'the next one' : rung != null ? `the ${rung}s` : `round ${rounds + 1}`;
+      // The confirm says what it saves, in the score's own words (the "wodi Poster Carousel"
+      // canvas, ConfirmStates).
+      const ends = rung != null || !result
+        ? { none: 'None of it', all: rung != null ? `Finished the ${rung}s` : 'The whole round' }
+        : { none: `Just ${rounds} ${rounds === 1 ? 'round' : 'rounds'}`, all: `That's ${rounds + 1} full rounds` };
       return {
         text: `And into ${into} — which moves did you finish?`,
         slotIds: [first.id],
@@ -1613,6 +1631,7 @@ export function nextQuestion(
         pick: {
           slotId: first.id,
           options: (first.options ?? []).map((option) => ({ value: option, label: stripMovementRolePrefix(option) })),
+          ...ends,
         },
       };
     }
