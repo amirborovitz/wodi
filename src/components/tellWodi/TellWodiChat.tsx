@@ -6,6 +6,7 @@ import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
 import { ChatBoardPreview } from './ChatBoardPreview';
+import { ChatPickCard } from './ChatPickCard';
 import { useCelebrationTakeover } from './useCelebrationTakeover';
 import { WodiText } from './WodiText';
 import { UnfinishedPosterTile } from '../home/UnfinishedPosterTile';
@@ -184,6 +185,9 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
                 </div>
               )}
               {message.preview && <ChatBoardPreview preview={message.preview} />}
+              {message.pick && !message.answered && (
+                <ChatPickCard pick={message.pick} disabled={busy != null} onAnswer={(chip) => { tapChip(message.id, chip); }} />
+              )}
               {message.panel && (
                 <ChatPanelCard
                   panel={message.panel}

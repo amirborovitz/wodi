@@ -59,7 +59,7 @@ const READING_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'swapUnit', 'perInterval', 'unit', 'noLoad'],
+          required: ['id', 'skipped', 'seconds', 'count', 'extraReps', 'weight', 'weightEnd', 'weights', 'choice', 'swapTo', 'swapAmount', 'swapUnit', 'perInterval', 'unit', 'noLoad', 'moves'],
           properties: {
             id: { type: 'string' },
             skipped: { type: 'boolean' },
@@ -76,6 +76,7 @@ const READING_SCHEMA = {
             perInterval: { type: 'boolean' },
             unit: { anyOf: [{ type: 'string', enum: ['kg', 'lb'] }, { type: 'null' }] },
             noLoad: { type: 'boolean' },
+            moves: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] },
           },
         },
       },
@@ -112,8 +113,9 @@ just finished a workout and is texting you about it. Your job has two parts.
      answered in one message ("bike 15, box jumps 12, burpees 10") — one entry each.
    - "ladder": the last rung they FINISHED, as that rung's rep number ("got through the 12s",
      "finished 12, died in the 15s" → count 12). Only numbers from "rungs" are valid.
-   - "partial": how far into the next rung they got — choice = the LAST move they finished from
-     "options", or "none" if they finished none of it.
+   - "partial": the moves they finished in the round or rung they didn't complete — moves = each
+     one, copied exactly from "options", in any order (people start a round on different moves);
+     [] if they finished none of it. Every other answer: moves = null.
    - "duration": seconds.
    - "weight": the load in the question's unit, in one of three shapes:
        · one weight for every set ("80", "80 all sets") → weight = 80.

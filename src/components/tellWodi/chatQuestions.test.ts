@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults, type StoryExerciseResult } from '../logging/story/types';
 import { toLegacyResult } from '../logging/story/StoryLogResults';
-import { EMPTY_ANSWER, applyAnswer, carriedLoads, describeAnswer, nextQuestion, openSlots, panelAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, applyAnswer, carriedLoads, describeAnswer, nextQuestion, openSlots, panelAnswer, pickAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import { buildSavedExercises } from '../../services/buildSavedExercises';
 import type { ParsedWorkout, Workout } from '../../types';
@@ -100,7 +100,7 @@ describe('Tell Wodi — what the chat asks', () => {
     const afterWeights = openSlots(results, new Set(['0.time', '0.weight.alt dumbbell snatch', '0.weight.weighted alt box step-up']));
     const choice = nextQuestion(afterWeights, results)!;
     expect(choice.text).toBe('Cash-out: Double Under or Single Under?');
-    expect(choice.chips.map((c) => c.label)).toEqual(['200 Double Under', '400 Single Under', 'Skip']);
+    expect(choice.chips.map((c) => c.label)).toEqual(['Double Under', 'Single Under', 'Skip']);
   });
 
   it('a finished chat saves what a form save would: the time, both loads, and 400 singles', () => {
@@ -278,7 +278,7 @@ describe('Tell Wodi — what the chat asks', () => {
       expect(slots.find((s) => s.id === '0.swap.double under')?.asked).toBe(false);
       const choice = nextQuestion(slots, results)!;
       expect(choice.text).toBe('Cash-out: Single Under again, or Double Under today?');
-      expect(choice.chips.map((c) => c.label)).toEqual(['400 Single Under', '200 Double Under', 'Skip']);
+      expect(choice.chips.map((c) => c.label)).toEqual(['Single Under', 'Double Under', 'Skip']);
     });
 
     it('no habit, no extra question', () => {
@@ -328,18 +328,37 @@ describe('Tell Wodi — PLATE STORM (AMRAP rounds + extra reps)', () => {
 
     const closed = new Set(['0.rounds']);
     const partial = nextQuestion(openSlots(rs, closed), rs)!;
-    expect(partial.text).toBe('And into round 9 — how far did you get?');
-    expect(partial.chips.map((c) => c.label)).toEqual(['None of it', 'Through Run', 'Through Sit-up']);
+    expect(partial.text).toBe('And into round 9 — which moves did you finish?');
+    // Every move on its own, tapped in any order — never "everything up to X" (GRIND, 2026-11-18).
+    expect(partial.chips).toEqual([]);
+    const pick = partial.pick!;
+    const moves = pick.options.map((o) => o.value);
+    expect(moves.slice(0, 2)).toEqual(['Run', 'Sit-up']);
 
     const partialSlot = openSlots(rs, closed).find((s) => s.id === '0.partial')!;
-    const through = applyAnswer(rs, partialSlot, partial.chips[2].answers[0]);
-    expect(through.closed).toBe(true);
-    expect(through.results[0]).toMatchObject({ rounds: 8, partialMovements: ['Run', 'Sit-up'], partialReps: 18 });
+    // Started the round on the sit-ups: the run before them was never done.
+    const sitUps = pickAnswer(pick, ['Sit-up']);
+    expect(sitUps.button).toBe('Done · 1 move');
+    expect(sitUps.chip.label).toBe('Sit-up');
+    const later = applyAnswer(rs, partialSlot, sitUps.chip.answers[0]);
+    expect(later.closed).toBe(true);
+    expect(later.results[0]).toMatchObject({ rounds: 8, partialMovements: ['Sit-up'], partialReps: 18 });
 
-    const none = applyAnswer(rs, partialSlot, partial.chips[0].answers[0]);
-    expect(none.closed).toBe(true);
-    expect(none.results[0].partialMovements).toBeUndefined();
-    expect(none.results[0].partialReps).toBeUndefined();
+    const twoMoves = pickAnswer(pick, ['Sit-up', 'Run']);
+    expect(twoMoves.chip.label).toBe('Run + Sit-up');
+    expect(applyAnswer(rs, partialSlot, twoMoves.chip.answers[0]).results[0]).toMatchObject({ partialMovements: ['Run', 'Sit-up'], partialReps: 18 });
+
+    const none = pickAnswer(pick, []);
+    expect(none.button).toBe('None of it');
+    const nothing = applyAnswer(rs, partialSlot, none.chip.answers[0]);
+    expect(nothing.closed).toBe(true);
+    expect(nothing.results[0].partialMovements).toBeUndefined();
+    expect(nothing.results[0].partialReps).toBeUndefined();
+
+    // Every move ticked is one more round, nothing left over.
+    const all = pickAnswer(pick, moves);
+    expect(all.button).toBe('Done · full round');
+    expect(applyAnswer(rs, partialSlot, all.chip.answers[0]).results[0]).toMatchObject({ rounds: 9, partialMovements: undefined, partialReps: undefined });
   });
 
   it('a typed "8 + 12" still lands, and the next-round question is not asked again', () => {
@@ -1003,3 +1022,39 @@ describe('a metcon count on the pad', () => {
     expect(bike?.quick).toEqual([]);
   });
 });
+
+describe('a board that says "with dumbbell or bodyweight"', () => {
+  // GORILLOT, 2026-11-17: "100 Box Step-up with Dumbbell or bodyweight", in pairs. The chat asked the
+  // dumbbell's weight, then "Dumbbell Box Step-up or Box Step-up?" with the team's 100 on each button.
+  const stepUp = {
+    name: 'Dumbbell Box Step-up', reps: 100, rxWeights: rx, inputType: 'weight', equipment: 'dumbbell', implementCount: 1,
+    alternative: { name: 'Box Step-up', reps: 100 },
+  } as ParsedMovement;
+  const part = {
+    name: 'For time', type: 'wod', loggingMode: 'for_time', prescription: 'For time', rawText: '100 Box Step-up with Dumbbell or bodyweight',
+    movements: [stepUp],
+  } as unknown as ParsedExercise;
+  const fresh = (): StoryExerciseResult[] => [createBlankResult(part, 0, 'for_time', 'male', undefined, true, { blankAnswers: true })];
+  const weightSlot = (results: StoryExerciseResult[]) => openSlots(results, new Set()).find((s) => s.kind === 'weight')!;
+
+  it('is one weight question with "No weight" on it — never a separate which-one question', () => {
+    const results = fresh();
+    const slots = openSlots(results, new Set());
+    expect(slots.some((s) => s.kind === 'choice')).toBe(false);
+    expect(weightSlot(results).orBodyweight).toBe(true);
+  });
+
+  it('no weight saves the bodyweight side; a weight saves the dumbbell side', () => {
+    const bodyweight = applyAnswer(fresh(), weightSlot(fresh()), answer(weightSlot(fresh()).id, { noLoad: true }));
+    const bw = bodyweight.results[0].movementResults!.find((m) => m.movement.name === 'Dumbbell Box Step-up')!;
+    expect(bodyweight.closed).toBe(true);
+    expect(bw.substitution?.selectedName).toBe('Box Step-up');
+    expect(bw.loadMode).toBe('bodyweight');
+
+    const loaded = applyAnswer(bodyweight.results, weightSlot(fresh()), answer(weightSlot(fresh()).id, { weight: 15 }));
+    const db = loaded.results[0].movementResults!.find((m) => m.movement.name === 'Dumbbell Box Step-up')!;
+    expect(db.substitution).toBeFalsy();
+    expect(db.weight).toBe(15);
+  });
+});
+

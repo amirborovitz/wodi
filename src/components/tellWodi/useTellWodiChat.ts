@@ -16,6 +16,7 @@ import {
   openSlots,
   readAnswerLocally,
   type ChatPanel,
+  type ChatPick,
   type ChatQuestion,
   type ChatSlot,
   type SlotAnswer,
@@ -64,6 +65,8 @@ export interface ChatMessage {
   chips?: ChatChipView[];
   /** Boxes to answer in, when the answer is several numbers (see ChatQuestion.panel). */
   panel?: ChatPanel;
+  /** Moves to tick, then one confirm (see ChatQuestion.pick). */
+  pick?: ChatPick;
   /** The card's quiet button in Skip's place — "Didn't do it" when a saved board's chat reopens on a card. */
   cardChip?: ChatChipView;
   /** A question whose chips were used, or which a later message answered — drawn dimmed. */
@@ -549,6 +552,7 @@ export function useTellWodiChat({
       ...(question.hint ? { hint: question.hint } : {}),
       ...(question.placeholder ? { placeholder: question.placeholder } : {}),
       ...(question.panel ? { panel: question.panel } : {}),
+      ...(question.pick ? { pick: question.pick } : {}),
       ...(cardChip ? { cardChip } : {}),
       ...(chips.length > 0 ? { chips } : {}),
     });

@@ -347,7 +347,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
   it('a ladder AMRAP is the rung finished, then how far into the next', () => {
     const { results, cards } = play('board-ascending-ladder-amrap', {
       ladder: (slot) => ({ count: slot.rungs![3] }),
-      partial: (slot) => ({ choice: slot.options![0] }),
+      partial: (slot) => ({ moves: [slot.options![0]] }),
     });
     expect(cards[0]).toBe('Which rung did you finish?');
     expect(results[0].ladderStep).toBe(4);

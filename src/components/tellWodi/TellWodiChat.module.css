@@ -170,6 +170,7 @@
 /* Answers are neutral pills; the one that commits (Remember) is solid white. Dashed is reserved
    for "waiting", so nothing here is dashed. */
 .chip,
+.chipOn,
 .chipPrimary,
 .chipSkip {
   min-height: 44px;
@@ -191,6 +192,21 @@
   background: #f2f2f0;
   border: 1px solid #f2f2f0;
   color: #0b0c0e;
+}
+
+/* A move ticked in the unfinished round — the app's one yellow, so what's counted reads at a glance. */
+.chipOn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--wodi-yellow);
+  border: 1px solid var(--wodi-yellow);
+  color: #0b0c0e;
+}
+
+.chipTick {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .chipSkip {
@@ -218,6 +234,7 @@
 .change:disabled { opacity: 0.5; }
 
 .chip:disabled,
+.chipOn:disabled,
 .chipPrimary:disabled,
 .chipSkip:disabled {
   opacity: 0.5;

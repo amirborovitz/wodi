@@ -69,8 +69,20 @@ describe('poster order — which part leads, and what follows', () => {
       .toEqual(['EMOM 12', '3 Sets Strength', 'Double Under Focus']);
   });
 
-  it('keeps board order between two metcons — how a part is scored never ranks it', () => {
-    expect(posterOrder([AMRAP, BACK_SQUAT, FOR_TIME])).toEqual(['16 Minutes AMRAP', '21-15-9', 'Back Squat']);
+  it('between two metcons the later one on the board leads — a class builds to the WOD', () => {
+    expect(posterOrder([AMRAP, BACK_SQUAT, FOR_TIME])).toEqual(['21-15-9', '16 Minutes AMRAP', 'Back Squat']);
+  });
+
+  it('GRIND (2026-11-18): a gymnastics block the parse called "metcon" no longer leads the AMRAP', () => {
+    const gymnastics = part({
+      name: '4 Sets Gymnastics / Bodyweight', type: 'skill', loggingMode: 'bodyweight', partKind: 'metcon', isSecondary: true,
+      movements: [{ name: 'Strict Chest to Bar Pull-up' }, { name: 'Dip' }] as Exercise['movements'],
+    });
+    const amrap20 = part({
+      name: '20 Minutes AMRAP', type: 'wod', loggingMode: 'amrap', partKind: 'metcon', isSecondary: false,
+      movements: [{ name: 'Echo Bike', inputType: 'calories' }, { name: 'Push-up' }] as Exercise['movements'],
+    });
+    expect(posterOrder([gymnastics, amrap20])).toEqual(['20 Minutes AMRAP', '4 Sets Gymnastics / Bodyweight']);
   });
 
   it('leads with the metcon on a workout saved before part kinds were', () => {

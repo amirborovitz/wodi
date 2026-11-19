@@ -67,7 +67,7 @@ const POSTER_RANK: Record<WorkoutPartKind, number> = { metcon: 0, strength: 1, s
 
 /**
  * The order a session's posters are shown in: the metcon, then strength, then practice — board
- * order within each. Decided HERE, once. Every part is its own poster, so the posters never
+ * order within each, except metcons, where the last one written leads. Decided HERE, once. Every part is its own poster, so the posters never
  * reorder themselves; whatever shows a whole session takes the deck in this order, and a surface
  * that shows one poster takes the first.
  *
@@ -76,5 +76,13 @@ const POSTER_RANK: Record<WorkoutPartKind, number> = { metcon: 0, strength: 1, s
  * it used to open the deck ahead of the metcon because it wasn't strength and came first.
  */
 export function orderPosterParts(parts: readonly Exercise[]): Exercise[] {
-  return [...parts].sort((a, b) => POSTER_RANK[posterPartKind(a)] - POSTER_RANK[posterPartKind(b)]);
+  return parts
+    .map((part, index) => ({ part, index, kind: posterPartKind(part) }))
+    .sort((a, b) => POSTER_RANK[a.kind] - POSTER_RANK[b.kind]
+      // Two metcons: the later one on the board leads (owner, 2026-11-19). A class builds to the
+      // WOD — what comes before it on the board is the warm-up, the practice, the strength —
+      // so when the parse names two parts "metcon", the last written is the day's WOD
+      // (GRIND, 2026-11-18: a gymnastics block called "metcon" led its AMRAP).
+      || (a.kind === 'metcon' ? b.index - a.index : a.index - b.index))
+    .map(({ part }) => part);
 }

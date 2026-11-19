@@ -17,6 +17,7 @@ import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
+import { resolveMovement } from '../../data/movementRegistry';
 
 const NO_HABITS: ReadonlyMap<string, SwapHabit> = new Map();
 const NO_IDS: ReadonlySet<string> = new Set();
@@ -84,6 +85,11 @@ export interface ChatSlot {
   equipment?: MovementEquipment;
   /** A pair of dumbbells or kettlebells — the weight is answered per bell, and said "2 × 16 kg". */
   pair?: boolean;
+  /**
+   * The board's either/or is this same movement without the load ("box step-up with dumbbell or
+   * bodyweight"): "No weight" is an answer on the weight card, and it saves the board's other side.
+   */
+  orBodyweight?: boolean;
   /**
    * A weight slot after another movement in the same part already has its load: that load, so
    * "same" is one tap. Often the same kettlebell or dumbbell — often not, so it's asked, never copied.
@@ -156,11 +162,16 @@ export interface SlotAnswer {
   unit: LoadUnit | null;
   /** No load at all — a band, bodyweight, "no weight". An answer, not a skip. */
   noLoad: boolean;
+  /**
+   * A 'partial' answer: every move they finished in the round they didn't complete, in any order
+   * — people start a round on different moves. [] = none of it.
+   */
+  moves: string[] | null;
 }
 
 export const EMPTY_ANSWER: Omit<SlotAnswer, 'id'> = {
   skipped: false, seconds: null, count: null, extraReps: null, weight: null, weightEnd: null, weights: null,
-  choice: null, swapTo: null, swapAmount: null, swapUnit: null, perInterval: false, unit: null, noLoad: false,
+  choice: null, swapTo: null, swapAmount: null, swapUnit: null, perInterval: false, unit: null, noLoad: false, moves: null,
 };
 
 const isScoredKind = (r: StoryExerciseResult): boolean =>
@@ -168,9 +179,6 @@ const isScoredKind = (r: StoryExerciseResult): boolean =>
 
 /** Rungs offered past the board's last one — for the athlete who climbed further than it wrote. */
 const LADDER_EXTRA_RUNGS = 3;
-
-/** A 'partial' answer meaning they finished no move of the next rung or round. */
-const NONE_FINISHED = 'none';
 
 /**
  * The moves of the rung or round they didn't finish, in board order, each with what finishing it
@@ -231,6 +239,19 @@ function distinctChoiceMovements(result: StoryExerciseResult): MovementResult[] 
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * The board's either/or is the same movement done without the load — "dumbbell box step-up or
+ * bodyweight", "weighted pull-up / pull-up". That isn't a choice between two movements, it's the
+ * weight question with "no weight" as an answer: one question, never "which one?" after the weight
+ * was already given. Same movement = the registry's one identity (resolveMovement), never a name match.
+ */
+function isLoadOrBodyweight(mr: MovementResult): boolean {
+  const alternative = mr.movement.alternative?.name;
+  if (mr.kind !== 'load' || !alternative) return false;
+  const family = resolveMovement(mr.movement.name).familyId;
+  return family != null && family === resolveMovement(alternative).familyId;
 }
 
 const loadAnswered = (mr: MovementResult): boolean =>
@@ -486,6 +507,7 @@ export function openSlots(
           subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
           rxWeights: rxPair(mr), unit: knownLoadUnit(mr.movement), equipment: mr.movement.equipment, asked: true,
           ...(isPair(mr.movement) ? { pair: true } : {}),
+          ...(isLoadOrBodyweight(mr) ? { orBodyweight: true } : {}),
           ...(sameAs ? { sameAs } : {}),
         });
       }
@@ -526,6 +548,8 @@ export function openSlots(
     }
 
     for (const mr of distinctChoiceMovements(r)) {
+      // With or without the load is answered on the weight card (isLoadOrBodyweight).
+      if (isLoadOrBodyweight(mr)) continue;
       if (!toAsk(`${key}.choice.${mr.movement.name.toLowerCase()}`, Boolean(mr.substitution))) continue;
       const alternative = mr.movement.alternative!.name;
       const habit = habits.get(habitKey(mr.movement.name));
@@ -807,13 +831,23 @@ export function applyAnswer(
     }
 
     case 'partial': {
-      // "Through the thrusters": every move up to and including it, each adding its own reps.
+      // Each move they finished, whatever order they did them in; each adds its own reps.
+      if (answer.moves == null) return { results, closed: false };
       const options = slot.options ?? [];
-      const picked = answer.choice?.trim().toLowerCase();
-      if (picked == null) return { results, closed: false };
-      const upTo = options.findIndex((o) => o.toLowerCase() === picked);
-      if (picked !== NONE_FINISHED && upTo < 0) return { results, closed: false };
-      const done = upTo < 0 ? [] : options.slice(0, upTo + 1);
+      const said = new Set(answer.moves.map((m) => m.trim().toLowerCase()));
+      const done = options.filter((o) => said.has(o.toLowerCase()));
+      if (done.length < said.size) return { results, closed: false };
+      // Every move of it is the whole round (or rung) — one more, with nothing left over.
+      if (options.length > 0 && done.length === options.length) {
+        return {
+          results: patchResult(results, i, (r) => ({
+            ...((r.exercise.ladderReps ?? []).length > 0 ? { ladderStep: (r.ladderStep ?? 0) + 1 } : { rounds: (r.rounds ?? 0) + 1 }),
+            partialMovements: undefined,
+            partialReps: undefined,
+          })),
+          closed: true,
+        };
+      }
       return {
         results: patchResult(results, i, (r) => {
           const reps = partialMoves(r).filter((m) => done.includes(m.name)).reduce((sum, m) => sum + m.reps, 0);
@@ -847,11 +881,16 @@ export function applyAnswer(
     case 'weight': {
       const load = loadPatch(answer);
       if (!load) return { results, closed: false };
+      // On a "with or without the load" movement the answer also says which side was done: no
+      // weight is the board's other side, a weight is the movement as written.
+      const side = (mr: MovementResult): Partial<MovementResult> => (
+        slot.orBodyweight ? buildSubstitutionPatch(mr, load.loadMode === 'bodyweight' ? alternativeSubstitution(mr) : null) : {}
+      );
       const weighed = patchResult(results, i, (r) => (
         usesResultLevelLoad(r)
           // The lone movement carries it too, so the result reads as filled everywhere.
-          ? { ...load, ...patchMovements(r, slot.movementNames ?? [], () => load) }
-          : patchMovements(r, slot.movementNames ?? [], () => load)
+          ? { ...load, ...patchMovements(r, slot.movementNames ?? [], (mr) => ({ ...side(mr), ...load })) }
+          : patchMovements(r, slot.movementNames ?? [], (mr) => ({ ...side(mr), ...load }))
       ));
       // "53 lb" says the unit too — the same as answering the unit question.
       return {
@@ -954,6 +993,34 @@ export interface ChatQuestion {
    * (panelAnswer), never a second path to the workout.
    */
   panel?: ChatPanel;
+  /** Moves to tick, any number in any order, then one confirm (pickAnswer) — the partial round. */
+  pick?: ChatPick;
+}
+
+export interface ChatPick {
+  slotId: string;
+  /** In board order. `value` is the answer; `label` is what the athlete reads. */
+  options: { value: string; label: string }[];
+}
+
+/**
+ * The confirm under a pick, for what's ticked. `button`: "None of it" with nothing, "Done · 2 moves",
+ * or "Done · full round" when every move is (one more round, not a partial one). `chip` is the
+ * answer, said in the thread as the moves themselves — "Echo Bike + Box Step-up".
+ */
+export function pickAnswer(pick: ChatPick, ticked: readonly string[]): { button: string; chip: ChatChip } {
+  const done = pick.options.filter((o) => ticked.includes(o.value));
+  const all = done.length > 0 && done.length === pick.options.length;
+  const button = done.length === 0 ? 'None of it'
+    : all ? 'Done · full round'
+    : `Done · ${done.length} ${done.length === 1 ? 'move' : 'moves'}`;
+  return {
+    button,
+    chip: {
+      label: done.length === 0 ? 'None of it' : all ? 'The whole round' : done.map((o) => o.label).join(' + '),
+      answers: [{ id: pick.slotId, ...EMPTY_ANSWER, moves: done.map((o) => o.value) }],
+    },
+  };
 }
 
 /** One box: the slot it answers and which number of that answer it holds. */
@@ -1212,7 +1279,8 @@ function weightGroup(slot: ChatSlot, name: string, unit: string, title: string, 
   const same = likely.same;
   // A load the board never weighed, on kit that isn't a weight by nature (a band, a plate, "other")
   // — "No weight" is an answer here. A barbell, dumbbell or kettlebell always carries a weight.
-  const mayBeUnloaded = !slot.rxWeights?.length && !WEIGHTED_KIT.has(slot.equipment ?? 'other');
+  // And on any movement the board itself said could be done without it ("or bodyweight").
+  const mayBeUnloaded = slot.orBodyweight === true || (!slot.rxWeights?.length && !WEIGHTED_KIT.has(slot.equipment ?? 'other'));
   // A load given as a weight per set has no pill to land in; a build from one weight to another
   // lands only where there's a peak to hold it.
   const sameFits = same && !same.weights?.length && (inSets || same.weightEnd == null);
@@ -1532,25 +1600,20 @@ export function nextQuestion(
       };
     }
     case 'partial': {
-      // Moves are done in order, so "how far into the next rung / round" is one tap: the last move
-      // finished.
-      const options = first.options ?? [];
+      // Each move is tapped on its own, in any order — people start a round on different moves,
+      // so "everything up to X" is a guess (GRIND, 2026-11-18: two moves done, one could be said).
       const ladder = result?.exercise.ladderReps ?? [];
       const into = !result ? 'the next one'
         : ladder.length > 0 ? `the ${getLadderRungValue(ladder, result.ladderStep ?? 0)}s`
         : `round ${(result.rounds ?? 0) + 1}`;
       return {
-        text: `And into ${into} — how far did you get?`,
-        hint: 'The last move you finished.',
+        text: `And into ${into} — which moves did you finish?`,
         slotIds: [first.id],
-        chips: [
-          { label: 'None of it', answers: [{ id: first.id, ...EMPTY_ANSWER, choice: NONE_FINISHED }] },
-          // Through the last move is the whole rung — that's the rung answer, not a partial one.
-          ...options.slice(0, -1).map((option) => ({
-            label: `Through ${stripMovementRolePrefix(option)}`,
-            answers: [{ id: first.id, ...EMPTY_ANSWER, choice: option }],
-          })),
-        ],
+        chips: [],
+        pick: {
+          slotId: first.id,
+          options: (first.options ?? []).map((option) => ({ value: option, label: stripMovementRolePrefix(option) })),
+        },
       };
     }
     case 'score':
@@ -1582,11 +1645,11 @@ export function nextQuestion(
       const [asWritten, alternative] = first.options ?? [];
       // The options are the answer values; what the athlete reads is the movement's own name.
       const [writtenLabel, alternativeLabel] = [asWritten, alternative].map((o) => stripMovementRolePrefix(o ?? ''));
-      const mr = result?.movementResults?.find((m) => m.movement.name === first.movementNames?.[0]);
-      const qty = (n?: number): string => (n ? `${n} ` : '');
+      // Which movement, nothing more: the board's number is no part of the question — and on a
+      // partner board it's the team's, not theirs.
       const sides: ChatChip[] = [
-        { label: `${qty(mr?.movement.reps)}${writtenLabel}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
-        { label: `${qty(mr?.movement.alternative?.reps)}${alternativeLabel}`, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
+        { label: writtenLabel, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: asWritten }] },
+        { label: alternativeLabel, answers: [{ id: first.id, ...EMPTY_ANSWER, choice: alternative }] },
       ];
       const prefix = first.subject === first.movementNames?.[0] ? '' : `${first.subject}: `;
       // Their usual side goes first and is named as usual — still a question, never a pre-fill.
