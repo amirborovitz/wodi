@@ -313,6 +313,9 @@ export function SkinFoil({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
         </div>
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* footer — dark metal strip, wordmark only. The achievement badge lives on whichever page earned it. */}
       <div style={{ position: 'relative', zIndex: 5, background: 'rgba(8,9,12,0.66)', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderTop: '1px solid rgba(232,231,239,0.10)' }}>
         <Wordmark color={FOIL_WHITE} dot={BRAND.yellow} size={17} />

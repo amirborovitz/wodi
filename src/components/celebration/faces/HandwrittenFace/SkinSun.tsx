@@ -208,6 +208,9 @@ export function SkinSun({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibeL
         </div>
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* Footer — a thin ruled line on the same paper, wordmark signing it. */}
       <div style={{ borderTop: `1.5px solid ${RULE}`, margin: '0 20px', padding: '9px 0 11px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={INK} dot={BRAND.yellow} size={17} />

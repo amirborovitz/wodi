@@ -342,6 +342,8 @@ export function HomeScreen({
                   <PosterThumbnail
                     workout={workout}
                     ep={posterEP.get(workout.id)}
+                    // Every poster on the rail is at most 3:4 — a long one folds its middle rows (PosterCard).
+                    maxHeightRatio={4 / 3}
                     onClick={() => handleSelectWorkout(workout)}
                   />
                 </div>

@@ -267,6 +267,9 @@ export function SkinPress({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         </div>
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* Footer — wordmark only. The achievement badge lives on whichever page earned it. */}
       <div style={{ background: BRAND.paperInk, color: BRAND.paper, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <Wordmark color={BRAND.paper} dot={BRAND.yellow} size={17} />

@@ -263,6 +263,9 @@ export function SkinHazard({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVi
         </div>
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* Footer — wordmark only. The achievement badge lives on whichever page earned it. */}
       <div style={{ background: STRIPE_BG, padding: '9px 14px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
         <span style={{ background: BRAND.ink, padding: '2px 8px 3px', borderRadius: 999 }}>

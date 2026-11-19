@@ -293,6 +293,9 @@ export function SkinAurum({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         )}
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* footer — gold-hairline strip, wordmark only */}
       <div style={{ position: 'relative', zIndex: 5, padding: '11px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${AU_HAIRLINE}` }}>
         <Wordmark color={AU_WHITE} dot={BRAND.yellow} size={17} />

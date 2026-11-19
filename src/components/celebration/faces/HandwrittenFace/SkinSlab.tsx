@@ -188,6 +188,9 @@ export function SkinSlab({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVibe
         </div>
       </div>
 
+      {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+      <div data-poster-spacer aria-hidden="true" />
+
       {/* Yellow brand strip — wordmark only. Static and non-swipable: the achievement badge
           lives on whichever poster page actually earned it (see the hero above), never here. */}
       <div style={{ background: BRAND.yellow, color: BRAND.ink, padding: '8px 16px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>

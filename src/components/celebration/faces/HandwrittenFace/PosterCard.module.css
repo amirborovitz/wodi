@@ -10,3 +10,23 @@
   left: 50%;
   transform-origin: top center;
 }
+
+/* A fixed frame (maxHeightRatio — Today's rail): the skin fills the frame's whole height, and
+   every skin's spacer (data-poster-spacer, just above its footer) takes what's left, so the
+   footer sits on the bottom edge and every card's outer size is the same. Chalk keeps its footer
+   inside its paper (data-poster-sheet), so the paper stretches too. */
+.cardFixed > :first-child {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--poster-height);
+}
+
+.cardFixed [data-poster-sheet] {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardFixed [data-poster-spacer] {
+  flex-grow: 1;
+}

@@ -55,7 +55,7 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
         boxShadow: '0 3px 6px rgba(0,0,0,0.3)', transform: 'rotate(-2.5deg)', zIndex: 2,
       }} />
 
-      <div style={{
+      <div data-poster-sheet style={{
         width: '100%', background: BRAND.paper, color: BRAND.paperInk, borderRadius: 5,
         padding: compact ? '18px 20px 13px' : '20px 22px 16px',
         boxShadow: '0 24px 55px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.05)',
@@ -240,6 +240,9 @@ export function SkinChalk({ wod, vibe, vibeOffset, onVibeMove, onVibeDrop, onVib
             </DraggableVibeStamp>
           )}
         </div>
+
+        {/* Takes the room a fixed frame leaves (PosterCard maxHeightRatio), so the footer sits on its bottom edge. Nothing anywhere else. */}
+        <div data-poster-spacer aria-hidden="true" />
 
         {/* Footer: wordmark only — the achievement badge lives on whichever page earned it. */}
         <div style={{ display: 'flex', marginTop: compact ? 8 : 12, alignItems: 'center', justifyContent: 'flex-end' }}>

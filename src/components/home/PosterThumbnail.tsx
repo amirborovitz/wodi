@@ -12,6 +12,8 @@ interface PosterThumbnailProps {
   fullWidth?: boolean;
   /** The workout's EP, printed beside its day — Home's rail passes it; the Gallery grid doesn't. */
   ep?: number;
+  /** Height ÷ width the poster may not exceed — Today's rail passes 4/3 (PosterCard). */
+  maxHeightRatio?: number;
 }
 
 function formatPosterDate(date: Date): string {
@@ -33,7 +35,7 @@ function getRelativeLabel(date: Date): string {
   return formatPosterDate(date);
 }
 
-export function PosterThumbnail({ workout, onClick, fullWidth, ep }: PosterThumbnailProps): React.ReactElement {
+export function PosterThumbnail({ workout, onClick, fullWidth, ep, maxHeightRatio }: PosterThumbnailProps): React.ReactElement {
   const frameRef = useRef<HTMLButtonElement>(null);
   // A poster is the full skin at small scale — building one per card for a whole history would
   // stall the Gallery on open. Build it only once the card is about to scroll into view.
@@ -45,15 +47,15 @@ export function PosterThumbnail({ workout, onClick, fullWidth, ep }: PosterThumb
   const relativeLabel = getRelativeLabel(getEffectiveWorkoutDate(workout));
 
   return (
-    <div className={`${styles.wrapper} ${fullWidth ? styles.wrapperFull : ''}`}>
+    <div className={`${styles.wrapper} ${fullWidth ? styles.wrapperFull : styles.wrapperRail}`}>
       <button
         ref={frameRef}
         type="button"
-        className={`${styles.frame} ${fullWidth ? styles.frameFull : ''} ${payload ? '' : styles.framePending}`}
+        className={`${styles.frame} ${payload ? '' : styles.framePending}`}
         onClick={onClick}
         aria-label={`Open ${workout.title} workout`}
       >
-        {payload && <PosterCard payload={payload} />}
+        {payload && <PosterCard payload={payload} maxHeightRatio={maxHeightRatio} />}
       </button>
       {/* A PR is rare and true — pinned on the poster's corner, where it can't be missed. */}
       {workout.isPR && <span className={styles.prBadge}>★ PR</span>}

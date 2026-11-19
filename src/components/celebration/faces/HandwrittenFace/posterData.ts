@@ -145,6 +145,35 @@ interface PosterWodInternal extends PosterWod {
   _rows: PosterRow[];
 }
 
+/** How many movement rows the poster prints. */
+export function posterLineCount(wod: PosterWod): number {
+  return rowsOf(wod).filter((row) => row.kind === 'line').length;
+}
+
+/**
+ * The poster with only its first `keepLines` movement rows, the rest folded into one "+N more"
+ * row — how a long poster fits a fixed frame (Today's rail, 3:4) and keeps its title and its
+ * result. The fold is an ordinary line, so every skin draws it in its own type; the full
+ * workout is a tap away. A block header whose rows were all folded goes with them.
+ */
+export function collapsePosterRows(wod: PosterWod, keepLines: number): PosterWod {
+  const rows = rowsOf(wod);
+  const total = posterLineCount(wod);
+  if (keepLines >= total) return wod;
+  const kept: PosterRow[] = [];
+  let lines = 0;
+  for (const row of rows) {
+    if (row.kind === 'line') {
+      if (lines === keepLines) break;
+      lines += 1;
+    }
+    kept.push(row);
+  }
+  while (kept.length > 0 && kept[kept.length - 1].kind === 'block') kept.pop();
+  const more: PosterLine = { kind: 'line', rx: `+${total - lines} more`, load: '', mine: '', team: '' };
+  return { ...wod, _rows: [...kept, more] } as PosterWodInternal;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 const GENERIC_TITLE_PATTERNS = [
