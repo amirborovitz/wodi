@@ -42,6 +42,8 @@ import {
 } from './workloadCalculation';
 import type { SectionMovementScope } from './workloadCalculation';
 import { isCoreTabataBlock, coreTabataDoseSeconds, CORE_DOSE_MOVEMENT_NAME } from '../utils/coreTabata';
+import { loggedRecipeRows } from './recipe/loggedTotals';
+import type { Side } from './recipe/types';
 
 /** One logged exercise, as the save path hands it over. */
 export interface ExerciseResult {
@@ -217,6 +219,8 @@ export function buildWorkloadBreakdownFromResults(
   results: ExerciseResult[],
   parsedWorkout?: ParsedWorkout,
   partnerFactor: number = 1,
+  /** The athlete's column of every women/men pair, from their profile — only when they gave one. */
+  profileSide?: Side,
 ): WorkloadBreakdown {
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
@@ -243,6 +247,30 @@ export function buildWorkloadBreakdownFromResults(
     // registry buckets them onto the same Core row regardless, so splitting four minutes three
     // ways would invent a per-movement share the board never stated. The names still reach the
     // poster — they are prescription, and prescription is read from the exercise.
+    // A part read as a recipe is counted from the recipe and nothing else: the board's nesting
+    // multiplied out, with the athlete's own numbers in their places (services/recipe). Every
+    // rule below exists to reconstruct structure the old parse could not state.
+    if (result.exercise.recipe) {
+      for (const row of loggedRecipeRows(result, resultIndex, profileSide)) {
+        const key = movementBucketKey(row.name, resultIndex);
+        const existing = movementMap.get(key);
+        movementMap.set(key, existing ? {
+          ...existing,
+          totalReps: (existing.totalReps ?? 0) + (row.totalReps ?? 0) || undefined,
+          totalDistance: (existing.totalDistance ?? 0) + (row.totalDistance ?? 0) || undefined,
+          totalCalories: (existing.totalCalories ?? 0) + (row.totalCalories ?? 0) || undefined,
+          totalTime: (existing.totalTime ?? 0) + (row.totalTime ?? 0) || undefined,
+        } : row);
+        grandTotalReps += row.totalReps ?? 0;
+        grandTotalCalories += row.totalCalories ?? 0;
+        if (row.totalDistance) {
+          if (isWeightedCarry(row.name) && row.weight && row.weight > 0) grandTotalWeightedDistance += row.totalDistance;
+          else grandTotalDistance += row.totalDistance;
+        }
+      }
+      return;
+    }
+
     if (isCoreTabataBlock(result.exercise)) {
       const doseSeconds = coreTabataDoseSeconds(result.exercise);
       if (doseSeconds > 0) {
@@ -856,7 +884,7 @@ export function buildWorkloadBreakdownFromResults(
   // and patch the corresponding movement entry in the map.
   results.forEach((result, resultIndex) => {
     const movements = result.exercise.movements;
-    if (!movements || movements.length === 0) return;
+    if (!movements || movements.length === 0 || result.exercise.recipe) return;
     const distinctWeights = [...new Set(
       result.sets
         .map(s => s.weight)

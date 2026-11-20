@@ -16,6 +16,7 @@ import { buildPartialRows } from '../logging/story/partialRoundRows';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
+import { boardNumbers } from '../../services/recipe/boardNumbers';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 import { resolveMovement } from '../../data/movementRegistry';
 import { FORMAT_LABELS } from '../home/unfinishedPoster';
@@ -70,6 +71,11 @@ export interface ChatSlot {
   total?: boolean;
   /** A 'count' slot: what one repeat of the block is called — "round" or "set". */
   per?: 'round' | 'set';
+  /**
+   * A 'count' slot: the numbers the board itself offers — both columns of "8/10 cal", the span of
+   * "10-12". The one-tap answers; any other number can still be typed.
+   */
+  picks?: number[];
   /** A 'ladder' slot: the rungs to offer, in order — the board's and a few beyond it. */
   rungs?: number[];
   /** What the slot is about, in words the athlete and the AI both read. */
@@ -545,6 +551,24 @@ export function openSlots(
         id, kind: 'count', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.substitution?.selectedName ?? mr.movement.name), movementNames: [mr.movement.name],
         metric, total: loggedAsTotal(mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
+      });
+    }
+
+    // A number the board leaves to the athlete by offering several: "8/10 cal" when nobody has
+    // said which column is theirs, "10-12 pull-ups". The board's own numbers are the one-tap
+    // answers; nothing is filled in for them — a pair is never assumed to be the men's.
+    for (const mr of resultLevel ? [] : distinctMovements(r)) {
+      const name = mr.movement.name.toLowerCase();
+      if (counted.has(name)) continue;
+      const board = boardNumbers(r.exercise, mr.movement);
+      if (!board) continue;
+      const id = `${key}.count.${name}`;
+      if (!toAsk(id, (mr[board.metric] ?? 0) > 0)) continue;
+      push(isScoredKind(r) ? scores : loads, {
+        id, kind: 'count', exerciseIndex: i,
+        subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
+        metric: board.metric, total: loggedAsTotal(mr.movement, board.metric),
+        per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', picks: board.numbers, asked: true,
       });
     }
 
@@ -1434,8 +1458,8 @@ const LIKELY_COUNTS: Record<'reps' | 'calories' | 'distance', number[]> = {
 };
 
 function countChips(slot: ChatSlot): ChatChip[] {
-  if (slot.total) return [];
-  return LIKELY_COUNTS[slot.metric ?? 'reps'].map((n) => ({ label: String(n), answers: [{ id: slot.id, ...EMPTY_ANSWER, count: n }] }));
+  const numbers = slot.picks ?? (slot.total ? [] : LIKELY_COUNTS[slot.metric ?? 'reps']);
+  return numbers.map((n) => ({ label: String(n), answers: [{ id: slot.id, ...EMPTY_ANSWER, count: n }] }));
 }
 
 /** Same part, and the same block of it. */

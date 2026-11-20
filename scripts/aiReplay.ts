@@ -1,15 +1,13 @@
 /**
  * aiReplay.ts — record/replay for the OpenAI calls the parse pipeline makes.
  *
- * WHY THIS EXISTS: the corpus used to test `parseWorkoutText` on the whole board in one call,
- * but production runs `parseWorkoutSession` — segment the board, then structure each part in its
- * OWN call, in parallel. Those are different code paths that give different answers (a metcon
- * section read alone classifies differently than the same section read beside its siblings), so
- * the old harness both manufactured failures production could never hit and missed real ones.
- * Testing the real pipeline offline means standing in for EVERY call it makes, not just one.
+ * WHY THIS EXISTS: production runs `parseWorkoutSession` — segment the board, then read each part
+ * as a recipe in its OWN call, in parallel. Testing the real pipeline offline means standing in for
+ * EVERY call it makes, not just one.
  *
  * KEYING. Responses are keyed by the pipeline's INPUT to each call — the board text for the
- * segmentation call, the part's text for a structuring call — deliberately NOT by:
+ * segmentation call, the part's text for a recipe call (and for its second reading, when the
+ * first one's totals did not add up) — deliberately NOT by:
  *   - call ORDER, because parts are structured concurrently (Promise.all) and finish in any order;
  *   - the PROMPT, because then every prompt edit would invalidate the whole cache and the offline
  *     suite would go red for a change it cannot actually evaluate.
@@ -17,13 +15,16 @@
  * prompt is what the LIVE suite tests. Keying on input keeps those two jobs separate.
  */
 import OpenAI from 'openai';
+import { RECHECK_LEAD, RECIPE_TEXT_LEAD } from '../src/services/recipe/request';
 
 export type RecordedResponses = Record<string, string>;
 
 // The exact lead-ins the pipeline writes before the text it wants read. Each identifies the call
 // TYPE, and everything after it is that call's input.
 const SEGMENT_MARKER = 'Here is the transcribed workout text:\n\n';
-const STRUCTURE_MARKER = 'Here is the workout text to parse:\n\n';
+// The recipe call's lead-ins, from the one builder the app uses (a re-reading carries both).
+const RECIPE_MARKER = RECIPE_TEXT_LEAD;
+const RECHECK_MARKER = RECHECK_LEAD;
 
 interface CreateBody {
   messages?: Array<{ content?: unknown }>;
@@ -39,9 +40,10 @@ export function requestKey(body: CreateBody): string {
         .map((part) => part.text)
     : [String(content ?? '')];
 
+  const recheck = texts.some((text) => text.startsWith(RECHECK_MARKER));
   for (const text of texts) {
     if (text.startsWith(SEGMENT_MARKER)) return `segment|${text.slice(SEGMENT_MARKER.length)}`;
-    if (text.startsWith(STRUCTURE_MARKER)) return `structure|${text.slice(STRUCTURE_MARKER.length)}`;
+    if (text.startsWith(RECIPE_MARKER)) return `${recheck ? 'recheck' : 'recipe'}|${text.slice(RECIPE_MARKER.length)}`;
   }
   // An image call (or anything else) carries no text input to key on. Length-keyed so a fixture
   // can still hold one, but text fixtures never reach this.

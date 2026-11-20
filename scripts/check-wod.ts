@@ -274,11 +274,9 @@ export function buildContext(
 }
 
 /**
- * THE production parse path: segment the board, structure each part in its own call, merge.
- * `parseWorkoutText` (one call over the whole board) is a FALLBACK production only reaches when
- * segmentation fails — testing against it reads a board in a way the app never does, which
- * produced phantom failures and hid real ones. Everything downstream of the parse is shared with
- * runOfflinePipeline so the two differ only in where the AI answers come from.
+ * THE production parse path: segment the board, read each part as a recipe in its own call, merge.
+ * Everything downstream of the parse is shared with runOfflinePipeline so the two differ only in
+ * where the AI answers come from.
  */
 export async function runSessionPipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
   // Gemini goes through Firebase AI Logic, which needs App Check (scripts/lib/appCheckDebug.ts).

@@ -38,7 +38,8 @@ function asWritten(slot: ChatSlot): SlotAnswer | null {
     case 'duration': return answer({ seconds: 60 });
     case 'weight': return answer({ weight: 50 });
     case 'maxset': return answer({ count: 10, weight: 50 });
-    case 'count': return answer({ count: 10 });
+    // A range or a pair offers the board's own numbers; as written is the middle of them.
+    case 'count': return answer({ count: slot.picks?.length ? slot.picks[Math.floor((slot.picks.length - 1) / 2)] : 10 });
     case 'ladder': return slot.rungs?.[2] ? answer({ count: slot.rungs[2] }) : null;
     case 'partial': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
     case 'choice': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
@@ -84,6 +85,7 @@ function savedAsWritten(parsed: ParsedWorkout): Record<string, number> {
     parsed,
     results,
     sessionPartnerScope(parsed).partnerFactor,
+    ATHLETE.sex,
   ).breakdownFromResults;
   const out: Record<string, number> = {};
   results.forEach((result, part) => {
@@ -186,7 +188,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     for (const { name, parsed } of boards) {
       const answers = logAsWritten(parsed);
       const { partnerFactor } = sessionPartnerScope(parsed);
-      const first = buildSavedWorkoutTotals(parsed, answers, partnerFactor);
+      const first = buildSavedWorkoutTotals(parsed, answers, partnerFactor, ATHLETE.sex);
       largest = Math.max(largest, first.loggedJson.length);
 
       // Stored as Firestore stores it: undefined dropped, a fresh copy read back.
@@ -199,7 +201,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
       if (JSON.stringify(reopened.results) !== JSON.stringify(answers)) drifted.push(`${name}: the answers reopened differently`);
       if (JSON.stringify(reopened.parsed) !== JSON.stringify(parsed)) drifted.push(`${name}: the board reopened differently`);
 
-      const again = buildSavedWorkoutTotals(reopened.parsed, reopened.results, partnerFactor);
+      const again = buildSavedWorkoutTotals(reopened.parsed, reopened.results, partnerFactor, ATHLETE.sex);
       if (JSON.stringify(again.exercises) !== JSON.stringify(first.exercises)) drifted.push(`${name}: re-save changed the sets`);
       if (JSON.stringify(again.breakdownFromResults) !== JSON.stringify(first.breakdownFromResults)) drifted.push(`${name}: re-save changed the totals`);
     }
@@ -221,7 +223,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
       const given = answers[slot.kind];
       return given ? { id: slot.id, ...EMPTY_ANSWER, ...given(slot) } : asWritten(slot);
     });
-    const saved = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor);
+    const saved = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex);
     const row = (movement: string) => saved.breakdownFromResults.movements.find((m) => m.name === movement);
     return { results, cards, saved, row };
   };
@@ -261,7 +263,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
         expect(slot, `${kind} slot for Double Under`).toBeDefined();
         results = applyAnswer(results, slot, { id: slot.id, ...EMPTY_ANSWER, ...fields }).results;
       }
-      const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+      const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex).breakdownFromResults.movements;
       expect(rows.find((m) => m.name === 'Crossover')?.totalReps, JSON.stringify(answers)).toBe(100);
       expect(rows.find((m) => m.name === 'Double Under')).toBeUndefined();
       // Nothing to convert on a "max" station — the number is the crossovers' own.
@@ -339,7 +341,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     // The board wrote no number for the station, so there's nothing to convert: the count typed
     // beside the pick IS the pull-ups — never "how many Pull-up for each Bar Muscle-up?".
     expect(openSlots(results, closed).some((s) => s.asked && s.kind === 'amount')).toBe(false);
-    const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+    const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex).breakdownFromResults.movements;
     expect(rows.find((m) => m.name === 'Pull-up')?.totalReps).toBe(50);
     expect(rows.find((m) => m.name === 'Bar Muscle-up')).toBeUndefined();
   });

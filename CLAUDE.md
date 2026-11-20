@@ -105,13 +105,13 @@ Never write two rules for the same selector fighting via cascade order. To chang
 
 ## AI Parser — Trust Rules
 
-**The AI (gpt-5.5 since 2026-09-12 — one constant, `PARSE_MODEL` in `openai.ts`) is the authority.** The post-processor and UI only **backfill missing fields**, never override what the AI returned. CrossFit has too many formats for heuristics to win.
+**The AI (gpt-5.5 since 2026-09-12 — one constant, `PARSE_MODEL` in `openai.ts`) is the authority on what the board says.** Since 2026-11-20 each part is read as a **recipe** (`src/services/recipe/`): nested repeats of movements, both columns of every women/men pair, plus the AI's own totals. There is no post-processor — nothing re-reads or corrects the AI's answer.
 
-- Pattern: `if (!aiProvidedValue) { /* regex fallback */ }` — never the reverse.
-- Applies to `loggingMode` (per exercise), `suggestedSets`/`suggestedReps`, `format`, `timeCap`, `inputType`, etc.
-- When the parser is wrong, **fix the prompt** (relax/generalize a rule), don't add a UI override. See `memory/feedback_trust_ai_over_regex.md`, `memory/feedback_ai_prompt_philosophy.md`.
-- **A blank is an answer.** The parse is a strict structured output: the model fills every field on every movement, so `null` means "there is none", not "it didn't say". Backfilling a field the model owns (`reps`, `distance`, `time`, `rxWeights`, `inputType`, `equipment`, `name`…) is overriding it. `MODEL_OWNED_FIELDS` in `parseAudit.ts` is the list.
-- **`npm run corpus` fails on a new one.** `fixtures/parse-baseline.json` freezes how often each board makes us overrule the model. Every entry is debt, the file only shrinks. Fix the pass or the prompt; `npm run corpus:baseline` banks a change and the commit says why.
+- **The AI says what the board means; the app multiplies.** Saved totals are the recipe multiplied out (`recipe/totals.ts`, `recipe/loggedTotals.ts`). The AI's stated totals are the check: a mismatch is re-read once, and a mismatch that survives keeps the recipe's arithmetic and is recorded (`recordTotalsOverruled`) — never shown to the athlete.
+- **The recipe prompt (`recipe/prompt.ts`) states general meaning and naming only.** Never a rule or example that exists to make the app's arithmetic come out right or that describes one box's board. When a board is misread, write a clearer general statement of meaning.
+- **A blank is an answer.** The read is a strict structured output: the model fills every field, so `null` means "there is none", not "it didn't say". Never backfill a field the model answered.
+- `recipe/toParsedWorkout.ts` only translates the recipe into the shape today's screens read — never infers. See `memory/feedback_trust_ai_over_regex.md`, `memory/feedback_ai_prompt_philosophy.md`.
+- **`npm run corpus` fails on a new overrule.** `fixtures/parse-baseline.json` freezes how often each board's own totals disagree with its recipe. `npm run corpus:baseline` banks a change and the commit says why.
 - **A name heuristic may produce a NAME, nothing else.** Kind, input type and quantities come from the model. `isRowErgName` (`utils/movementNameMatch.ts`) is the shape to copy: one predicate, one owner, no bare `'row'` scattered through pattern lists.
 
 ---

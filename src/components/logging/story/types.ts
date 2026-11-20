@@ -17,6 +17,7 @@ import { isRowErgName, matchesNamePattern } from '../../../utils/movementNameMat
 import { parseTimeCapSeconds } from '../../../utils/timeCap';
 import { isCoreTabataBlock } from '../../../utils/coreTabata';
 import { asksImplementCount } from './implementQuestion';
+import { boardNumbers } from '../../../services/recipe/boardNumbers';
 
 // ─── Exercise Kind ───────────────────────────────────────────────
 // Universal classification: every exercise maps to exactly ONE kind.
@@ -1098,7 +1099,17 @@ export function createBlankResult(
       if (movKind === 'duration' && mov.time) {
         mr.durationSeconds = mov.time;
       }
-      if (movKind === 'distance') {
+      // A women/men pair the board wrote ("8/10 cal", "400/300m", "12/15 reps") starts on the
+      // athlete's own column when their profile says it — and on nothing when it doesn't: the chat
+      // asks with both numbers rather than assume one (services/recipe/boardNumbers).
+      // A range ("10-12") starts empty too: its middle is only how the row is shown.
+      const board = boardNumbers(exercise, mov);
+      if (board?.pair) {
+        const column = userSex === 'female' ? board.pair.women : userSex === 'male' ? board.pair.men : undefined;
+        mr[board.metric] = column != null ? Math.round(column / shareDivisor) : undefined;
+      } else if (board) {
+        mr[board.metric] = undefined;
+      } else if (movKind === 'distance') {
         if (mov.inputType === 'calories' || (mov.calories != null && mov.calories > 0)) {
           // Use sex-appropriate Rx calories if available
           const rxCal = mov.rxCalories;

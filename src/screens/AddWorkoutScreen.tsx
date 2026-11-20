@@ -1598,7 +1598,7 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
       const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes, loggedJson } =
-        buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor);
+        buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor, user?.sex);
       rememberWeightUnit(results);
       const workoutTitle = parsedWorkout.title || "Today's Workout";
 
