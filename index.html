@@ -34,28 +34,86 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Caveat:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Barlow:wght@400;500;600;700;800;900&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
-    <title>WODI | Your personal assistant for workouts</title>
-    <meta name="description" content="Send WODI your CrossFit board. It logs the workout, shows your last weights, answers questions about your training and makes a poster of every session." />
-    <link rel="canonical" href="https://wodboard-17f3d.web.app/" />
+    <title>WODI: Every CrossFit workout deserves a poster | wodi.fit</title>
+    <meta name="description" content="WODI turns your CrossFit training into something worth sharing. Snap the board, get a poster of every WOD, Wrapped-style weekly recaps, and a feed to cheer your crew." />
+    <link rel="canonical" href="https://wodi.fit/" />
 
     <!-- Link previews (iMessage, WhatsApp, Slack, social). Square brand icon, so the
          small "summary" card rather than a wide banner that would crop it. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="WODI" />
-    <meta property="og:url" content="https://wodboard-17f3d.web.app/" />
-    <meta property="og:title" content="WODI | Your personal assistant for workouts" />
-    <meta property="og:description" content="Send WODI your CrossFit board. It logs the workout, shows your last weights, answers questions about your training and makes a poster of every session." />
-    <meta property="og:image" content="https://wodboard-17f3d.web.app/wodi-icon-512.png" />
+    <meta property="og:url" content="https://wodi.fit/" />
+    <meta property="og:title" content="WODI: Every CrossFit workout deserves a poster" />
+    <meta property="og:description" content="Snap the board, get a poster of every WOD, Wrapped-style recaps of your week, month and season, and a feed to cheer your crew." />
+    <meta property="og:image" content="https://wodi.fit/wodi-icon-512.png" />
     <meta property="og:image:width" content="512" />
     <meta property="og:image:height" content="512" />
     <meta property="og:image:alt" content="The wodi logo" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="WODI | Your personal assistant for workouts" />
-    <meta name="twitter:description" content="Send WODI your CrossFit board. It logs the workout, shows your last weights, answers questions about your training and makes a poster of every session." />
-    <meta name="twitter:image" content="https://wodboard-17f3d.web.app/wodi-icon-512.png" />
+    <meta name="twitter:title" content="WODI: Every CrossFit workout deserves a poster" />
+    <meta name="twitter:description" content="Snap the board, get a poster of every WOD, Wrapped-style recaps of your week, month and season, and a feed to cheer your crew." />
+    <meta name="twitter:image" content="https://wodi.fit/wodi-icon-512.png" />
+
+    <!-- Tells search engines this is an app called WODI, so it stops being
+         confused with similarly named apps and with unrelated "WODI" results. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://wodi.fit/#website",
+          "name": "WODI",
+          "alternateName": ["wodi.fit", "WODI workout log"],
+          "url": "https://wodi.fit/"
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://wodi.fit/#app",
+          "name": "WODI",
+          "alternateName": "wodi.fit",
+          "url": "https://wodi.fit/",
+          "applicationCategory": "HealthApplication",
+          "applicationSubCategory": "CrossFit workout log and social training app",
+          "operatingSystem": "Web browser (iPhone, Android, desktop)",
+          "browserRequirements": "Requires JavaScript",
+          "description": "WODI is a social CrossFit app that turns training into something worth sharing. Photograph the gym whiteboard or just chat to log a workout; WODI makes a poster of every session, Wrapped-style recaps of every week, month and season, tracks personal records, remembers your weights and lets you follow and cheer the people you train with.",
+          "image": "https://wodi.fit/wodi-icon-512.png",
+          "isPartOf": { "@id": "https://wodi.fit/#website" }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Readable text for crawlers and AI tools that don't run JavaScript.
+         React replaces everything inside #root the moment the app boots, so
+         people with JavaScript see it only for the instant before the app loads. -->
+    <div id="root">
+      <main style="max-width:36rem;margin:0 auto;padding:3rem 1rem;font-family:Barlow,system-ui,sans-serif;color:#e8e8e8;background:#0b0c0e;line-height:1.5">
+        <h1 style="font-size:2rem;margin:0 0 .5rem;color:#f5c200">WODI</h1>
+        <p style="margin:0 0 1.5rem;font-weight:600">Every workout deserves a poster. The CrossFit app that turns your training into something worth sharing.</p>
+        <p>Snap the whiteboard. Tell WODI how it went. Get a poster of the session in seconds, and at the end of every week, month and season, a Wrapped-style recap of everything you lifted, ran and survived.</p>
+        <h2 style="font-size:1.1rem;margin:1.5rem 0 .5rem">Your training, made to show off</h2>
+        <ul>
+          <li><strong>A poster for every WOD.</strong> Pick a look, stamp your mood, save it or share it.</li>
+          <li><strong>Your Wrapped, all year round.</strong> Weekly, monthly and seasonal recaps: total reps, total weight moved, your top movement, your engine, new bests, and the training persona you earned.</li>
+          <li><strong>A feed for your crew.</strong> Follow the people you train with, cheer their workouts, post a selfie with the board.</li>
+          <li><strong>PRs that feel like PRs.</strong> New personal bests on lifts and benchmark WODs get their own moment.</li>
+          <li><strong>Your week at a glance.</strong> See which parts of your body you trained and what's still waiting.</li>
+        </ul>
+        <h2 style="font-size:1.1rem;margin:1.5rem 0 .5rem">Logging that takes seconds</h2>
+        <ul>
+          <li><strong>Snap the board.</strong> WODI reads AMRAPs, EMOMs, For Time, strength sets, chippers and partner WODs from a photo.</li>
+          <li><strong>Just chat.</strong> "Got 6 rounds plus 10, 60 kg on the cleans." WODI logs it.</li>
+          <li><strong>Remembers your weights.</strong> See what you loaded last time before you touch the bar.</li>
+          <li><strong>A training buddy that knows your history.</strong> Ask WODI anything about your training.</li>
+        </ul>
+        <p>WODI runs on iPhone, Android and desktop, right in the browser. Add it to your home screen and it works like an app.</p>
+        <p style="font-size:.9rem;opacity:.75">WODI at wodi.fit is an independent app. It is not affiliated with Wodify or other similarly named apps.</p>
+        <p><a href="/privacy.html" style="color:#f5c200">Privacy</a> · <a href="/terms.html" style="color:#f5c200">Terms</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

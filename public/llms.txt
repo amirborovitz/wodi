@@ -1,0 +1,30 @@
+# WODI
+
+> WODI (https://wodi.fit) is a social CrossFit app that turns your training into something worth sharing. Snap the gym's whiteboard or just chat to log a workout, and WODI makes a poster of every session, Wrapped-style recaps of every week, month and season, and a feed where you follow and cheer the people you train with.
+
+WODI is an independent app that runs in the browser on iPhone, Android and desktop and can be added to the home screen like a native app. It is not affiliated with Wodify, wodii.ai, or other apps with similar names, and is unrelated to "WODI" as used in cricket (Women's One Day International).
+
+## Made to show off
+
+- **A poster for every workout**: each session becomes a designed poster with several looks and a mood stamp, ready to save or share
+- **Wrapped, all year round**: Spotify Wrapped-style story recaps for every week, month and season — total reps, total weight moved, top movement, engine work, new personal bests and a training persona
+- **A social feed**: follow the athletes you train with, cheer and like their workouts, post a selfie with the board
+- **PR moments**: new personal records on lifts and named benchmark WODs (Fran, Murph, etc.) get their own celebration
+- **Week body map**: see at a glance which parts of your body you trained this week
+
+## Logging in seconds
+
+- **Snap the board**: reads AMRAP, EMOM, For Time, strength sets, chippers, intervals and partner workouts from a photo
+- **Just chat**: tell WODI how it went in plain words ("6 rounds plus 10, 60 kg on the cleans") and it logs the result
+- **Remembers your weights**: shows what you loaded last time for each movement
+- **A training buddy**: WODI knows your history and answers questions about your training
+
+## Who it's for
+
+People who train CrossFit or functional fitness at a box (gym) and want their training to feel as good to look back on as it felt to do — without typing workouts into a spreadsheet.
+
+## Links
+
+- [Home](https://wodi.fit/): the app
+- [Privacy policy](https://wodi.fit/privacy.html)
+- [Terms of service](https://wodi.fit/terms.html)

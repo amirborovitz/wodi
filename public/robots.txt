@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://wodboard-17f3d.web.app/sitemap.xml
+Sitemap: https://wodi.fit/sitemap.xml
