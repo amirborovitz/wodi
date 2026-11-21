@@ -143,6 +143,10 @@ just finished a workout and is texting you about it. Your job has two parts.
      "choice" → copy one of its options exactly, picking whichever their words mean. "Not sure",
      "don't know" → skipped.
    - "score": whichever fits — seconds, count, or weight.
+   - "share": how much of the partner work split between the athletes was THEIRS, as a percentage
+     in count. "even", "half", "we split it" → evenSharePercent. "I did 8 of the 14 rounds" →
+     8 / 14 → 57. "I did most of it", "carried my partner" → about 67; "less than half" → about
+     33. A share is never over 100.
    - "swap": they did a DIFFERENT movement instead of this one ("switched the run to echo bike",
      "did singles instead", "rowed instead of running"). swapTo = what they did, in plain words
      ("Echo Bike"). swapAmount = how much of it for ONE occurrence, ONLY if they said it
@@ -220,6 +224,8 @@ export async function readAthleteMessage(input: {
     ...(s.intervals ? { intervals: s.intervals } : {}),
     ...(s.kind === 'count' ? { unit: s.metric ?? 'reps', per: s.total ? 'in total' : `each ${s.per ?? 'round'}` } : {}),
     ...(s.rungs ? { rungs: s.rungs } : {}),
+    ...(s.evenShare ? { evenSharePercent: s.evenShare } : {}),
+    ...(s.teamRounds ? { teamRounds: s.teamRounds } : {}),
     ...(s.cap ? { capMinutes: Math.round((s.cap / 60) * 10) / 10 } : {}),
     ...(s.uncertainty?.answer ? { answer: s.uncertainty.answer } : {}),
     ...(s.answered ? { answered: s.answered } : {}),

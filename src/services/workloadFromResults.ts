@@ -75,6 +75,8 @@ export interface ExerciseResult {
   partialReps?: number; // Partial reps in next cycle (for restore)
   partialMovements?: string[]; // Movement names completed in AMRAP partial round
   ladderStep?: number;
+  /** Split partner work: the fraction this athlete did, when they said (else the part's even share). */
+  ownShare?: number;
 }
 
 

@@ -37,6 +37,8 @@ export interface AthleteChoices {
   partial?: ReadonlySet<RecipePath>;
   /** Places whose `amounts` entry is the athlete's own share already — never shared out again. */
   own?: ReadonlySet<RecipePath>;
+  /** Split partner work: the fraction this athlete did, when they said — else the part's share. */
+  share?: number;
 }
 
 export interface MovementTotal {
@@ -105,7 +107,8 @@ function occurrenceTotal(
   const work = placeWork(movement.amount, per, repeats, choices.partial?.has(path) === true);
   if (work == null) return undefined;
   const sides = movement.perSide ? 2 : 1;
-  const share = movement.shared === 'split' && part.share != null && !choices.own?.has(path) ? part.share : 1;
+  const partShare = choices.share ?? part.share;
+  const share = movement.shared === 'split' && partShare != null && !choices.own?.has(path) ? partShare : 1;
   return work * sides * share;
 }
 

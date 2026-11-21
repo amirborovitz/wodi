@@ -17,6 +17,7 @@ import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
 import { boardNumbers } from '../../services/recipe/boardNumbers';
+import { recipeIndex } from '../../services/recipe/totals';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 import { resolveMovement } from '../../data/movementRegistry';
 import { FORMAT_LABELS } from '../home/unfinishedPoster';
@@ -53,6 +54,7 @@ export type ChatSlotKind =
   | 'sets'      // how many sets/intervals were done — OPTIONAL, filled only when mentioned
   | 'swap'      // did something else instead ("switched the run to echo bike") — OPTIONAL
   | 'amount'    // how much of a swap they did, when nothing converts the board's number to it
+  | 'share'     // partner work split between athletes: how much of it was theirs (a percentage)
   | 'clarify';  // something the board reader couldn't settle — its own question (ParseUncertainty)
 
 export interface ChatSlot {
@@ -131,6 +133,12 @@ export interface ChatSlot {
    * several lengths (400 / 800 / 1200 / 1600 m of run is 1200–4800 m of bike, never just "1200 m").
    */
   usualAmount?: { value: number; unit: SwapUnit; range?: { low: number; high: number } };
+  /**
+   * A 'share' slot: the even split as a percentage (50 in pairs), and the team's rounds once they
+   * are known — so "8" on a 14-round AMRAP reads as 8 of the 14.
+   */
+  evenShare?: number;
+  teamRounds?: number;
   /** A 'clarify' slot's flag: the question, how it's answered, and the field the answer goes in. */
   uncertainty?: ParseUncertainty;
 }
@@ -207,6 +215,14 @@ function partialMoves(r: StoryExerciseResult): { name: string; reps: number }[] 
  */
 function countedWhole(r: StoryExerciseResult, movement: ParsedMovement, metric: 'reps' | 'distance' | 'calories'): boolean {
   return loggedAsTotal(movement, metric) || (!isScoredKind(r) && r.kind !== 'intervals' && r.setsTotal <= 1);
+}
+
+/** The even split of a part's partner work (0.5 in pairs) — only when some of its work is split. */
+function splitShare(r: StoryExerciseResult): number | undefined {
+  const part = r.exercise.recipe;
+  if (!part || part.share == null || part.share >= 1) return undefined;
+  const split = [...recipeIndex(part).movements.values()].some((m) => m.shared === 'split');
+  return split ? part.share : undefined;
 }
 
 function spreadEvenly(total: number, parts: number): number[] {
@@ -499,6 +515,16 @@ export function openSlots(
     }
     if (r.kind === 'duration' && toAsk(`${key}.duration`, (r.durationSeconds ?? 0) > 0)) {
       push(scores, { id: `${key}.duration`, kind: 'duration', exerciseIndex: i, subject: r.exercise.name, asked: true });
+    }
+    // Partner work split between athletes: the score is the team's, the work is theirs. How much of
+    // it they did — an even split is one tap; unanswered, the save takes the even split.
+    const evenShare = splitShare(r);
+    if (evenShare != null && toAsk(`${key}.share`, r.ownShare != null)) {
+      push(scores, {
+        id: `${key}.share`, kind: 'share', exerciseIndex: i, subject: part, asked: true,
+        evenShare: Math.round(evenShare * 100),
+        ...(r.kind === 'score_rounds' && (r.rounds ?? 0) > 0 ? { teamRounds: r.rounds } : {}),
+      });
     }
 
     if (usesResultLevelLoad(r)) {
@@ -986,6 +1012,13 @@ export function applyAnswer(
         ?.find((mr) => mr.movement.name === slot.movementNames?.[0])?.substitution?.selectedName;
       if (!amount || amount <= 0 || !target) return { results, closed: false };
       return { results: swapMovement(results, slot, target, amount, answer.swapUnit), closed: true };
+    }
+
+    case 'share': {
+      // A percentage of the split work. Over 100 isn't a share of anything.
+      const pct = answer.count;
+      if (pct == null || pct <= 0 || pct > 100) return { results, closed: false };
+      return { results: patchResult(results, i, () => ({ ownShare: pct / 100 })), closed: true };
     }
 
     case 'sets': {
@@ -1693,6 +1726,21 @@ export function nextQuestion(
         panel: { title: one ? nameOf(first) : results.length > 1 && result ? result.exercise.name : 'Weights', groups },
       };
     }
+    case 'share': {
+      const even = first.evenShare ?? 50;
+      const pick = (label: string, pct: number): ChatChip => ({ label, answers: [{ id: first.id, ...EMPTY_ANSWER, count: pct }] });
+      // In pairs the likely answers are half, a bit less, a bit more; in a bigger team, the even split.
+      const chips = even === 50
+        ? [pick('Even split', 50), pick('About a third', 33), pick('About two thirds', 67)]
+        : [pick(`Even split · ${even}%`, even)];
+      return {
+        text: `How much of the work was yours${onPart}?`,
+        hint: 'The score is the team’s — your stats count what you did.',
+        placeholder: first.teamRounds ? `Or type your rounds — e.g. ${Math.round(first.teamRounds * even / 100)} of ${first.teamRounds}` : 'Or type a percentage — e.g. 40%',
+        slotIds: [first.id],
+        chips: [...chips, skipChip([first.id])],
+      };
+    }
     case 'choice': {
       const [asWritten, alternative] = first.options ?? [];
       // The options are the answer values; what the athlete reads is the movement's own name.
@@ -1825,6 +1873,8 @@ export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | nul
     }
     case 'ladder':
       return answer.count ? `through the ${answer.count}s` : null;
+    case 'share':
+      return answer.count ? (answer.count === slot.evenShare ? 'even split' : `${Math.round(answer.count)}% of the work`) : null;
     case 'distance':
       return answer.count ? `${answer.count} m` : null;
     case 'weight': {
@@ -1896,6 +1946,20 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
     }
     case 'clarify':
       return readClarifyLocally(slot, t, answer);
+    case 'share': {
+      if (/^(even|half|50 ?50|same|split evenly|even split)$/.test(t)) return answer({ count: slot.evenShare ?? 50 });
+      m = t.match(/^(\d{1,3})(?: ?(%|percent))?$/);
+      if (!m) {
+        // "8 of 14", "8 rounds"
+        const of = t.match(/^(\d{1,3})(?: ?rounds?)?(?: ?(?:of|out of|\/) ?(\d{1,3}))?(?: ?rounds?)?$/);
+        const team = of?.[2] ? Number(of[2]) : slot.teamRounds;
+        return of && team && Number(of[1]) <= team ? answer({ count: (Number(of[1]) / team) * 100 }) : null;
+      }
+      const n = Number(m[1]);
+      // A bare number on a rounds AMRAP is their own rounds; a percentage is said, or is all that's left.
+      if (!m[2] && slot.teamRounds && n <= slot.teamRounds) return answer({ count: (n / slot.teamRounds) * 100 });
+      return n > 0 && n <= 100 ? answer({ count: n }) : null;
+    }
     case 'weight': {
       m = t.match(new RegExp(`^${NUM} ?${UNIT}?$`));
       if (m) return answer({ weight: toNum(m[1]), unit: toUnit(m[2]) });

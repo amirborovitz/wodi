@@ -223,7 +223,7 @@ const NUDGE_REPLY: Record<EnableResult, string> = {
  * What a "Change" can reopen: a value the athlete gave. A swap rewrites the movement itself, so
  * undoing one is a fix for the standard screen, not a question asked again.
  */
-const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 'reps', 'distance', 'duration', 'score', 'weight', 'maxset', 'count', 'ladder', 'partial', 'choice', 'unit']);
+const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 'reps', 'distance', 'duration', 'score', 'weight', 'maxset', 'count', 'ladder', 'partial', 'choice', 'unit', 'share']);
 
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;

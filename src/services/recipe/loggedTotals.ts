@@ -213,6 +213,7 @@ export function athleteChoicesFromResult(result: ExerciseResult, profileSide?: S
   return {
     ...(chosenSide ? { side: chosenSide } : {}),
     amounts, totals, own, repeats, alternatives, swaps, partial,
+    ...(result.ownShare != null ? { share: result.ownShare } : {}),
   };
 }
 

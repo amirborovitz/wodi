@@ -129,6 +129,10 @@ export interface StoryExerciseResult {
   // fields above (the same "which moves did you finish?" checklist as AMRAP rounds).
   ladderStep?: number;                // how many rungs completed (e.g., 3 = completed through rung index 2)
 
+  // partner work split between athletes: the fraction of it this athlete did (0.4 = 40%), when they
+  // said. Unset is the even split the board implies (the part's share).
+  ownShare?: number;
+
   // intervals
   intervalsCompleted?: number;        // how many intervals done
   intervalsTotal?: number;            // prescribed intervals

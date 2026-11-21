@@ -127,6 +127,7 @@ board-partner-amrap-igug
   part 1 · Partner AMRAP 20 · score_rounds
     asks: How many rounds did you get?
     asks: And into round 6 — which moves did you finish?
+    asks: How much of the work was yours?
     asks: What weight did you use for Power Clean?
 
 board-partner-synchro
@@ -136,6 +137,7 @@ board-partner-synchro
 board-partner-ygig-chipper
   part 1 · Partner WOD For Time, 35 min cap · score_time
     asks: What was your time?
+    asks: How much of the work was yours?
     asks: What weights did you use?
 
 board-skill-hs-walk
@@ -240,6 +242,7 @@ pair-paced-amrap
     asks: What did you lift on the Front Squat?
     asks: How many rounds did you get on 12 Minutes AMRAP in Pairs?
     asks: And into round 6 — which moves did you finish?
+    asks: How much of the work was yours on 12 Minutes AMRAP in Pairs?
     asks: What weight did you use for Thruster?
     asks: How many tibialis raises each set?
 
@@ -248,6 +251,7 @@ palindrome-partner-chipper
   part 2 · For Time, In Pairs · score_time
     asks: What did you lift on the Twin Kettlebell Front Rack Carry?
     asks: What was your time on For Time, In Pairs?
+    asks: How much of the work was yours on For Time, In Pairs?
     asks: What weight did you use for Twin Kettlebell Clean and Jerk?
     asks: Bar Muscle-up or Chest to Bar Pull-up / Pull-up?
 
