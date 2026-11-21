@@ -12,6 +12,7 @@
   --wodi-line:    rgba(242,240,235,0.08);
   --wodi-line2:   rgba(242,240,235,0.12);
   --font-display: 'Barlow Condensed', sans-serif;
+  --font-poster:  'Anton', 'Barlow Condensed', sans-serif;  /* poster titles, the sign-in headline */
   --font-body:    'Barlow', sans-serif;
   --font-barlow:  'Barlow', sans-serif;
 

@@ -1,144 +1,371 @@
+/* Sign in — design: "wodi Poster Carousel" canvas, artboard SignIn. Posters fanned on top,
+   the headline and the ways in anchored to the bottom, one yellow on ink. */
+
 .container {
+  --poster-ink: #141413;
+  --poster-cream: #efe8d8;
+  --poster-navy: #1b2a4a;
+
   min-height: 100vh;
   min-height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   align-items: center;
-  justify-content: center;
-  padding: clamp(20px, 5vw, 40px);
-  padding-top: max(clamp(20px, 5vw, 40px), var(--safe-top));
-  padding-bottom: max(clamp(20px, 5vw, 40px), var(--safe-bottom));
-  background:
-    linear-gradient(180deg, #101113 0%, var(--wodi-bg) 52%, #050608 100%),
-    var(--wodi-bg);
+  background: var(--wodi-bg);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
 }
 
-.logoGlow {
+/* ─── The poster fan ─────────────────────────────────────────────── */
+
+.fan {
   position: absolute;
-  top: 18%;
-  left: 50%;
-  width: min(62vw, 420px);
-  height: min(62vw, 420px);
-  transform: translateX(-50%);
-  border-radius: 50%;
+  inset: 0 0 auto;
+  height: 470px;
+  overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(circle, rgba(245, 194, 0, 0.08) 0%, rgba(245, 194, 0, 0) 72%);
-  filter: blur(28px);
+  padding-top: var(--safe-top);
 }
+
+/* The posters are laid out on a phone-width stage, kept centred on wider screens. */
+.stage {
+  position: relative;
+  width: 390px;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.poster {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.posterGrid {
+  left: -28px;
+  top: 70px;
+  width: 180px;
+  height: 240px;
+  padding: 14px;
+  transform: rotate(-11deg);
+  background-color: var(--poster-navy);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 16px 16px;
+  color: #e9edf5;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.posterYellow {
+  right: -34px;
+  top: 54px;
+  width: 180px;
+  height: 240px;
+  padding: 14px;
+  transform: rotate(9deg);
+  background: var(--wodi-yellow);
+  color: var(--poster-ink);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.posterCream {
+  left: 100px;
+  top: 118px;
+  width: 190px;
+  height: 254px;
+  transform: rotate(-2deg);
+  overflow: hidden;
+  background: var(--poster-cream);
+  color: var(--poster-ink);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.63);
+}
+
+.chip {
+  align-self: flex-start;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font: 500 7px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.posterGrid .chip {
+  color: var(--wodi-yellow);
+}
+
+.posterTitle {
+  margin-top: 10px;
+  font: 400 20px/1 var(--font-poster);
+}
+
+.posterSub {
+  margin-top: 4px;
+  font: 700 9px/1 var(--font-display);
+}
+
+.posterGrid .posterSub {
+  color: var(--wodi-yellow);
+}
+
+.posterLines {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: 700 10px/1 var(--font-display);
+}
+
+.posterLabel {
+  margin-top: auto;
+  font: 500 8px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.posterScore {
+  margin-top: auto;
+  font: 400 38px/1 var(--font-poster);
+}
+
+.posterGrid .posterScore {
+  color: var(--wodi-yellow);
+}
+
+.posterLabel + .posterScore {
+  margin-top: 2px;
+}
+
+.creamBody {
+  flex: 1;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.creamHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule {
+  flex: 1;
+  height: 1px;
+  background: rgba(20, 20, 19, 0.25);
+}
+
+.ep {
+  font: 500 8px/1 var(--font-mono);
+}
+
+.creamTitle {
+  margin-top: 10px;
+  font: 400 24px/1 var(--font-poster);
+}
+
+.creamRows {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  font: 700 10.5px/1 var(--font-display);
+}
+
+.creamRows span {
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(20, 20, 19, 0.13);
+}
+
+.creamHero {
+  margin-top: auto;
+  position: relative;
+  height: 54px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.creamHero .posterLabel {
+  position: relative;
+  margin-top: 0;
+  letter-spacing: 0.16em;
+}
+
+.heroDisc {
+  position: absolute;
+  left: -6px;
+  bottom: -6px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--wodi-yellow);
+}
+
+.creamScore {
+  position: relative;
+  margin-top: 2px;
+  font: 400 40px/1 var(--font-poster);
+}
+
+.creamFoot {
+  height: 20px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: var(--poster-ink);
+  color: var(--poster-cream);
+  font: 700 10px/1 var(--font-display);
+}
+
+.fade {
+  position: absolute;
+  inset: auto 0 0;
+  height: 200px;
+  background: linear-gradient(rgba(12, 13, 15, 0), var(--wodi-bg) 85%);
+}
+
+/* ─── Headline and the ways in ───────────────────────────────────── */
 
 .content {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 420px;
+  box-sizing: border-box;
+  padding: 0 24px max(40px, calc(var(--safe-bottom) + 24px));
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  z-index: 1;
 }
 
 .brand {
-  margin-bottom: clamp(42px, 7vh, 64px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.heading {
-  margin: 0;
+.brandMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--wodi-yellow);
+  color: var(--poster-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 400 20px/1 var(--font-poster);
 }
 
-.wordmarkLogo {
-  width: min(78vw, 336px);
-  height: auto;
-  display: block;
+.brandName {
+  font: 400 28px/1 var(--font-poster);
 }
 
-.tagline {
-  margin: 10px 0 0;
-  color: var(--wodi-dim);
-  font-size: clamp(13px, 3vw, 14px);
-  letter-spacing: 0.035em;
+.dot {
+  color: var(--wodi-yellow);
 }
 
-.intro {
-  margin: 18px auto 0;
+.headline {
+  margin: 22px 0 0;
+  font: 400 clamp(56px, 19.5vw, 76px)/0.92 var(--font-poster);
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+}
+
+.pitch {
+  margin: 16px 0 0;
   max-width: 320px;
-  color: var(--wodi-dim);
-  font-size: 14px;
-  line-height: 1.5;
+  color: #b4b4ae;
+  font: 500 17px/1.4 var(--font-body);
 }
 
 .actions {
-  width: 100%;
+  margin-top: 30px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-.appleButton,
-.googleButton {
+.googleButton,
+.outlineButton {
   width: 100%;
-  min-height: 52px;
+  min-height: 58px;
   border-radius: 14px;
-  font-size: 16px;
-  font-weight: 700;
-  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
+  font: 700 17px/1 var(--font-body);
   cursor: pointer;
-  transition: transform 0.15s ease, opacity 0.2s ease, background-color 0.2s ease;
-}
-
-.appleButton {
-  border: none;
-  background: #ffffff;
-  color: #000000;
+  transition: transform 0.15s ease, opacity 0.2s ease;
 }
 
 .googleButton {
-  border: 1px solid #2c2f36;
-  background: #090909;
-  color: #ffffff;
+  border: none;
+  background: var(--wodi-yellow);
+  color: var(--poster-ink);
 }
 
-.appleButton:hover,
-.googleButton:hover {
-  transform: translateY(-1px);
+.outlineButton {
+  gap: 10px;
+  border: 1.5px solid #3a3a3e;
+  background: transparent;
+  color: var(--wodi-white);
 }
 
-.googleButton:disabled {
-  opacity: 0.75;
+.googleButton:active,
+.outlineButton:active {
+  transform: scale(0.98);
+}
+
+.googleButton:disabled,
+.outlineButton:disabled {
+  opacity: 0.45;
   cursor: default;
   transform: none;
 }
 
-.emailLink {
-  margin-top: 6px;
-  border: none;
-  background: transparent;
-  color: #b3b7be;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
-  cursor: pointer;
+.googleMark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--poster-ink);
+  color: var(--wodi-yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.emailLink:disabled {
-  opacity: 0.5;
-  cursor: default;
+.legal {
+  margin: 22px 0 0;
+  text-align: center;
+  color: #8a8a86;
+  font: 500 12px/1.5 var(--font-body);
 }
+
+.legal a {
+  color: #c9c9c5;
+}
+
+.error {
+  margin: 2px 0 0;
+  color: #ff6b6b;
+  font-size: 13px;
+}
+
+/* ─── Email code ─────────────────────────────────────────────────── */
 
 .emailForm {
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  text-align: left;
 }
 
 .fieldLabel {
-  color: var(--wodi-dim);
+  color: #b4b4ae;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -147,14 +374,14 @@
 /* 16px text: anything smaller makes iOS Safari zoom the page on focus. */
 .field {
   width: 100%;
-  min-height: 52px;
+  box-sizing: border-box;
+  min-height: 58px;
   padding: 0 16px;
   border-radius: 14px;
-  border: 1px solid #2c2f36;
-  background: #090909;
+  border: 1.5px solid #3a3a3e;
+  background: transparent;
   color: var(--wodi-white);
-  font-size: 16px;
-  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+  font: 500 16px var(--font-body);
   outline: none;
   transition: border-color 0.2s ease;
 }
@@ -174,28 +401,9 @@
   letter-spacing: 0.4em;
 }
 
-.primaryButton {
-  width: 100%;
-  min-height: 52px;
-  border: none;
-  border-radius: 14px;
-  background: var(--wodi-yellow);
-  color: var(--wodi-bg);
-  font-size: 16px;
-  font-weight: 700;
-  font-family: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.primaryButton:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 .notice {
   margin: 0;
-  color: var(--wodi-dim);
+  color: #b4b4ae;
   font-size: 13px;
   line-height: 1.4;
 }
@@ -206,34 +414,16 @@
   gap: 20px;
 }
 
-.error {
-  color: #ff6b6b;
-  font-size: 13px;
-  margin: 2px 0 0;
+.textLink {
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: #c9c9c5;
+  font: 600 14px var(--font-body);
+  cursor: pointer;
 }
 
-.footer {
-  margin-top: clamp(28px, 5vh, 40px);
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.footerLink {
-  color: #666a71;
-  text-decoration: none;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-
-.footerLink:hover {
-  color: #8f939a;
-}
-
-@media (max-width: 360px) {
-  .appleButton,
-  .googleButton {
-    min-height: 50px;
-    font-size: 15px;
-  }
+.textLink:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
