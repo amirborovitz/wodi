@@ -8,10 +8,6 @@
   },
   "expect": {
     "exerciseCount": "2",
-    "logKinds": "load, score_rounds",
-    "parsed.exercises.1.movements.0.countingMode": "per_round",
-    "parsed.exercises.1.movements.1.countingMode": "per_round",
-    "parsed.exercises.1.movements.2.countingMode": "per_round",
-    "movementCountingModes!~=": "per_station_visit"
+    "logKinds": "load, score_rounds"
   }
 }

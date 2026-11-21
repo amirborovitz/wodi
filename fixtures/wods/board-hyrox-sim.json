@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.distance": "5130"
+    "logKinds": "score_time"
   },
   "description": "4km run total; each station once.",
   "expectSaved": {

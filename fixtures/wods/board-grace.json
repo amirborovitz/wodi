@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.reps": "30"
+    "logKinds": "score_time"
   },
   "description": "Benchmark; PR-worthy.",
   "expectSaved": {

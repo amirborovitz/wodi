@@ -10,9 +10,6 @@
     "format": "for_time",
     "logKinds": "score_time",
     "movementNames": "Run, Deadlift, Run, Power Clean, Run, Front Squat, Run, Shoulder to Overhead, Run, Pull-up",
-    "totals.distance": "4000",
-    "totals.reps": "200",
-    "totals.volume": "8000",
     "hero.value": "35:00",
     "hero.unit": "MIN"
   },

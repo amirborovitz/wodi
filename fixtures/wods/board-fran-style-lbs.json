@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.reps": "90"
+    "logKinds": "score_time"
   },
   "description": "Rx in lb. 45 thrusters + 45 pull-ups.",
   "expectSaved": {

@@ -9,9 +9,6 @@
     "format": "emom",
     "logKinds": "intervals",
     "movementNames": "Pull-up, Alternating Kettlebell Swing, Box Jump",
-    "totals.reps": "220",
-    "totals.volume": "2160",
-    "totals.distance": "",
     "hero.value": "220",
     "hero.unit": "REPS"
   },

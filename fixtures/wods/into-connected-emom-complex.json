@@ -10,18 +10,15 @@
     "exerciseCount": "2",
     "format": "for_time",
     "logKinds": "load, score_time",
-    "parsed.exercises.0.name": "Weightlifting",
     "parsed.exercises.0.movements.0.name": "Push Press",
     "parsed.exercises.0.movements.1.name": "Push Jerk",
     "parsed.exercises.1.sections.0.movements.0.name": "Run",
     "parsed.exercises.1.sections.1.sectionType": "rounds",
     "parsed.exercises.1.sections.1.rounds": "3",
     "parsed.exercises.1.sections.3.rounds": "2",
-    "totals.reps": "286",
-    "totals.volume": "0",
-    "totals.distance": "900",
     "parsed.exercises.1.sections.2.movements.0.name": "Run",
-    "parsed.exercises.1.sections.4.movements.0.name": "Run"
+    "parsed.exercises.1.sections.4.movements.0.name": "Run",
+    "parsed.exercises.0.name~=": "Push Press"
   },
   "expectSaved": {
     "0:Push Press:totalReps": 8,

@@ -10,7 +10,6 @@
   "expect": {
     "format": "amrap_intervals",
     "loggingModes": "strength, amrap_intervals",
-    "totals.distance": "1000",
     "movementNames!~=": "Buy-In: Run, Buy-In: Run"
   },
   "expectSaved": {

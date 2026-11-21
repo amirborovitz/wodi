@@ -3,8 +3,9 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { ParsedWorkout, Workout } from './types';
 import { initStoryResults, type StoryExerciseResult } from './components/logging/story/types';
-import { boardResults, type BoardAthlete } from './components/tellWodi/boardResults';
+import { boardResults } from './components/tellWodi/boardResults';
 import { openSlots, applyAnswer, nextQuestion, panelAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
+import { ATHLETE, asWritten, logAsWritten, savedAsWrittenTotals } from '../scripts/lib/asWritten';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from './services/savedWorkout';
 import { reopenLogged } from './services/loggedRecord';
 import { removeUndefined } from './utils/firestoreUtils';
@@ -24,69 +25,12 @@ import { removeUndefined } from './utils/firestoreUtils';
  * they disagree the board decides. AMRAPs and max tests are skipped — there the score IS the work.
  */
 
-const ATHLETE: BoardAthlete = { sex: 'male', weightUnit: 'kg' };
-const FIXED_WORK_KINDS =new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
-
-/** The answer an athlete who did the board as written gives to each question. */
-function asWritten(slot: ChatSlot): SlotAnswer | null {
-  const answer = (fields: Partial<SlotAnswer>): SlotAnswer => ({ id: slot.id, ...EMPTY_ANSWER, ...fields });
-  switch (slot.kind) {
-    case 'time': return answer({ seconds: slot.cap ?? 1200 });
-    case 'rounds': return answer({ count: 5 });
-    case 'reps': return answer({ count: 20 });
-    case 'distance': return answer({ count: 1000 });
-    case 'duration': return answer({ seconds: 60 });
-    case 'weight': return answer({ weight: 50 });
-    case 'maxset': return answer({ count: 10, weight: 50 });
-    // A range or a pair offers the board's own numbers; as written is the middle of them.
-    case 'count': return answer({ count: slot.picks?.length ? slot.picks[Math.floor((slot.picks.length - 1) / 2)] : 10 });
-    case 'ladder': return slot.rungs?.[2] ? answer({ count: slot.rungs[2] }) : null;
-    case 'partial': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
-    case 'choice': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
-    case 'unit': return answer({ unit: 'kg' });
-    default: return null;
-  }
-}
-
-/**
- * The chat, played to the end by an athlete who did the board as written. `asked` hears each
- * question card as the athlete would see it — what the decisions snapshot records.
- */
-function logAsWritten(
-  parsed: ParsedWorkout,
-  asked?: (text: string) => void,
-  answerFor: (slot: ChatSlot) => SlotAnswer | null = asWritten,
-): StoryExerciseResult[] {
-  let results = boardResults(parsed, ATHLETE);
-  const closed = new Set<string>();
-  for (let guard = 0; guard < 60; guard += 1) {
-    const slots = openSlots(results, closed, new Map(), parsed.teamSize);
-    const question = nextQuestion(slots, results);
-    if (!question) break;
-    asked?.(question.text);
-    // One card can answer several slots at once (a lift's start, peak and max set).
-    for (const id of question.slotIds) {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) continue;
-      const answer = answerFor(slot);
-      closed.add(slot.id);
-      if (answer) results = applyAnswer(results, slot, answer).results;
-    }
-    // A card that names no open slot would be asked forever.
-    if (!question.slotIds.some((id) => closed.has(id))) throw new Error(`"${question.text}" answers nothing`);
-  }
-  return results;
-}
+const FIXED_WORK_KINDS = new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
 
 /** Every fixed-work part's stored totals, keyed "part:Movement:field" — what expectSaved holds. */
 function savedAsWritten(parsed: ParsedWorkout): Record<string, number> {
   const results = logAsWritten(parsed);
-  const saved = buildSavedWorkoutTotals(
-    parsed,
-    results,
-    sessionPartnerScope(parsed).partnerFactor,
-    ATHLETE.sex,
-  ).breakdownFromResults;
+  const saved = savedAsWrittenTotals(parsed, results);
   const out: Record<string, number> = {};
   results.forEach((result, part) => {
     if (!FIXED_WORK_KINDS.has(result.kind)) return;

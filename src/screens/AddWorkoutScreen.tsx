@@ -33,7 +33,7 @@ import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, Reward
 import { buildLastLoadMap, recentLoads } from '../utils/lastLoadHistory';
 import { buildPrescriptionLines } from '../utils/prescriptionLines';
 import { applyPartReparse, primaryExerciseIndex } from '../utils/applyPartReparse';
-import { getMovementKeys } from '../components/workouts/InlineMovementEditor';
+import { getMovementKeys } from '../utils/movementKeys';
 import { TellWodiSheet } from '../components/workouts/TellWodiSheet';
 import {
   getAlternativeType,

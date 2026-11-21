@@ -30,8 +30,8 @@ const STEPS: Step[] = [
   {
     name: 'parse',
     says: 'a board parses differently, or a pass overrules the AI somewhere new',
-    command: 'npx',
-    args: ['tsx', 'scripts/wod-corpus.ts'],
+    command: 'node',
+    args: ['--import', 'tsx', '--import', './scripts/lib/offline-env.mjs', 'scripts/wod-corpus.ts'],
   },
   { name: 'posters', says: 'a saved poster renders differently', command: 'npx', args: ['tsx', 'scripts/poster-corpus.ts'] },
 ];

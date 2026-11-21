@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.reps": "150"
+    "logKinds": "score_time"
   },
   "description": "Done once through.",
   "expectSaved": {

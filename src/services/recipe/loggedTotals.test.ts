@@ -125,4 +125,43 @@ describe('what is saved for a part read as a recipe', () => {
     expect(rows['Run']).toMatchObject({ totalDistance: 2000, together: true });
     expect(rows['Wall Ball']).toMatchObject({ totalReps: 100 });
   });
+
+  // Carried over from the parse-time calculator's tests (deleted with it, 2026-11-21): rules every
+  // stored total must still keep.
+
+  it('counts both implements of a twin-dumbbell lift in the volume', () => {
+    const twins = part([block(3, [mv('Dumbbell Thruster', 10, { equipment: 'dumbbell', implements: 2 })])], { mode: 'for_time' });
+    const breakdown = buildWorkloadBreakdownFromResults([{ exercise: recipeToExercise(twins, 'text'), sets: [], movementWeights: { 'Dumbbell Thruster': 22.5 },
+      // The chat seeds the pair from the board's own implements (story/types), the weight is per dumbbell.
+      implementCounts: { 'Dumbbell Thruster': 2 } }]);
+    expect(breakdown.movements[0]).toMatchObject({ totalReps: 30 });
+    expect(breakdown.grandTotalVolume).toBe(1350);
+  });
+
+  it('keeps a pound load in pounds on the row and in kg in the volume', () => {
+    const lb = part([block(3, [mv('Thruster', 10, { equipment: 'barbell', load: { value: 135, unit: 'lb' } })])], { mode: 'for_time' });
+    const breakdown = buildWorkloadBreakdownFromResults([{ exercise: recipeToExercise(lb, 'text'), sets: [], movementWeights: { Thruster: 135 } }]);
+    expect(breakdown.movements[0]).toMatchObject({ totalReps: 30, weight: 135, unit: 'lb' });
+    // 30 × 135 lb = 4,050 lb = 1,837 kg.
+    expect(breakdown.grandTotalVolume).toBe(1837);
+  });
+
+  it('adds miles up in metres (Murph: two miles are 3,219 m)', () => {
+    const run = (): RecipeItem => ({ movement: { name: 'Run', kind: 'distance', amount: { value: 1 }, distanceUnit: 'mi', equipment: 'none' } });
+    const murph = part([run(), mv('Pull-up', 100), run()], { mode: 'for_time' });
+    const breakdown = buildWorkloadBreakdownFromResults([{ exercise: recipeToExercise(murph, 'text'), sets: [] }]);
+    expect(breakdown.movements.find((m) => m.name === 'Run')).toMatchObject({ unit: 'm' });
+    expect(breakdown.grandTotalDistance).toBe(3219);
+  });
+
+  it('keeps one lift trained in two parts as two rows', () => {
+    const a = part([block(5, [mv('Deadlift', 3, { equipment: 'barbell' })])], { mode: 'strength' }, { kind: 'strength' });
+    const b = part([block(3, [mv('Deadlift', 10, { equipment: 'barbell' })])], { mode: 'for_time' });
+    const breakdown = buildWorkloadBreakdownFromResults([
+      { exercise: recipeToExercise(a, 'a'), sets: [1, 2, 3, 4, 5].map((n) => set(n, { actualReps: 3, weight: 140 })) },
+      { exercise: recipeToExercise(b, 'b'), sets: [], movementWeights: { Deadlift: 60 } },
+    ]);
+    const rows = breakdown.movements.filter((m) => m.name === 'Deadlift').sort((x, y) => (x.exerciseIndex ?? 0) - (y.exerciseIndex ?? 0));
+    expect(rows.map((m) => [m.exerciseIndex, m.totalReps, m.weight])).toEqual([[0, 15, 140], [1, 30, 60]]);
+  });
 });

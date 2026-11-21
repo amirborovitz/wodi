@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { calculateWorkloadBreakdown } from './workloadCalculation';
+import { buildWorkloadBreakdownFromResults } from './workloadFromResults';
 import {
   calculateWorkloadFromExercises,
   getStationVisitCountsForExercise,
   isTeamPrescribedExercise,
   normalizeStationTotalIntervals,
 } from './workloadCalculation';
-import type { ParsedWorkout } from '../types';
+import type { ParsedWorkout, WorkloadBreakdown } from '../types';
+
+/** What the board prescribes: the save path with nothing logged — a prescription is a log with nothing in it. */
+const prescribed = (workout: ParsedWorkout): WorkloadBreakdown =>
+  buildWorkloadBreakdownFromResults(workout.exercises.map((exercise) => ({ exercise, sets: [] })), workout);
+
 
 describe('isTeamPrescribedExercise', () => {
   const team = (name: string, prescription: string, sole = false) =>
@@ -108,86 +113,6 @@ describe('calculateWorkloadFromExercises — partner factor gating', () => {
   });
 });
 
-// A deliberately simple, fully-predictable workout: 3 rounds (containerRounds) of two weighted
-// movements, no sections/stations. This pins the core rep × round and twin-implement volume math
-// and, crucially, checks the grand totals actually equal the sum of the movement rows — the
-// "are the collected totals right?" invariant.
-const THREE_ROUNDER: ParsedWorkout = {
-  title: '3 RFT',
-  type: 'for_time',
-  format: 'for_time',
-  scoreType: 'time',
-  containerRounds: 3,
-  exercises: [{
-    name: '3 RFT',
-    type: 'metcon',
-    loggingMode: 'for_time',
-    movements: [
-      // 10 reps × 3 rounds = 30 reps; 30 × 50kg = 1500 volume.
-      { name: 'Thruster', reps: 10, inputType: 'weight', rxWeights: { male: 50, female: 35, unit: 'kg' }, implementCount: 1 },
-      // 5 reps × 3 = 15 reps; twin 40kg → 80kg effective; 15 × 80 = 1200 volume.
-      { name: 'DB Snatch', reps: 5, inputType: 'weight', rxWeights: { male: 40, female: 30, unit: 'kg' }, implementCount: 2 },
-    ],
-  }],
-} as unknown as ParsedWorkout;
-
-describe('calculateWorkloadBreakdown', () => {
-  it('applies round multiplier and twin-implement weight, per movement', () => {
-    const wb = calculateWorkloadBreakdown(THREE_ROUNDER);
-    const thruster = wb.movements.find(m => m.name === 'Thruster');
-    const snatch = wb.movements.find(m => m.name === 'DB Snatch');
-
-    expect(thruster).toMatchObject({ totalReps: 30, weight: 50 });
-    expect(snatch).toMatchObject({ totalReps: 15, weight: 80 }); // 2 × 40kg
-  });
-
-  it('grand totals equal the sum of the movement rows (no silent drift)', () => {
-    const wb = calculateWorkloadBreakdown(THREE_ROUNDER);
-    const sumReps = wb.movements.reduce((s, m) => s + (m.totalReps ?? 0), 0);
-    const sumVolume = wb.movements.reduce(
-      (s, m) => s + (m.weight && m.totalReps ? m.weight * m.totalReps : 0), 0,
-    );
-    expect(wb.grandTotalReps).toBe(sumReps);
-    expect(wb.grandTotalReps).toBe(45);       // 30 + 15
-    expect(wb.grandTotalVolume).toBe(sumVolume);
-    expect(wb.grandTotalVolume).toBe(2700);   // 1500 + 1200
-  });
-});
-
-// An American board. The rows must read back in POUNDS (that's what the coach wrote and what
-// the poster prints), while grandTotalVolume — which EP divides by a bodyweight in kg — must
-// be converted. Reading 135 lb as 135 kg ran an lb gym's EP ~2.2x hot.
-const POUND_BOARD: ParsedWorkout = {
-  title: '3 RFT',
-  type: 'for_time',
-  format: 'for_time',
-  scoreType: 'time',
-  containerRounds: 3,
-  exercises: [{
-    name: '3 RFT',
-    type: 'metcon',
-    loggingMode: 'for_time',
-    movements: [
-      { name: 'Thruster', reps: 10, inputType: 'weight', rxWeights: { male: 135, female: 95, unit: 'lb' }, implementCount: 1 },
-    ],
-  }],
-} as unknown as ParsedWorkout;
-
-describe('pound-prescribed boards', () => {
-  it('keeps the row in lb but converts the volume total to kg', () => {
-    const wb = calculateWorkloadBreakdown(POUND_BOARD);
-    const thruster = wb.movements.find(m => m.name === 'Thruster');
-
-    expect(thruster).toMatchObject({ totalReps: 30, weight: 135, unit: 'lb' });
-    // 30 reps × 135 lb = 4050 lb = 1837 kg (not the 4050 a kg-blind sum would return).
-    expect(wb.grandTotalVolume).toBe(1837);
-  });
-
-  it('leaves a kg board untouched', () => {
-    expect(calculateWorkloadBreakdown(THREE_ROUNDER).grandTotalVolume).toBe(2700);
-  });
-});
-
 // "A. WEIGHTLIFTING — 4 sets, Every 01:30: 2 Clean & Jerks / Into: 4 sets, Every 01:30:
 // 1 Clean & Jerk". Two SEQUENTIAL blocks (block A to completion, then block B) that the AI
 // stamps as a station rotation. Counted as stations, the 4 intervals get split across the two
@@ -216,7 +141,7 @@ const SEQUENTIAL_CJ_BLOCKS: ParsedWorkout = {
 
 describe('sequential blocks are not a station rotation', () => {
   it('counts each block over its OWN set count, not a divided interval count', () => {
-    const wb = calculateWorkloadBreakdown(SEQUENTIAL_CJ_BLOCKS);
+    const wb = prescribed(SEQUENTIAL_CJ_BLOCKS);
     // 4 sets × 2 reps + 4 sets × 1 rep = 12, never 6.
     expect(wb.grandTotalReps).toBe(12);
   });
@@ -236,7 +161,7 @@ describe('sequential blocks are not a station rotation', () => {
     // 8 intervals ÷ 2 stations = 4 visits each → 4×2 + 4×1 = 12. Same figure as the block reading
     // only because these counts happen to line up; the assertion that matters is that the
     // divide-across-stations path is still the one taken.
-    const wb = calculateWorkloadBreakdown(rotating);
+    const wb = prescribed(rotating);
     expect(wb.grandTotalReps).toBe(12);
   });
 });
@@ -276,24 +201,15 @@ const SAME_LIFT_IN_TWO_PARTS: ParsedWorkout = {
 } as unknown as ParsedWorkout;
 
 describe('one movement trained in two parts', () => {
-  it('keeps a per-part row for the same lift, each with its own reps and load', () => {
-    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
-    const frontSquats = wb.movements.filter((m) => m.name === 'Front Squat');
-
-    expect(frontSquats).toHaveLength(2);
-    expect(frontSquats.find((m) => m.exerciseIndex === 0)).toMatchObject({ totalReps: 1, weight: 50 });
-    expect(frontSquats.find((m) => m.exerciseIndex === 1)).toMatchObject({ totalReps: 8, weight: 45 });
-  });
-
   it('stamps every row with the part it was trained in', () => {
-    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
+    const wb = prescribed(SAME_LIFT_IN_TWO_PARTS);
     expect(wb.movements.every((m) => m.exerciseIndex != null)).toBe(true);
     expect(wb.movements.find((m) => m.name === 'Squat Clean')?.exerciseIndex).toBe(0);
     expect(wb.movements.find((m) => m.name === 'Chest To Bar Pull-up')?.exerciseIndex).toBe(1);
   });
 
   it('leaves the session totals unchanged — the split re-buckets, it never re-counts', () => {
-    const wb = calculateWorkloadBreakdown(SAME_LIFT_IN_TWO_PARTS);
+    const wb = prescribed(SAME_LIFT_IN_TWO_PARTS);
     const sumReps = wb.movements.reduce((s, m) => s + (m.totalReps ?? 0), 0);
     expect(wb.grandTotalReps).toBe(sumReps);
     expect(wb.grandTotalReps).toBe(19); // complex 1+1+1, metcon 8+8 — one round each, no double count
@@ -312,7 +228,7 @@ describe('one movement trained in two parts', () => {
         ],
       }],
     } as unknown as ParsedWorkout;
-    const wb = calculateWorkloadBreakdown(twiceInOnePart);
+    const wb = prescribed(twiceInOnePart);
     expect(wb.movements.filter((m) => m.name === 'Wall Ball')).toHaveLength(1);
     expect(wb.movements[0]).toMatchObject({ totalReps: 15, exerciseIndex: 0 });
   });
@@ -355,20 +271,20 @@ describe('board-stated occurrences outrank the round count', () => {
   } as unknown as ParsedWorkout);
 
   it('counts the run five times, not once per tier', () => {
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
+    const wb = prescribed(ladderWithBetweenSetsRun({ occurrences: 5 }));
     expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 1000 });
     expect(wb.grandTotalDistance).toBe(1000);
   });
 
   it('a stated count is never flagged as an estimate — it is the coach\'s own number', () => {
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
+    const wb = prescribed(ladderWithBetweenSetsRun({ occurrences: 5 }));
     expect(wb.estimated).not.toBe(true);
   });
 
   it('without a stated count it still falls back to the interval multiplier', () => {
     // Regression guard in the other direction: the occurrences path must not swallow the
     // existing behaviour for boards that state no total.
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({}));
+    const wb = prescribed(ladderWithBetweenSetsRun({}));
     expect(wb.movements.find((m) => m.name === 'Run')?.totalDistance).toBe(1200);
   });
 
@@ -376,7 +292,7 @@ describe('board-stated occurrences outrank the round count', () => {
     // The case a free-text cadence note could never serve: 'in between sets' with no '(5
     // total)'. Six sets hold five gaps, so the count follows from the structure the coach
     // described - no stated number needed, and no falling back to the tier count.
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ placement: 'between_sets' }));
+    const wb = prescribed(ladderWithBetweenSetsRun({ placement: 'between_sets' }));
     expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 1000 });
     expect(wb.grandTotalDistance).toBe(1000);
     expect(wb.estimated).not.toBe(true);
@@ -384,131 +300,10 @@ describe('board-stated occurrences outrank the round count', () => {
 
   it('lets an explicitly written total outrank the derived one', () => {
     // A coach who writes both wins: the stated number is the answer, not an input to it.
-    const wb = calculateWorkloadBreakdown(
+    const wb = prescribed(
       ladderWithBetweenSetsRun({ placement: 'between_sets', occurrences: 3 }),
     );
     expect(wb.movements.find((m) => m.name === 'Run')).toMatchObject({ totalDistance: 600 });
-  });
-  it('gives the run no reps at all — the flat form has none to give', () => {
-    // The bug the occurrence audit found in real saved data: this run carried totalReps 54,
-    // the ladder's rep SUM (14+12+10+8+6+4) glued onto a movement that has no reps. Counting
-    // actual performances cannot produce that number, because not one run contributes a rep.
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ placement: 'between_sets' }));
-    const run = wb.movements.find((m) => m.name === 'Run');
-    expect(run?.totalReps ?? 0).toBe(0);
-    expect(run?.totalDistance).toBe(1000);
-    // ...and the phantom reps are therefore out of the session total too: 54 + 54, not + 54 more.
-    expect(wb.grandTotalReps).toBe(108);
-  });
-  it('does not disturb the movements that do climb the scheme', () => {
-    const wb = calculateWorkloadBreakdown(ladderWithBetweenSetsRun({ occurrences: 5 }));
-    // 14+12+10+8+6+4 = 54 per movement.
-    expect(wb.movements.find((m) => m.name === 'Front Squat')).toMatchObject({ totalReps: 54 });
-    expect(wb.movements.find((m) => m.name === 'Burpee')).toMatchObject({ totalReps: 54 });
-  });
-});
-
-describe('a buy-in that repeats inside each interval', () => {
-  // "[02:00 AMRAP , 02:00 REST] x 4 rounds: 2 rounds / 8 Push Press / 8 Box Jumps / Into - Max
-  // Burpees Over the Bar". The fixed work runs TWICE inside each of the four windows, so each
-  // movement is done 8 × 2 × 4 = 64 times. `rounds` has always been on ParsedSection ("how many
-  // times this block is repeated"), but every consumer hardcoded 1 unless the section was type
-  // 'rounds' — so the ×2 vanished and 64 was stored as 32.
-  const fixedWorkIntoMax = (buyInRounds?: number): ParsedWorkout => ({
-    title: 'WOD',
-    format: 'amrap_intervals',
-    sets: 4,
-    exercises: [{
-      name: '2:00 AMRAP x 4',
-      type: 'wod',
-      loggingMode: 'amrap_intervals',
-      prescription: '[02:00 AMRAP / 02:00 REST] x 4: 2 rounds of 8 Push Press + 8 Box Jumps, then Max Burpees',
-      suggestedSets: 4,
-      intervalCount: 4,
-      sections: [
-        {
-          sectionType: 'buy_in',
-          rounds: buyInRounds,
-          movements: [
-            { name: 'Push Press', reps: 8, inputType: 'weight', rxWeights: { male: 50, female: 35, unit: 'kg' }, countingMode: 'per_interval' },
-            { name: 'Box Jump', reps: 8, inputType: 'none', countingMode: 'per_interval' },
-          ],
-        },
-        {
-          sectionType: 'rounds',
-          rounds: 1,
-          movements: [{ name: 'Burpees Over the Bar', inputType: 'none', isMaxReps: true }],
-        },
-      ],
-    }],
-  } as unknown as ParsedWorkout);
-
-  it('multiplies the buy-in by its own round count on top of the interval count', () => {
-    const wb = calculateWorkloadBreakdown(fixedWorkIntoMax(2));
-    expect(wb.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(64);
-    expect(wb.movements.find((m) => m.name === 'Box Jump')?.totalReps).toBe(64);
-  });
-
-  it('still treats an unstated buy-in count as one pass', () => {
-    // The default the type documents. A buy-in is normally done once per interval, and boards
-    // that say nothing must keep reading exactly as they did.
-    const wb = calculateWorkloadBreakdown(fixedWorkIntoMax(undefined));
-    expect(wb.movements.find((m) => m.name === 'Push Press')?.totalReps).toBe(32);
-  });
-});
-
-// The real board of 2026-09-11, logged and stored 4× too high:
-//
-//   With a running clock:
-//   00:00-03:00: 19 DB/KB Thruster, 19 Burpee, Max V-up / Sit-up
-//   03:00-06:00: 16 …   06:00-09:00: 13 …   09:00-12:00: 10 …
-//
-// The four windows are WRITTEN OUT, one section each — 19+16+13+10 = 58 of each movement. But
-// v0.1.30's strict schema also stamps `countingMode: 'per_interval'` on every movement inside
-// them, which says "multiply me by the interval count" — so the four windows were counted once
-// by being listed and again by the multiplier: 58 × 4 = 232 thrusters and 232 burpees stored.
-//
-// A movement inside a window the board already wrote out happens as many times as THAT window
-// says. The guard that used to catch this only fires for a movement that stated no counting mode
-// at all, and since the strict schema none ever does.
-describe('an interval board that writes its windows out one by one', () => {
-  const runningClock = (windowRounds?: number): ParsedWorkout => ({
-    title: 'WOD',
-    format: 'amrap_intervals',
-    sets: 4,
-    exercises: [{
-      name: 'Running Clock Intervals',
-      type: 'wod',
-      loggingMode: 'amrap_intervals',
-      prescription: '00:00-03:00: 19 Thrusters, 19 Burpees, Max V-up …',
-      intervalCount: 4,
-      workDuration: 720,
-      sections: [19, 16, 13, 10].map((reps, i) => ({
-        sectionType: 'rounds',
-        rounds: windowRounds ?? 1,
-        label: `0${i * 3}:00-${i * 3 + 3}:00`,
-        scoreType: 'reps',
-        movements: [
-          { name: 'Dumbbell / Kettlebell Thruster', reps, inputType: 'weight', equipment: 'dumbbell', countingMode: 'per_interval' },
-          { name: 'Burpee', reps, inputType: 'none', countingMode: 'per_interval' },
-          { name: 'V-up / Sit-up', inputType: 'none', isMaxReps: true, countingMode: 'per_interval' },
-        ],
-      })),
-    }],
-  } as unknown as ParsedWorkout);
-
-  it('counts each written window once, not once per interval', () => {
-    // Was 232 — the windows multiplied by their own count.
-    const wb = calculateWorkloadBreakdown(runningClock());
-    expect(wb.movements.find((m) => m.name === 'Dumbbell / Kettlebell Thruster')?.totalReps).toBe(58);
-    expect(wb.movements.find((m) => m.name === 'Burpee')?.totalReps).toBe(58);
-  });
-
-  it("still honours a window's own round count", () => {
-    // "00:00-03:00: 2 rounds of 19 Thrusters …" — the window repeats its contents twice, which is
-    // the section's own number and has nothing to do with how many windows there are.
-    const wb = calculateWorkloadBreakdown(runningClock(2));
-    expect(wb.movements.find((m) => m.name === 'Dumbbell / Kettlebell Thruster')?.totalReps).toBe(116);
   });
 });
 
@@ -587,7 +382,7 @@ describe('a station EMOM whose intervalCount is really its round count', () => {
   });
 
   it('counts each station over all five visits, not one', () => {
-    const wb = calculateWorkloadBreakdown(STATION_EMOM_5010);
+    const wb = prescribed(STATION_EMOM_5010);
     const total = (name: string) => wb.movements.find((m) => m.name === name)?.totalReps;
     // 4/5/6 per visit × 5 visits — the stored figures used to equal the per-visit value itself.
     expect(total('Bar Muscle-up')).toBe(20);

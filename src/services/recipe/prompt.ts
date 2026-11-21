@@ -23,17 +23,19 @@ Describe the part as nested blocks. A block means "do these items <repeat> times
 - score: only on a block the board scores on its own (A / B / C AMRAPs, each with its own score) — what that block's result is counted in. Null on every other block.
 
 MOVEMENTS
-- name: canonical and singular, as written in the part ("Pull-up", "Box Jump", "Toes to Bar", "Double Under", "Echo Bike", "Run"). A kettlebell swing is "American Kettlebell Swing" unless the board says Russian. Words for how partners move ("synchro", "together") are not part of the name. When the board lets the athlete pick the implement ("dumbbells / kettlebells"), name the movement once, by the first one written.
+- name: canonical and singular, as written in the part ("Pull-up", "Box Jump", "Toes to Bar", "Double Under", "Echo Bike", "Run"). A word that changes how the movement is done stays in the name ("strict", "tempo", "pause", "deficit", "single-arm": "Strict Chest to Bar Pull-up", "Tempo Dip"). A kettlebell swing is "American Kettlebell Swing" unless the board says Russian. Words for how partners move ("synchro", "together") are not part of the name. When the board lets the athlete pick the implement ("dumbbells / kettlebells"), name the movement once, by the first one written.
 - kind: what the number counts — reps, calories (machines), distance, or seconds (holds, planks). Calories are never reps.
 - amount — write the board's number in exactly one form:
   - value: one number for everyone.
   - women + men: two numbers for the SAME movement, one per gender ("8/10 cal", "24/20 in box", "400/300m"). The lighter or smaller one is women's unless the board labels them otherwise. Never pick one side — keep both.
   - low + high: a range ("10-12").
-  - max: true for an open effort ("max sit-ups", the "+" of "1+"), with no number.
+  - max: true for an open effort ("max sit-ups", the "+" of "1+"), with no number. A movement written with no number inside a timed window is an open effort too.
+  - A movement nobody counts (flutter kicks, hollow rocks, holds) done for a timed window with no number is not an open effort: kind seconds, value the window's work time.
+  - Machine or running work done for a time ("30 min Zone 2, bike") has the time as its clock and an open effort as its amount: kind calories on a machine, distance for running, max true — that is the number the athlete logs.
   - start + step: a number that climbs every round ("3-6-9-12…" = start 3, step 3; "min 1: 1 burpee, min 2: 2…" = start 1, step 1), in a block the athlete repeats as far as they climb.
 - perSide: true when the number is done on each side ("10/10" on a one-sided movement, "each arm", "each leg", "L/R"). The amount is the per-side number.
 - load: the weight as value or women + men, with unit. A percentage or effort ("@85%", "heavy") goes in note with no number. Same rule as amounts: "40/60kg" keeps both.
-- equipment: the implement the movement is done with, even when the board writes no weight — barbell, dumbbell, kettlebell, other (plate, sandbag, wall ball, vest…), or none for bodyweight, running, machines, bands.
+- equipment: the implement the movement is loaded with, even when the board writes no weight — barbell, dumbbell, kettlebell, other (plate, sandbag, wall ball, vest…), or none for bodyweight, running, machines, bands. What the athlete moves on or over (a box, a bar, rings, a rope) is not a load: none. A lift written with no implement ("bent over row", "deadlift", "good morning") takes the one it is normally done with, a barbell.
 - implements: 2 for twin / double dumbbells or kettlebells, else 1.
 - alternative: a different movement offered instead ("50 DU / 80 singles" → Double Under 50, alternative Single Under 80). Movements done in turn ("alternating power clean / squat clean", odd / even minutes) are not alternatives: both are done, as a rotation.
 

@@ -7,9 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.reps": "600",
-    "totals.distance": "3219"
+    "logKinds": "score_time"
   },
   "description": "Vest is a load; 3218m run; 600 reps.",
   "expectSaved": {

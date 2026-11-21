@@ -200,6 +200,15 @@ function partialMoves(r: StoryExerciseResult): { name: string; reps: number }[] 
 }
 
 /** `total` over `parts` whole numbers that add back up to it: 22 over 5 is 5, 5, 4, 4, 4. */
+/**
+ * Is the athlete's count for this movement the whole of it? Either the board says it is entered as
+ * a total, or the part is one pass of fixed work ("30 min Zone 2 bike"), where one round IS the
+ * whole — there is no "each set" to ask about.
+ */
+function countedWhole(r: StoryExerciseResult, movement: ParsedMovement, metric: 'reps' | 'distance' | 'calories'): boolean {
+  return loggedAsTotal(movement, metric) || (!isScoredKind(r) && r.kind !== 'intervals' && r.setsTotal <= 1);
+}
+
 function spreadEvenly(total: number, parts: number): number[] {
   const base = Math.floor(total / parts);
   return Array.from({ length: parts }, (_, index) => base + (index < total - base * parts ? 1 : 0));
@@ -550,7 +559,7 @@ export function openSlots(
       push(isScoredKind(r) ? scores : loads, {
         id, kind: 'count', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.substitution?.selectedName ?? mr.movement.name), movementNames: [mr.movement.name],
-        metric, total: loggedAsTotal(mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
+        metric, total: countedWhole(r, mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
       });
     }
 
@@ -567,7 +576,7 @@ export function openSlots(
       push(isScoredKind(r) ? scores : loads, {
         id, kind: 'count', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
-        metric: board.metric, total: loggedAsTotal(mr.movement, board.metric),
+        metric: board.metric, total: countedWhole(r, mr.movement, board.metric),
         per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', picks: board.numbers, asked: true,
       });
     }

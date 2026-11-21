@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.distance": "800"
+    "logKinds": "score_time"
   },
   "description": "Two blocks inside one piece; each counted twice.",
   "expectSaved": {

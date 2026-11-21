@@ -8,8 +8,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "load",
-    "totals.distance": "150"
+    "logKinds": "load"
   },
   "expectSaved": {
     "0:Sled Push:totalDistance": 150

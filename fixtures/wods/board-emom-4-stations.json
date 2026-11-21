@@ -7,9 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "intervals",
-    "totals.reps": "100",
-    "totals.calories": "48"
+    "logKinds": "intervals"
   },
   "description": "Station rotation, 4 visits each. Bike 48 cal, swings 60, burpees 40, plank 4 x 30s.",
   "expectSaved": {

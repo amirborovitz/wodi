@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { buildWorkloadBreakdownFromResults } from '../services/workloadFromResults';
-import type { ParsedExercise, ParsedMovement, ParsedWorkout } from '../types';
-import { calculateWorkloadBreakdown } from '../services/workloadCalculation';
+import type { ParsedExercise, ParsedMovement, ParsedWorkout, WorkloadBreakdown } from '../types';
+
+/** What the board prescribes: the save path with nothing logged. */
+const prescribed = (workout: ParsedWorkout): WorkloadBreakdown =>
+  buildWorkloadBreakdownFromResults(workout.exercises.map((exercise) => ({ exercise, sets: [] })), workout);
 
 /**
  * Volume is the shared-bar question: a barbell complex is ONE implement carried through
@@ -270,7 +273,7 @@ describe('buildWorkloadBreakdownFromResults — a buy-in that repeats inside eac
 
   it('agrees with the parse path on the same board', () => {
     // The whole point of the shared owner: the same answer whichever end of the pipeline asks.
-    const parsed = calculateWorkloadBreakdown({
+    const parsed = prescribed({
       title: 'WOD',
       format: 'amrap_intervals',
       sets: 4,
@@ -463,7 +466,7 @@ describe('buildWorkloadBreakdownFromResults — the board states the count', () 
     };
 
     const saved = buildWorkloadBreakdownFromResults([{ exercise: ex, sets: [], rounds: 5 }], parsedWorkout);
-    const parsed = calculateWorkloadBreakdown(parsedWorkout);
+    const parsed = prescribed(parsedWorkout);
 
     // The whole point of one resolver: these two can no longer drift.
     expect(saved.movements.find((m) => m.name === 'Run')?.totalDistance)
@@ -714,7 +717,7 @@ describe('buildWorkloadBreakdownFromResults — rounds written out, a station pe
   };
 
   it('counts each round once: 4 km of running, every station once', () => {
-    const parsed = calculateWorkloadBreakdown(parsedWorkout);
+    const parsed = prescribed(parsedWorkout);
     const saved = buildWorkloadBreakdownFromResults([{ exercise: ex, sets: [], rounds: 4 }], parsedWorkout);
     for (const b of [parsed, saved]) {
       const row = (name: string) => b.movements.find((m) => m.name === name);

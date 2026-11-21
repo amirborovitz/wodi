@@ -8,7 +8,7 @@ Runs every fixture in `fixtures/wods/*.json` in offline mode.
 
 Offline mode does not call OpenAI. It replays the fixture's cached `aiResponse` through:
 
-`validateParsedWorkout -> postProcessParsedWorkout -> calculateWorkloadBreakdown -> computeHeroResult`
+`parseWorkoutSession` (each part read as a recipe) -> the chat played as written (`scripts/lib/asWritten.ts`) -> the app's own save -> `computeHeroResult`
 
 It prints one PASS/FAIL line per fixture, a summary table, and exits `1` if any fixture fails.
 

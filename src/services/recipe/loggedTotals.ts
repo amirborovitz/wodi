@@ -12,7 +12,7 @@
 
 import type { MovementTotal, ParsedMovement, User } from '../../types';
 import { loggedAsTotal, type ExerciseResult } from '../workloadFromResults';
-import { getMovementKeys, movementLookup } from '../../components/workouts/InlineMovementEditor';
+import { getMovementKeys, movementLookup } from '../../utils/movementKeys';
 import { resolveLoggedQuantity } from '../../utils/tierScaling';
 import { toMetres } from '../../utils/distanceUnits';
 import { movementLoadUnit } from '../../utils/loadUnits';
@@ -93,33 +93,41 @@ export function athleteChoicesFromResult(result: ExerciseResult, profileSide?: S
   const swaps = new Map<RecipePath, RecipeMovement>();
 
   for (const { row, key, path } of rows) {
-    const movement = movements.get(path);
-    if (!movement) continue;
+    const onBoard = movements.get(path);
+    if (!onBoard) continue;
+    // What the athlete's numbers below are read against: the movement they did at this place.
+    let movement: RecipeMovement = onBoard;
     const fold = row.recipeFold ?? 1;
 
     // The load they logged names their column of a "40/60kg" pair.
     const weight = movementLookup(result.movementWeights ?? {}, key, row.name);
-    if (weight != null && movement.load) sideFrom(columnOf(movement.load.women, movement.load.men, weight));
+    if (weight != null && onBoard.load) sideFrom(columnOf(onBoard.load.women, onBoard.load.men, weight));
 
     const chosen = movementLookup(result.movementAlternatives ?? {}, key, row.name);
     if (chosen && chosen.toLowerCase() !== row.name.toLowerCase()) {
-      if (movement.alternative && movement.alternative.name.toLowerCase() === chosen.toLowerCase()) {
+      if (onBoard.alternative && onBoard.alternative.name.toLowerCase() === chosen.toLowerCase()) {
+        // The board's own alternative. Its number is the board's ("50 DU / 80 singles"), or the
+        // athlete's when the board left it open ("Bar Muscle-up / Pull-up" on a max station).
         alternatives.add(path);
-        continue;
+        const { alternative } = onBoard;
+        movement = { ...onBoard, name: alternative.name, kind: alternative.kind, amount: alternative.amount, alternative: undefined };
+      } else {
+        const substitution = movementLookup(result.movementSubstitutions ?? {}, key, row.name);
+        const kind = substitution?.targetUnit ? KIND_OF_UNIT[substitution.targetUnit] : onBoard.kind;
+        const adjusted = substitution?.adjustedValue;
+        movement = {
+          ...onBoard,
+          name: chosen,
+          kind,
+          // A swap's amount is what the athlete did in the logging screen's own units (metres).
+          amount: adjusted != null ? { value: adjusted / fold } : onBoard.amount,
+          distanceUnit: kind === 'distance' ? (adjusted != null ? 'm' : onBoard.distanceUnit) : undefined,
+          alternative: undefined,
+        };
+        swaps.set(path, movement);
+        // A swap with its own amount is complete; one without takes the number logged on the row.
+        if (adjusted != null) continue;
       }
-      const substitution = movementLookup(result.movementSubstitutions ?? {}, key, row.name);
-      const kind = substitution?.targetUnit ? KIND_OF_UNIT[substitution.targetUnit] : movement.kind;
-      const adjusted = substitution?.adjustedValue;
-      swaps.set(path, {
-        ...movement,
-        name: chosen,
-        kind,
-        // A swap's amount is what the athlete did in the logging screen's own units (metres).
-        amount: adjusted != null ? { value: adjusted / fold } : movement.amount,
-        distanceUnit: kind === 'distance' ? (adjusted != null ? 'm' : movement.distanceUnit) : undefined,
-        alternative: undefined,
-      });
-      continue;
     }
 
     // Work set by the clock ("30 min bike") is measured by the athlete: the calories or metres

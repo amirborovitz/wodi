@@ -7,8 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_open_reps",
-    "totals.distance": "2000"
+    "logKinds": "score_open_reps"
   },
   "description": "Run fixed (2000m); push-ups are the score."
 }

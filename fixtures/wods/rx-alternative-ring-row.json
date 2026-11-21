@@ -14,10 +14,7 @@
     "parsed.exercises.0.movements.1.name": "Pull-up",
     "parsed.exercises.0.movements.1.alternative.name": "Ring Row",
     "parsed.exercises.0.movements.1.inputType": "none",
-    "parsed.exercises.0.movements.1.time": "",
-    "totals.reps": "250",
-    "totals.volume": "5000",
-    "totals.distance": "2000"
+    "parsed.exercises.0.movements.1.time": ""
   },
   "expectSaved": {
     "0:Pull-up:totalReps": 50,

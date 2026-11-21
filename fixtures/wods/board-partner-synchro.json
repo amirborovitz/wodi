@@ -7,9 +7,7 @@
   },
   "expect": {
     "exerciseCount": "1",
-    "logKinds": "score_time",
-    "totals.reps": "150",
-    "totals.distance": "1000"
+    "logKinds": "score_time"
   },
   "description": "Synchronized = both do ALL the work (no halving). 1000m run each.",
   "expectSaved": {
