@@ -77,6 +77,8 @@ export interface ExerciseResult {
   ladderStep?: number;
   /** Split partner work: the fraction this athlete did, when they said (else the part's even share). */
   ownShare?: number;
+  /** Loops the athlete counted themselves, by recipe place: how many times they did each. */
+  loopCounts?: Record<string, number>;
 }
 
 

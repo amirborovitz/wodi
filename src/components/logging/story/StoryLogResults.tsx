@@ -72,6 +72,7 @@ export interface LegacyExerciseResult {
   partialMovements?: string[];
   ladderStep?: number;
   ownShare?: number;
+  loopCounts?: Record<string, number>;
 }
 
 // ─── Block computation ───────────────────────────────────────────
@@ -208,8 +209,12 @@ interface StoryLogResultsProps {
  */
 export function toLegacyResult(r: StoryExerciseResult): LegacyExerciseResult {
   const built = buildLegacyResult(r);
-  // The athlete's own share of split partner work rides on the part, whatever shape it saves in.
-  const legacy = r.ownShare != null ? { ...built, ownShare: r.ownShare } : built;
+  // The athlete's own share of split partner work, and the loops they counted, ride on the part.
+  const legacy = {
+    ...built,
+    ...(r.ownShare != null ? { ownShare: r.ownShare } : {}),
+    ...(r.loopCounts ? { loopCounts: r.loopCounts } : {}),
+  };
 
   // A part logged flat is SAVED flat. `loggingMode: 'free'` is the shape every downstream reader
   // already treats as "structure not to be trusted" — the poster renders the board rather than a

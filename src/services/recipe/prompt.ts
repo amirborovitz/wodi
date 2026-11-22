@@ -19,8 +19,9 @@ Describe the part as nested blocks. A block means "do these items <repeat> times
 - Rotations (min 1 / min 2 / min 3, stations A/B/C, alternating stations) = one block holding one full cycle, repeated by the number of cycles.
 - Work done between sets or after each set is written where it happens, with its own count ("in between, 3 sets of 10" = repeat 3 { 10 }; "15 box jumps after each set" = inside each set's block).
 - Work done once before or after the repeats sits outside them.
+- Work partners do at the same time (one runs while the other works, one rides while the other does a set) is sibling blocks, each repeated as far as the athletes get — never one inside the other.
 - label: the board's own name for a block ("A", "Min 2", "Station B"), else null.
-- score: only on a block the board scores on its own (A / B / C AMRAPs, each with its own score) — what that block's result is counted in. Null on every other block.
+- score: only on a block the board scores on its own (A / B / C AMRAPs, each with its own score) — what that block's result is counted in — or, when a part has several blocks repeated as far as the athletes get, on the one the part's score counts ("score = total rounds" of the AMRAP, not the runner's laps). Null on every other block.
 
 MOVEMENTS
 - name: canonical and singular, as written in the part ("Pull-up", "Box Jump", "Toes to Bar", "Double Under", "Echo Bike", "Run"). A word that changes how the movement is done stays in the name ("strict", "tempo", "pause", "deficit", "single-arm": "Strict Chest to Bar Pull-up", "Tempo Dip"). A kettlebell swing is "American Kettlebell Swing" unless the board says Russian. Words for how partners move ("synchro", "together") are not part of the name. When the board lets the athlete pick the implement ("dumbbells / kettlebells"), name the movement once, by the first one written.

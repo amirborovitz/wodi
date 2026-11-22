@@ -11,7 +11,7 @@
  * misread something, and the part must not be logged as if it hadn't.
  */
 
-import type { Amount, PartRecipe, QuantityKind, RecipeBlock, RecipeMovement, Side } from './types';
+import type { Amount, PartRecipe, QuantityKind, RecipeBlock, RecipeItem, RecipeMovement, Side } from './types';
 
 /** Where an item sits: its index at every level, "0.1.0". */
 export type RecipePath = string;
@@ -135,6 +135,38 @@ export function recipeIndex(part: PartRecipe): { movements: Map<RecipePath, Reci
   };
   walk(part.recipe, '');
   return { movements, athleteBlocks };
+}
+
+/** The block at a place ('' is the whole part). */
+export function recipeBlockAt(part: PartRecipe, path: RecipePath): RecipeBlock | undefined {
+  let block: RecipeBlock | undefined = part.recipe;
+  for (const index of path === '' ? [] : path.split('.').map(Number)) {
+    const item: RecipeItem | undefined = block?.items[index];
+    block = item && 'block' in item ? item.block : undefined;
+  }
+  return block;
+}
+
+/** Does the part's score count rounds — so the score is how often its AMRAP block went round? */
+export function scoredInRounds(part: PartRecipe): boolean {
+  return part.logging.mode === 'amrap' || part.logging.mode === 'amrap_intervals' || part.logging.score === 'rounds';
+}
+
+/**
+ * How each block the athletes repeat as far as they get is counted. The part's score counts one of
+ * them — its rounds come from the score (the block the board scores, or the only one). A block the
+ * board scores on its own is asked as a part of its own. Every other one — a runner's laps while
+ * the partner works, the set done while off the bike — is counted by the athlete: how many times
+ * THEY did it. That number is their own, never shared out.
+ */
+export function athleteLoops(part: PartRecipe): { rounds?: RecipePath; counted: RecipePath[] } {
+  const { athleteBlocks } = recipeIndex(part);
+  // The whole part ('') is no block of its own: a score on it is the part's score.
+  const scored = athleteBlocks.filter((path) => path !== '' && recipeBlockAt(part, path)?.score != null);
+  const rounds = !scoredInRounds(part) ? undefined
+    : scored.length === 1 && recipeBlockAt(part, scored[0])?.score === 'rounds' ? scored[0]
+    : athleteBlocks.length === 1 ? athleteBlocks[0] : undefined;
+  return { rounds, counted: athleteBlocks.filter((path) => path !== rounds && !scored.includes(path)) };
 }
 
 /** Every place the board offers an alternative. */

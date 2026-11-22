@@ -65,9 +65,12 @@ function toMovement(m: RecipeMovement, path: RecipePath, factor: number, station
   if (m.kind === 'calories' && (m.amount.women != null || m.amount.men != null)) {
     movement.rxCalories = { male: scaled(m.amount.men, factor), female: scaled(m.amount.women, factor) };
   }
-  if (m.amount.max) {
+  // An open effort the athlete counts ("max sit-ups", "max cal"). An open-ended hold ("holds a plank
+  // while the partner works") has no number to earn: it stays on the board and the poster, and is
+  // never asked or counted.
+  if (m.amount.max && m.kind !== 'seconds') {
     movement.isMaxReps = true;
-    if (m.kind !== 'seconds') movement.maxMetric = m.kind;
+    movement.maxMetric = m.kind;
   }
   if (m.kind === 'distance') movement.unit = m.distanceUnit ?? 'm';
   if (m.kind === 'calories') movement.unit = 'cal';

@@ -132,6 +132,9 @@ export interface StoryExerciseResult {
   // partner work split between athletes: the fraction of it this athlete did (0.4 = 40%), when they
   // said. Unset is the even split the board implies (the part's share).
   ownShare?: number;
+  // a block repeated as far as the athletes get that the score does not count (a runner's laps, the
+  // set done while off the bike): how many times THIS athlete did it, by its recipe place.
+  loopCounts?: Record<string, number>;
 
   // intervals
   intervalsCompleted?: number;        // how many intervals done

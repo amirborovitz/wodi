@@ -16,7 +16,7 @@ import { getMovementKeys, movementLookup } from '../../utils/movementKeys';
 import { resolveLoggedQuantity } from '../../utils/tierScaling';
 import { toMetres } from '../../utils/distanceUnits';
 import { movementLoadUnit } from '../../utils/loadUnits';
-import { recipeIndex, recipeTotals, type AthleteChoices, type RecipePath } from './totals';
+import { athleteLoops, recipeIndex, recipeTotals, type AthleteChoices, type RecipePath } from './totals';
 import type { QuantityKind, RecipeMovement, Side } from './types';
 
 type Metric = 'reps' | 'calories' | 'distance';
@@ -35,9 +35,13 @@ const ENTRIES: Record<Metric, 'movementReps' | 'movementCalories' | 'movementDis
 
 const close = (a: number, b: number): boolean => Math.abs(a - b) < 0.01;
 
-/** The logging screens enter distance in metres; the recipe keeps the board's unit. */
-const inRecipeUnit = (metric: Metric, value: number, movement: RecipeMovement): number => (
-  metric === 'distance' ? value / toMetres(1, movement.distanceUnit ?? 'm') : value
+/**
+ * A distance logged on a row is in that row's own unit — the form shows a "20 km" row in km, and
+ * the chat asks it in the row's unit. The recipe keeps the board's unit. (Read as metres, a 10 km
+ * share of a 20 km bike saved as 10 m — 2026-11-21.)
+ */
+const inRecipeUnit = (metric: Metric, value: number, row: ParsedMovement, movement: RecipeMovement): number => (
+  metric === 'distance' ? toMetres(value, row.unit) / toMetres(1, movement.distanceUnit ?? 'm') : value
 );
 
 interface Row {
@@ -152,7 +156,7 @@ export function athleteChoicesFromResult(result: ExerciseResult, profileSide?: S
     if (!metric) continue;
     const logged = resolveLoggedQuantity(result[ENTRIES[metric]], key, row, row, result.movementSubstitutions, metric);
     if (logged == null) continue;
-    const value = inRecipeUnit(metric, logged, movement);
+    const value = inRecipeUnit(metric, logged, row, movement);
     // Read exactly as the chat asked it: a total for the whole part, or one round's number.
     if (loggedAsTotal(row, metric)) {
       totals[path] = value;
@@ -199,13 +203,31 @@ export function athleteChoicesFromResult(result: ExerciseResult, profileSide?: S
       && section.movements.some((m) => m.recipePath != null && isInside(m.recipePath, blockPath)));
     if (scored?.result) repeats[blockPath] = scored.result.value;
   }
-  const scoredInRounds = part.logging.mode === 'amrap' || part.logging.mode === 'amrap_intervals' || part.logging.score === 'rounds';
-  if (scoredInRounds && athleteBlocks.length === 1 && repeats[athleteBlocks[0]] == null && result.rounds != null) {
-    const [blockPath] = athleteBlocks;
+  const loops = athleteLoops(part);
+  if (loops.rounds != null && repeats[loops.rounds] == null && result.rounds != null) {
+    const blockPath = loops.rounds;
     repeats[blockPath] = result.rounds;
     const done = new Set((result.partialMovements ?? []).map((name) => name.toLowerCase()));
     for (const { row, path } of rows) {
       if (isInside(path, blockPath) && done.has(row.name.toLowerCase())) partial.add(path);
+    }
+  }
+  // A loop the athlete counted themselves ("I ran 4 times"): their own number — what is inside it
+  // is theirs, never shared out again. The scored AMRAP may sit inside it (the AI nests "run, then
+  // AMRAP till the runner is back"): its rounds are already the whole, so they are spread across the
+  // laps rather than multiplied by them. A loop they didn't count adds nothing of its own.
+  for (const blockPath of loops.counted) {
+    if (repeats[blockPath] != null) continue;
+    const times = result.loopCounts?.[blockPath];
+    const inner = loops.rounds != null && isInside(loops.rounds, blockPath) ? loops.rounds : undefined;
+    const ownWork = [...movements.keys()].filter((path) => isInside(path, blockPath) && !(inner != null && isInside(path, inner)));
+    if (times != null && times > 0) {
+      repeats[blockPath] = times;
+      if (inner != null && repeats[inner] != null) repeats[inner] /= times;
+      ownWork.forEach((path) => own.add(path));
+    } else {
+      repeats[blockPath] = 1;
+      ownWork.forEach((path) => { totals[path] = 0; });
     }
   }
 

@@ -143,6 +143,9 @@ just finished a workout and is texting you about it. Your job has two parts.
      "choice" → copy one of its options exactly, picking whichever their words mean. "Not sure",
      "don't know" → skipped.
    - "score": whichever fits — seconds, count, or weight.
+   - "times": how many times THEY did the loop named in "about" (the runs while their partner
+     worked, the sets done while off the bike) → count. "I ran 4 times", "4 laps" → 4. Only their
+     own, never the team's.
    - "share": how much of the partner work split between the athletes was THEIRS, as a percentage
      in count. "even", "half", "we split it" → evenSharePercent. "I did 8 of the 14 rounds" →
      8 / 14 → 57. "I did most of it", "carried my partner" → about 67; "less than half" → about
