@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crossCheckTotals, recipeTotals } from './totals';
+import { athleteLoops, crossCheckTotals, recipeTotals } from './totals';
 import { readRecipe } from './readRecipe';
 import type { PartRecipe, RecipeBlock, RecipeItem, RecipeMovement } from './types';
 
@@ -161,5 +161,32 @@ describe('reading the AI\'s answer', () => {
   it('rejects a share that is not a fraction', () => {
     expect(() => readRecipe({ title: 'x', kind: 'metcon', prescription: 'x', logging: { mode: 'for_time' }, share: 6, recipe: { repeat: 1, repeatBy: 'board', items: [] }, totals: [], asks: [] }))
       .toThrow(/share/);
+  });
+});
+
+describe('loops the athletes repeat as far as they get', () => {
+  it('a part with one such loop: the score measures it — there is no other loop to count', () => {
+    // Death by Burpees, scored in reps. Asking "how many times did you do the Burpee?" next to
+    // "how many burpees?" was the bug (2026-11-22).
+    const deathBy = part([mv('Burpee', 1)], { logging: { mode: 'free', score: 'reps' } });
+    deathBy.recipe = { repeatBy: 'athlete', items: deathBy.recipe.items };
+    expect(athleteLoops(deathBy).counted).toEqual([]);
+  });
+
+  it('a loop inside a part scored on time is the athlete\'s to count, even when it is the only one', () => {
+    // "20 km Echo Bike as a team; one rides while the other does 10 Wall Balls + 10 Burpees".
+    const bikeGoal = part([
+      { movement: { equipment: 'none', name: 'Echo Bike', kind: 'distance', amount: { value: 20 }, distanceUnit: 'km', shared: 'split' } },
+      block(undefined, [mv('Wall Ball', 10), mv('Burpee', 10)]),
+    ]);
+    expect(athleteLoops(bikeGoal).counted).toEqual(['1']);
+  });
+
+  it('a runner\'s laps beside the scored AMRAP are counted by the athlete', () => {
+    const runnerAmrap = part([
+      block(undefined, [{ movement: { equipment: 'none', name: 'Run', kind: 'distance', amount: { value: 400 }, distanceUnit: 'm' } }]),
+      block(undefined, [mv('Pull-up', 5), mv('Push-up', 10)], { score: 'rounds' }),
+    ], { logging: { mode: 'amrap' } });
+    expect(athleteLoops(runnerAmrap)).toEqual({ rounds: '1', counted: ['0'] });
   });
 });

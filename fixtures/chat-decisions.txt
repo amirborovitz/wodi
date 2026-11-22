@@ -237,12 +237,13 @@ multipart-emom-amrap
 
 pair-paced-amrap
   part 1 · Front Squat 4x3 · load
-  part 2 · 12 Minutes AMRAP in Pairs · score_rounds
+  part 2 · 12 Minutes AMRAP · score_rounds
   part 3 · 2 Sets · reps
     asks: What did you lift on the Front Squat?
-    asks: How many rounds did you get on 12 Minutes AMRAP in Pairs?
+    asks: How many rounds did you get on 12 Minutes AMRAP?
     asks: And into round 6 — which moves did you finish?
-    asks: How much of the work was yours on 12 Minutes AMRAP in Pairs?
+    asks: How much of the work was yours on 12 Minutes AMRAP?
+    asks: How many times did you do the 200 m Run on 12 Minutes AMRAP?
     asks: What weight did you use for Thruster?
     asks: How many tibialis raises each set?
 
@@ -254,6 +255,41 @@ palindrome-partner-chipper
     asks: How much of the work was yours on For Time, In Pairs?
     asks: What weight did you use for Twin Kettlebell Clean and Jerk?
     asks: Bar Muscle-up or Chest to Bar Pull-up / Pull-up?
+
+partner-bike-goal-side-job
+  part 1 · Team of 2 For Time · score_time
+    asks: What was your time?
+    asks: How much of the work was yours?
+    asks: How many times did you do the 10 Wall Ball + 10 Burpee?
+    asks: What weight did you use for Wall Ball?
+
+partner-runner-amrap
+  part 1 · 16 min In Pairs · score_rounds
+    asks: How many rounds did you get?
+    asks: And into round 6 — which moves did you finish?
+    asks: How much of the work was yours?
+    asks: How many times did you do the 400 m Run?
+
+partner-synchro-together
+  part 1 · 5 Rounds In Pairs · score_time
+    asks: What was your time?
+
+partner-technical-heats
+  part 1 · 3 Rounds For Time · score_time
+    asks: What was your time?
+    asks: What weight did you use for Wall Ball?
+
+partner-work-while-hold
+  part 1 · 21-15-9 For Time · score_time
+    asks: What was your time?
+    asks: How much of the work was yours?
+    asks: What weight did you use for Thruster?
+
+partner-ygig-split-chipper
+  part 1 · 30 min cap Partner Chipper · score_time
+    asks: What was your time?
+    asks: How much of the work was yours?
+    asks: What weights did you use?
 
 per-movement-ladder-flat-collapse
   part 1 · For Time 12 min cap · score_time

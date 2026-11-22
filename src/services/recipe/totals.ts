@@ -166,7 +166,11 @@ export function athleteLoops(part: PartRecipe): { rounds?: RecipePath; counted: 
   const rounds = !scoredInRounds(part) ? undefined
     : scored.length === 1 && recipeBlockAt(part, scored[0])?.score === 'rounds' ? scored[0]
     : athleteBlocks.length === 1 ? athleteBlocks[0] : undefined;
-  return { rounds, counted: athleteBlocks.filter((path) => path !== rounds && !scored.includes(path)) };
+  // What the part's score measures: the block its rounds count — otherwise the part itself. A part
+  // that IS the loop ("Death by Burpees", scored in burpees) has no other loop to count; a loop
+  // inside a part scored on time (the set done while off the bike) is still the athlete's to count.
+  const measured = rounds ?? '';
+  return { rounds, counted: athleteBlocks.filter((path) => path !== measured && !scored.includes(path)) };
 }
 
 /** Every place the board offers an alternative. */

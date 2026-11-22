@@ -1765,7 +1765,8 @@ export function nextQuestion(
     }
     case 'times':
       return {
-        text: `How many times did you do the ${first.subject}${onPart}?`,
+        // The subject is the loop, so the part is named by its own title.
+        text: `How many times did you do the ${first.subject}${results.length > 1 && result ? ` on ${result.exercise.name}` : ''}?`,
         hint: 'Just yours — the team’s score is already in.',
         placeholder: 'Type a number — e.g. 4',
         slotIds: [first.id],
