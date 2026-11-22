@@ -1,0 +1,15 @@
+{
+  "name": "partner-synchro-together",
+  "description": "Everything done together: each athlete does every rep.",
+  "rawText": "IN PAIRS\n5 rounds:\n10 synchro Burpees\n20 synchro Sit-ups\n200m Run together",
+  "expect": {},
+  "expectSaved": {
+    "0:Sit-up:totalReps": 100,
+    "0:Burpee:totalReps": 50,
+    "0:Run:totalDistance": 1000
+  },
+  "aiResponses": {
+    "segment|IN PAIRS\n5 rounds:\n10 synchro Burpees\n20 synchro Sit-ups\n200m Run together": "{\"parts\":[{\"label\":\"A\",\"kind\":\"metcon\",\"text\":\"IN PAIRS\\n5 rounds:\\n10 synchro Burpee\\n20 synchro Sit-up\\n200m Run together\"}]}",
+    "recipe|IN PAIRS\n5 rounds:\n10 synchro Burpee\n20 synchro Sit-up\n200m Run together": "{\"label\":null,\"title\":\"5 Rounds In Pairs\",\"kind\":\"metcon\",\"prescription\":\"In pairs, 5 rounds:\\n10 synchro Burpee\\n20 synchro Sit-up\\n200m Run together\",\"wodName\":null,\"complex\":false,\"clock\":null,\"logging\":{\"mode\":\"for_time\",\"score\":null,\"timeCapSeconds\":null,\"intervalSeconds\":null,\"intervalRestSeconds\":null,\"intervalCount\":null,\"workSeconds\":null,\"difficulty\":6,\"activeShare\":1},\"teamSize\":2,\"share\":null,\"partnerNote\":\"In pairs; synchro Burpees and Sit-ups, run together.\",\"recipe\":{\"repeat\":5,\"repeatBy\":\"board\",\"clock\":null,\"label\":null,\"score\":null,\"note\":null,\"items\":[{\"movement\":{\"name\":\"Burpee\",\"kind\":\"reps\",\"amount\":{\"value\":10,\"women\":null,\"men\":null,\"low\":null,\"high\":null,\"max\":false,\"start\":null,\"step\":null},\"distanceUnit\":null,\"equipment\":\"none\",\"load\":null,\"implements\":null,\"perSide\":false,\"shared\":\"together\",\"alternative\":null},\"block\":null},{\"movement\":{\"name\":\"Sit-up\",\"kind\":\"reps\",\"amount\":{\"value\":20,\"women\":null,\"men\":null,\"low\":null,\"high\":null,\"max\":false,\"start\":null,\"step\":null},\"distanceUnit\":null,\"equipment\":\"none\",\"load\":null,\"implements\":null,\"perSide\":false,\"shared\":\"together\",\"alternative\":null},\"block\":null},{\"movement\":{\"name\":\"Run\",\"kind\":\"distance\",\"amount\":{\"value\":200,\"women\":null,\"men\":null,\"low\":null,\"high\":null,\"max\":false,\"start\":null,\"step\":null},\"distanceUnit\":\"m\",\"equipment\":\"none\",\"load\":null,\"implements\":null,\"perSide\":false,\"shared\":\"together\",\"alternative\":null},\"block\":null}]},\"totals\":[{\"movement\":\"Burpee\",\"kind\":\"reps\",\"value\":50,\"women\":null,\"men\":null,\"dependsOnAthlete\":false,\"how\":\"5 x 10\"},{\"movement\":\"Sit-up\",\"kind\":\"reps\",\"value\":100,\"women\":null,\"men\":null,\"dependsOnAthlete\":false,\"how\":\"5 x 20\"},{\"movement\":\"Run\",\"kind\":\"distance\",\"value\":1000,\"women\":null,\"men\":null,\"dependsOnAthlete\":false,\"how\":\"5 x 200m\"}],\"asks\":[{\"question\":\"What was your time?\",\"answer\":\"time\"}]}"
+  }
+}

@@ -5,7 +5,8 @@
  * prescription-only twin in workloadCalculation.ts that no app code called. The twin was the one
  * that looked authoritative — right folder, best comments, most tests — so a fix went into it,
  * the suite went green, and the number that reached Firestore was still wrong. A test that passes
- * has to mean the athlete's data is right, and with two implementations it could not.
+ * has to mean the athlete's data is right, and with two implementations it could not. The twin
+ * was deleted on 2026-11-21; a board's prescribed totals are this function with nothing logged.
  *
  * They were already half-joined: getMovementMultiplier, scopeSectionMovements and
  * statedOccurrenceCount are shared and each documented as the single owner of its question. That
@@ -14,8 +15,7 @@
  *
  * The difference between the two was never the logic. It was the INPUT: this one knows what the
  * athlete logged (weights, substitutions, per-window counts, sets), the twin knew only what the
- * board prescribed. A prescription is just a log with nothing logged, so
- * calculateWorkloadBreakdown now calls this with empty results.
+ * board prescribed. A prescription is just a log with nothing logged.
  *
  * Lifted out of AddWorkoutScreen.tsx, where 669 lines of domain logic sat inside a screen
  * component — against rule 1, and unreachable from the dev scripts, which cannot import a .tsx.
@@ -25,7 +25,7 @@ import type { ParsedWorkout, ParsedExercise, ParsedMovement, ExerciseSet, Worklo
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
 import { matchesNamePattern } from '../utils/movementNameMatch';
-import { getMovementKeys, movementLookup } from '../components/workouts/InlineMovementEditor';
+import { getMovementKeys, movementLookup } from '../utils/movementKeys';
 import { resolveLoggedQuantity } from '../utils/tierScaling';
 import { isBoardOfferedChoice } from '../components/celebration/movementResolution';
 import { getAlternativeType } from '../data/exerciseDefinitions';
@@ -42,6 +42,8 @@ import {
 } from './workloadCalculation';
 import type { SectionMovementScope } from './workloadCalculation';
 import { isCoreTabataBlock, coreTabataDoseSeconds, CORE_DOSE_MOVEMENT_NAME } from '../utils/coreTabata';
+import { loggedRecipeRows } from './recipe/loggedTotals';
+import type { Side } from './recipe/types';
 
 /** One logged exercise, as the save path hands it over. */
 export interface ExerciseResult {
@@ -73,6 +75,10 @@ export interface ExerciseResult {
   partialReps?: number; // Partial reps in next cycle (for restore)
   partialMovements?: string[]; // Movement names completed in AMRAP partial round
   ladderStep?: number;
+  /** Split partner work: the fraction this athlete did, when they said (else the part's even share). */
+  ownShare?: number;
+  /** Loops the athlete counted themselves, by recipe place: how many times they did each. */
+  loopCounts?: Record<string, number>;
 }
 
 
@@ -211,12 +217,14 @@ export function loggedAsTotal(movement: ParsedMovement, metric: 'reps' | 'distan
 /**
  * Exported for tests only — this is a pure function trapped in a screen component. It owns the
  * save-time breakdown (every stored total and therefore every workout's EP), so it needs a
- * regression net; it belongs in src/services/ alongside calculateWorkloadBreakdown.
+ * regression net.
  */
 export function buildWorkloadBreakdownFromResults(
   results: ExerciseResult[],
   parsedWorkout?: ParsedWorkout,
   partnerFactor: number = 1,
+  /** The athlete's column of every women/men pair, from their profile — only when they gave one. */
+  profileSide?: Side,
 ): WorkloadBreakdown {
   const movementMap = new Map<string, MovementTotal>();
   let grandTotalReps = 0;
@@ -243,6 +251,30 @@ export function buildWorkloadBreakdownFromResults(
     // registry buckets them onto the same Core row regardless, so splitting four minutes three
     // ways would invent a per-movement share the board never stated. The names still reach the
     // poster — they are prescription, and prescription is read from the exercise.
+    // A part read as a recipe is counted from the recipe and nothing else: the board's nesting
+    // multiplied out, with the athlete's own numbers in their places (services/recipe). Every
+    // rule below exists to reconstruct structure the old parse could not state.
+    if (result.exercise.recipe) {
+      for (const row of loggedRecipeRows(result, resultIndex, profileSide)) {
+        const key = movementBucketKey(row.name, resultIndex);
+        const existing = movementMap.get(key);
+        movementMap.set(key, existing ? {
+          ...existing,
+          totalReps: (existing.totalReps ?? 0) + (row.totalReps ?? 0) || undefined,
+          totalDistance: (existing.totalDistance ?? 0) + (row.totalDistance ?? 0) || undefined,
+          totalCalories: (existing.totalCalories ?? 0) + (row.totalCalories ?? 0) || undefined,
+          totalTime: (existing.totalTime ?? 0) + (row.totalTime ?? 0) || undefined,
+        } : row);
+        grandTotalReps += row.totalReps ?? 0;
+        grandTotalCalories += row.totalCalories ?? 0;
+        if (row.totalDistance) {
+          if (isWeightedCarry(row.name) && row.weight && row.weight > 0) grandTotalWeightedDistance += row.totalDistance;
+          else grandTotalDistance += row.totalDistance;
+        }
+      }
+      return;
+    }
+
     if (isCoreTabataBlock(result.exercise)) {
       const doseSeconds = coreTabataDoseSeconds(result.exercise);
       if (doseSeconds > 0) {
@@ -376,9 +408,8 @@ export function buildWorkloadBreakdownFromResults(
       let iterationMovements: ParsedMovement[];
       let perMovementRounds: number[];
       // What the SECTION around each movement says about how many times it happened. Read from
-      // scopeSectionMovements, the same owner calculateWorkloadBreakdown reads, so the number
-      // this function stores and the number the parse computed can never disagree again. The
-      // save path used to answer this itself, and knew one fewer fact than the parse did.
+      // scopeSectionMovements, the one owner of that question. The save path used to answer this
+      // itself, and knew one fewer fact than the parse did.
       let perMovementScopes: Array<SectionMovementScope | undefined>;
 
       if (hasSections) {
@@ -856,7 +887,7 @@ export function buildWorkloadBreakdownFromResults(
   // and patch the corresponding movement entry in the map.
   results.forEach((result, resultIndex) => {
     const movements = result.exercise.movements;
-    if (!movements || movements.length === 0) return;
+    if (!movements || movements.length === 0 || result.exercise.recipe) return;
     const distinctWeights = [...new Set(
       result.sets
         .map(s => s.weight)

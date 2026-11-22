@@ -78,9 +78,8 @@ const STARTER_EXPECT_PATHS = [
   'format',
   'loggingModes',
   'movementNames',
-  'totals.reps',
-  'totals.volume',
-  'totals.distance',
+  // No totals: what a board stores is `expectSaved`, traced to the board and checked by
+  // src/corpusSave.test.ts against the app's own save.
   'hero.value',
   'hero.unit',
 ] as const;

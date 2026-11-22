@@ -1,8 +1,7 @@
-import { toMetres } from '../utils/distanceUnits';
 import type { ParsedWorkout, ParsedExercise, ParsedMovement, ParsedSection, MovementTotal, WorkloadBreakdown } from '../types';
 import { isWeightedCarry } from '../utils/xpCalculations';
 import { hasSequentialBlocks, sectionsEnumerateIntervals } from '../utils/sectionShape';
-import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
+import { exerciseLoadUnit, toKg } from '../utils/loadUnits';
 
 /**
  * Every partner-scope rule — which blocks are team-prescribed, what divides and what does not —
@@ -11,7 +10,6 @@ import { exerciseLoadUnit, movementLoadUnit, toKg } from '../utils/loadUnits';
  */
 export { isTeamPrescribedExercise } from './partnerScope';
 import { exercisePartnerFactor } from './partnerScope';
-import { expandExercise, totalsForMovementIndex } from './occurrenceExpansion';
 import { sectionRoundsCompleted } from './blockScore';
 
 /**
@@ -84,42 +82,6 @@ const SKILL_PATTERNS = [
   'strict', 'kipping', 'butterfly', 'toes to bar', 't2b',
   'knees to elbow', 'k2e', 'chest to bar', 'c2b'
 ];
-
-const CARDIO_PATTERNS = [
-  'run', 'row', 'bike', 'ski', 'swim', 'jump', 'box jump',
-  'burpee', 'double under', 'single under', 'du', 'su',
-  'air squat', 'push-up', 'pushup', 'pull-up', 'pullup', 'sit-up', 'situp'
-];
-
-/**
- * Determine the Trinity color for a movement
- */
-function getMovementColor(movement: ParsedMovement): 'cyan' | 'magenta' | 'yellow' {
-  const name = movement.name.toLowerCase();
-
-  // Check if it has weight - likely a weighted movement
-  if (movement.rxWeights) {
-    return 'yellow';
-  }
-
-  // Check for skill/gymnastics patterns first (more specific)
-  if (SKILL_PATTERNS.some(p => name.includes(p))) {
-    return 'cyan';
-  }
-
-  // Check for weighted movement patterns
-  if (WEIGHTED_PATTERNS.some(p => name.includes(p))) {
-    return 'yellow';
-  }
-
-  // Check for cardio/bodyweight patterns
-  if (CARDIO_PATTERNS.some(p => name.includes(p))) {
-    return 'magenta';
-  }
-
-  // Default to magenta for unclassified movements (treat as conditioning)
-  return 'magenta';
-}
 
 /**
  * Assign colors to all movements in a breakdown
@@ -632,251 +594,6 @@ export function movementForSectionCounting(scope: SectionMovementScope): ParsedM
     : scope.movement;
 }
 
-function getVariableSchemeMovementReps(
-  movement: ParsedMovement,
-  exercise: ParsedExercise,
-): number | undefined {
-  const scheme = exercise.suggestedRepsPerSet;
-  if (!scheme || scheme.length <= 1 || !movement.reps || movement.reps !== scheme[0]) {
-    return undefined;
-  }
-  return scheme.reduce((sum, reps) => sum + reps, 0);
-}
-
-/**
- * Calculate the workload breakdown from a parsed workout
- */
-export function calculateWorkloadBreakdown(
-  workout: ParsedWorkout,
-  movementWeights?: Record<string, number>,
-): WorkloadBreakdown {
-  // Aggregate movements across all exercises
-  const movementMap = new Map<string, MovementTotal>();
-  let grandTotalReps = 0;
-  let grandTotalVolume = 0;
-  let grandTotalDistance = 0;
-  let grandTotalWeightedDistance = 0;
-  let grandTotalCalories = 0;
-  // Poster truth standard: totals derived by guesswork never render on the poster.
-  let estimated = false;
-
-  workout.exercises.forEach((exercise, exerciseIndex) => {
-    const multiplier = getContainerMultiplier(workout, exercise);
-    const stationVisitCounts = getStationVisitCountsForExercise(workout, exercise, exerciseIndex);
-    // The flat form of this exercise — the individual performances it is actually made of. Used
-    // in place of per-movement multiplier arithmetic ONLY when the expansion reports no gaps,
-    // i.e. when writing the workout out answers "how many times?" on its own. Every other shape
-    // (AMRAP round counts, stations, sections, max efforts) stays on the multiplier path below,
-    // untouched. See occurrenceExpansion.ts for why this is the direction of travel.
-    const expansion = expandExercise(exercise, multiplier);
-    const useFlatForm = expansion.gaps.length === 0 && !exercise.sections?.length;
-    // A free/unclassified part's movement totals are estimates by definition — the structure
-    // was never understood, so any multiplier is a guess.
-    if ((exercise.movements?.length || exercise.sections?.length)
-      && (!exercise.loggingMode || exercise.loggingMode === 'free')) {
-      estimated = true;
-    }
-
-    // Prefer structured sections when present. They preserve semantic repeat
-    // scope from the single AI parse: buy-in/cash-out sections are once,
-    // rounds sections use their explicit section round count.
-    const movementEntries: SectionMovementScope[] = exercise.sections && exercise.sections.length > 0
-      ? scopeSectionMovements(exercise.sections, exercise.intervalCount)
-      : (exercise.movements || []).map((movement) => ({
-          movement,
-          fallbackMultiplier: multiplier,
-          forceOnce: false,
-          sectionRepeat: 1,
-          // The flat list IS one window's worth of work — 'once per interval' is exactly what it
-          // means here, and the multiplier is the only thing that knows how many windows there are.
-          enumeratesInterval: false,
-        }));
-
-    // If exercise has movement structure, use it
-    if (movementEntries.length > 0) {
-      movementEntries.forEach((scope, movementIndex) => {
-        const { movement, fallbackMultiplier, sectionRepeat } = scope;
-        const key = movementBucketKey(movement.name, exerciseIndex);
-        const existing = movementMap.get(key);
-
-        // Calculate totals for this movement
-        const movementForCounting = movementForSectionCounting(scope);
-        const multiplierResult = getMovementMultiplier(
-          movementForCounting,
-          movementIndex,
-          exercise,
-          workout,
-          fallbackMultiplier,
-          stationVisitCounts
-        );
-        const movMultiplier = multiplierResult.multiplier * sectionRepeat;
-        if (multiplierResult.estimated) estimated = true;
-        // Flat form: sum this written line's own performances. Keyed by movement INDEX, so a
-        // chipper that writes "600m run" twice keeps two honest rows instead of one merged
-        // figure. A run's rep count comes out as 0 here rather than inheriting the ladder's rep
-        // sum, because no occurrence of a run has reps to contribute.
-        const flat = useFlatForm ? totalsForMovementIndex(expansion, movementIndex) : null;
-        const schemeReps = getVariableSchemeMovementReps(movement, exercise);
-        // "6/6 KB Windmill" and "20/20m Suitcase Carry" write ONE SIDE's number. The athlete does
-        // both, so the written quantity is half the real work — which is why a 6/6 windmill
-        // counted 6 and a 20/20m carry counted 20. Applied to every quantity uniformly, and to
-        // the flat form too, since that sums the same written values per occurrence.
-        const sideMultiplier = perSideFactor(movement);
-        const reps = (flat ? flat.reps : (schemeReps ?? ((movement.reps || 0) * movMultiplier))) * sideMultiplier;
-        // Totals are metres whatever the board wrote ("1 mile run"); the board's own words stay on the
-        // prescription. See utils/distanceUnits.
-        const distance = toMetres((flat ? flat.distance : (movement.distance || 0) * movMultiplier) * sideMultiplier, movement.unit);
-        const calories = (flat ? flat.calories : (movement.calories || 0) * movMultiplier) * sideMultiplier;
-        const time = (flat ? flat.time : (movement.time || 0) * movMultiplier) * sideMultiplier;
-
-        // Get per-implement weight from movementWeights override or rxWeights
-        const perImplementWeight = movementWeights?.[movement.name]
-          || movement.rxWeights?.male
-          || movement.rxWeights?.female
-          || undefined;
-
-        // Apply implement count multiplier (e.g., 2x22.5kg DBs = 45kg effective weight)
-        const implementCount = movement.implementCount || 1;
-        const explicitWeight = perImplementWeight && implementCount > 1
-          ? perImplementWeight * implementCount
-          : perImplementWeight;
-
-        const weight = explicitWeight;
-
-        // Determine unit
-        let unit: 'kg' | 'lb' | 'm' | 'cal' | undefined;
-        if (distance > 0) {
-          unit = 'm';
-        } else if (calories > 0) {
-          unit = 'cal';
-        } else if (weight) {
-          unit = movementLoadUnit(movement);
-        }
-
-        // Get color for this movement
-        const color = getMovementColor(movement);
-
-        if (existing) {
-          // Aggregate with existing
-          movementMap.set(key, {
-            ...existing,
-            totalReps: (existing.totalReps || 0) + reps,
-            totalDistance: (existing.totalDistance || 0) + distance,
-            totalCalories: (existing.totalCalories || 0) + calories,
-            totalTime: (existing.totalTime || 0) + time,
-            // Keep the first weight encountered
-            weight: existing.weight || weight,
-            implementCount: existing.implementCount || (implementCount > 1 ? implementCount : undefined),
-          });
-        } else {
-          // New movement
-          movementMap.set(key, {
-            name: movement.name,
-            exerciseIndex,
-            totalReps: reps > 0 ? reps : undefined,
-            totalDistance: distance > 0 ? distance : undefined,
-            totalCalories: calories > 0 ? calories : undefined,
-            totalTime: time > 0 ? time : undefined,
-            weight,
-            unit,
-            color,
-            implementCount: implementCount > 1 ? implementCount : undefined,
-            distancePerRep: (movement.distance || 0) > 0 ? toMetres(movement.distance || 0, movement.unit) : undefined,
-          });
-        }
-
-        // Update grand totals
-        grandTotalReps += reps;
-        if (weight && reps > 0) {
-          grandTotalVolume += weight * reps;
-        }
-        if (distance > 0) {
-          grandTotalDistance += distance;
-          if ((weight && weight > 0) || isWeightedCarry(movement.name)) {
-            grandTotalWeightedDistance += distance;
-          }
-        }
-        if (calories > 0) {
-          grandTotalCalories += calories;
-        }
-      });
-    } else {
-      // Exercise without movements array - use exercise itself
-      const stationVisits = stationVisitCounts?.[0] ?? (exercise.suggestedSets || 1);
-      const reps = (exercise.suggestedReps || 0) * stationVisits;
-      const weight = exercise.suggestedWeight
-        || exercise.rxWeights?.male
-        || exercise.rxWeights?.female;
-
-      const key = movementBucketKey(exercise.name, exerciseIndex);
-      const existing = movementMap.get(key);
-
-      const color = inferColorFromName(exercise.name, weight);
-
-      if (existing) {
-        movementMap.set(key, {
-          ...existing,
-          totalReps: (existing.totalReps || 0) + reps,
-          weight: existing.weight || weight,
-        });
-      } else {
-        movementMap.set(key, {
-          name: exercise.name,
-          exerciseIndex,
-          totalReps: reps > 0 ? reps : undefined,
-          weight,
-          unit: weight ? exerciseLoadUnit(exercise) : undefined,
-          color,
-        });
-      }
-
-      grandTotalReps += reps;
-      if (weight && reps > 0) {
-        grandTotalVolume += weight * reps;
-      }
-    }
-  });
-
-  // Convert map to array and sort by color priority (yellow first, then magenta, then cyan)
-  const colorOrder = { yellow: 0, magenta: 1, cyan: 2 };
-  const movements = Array.from(movementMap.values())
-    // A logged weight keeps the movement even with no countable quantity — an unprescribed
-    // rep count (e.g. an alternating pair line the coach wrote without reps) still happened
-    // and must reach the poster as a weight-only line.
-    .filter(m => (m.totalReps && m.totalReps > 0)
-      || (m.totalDistance && m.totalDistance > 0)
-      || (m.totalCalories && m.totalCalories > 0)
-      || (m.totalTime && m.totalTime > 0)
-      || (m.weight && m.weight > 0))
-    .sort((a, b) => {
-      const colorDiff = (colorOrder[a.color || 'magenta'] || 1) - (colorOrder[b.color || 'magenta'] || 1);
-      if (colorDiff !== 0) return colorDiff;
-      // Secondary sort by total reps (descending)
-      return (b.totalReps || 0) - (a.totalReps || 0);
-    });
-
-  // Derive volume from final movements for consistency with display.
-  // Rows keep the unit the coach wrote; grandTotalVolume is kg by definition (EP divides it
-  // by the athlete's bodyweight in kg), so an lb load converts here and only here.
-  const derivedVolume = movements.reduce((sum, m) => {
-    if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
-      return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;
-    }
-    return sum;
-  }, 0);
-
-  return {
-    movements,
-    grandTotalReps,
-    grandTotalVolume: Math.round(derivedVolume),
-    grandTotalDistance: grandTotalDistance > 0 ? Math.round(grandTotalDistance) : undefined,
-    grandTotalWeightedDistance: grandTotalWeightedDistance > 0 ? Math.round(grandTotalWeightedDistance) : undefined,
-    grandTotalCalories: grandTotalCalories > 0 ? Math.round(grandTotalCalories) : undefined,
-    containerRounds: workout.containerRounds,
-    ...(estimated ? { estimated: true } : {}),
-  };
-}
-
 /**
  * Recalculate workload breakdown from stored workout data
  * (for historical view on WorkoutDetailScreen)
@@ -1025,7 +742,7 @@ export function calculateWorkloadFromExercises(
     });
 
   // Derive volume from final movements for consistency with display.
-  // grandTotalVolume is kg by definition — see the note in calculateWorkloadBreakdown.
+  // grandTotalVolume is kg by definition: EP divides it by the athlete's bodyweight in kg.
   const derivedVolume = movements.reduce((sum, m) => {
     if (m.weight && m.weight > 0 && m.totalReps && m.totalReps > 0) {
       return sum + toKg(m.weight, m.unit === 'lb' ? 'lb' : 'kg') * m.totalReps;

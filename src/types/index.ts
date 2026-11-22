@@ -1,3 +1,4 @@
+import type { PartRecipe } from '../services/recipe/types';
 // User types
 export interface User {
   id: string;
@@ -582,6 +583,13 @@ export interface ParsedMovement {
   // movement rebuilt for editing the reverse holds: the fields above are back to the board's Rx
   // and this is the swap to re-apply on top of it.
   substitution?: MovementSubstitution;
+  // Where this movement sits in its part's recipe ("0.1.0"), on parts read as a recipe. It is how
+  // what the athlete logged against this row finds its place in the recipe's arithmetic.
+  recipePath?: string;
+  // How many recipe occurrences this row stands for, when inner repeats were folded into one round
+  // ("2 rounds of 5 cleans" shown as 10). A number the athlete enters on the row is divided by it
+  // to land on one occurrence. Absent = 1.
+  recipeFold?: number;
 }
 
 export type ParsedSectionType = 'buy_in' | 'rounds' | 'cash_out';
@@ -702,6 +710,10 @@ export interface ParsedExercise {
   // The movements[] keep each sub-lift; the poster renders them as one combined line, and volume
   // counts the shared bar once. AI-set at parse time; backfilled from "+"-joined board text.
   complex?: boolean;
+  // The part as the AI read it — nested repeats, both columns of every women/men pair, and the
+  // AI's own totals. Present on every part read since the recipe reader; the saved totals are this
+  // recipe multiplied out (services/recipe/totals.ts), never counted from the fields above.
+  recipe?: PartRecipe;
 }
 
 // Movement substitution tracking during logging

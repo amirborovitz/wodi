@@ -16,6 +16,10 @@ import { buildPartialRows } from '../logging/story/partialRoundRows';
 import { stripMovementRolePrefix } from '../../utils/movementNameMatch';
 import type { MovementEquipment, ParsedMovement, ParsedWorkout, ParseUncertainty } from '../../types';
 import { askableUncertainty } from '../../services/parseUncertainty';
+import { boardNumbers } from '../../services/recipe/boardNumbers';
+import { athleteLoops, recipeBlockAt, recipeIndex } from '../../services/recipe/totals';
+import type { RecipeBlock } from '../../services/recipe/types';
+import { toMetres } from '../../utils/distanceUnits';
 import { lastLoadKey, type LastLoad } from '../../utils/lastLoadHistory';
 import { resolveMovement } from '../../data/movementRegistry';
 import { FORMAT_LABELS } from '../home/unfinishedPoster';
@@ -52,6 +56,8 @@ export type ChatSlotKind =
   | 'sets'      // how many sets/intervals were done — OPTIONAL, filled only when mentioned
   | 'swap'      // did something else instead ("switched the run to echo bike") — OPTIONAL
   | 'amount'    // how much of a swap they did, when nothing converts the board's number to it
+  | 'share'     // partner work split between athletes: how much of it was theirs (a percentage)
+  | 'times'     // a loop repeated as far as they got that the score doesn't count: how many times THEY did it
   | 'clarify';  // something the board reader couldn't settle — its own question (ParseUncertainty)
 
 export interface ChatSlot {
@@ -66,10 +72,17 @@ export interface ChatSlot {
   block?: number;
   /** A 'count' slot's unit: the quantity the board left open on that movement. */
   metric?: 'reps' | 'calories' | 'distance';
+  /** A distance 'count' slot's unit: the row's own ("20 km" is asked in km), metres when it says none. */
+  lengthUnit?: string;
   /** A 'count' slot: the number is the block's total, not one round's or set's (loggedAsTotal). */
   total?: boolean;
   /** A 'count' slot: what one repeat of the block is called — "round" or "set". */
   per?: 'round' | 'set';
+  /**
+   * A 'count' slot: the numbers the board itself offers — both columns of "8/10 cal", the span of
+   * "10-12". The one-tap answers; any other number can still be typed.
+   */
+  picks?: number[];
   /** A 'ladder' slot: the rungs to offer, in order — the board's and a few beyond it. */
   rungs?: number[];
   /** What the slot is about, in words the athlete and the AI both read. */
@@ -125,6 +138,14 @@ export interface ChatSlot {
    * several lengths (400 / 800 / 1200 / 1600 m of run is 1200–4800 m of bike, never just "1200 m").
    */
   usualAmount?: { value: number; unit: SwapUnit; range?: { low: number; high: number } };
+  /**
+   * A 'share' slot: the even split as a percentage (50 in pairs), and the team's rounds once they
+   * are known — so "8" on a 14-round AMRAP reads as 8 of the 14.
+   */
+  evenShare?: number;
+  teamRounds?: number;
+  /** A 'times' slot: the loop's place in the part's recipe — where the count is kept. */
+  loopPath?: string;
   /** A 'clarify' slot's flag: the question, how it's answered, and the field the answer goes in. */
   uncertainty?: ParseUncertainty;
 }
@@ -194,6 +215,36 @@ function partialMoves(r: StoryExerciseResult): { name: string; reps: number }[] 
 }
 
 /** `total` over `parts` whole numbers that add back up to it: 22 over 5 is 5, 5, 4, 4, 4. */
+/**
+ * Is the athlete's count for this movement the whole of it? Either the board says it is entered as
+ * a total, or the part is one pass of fixed work ("30 min Zone 2 bike"), where one round IS the
+ * whole — there is no "each set" to ask about.
+ */
+function countedWhole(r: StoryExerciseResult, movement: ParsedMovement, metric: 'reps' | 'distance' | 'calories'): boolean {
+  return loggedAsTotal(movement, metric) || (!isScoredKind(r) && r.kind !== 'intervals' && r.setsTotal <= 1);
+}
+
+/** A loop in the athlete's words: "400 m Run", "10 Wall Ball + 10 Burpee". */
+function loopName(block: RecipeBlock | undefined): string {
+  const said = (block?.items ?? []).flatMap((item) => {
+    if (!('movement' in item)) return [];
+    const { name, kind, amount, distanceUnit } = item.movement;
+    const n = amount.value ?? amount.men ?? amount.low;
+    if (n == null) return [name];
+    const unit = kind === 'distance' ? ` ${distanceUnit ?? 'm'}` : kind === 'calories' ? ' cal' : kind === 'seconds' ? ' s' : '';
+    return [`${n}${unit} ${name}`];
+  });
+  return said.length > 0 ? said.join(' + ') : 'that loop';
+}
+
+/** The even split of a part's partner work (0.5 in pairs) — only when some of its work is split. */
+function splitShare(r: StoryExerciseResult): number | undefined {
+  const part = r.exercise.recipe;
+  if (!part || part.share == null || part.share >= 1) return undefined;
+  const split = [...recipeIndex(part).movements.values()].some((m) => m.shared === 'split');
+  return split ? part.share : undefined;
+}
+
 function spreadEvenly(total: number, parts: number): number[] {
   const base = Math.floor(total / parts);
   return Array.from({ length: parts }, (_, index) => base + (index < total - base * parts ? 1 : 0));
@@ -485,6 +536,24 @@ export function openSlots(
     if (r.kind === 'duration' && toAsk(`${key}.duration`, (r.durationSeconds ?? 0) > 0)) {
       push(scores, { id: `${key}.duration`, kind: 'duration', exerciseIndex: i, subject: r.exercise.name, asked: true });
     }
+    // Partner work split between athletes: the score is the team's, the work is theirs. How much of
+    // it they did — an even split is one tap; unanswered, the save takes the even split.
+    const evenShare = splitShare(r);
+    if (evenShare != null && toAsk(`${key}.share`, r.ownShare != null)) {
+      push(scores, {
+        id: `${key}.share`, kind: 'share', exerciseIndex: i, subject: part, asked: true,
+        evenShare: Math.round(evenShare * 100),
+        ...(r.kind === 'score_rounds' && (r.rounds ?? 0) > 0 ? { teamRounds: r.rounds } : {}),
+      });
+    }
+    // A loop repeated as far as they got that the score doesn't count — the runner's laps, the set
+    // done while off the bike: how many times they did it. Unanswered, it isn't counted.
+    const recipe = r.exercise.recipe;
+    for (const loopPath of recipe ? athleteLoops(recipe).counted : []) {
+      const id = `${key}.times.${loopPath}`;
+      if (!toAsk(id, r.loopCounts?.[loopPath] != null)) continue;
+      push(scores, { id, kind: 'times', exerciseIndex: i, subject: loopName(recipeBlockAt(recipe!, loopPath)), loopPath, asked: true });
+    }
 
     if (usesResultLevelLoad(r)) {
       if (toAsk(`${key}.weight`, (r.weight ?? 0) > 0) && r.loadMode !== 'bodyweight') {
@@ -544,7 +613,25 @@ export function openSlots(
       push(isScoredKind(r) ? scores : loads, {
         id, kind: 'count', exerciseIndex: i,
         subject: stripMovementRolePrefix(mr.substitution?.selectedName ?? mr.movement.name), movementNames: [mr.movement.name],
-        metric, total: loggedAsTotal(mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
+        metric, ...(metric === 'distance' && mr.movement.unit && mr.movement.unit !== 'm' ? { lengthUnit: mr.movement.unit } : {}), total: countedWhole(r, mr.movement, metric), per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', asked: true,
+      });
+    }
+
+    // A number the board leaves to the athlete by offering several: "8/10 cal" when nobody has
+    // said which column is theirs, "10-12 pull-ups". The board's own numbers are the one-tap
+    // answers; nothing is filled in for them — a pair is never assumed to be the men's.
+    for (const mr of resultLevel ? [] : distinctMovements(r)) {
+      const name = mr.movement.name.toLowerCase();
+      if (counted.has(name)) continue;
+      const board = boardNumbers(r.exercise, mr.movement);
+      if (!board) continue;
+      const id = `${key}.count.${name}`;
+      if (!toAsk(id, (mr[board.metric] ?? 0) > 0)) continue;
+      push(isScoredKind(r) ? scores : loads, {
+        id, kind: 'count', exerciseIndex: i,
+        subject: stripMovementRolePrefix(mr.movement.name), movementNames: [mr.movement.name],
+        metric: board.metric, ...(board.metric === 'distance' && mr.movement.unit && mr.movement.unit !== 'm' ? { lengthUnit: mr.movement.unit } : {}), total: countedWhole(r, mr.movement, board.metric),
+        per: isScoredKind(r) || r.kind === 'intervals' ? 'round' : 'set', picks: board.numbers, asked: true,
       });
     }
 
@@ -953,6 +1040,22 @@ export function applyAnswer(
         ?.find((mr) => mr.movement.name === slot.movementNames?.[0])?.substitution?.selectedName;
       if (!amount || amount <= 0 || !target) return { results, closed: false };
       return { results: swapMovement(results, slot, target, amount, answer.swapUnit), closed: true };
+    }
+
+    case 'share': {
+      // A percentage of the split work. Over 100 isn't a share of anything.
+      const pct = answer.count;
+      if (pct == null || pct <= 0 || pct > 100) return { results, closed: false };
+      return { results: patchResult(results, i, () => ({ ownShare: pct / 100 })), closed: true };
+    }
+
+    case 'times': {
+      const times = answer.count;
+      if (times == null || times < 0 || !slot.loopPath) return { results, closed: false };
+      return {
+        results: patchResult(results, i, (r) => ({ loopCounts: { ...r.loopCounts, [slot.loopPath!]: Math.round(times) } })),
+        closed: true,
+      };
     }
 
     case 'sets': {
@@ -1434,8 +1537,8 @@ const LIKELY_COUNTS: Record<'reps' | 'calories' | 'distance', number[]> = {
 };
 
 function countChips(slot: ChatSlot): ChatChip[] {
-  if (slot.total) return [];
-  return LIKELY_COUNTS[slot.metric ?? 'reps'].map((n) => ({ label: String(n), answers: [{ id: slot.id, ...EMPTY_ANSWER, count: n }] }));
+  const numbers = slot.picks ?? (slot.total ? [] : LIKELY_COUNTS[slot.metric ?? 'reps']);
+  return numbers.map((n) => ({ label: String(n), answers: [{ id: slot.id, ...EMPTY_ANSWER, count: n }] }));
 }
 
 /** Same part, and the same block of it. */
@@ -1568,7 +1671,7 @@ export function nextQuestion(
         && sameSpot(c, s) && c.movementNames?.[0] === s.movementNames?.[0] && (c.options?.length ?? 0) > 1);
       const choices = counts.map(choiceFor).filter((c): c is ChatSlot => c != null);
       const how = (s: ChatSlot): string => (s.total ? 'in total' : `each ${s.per ?? 'round'}`);
-      const unitOf = (s: ChatSlot): string => (s.metric === 'calories' ? 'cal' : s.metric === 'distance' ? 'm' : 'reps');
+      const unitOf = (s: ChatSlot): string => (s.metric === 'calories' ? 'cal' : s.metric === 'distance' ? s.lengthUnit ?? 'm' : 'reps');
       const sameHow = counts.every((s) => how(s) === how(first));
       const one = counts.length === 1;
       return {
@@ -1658,6 +1761,30 @@ export function nextQuestion(
         // Skip is on the card itself.
         chips: [],
         panel: { title: one ? nameOf(first) : results.length > 1 && result ? result.exercise.name : 'Weights', groups },
+      };
+    }
+    case 'times':
+      return {
+        // The subject is the loop, so the part is named by its own title.
+        text: `How many times did you do the ${first.subject}${results.length > 1 && result ? ` on ${result.exercise.name}` : ''}?`,
+        hint: 'Just yours — the team’s score is already in.',
+        placeholder: 'Type a number — e.g. 4',
+        slotIds: [first.id],
+        chips: [skipChip([first.id])],
+      };
+    case 'share': {
+      const even = first.evenShare ?? 50;
+      const pick = (label: string, pct: number): ChatChip => ({ label, answers: [{ id: first.id, ...EMPTY_ANSWER, count: pct }] });
+      // In pairs the likely answers are half, a bit less, a bit more; in a bigger team, the even split.
+      const chips = even === 50
+        ? [pick('Even split', 50), pick('About a third', 33), pick('About two thirds', 67)]
+        : [pick(`Even split · ${even}%`, even)];
+      return {
+        text: `How much of the work was yours${onPart}?`,
+        hint: 'The score is the team’s — your stats count what you did.',
+        placeholder: first.teamRounds ? `Or type your rounds — e.g. ${Math.round(first.teamRounds * even / 100)} of ${first.teamRounds}` : 'Or type a percentage — e.g. 40%',
+        slotIds: [first.id],
+        chips: [...chips, skipChip([first.id])],
       };
     }
     case 'choice': {
@@ -1787,11 +1914,15 @@ export function describeAnswer(slot: ChatSlot, answer: SlotAnswer): string | nul
       return answer.count ? `${answer.count} reps${answer.perInterval ? ' each round' : ''}` : null;
     case 'count': {
       if (answer.count == null) return null;
-      const unit = slot.metric === 'calories' ? 'cal' : slot.metric === 'distance' ? 'm' : 'reps';
+      const unit = slot.metric === 'calories' ? 'cal' : slot.metric === 'distance' ? slot.lengthUnit ?? 'm' : 'reps';
       return `${answer.count} ${unit} ${slot.total ? 'in total' : `each ${slot.per ?? 'round'}`}`;
     }
     case 'ladder':
       return answer.count ? `through the ${answer.count}s` : null;
+    case 'times':
+      return answer.count != null ? `${answer.count} time${answer.count === 1 ? '' : 's'}` : null;
+    case 'share':
+      return answer.count ? (answer.count === slot.evenShare ? 'even split' : `${Math.round(answer.count)}% of the work`) : null;
     case 'distance':
       return answer.count ? `${answer.count} m` : null;
     case 'weight': {
@@ -1845,9 +1976,14 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
     case 'reps':
       m = t.match(/^(\d{1,4})(?: ?reps?)?$/);
       return m ? answer({ count: Number(m[1]) }) : null;
-    case 'count':
-      m = t.match(/^(\d{1,5}(?:[.,]\d+)?)(?: ?(?:reps?|cals?|calories|m|meters?|metres?))?$/);
-      return m ? answer({ count: toNum(m[1]) }) : null;
+    case 'count': {
+      m = t.match(/^(\d{1,5}(?:[.,]\d+)?)(?: ?(reps?|cals?|calories|m|meters?|metres?|km|kilometers?|kilometres?|mi|miles?))?$/);
+      if (!m) return null;
+      // A distance is stored in the row's own unit: "8 km" on a metres row is 8,000, "800 m" on a km row 0.8.
+      const said = m[2] && /^(km|kilomet)/.test(m[2]) ? 'km' : m[2] && /^mi/.test(m[2]) ? 'mi' : m[2] && /^m/.test(m[2]) ? 'm' : null;
+      const count = toNum(m[1]);
+      return answer({ count: slot.metric === 'distance' && said ? toMetres(count, said) / toMetres(1, slot.lengthUnit ?? 'm') : count });
+    }
     case 'ladder':
       m = t.match(/^(?:the )?(\d{1,3})(?:'?s)?$/);
       return m ? answer({ count: Number(m[1]) }) : null;
@@ -1863,6 +1999,23 @@ export function readAnswerLocally(slot: ChatSlot | undefined, text: string): Slo
     }
     case 'clarify':
       return readClarifyLocally(slot, t, answer);
+    case 'times':
+      m = t.match(/^(\d{1,3})(?: ?(?:times?|x|laps?|sets?|rounds?))?$/);
+      return m ? answer({ count: Number(m[1]) }) : null;
+    case 'share': {
+      if (/^(even|half|50 ?50|same|split evenly|even split)$/.test(t)) return answer({ count: slot.evenShare ?? 50 });
+      m = t.match(/^(\d{1,3})(?: ?(%|percent))?$/);
+      if (!m) {
+        // "8 of 14", "8 rounds"
+        const of = t.match(/^(\d{1,3})(?: ?rounds?)?(?: ?(?:of|out of|\/) ?(\d{1,3}))?(?: ?rounds?)?$/);
+        const team = of?.[2] ? Number(of[2]) : slot.teamRounds;
+        return of && team && Number(of[1]) <= team ? answer({ count: (Number(of[1]) / team) * 100 }) : null;
+      }
+      const n = Number(m[1]);
+      // A bare number on a rounds AMRAP is their own rounds; a percentage is said, or is all that's left.
+      if (!m[2] && slot.teamRounds && n <= slot.teamRounds) return answer({ count: (n / slot.teamRounds) * 100 });
+      return n > 0 && n <= 100 ? answer({ count: n }) : null;
+    }
     case 'weight': {
       m = t.match(new RegExp(`^${NUM} ?${UNIT}?$`));
       if (m) return answer({ weight: toNum(m[1]), unit: toUnit(m[2]) });

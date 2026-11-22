@@ -3,8 +3,9 @@ import path from 'node:path';
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { ParsedWorkout, Workout } from './types';
 import { initStoryResults, type StoryExerciseResult } from './components/logging/story/types';
-import { boardResults, type BoardAthlete } from './components/tellWodi/boardResults';
+import { boardResults } from './components/tellWodi/boardResults';
 import { openSlots, applyAnswer, nextQuestion, panelAnswer, EMPTY_ANSWER, type ChatSlot, type SlotAnswer } from './components/tellWodi/chatQuestions';
+import { ATHLETE, asWritten, logAsWritten, savedAsWrittenTotals } from '../scripts/lib/asWritten';
 import { buildSavedWorkoutTotals, sessionPartnerScope } from './services/savedWorkout';
 import { reopenLogged } from './services/loggedRecord';
 import { removeUndefined } from './utils/firestoreUtils';
@@ -24,67 +25,12 @@ import { removeUndefined } from './utils/firestoreUtils';
  * they disagree the board decides. AMRAPs and max tests are skipped — there the score IS the work.
  */
 
-const ATHLETE: BoardAthlete = { sex: 'male', weightUnit: 'kg' };
-const FIXED_WORK_KINDS =new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
-
-/** The answer an athlete who did the board as written gives to each question. */
-function asWritten(slot: ChatSlot): SlotAnswer | null {
-  const answer = (fields: Partial<SlotAnswer>): SlotAnswer => ({ id: slot.id, ...EMPTY_ANSWER, ...fields });
-  switch (slot.kind) {
-    case 'time': return answer({ seconds: slot.cap ?? 1200 });
-    case 'rounds': return answer({ count: 5 });
-    case 'reps': return answer({ count: 20 });
-    case 'distance': return answer({ count: 1000 });
-    case 'duration': return answer({ seconds: 60 });
-    case 'weight': return answer({ weight: 50 });
-    case 'maxset': return answer({ count: 10, weight: 50 });
-    case 'count': return answer({ count: 10 });
-    case 'ladder': return slot.rungs?.[2] ? answer({ count: slot.rungs[2] }) : null;
-    case 'partial': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
-    case 'choice': return slot.options?.[0] ? answer({ choice: slot.options[0] }) : null;
-    case 'unit': return answer({ unit: 'kg' });
-    default: return null;
-  }
-}
-
-/**
- * The chat, played to the end by an athlete who did the board as written. `asked` hears each
- * question card as the athlete would see it — what the decisions snapshot records.
- */
-function logAsWritten(
-  parsed: ParsedWorkout,
-  asked?: (text: string) => void,
-  answerFor: (slot: ChatSlot) => SlotAnswer | null = asWritten,
-): StoryExerciseResult[] {
-  let results = boardResults(parsed, ATHLETE);
-  const closed = new Set<string>();
-  for (let guard = 0; guard < 60; guard += 1) {
-    const slots = openSlots(results, closed, new Map(), parsed.teamSize);
-    const question = nextQuestion(slots, results);
-    if (!question) break;
-    asked?.(question.text);
-    // One card can answer several slots at once (a lift's start, peak and max set).
-    for (const id of question.slotIds) {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) continue;
-      const answer = answerFor(slot);
-      closed.add(slot.id);
-      if (answer) results = applyAnswer(results, slot, answer).results;
-    }
-    // A card that names no open slot would be asked forever.
-    if (!question.slotIds.some((id) => closed.has(id))) throw new Error(`"${question.text}" answers nothing`);
-  }
-  return results;
-}
+const FIXED_WORK_KINDS = new Set<StoryExerciseResult['kind']>(['score_time', 'intervals', 'load', 'reps']);
 
 /** Every fixed-work part's stored totals, keyed "part:Movement:field" — what expectSaved holds. */
 function savedAsWritten(parsed: ParsedWorkout): Record<string, number> {
   const results = logAsWritten(parsed);
-  const saved = buildSavedWorkoutTotals(
-    parsed,
-    results,
-    sessionPartnerScope(parsed).partnerFactor,
-  ).breakdownFromResults;
+  const saved = savedAsWrittenTotals(parsed, results);
   const out: Record<string, number> = {};
   results.forEach((result, part) => {
     if (!FIXED_WORK_KINDS.has(result.kind)) return;
@@ -186,7 +132,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     for (const { name, parsed } of boards) {
       const answers = logAsWritten(parsed);
       const { partnerFactor } = sessionPartnerScope(parsed);
-      const first = buildSavedWorkoutTotals(parsed, answers, partnerFactor);
+      const first = buildSavedWorkoutTotals(parsed, answers, partnerFactor, ATHLETE.sex);
       largest = Math.max(largest, first.loggedJson.length);
 
       // Stored as Firestore stores it: undefined dropped, a fresh copy read back.
@@ -199,7 +145,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
       if (JSON.stringify(reopened.results) !== JSON.stringify(answers)) drifted.push(`${name}: the answers reopened differently`);
       if (JSON.stringify(reopened.parsed) !== JSON.stringify(parsed)) drifted.push(`${name}: the board reopened differently`);
 
-      const again = buildSavedWorkoutTotals(reopened.parsed, reopened.results, partnerFactor);
+      const again = buildSavedWorkoutTotals(reopened.parsed, reopened.results, partnerFactor, ATHLETE.sex);
       if (JSON.stringify(again.exercises) !== JSON.stringify(first.exercises)) drifted.push(`${name}: re-save changed the sets`);
       if (JSON.stringify(again.breakdownFromResults) !== JSON.stringify(first.breakdownFromResults)) drifted.push(`${name}: re-save changed the totals`);
     }
@@ -221,7 +167,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
       const given = answers[slot.kind];
       return given ? { id: slot.id, ...EMPTY_ANSWER, ...given(slot) } : asWritten(slot);
     });
-    const saved = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor);
+    const saved = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex);
     const row = (movement: string) => saved.breakdownFromResults.movements.find((m) => m.name === movement);
     return { results, cards, saved, row };
   };
@@ -261,7 +207,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
         expect(slot, `${kind} slot for Double Under`).toBeDefined();
         results = applyAnswer(results, slot, { id: slot.id, ...EMPTY_ANSWER, ...fields }).results;
       }
-      const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+      const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex).breakdownFromResults.movements;
       expect(rows.find((m) => m.name === 'Crossover')?.totalReps, JSON.stringify(answers)).toBe(100);
       expect(rows.find((m) => m.name === 'Double Under')).toBeUndefined();
       // Nothing to convert on a "max" station — the number is the crossovers' own.
@@ -339,7 +285,7 @@ describe('what the athlete ends up seeing — every corpus board, logged and sav
     // The board wrote no number for the station, so there's nothing to convert: the count typed
     // beside the pick IS the pull-ups — never "how many Pull-up for each Bar Muscle-up?".
     expect(openSlots(results, closed).some((s) => s.asked && s.kind === 'amount')).toBe(false);
-    const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor).breakdownFromResults.movements;
+    const rows = buildSavedWorkoutTotals(board.parsed, results, sessionPartnerScope(board.parsed).partnerFactor, ATHLETE.sex).breakdownFromResults.movements;
     expect(rows.find((m) => m.name === 'Pull-up')?.totalReps).toBe(50);
     expect(rows.find((m) => m.name === 'Bar Muscle-up')).toBeUndefined();
   });

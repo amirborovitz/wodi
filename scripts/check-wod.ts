@@ -274,23 +274,23 @@ export function buildContext(
 }
 
 /**
- * THE production parse path: segment the board, structure each part in its own call, merge.
- * `parseWorkoutText` (one call over the whole board) is a FALLBACK production only reaches when
- * segmentation fails — testing against it reads a board in a way the app never does, which
- * produced phantom failures and hid real ones. Everything downstream of the parse is shared with
- * runOfflinePipeline so the two differ only in where the AI answers come from.
+ * THE production parse path: segment the board, read each part as a recipe in its own call, merge.
+ * Everything downstream of the parse is shared with runOfflinePipeline so the two differ only in
+ * where the AI answers come from.
  */
 export async function runSessionPipeline(text: string, result: CliOptions['result'] = {}): Promise<PipelineResult> {
   // Gemini goes through Firebase AI Logic, which needs App Check (scripts/lib/appCheckDebug.ts).
   await installScriptAppCheck();
   const { parseWorkoutSession } = await import('../src/services/openai');
-  const { calculateWorkloadBreakdown } = await import('../src/services/workloadCalculation');
+  const { logAsWritten, savedAsWrittenTotals } = await import('./lib/asWritten');
   const { computeHeroResult } = await import('../src/components/celebration/helpers');
   const { initStoryResults } = await import('../src/components/logging/story/types');
 
   const parsed = await parseWorkoutSession(text);
   const raw = JSON.stringify(parsed, null, 2);
-  const workload = calculateWorkloadBreakdown(parsed);
+  // The totals the app stores for an athlete who did the board as written — the save path, the
+  // same one src/corpusSave.test.ts plays. Never a second calculator.
+  const workload = savedAsWrittenTotals(parsed, logAsWritten(parsed));
   const exercises = parsed.exercises.map((exercise, index) => exerciseToSavedExercise(parsed, exercise, index, result));
   const hero = computeHeroResult(
     exercises,

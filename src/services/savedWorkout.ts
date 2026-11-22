@@ -1,4 +1,5 @@
-import type { Exercise, ParsedWorkout, WorkloadBreakdown } from '../types';
+import type { Exercise, ParsedWorkout, User, WorkloadBreakdown } from '../types';
+import { sideOfSex } from './recipe/loggedTotals';
 import { buildSavedExercises } from './buildSavedExercises';
 import { assignMovementColors } from './workloadCalculation';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from './workloadFromResults';
@@ -60,12 +61,14 @@ export function buildSavedWorkoutTotals(
   parsedWorkout: ParsedWorkout,
   answers: StoryExerciseResult[],
   partnerFactor: number,
+  /** The athlete's sex from their profile — names their column of a women/men pair. */
+  athleteSex?: User['sex'],
 ): SavedWorkoutTotals {
   // The one conversion from the athlete's answers to the stored shape.
   const results = answers.map(toLegacyResult) as unknown as ExerciseResult[];
   const { builtExercises: exercises, totalDuration } = buildSavedExercises(results);
 
-  const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor);
+  const breakdownFromResults = buildWorkloadBreakdownFromResults(results, parsedWorkout, partnerFactor, sideOfSex(athleteSex));
   breakdownFromResults.movements = assignMovementColors(breakdownFromResults.movements);
   const totalVolume = breakdownFromResults.grandTotalVolume;
   const totalReps = breakdownFromResults.grandTotalReps;
