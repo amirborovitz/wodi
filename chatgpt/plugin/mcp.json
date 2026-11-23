@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "wodi": {
+      "type": "streamable-http",
+      "url": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth", "client": { "mode": "provided", "clientId": "wodi-chatgpt", "tokenEndpointAuthMethod": "none" },
+            "authorizationServerBase": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app",
+            "resource": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/mcp",
+            "baseScopes": ["openid", "email", "offline_access", "workouts:read", "workouts:write", "posters:read", "posters:write"]
+          }
+        }
+      }
+    }
+  }
+}
