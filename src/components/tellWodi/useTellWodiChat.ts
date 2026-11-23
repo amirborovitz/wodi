@@ -8,12 +8,9 @@ import type { WodiNote } from '../../types';
 import type { ThreadMessage } from '../../services/wodiAgent/threadItems';
 import type { LastLoad, LoggedLoad } from '../../utils/lastLoadHistory';
 import {
-  applyAnswer,
-  clarifySlots,
   carriedLoads,
   describeAnswer,
   nextQuestion,
-  openSlots,
   readAnswerLocally,
   type ChatPanel,
   type ChatPick,
@@ -21,7 +18,7 @@ import {
   type ChatSlot,
   type SlotAnswer,
 } from './chatQuestions';
-import { answerUncertainty, uncertaintyValue } from '../../services/parseUncertainty';
+import { EMPTY_SESSION, answeredSlots as answeredSessionSlots, applySessionAnswers, reopenSlots, sessionSlots, startSession, type ChatSessionContext, type ChatSessionState } from './chatSession';
 import { buildLoadSuggestions, type LoadSuggestion } from './loadSuggestions';
 import { routeMessage, routeReading, routeWorkoutWords } from './chatRouting';
 import { boardReading } from '../../services/wodiAgent/boardReading';
@@ -219,12 +216,6 @@ const NUDGE_REPLY: Record<EnableResult, string> = {
   failed: "Couldn't turn them on just now. No stress — it's on Today either way.",
 };
 
-/**
- * What a "Change" can reopen: a value the athlete gave. A swap rewrites the movement itself, so
- * undoing one is a fix for the standard screen, not a question asked again.
- */
-const CHANGEABLE: ReadonlySet<ChatSlot['kind']> = new Set(['time', 'rounds', 'reps', 'distance', 'duration', 'score', 'weight', 'maxset', 'count', 'ladder', 'partial', 'choice', 'unit', 'share', 'times']);
-
 let messageSeq = 0;
 const nextId = (): string => `m${Date.now()}-${messageSeq++}`;
 
@@ -275,10 +266,6 @@ function describeSwap(sub: NonNullable<StoryExerciseResult['movementResults']>[n
   return `${sub.selectedName} instead of ${sub.originalName}${amount}`;
 }
 
-function withoutIds(ids: ReadonlySet<string>, drop: readonly string[]): Set<string> {
-  return new Set([...ids].filter((id) => !drop.includes(id)));
-}
-
 function suggestionsAsText(suggestions: LoadSuggestion[]): string {
   return suggestions
     .map((s) => [
@@ -305,9 +292,9 @@ export function useTellWodiChat({
 
   // The conversation's working state. Refs, because every step is async and must read the latest
   // answers — a stale closure here would re-ask a question the athlete just answered.
-  const workoutRef = useRef<ParsedWorkout | null>(null);
-  const resultsRef = useRef<StoryExerciseResult[]>([]);
-  const closedRef = useRef<Set<string>>(new Set());
+  // The board, its results, and what's been answered — the ONE conversation engine's state
+  // (chatSession.ts), the same the ChatGPT plugin keeps between its calls.
+  const sessionRef = useRef<ChatSessionState>(EMPTY_SESSION);
   const vibeRef = useRef<PosterVibeKey | null>(null);
   const waitingRef = useRef(false);
   // Where this workout's own conversation starts. Everything before it — the greeting, questions
@@ -323,11 +310,6 @@ export function useTellWodiChat({
   const pendingWordsRef = useRef<{ text: string; sentId: string; board: PlannedWorkout } | null>(null);
   // The words to read once a taken-on board has reached the screen.
   const [takenBoardWords, setTakenBoardWords] = useState<{ text: string; sentId: string } | null>(null);
-  // Every answer that landed, in order — replayed onto the results when an answer about the board
-  // itself rebuilds them, so nothing the athlete already said is lost.
-  const givenRef = useRef<SlotAnswer[]>([]);
-  // Answers the athlete tapped "Change" on — asked again although the results hold a value.
-  const reopenedRef = useRef<ReadonlySet<string>>(new Set());
 
   // The opening is computed from the log, which loads after the chat opens: until the athlete has
   // said anything, it follows the newest words rather than freezing on the first render's.
@@ -395,20 +377,22 @@ export function useTellWodiChat({
     if (leftRef.current) return;
     messagesRef.current = next;
     setMessages(next);
-    if (workoutRef.current) callbacks.current.onPersist(boardChat(next, waitingRef.current), workoutRef.current);
+    if (sessionRef.current.workout) callbacks.current.onPersist(boardChat(next, waitingRef.current), sessionRef.current.workout);
     // boardChat reads refs only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** The chat is now on this board: its questions start from blank answers. */
   const openBoard = (workout: ParsedWorkout): void => {
-    workoutRef.current = workout;
-    resultsRef.current = callbacks.current.buildResults(workout);
-    closedRef.current = new Set();
-    givenRef.current = [];
-    reopenedRef.current = new Set();
+    sessionRef.current = startSession(workout, sessionContext());
     setHasBoard(true);
   };
+
+  /** What the conversation engine needs from this athlete — read fresh, never a stale closure. */
+  const sessionContext = (): ChatSessionContext => ({
+    buildResults: callbacks.current.buildResults,
+    habits: callbacks.current.habits,
+  });
 
   const push = useCallback((message: Omit<ChatMessage, 'id' | 'at'>): ChatMessage => {
     const full: ChatMessage = { ...message, id: nextId(), at: Date.now() };
@@ -418,7 +402,7 @@ export function useTellWodiChat({
 
   /** Kept in the ongoing thread only while there's no board — after that it's the workout's chat. */
   const keepIfBetweenWorkouts = (...said: (ChatMessage | null)[]): void => {
-    if (workoutRef.current) return;
+    if (sessionRef.current.workout) return;
     callbacks.current.keepInThread(said.flatMap((m) => (m?.text ? [{
       id: m.id, from: m.from, text: m.text, at: m.at, ...(m.receipts?.length ? { workoutIds: m.receipts } : {}),
     }] : [])));
@@ -435,90 +419,33 @@ export function useTellWodiChat({
     .map((m) => ({ from: m.from, text: m.text! }));
 
   /**
-   * Applies answers; returns how many landed, the questions they closed that the athlete can
-   * change, a line per swap so Wodi can say it back, and each correction of an earlier answer.
+   * Applies answers through the one conversation engine (chatSession.ts); returns how many landed,
+   * the questions they closed that the athlete can change, a line per swap so Wodi can say it
+   * back, and each correction of an earlier answer.
    */
   const applyAnswers = (answers: SlotAnswer[], slots: ChatSlot[]): { applied: number; closed: string[]; swaps: string[]; corrected: string[] } => {
-    const closed: string[] = [];
-    let applied = 0;
-    const swaps: string[] = [];
-    const corrected: string[] = [];
-    for (const answer of answers) {
-      const slot = slots.find((s) => s.id === answer.id);
-      if (!slot) continue;
-      if (slot.kind === 'clarify') {
-        if (settleBoardQuestion(slot, answer)) applied += 1;
-        continue;
-      }
-      const outcome = applyAnswer(resultsRef.current, slot, answer);
-      resultsRef.current = outcome.results;
-      if (!outcome.closed) continue;
-      // Answered before and not reopened: a correction typed in passing — said back, never silent.
-      if (closedRef.current.has(slot.id)) {
-        const heard = describeAnswer(slot, answer);
-        if (heard) corrected.push(heard);
-      }
-      givenRef.current = [...givenRef.current, answer];
-      closedRef.current = new Set(closedRef.current).add(slot.id);
-      reopenedRef.current = withoutIds(reopenedRef.current, [slot.id]);
-      applied += 1;
-      if (CHANGEABLE.has(slot.kind)) closed.push(slot.id);
-      if (slot.kind === 'swap' || slot.kind === 'amount') {
-        const swapped = resultsRef.current
-          .find((r) => r.exerciseIndex === slot.exerciseIndex)
-          ?.movementResults?.find((mr) => mr.movement.name === slot.movementNames?.[0] && mr.substitution);
-        const sub = swapped?.substitution;
-        if (sub) swaps.push(describeSwap(sub));
-      }
-    }
-    return { applied, closed, swaps, corrected };
-  };
-
-  /**
-   * An answer about the board itself: written into the field the reader named, which changes the
-   * board, so the results are rebuilt from it and every answer already given is laid back on top.
-   * False when the reply didn't answer it — the question stays open.
-   */
-  const settleBoardQuestion = (slot: ChatSlot, answer: SlotAnswer): boolean => {
-    const workout = workoutRef.current;
-    const flag = slot.uncertainty;
-    if (!workout || !flag) return false;
-    const value = answer.skipped ? undefined : uncertaintyValue(flag, answer);
-    if (!answer.skipped && value === undefined) return false;
-    const next = answerUncertainty(workout, flag.field, value);
-    workoutRef.current = next;
-    let results = callbacks.current.buildResults(next);
-    const all = openSlots(results, new Set(), callbacks.current.habits, next.teamSize);
-    for (const given of givenRef.current) {
-      const s = all.find((x) => x.id === given.id);
-      if (s) results = applyAnswer(results, s, given).results;
-    }
-    resultsRef.current = results;
-    callbacks.current.onBoardChanged(next);
-    return true;
+    const out = applySessionAnswers(sessionRef.current, answers, slots, sessionContext());
+    sessionRef.current = out.state;
+    // An answer about the board itself changed it — the save reads this one.
+    if (out.boardChanged && out.state.workout) callbacks.current.onBoardChanged(out.state.workout);
+    const swaps = out.swapSlots.flatMap((slot) => {
+      const sub = out.state.results
+        .find((r) => r.exerciseIndex === slot.exerciseIndex)
+        ?.movementResults?.find((mr) => mr.movement.name === slot.movementNames?.[0] && mr.substitution)
+        ?.substitution;
+      return sub ? [describeSwap(sub)] : [];
+    });
+    return { applied: out.applied, closed: out.closed, swaps, corrected: out.corrected };
   };
 
   /** Every question still open: the board's own first — their answers can change the rest. */
-  const slotsNow = (): ChatSlot[] => [
-    ...clarifySlots(workoutRef.current),
-    ...openSlots(resultsRef.current, closedRef.current, callbacks.current.habits, workoutRef.current?.teamSize, reopenedRef.current),
-  ];
+  const slotsNow = (): ChatSlot[] => sessionSlots(sessionRef.current, sessionContext());
 
   /**
    * What they've already answered, with what they said — handed to the reader beside the open
    * questions so "oops, 19:30 not 18:30" lands. Never asked: only a correction fills one.
    */
-  const answeredSlots = (): ChatSlot[] => {
-    const closed = closedRef.current;
-    const lastSaid = new Map(givenRef.current.map((a) => [a.id, a]));
-    return openSlots(resultsRef.current, new Set(), callbacks.current.habits, workoutRef.current?.teamSize, closed)
-      .filter((s) => closed.has(s.id) && CHANGEABLE.has(s.kind))
-      .flatMap((s) => {
-        const said = lastSaid.get(s.id);
-        const words = said && !said.skipped ? describeAnswer(s, said) : null;
-        return words ? [{ ...s, asked: false, answered: words }] : [];
-      });
-  };
+  const answeredSlots = (): ChatSlot[] => answeredSessionSlots(sessionRef.current, sessionContext());
 
   /** My message gave these answers — it can be tapped to change them. An answer given again moves its "Change" here. */
   const markAnswered = (messageId: string, slotIds: string[]): void => {
@@ -535,7 +462,7 @@ export function useTellWodiChat({
     setFinished(true);
     push({ from: 'wodi', text: 'Got it all. Making your poster…' });
     setBusy('saving');
-    callbacks.current.onFinished(resultsRef.current, vibeRef.current, boardChat(messagesRef.current, false));
+    callbacks.current.onFinished(sessionRef.current.results, vibeRef.current, boardChat(messagesRef.current, false));
   };
 
   const askQuestion = (question: ChatQuestion, prefix?: string, extra: ChatChipView[] = []): void => {
@@ -567,7 +494,7 @@ export function useTellWodiChat({
     waitingRef.current = stillWaiting;
     const slots = slotsNow();
     // A lift they already weighed today is said, not asked — with Change on Wodi's line.
-    const carried = carriedLoads(slots, reopenedRef.current);
+    const carried = carriedLoads(slots, sessionRef.current.reopened);
     if (carried) {
       const { closed } = applyAnswers(carried.answers, slots);
       if (closed.length > 0) {
@@ -577,7 +504,7 @@ export function useTellWodiChat({
         return;
       }
     }
-    const question = nextQuestion(slots, resultsRef.current, callbacks.current.lastLoads);
+    const question = nextQuestion(slots, sessionRef.current.results, callbacks.current.lastLoads);
     if (question) {
       askQuestion(question, prefix, extra);
       return;
@@ -595,7 +522,7 @@ export function useTellWodiChat({
   const parkBeforeWorkout = async (question: string): Promise<void> => {
     const { lastLoads: last, history: logged, athleteSex: sex } = callbacks.current;
     const firstTime = !waitingRef.current;
-    const suggestions = buildLoadSuggestions(resultsRef.current, last, logged);
+    const suggestions = buildLoadSuggestions(sessionRef.current.results, last, logged);
     if (firstTime && suggestions.length > 0) {
       push({ from: 'wodi', text: "Here's where you've been on the weights:" });
       push({ from: 'wodi', suggestions });
@@ -609,7 +536,7 @@ export function useTellWodiChat({
       const plan = await callbacks.current.ask(
         question || 'Give me a game plan for this one.',
         last?.from === 'me' && last.text === question ? recent.slice(0, -1) : recent,
-        { kind: 'upcoming', workout: { board: workoutRef.current?.rawText ?? '', reading: boardReading(workoutRef.current), loads: suggestionsAsText(suggestions), sex } },
+        { kind: 'upcoming', workout: { board: sessionRef.current.workout?.rawText ?? '', reading: boardReading(sessionRef.current.workout), loads: suggestionsAsText(suggestions), sex } },
       );
       if (plan.kind === 'answer' && plan.text) {
         planned = true;
@@ -644,7 +571,7 @@ export function useTellWodiChat({
   };
 
   const readWords = async (text: string, sentId: string): Promise<void> => {
-    const workout = workoutRef.current;
+    const workout = sessionRef.current.workout;
     if (!workout) return;
     const slots = slotsNow();
     const askedBefore = slots.find((s) => s.asked)?.id;
@@ -690,7 +617,7 @@ export function useTellWodiChat({
       if (reading.vibe) vibeRef.current = reading.vibe;
       const { applied, closed, swaps, corrected } = applyAnswers(reading.answers, [...slots, ...answered]);
       markAnswered(sentId, closed);
-      const stillOpen = askedBefore != null && !closedRef.current.has(askedBefore);
+      const stillOpen = askedBefore != null && !sessionRef.current.closed.has(askedBefore);
       // Nothing landed on the question just asked: a bare "Got it." would claim it did, so only a
       // reaction to how it felt is said — then "Didn't catch that" and the question again.
       const missed = applied === 0 && stillOpen;
@@ -776,7 +703,7 @@ export function useTellWodiChat({
     }
 
     void (async () => {
-      const route = routeMessage({ hasBoard: !!workoutRef.current, hasFile: !!file, text });
+      const route = routeMessage({ hasBoard: !!sessionRef.current.workout, hasFile: !!file, text });
       if (route === 'open-form') {
         openStandardScreen('typed');
         return;
@@ -826,7 +753,7 @@ export function useTellWodiChat({
       return;
     }
     if (!text) {
-      const title = workoutRef.current?.title?.trim();
+      const title = sessionRef.current.workout?.title?.trim();
       // Just the board — it could be before class or after. Ask rather than assume.
       push({
         from: 'wodi',
@@ -840,7 +767,7 @@ export function useTellWodiChat({
 
   /** The workout Wodi just wrote, drawn as its board: take it on, or ask for another. */
   const offerSuggestedBoard = (board: string, why: string): void => {
-    const workout = workoutRef.current;
+    const workout = sessionRef.current.workout;
     const planned: PlannedWorkout = { id: 'suggested', userId: '', status: 'parsed', raw: board, parsedWorkout: workout ?? undefined, createdAt: new Date() };
     push({
       from: 'wodi',
@@ -852,7 +779,7 @@ export function useTellWodiChat({
 
   /** "Something else": the written board is let go and Wodi writes a different one. */
   const anotherWorkout = async (sentId: string): Promise<void> => {
-    const title = workoutRef.current?.title?.trim();
+    const title = sessionRef.current.workout?.title?.trim();
     releaseBoard();
     const reply = await askWodiFor(`Write me a different workout${title ? ` than "${title}"` : ''}.`, sentId, { kind: 'between' });
     if (reply === 'log') push({ from: 'wodi', text: 'Tell me what you\'re after — time, kit or focus — and I\'ll write one.' });
@@ -897,11 +824,7 @@ export function useTellWodiChat({
   /** The chat lets go of its board: cleared from Today, and the next words start fresh. */
   const releaseBoard = (): void => {
     callbacks.current.onDropBoard();
-    workoutRef.current = null;
-    resultsRef.current = [];
-    closedRef.current = new Set();
-    givenRef.current = [];
-    reopenedRef.current = new Set();
+    sessionRef.current = EMPTY_SESSION;
     waitingRef.current = false;
     priorRef.current = [];
     setHasBoard(false);
@@ -909,7 +832,7 @@ export function useTellWodiChat({
 
   /** Over to the standard screen — everything said so far goes along when there's a board. */
   const openStandardScreen = (how: FormHandoff): void => {
-    if (workoutRef.current) callbacks.current.onOpenForms(resultsRef.current, how);
+    if (sessionRef.current.workout) callbacks.current.onOpenForms(sessionRef.current.results, how);
     else callbacks.current.onUseForm(how);
   };
 
@@ -1015,11 +938,8 @@ export function useTellWodiChat({
    */
   const changeAnswer = useCallback((messageId: string): void => {
     const message = messagesRef.current.find((m) => m.id === messageId);
-    if (!message?.slotIds?.length || !workoutRef.current) return;
-    closedRef.current = withoutIds(closedRef.current, message.slotIds);
-    // The results still hold the old value — reopened, so the question is asked rather than
-    // passed over as already filled (which went straight on, or saved the old value).
-    reopenedRef.current = new Set([...reopenedRef.current, ...message.slotIds]);
+    if (!message?.slotIds?.length || !sessionRef.current.workout) return;
+    sessionRef.current = reopenSlots(sessionRef.current, message.slotIds);
     settleQuestions();
     commit(messagesRef.current.map((m) => (m.id === messageId ? { ...m, slotIds: undefined } : m)));
     askNext('No problem —');

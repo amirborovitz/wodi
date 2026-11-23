@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { recipeToParsedWorkout } from '../../services/recipe/toParsedWorkout';
 import type { PartRecipe, RecipeItem } from '../../services/recipe/types';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
-import { toLegacyResult } from '../logging/story/StoryLogResults';
+import { toLegacyResult } from '../logging/story/legacyResult';
 import { boardResults } from './boardResults';
 import { EMPTY_ANSWER, applyAnswer, describeAnswer, nextQuestion, openSlots, readAnswerLocally } from './chatQuestions';
 

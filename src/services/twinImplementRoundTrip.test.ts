@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ParsedMovement, ParsedWorkout, Workout } from '../types';
 import { createBlankResult } from '../components/logging/story/types';
 import type { StoryExerciseResult } from '../components/logging/story/types';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import { computeHeroResult } from '../components/celebration/helpers';
 import { formatPeakLoadValue, getExercisePeakLoad } from '../components/celebration/movementResolution';
 import { splitResultValue } from '../components/celebration/faces/HandwrittenFace/PosterComponents';

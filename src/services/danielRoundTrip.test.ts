@@ -3,7 +3,7 @@ import { buildSubstitutionPatch } from '../components/logging/story/substitution
 import { describe, it, expect } from 'vitest';
 import type { ParsedExercise } from '../types';
 import { createBlankResult } from '../components/logging/story/types';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import { buildSavedExercises } from './buildSavedExercises';
 import { buildWorkloadBreakdownFromResults } from './workloadFromResults';
 import { buildPageArtifactSections, buildRewardArtifactSections } from '../components/celebration/helpers';

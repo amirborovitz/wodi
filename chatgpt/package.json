@@ -1,0 +1,38 @@
+{
+  "name": "wodi-chatgpt",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/server.mjs",
+    "test": "node --test dist/*.test.mjs",
+    "test:e2e": "node --test dist/workflow.e2e.mjs dist/oauth.e2e.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/archivo-black": "^5.3.0",
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/dm-mono": "^5.3.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.4",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.5",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.0",
+    "jose": "^6.1.0",
+    "oidc-provider": "^9.15.1",
+    "openai": "^6.49.0",
+    "playwright": "^1.56.0",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/oidc-provider": "^9.13.1",
+    "esbuild": "^0.25.0",
+    "firebase-tools": "^15.37.0",
+    "tsx": "^4.22.4",
+    "typescript": "~5.9.3"
+  }
+}

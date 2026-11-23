@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedWorkout, Workout } from '../types';
 import { createBlankResult } from '../components/logging/story/types';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import { buildSubstitutionPatch } from '../components/logging/story/substitutionPatch';
 import { buildSavedExercises } from './buildSavedExercises';
 import { buildWorkloadBreakdownFromResults } from './workloadFromResults';

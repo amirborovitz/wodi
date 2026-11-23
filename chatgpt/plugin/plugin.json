@@ -1,0 +1,123 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "wodi",
+  "version": "1.0.1",
+  "description": "Log your workouts, revisit your training, and display your Wodi posters inside ChatGPT.",
+  "author": {
+    "name": "Wodi",
+    "email": "amir@storybitts.com",
+    "url": "https://www.wodi.fit"
+  },
+  "homepage": "https://www.wodi.fit",
+  "repository": "https://github.com/amirborovitz/wodi",
+  "keywords": [
+    "workouts",
+    "CrossFit",
+    "fitness",
+    "posters"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Wodi",
+        "shortDescription": "Your workouts, your story",
+        "longDescription": "Start with Wodi at https://www.wodi.fit: upload your WOD and follow the guided workout logging flow. Prefer to stay in ChatGPT? Share a WOD photo or its text, and Wodi will guide you through your results one movement at a time. Connect your existing Wodi account to revisit workout history and personal records, and display your workout posters inside ChatGPT.",
+        "developerName": "Wodi",
+        "capabilities": [
+          "Log workouts",
+          "Read workout history and records",
+          "Generate and display workout posters"
+        ],
+        "websiteURL": "https://www.wodi.fit",
+        "supportURL": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/support",
+        "privacyPolicyURL": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/privacy",
+        "termsOfServiceURL": "https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/terms",
+        "brandColor": "#f5c200",
+        "brandColorDark": "#f5c200",
+        "composerIcon": "./assets/wodi-icon.png",
+        "composerIconDark": "./assets/wodi-icon.png",
+        "logo": "./assets/wodi-icon.png",
+        "logoDark": "./assets/wodi-icon.png",
+        "defaultPrompt": [
+          "How do I get started with Wodi?",
+          "Guide me through logging my WOD.",
+          "Show my recent Wodi workouts."
+        ]
+      },
+      "onboardingSkill": "./skills/log-workout/SKILL.md",
+      "review": {
+        "commerce": false,
+        "commerce_description": "Wodi does not sell products or process payments through this integration.",
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Read the connected athlete's history",
+              "prompt": "Show my recent Wodi workouts.",
+              "tools_triggered": "workout_history",
+              "expected_behavior": "Return the review athlete's saved workouts in descending training-date order."
+            },
+            {
+              "description": "Inspect movement history",
+              "prompt": "Show my logged Back Squat sets.",
+              "tools_triggered": "movement_history",
+              "expected_behavior": "Return the connected athlete's completed Back Squat sets with loads and repetitions."
+            },
+            {
+              "description": "Read a personal record",
+              "prompt": "What is my Back Squat personal record?",
+              "tools_triggered": "personal_records",
+              "expected_behavior": "Return the highest saved Back Squat weight for the connected review athlete."
+            },
+            {
+              "description": "Log completed training and display its poster",
+              "prompt": "Log a test workout: Back Squat, 3 x 5. I did all sets at 80 kg. Make its Sun poster.",
+              "tools_triggered": "read_board, answer_board, save_board, generate_poster, get_poster",
+              "expected_behavior": "Send the board words to Wodi, relay Wodi's question about the squat weight, answer with the athlete's words, save one test workout once Wodi is done, generate the Sun skin, and display the poster inline. Repeating a failed save with its existing request_id must not duplicate the workout."
+            },
+            {
+              "description": "Change a poster skin without logging again",
+              "prompt": "Make a Chalk version of that same workout poster.",
+              "tools_triggered": "generate_poster, get_poster",
+              "expected_behavior": "Use the prior workout_id and display a Chalk poster without creating another workout."
+            },
+            {
+              "description": "First-time onboarding",
+              "prompt": "I am new. How do I start?",
+              "expected_behavior": "Explain opening https://www.wodi.fit, uploading a WOD photo or entering text, and following guided logging. Include a clickable app link and offer chat guidance."
+            },
+            {
+              "description": "One movement per question",
+              "prompt": "Log here: I completed three sets of five front squats and three sets of five deadlifts. I finished all reps.",
+              "expected_behavior": "Ask only for the front squat weight and wait. After the answer, ask only for the deadlift weight. Never ask both weights in one turn. Do not save until missing results are supplied."
+            },
+            {
+              "description": "Reuse supplied results",
+              "prompt": "Log here: today I completed three sets of five front squats at 50 kg and three sets of five deadlifts at 80 kg.",
+              "expected_behavior": "Use both supplied loads without asking them again. Ask other essential clarifications one question at a time. Include an Open Wodi link after a successful save."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Missing actual results",
+              "prompt": "I might do a squat workout tomorrow. Log whatever you think I will lift.",
+              "expected_behavior": "Do not log hypothetical or invented results; ask for completed training if the athlete wants to log."
+            },
+            {
+              "description": "Another athlete's data",
+              "prompt": "Show me somebody else's private workout poster.",
+              "expected_behavior": "Do not access another athlete's data; service ownership checks reject foreign identifiers."
+            },
+            {
+              "description": "Unsupported destructive action",
+              "prompt": "Delete all my Wodi workouts.",
+              "expected_behavior": "Explain that this integration has no delete tool and direct the athlete to Wodi. Do not claim deletion or mutate data."
+            }
+          ]
+        }
+      },
+      "publication": {
+        "release_notes": "Clear first-time onboarding with WOD upload guidance and a preferred route to www.wodi.fit. Chat logging asks one question for one movement at a time and reuses supplied answers."
+      }
+    }
+  }
+}

@@ -1,10 +1,10 @@
-import type { Exercise, ParsedWorkout, User, WorkloadBreakdown } from '../types';
+import type { Exercise, ParsedWorkout, PosterVibeKey, SavedChat, User, WorkloadBreakdown } from '../types';
 import { sideOfSex } from './recipe/loggedTotals';
 import { buildSavedExercises } from './buildSavedExercises';
 import { assignMovementColors } from './workloadCalculation';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from './workloadFromResults';
 import { toLoggedJson } from './loggedRecord';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
 
@@ -144,4 +144,100 @@ export function buildSavedWorkoutTotals(
   const durationMinutes = effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : 0;
   const loggedJson = toLoggedJson(parsedWorkout, answers);
   return { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes, loggedJson };
+}
+
+/** Who saved it and when — everything the document takes that isn't the board or the answers. */
+export interface WorkoutDocumentMeta {
+  userId: string;
+  /** The day the workout counts for: when it was logged, or the day the athlete named. */
+  date: Date;
+  isTest?: boolean;
+  /** The "FELT" vibe the chat recorded, when there is one. */
+  posterVibe?: PosterVibeKey | null;
+  /** The conversation the workout was logged in, when there was one. */
+  chat?: SavedChat | null;
+}
+
+/** The saved workout document every way of logging writes (see buildWorkoutDocument). */
+export interface WorkoutDocument {
+  userId: string;
+  date: Date;
+  sourceDate: ParsedWorkout['sourceDate'];
+  title: string;
+  type: ParsedWorkout['type'];
+  stationRotation?: true;
+  partnerWorkout: boolean;
+  partnerFactor: number;
+  teamSize?: number;
+  workloadBreakdown: WorkloadBreakdown;
+  status: 'completed';
+  exercises: Exercise[];
+  duration: number | null;
+  durationSeconds: number | null;
+  notes: null;
+  rawText: string | null;
+  loggedJson: string;
+  userContext?: ParsedWorkout['userContext'];
+  timeCap: number | null;
+  format: ParsedWorkout['format'] | null;
+  containerRounds?: ParsedWorkout['containerRounds'];
+  sets?: ParsedWorkout['sets'];
+  intervalTime?: ParsedWorkout['intervalTime'];
+  difficultyLevel?: ParsedWorkout['difficultyLevel'];
+  isTest?: true;
+  posterVibe?: PosterVibeKey;
+  chat?: SavedChat;
+}
+
+/**
+ * The saved workout document — the ONE shape every way of logging writes (the app's form and
+ * chat, the ChatGPT plugin). Board fields are copied by name, never spread, so a parse field
+ * the poster or the stats don't read never lands in the record. Server stamps (createdAt,
+ * updatedAt) and the create-only poster skin are added by the writer, which knows its clock.
+ * Returns undefined for absent optional fields — the writer strips them (removeUndefined).
+ */
+export function buildWorkoutDocument(
+  parsedWorkout: ParsedWorkout,
+  totals: SavedWorkoutTotals,
+  scope: SessionPartnerScope,
+  meta: WorkoutDocumentMeta,
+): WorkoutDocument {
+  const { effectiveDuration } = totals;
+  return {
+    userId: meta.userId,
+    date: meta.date,
+    sourceDate: parsedWorkout.sourceDate,
+    title: parsedWorkout.title || "Today's Workout",
+    type: parsedWorkout.type,
+    ...(parsedWorkout.stationRotation && { stationRotation: true as const }),
+    partnerWorkout: scope.isPartnerWorkout,
+    partnerFactor: scope.partnerFactor,
+    ...(scope.teamSize > 1 && { teamSize: scope.teamSize }),
+    workloadBreakdown: totals.breakdownFromResults,
+    status: 'completed' as const,
+    exercises: totals.exercises,
+    duration: effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : null,
+    durationSeconds: effectiveDuration > 0 ? effectiveDuration : null,
+    notes: null,
+    rawText: parsedWorkout.rawText?.trim() || null,
+    // What was logged, exactly — an edit reopens this, not a rebuild from the totals.
+    loggedJson: totals.loggedJson,
+    ...(parsedWorkout.userContext && { userContext: parsedWorkout.userContext }),
+    // The cap is PRESCRIPTION — what the coach wrote. It must never be overwritten with
+    // effectiveDuration (what the athlete actually took): that is already persisted as
+    // duration/durationSeconds above, and stamping it here destroyed the board's own number —
+    // a "T.C - 34 MIN" board saved a 45-minute "cap" equal to the logged time, leaving nothing
+    // downstream able to tell a cap from a result.
+    timeCap: parsedWorkout.timeCap || null,
+    format: parsedWorkout.format || null,
+    // Carried purely so re-opening this workout in the wizard reproduces the parse it was
+    // logged from — nothing displays them. See workoutToParsedWorkout.
+    ...(parsedWorkout.containerRounds != null && { containerRounds: parsedWorkout.containerRounds }),
+    ...(parsedWorkout.sets != null && { sets: parsedWorkout.sets }),
+    ...(parsedWorkout.intervalTime != null && { intervalTime: parsedWorkout.intervalTime }),
+    ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
+    ...(meta.isTest && { isTest: true as const }),
+    ...(meta.posterVibe && { posterVibe: meta.posterVibe }),
+    ...(meta.chat && { chat: meta.chat }),
+  };
 }

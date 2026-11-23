@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedWorkout, Workout } from '../types';
 import { createBlankResult, type StoryExerciseResult } from '../components/logging/story/types';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import { EMPTY_ANSWER, applyAnswer, nextQuestion, openSlots, type SlotAnswer } from '../components/tellWodi/chatQuestions';
 import { formatPosterLoad } from '../components/celebration/posterFormatters';
 import { buildSavedExercises } from './buildSavedExercises';

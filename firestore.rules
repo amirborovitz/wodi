@@ -156,5 +156,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // A board being logged from ChatGPT, between the athlete's answers, and the posters made there
+    // (chatgpt/src/service.ts). Only the ChatGPT server touches them.
+    match /chatgptDrafts/{boardId} {
+      allow read, write: if false;
+    }
+    match /chatgptPosters/{posterId} {
+      allow read, write: if false;
+    }
+
   }
 }

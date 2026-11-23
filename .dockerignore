@@ -1,0 +1,18 @@
+# Build context for chatgpt/Dockerfile (the ChatGPT plugin server), run from this repo root.
+# Secrets never enter the image — in ANY folder (functions/.env holds the app's server keys).
+**/.env*
+**/*adminsdk*.json
+**/*service-account*.json
+# Not needed to build the server.
+.git
+**/node_modules
+**/dist
+**/test-artifacts
+**/*.log
+functions
+memory
+docs
+extracted
+tmpclaude-*
+wodi_store_launch_pack
+*.pdf

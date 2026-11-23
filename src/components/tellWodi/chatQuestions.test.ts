@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement } from '../../types';
 import { createBlankResult, initStoryResults, type StoryExerciseResult } from '../logging/story/types';
-import { toLegacyResult } from '../logging/story/StoryLogResults';
+import { toLegacyResult } from '../logging/story/legacyResult';
 import { EMPTY_ANSWER, applyAnswer, carriedLoads, describeAnswer, nextQuestion, openSlots, panelAnswer, pickAnswer, readAnswerLocally, weightChoices, type SlotAnswer } from './chatQuestions';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from '../../services/workloadFromResults';
 import { buildSavedExercises } from '../../services/buildSavedExercises';
