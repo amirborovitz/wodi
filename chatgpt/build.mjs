@@ -1,14 +1,14 @@
 import { build } from 'esbuild';
-import { createGenerator } from 'ts-json-schema-generator';
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 await mkdir('dist', { recursive: true });
-const schema = createGenerator({ path: 'src/contracts.ts', tsconfig: 'tsconfig.json', type: 'WorkoutLog', skipTypeCheck: true }).createSchema('WorkoutLog');
-await writeFile('dist/log-schema.json', JSON.stringify(schema));
 await build({ entryPoints: ['src/server.ts'], outfile: 'dist/server.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external' });
 await build({ entryPoints: ['test/workflow.e2e.ts'], outfile: 'dist/workflow.e2e.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external' });
 await build({ entryPoints: ['test/oauth.e2e.ts'], outfile: 'dist/oauth.e2e.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external' });
 await build({ entryPoints: ['test/renderer.test.ts'], outfile: 'dist/renderer.test.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external' });
+await build({ entryPoints: ['test/boardFlow.test.ts'], outfile: 'dist/boardFlow.test.mjs', bundle: true, platform: 'node', format: 'esm', packages: 'external' });
+await mkdir('dist/fixtures', { recursive: true });
+await copyFile('test/fixtures/board-20261119.json', 'dist/fixtures/board-20261119.json');
 await build({ entryPoints: ['src/render.tsx'], outfile: 'dist/render.js', bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic',
   alias: { react: resolve('../node_modules/react'), 'react-dom': resolve('../node_modules/react-dom') },
   plugins: [{ name: 'render-profile', setup(b) {

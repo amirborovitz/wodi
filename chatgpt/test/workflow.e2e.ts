@@ -13,7 +13,7 @@ import { PosterRenderer } from '../src/renderer';
 import { createVerifier } from '../src/auth';
 import { createApp } from '../src/http';
 import { SCOPES } from '../src/mcp';
-import type { WorkoutLog } from '../src/contracts';
+import type { ParsedWorkout } from '../../src/types/index';
 import { writeFile, mkdir } from 'node:fs/promises';
 
 async function listen(server: Server): Promise<string> {
@@ -21,20 +21,22 @@ async function listen(server: Server): Promise<string> {
   const address = server.address(); assert(address && typeof address !== 'string');
   return `http://127.0.0.1:${address.port}`;
 }
-const exercise = { name: 'Back Squat', type: 'strength' as const, prescription: '3 sets of 5', suggestedSets: 3, suggestedReps: 5, loggingMode: 'strength' as const };
-const log: WorkoutLog = {
-  parsed_workout: { title: 'Squat day', type: 'strength', format: 'strength', scoreType: 'load', exercises: [exercise] },
-  results: [{ kind: 'load', exerciseIndex: 0, exercise, setsTotal: 3, setsCompleted: 3, weight: 80, loadMode: 'same', repsPerSet: 5 }],
-  trained_at: '2026-11-22T08:00:00Z', request_id: 'squat-e2e',
-};
+// The board reader is the app's own (OpenAI) in production; checks never call OpenAI, so it is
+// stubbed here with the shape that reader returns for "Back Squat 3x5".
+const squatBoard: ParsedWorkout = {
+  title: 'Squat day', type: 'strength', format: 'strength', scoreType: 'load',
+  exercises: [{ name: 'Back Squat', type: 'strength', prescription: '3 sets of 5', suggestedSets: 3, suggestedReps: 5, loggingMode: 'strength',
+    movements: [{ name: 'Back Squat', reps: 5, inputType: 'weight', equipment: 'barbell' }] }],
+} as ParsedWorkout;
+const readBoard = async (): Promise<ParsedWorkout> => structuredClone(squatBoard);
 test('authenticated MCP → Firestore → original poster skins → Storage → ChatGPT images', { timeout: 240_000 }, async t => {
   assert(process.env.FIRESTORE_EMULATOR_HOST && process.env.FIREBASE_STORAGE_EMULATOR_HOST && process.env.FIREBASE_AUTH_EMULATOR_HOST, 'Run with firebase emulators:exec; never against production');
   const firebase = initializeApp({ projectId: 'demo-wodi', storageBucket: 'demo-wodi.appspot.com' });
   const db = getFirestore(firebase), auth = getAuth(firebase), renderer = new PosterRenderer();
-  const service = new WodiService(db, getStorage(firebase).bucket(), renderer);
+  const service = new WodiService(db, getStorage(firebase).bucket(), renderer, readBoard);
   const suffix = Date.now().toString();
   const uid = `alice-${suffix}`, other = `bob-${suffix}`;
-  for (const user of [uid, other]) { await auth.createUser({ uid: user }); await db.doc(`users/${user}`).set({ weight: 75, stats: { totalWorkouts: 0, totalVolume: 0 } }); }
+  for (const user of [uid, other]) { await auth.createUser({ uid: user }); await db.doc(`users/${user}`).set({ weight: 75, sex: 'male', weightUnit: 'kg', stats: { totalWorkouts: 0, totalVolume: 0 } }); }
   const keys = await generateKeyPair('RS256');
   const jwk = { ...await exportJWK(keys.publicKey), kid: 'test-key', alg: 'RS256', use: 'sig' };
   const jwks = createServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ keys: [jwk] })); });
@@ -63,15 +65,29 @@ test('authenticated MCP → Firestore → original poster skins → Storage → 
     });
     const client = await connect(await token(uid)); clients.push(client);
     const call = async (name: string, args: Record<string, unknown>) => client.callTool({ name, arguments: args });
-    await t.test('preserves history tools and publishes full logging contract', async () => {
+    /** Wodi reads the board, asks, takes the athlete's words, and says when it's done. */
+    const converse = async (): Promise<string> => {
+      const read = await call('read_board', { board_text: 'Back Squat\n3 x 5' });
+      assert(!read.isError, JSON.stringify(read));
+      let turn = read.structuredContent as { board_id: string; done: boolean; question: { slots: { slot_id: string; kind: string }[] } | null };
+      for (let i = 0; !turn.done && i < 5; i++) {
+        const answers = turn.question!.slots.map((slot) => (slot.kind === 'weight' ? { slot_id: slot.slot_id, text: '80' } : { slot_id: slot.slot_id, skipped: true }));
+        const answered = await call('answer_board', { board_id: turn.board_id, answers });
+        assert(!answered.isError, JSON.stringify(answered));
+        turn = answered.structuredContent as typeof turn;
+      }
+      assert.equal(turn.done, true);
+      return turn.board_id;
+    };
+    await t.test('publishes the conversation tools beside the history and poster tools', async () => {
       const { tools } = await client.listTools();
-      assert.equal(tools.length, 6);
-      assert(tools.some(tool => tool.name === 'movement_history'));
-      assert(JSON.stringify(tools.find(tool => tool.name === 'log_workout')!.inputSchema).includes('prescription'));
+      assert.deepEqual(tools.map(tool => tool.name).sort(), ['answer_board', 'generate_poster', 'get_poster', 'movement_history', 'personal_records', 'read_board', 'save_board', 'workout_history']);
     });
     let workoutId = '';
     await t.test('logs once across concurrent retries, persists app totals and PR', async () => {
-      const results = await Promise.all([call('log_workout', log as unknown as Record<string, unknown>), call('log_workout', log as unknown as Record<string, unknown>)]);
+      const board = await converse();
+      const save = { board_id: board, request_id: 'squat-e2e' };
+      const results = await Promise.all([call('save_board', save), call('save_board', save)]);
       assert(!results[0].isError, JSON.stringify(results[0]));
       workoutId = (results[0].structuredContent as { workout_id: string }).workout_id;
       assert.equal((results[1].structuredContent as { workout_id: string }).workout_id, workoutId);
@@ -79,7 +95,8 @@ test('authenticated MCP → Firestore → original poster skins → Storage → 
       assert.equal(workout.totalReps, 15); assert.equal(workout.totalVolume, 1200);
       assert.equal((await db.doc(`users/${uid}`).get()).get('stats.totalWorkouts'), 1);
       assert.equal((await service.records(uid)).length, 1);
-      const conflict = await call('log_workout', { ...log, trained_at: '2026-11-21T08:00:00Z' }); assert.equal(conflict.isError, true);
+      // The board is spent once saved.
+      assert.equal((await call('answer_board', { board_id: board, answers: [{ slot_id: 'x', text: '1' }] })).isError, true);
     });
     let posterId = '';
     await t.test('renders every existing skin as a real 1080px PNG and retrieves images', async () => {
@@ -109,13 +126,14 @@ test('authenticated MCP → Firestore → original poster skins → Storage → 
       assert.equal((await bob.callTool({ name: 'get_poster', arguments: { poster_id: posterId } })).isError, true);
       assert.equal((await bob.callTool({ name: 'generate_poster', arguments: { workout_id: workoutId, skin: 'sun' } })).isError, true);
       const reader = await connect(await token(uid, ['workouts:read'])); clients.push(reader);
-      assert.equal((await reader.callTool({ name: 'log_workout', arguments: log as unknown as Record<string, unknown> })).isError, true);
-      assert.equal((await call('log_workout', { ...log, request_id: 'negative', results: [{ ...log.results[0], weight: -10 }] })).isError, true);
+      assert.equal((await reader.callTool({ name: 'read_board', arguments: { board_text: 'Back Squat 3x5' } })).isError, true);
+      assert.equal((await call('answer_board', { board_id: '00000000-0000-4000-8000-000000000000', answers: [{ slot_id: 'x', weight: -10 }] })).isError, true);
+      assert.equal((await call('save_board', { board_id: await converse(), request_id: 'not a valid id!' })).isError, true);
       assert.equal((await call('generate_poster', { workout_id: '../users/alice', skin: 'sun' })).isError, true);
       assert.equal((await call('generate_poster', { workout_id: workoutId, skin: 'invented' })).isError, true);
     });
     await t.test('test logs do not update athlete counters or records', async () => {
-      await service.log(uid, { ...log, request_id: 'test-log', is_test: true });
+      await service.saveBoard(uid, { board_id: await converse(), request_id: 'test-log', is_test: true });
       assert.equal((await db.doc(`users/${uid}`).get()).get('stats.totalWorkouts'), 1);
       assert.equal((await service.records(uid)).length, 1);
     });

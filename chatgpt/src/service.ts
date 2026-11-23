@@ -1,16 +1,15 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { isDeepStrictEqual } from 'node:util';
-import Ajv from 'ajv';
-import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
+import { createHash, randomUUID } from 'node:crypto';
+import { FieldValue, Timestamp, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import type { Bucket } from '@google-cloud/storage';
-import { buildSavedWorkoutTotals, sessionPartnerScope } from '../../src/services/savedWorkout';
 import type { WorkoutWithStats } from '../../src/hooks/useWorkouts';
-import type { PosterSkinId, PersonalRecord } from '../../src/types/index';
+import type { ParsedWorkout, PosterSkinId, PersonalRecord, Workout } from '../../src/types/index';
 import { extractNewPRs } from '../../src/services/achievementDetection';
-import type { WorkoutLog } from './contracts';
+import { swapHabits } from '../../src/services/wodiAgent/athleteHabits';
 import type { PosterRenderer } from './renderer';
-import { getRowState } from '../../src/components/logging/story/types';
+import {
+  answerBoard, boardTurn, deserializeBoard, finishBoard, serializeBoard, startBoard, BoardNotFinished,
+  type AnswerInput, type BoardAthlete, type BoardTurn, type FinishedBoard,
+} from './boardFlow';
 
 export class ToolError extends Error {}
 const id = (value: string): string => {
@@ -18,70 +17,120 @@ const id = (value: string): string => {
   return value;
 };
 const clean = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-function bounded(value: unknown, depth = 0): void {
-  if (depth > 30) throw new ToolError('Workout is too deeply nested');
-  if (typeof value === 'number' && (!Number.isFinite(value) || value < 0 || value > 10_000_000)) throw new ToolError('Workout numbers must be finite and between 0 and 10000000');
-  if (typeof value === 'string' && value.length > 20_000) throw new ToolError('Workout text is too long');
-  if (Array.isArray(value) && value.length > 1000) throw new ToolError('Too many entries');
-  if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) {
-    if (['__proto__', 'prototype', 'constructor'].includes(key)) throw new ToolError('Invalid field');
-    bounded(child, depth + 1);
-  }
-}
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') return `{${Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
-  return JSON.stringify(value);
+
+/** Reads a board's words into the app's workout — the app's own reader (parseWorkoutSession). */
+export type BoardReader = (text: string, athleteNote?: string) => Promise<ParsedWorkout>;
+
+/** A board being logged from ChatGPT lives this long between the athlete's answers. */
+const DRAFT_HOURS = 24;
+/** Workouts read for the athlete's usual swaps — the same signal the app's chat uses. */
+const HABIT_WORKOUTS = 40;
+
+export interface BoardTurnResult extends BoardTurn {
+  board_id: string;
 }
 
 export class WodiService {
-  private validate = new Ajv({ strict: false, allErrors: true }).compile<WorkoutLog>(JSON.parse(readFileSync(new URL('../dist/log-schema.json', import.meta.url), 'utf8')));
-  constructor(private db: Firestore, private bucket: Bucket, private renderer: PosterRenderer) {}
+  constructor(private db: Firestore, private bucket: Bucket, private renderer: PosterRenderer, private readBoardText: BoardReader) {}
 
-  async log(uid: string, input: unknown): Promise<{ workout_id: string }> {
-    bounded(input);
-    if (!this.validate(input)) throw new ToolError(`Invalid workout: ${new Ajv().errorsText(this.validate.errors)}`);
-    const date = new Date(input.trained_at);
-    if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.trained_at) || !Number.isFinite(date.getTime())) throw new ToolError('trained_at must be an ISO timestamp with timezone');
-    if (!input.parsed_workout.exercises.length || input.results.length !== input.parsed_workout.exercises.length || input.results.length > 30) throw new ToolError('Supply one result for every exercise (1–30)');
-    const parsed = input.parsed_workout;
-    // Result copies of the prescription must never disagree with the board being saved.
-    const results = input.results.map((result, i) => {
-      if (result.exerciseIndex !== i || !isDeepStrictEqual(clean(result.exercise), clean(parsed.exercises[i]))) throw new ToolError('Results must reference the matching parsed exercise in order');
-      if (!Number.isInteger(result.setsTotal) || result.setsTotal < 1 || result.setsTotal > 1000) throw new ToolError('setsTotal must be an integer from 1 to 1000');
-      if (!result.skipped && result.kind !== 'fixed_dose' && !result.blockScores?.length && getRowState(result) === 'empty') throw new ToolError(`Missing actual result for exercise ${i + 1}`);
-      return { ...result, exercise: parsed.exercises[i] };
+  /** The athlete as the chat knows them: their column of a women/men pair, their unit, their usual swaps. */
+  private async athlete(uid: string): Promise<BoardAthlete> {
+    const profile = await this.db.doc(`users/${uid}`).get();
+    if (!profile.exists) throw new ToolError('Finish Wodi account setup first');
+    const recent = await this.db.collection('workouts').where('userId', '==', uid).orderBy('date', 'desc').limit(HABIT_WORKOUTS).get();
+    const workouts = recent.docs.map((doc) => ({ ...doc.data(), id: doc.id, date: doc.get('date').toDate() }) as Workout);
+    return { sex: profile.get('sex'), weightUnit: profile.get('weightUnit'), habits: swapHabits(workouts) };
+  }
+
+  private async draft(uid: string, boardId: string): Promise<{ ref: DocumentReference; json: string }> {
+    const ref = this.db.collection('chatgptDrafts').doc(id(boardId));
+    const doc = await ref.get();
+    if (!doc.exists || doc.get('userId') !== uid) throw new ToolError('Board not found — read it again with read_board');
+    if ((doc.get('expiresAt') as Timestamp).toMillis() < Date.now()) throw new ToolError('This board expired — read it again with read_board');
+    return { ref, json: doc.get('sessionJson') as string };
+  }
+
+  /** Wodi reads the board's words with the app's own reader and asks its first question. */
+  async readBoard(uid: string, input: { board_text: string; athlete_note?: string }): Promise<BoardTurnResult> {
+    const text = input.board_text.trim();
+    if (!text) throw new ToolError("Send the board's words");
+    const athlete = await this.athlete(uid);
+    let workout: ParsedWorkout;
+    try {
+      workout = await this.readBoardText(text, input.athlete_note?.trim() || undefined);
+    } catch {
+      throw new ToolError('Wodi could not read that board — send its words again, exactly as written');
+    }
+    if (!workout.exercises?.length) throw new ToolError('Wodi found no workout in that text');
+    const state = startBoard(workout, athlete);
+    const boardId = randomUUID();
+    const now = Date.now();
+    await this.db.collection('chatgptDrafts').doc(boardId).set({
+      userId: uid,
+      sessionJson: serializeBoard(state),
+      createdAt: Timestamp.fromMillis(now),
+      expiresAt: Timestamp.fromMillis(now + DRAFT_HOURS * 3_600_000),
     });
-    const scope = sessionPartnerScope(parsed);
-    if (scope.teamSize < 1 || scope.teamSize > 100) throw new ToolError('Invalid team size');
-    const totals = buildSavedWorkoutTotals(parsed, results, scope.partnerFactor);
-    if (![totals.totalVolume, totals.totalReps, totals.effectiveDuration].every(n => Number.isFinite(n) && n >= 0)) throw new ToolError('Invalid workout totals');
+    return { board_id: boardId, ...boardTurn(state, athlete) };
+  }
+
+  /** The athlete's answers, laid on the board by the app's engine; Wodi's next question back. */
+  async answerBoard(uid: string, input: { board_id: string; answers: AnswerInput[] }): Promise<BoardTurnResult & { understood: string[]; not_understood: string[] }> {
+    const athlete = await this.athlete(uid);
+    const { ref, json } = await this.draft(uid, input.board_id);
+    const out = answerBoard(deserializeBoard(json), input.answers, athlete);
+    await ref.update({ sessionJson: serializeBoard(out.state) });
+    return { board_id: input.board_id, ...boardTurn(out.state, athlete), understood: out.understood, not_understood: out.not_understood };
+  }
+
+  /**
+   * Saves the finished board — the app's own totals and document (finishBoard). Dated when it is
+   * saved unless the athlete named the day. Idempotent per request_id: a retry after a lost reply
+   * returns the workout already saved.
+   */
+  async saveBoard(uid: string, input: { board_id: string; request_id: string; trained_at?: string; is_test?: boolean }): Promise<{ workout_id: string }> {
     const key = createHash('sha256').update(`${uid}:${id(input.request_id)}`).digest('hex');
-    const fingerprint = createHash('sha256').update(canonical(input)).digest('hex');
     const ref = this.db.collection('workouts').doc(key);
-    await this.db.runTransaction(async tx => {
-      const prior = await tx.get(ref);
-      if (prior.exists) {
-        if (prior.get('integrationFingerprint') !== fingerprint) throw new ToolError('request_id was already used for a different workout');
-        return;
+    const prior = await ref.get();
+    if (prior.exists && prior.get('userId') === uid) return { workout_id: key };
+    let date = new Date();
+    if (input.trained_at != null) {
+      date = new Date(input.trained_at);
+      if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.trained_at) || !Number.isFinite(date.getTime())) {
+        throw new ToolError('trained_at must be an ISO timestamp with timezone');
       }
+    }
+    const athlete = await this.athlete(uid);
+    const draft = await this.draft(uid, input.board_id);
+    let finished: FinishedBoard;
+    try {
+      finished = finishBoard(deserializeBoard(draft.json), athlete, { userId: uid, date, isTest: input.is_test });
+    } catch (error) {
+      if (error instanceof BoardNotFinished) throw new ToolError(error.message);
+      throw error;
+    }
+    const { document, totals } = finished;
+    await this.db.runTransaction(async tx => {
+      const again = await tx.get(ref);
+      if (again.exists) return;
       const profile = await tx.get(this.db.doc(`users/${uid}`));
       if (!profile.exists) throw new ToolError('Finish Wodi account setup first');
       const recordDocs = input.is_test ? null : await tx.get(this.db.collection('personalRecords').where('userId', '==', uid));
       const now = Timestamp.now();
-      const workout = clean({
-        ...parsed, id: key, userId: uid, date: date.toISOString(), title: parsed.title || "Today's Workout",
-        status: 'completed', exercises: totals.exercises, workloadBreakdown: totals.breakdownFromResults,
-        durationSeconds: totals.effectiveDuration, duration: Math.round(totals.effectiveDuration / 60),
-        loggedJson: totals.loggedJson, partnerWorkout: scope.isPartnerWorkout, teamSize: scope.teamSize,
-        partnerFactor: scope.partnerFactor, posterSkin: 'sun', isTest: input.is_test ?? false,
-        integrationFingerprint: fingerprint, integrationSource: 'chatgpt',
+      tx.create(ref, {
+        ...clean({ ...document, date: date.toISOString() }),
+        date: Timestamp.fromDate(date),
+        // Same as a new poster in the app before the athlete picks a favourite.
+        posterSkin: 'sun',
+        integrationSource: 'chatgpt',
+        createdAt: now,
+        updatedAt: now,
       });
-      tx.create(ref, { ...workout, date: Timestamp.fromDate(date), createdAt: now, updatedAt: now });
+      tx.delete(draft.ref);
       if (!input.is_test) {
         tx.set(profile.ref, { stats: { totalWorkouts: FieldValue.increment(1), totalVolume: FieldValue.increment(totals.totalVolume) } }, { merge: true });
         const previous = recordDocs!.docs.map(doc => ({ ...doc.data(), date: doc.get('date').toDate() }) as PersonalRecord);
-        const records = extractNewPRs({ id: key, title: workout.title, exercises: totals.exercises, date }, previous);
+        const records = extractNewPRs({ id: key, title: document.title, exercises: totals.exercises, date }, previous);
         for (const record of records) {
           const eventId = `${uid}_${record.movement.toLowerCase().replace(/\s+/g, '_').replace(/\//g, '_')}_${key}`;
           tx.set(this.db.collection('personalRecords').doc(eventId), { userId: uid, movement: record.movement, weight: record.weight, date: Timestamp.fromDate(date), workoutId: key });

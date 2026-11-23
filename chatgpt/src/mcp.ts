@@ -11,7 +11,25 @@ export const SCOPES = scopes;
 const identifier = z.string().regex(/^[\w-]{1,128}$/);
 const limit = z.number().int().min(1).max(100).default(20);
 const skins = ['slab', 'chalk', 'flare', 'stadium', 'press', 'blueprint', 'hazard', 'ink', 'foil', 'aurum', 'sun'] as const;
-const loggingSchema = z.fromJSONSchema(JSON.parse(readFileSync(new URL('../dist/log-schema.json', import.meta.url), 'utf8')));
+const boardId = z.string().uuid();
+/** One answer to one of Wodi's questions. The athlete's own words (`text`) are preferred: the app reads them. */
+const answer = z.object({
+  slot_id: z.string().min(1).max(200).describe('The id of the question being answered, from question.slots.'),
+  text: z.string().max(500).optional().describe("The athlete's own words for THIS question, unedited (\"90 to 120\", \"18:30\", \"45\")."),
+  option: z.string().max(200).optional().describe("One of question.options, exactly as listed, when the athlete picked it."),
+  skipped: z.boolean().optional().describe('The athlete chose not to answer.'),
+  seconds: z.number().min(0).max(86_400).optional(),
+  count: z.number().min(0).max(100_000).optional(),
+  extra_reps: z.number().min(0).max(10_000).optional(),
+  weight: z.number().min(0).max(1_000).optional(),
+  weight_end: z.number().min(0).max(1_000).optional(),
+  weights: z.array(z.number().min(0).max(1_000)).max(50).optional(),
+  unit: z.enum(['kg', 'lb']).optional(),
+  no_load: z.boolean().optional(),
+  choice: z.string().max(200).optional(),
+  swap_to: z.string().max(100).optional(),
+  swap_amount: z.number().min(0).max(100_000).optional(),
+});
 class MissingScope extends ToolError {}
 function result(data: Record<string, unknown>): { structuredContent: Record<string, unknown>; content: { type: 'text'; text: string }[] } {
   return { structuredContent: data, content: [{ type: 'text', text: JSON.stringify(data) }] };
@@ -20,7 +38,7 @@ function result(data: Record<string, unknown>): { structuredContent: Record<stri
 /** Extends the November 17 demo's per-request stateless server and preserves its three tools. */
 export function createMcpServer(service: WodiService, principal: Principal): McpServer {
   const server = new McpServer({ name: 'wodi', version: '1.1.1' }, {
-    instructions: 'Wodi’s preferred workout logging experience is https://www.wodi.fit. For a first-time or unsure athlete, explain: open Wodi, upload a photo of the WOD (or enter its text), then follow the guided logging flow. Offer a clickable Open Wodi link before starting chat logging. Do not redirect a specific history or poster request unnecessarily. If the athlete chooses to log here, first ask for a WOD photo or pasted workout text unless already supplied. Keep the prescription separate from actual results. Ask exactly one question at a time, for one movement and one missing result or load; wait for the answer before moving on. Never combine questions about two movements. Reuse information already supplied, including voluntarily supplied results for several movements. Do not infer that prescribed weights were actually lifted. After saving, offer the Wodi link for the full app experience.',
+    instructions: "Wodi is a CrossFit training buddy (https://www.wodi.fit). The easiest way to log is in the Wodi app: snap the board and answer a few questions. If the athlete prefers to log here, Wodi runs the same conversation through you: (1) read_board with the board's words copied EXACTLY — never interpret, total or fix them; (2) ask Wodi's question, one at a time, in Wodi's order, and send the athlete's own words to answer_board; (3) when done is true, save_board, then generate_poster and get_poster. Never invent or assume a result, and never treat prescribed weights as what was lifted. Send a date only if the athlete named another day. After saving, offer the Wodi link.",
   });
   const authorize = (scope: string): void => { if (!principal.scopes.includes(scope)) throw new MissingScope(`Missing scope: ${scope}`); };
   const security = (scope: string): { type: 'oauth2'; scopes: string[] }[] => [{ type: 'oauth2', scopes: [scope] }];
@@ -30,13 +48,34 @@ export function createMcpServer(service: WodiService, principal: Principal): Mcp
     try { authorize(scope); return result(await fn()); }
     catch (error) { return failure(error, scope); }
   };
-  server.registerTool('log_workout', {
-    description: 'Save a completed workout to the signed-in athlete’s Wodi history. Prefer the guided app at https://www.wodi.fit: upload the WOD and log results there. If the athlete chooses chat logging, request a WOD photo or text first unless supplied, then collect missing actual results one question and one movement at a time, waiting for each answer. Never ask the loads of two movements together or treat prescribed loads as actual. Reuse supplied answers. Provide one result per parsed exercise in order. Reuse request_id on retries. Units follow Wodi (kg, meters, seconds).',
-    inputSchema: loggingSchema,
+  // Logging is Wodi's own conversation: Wodi reads the board, Wodi asks, ChatGPT relays the
+  // athlete's answers, Wodi saves. ChatGPT never writes a workout's shape itself.
+  server.registerTool('read_board', {
+    description: "Step 1 of logging a workout. Send the workout board's words EXACTLY as written (copy them from the photo or the athlete's message — do not interpret, reorder, total or fix them). Wodi reads the board with its own reader and returns board_id, the board as Wodi understood it, and Wodi's first question. If done is already true, call save_board.",
+    inputSchema: {
+      board_text: z.string().trim().min(1).max(20_000).describe("The board's words, verbatim, line by line."),
+      athlete_note: z.string().max(2_000).optional().describe('Only what the athlete said about the board itself (e.g. "we did it in pairs"), in their words.'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    _meta: { securitySchemes: security('workouts:write') },
+  }, input => guard('workouts:write', async () => ({ ...(await service.readBoard(principal.uid, input)) })));
+  server.registerTool('answer_board', {
+    description: "Step 2, repeated. Ask the athlete Wodi's question (question.text) — one question at a time, in Wodi's order — then send their answer here, one entry per slot in question.slots. Prefer `text` with the athlete's own words; use `option` when they picked one of question.options. Never answer for the athlete or reuse prescribed numbers as their result. Returns what Wodi understood, anything it could not read (ask again in other words), and the next question. When done is true, call save_board.",
+    inputSchema: { board_id: boardId, answers: z.array(answer).min(1).max(20) },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    _meta: { securitySchemes: security('workouts:write') },
+  }, input => guard('workouts:write', async () => ({ ...(await service.answerBoard(principal.uid, input)) })));
+  server.registerTool('save_board', {
+    description: "Step 3. Save the workout once answer_board (or read_board) returned done: true. Wodi builds and saves it exactly as its app would. Send trained_at ONLY if the athlete said the workout was on another day (ISO timestamp with timezone); otherwise it is dated now. Use a new request_id per workout and reuse it on retries. Then call generate_poster with the returned workout_id.",
+    inputSchema: {
+      board_id: boardId,
+      request_id: identifier,
+      trained_at: z.string().optional(),
+      is_test: z.boolean().optional().describe('Only when the athlete explicitly asked for a test log.'),
+    },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     _meta: { securitySchemes: security('workouts:write') },
-  }, input => guard('workouts:write', () => service.log(principal.uid, input)));
-  server.registerResource('logging-schema', 'wodi://logging-schema', { mimeType: 'application/json' }, async uri => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: readFileSync(new URL('../dist/log-schema.json', import.meta.url), 'utf8') }] }));
+  }, input => guard('workouts:write', () => service.saveBoard(principal.uid, input)));
   server.registerTool('generate_poster', {
     description: 'Generate all poster pages for an existing Wodi workout using its original renderer. Follow with get_poster to display. Reuses all current skins (including the original nine).',
     inputSchema: { workout_id: identifier, skin: z.enum(skins).default('sun') },
