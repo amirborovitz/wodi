@@ -12,8 +12,7 @@
           "subNote": "8 total",
           "mineKey": "Push Press",
           "mineOverride": "45→55kg",
-          "accent": "yellow",
-          "repeatCount": 4
+          "accent": "yellow"
         },
         {
           "primary": "4 × 2",
@@ -22,8 +21,7 @@
           "subNote": "8 total",
           "mineKey": "Push Jerk",
           "mineOverride": "60→70kg",
-          "accent": "yellow",
-          "repeatCount": 4
+          "accent": "yellow"
         }
       ],
       "hiddenCount": 0,
@@ -44,8 +42,7 @@
             "subNote": "8 total",
             "mineKey": "Push Press",
             "mineOverride": "45→55kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           },
           {
             "primary": "4 × 2",
@@ -54,8 +51,7 @@
             "subNote": "8 total",
             "mineKey": "Push Jerk",
             "mineOverride": "60→70kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           }
         ],
         "hiddenCount": 0,

@@ -59,6 +59,7 @@ import { timeCapLabelFromText } from '../../utils/timeCap';
 import { blockCadence, formatCadenceClock } from '../../utils/blockClock';
 import { exerciseLoadUnit, movementLoadUnit, rxLoadUnit } from '../../utils/loadUnits';
 import { readRepsDisplay } from '../../utils/repsDisplay';
+import { boardNest, type BoardNest } from '../../services/recipe/boardNumbers';
 import { isCoreTabataBlock, coreTabataDoseSeconds, doseMinutes, TABATA_PROTOCOL_LABEL } from '../../utils/coreTabata';
 import { namesAPair, stripMovementRolePrefix } from '../../utils/movementNameMatch';
 
@@ -1327,8 +1328,28 @@ function buildCelebrationMovementRow(params: {
   sharedLabel?: SharedWorkLabel;
   /** The board prescribed no count — the athlete's own max effort IS the quantity. */
   isMaxEffort?: boolean;
+  /**
+   * The row sits inside a repeat nested in the round (boardNest). Its prescription arrives
+   * multiplied out; the row states the board's own number and runs over the outer rounds × times.
+   */
+  nest?: BoardNest;
 }): ArtifactRow {
-  const { movementName, prescribed, actual, repeatCount, occurrenceCount, isStrength, statesOwnReps, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit, teamSize, together, sharedLabel, isMaxEffort } = params;
+  const { movementName, actual, occurrenceCount, isStrength, statesOwnReps, suppressCalorieTotal, suppressDistanceTotal, isLadder, partnerSplit, teamSize, together, sharedLabel, isMaxEffort, nest } = params;
+  const times = nest?.times ?? 1;
+  const unfold = (value: number | undefined): number | undefined => (value != null ? value / times : undefined);
+  const prescribed = nest && params.prescribed
+    ? {
+        ...params.prescribed,
+        reps: unfold(params.prescribed.reps),
+        distance: unfold(params.prescribed.distance),
+        calories: unfold(params.prescribed.calories),
+        time: unfold(params.prescribed.time),
+        // The board's notation describes the multiplied-out number; the row now states the
+        // board's own, so the multiplied spelling would contradict it.
+        repsDisplay: undefined,
+      }
+    : params.prescribed;
+  const repeatCount = nest ? (params.repeatCount ?? 1) * times : params.repeatCount;
   // The breakdown is a totals table keyed by movement NAME, so a movement the board writes more
   // than once merges into ONE entry. That merged figure belongs to no single occurrence — printing
   // it on each turns "80 C&J … 160 total" into a line that reads as if it alone were 160. The
@@ -1539,6 +1560,7 @@ function buildCelebrationMovementRow(params: {
     // Pair-paced pacer rows get a SWAP chip: the run/bike is the swap task between AMRAP
     // turns, not a movement inside the round — the chip keeps the story readable.
     ...(prescribed?.relay ? { roundLabel: 'SWAP' } : {}),
+    ...(nest ? { nest } : {}),
   };
 
   if (shouldLogCelebrationDebug()) {
@@ -2150,6 +2172,7 @@ function buildSequentialMovementRows(
       together: movement.together ?? actual?.together,
       sharedLabel: movement.sharedLabel ?? actual?.sharedLabel,
       isMaxEffort: statesMax,
+      nest: maxSet || onceOnly ? undefined : boardNest(movement),
     });
     if (onceOnly) row.onceOnly = onceOnly;
     // The poster resolves a row's right-hand value from the breakdown through mineKey, and the
@@ -2230,8 +2253,9 @@ function buildStrengthBlockRows(exercise: Exercise, movements: MovementTotal[]):
         // The name-keyed mine map holds ONE value per movement, so blocks sharing a lift would
         // all read the merged figure. This row already resolved its own occupant's load.
         ...(load ? { mineOverride: formatLoggedLoad(load.weights, load.unit, load.implementCount) } : {}),
+        // No repeatCount: that field means "primary is ONE round's value", and this primary
+        // already states the rounds ("4 × 2").
         accent: 'yellow',
-        repeatCount: rounds,
       };
     });
   });
@@ -2842,10 +2866,35 @@ export function buildIntervalSchemeLine(
 ): string | undefined {
   const scheme = blockCadence(exercise, scopedText);
   if (!scheme) return undefined;
+  const count = scheme.count && scheme.count > 1 ? scheme.count : undefined;
+  const clock = formatCadenceClock(scheme.workSeconds);
+  // An EMOM-style piece's clock is a START cadence — a new round begins every 3:00 — and the
+  // board says so with "every". Written as "3:00 × 4" it reads as four 3-minute efforts.
+  if (!scheme.restSeconds && exercise && startsEveryClock(exercise)) {
+    return count ? `${count} × EVERY ${clock}` : `EVERY ${clock}`;
+  }
   const window = scheme.restSeconds
-    ? `${formatCadenceClock(scheme.workSeconds)} ON / ${formatCadenceClock(scheme.restSeconds)} OFF`
-    : formatCadenceClock(scheme.workSeconds);
-  return scheme.count && scheme.count > 1 ? `${window} × ${scheme.count}` : window;
+    ? `${clock} ON / ${formatCadenceClock(scheme.restSeconds)} OFF`
+    : clock;
+  return count ? `${window} × ${count}` : window;
+}
+
+/**
+ * The start clock as the scheme line writes it ("3:00") — the parse's own window first, the
+ * prescription text only for docs saved before it had one. The format line and the composed
+ * title must spell the clock the same way, or "4 × EVERY 03:00" sits under "4 × EVERY 3:00".
+ */
+function startClockOf(exercise: Exercise | undefined): string | undefined {
+  const window = exercise?.intervalSeconds;
+  if (window && window > 0) return formatCadenceClock(window);
+  const text = normalizeIntervalNotation(exercise?.prescription || '');
+  return text.match(/every\s+(\d+:\d+)/i)?.[1] || text.match(/(\d+:\d+)\s*min/i)?.[1];
+}
+
+/** The part's clock starts each round (EMOM, intervals) rather than bounding a work window (AMRAP × N). */
+function startsEveryClock(exercise: Exercise): boolean {
+  const format = inferWorkoutFormatForExercise(exercise);
+  return format === 'emom' || format === 'intervals';
 }
 
 /**
@@ -3168,7 +3217,11 @@ export function buildPageArtifactSections(
     const blueprintStructure = descScheme ? `[${descScheme.join('-')}] for time`
       : forTime ? (getSectionedForTimeLabel(exercise) || `${repeatCount} rounds for time`)
       : isAmrapPiece ? null
-      : pageCadence ? formatNestedRoundBlueprint(`${pageCadence} · ${repeatCount} rounds`, exercise)
+      // An every-X piece states its scheme ONCE, above the rows: as the title ("4 × EVERY 3:00")
+      // or, under a real name, as the format line. Here it says what the rows are — one round's
+      // work, totals on the right. A recipe-read board states its nested repeat on the rows
+      // ("2 ROUNDS"); an older doc has only the text, so its "2 rounds of" hint stays here.
+      : pageCadence ? (prescribedMovements.some((m) => boardNest(m)) ? 'Each round' : formatNestedRoundBlueprint('Each round', exercise))
       : `${repeatCount} rounds`;
     const blueprintParts = [
       blueprintStructure,
@@ -3611,6 +3664,7 @@ export function buildPageArtifactSections(
           prescribed,
           actual: movement,
           repeatCount: onceOnly ? 1 : movementRepeatCounts?.get(movement.originalMovement?.toLowerCase() || movement.name.toLowerCase()) ?? rowRepeatCount,
+          nest: parsedMovement && !onceOnly ? boardNest(parsedMovement) : undefined,
           isStrength,
           statesOwnReps: strengthRowsStateOwnReps,
           partnerSplit: splitInfo?.split,
@@ -4021,15 +4075,13 @@ function buildFormatLine(format: string | undefined, exercises: Exercise[], _dur
     // The count is WINDOWS on the clock, which the parse states as `intervalCount`. Saved sets are
     // not windows: "every 3:00 × 5, 2 rounds of…" logs a set per round, and read "10 × every 3:00".
     const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.intervalCount || ex?.sets?.length || 0;
-    const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
-    const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
+    const intervalTime = startClockOf(ex);
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
     else return undefined;
   } else if (format === 'intervals') {
     const ex = exercises[0];
     const intervalSets = (hasSequentialBlocks(ex) ? sequentialBlockSetCount(ex) : 0) || ex?.intervalCount || ex?.sets?.length || ex?.rounds || 0;
-    const normalizedPrescription = normalizeIntervalNotation(ex?.prescription || '');
-    const intervalTime = normalizedPrescription.match(/every\s+(\d+:\d+)/i)?.[1] || normalizedPrescription.match(/(\d+:\d+)\s*min/i)?.[1];
+    const intervalTime = startClockOf(ex);
     if (intervalSets > 0 && intervalTime) base = `${intervalSets} × every ${intervalTime}`;
     else return undefined;
   } else if (format === 'for_time') {

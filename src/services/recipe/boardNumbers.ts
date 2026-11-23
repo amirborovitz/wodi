@@ -23,6 +23,25 @@ const METRICS = { reps: 'reps', calories: 'calories', distance: 'distance' } as 
 /** A range is offered whole when short; a long one by its ends and middle. */
 const MAX_SPAN = 7;
 
+/**
+ * A row that sits inside a repeat nested in its round — the board's "into, 2 rounds: 5 cleans,
+ * 5 burpees". The old shape stores such a row multiplied out (reps 10, `recipeFold` 2); this
+ * says how to read it back: `times` the repeat, and `group` the recipe parent its siblings share
+ * ("1.0" and "1.1" are both under "1"). Undefined on a row read once per round, and on every doc
+ * saved before the recipe reader — those carry no fold, and nothing guesses one from text.
+ */
+export interface BoardNest {
+  times: number;
+  group: string;
+}
+
+export function boardNest(movement: Pick<ParsedMovement, 'recipeFold' | 'recipePath'>): BoardNest | undefined {
+  const times = movement.recipeFold ?? 1;
+  if (times <= 1) return undefined;
+  const path = movement.recipePath ?? '';
+  return { times, group: path.includes('.') ? path.slice(0, path.lastIndexOf('.')) : path };
+}
+
 export function boardNumbers(exercise: ParsedExercise, movement: ParsedMovement): BoardNumbers | undefined {
   if (!exercise.recipe || movement.recipePath == null) return undefined;
   const placed = recipeIndex(exercise.recipe).movements.get(movement.recipePath);

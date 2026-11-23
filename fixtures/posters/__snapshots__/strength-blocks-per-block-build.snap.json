@@ -12,8 +12,7 @@
           "subNote": "8 total",
           "mineKey": "Clean and Jerk",
           "mineOverride": "40→50kg",
-          "accent": "yellow",
-          "repeatCount": 4
+          "accent": "yellow"
         },
         {
           "primary": "4 × 1",
@@ -22,8 +21,7 @@
           "subNote": "4 total",
           "mineKey": "Clean and Jerk",
           "mineOverride": "50→65kg",
-          "accent": "yellow",
-          "repeatCount": 4
+          "accent": "yellow"
         }
       ],
       "hiddenCount": 0,
@@ -44,8 +42,7 @@
             "subNote": "8 total",
             "mineKey": "Clean and Jerk",
             "mineOverride": "40→50kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           },
           {
             "primary": "4 × 1",
@@ -54,8 +51,7 @@
             "subNote": "4 total",
             "mineKey": "Clean and Jerk",
             "mineOverride": "50→65kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           }
         ],
         "hiddenCount": 0,

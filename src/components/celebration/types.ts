@@ -1,3 +1,5 @@
+import type { BoardNest } from '../../services/recipe/boardNumbers';
+
 export interface HeroResult {
   value: string;
   unit?: string;
@@ -152,6 +154,12 @@ export interface ArtifactRow {
    * split of `primary`.
    */
   parts?: LinePart[];
+  /**
+   * This row sits inside a repeat nested in the round (recipe/boardNumbers.boardNest). `primary`
+   * states the board's own number (5, not the multiplied 10), and rows sharing a `group` print
+   * under one "2 ROUNDS" header.
+   */
+  nest?: BoardNest;
 }
 
 /** One movement of a line that names several: its words as printed, and the movement's own name. */

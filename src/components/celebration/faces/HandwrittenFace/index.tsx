@@ -725,15 +725,14 @@ export function HandwrittenFace({
   // ─────────────────────────────────────────────────────────────────────
 
   if (isCarousel && pageWods) {
-    const navTitle = pageWods[carouselPage]?.title ?? pageWods[carouselPage]?.type ?? singleWod.type;
     const shownPageWods = displayDate ? pageWods.map((w) => ({ ...w, date: displayDate })) : pageWods;
 
     return (
       <div className={styles.root} onPointerDownCapture={posterDate.onScreenPointerDown}>
         {storyBg}
         <div className={styles.nav}>
+          {/* No title here: the poster right below says it — the bar is Back, the dots and the menu. */}
           <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
-          <span className={styles.navTitle}>{navTitle}</span>
           {navRight}
         </div>
 
@@ -849,7 +848,6 @@ export function HandwrittenFace({
       {storyBg}
       <div className={styles.nav}>
         <button className={styles.navBack} onClick={onBack ?? onDone} aria-label="Back">←</button>
-        <span className={styles.navTitle}>{singleWod.title ?? singleWod.type}</span>
         {navRight}
       </div>
 

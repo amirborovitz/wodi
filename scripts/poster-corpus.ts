@@ -42,6 +42,7 @@ import {
   buildHeroResultMeta,
   formatPosterStrengthRepsSequence,
   composedSchemeTitle,
+  isGenericTitle,
   posterPageFormat,
   mapFormatToType,
 } from '../src/components/celebration/faces/HandwrittenFace/posterData';
@@ -253,9 +254,28 @@ function buildSnapshot(fixture: PosterFixture): { snapshot: unknown; dropped: st
     // production shows once.
     hasScoreboard: !!hero.blockScores?.length,
   };
+  // A carousel page is headed by ITS OWN part, titled the way buildPosterWodFromPage titles it:
+  // the coach's name, else the part's own name unless it is generic, with the scheme composed over
+  // a name that only spelled the clock. The part's name counts as already said (`partName`) only
+  // when it reached that headline. Deduping every page against part A's title — what this did
+  // before — judged part B's rows against a header no page in production shows.
+  const pageHeaderContext = (index: number): typeof headerContext & { partName?: string } => {
+    const exercise = exercises[index];
+    const name = exercise?.name?.trim().toUpperCase() || null;
+    const structureName = name && !isGenericTitle(name) ? name : null;
+    const wodName = exercise?.wodName?.trim().toUpperCase() || null;
+    const named = wodName ?? structureName;
+    const schemeTitle = composedSchemeTitle(exercise, named);
+    const title = schemeTitle ?? named;
+    const partIsHeadline = title != null && (title === wodName || title === structureName || title === schemeTitle);
+    return { ...headerContext, title, ...(partIsHeadline && exercise?.name ? { partName: exercise.name } : {}) };
+  };
+  const rewardSchemeTitle = composedSchemeTitle(exercises[0], rawSectionName);
   const posterRows = {
-    reward: reward ? sectionsToRows(reward, mineMap, headerContext) : null,
-    pages: pages.map((sections, index) => sectionsToRows(sections, pageMineMaps?.[index] ?? mineMap, headerContext)),
+    reward: reward
+      ? sectionsToRows(reward, mineMap, { ...headerContext, ...(rewardSchemeTitle && exercises[0]?.name ? { partName: exercises[0].name } : {}) })
+      : null,
+    pages: pages.map((sections, index) => sectionsToRows(sections, pageMineMaps?.[index] ?? mineMap, pageHeaderContext(index))),
   };
 
   // Poster header sub-line for sectioned partner artifacts ("you & your partner - N blocks") —

@@ -205,14 +205,14 @@ const CADENCE_TITLE_PATTERNS = [
   /^every\s+[\d:]+\s*min(?:ute)?s?\s*(?:x|×)\s*\d+/i,
 ];
 
-function isGenericTitle(title: string): boolean {
+export function isGenericTitle(title: string): boolean {
   const t = title.trim();
   return GENERIC_TITLE_PATTERNS.some((p) => p.test(t))
     || CADENCE_TITLE_PATTERNS.some((p) => p.test(t));
 }
 
 // The words a coach uses to write a scheme rather than name a workout.
-const SCHEME_TITLE_VOCAB = /\b(?:amrap|emom|tabata|intervals?|rounds?|sets?|min(?:ute)?s?|sec(?:ond)?s?|rest|work|on|off|cap|for|time|each|alt(?:ernating)?|x)\b/gi;
+const SCHEME_TITLE_VOCAB = /\b(?:amrap|emom|every|tabata|intervals?|rounds?|sets?|min(?:ute)?s?|sec(?:ond)?s?|rest|work|on|off|cap|for|time|each|alt(?:ernating)?|x)\b/gi;
 
 /**
  * Is this "title" just the scheme in the coach's own spelling?
@@ -222,11 +222,6 @@ const SCHEME_TITLE_VOCAB = /\b(?:amrap|emom|tabata|intervals?|rounds?|sets?|min(
  * is left, there was no name. Deliberately a subtraction, not a list of notations: coaches
  * write this a dozen ways and an enumeration only ever covers the ones already seen.
  */
-/** Does this line state a clock — "2:00", "3 min", "45 sec"? */
-function statesAClock(text: string): boolean {
-  return /\d{1,3}\s*:\s*\d{2}|\b\d+\s*(?:min(?:ute)?s?|sec(?:ond)?s?)\b/i.test(text);
-}
-
 function isSchemeTitle(title: string): boolean {
   return title
     .replace(SCHEME_TITLE_VOCAB, ' ')
@@ -309,6 +304,8 @@ function normalizePosterHeaderText(value: string | null | undefined): string {
 
 interface PosterHeaderContext {
   title?: string | null;
+  /** The part's own name as saved — the block carrying it is the poster's headline, not a header. */
+  partName?: string | null;
   type?: string;
   format?: string;
   sub?: string;
@@ -451,7 +448,8 @@ export function buildFormatLine(data: CelebrationData): string {
   // Confirmed-partner workouts: trust the artifact blueprint over independent format guesses.
   if (data.artifactSections[0]?.isPartnerConfirmed) {
     const sectionBlueprint = data.artifactSections[0]?.blueprint;
-    if (sectionBlueprint) return sectionBlueprint.toUpperCase();
+    // A clocked piece's scheme comes from the one producer; its caption only describes the rows.
+    if (sectionBlueprint) return (buildIntervalSchemeLine(data.exercises[0]) ?? sectionBlueprint).toUpperCase();
   }
 
   // Prefer heroResult.formatLine if it looks meaningful
@@ -834,16 +832,10 @@ export function sectionsToRows(
     const isDuplicateTitle =
       isDuplicatePosterHeader(section.title, { title: headerContext.title })
       || isRoundCountForTimeCoveredByFormat(section.title, headerContext)
-      // A block header written as the scheme ("2:00 AMRAP X 4") is the card's own scheme in the
-      // coach's spelling — the title or the format line above already states it in the app's.
-      // Matching them verbatim can't catch this, which is exactly how one card ended up with
-      // "3:00 × 4" as its title and "3:00 MIN AMRAP X 4" as the header underneath.
-      //
-      // It must state a CLOCK to qualify: that is what the composed scheme line replaces. A
-      // round-count header ("6 ROUNDS FOR TIME") is scheme vocabulary too, but nothing above
-      // restates it, and isRoundCountForTimeCoveredByFormat already rules on those.
-      || (!!section.title?.trim() && !!(headerContext.title || headerContext.format)
-        && statesAClock(section.title) && isSchemeTitle(section.title));
+      // The block named after the part itself IS the poster's headline — already printed at the
+      // top as the name, or as the scheme the name only spelled ("Every 03:00 x 4 Rounds" →
+      // "4 × EVERY 3:00"). Known by where it came from, not by how alike two strings look.
+      || (!!headerContext.partName && section.title?.trim() === headerContext.partName.trim());
     // Station sections carry their structure in the poster title ("[2:00/1:00] × 6") and in the
     // blueprint cap below — a section-level block on top would restate both.
     const hasStationRows = section.rows.some((row) => row.stationRow && row.roundLabel);
@@ -857,9 +849,6 @@ export function sectionsToRows(
     // here the moment the interval blueprint stopped restating the scheme.
     const eyebrowCap = section.eyebrow && !isFormatHeader(section.eyebrow) ? section.eyebrow : '';
     const cap = section.blueprint ?? eyebrowCap;
-
-    const isCadenceTitle = !hasStationRows
-      && CADENCE_TITLE_PATTERNS.some((p) => p.test(section.title?.trim() ?? ''));
 
     // 'Blueprint' is the section builders' generic placeholder title — it says nothing an
     // athlete reads. The structure cap ("EMOM 15 MIN · 5 ROUNDS") IS the header: promote it
@@ -894,9 +883,10 @@ export function sectionsToRows(
       if (label || visibleCap) {
         rows.push({ kind: 'block', label, cap: isGenericTitle ? '' : visibleCap } satisfies PosterBlock);
       }
-    } else if (!hasStationRows && (isDuplicateTitle || isCadenceTitle) && cap && !capDuplicatesPosterHeader) {
-      // Section title was a format/cadence header (suppressed as label) but the
-      // blueprint cap carries structural context worth showing (e.g. "EVERY 4 MIN · 4 ROUNDS").
+    } else if (!hasStationRows && cap && !capDuplicatesPosterHeader) {
+      // No label to print — the title was a bare format word ("For Time"), the clock, or empty —
+      // but the caption still carries the board's structure ("[14-12-10-8-6-4] for time").
+      // Whether it shows can't depend on WHY the label went.
       rows.push({ kind: 'block', label: '', cap } satisfies PosterBlock);
     } else if (hasStationRows && cap) {
       // Station rows carry only their own letter, so the clock has to be stated once above them
@@ -905,7 +895,13 @@ export function sectionsToRows(
       rows.push({ kind: 'block', label: cap.toUpperCase(), cap: '' } satisfies PosterBlock);
     }
 
+    let nestGroup: string | undefined;
     for (const row of section.rows) {
+      // A repeat nested in the round ("into, 2 rounds:") gets its own header, once, above its rows.
+      if (row.nest && row.nest.group !== nestGroup) {
+        rows.push({ kind: 'block', label: `${row.nest.times} ROUNDS`, cap: '' } satisfies PosterBlock);
+      }
+      nestGroup = row.nest?.group;
       // The station letter rides ON the row, as the chip every skin already renders. A station
       // is one line of whiteboard ("ST. 1 — Max Echo Bike — 40 cal"), and giving each one a
       // full-width header block above its single line turned a five-station board into eleven
@@ -1287,7 +1283,11 @@ export function buildPosterWodFromPage(
   const format = (() => {
     // Partner pages: trust the artifact blueprint (already split-aware) over an independent
     // format guess, for the same reason buildPosterWod does — see that function's comment.
-    if (isPartnerPage && section?.blueprint) return section.blueprint.toUpperCase();
+    // A clocked piece states its scheme from the one producer, like every other page: its block
+    // caption describes the rows ("Each round"), not the clock.
+    if (isPartnerPage && section?.blueprint) {
+      return (buildIntervalSchemeLine(page.exercise) ?? section.blueprint).toUpperCase();
+    }
     // Station pages: the title already carries the interval clock ("[2:00/1:00] × 6") — pair
     // it with the station descriptor instead of a formatLine restating AMRAP.
     if (stationClock) return 'alt. stations';
@@ -1329,6 +1329,11 @@ export function buildPosterWodFromPage(
     && (title.toUpperCase() === format.toUpperCase() || title.toUpperCase() === type.toUpperCase())) {
     title = null;
   }
+  // The part reached the headline — by the coach's name for it, by its own name, or as the scheme
+  // its name only spelled. Its block then has nothing left to say as a label ("KICK START AMRAP"
+  // under KICK START). A name too generic to headline ("6 Rounds For Time") never got there, and
+  // its block is still the only place it is said.
+  const partIsHeadline = title != null && (title === wodName || title === structureName || title === schemeTitle);
   if (!title && isPartnerPage) {
     title = section?.partnerDisplayMode === 'sections' ? 'PARTNER WOD' : 'PARTNER METCON';
   }
@@ -1358,7 +1363,7 @@ export function buildPosterWodFromPage(
   const teamSize = data.teamSize ?? 1;
   const totalsEstimated = !!data.activeBreakdown?.estimated;
   const builtRows: PosterRow[] = sections.length > 0
-    ? sectionsToRows(sections, mineMap, { title, type, format, sub, hasScoreboard: !!heroScores?.length })
+    ? sectionsToRows(sections, mineMap, { title, partName: partIsHeadline ? page.exercise.name : undefined, type, format, sub, hasScoreboard: !!heroScores?.length })
     : [];
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
   const strengthTopSet = page.isStrength && !isMaxPractice
@@ -1573,7 +1578,7 @@ export function buildPosterWod(
   // repeats the type pill verbatim ("EMOM" pill + "EMOM" sub-line), drop it. Unnamed posters
   // keep it: there the format IS the headline.
   const dedupedFormat = dedupeAmrapFormat(title, format, type, isAmrap, amrapMinutes);
-  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, type, format: dedupedFormat, sub, hasScoreboard: !!data.heroResult?.blockScores?.length });
+  const builtRows = sectionsToRows(data.artifactSections, mineMap, { title, partName: schemeTitle && title === schemeTitle ? mainEx?.name : undefined, type, format: dedupedFormat, sub, hasScoreboard: !!data.heroResult?.blockScores?.length });
   const rows = totalsEstimated ? stripEstimatedTotals(builtRows) : builtRows;
 
   const wod: PosterWodInternal = {

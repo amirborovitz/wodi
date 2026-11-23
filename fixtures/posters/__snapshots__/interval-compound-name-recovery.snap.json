@@ -3,7 +3,7 @@
     {
       "eyebrow": "WOD",
       "title": "Interval Metcon",
-      "blueprint": "EVERY 2:30 · 5 rounds",
+      "blueprint": "Each round",
       "rows": [
         {
           "primary": "800m",
@@ -36,7 +36,7 @@
       {
         "eyebrow": "WOD",
         "title": "Interval Metcon",
-        "blueprint": "EVERY 2:30 · 5 rounds",
+        "blueprint": "Each round",
         "rows": [
           {
             "primary": "800m",
@@ -102,7 +102,7 @@
       {
         "kind": "block",
         "label": "",
-        "cap": "EVERY 2:30 · 5 rounds"
+        "cap": "Each round"
       },
       {
         "kind": "line",
@@ -127,7 +127,7 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "EVERY 2:30 · 5 rounds"
+          "cap": "Each round"
         },
         {
           "kind": "line",
