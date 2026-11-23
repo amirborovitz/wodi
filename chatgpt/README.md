@@ -3,11 +3,11 @@
 Website: https://www.wodi.fit
 MCP endpoint: https://wodi-chatgpt-ykhzfuxbnq-uc.a.run.app/mcp
 
-The service extends the November 17 stateless demo, retains its three history tools, replaces fictional data with Firebase, and adds log_workout, generate_poster, and get_poster.
+Lives in the Wodi app repo (wodboard/chatgpt) and imports the app's live code — nothing is copied. Tools: read_board, answer_board, save_board (logging), generate_poster, get_poster (posters), and workout_history, movement_history, personal_records (history).
 
 ## Workout and poster workflow
 
-log_workout accepts Wodi's ParsedWorkout and matching StoryExerciseResult[] plus a timezone-qualified trained_at and a retry-safe request_id. It calls the existing buildSavedWorkoutTotals. A Firestore transaction saves the workout, updates counters once, and saves PR events using Wodi's existing detector. is_test suppresses counter/PR changes. The full schema is advertised directly in tools/list and at wodi://logging-schema. Retry uncertain saves with identical input and request_id. If generation fails after a save, retry generation against the existing workout_id.
+Logging is Wodi's own conversation, never a shape ChatGPT writes. read_board sends the board's words verbatim to the app's reader (parseWorkoutSession; needs OPENAI_API_KEY) and returns Wodi's first question; the draft lives in chatgptDrafts (server-only, 24 h). answer_board takes the athlete's words per question — read by the app (readAnswerLocally) and applied by the shared engine (src/components/tellWodi/chatSession.ts). save_board refuses while Wodi has a question, then builds the workout with the app's buildSavedWorkoutTotals + buildWorkoutDocument, dated now unless the athlete named a day. A Firestore transaction saves it, updates counters once and saves PR events; is_test suppresses counters/PRs. Retry uncertain saves with the same request_id. If generation fails after a save, retry generation against the existing workout_id. The logic without Firestore is chatgpt/src/boardFlow.ts, tested on a real board in test/boardFlow.test.ts.
 
 generate_poster runs the original usePosterPayload -> useCelebrationData -> PosterCard pipeline in isolated Chromium. It renders every multipart page, uses bundled fonts and the owner's weight, and supports all 11 current skins, including the original nine. Photo overlays are omitted; arbitrary browser network fetches are blocked. Text stickers remain. Print dates use UTC; supply sourceDate for an explicit local training calendar date.
 
@@ -48,7 +48,16 @@ Protected-resource discovery: /.well-known/oauth-protected-resource/mcp and the 
 Support, privacy and terms: /support, /privacy, /terms.
 Use /support or the root page for external availability checks; Google Frontend intercepts /healthz on this deployment.
 
-Build the container from the repository root using chatgpt/Dockerfile. Future updates can use Cloud Build/Artifact Registry and Cloud Run with the same service account/environment. Preserve the issuer URL and signing material. Main Wodi Hosting and existing Firebase Functions need no deployment changes.
+Build the container from the **wodboard repository root** (not chatgpt/) using chatgpt/Dockerfile — the root `.dockerignore` keeps every `.env` and service-account key out of the image. Future updates can use Cloud Build/Artifact Registry and Cloud Run with the same service account/environment. Preserve the issuer URL and signing material. Main Wodi Hosting and existing Firebase Functions need no deployment changes.
+
+**New since the board-reader rebuild:** the service needs `OPENAI_API_KEY` (the app's board reader runs on the server). Give it as a Secret Manager secret, for example `--set-secrets OPENAI_API_KEY=<secret-name>:latest` on `gcloud run deploy`; never as a plain env var or in the image. The server refuses to start without it.
+
+    # from the wodboard repo root — IMAGE is your Artifact Registry path for wodi-chatgpt
+    docker build -f chatgpt/Dockerfile -t IMAGE .
+    docker push IMAGE
+    gcloud run deploy wodi-chatgpt --image IMAGE --region us-central1 \
+      --set-secrets OPENAI_API_KEY=<secret-name>:latest
+    # keep the service's existing env vars, service account and region as they are today
 
 ## Build and test
 

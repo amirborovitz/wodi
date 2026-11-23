@@ -70,9 +70,9 @@
             },
             {
               "description": "Log completed training and display its poster",
-              "prompt": "Log a test workout for November 22, 2026 at 10:00 Israel time: Back Squat, three sets of five, all completed at 80 kg. Make its Sun poster.",
-              "tools_triggered": "log_workout, generate_poster, get_poster",
-              "expected_behavior": "Save one test workout, generate the original Sun skin, and display the poster inline. Repeating a failed request with its existing request_id must not duplicate the workout."
+              "prompt": "Log a test workout: Back Squat, 3 x 5. I did all sets at 80 kg. Make its Sun poster.",
+              "tools_triggered": "read_board, answer_board, save_board, generate_poster, get_poster",
+              "expected_behavior": "Send the board words to Wodi, relay Wodi's question about the squat weight, answer with the athlete's words, save one test workout once Wodi is done, generate the Sun skin, and display the poster inline. Repeating a failed save with its existing request_id must not duplicate the workout."
             },
             {
               "description": "Change a poster skin without logging again",
