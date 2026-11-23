@@ -1,7 +1,7 @@
 {
   "name": "wodi",
   "short_name": "wodi",
-  "description": "Log the workout. Keep the poster.",
+  "description": "Snap the board. Keep the poster.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

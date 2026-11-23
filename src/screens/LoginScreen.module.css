@@ -6,8 +6,9 @@
   --poster-cream: #efe8d8;
   --poster-navy: #1b2a4a;
 
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: calc(100vh - 44px);
+  /* Leaves the top of "How it works" showing, so it is clear there is more below. */
+  min-height: calc(100dvh - 44px);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -426,4 +427,121 @@
 .textLink:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* ─── What Wodi is (below the ways in) ───────────────────────────── */
+
+.page {
+  background: var(--wodi-bg);
+  color: var(--wodi-white);
+  font-family: var(--font-body);
+}
+
+.about {
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 16px 20px max(40px, calc(var(--safe-bottom) + 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--wodi-dim);
+  font: 500 12px/1 var(--font-mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.blockLead {
+  margin: 0;
+  color: #b4b4ae;
+  font: 500 17px/1.4 var(--font-body);
+}
+
+.steps,
+.cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.steps {
+  gap: 24px;
+}
+
+.cards {
+  gap: 12px;
+}
+
+.step {
+  display: flex;
+  gap: 16px;
+}
+
+.stepNumber {
+  flex-shrink: 0;
+  width: 40px;
+  color: var(--wodi-yellow);
+  font: 900 32px/0.9 var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+.card {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--wodi-line2);
+  background: var(--wodi-card);
+}
+
+.itemTitle {
+  margin: 0;
+  font: 800 17px/1.2 var(--font-body);
+}
+
+.itemBody {
+  margin: 8px 0 0;
+  color: #b4b4ae;
+  font: 500 15px/1.45 var(--font-body);
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.closer {
+  margin: 0;
+  font: 400 48px/0.92 var(--font-poster);
+  text-transform: uppercase;
+}
+
+.footerLinks {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font: 500 13px/1 var(--font-body);
+}
+
+.footerLinks a {
+  color: #c9c9c5;
+}
+
+.wordmark {
+  margin-right: auto;
+  font: 900 24px/1 var(--font-display);
+  letter-spacing: -0.02em;
 }
