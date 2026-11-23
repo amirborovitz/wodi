@@ -5,7 +5,7 @@
       {
         "eyebrow": "WOD",
         "title": "Double Unders",
-        "blueprint": "EMOM 8 MIN · 8 rounds",
+        "blueprint": "Each round",
         "rows": [
           {
             "primary": "Max",
@@ -134,7 +134,7 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "EMOM 8 MIN · 8 rounds"
+          "cap": "Each round"
         },
         {
           "kind": "line",

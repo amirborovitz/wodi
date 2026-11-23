@@ -1,0 +1,101 @@
+{
+  "name": "real-every-3min-nested-rounds-20261119",
+  "description": "Real doc 2FbfBeuiVLiEGSw15JUp. A: deadlift 4x3 with LU raises between sets. B: every 3:00 x 4 — 200m run, then 2 rounds of 5 T&G power cleans + 5 burpees (recipe folds it to 10, recipeFold 2). The metcon must say the format once and show '2 rounds' the way the board wrote it.",
+  "workout": {
+    "date": "2026-11-22T10:53:41.720Z",
+    "sourceDate": "2026-11-19",
+    "title": "Every 03:00 x 4 Rounds",
+    "type": "emom",
+    "format": "emom",
+    "partnerWorkout": false,
+    "partnerFactor": 1,
+    "duration": 12,
+    "durationSeconds": 720,
+    "timeCap": null,
+    "sets": 4,
+    "intervalTime": 180,
+    "difficultyLevel": 7,
+    "workloadBreakdown": {
+      "grandTotalDistance": 2400,
+      "movements": [
+        { "name": "Touch-and-Go Power Clean", "exerciseIndex": 1, "totalReps": 40, "weight": 45, "unit": "kg", "color": "yellow" },
+        { "name": "Burpee", "exerciseIndex": 1, "totalReps": 40, "color": "magenta" },
+        { "name": "LU Raise", "exerciseIndex": 0, "totalReps": 30, "color": "magenta" },
+        { "name": "Deadlift", "exerciseIndex": 0, "totalReps": 12, "weight": 90, "weightProgression": [90, 120], "unit": "kg", "color": "yellow" },
+        { "name": "Echo Bike", "exerciseIndex": 1, "totalDistance": 2400, "unit": "m", "wasSubstituted": true, "originalMovement": "Run", "color": "magenta" }
+      ],
+      "grandTotalVolume": 2880,
+      "grandTotalReps": 122
+    },
+    "rawText": "19/11/26\nA. STRENGTH (Hinge)\nDeadlift\n4 sets x 3 reps @85+%\nAs singles (not Touch & Go)\n\nIn between, 3 sets of:\n10 “LU” raises\n\nB. METCON (Intervals)\nEvery 03:00 min x 4 rounds:\n200m run\nInto, 2 rounds:\n5 Touch-and-Go Power Clean\n5 Burpee\n\n< WEIGHT: 40/60kg >\n* Aim for 45-60 sec rest\n** Two heats, 01:00 minute apart",
+    "exercises": [
+      {
+        "id": "exercise-0",
+        "name": "Deadlift 4x3",
+        "type": "strength",
+        "prescription": "Deadlift\n4 sets x 3 reps @85+%\nAs singles (not Touch & Go)\n\nIn between, 3 sets of:\n10 “LU” raises",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 13, "weight": 90 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 13 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 13 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 13, "weight": 120 }
+        ],
+        "movements": [
+          { "name": "Deadlift", "equipment": "barbell", "implementCount": 1, "recipePath": "0.0", "scoreEntryMode": "per_round", "reps": 3, "inputType": "weight", "loadUnit": "kg", "loggedWeights": [90, 120] },
+          { "name": "LU Raise", "equipment": "none", "implementCount": 1, "recipePath": "1.0", "scoreEntryMode": "per_round", "reps": 10, "inputType": "none", "isBodyweight": true }
+        ],
+        "sections": [
+          {
+            "sectionType": "rounds",
+            "rounds": 4,
+            "movements": [
+              { "name": "Deadlift", "equipment": "barbell", "implementCount": 1, "recipePath": "0.0", "scoreEntryMode": "per_round", "reps": 3, "inputType": "weight", "loadUnit": "kg", "loggedWeights": [90, 120] }
+            ]
+          },
+          {
+            "sectionType": "rounds",
+            "rounds": 3,
+            "movements": [
+              { "name": "LU Raise", "equipment": "none", "implementCount": 1, "recipePath": "1.0", "scoreEntryMode": "per_round", "reps": 10, "inputType": "none", "isBodyweight": true }
+            ],
+            "label": "In between"
+          }
+        ],
+        "rounds": 4,
+        "rawText": "19/11/26\nA. STRENGTH (Hinge)\nDeadlift\n4 sets x 3 reps @85+%\nAs singles (not Touch & Go)\n\nIn between, 3 sets of:\n10 “LU” raises",
+        "partKind": "strength",
+        "loggingMode": "strength",
+        "partnerWorkout": false
+      },
+      {
+        "id": "exercise-1",
+        "name": "Every 03:00 x 4 Rounds",
+        "type": "wod",
+        "prescription": "Every 03:00 min x 4 rounds:\n200m run\nInto, 2 rounds:\n5 Touch-and-Go Power Clean\n5 Burpee\n\n< WEIGHT: 40/60kg >\n* Aim for 45-60 sec rest\n** Two heats, 01:00 minute apart",
+        "sets": [
+          { "id": "set-0", "setNumber": 1, "completed": true, "actualReps": 20, "weight": 45 },
+          { "id": "set-1", "setNumber": 2, "completed": true, "actualReps": 20, "weight": 45 },
+          { "id": "set-2", "setNumber": 3, "completed": true, "actualReps": 20, "weight": 45 },
+          { "id": "set-3", "setNumber": 4, "completed": true, "actualReps": 20, "weight": 45 }
+        ],
+        "movements": [
+          {
+            "name": "Echo Bike", "equipment": "none", "implementCount": 1, "recipePath": "0", "scoreEntryMode": "per_round", "distance": 600, "unit": "m", "inputType": "distance", "isBodyweight": true,
+            "substitution": { "originalName": "Run", "selectedName": "Echo Bike", "substitutionType": "equivalent", "distanceMultiplier": 3, "originalValue": 200, "adjustedValue": 600, "targetUnit": "distance", "originalPrescription": { "distance": 200 } },
+            "calories": 0, "reps": 0
+          },
+          { "name": "Touch-and-Go Power Clean", "equipment": "barbell", "implementCount": 1, "recipePath": "1.0", "recipeFold": 2, "scoreEntryMode": "per_round", "reps": 10, "rxWeights": { "male": 60, "female": 40, "unit": "kg" }, "inputType": "weight", "loggedWeights": [45] },
+          { "name": "Burpee", "equipment": "none", "implementCount": 1, "recipePath": "1.1", "recipeFold": 2, "scoreEntryMode": "per_round", "reps": 10, "inputType": "none", "isBodyweight": true }
+        ],
+        "rounds": 4,
+        "rawText": "B. METCON (Intervals)\nEvery 03:00 min x 4 rounds:\n200m run\nInto, 2 rounds:\n5 Touch-and-Go Power Clean\n5 Burpee\n\n< WEIGHT: 40/60kg >\n* Aim for 45-60 sec rest\n** Two heats, 01:00 minute apart",
+        "partKind": "metcon",
+        "loggingMode": "emom",
+        "partnerWorkout": false,
+        "intervalCount": 4,
+        "workDuration": 720,
+        "intervalSeconds": 180
+      }
+    ]
+  }
+}

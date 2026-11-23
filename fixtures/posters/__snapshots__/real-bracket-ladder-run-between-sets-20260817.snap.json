@@ -208,6 +208,11 @@
       ],
       [
         {
+          "kind": "block",
+          "label": "",
+          "cap": "[14-12-10-8-6-4] for time (15 MIN CAP)"
+        },
+        {
           "kind": "line",
           "rx": "14-12-10-8-6-4 Front Squats + Burpees",
           "load": "",

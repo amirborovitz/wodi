@@ -3,7 +3,7 @@
     {
       "eyebrow": "WOD",
       "title": "Every 3:15 min x 10",
-      "blueprint": "EVERY 3:15 · 10 rounds",
+      "blueprint": "Each round",
       "rows": [
         {
           "primary": "1000m",
@@ -46,7 +46,7 @@
       {
         "eyebrow": "WOD",
         "title": "Every 3:15 min x 10",
-        "blueprint": "EVERY 3:15 · 10 rounds",
+        "blueprint": "Each round",
         "rows": [
           {
             "primary": "1000m",
@@ -127,7 +127,7 @@
       {
         "kind": "block",
         "label": "",
-        "cap": "EVERY 3:15 · 10 rounds"
+        "cap": "Each round"
       },
       {
         "kind": "line",
@@ -159,7 +159,7 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "EVERY 3:15 · 10 rounds"
+          "cap": "Each round"
         },
         {
           "kind": "line",

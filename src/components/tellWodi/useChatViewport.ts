@@ -8,9 +8,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
  *  - Wodi's own new messages move the view only when you'd otherwise miss them: on opening the
  *    chat, and when you've read to the end and the next message lands below the fold — then it
  *    comes up to the top. Mid-read, or scrolled back into history, the view stays where you are;
- *  - a question waiting for your tap (chips, a pick, a card) is never left below the fold: the
- *    turn scrolls up just far enough to show it whole — a tall board photo at the top of the turn
- *    otherwise pushes the buttons off the screen and nothing says Wodi is waiting on you;
+ *  - what you're waiting on is never left below the fold — a question waiting for your tap
+ *    (chips, a pick, a card), or Wodi's "typing" / "Reading the board…" bubble: the turn scrolls
+ *    up just far enough to show it whole. A tall board photo at the top of the turn otherwise
+ *    pushes it off the screen and nothing says Wodi is working or waiting on you. Within a turn
+ *    the view only moves forward, so the bubble giving way to the reply never jumps back up;
  *  - a spacer under the thread lets a short turn sit at the top of a tall screen, the room the
  *    reply is about to fill;
  *  - the screen is the VISIBLE viewport, so the composer rides on top of the keyboard instead of
@@ -31,6 +33,9 @@ export interface ChatViewport {
 
 /** Each message row carries its id here, so the thread can bring that row to the top. */
 export const CHAT_MESSAGE_ATTR = 'data-chat-message';
+
+/** The id the "Wodi is typing" row carries under CHAT_MESSAGE_ATTR. */
+export const TYPING_ROW_ID = 'typing';
 
 /** Within this many pixels of the end counts as "read to the end". */
 const END_SLACK = 48;
@@ -54,7 +59,10 @@ const roomOf = (el: HTMLDivElement): number => {
   return el.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
 };
 
-export function useChatViewport(messages: readonly ViewportMessage[]): ChatViewport {
+/**
+ * @param typing Wodi's typing / "Reading the board…" row is showing — it must be on screen.
+ */
+export function useChatViewport(messages: readonly ViewportMessage[], typing: boolean): ChatViewport {
   const threadRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const spacerRef = useRef<HTMLDivElement | null>(null);
@@ -66,10 +74,12 @@ export function useChatViewport(messages: readonly ViewportMessage[]): ChatViewp
   /** Where the last programmatic scroll put the thread, to tell our scrolls from theirs. */
   const placedAtRef = useRef<number | null>(null);
   const seenRef = useRef<Set<string>>(new Set());
-  /** The newest message, when it's a question waiting for the athlete — it must be on screen. */
+  /** The row the athlete is waiting on — Wodi typing, or the newest question — it must be on screen. */
   const awaitingRef = useRef<string | null>(null);
   const newest = messages.length > 0 ? messages[messages.length - 1] : undefined;
-  awaitingRef.current = newest && awaitsAnswer(newest) ? newest.id : null;
+  awaitingRef.current = typing ? TYPING_ROW_ID : newest && awaitsAnswer(newest) ? newest.id : null;
+  /** How far past the anchor this turn has already scrolled — the view never goes back up within a turn. */
+  const revealedRef = useRef(0);
 
   /** A message's top and bottom, measured from the top of the content. */
   const offsetOf = useCallback((id: string | null): { top: number; bottom: number } | null => {
@@ -105,7 +115,8 @@ export function useChatViewport(messages: readonly ViewportMessage[]): ChatViewp
     // then scroll up just far enough to show it whole (or its start, if it's taller than the screen).
     const waiting = offsetOf(awaitingRef.current);
     const reveal = waiting && waiting.top >= top ? Math.min(waiting.top, waiting.bottom - roomOf(el)) : top;
-    el.scrollTop = Math.max(top, reveal);
+    revealedRef.current = Math.max(revealedRef.current, reveal - top);
+    el.scrollTop = top + revealedRef.current;
     placedAtRef.current = el.scrollTop;
   }, [anchorTop, fitSpacer, offsetOf]);
 
@@ -138,7 +149,10 @@ export function useChatViewport(messages: readonly ViewportMessage[]): ChatViewp
     // A question for the athlete always comes into view — Wodi is waiting on a tap. It keeps the
     // turn's top; placeAnchor scrolls on from there just far enough to show it.
     const asks = added.some((m) => m.id === awaitingRef.current);
-    if (move) anchorRef.current = (mine ?? added[0]).id;
+    if (move) {
+      anchorRef.current = (mine ?? added[0]).id;
+      revealedRef.current = 0;
+    }
     if (move || asks) {
       heldRef.current = true;
       placeAnchor();

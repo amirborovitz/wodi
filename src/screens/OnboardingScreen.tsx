@@ -18,7 +18,7 @@ const LAST_STEP: Step = 4;
 // Wodi's hello — its four jobs in its own voice: cheers, posters, remembers, asks.
 const HELLO_LINES = [
   "Hey! I'm Wodi 👋",
-  'Your personal assistant for workouts. Send me the board, tell me how it went, and I log it and make your poster.',
+  'Your CrossFit training buddy. Send me the board, tell me how it went, and I keep it and make your poster.',
   'Ask me anything about your training: your last weights, your PRs, how to pace today.',
   'First up — what should I call you?',
 ] as const;

@@ -5,7 +5,7 @@
       {
         "eyebrow": "WOD",
         "title": "Every 1:30 min x 8 sets",
-        "blueprint": "EVERY 1:30 · 8 rounds",
+        "blueprint": "Each round",
         "rows": [
           {
             "primary": "2",
@@ -182,7 +182,7 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "EVERY 1:30 · 8 rounds"
+          "cap": "Each round"
         },
         {
           "kind": "line",
@@ -228,11 +228,6 @@
         }
       ],
       [
-        {
-          "kind": "block",
-          "label": "2 SETS:",
-          "cap": ""
-        },
         {
           "kind": "line",
           "rx": "2 sets:",

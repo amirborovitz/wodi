@@ -205,7 +205,7 @@
       [
         {
           "kind": "block",
-          "label": "METCON LONG FOR TIME",
+          "label": "",
           "cap": "For time (30 MIN CAP)"
         },
         {

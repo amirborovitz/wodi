@@ -95,21 +95,6 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.navTitle {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: rgba(243, 241, 234, 0.6);
-  text-transform: uppercase;
-  text-align: center;
-  flex: 1;
-  padding: 0 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .navSpacer {
   width: 36px;
 }

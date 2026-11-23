@@ -14,8 +14,7 @@
             "subNote": "8 total",
             "mineKey": "Push Press",
             "mineOverride": "50→65kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           },
           {
             "primary": "4 × 2",
@@ -24,8 +23,7 @@
             "subNote": "8 total",
             "mineKey": "Push Jerk",
             "mineOverride": "65→80kg",
-            "accent": "yellow",
-            "repeatCount": 4
+            "accent": "yellow"
           }
         ],
         "hiddenCount": 0,

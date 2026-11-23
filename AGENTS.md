@@ -1,5 +1,7 @@
 # Wodi Project Instructions
 
+> **Before anything else, read the shared handoff:** `C:\Users\aboro\.claude\projects\C--Users-aboro-OneDrive-Documents-myapps-wodboard\memory\handoff.md` — where the last session stopped. Update it after each finished step and before stopping (the laptop crashes on sleep). One file, shared with the ChatGPT plugin folder (`../wodi-chatgpt-plugin`); never start a second one.
+
 Before changing UI, read the Wodi design system:
 
 - `memory/wodi-design-system.html` is the authoritative handoff.

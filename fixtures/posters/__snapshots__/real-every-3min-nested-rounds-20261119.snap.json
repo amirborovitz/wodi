@@ -1,0 +1,232 @@
+{
+  "reward": null,
+  "pages": [
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Deadlift 4x3",
+        "blueprint": "7 sets",
+        "rows": [
+          {
+            "primary": "4 × 3",
+            "name": "Deadlift",
+            "totalNote": "12 total",
+            "subNote": "12 total",
+            "mineKey": "Deadlift",
+            "mineOverride": "90→120kg",
+            "accent": "yellow"
+          },
+          {
+            "primary": "3 × 10",
+            "name": "LU Raise",
+            "totalNote": "30 total",
+            "subNote": "30 total",
+            "mineKey": "LU Raise",
+            "accent": "yellow"
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ],
+    [
+      {
+        "eyebrow": "WOD",
+        "title": "Every 03:00 x 4 Rounds",
+        "blueprint": "Each round",
+        "rows": [
+          {
+            "primary": "4×",
+            "name": "Echo Bike",
+            "nameWithLoad": "600m Echo Bike",
+            "subNote": "2.40 km total",
+            "totalNote": "2.40 km total",
+            "mineKey": "Run",
+            "substitutedFrom": "Run",
+            "accent": "magenta",
+            "repeatCount": 4
+          },
+          {
+            "primary": "5",
+            "name": "Touch-and-Go Power Cleans",
+            "nameWithLoad": "Touch-and-Go Power Cleans @ 45kg",
+            "loadNote": "45kg",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Touch-and-Go Power Clean",
+            "accent": "yellow",
+            "repeatCount": 8,
+            "nest": {
+              "times": 2,
+              "group": "1"
+            }
+          },
+          {
+            "primary": "5",
+            "name": "Burpees",
+            "subNote": "40 total",
+            "totalNote": "40 total",
+            "mineKey": "Burpee",
+            "accent": "magenta",
+            "repeatCount": 8,
+            "nest": {
+              "times": 2,
+              "group": "1"
+            }
+          }
+        ],
+        "hiddenCount": 0,
+        "isPartnerConfirmed": false
+      }
+    ]
+  ],
+  "hero": {
+    "value": "122",
+    "unit": "REPS",
+    "formatLine": "Strength + E3MOM × 4",
+    "storyLine": "40 touch-and-go power clean · 40 burpee · 30 lu raise · 12 deadlift · 2.4km echo bike",
+    "storyMovements": [
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "STRENGTH · DEADLIFT",
+        "sectionColor": "yellow"
+      },
+      {
+        "perRound": "",
+        "name": "Deadlift",
+        "total": "",
+        "color": "yellow",
+        "weightProgression": [
+          90,
+          120
+        ],
+        "unit": "kg",
+        "strengthTotalReps": 12
+      },
+      {
+        "perRound": "10",
+        "name": "LU Raise",
+        "total": "30 total",
+        "color": "magenta",
+        "unit": "kg"
+      },
+      {
+        "perRound": "",
+        "name": "",
+        "total": "",
+        "sectionHeader": "E3MOM × 4",
+        "sectionColor": "cyan"
+      },
+      {
+        "perRound": "600m",
+        "name": "Echo Bike",
+        "total": "2.4km total",
+        "color": "magenta"
+      },
+      {
+        "perRound": "10",
+        "name": "Touch-and-Go Power Clean",
+        "total": "40 total",
+        "color": "yellow",
+        "weight": 45,
+        "unit": "kg"
+      },
+      {
+        "perRound": "10",
+        "name": "Burpee",
+        "total": "40 total",
+        "color": "magenta",
+        "unit": "kg"
+      }
+    ],
+    "accentClass": "accentMagenta"
+  },
+  "resultLabel": "TOTAL REPS",
+  "resultValue": "122",
+  "posterRows": {
+    "reward": null,
+    "pages": [
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "7 sets"
+        },
+        {
+          "kind": "line",
+          "rx": "4 × 3 Deadlift",
+          "load": "",
+          "mine": "90→120kg",
+          "team": "",
+          "total": "12 total"
+        },
+        {
+          "kind": "line",
+          "rx": "3 × 10 LU Raise",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "30 total"
+        }
+      ],
+      [
+        {
+          "kind": "block",
+          "label": "",
+          "cap": "Each round"
+        },
+        {
+          "kind": "line",
+          "rx": "600m Echo Bike",
+          "swapFrom": "Run",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "2.40 km total"
+        },
+        {
+          "kind": "block",
+          "label": "2 ROUNDS",
+          "cap": ""
+        },
+        {
+          "kind": "line",
+          "rx": "5 Touch-and-Go Power Cleans",
+          "load": "",
+          "mine": "45kg",
+          "team": "",
+          "total": "40 total"
+        },
+        {
+          "kind": "line",
+          "rx": "5 Burpees",
+          "load": "",
+          "mine": "",
+          "team": "",
+          "total": "40 total"
+        }
+      ]
+    ]
+  },
+  "partnerSubs": {
+    "reward": null,
+    "pages": [
+      null,
+      null
+    ]
+  },
+  "pageRepsSchemes": [
+    null,
+    null
+  ],
+  "pageMaxPractices": [
+    false,
+    false
+  ],
+  "pageTypes": [
+    "STRENGTH",
+    "EMOM"
+  ]
+}

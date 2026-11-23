@@ -3,7 +3,7 @@
     {
       "eyebrow": "WOD",
       "title": "Every 3:00 min x 5",
-      "blueprint": "EVERY 3 MIN · 5 rounds",
+      "blueprint": "Each round",
       "rows": [
         {
           "primary": "200m",
@@ -44,7 +44,7 @@
       {
         "eyebrow": "WOD",
         "title": "Every 3:00 min x 5",
-        "blueprint": "EVERY 3 MIN · 5 rounds",
+        "blueprint": "Each round",
         "rows": [
           {
             "primary": "200m",
@@ -120,7 +120,7 @@
       {
         "kind": "block",
         "label": "",
-        "cap": "EVERY 3 MIN · 5 rounds"
+        "cap": "Each round"
       },
       {
         "kind": "line",
@@ -152,7 +152,7 @@
         {
           "kind": "block",
           "label": "",
-          "cap": "EVERY 3 MIN · 5 rounds"
+          "cap": "Each round"
         },
         {
           "kind": "line",
