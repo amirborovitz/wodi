@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ChatMessage, TellWodiChat as TellWodiChatState } from './useTellWodiChat';
-import { CHAT_MESSAGE_ATTR, useChatViewport } from './useChatViewport';
+import { CHAT_MESSAGE_ATTR, TYPING_ROW_ID, useChatViewport } from './useChatViewport';
 import { Receipts, ThreadHistory } from './ThreadHistory';
 import { ChatPanelCard } from './ChatPanelCard';
 import { ChatPoster } from './ChatPoster';
@@ -55,7 +55,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
   // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
   // Everything then lands in one step — no opener swapped out, no history pushing it down.
   const warming = !thread.ready || messages.length === 0;
-  const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(messages);
+  const typing = busy === 'reading-board' || busy === 'thinking' || warming;
+  const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(messages, typing);
 
   const canSend = draft.trim().length > 0 && busy !== 'saving';
   const submit = (): void => {
@@ -221,8 +222,8 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
               )}
             </motion.div>
           ))}
-          {(busy === 'reading-board' || busy === 'thinking' || warming) && (
-            <motion.div key="typing" className={styles.rowWodi} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          {typing && (
+            <motion.div key="typing" className={styles.rowWodi} {...{ [CHAT_MESSAGE_ATTR]: TYPING_ROW_ID }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className={styles.bubbleWodi} aria-live="polite">
                 {typingLabel ? (
                   <p className={styles.text}>{typingLabel}</p>
