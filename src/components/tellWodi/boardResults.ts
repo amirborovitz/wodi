@@ -1,7 +1,7 @@
 import type { ExerciseLoggingMode, ParsedWorkout } from '../../types';
 import type { LoadUnit } from '../../utils/loadUnits';
 import { initStoryResults, type StoryExerciseResult } from '../logging/story/types';
-import { storyTeamSize } from '../logging/story/StoryLogResults';
+import { storyTeamSize } from '../logging/story/legacyResult';
 import { getExerciseLoggingMode } from '../../services/exerciseLoggingMode';
 
 /**

@@ -4,7 +4,7 @@ import { buildSavedExercises } from './buildSavedExercises';
 import { assignMovementColors } from './workloadCalculation';
 import { buildWorkloadBreakdownFromResults, type ExerciseResult } from './workloadFromResults';
 import { toLoggedJson } from './loggedRecord';
-import { toLegacyResult } from '../components/logging/story/StoryLogResults';
+import { toLegacyResult } from '../components/logging/story/legacyResult';
 import type { StoryExerciseResult } from '../components/logging/story/types';
 import { blockClockSeconds, intervalChainSeconds, trailingRestIsOccupied } from '../utils/blockClock';
 

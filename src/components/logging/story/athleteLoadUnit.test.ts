@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement, ParsedWorkout } from '../../../types';
 import { initStoryResults } from './types';
-import { toLegacyResult } from './StoryLogResults';
+import { toLegacyResult } from './legacyResult';
 import { setLoadUnit, unitToRemember, loadsWithoutUnit } from './athleteLoadUnit';
 import { buildSavedExercises } from '../../../services/buildSavedExercises';
 import { exerciseLoadUnit, knownLoadUnit, movementLoadUnit, rxLoadUnit } from '../../../utils/loadUnits';

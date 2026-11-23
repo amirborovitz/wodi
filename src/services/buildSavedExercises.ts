@@ -1,5 +1,5 @@
 import type { Exercise, ExerciseSet, ParsedMovement, MovementSubstitution } from '../types';
-import type { LegacyExerciseResult } from '../components/logging/story/StoryLogResults';
+import type { LegacyExerciseResult } from '../components/logging/story/legacyResult';
 import { getMovementKeys, movementLookup } from '../utils/movementKeys';
 import { resolveLoggedQuantity } from '../utils/tierScaling';
 import { openQuantitySlot, sectionRoundsCompleted } from './blockScore';
