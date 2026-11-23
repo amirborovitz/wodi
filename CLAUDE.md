@@ -14,6 +14,7 @@ WodBoard (codename **Wodi**) is a premium CrossFit workout logging app.
 
 ## Agent Operating Norms
 
+- **Handoff: read it first, keep it current.** `C:\Users\aboro\.claude\projects\C--Users-aboro-OneDrive-Documents-myapps-wodboard\memory\handoff.md` says where the last session stopped. Read it at session start; rewrite it after each finished step and before stopping — the laptop crashes on sleep, and anything not written there or on disk is lost. One file: edit it, never start a second one.
 - **Read the design system PDF** (`wodi · Design System.pdf`, project root) before any visual, layout, or component-design decision — not just the markdown summary.
 - **The user builds, deploys, and tests on production themselves.** Do not run `npm run build`, `npm run dev`, `firebase deploy`, or start dev servers unless explicitly asked. Do not block completion on "verify in browser" — finish the code change and let the user test it live.
 - **Never merge, and never commit, without being asked — `main` least of all.** On 2026-08-29 a branch was fast-forwarded onto `main` unasked; it carried a routing regression that broke EMOM logging for two days before the user found it in production. Committing when asked is fine. Merging to `main` is the user's decision, every time, and so is pushing. Do the work on a branch and say it is ready.
@@ -126,6 +127,14 @@ The recap is a **social artifact** — optimized for pride and shareability, not
 - Hero-result priority and per-format nuances live in `memory/project_hero_result_rules.md`. Poster snapshot harness: `npm run posters` (25 fixtures — extend when touching poster code; `posters:update` after an intentional change).
 
 ---
+
+## How Wodi Talks About Itself — never "log"
+
+Public address: **https://wodi.fit** (every canonical/og/sitemap URL uses it). Tagline: **"Your CrossFit training buddy."**
+
+**Never use "log", "logging", "logbook" or "tracker" in anything a person reads about Wodi** — page title, meta/og descriptions, the sign-in/landing page, manifest, store listings, onboarding, Wodi's own lines, marketing copy, button labels ("Get started", not "Start logging").
+**Why (owner, 2026-11-22):** "log sounds like old logging apps. We are looking for something different." Wodi is a buddy that reads your board, remembers, cheers and makes your poster — say what it *does* for you: *snap, reads, remembers, keeps, poster, buddy*.
+Code identifiers (`loggingMode`, `loggedTotals`, …) are not copy — don't rename them for this.
 
 ## Domain Rules (short — details in code/memory)
 
