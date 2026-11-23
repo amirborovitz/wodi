@@ -1,6 +1,6 @@
 import { analyzeExerciseMetric, getExerciseLoggingMode, type ExerciseInputType } from '../services/exerciseLoggingMode';
 import { reopenLogged } from '../services/loggedRecord';
-import { buildSavedWorkoutTotals, sessionPartnerScope } from '../services/savedWorkout';
+import { buildSavedWorkoutTotals, buildWorkoutDocument, sessionPartnerScope } from '../services/savedWorkout';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ActionMenuSheet, Button, Card } from '../components/ui';
@@ -1597,51 +1597,23 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
       // Asked of the session's workout id, never of `isEditingAfterSave` — see saveTarget.ts.
       const saveTarget = resolveSaveTarget(session?.id);
       const isUpdate = saveTarget.kind === 'update';
-      const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, effectiveDuration, durationMinutes, loggedJson } =
-        buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor, user?.sex);
+      const totals = buildSavedWorkoutTotals(parsedWorkout, results, partnerFactor, user?.sex);
+      const { exercises, breakdownFromResults, totalVolume, totalReps, totalDuration, durationMinutes } = totals;
       rememberWeightUnit(results);
       const workoutTitle = parsedWorkout.title || "Today's Workout";
 
       // A workout being re-saved — or an earlier log being replaced — keeps the day it was logged.
       const workoutDate = session?.date || new Date();
 
-      // Create workout document
+      // The one saved-workout shape (savedWorkout.ts) — the ChatGPT plugin writes the same.
       const workoutBase = {
-        userId: user.id,
-        date: workoutDate,
-        sourceDate: parsedWorkout.sourceDate,
-        title: workoutTitle,
-        type: parsedWorkout.type,
-        ...(parsedWorkout.stationRotation && { stationRotation: true }),
-        partnerWorkout: isPartnerWorkout,
-        partnerFactor,
-        ...(teamSize > 1 && { teamSize }),
-        workloadBreakdown: breakdownFromResults,
-        status: 'completed',
-        exercises,
-        duration: effectiveDuration > 0 ? Math.round(effectiveDuration / 60) : null,
-        durationSeconds: effectiveDuration > 0 ? effectiveDuration : null,
-        notes: null,
-        rawText: parsedWorkout.rawText?.trim() || null,
-        // What was logged, exactly — an edit reopens this, not a rebuild from the totals.
-        loggedJson,
-        ...(parsedWorkout.userContext && { userContext: parsedWorkout.userContext }),
-        // The cap is PRESCRIPTION — what the coach wrote. It must never be overwritten with
-        // effectiveDuration (what the athlete actually took): that is already persisted as
-        // duration/durationSeconds directly above, and stamping it here destroyed the board's
-        // own number — a "T.C - 34 MIN" board saved a 45-minute "cap" equal to the logged time,
-        // leaving nothing downstream able to tell a cap from a result.
-        timeCap: parsedWorkout.timeCap || null,
-        format: parsedWorkout.format || null,
-        // Carried purely so re-opening this workout in the wizard reproduces the parse it was
-        // logged from — nothing displays them. See workoutToParsedWorkout.
-        ...(parsedWorkout.containerRounds != null && { containerRounds: parsedWorkout.containerRounds }),
-        ...(parsedWorkout.sets != null && { sets: parsedWorkout.sets }),
-        ...(parsedWorkout.intervalTime != null && { intervalTime: parsedWorkout.intervalTime }),
-        ...(parsedWorkout.difficultyLevel && { difficultyLevel: parsedWorkout.difficultyLevel }),
-        ...(isTestWorkout && { isTest: true }),
-        ...(chatVibeRef.current && { posterVibe: chatVibeRef.current }),
-        ...(chatThreadRef.current && { chat: chatThreadRef.current }),
+        ...buildWorkoutDocument(parsedWorkout, totals, { isPartnerWorkout, teamSize, partnerFactor }, {
+          userId: user.id,
+          date: workoutDate,
+          isTest: isTestWorkout,
+          posterVibe: chatVibeRef.current,
+          chat: chatThreadRef.current,
+        }),
         updatedAt: serverTimestamp(),
       };
 
