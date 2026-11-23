@@ -144,7 +144,7 @@ export function WeekMasthead({
           )}
           <span style={{ position: 'relative' }}>{weekNo}</span>
         </span>
-        <span style={{ fontFamily: fM, fontSize: 30, letterSpacing: '0.14em', color: dim }}>{dates}</span>
+        <span style={{ fontFamily: fM, fontWeight: 500, fontSize: 30, letterSpacing: '0.14em', color: dim }}>{dates}</span>
       </div>
     </div>
   );
@@ -194,7 +194,7 @@ export function WeekLiftBlock({ lifts, ink, dim, accent, rule, prFill, prColor, 
                 <span style={{ position: 'absolute', left: -10, right: -10, top: -8, bottom: 6, background: plate, mixBlendMode: 'multiply', transform: 'rotate(-0.7deg)' }} />
               )}
               <span style={{ position: 'relative', fontFamily: fD, fontWeight: 900, fontSize: 96, lineHeight: 1, color: l.pr ? accent : ink }}>{l.kg}</span>
-              <span style={{ position: 'relative', fontFamily: fB, fontWeight: 800, fontSize: 26, letterSpacing: '0.14em', color: dim }}>KG</span>
+              <span style={{ position: 'relative', fontFamily: fB, fontWeight: 800, fontSize: 40, letterSpacing: '0.14em', color: dim }}>KG</span>
             </span>
           </div>
         </div>
@@ -367,7 +367,7 @@ export function WeekMoveList({ moves, ink, dim, accent, rule, inkSoft }: WeekMov
           }}
         >
           {opensGroup && (
-            <div style={{ fontFamily: fM, fontSize: 22, letterSpacing: '0.18em', color: dim, marginBottom: 14 }}>
+            <div style={{ fontFamily: fB, fontWeight: 800, fontSize: 21, letterSpacing: '0.24em', color: dim, marginBottom: 14 }}>
               {m.weighted ? 'LIFTED' : 'BODYWEIGHT'} · REPS
             </div>
           )}
@@ -435,7 +435,7 @@ export function WeekTiles({ tiles, border, num, label, fill = 'transparent' }: W
               <React.Fragment key={p.unit}>
                 {i > 0 && <span style={{ fontFamily: fD, fontWeight: 700, fontSize: 64, lineHeight: 0.86, color: label, margin: '0 6px' }}>+</span>}
                 <span style={{ fontFamily: fD, fontWeight: 900, fontSize: 88, lineHeight: 0.86, color: num }}>{p.value}</span>
-                <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 27, letterSpacing: '0.14em', color: num }}>{p.unit}</span>
+                <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 36, letterSpacing: '0.14em', color: num }}>{p.unit}</span>
               </React.Fragment>
             ))}
           </div>
@@ -491,7 +491,7 @@ export function WeekFooter({ ep, border, epColor, epBorder, wordColor, dot = '#f
         <span style={{ fontFamily: fD, fontWeight: 900, fontSize: 58, lineHeight: 0.85, color: epColor }}>
           {ep.toLocaleString()}
         </span>
-        <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 23, letterSpacing: '0.18em', color: epColor, opacity: 0.75 }}>
+        <span style={{ fontFamily: fB, fontWeight: 800, fontSize: 26, letterSpacing: '0.18em', color: epColor }}>
           EP
         </span>
       </div>

@@ -14,7 +14,7 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 18px 16px 0;
+  padding: 10px 16px 0;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -105,16 +105,20 @@
   outline-offset: 3px;
 }
 
+/* The close button's own row, so it sits on the page instead of on the poster. */
+.topBar {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .closeBtn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 11;
   width: 32px;
   height: 32px;
   border-radius: 999px;
   border: none;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
@@ -126,7 +130,7 @@
 }
 
 .closeBtn:active {
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .closeBtn:focus-visible {

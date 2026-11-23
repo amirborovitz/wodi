@@ -107,6 +107,16 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
 
   return (
     <div className={styles.root}>
+      {/* Chrome above the poster, on the dark page — never over the artifact's own corner. */}
+      <div className={styles.topBar}>
+        <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close week recap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="18" y1="6" x2="6" y2="18" />
+          </svg>
+        </button>
+      </div>
+
       <div className={styles.stage} ref={stageRef}>
         <div
           className={styles.frame}
@@ -158,12 +168,6 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
         </div>
       )}
 
-      <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close week recap">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-          <line x1="6" y1="6" x2="18" y2="18" />
-          <line x1="18" y1="6" x2="6" y2="18" />
-        </svg>
-      </button>
 
       <div className={styles.shareBar}>
         <button
