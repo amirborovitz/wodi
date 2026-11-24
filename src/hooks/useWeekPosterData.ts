@@ -1,9 +1,8 @@
 /**
- * useWeekPosterData — RecapData → the one shape every week skin renders.
+ * useWeekPosterData — RecapData → the one shape the week poster renders.
  *
- * The skins are surfaces: they pick colour, texture and rhythm, never what the
- * week says. Every string and number a poster prints is decided here once, so
- * Slab and Hazard can't disagree about how many sessions there were.
+ * The poster is a surface: it picks colour, texture and rhythm, never what the
+ * week says. Every string and number it prints is decided here once.
  *
  * Same truth standard as the WOD poster: everything below is either a number the
  * athlete entered or one derived from those. A week with no logged durations,
@@ -13,7 +12,7 @@
 import { useMemo } from 'react';
 import type { RecapData, RecapEngineCell, RecapLift, RecapMoveStat } from './useRecapData';
 import { isLoadedImplement } from '../data/movementRegistry';
-import { bodyWorked, type BodyWorked } from '../data/bodyAreas';
+import { BODY_AREAS, bodyWorked, type BodyWorked } from '../data/bodyAreas';
 
 /** Rows in the body page's list — what fits under the figure. */
 const MAX_BODY_ROWS = 5;
@@ -65,9 +64,12 @@ export interface WeekPosterTile {
   source: string;
 }
 
+/** Which page of the week to draw: the work, or the body it worked. */
+export type WeekPage = 'week' | 'body';
+
 export interface WeekPosterData {
-  /** "THE WEEK" — the week's answer to FOR TIME, so the poster says what it is. */
-  tag: string;
+  /** The pages this week fills, in swipe order: the work always, the body when anything resolved to a body part. */
+  pages: WeekPage[];
   /** "WEEK 34" — set big, because it has to survive a story thumbnail. */
   weekNo: string;
   /** "AUG 17 — 23" — the quiet half of the masthead. */
@@ -103,6 +105,8 @@ export interface WeekPosterData {
   sessionCount: number;
   /** The body the week worked: the figure and its list, for the body page. Null when nothing resolved to a body part. */
   body: BodyWorked | null;
+  /** How many body parts the week trained — all of them, not just the rows the list has room for. */
+  partsWorked: number;
   /** The one handwritten line. Null when the week has nothing to brag with. */
   brag: string | null;
   ep: number;
@@ -229,8 +233,10 @@ export function buildWeekPosterData(data: RecapData): WeekPosterData {
       ? `${data.tonnage.toLocaleString()} kg — ${data.tonnageComp}`
       : (data.aerobic?.compare ?? null);
 
+  const body = bodyWorked(data.bodyAreas, MAX_BODY_ROWS);
+
   return {
-    tag: data.label,
+    pages: body ? ['week', 'body'] : ['week'],
     weekNo: data.period,
     dates: data.periodSub,
     hero: hero.value,
@@ -239,7 +245,8 @@ export function buildWeekPosterData(data: RecapData): WeekPosterData {
     moves,
     lifts: data.lifts,
     sessionCount: data.workouts,
-    body: bodyWorked(data.bodyAreas, MAX_BODY_ROWS),
+    body,
+    partsWorked: BODY_AREAS.filter((a) => data.bodyAreas[a] > 0).length,
     tiles,
     brag,
     ep: data.epTotal,

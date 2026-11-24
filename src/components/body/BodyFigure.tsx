@@ -103,13 +103,14 @@ interface BodyFigureProps {
   ramp: BodyRamp;
   /** FRONT / BACK under the figures. */
   labelFont: string;
+  labelWeight?: number;
   labelSize: number;
   labelColor: string;
 }
 
-export function BodyFigure({ sessions, height, ramp, labelFont, labelSize, labelColor }: BodyFigureProps): React.JSX.Element {
+export function BodyFigure({ sessions, height, ramp, labelFont, labelWeight = 400, labelSize, labelColor }: BodyFigureProps): React.JSX.Element {
   const width = (height * VIEW_W) / VIEW_H;
-  const labelStyle: React.CSSProperties = { fontFamily: labelFont, fontSize: labelSize, letterSpacing: '0.2em', color: labelColor, textAlign: 'center' };
+  const labelStyle: React.CSSProperties = { fontFamily: labelFont, fontWeight: labelWeight, fontSize: labelSize, letterSpacing: '0.2em', color: labelColor, textAlign: 'center' };
   return (
     <div style={{ width, flexShrink: 0 }}>
       <svg width={width} height={height} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="Body parts trained, front and back" style={{ display: 'block' }}>
@@ -129,6 +130,7 @@ export function BodyFigure({ sessions, height, ramp, labelFont, labelSize, label
 interface BodyTallyProps {
   rows: BodyTallyRow[];
   nameFont: string;
+  nameWeight?: number;
   nameSize: number;
   nameColor: string;
   /** One bar per session, up to three, in the figure's own ramp: a row's bars are the shade of its part. */
@@ -139,25 +141,43 @@ interface BodyTallyProps {
   gap: number;
   /** Names at the left edge, bars at the right — for a full-width list. */
   spread?: boolean;
+  /**
+   * Count each part out of this many sessions — one bar per session of the week, a
+   * part's own sessions filled. Without it, three bars filled to the part's level.
+   */
+  outOf?: number;
+  /** A divider under every row but the last, as a CSS border. */
+  rule?: string;
 }
 
 /** The trained parts, most sessions first, each with a bar per session. */
-export function BodyTally({ rows, nameFont, nameSize, nameColor, pipWidth, pipHeight, ramp, gap, spread = false }: BodyTallyProps): React.JSX.Element {
+export function BodyTally({
+  rows, nameFont, nameWeight = 800, nameSize, nameColor, pipWidth, pipHeight, ramp, gap, spread = false, outOf, rule,
+}: BodyTallyProps): React.JSX.Element {
   const pipGap = Math.max(2, Math.round(pipWidth / 5));
+  const bars = Array.from({ length: outOf ?? 3 }, (_, i) => i + 1);
+  // A ruled list puts its spacing inside the cells, so the rule runs unbroken under both columns.
+  const cell = (last: boolean): React.CSSProperties => (rule
+    ? { paddingBlock: gap / 2, borderBottom: last ? 'none' : rule, alignSelf: 'stretch', display: 'flex', alignItems: 'center' }
+    : {});
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: spread ? '1fr auto' : 'auto auto', columnGap: pipWidth * 0.7, rowGap: gap, alignItems: 'center', justifyContent: 'start' }}>
-      {rows.map((r) => (
-        <React.Fragment key={r.area}>
-          <span style={{ fontFamily: nameFont, fontWeight: 800, fontSize: nameSize, lineHeight: 1, textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
-            {r.label}
-          </span>
-          <span style={{ display: 'flex', gap: pipGap }}>
-            {[1, 2, 3].map((n) => (
-              <span key={n} style={{ width: pipWidth, height: pipHeight, borderRadius: Math.max(2, pipHeight / 3.5), background: ramp[n <= r.level ? r.level : 0] }} />
-            ))}
-          </span>
-        </React.Fragment>
-      ))}
+    <div style={{ display: 'grid', gridTemplateColumns: spread ? '1fr auto' : 'auto auto', rowGap: rule ? 0 : gap, alignItems: 'center', justifyContent: spread ? 'stretch' : 'start' }}>
+      {rows.map((r, i) => {
+        const last = i === rows.length - 1;
+        const filled = outOf != null ? r.sessions : r.level;
+        return (
+          <React.Fragment key={r.area}>
+            <span style={{ ...cell(last), fontFamily: nameFont, fontWeight: nameWeight, fontSize: nameSize, lineHeight: 1, textTransform: 'uppercase', color: nameColor, whiteSpace: 'nowrap' }}>
+              {r.label}
+            </span>
+            <span style={{ ...cell(last), paddingLeft: pipWidth * 0.7, gap: pipGap, display: 'flex' }}>
+              {bars.map((n) => (
+                <span key={n} style={{ width: pipWidth, height: pipHeight, borderRadius: Math.max(2, pipHeight / 3.5), background: ramp[n <= filled ? r.level : 0] }} />
+              ))}
+            </span>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
