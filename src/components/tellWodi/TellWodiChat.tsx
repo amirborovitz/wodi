@@ -52,11 +52,14 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
   // The board you still owe, one tap away however far the thread scrolls — not while this chat is on a board.
   const pinned = hasBoard ? null : thread.pinned;
   // Every change that adds height to the thread: a message, a chip row going away, "typing…".
-  // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing".
-  // Everything then lands in one step — no opener swapped out, no history pushing it down.
+  // Opening: until the thread's first read and Wodi's first line are both in, Wodi is "typing" and
+  // nothing else is drawn. Everything then lands in one step — no opener swapped out, and no
+  // history arriving late above a reopened board and shoving it down (on a cold first open the
+  // thread read takes a moment longer than the board). The viewport sees exactly what is drawn.
   const warming = !thread.ready || messages.length === 0;
+  const shown = warming ? [] : messages;
   const typing = busy === 'reading-board' || busy === 'thinking' || warming;
-  const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(messages, typing);
+  const { threadRef, contentRef, spacerRef, onThreadScroll, screenStyle } = useChatViewport(shown, typing);
 
   const canSend = draft.trim().length > 0 && busy !== 'saving';
   const submit = (): void => {
@@ -92,9 +95,9 @@ export function TellWodiChat({ chat, thread, onBack, onOpenWorkout, onCelebrate,
 
       <div className={styles.thread} ref={threadRef} onScroll={onThreadScroll}>
         <div className={styles.threadContent} ref={contentRef}>
-        {thread.ready && <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} />}
+        {!warming && <ThreadHistory thread={thread} onOpenWorkout={onOpenWorkout} />}
         <AnimatePresence initial={false}>
-          {messages.map((message) => (
+          {shown.map((message) => (
             <motion.div
               key={message.id}
               className={message.from === 'me' ? styles.rowMe : styles.rowWodi}

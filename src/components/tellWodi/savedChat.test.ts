@@ -46,25 +46,22 @@ describe('every saved board opens in the chat', () => {
     expect(resumeGreeting(false)).toBe('Picking up where we left off.');
   });
 
-  it('the reopened board is shown whole — every part and every movement, nothing cut', () => {
+  it('the reopened board is written once, as the board wrote it — every part, every line', () => {
+    const metcon = 'For time:\nA. 4 rounds:\n640/800m echo bike\n16 American Kettlebell Swing @12/20kg\n16 Box Jump\nB. 4 rounds:\n400m run\n16 Goblet Lunge @12/20kg\n16 Burpee';
     const preview = buildBoardPreview({
       title: 'SNATCH CLIMB',
       format: 'for_time',
       exercises: [
-        { name: 'Warm-up', prescription: '3 rounds', movements: [{ name: 'Row', calories: 10 }, { name: 'Air Squat', reps: 10 }] },
-        {
-          name: 'Metcon',
-          prescription: 'For time, 12 min cap',
-          movements: Array.from({ length: 7 }, (_, i) => ({ name: `Move ${i + 1}`, reps: 10 + i })),
-        },
+        { name: 'Warm-up', prescription: '3 rounds:\n10 cal Row\n10 Air Squat', movements: [{ name: 'Row', calories: 10 }, { name: 'Air Squat', reps: 10 }] },
+        { name: 'Metcon', prescription: `${metcon}\n`, movements: [{ name: 'Echo Bike', repsDisplay: '640/800' }] },
       ],
     } as unknown as ParsedWorkout);
     expect(preview.title).toBe('SNATCH CLIMB');
-    expect(preview.format).toBe('FOR TIME');
     expect(preview.parts.map((p) => p.name)).toEqual(['Warm-up', 'Metcon']);
-    expect(preview.parts[1].prescription).toBe('For time, 12 min cap');
-    expect(preview.parts[1].lines).toHaveLength(7);
-    expect(preview.parts[0].lines.map((l) => `${l.qty} ${l.name}`)).toEqual(['10 cal Row', '10 Air Squat']);
+    expect(preview.parts[0].text).toBe('3 rounds:\n10 cal Row\n10 Air Squat');
+    // Parts, rounds, both bike distances and the weights all survive, line breaks kept.
+    expect(preview.parts[1].text).toBe(metcon);
+    expect(Object.keys(preview.parts[1])).toEqual(['name', 'text']);
   });
 
   it('a one-part board is named by its title alone', () => {

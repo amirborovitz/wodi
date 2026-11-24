@@ -22,10 +22,18 @@
 
 /* ─── The poster fan ─────────────────────────────────────────────── */
 
+/* In the flow, above the content — never behind it. It takes the height the content leaves
+   (470px on a tall screen, down to 260px on a short phone, where the fade crops it), so the
+   headline and the buttons always sit below the posters. A shorter phone scrolls a little
+   rather than stacking the headline on the posters. The auto margin keeps it at the top when
+   the screen has room to spare. 440px is the content below it (about 496px tall) less the
+   56px it tucks under the fade. */
 .fan {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 470px;
+  position: relative;
+  flex: none;
+  width: 100%;
+  height: clamp(260px, calc(100dvh - 44px - 440px), 470px);
+  margin-bottom: auto;
   overflow: hidden;
   pointer-events: none;
   padding-top: var(--safe-top);
@@ -235,6 +243,8 @@
 .content {
   position: relative;
   z-index: 1;
+  /* The bottom of the fan's fade runs behind the brand row, as drawn. */
+  margin-top: -56px;
   width: 100%;
   max-width: 420px;
   box-sizing: border-box;
