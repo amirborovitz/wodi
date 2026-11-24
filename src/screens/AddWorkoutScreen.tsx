@@ -61,6 +61,7 @@ import { removeUndefined } from '../utils/firestoreUtils';
 import { buildLastMaxRepsMap } from '../utils/maxRepsHistory';
 import { WrapFlash } from '../components/logging/story/WrapFlash';
 import { backFromChat, backFromForm, type BackTarget } from './addWorkoutBack';
+import { isDegradedSavedParse, openingStep, savedBoardOpening } from './addWorkoutOpening';
 // BattleReport removed — recap goes straight to reward screen
 import styles from './AddWorkoutScreen.module.css';
 
@@ -450,7 +451,8 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
   // screen still needs it for is the EDIT path: re-saving a workout already marked as a test must
   // not feed its volume back into the counters it was taken out of, or rewrite PRs from it.
   const isTestWorkout = editWorkout?.isTest === true;
-  const [step, setStep] = useState<Step>(startInChat ? 'chat' : 'capture');
+  // Decided before the first paint: a saved board's first frame is its chat, never a flash of capture.
+  const [step, setStep] = useState<Step>(() => openingStep({ planned: plannedWorkout, startInChat }));
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -604,20 +606,17 @@ export function AddWorkoutScreen({ onBack, onLeaveBoard, onWorkoutCreated, onWor
 
       const stored = plannedWorkout.parsedWorkout;
       const raw = plannedWorkout.raw.trim();
-      // An exercise with loggingMode 'free' and no movements is the crash-path parse fallback
-      // frozen at save time (AI-chosen 'free' parts always list their movements). If the
-      // original text is still around, reparse it and heal the doc instead of replaying the
-      // degraded parse on every open.
-      const storedDegraded = stored
-        ? stored.exercises.some((exercise) => exercise.loggingMode === 'free' && !exercise.movements?.length)
-        : false;
+      // A degraded saved parse (the crash-path fallback frozen at save time) is read again from
+      // the original text and the doc healed, instead of replaying it on every open.
+      const storedDegraded = isDegradedSavedParse(plannedWorkout);
+      const opening = savedBoardOpening(plannedWorkout);
 
-      if (stored && (!storedDegraded || !raw)) {
+      if (opening === 'chat' && stored) {
         openInChat(stored);
         return;
       }
 
-      if (!raw) {
+      if (opening === 'capture') {
         setError('Saved WOD is missing its original text.');
         setStep('capture');
         return;
