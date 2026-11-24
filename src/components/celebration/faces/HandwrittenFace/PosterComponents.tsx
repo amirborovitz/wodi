@@ -619,6 +619,11 @@ interface WordmarkProps {
   size?: number | string;
 }
 
+/**
+ * The poster's signature, written as the address — "wodi.fit". Every shared poster is the
+ * way a stranger first meets Wodi, so the sign-off doubles as where to find it. The yellow
+ * dot stays the brand; "fit" follows it in the same ink.
+ */
 export function Wordmark({ color, dot = BRAND.yellow, size = 15 }: WordmarkProps): React.JSX.Element {
   return (
     <span
@@ -631,7 +636,7 @@ export function Wordmark({ color, dot = BRAND.yellow, size = 15 }: WordmarkProps
         lineHeight: 1,
       }}
     >
-      wodi<span style={{ color: dot }}>.</span>
+      wodi<span style={{ color: dot }}>.</span>fit
     </span>
   );
 }

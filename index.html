@@ -2,6 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Wodi's home is wodi.fit. The two Firebase addresses serve the very same files, so
+         anyone (or any search engine) arriving there is sent across, path and all, before
+         the app starts. Sign-in's own pages under /__/ are Firebase's, not this file. -->
+    <script>
+      if (/(^|\.)(web\.app|firebaseapp\.com)$/.test(location.hostname)) {
+        location.replace('https://wodi.fit' + location.pathname + location.search + location.hash);
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="/wodi-mark.svg" />
     <link rel="apple-touch-icon" href="/wodi-icon-180.png" />
     <link rel="manifest" href="/manifest.webmanifest" />

@@ -205,7 +205,8 @@ function AboutWodi() {
           Get started
         </button>
         <p className={styles.footerLinks}>
-          <span className={styles.wordmark}>wodi<span className={styles.dot}>.</span></span>
+          <span className={styles.wordmark}>wodi<span className={styles.dot}>.</span>fit</span>
+          <a href="/wods/">Benchmark WODs</a>
           <a href="/terms.html">Terms</a>
           <a href="/privacy.html">Privacy</a>
         </p>

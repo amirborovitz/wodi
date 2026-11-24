@@ -5,7 +5,9 @@
       "http://localhost:3000",
       "http://localhost:4173",
       "https://wodboard-17f3d.web.app",
-      "https://wodboard-17f3d.firebaseapp.com"
+      "https://wodboard-17f3d.firebaseapp.com",
+      "https://wodi.fit",
+      "https://www.wodi.fit"
     ],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"],
     "maxAgeSeconds": 3600,

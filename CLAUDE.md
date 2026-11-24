@@ -130,7 +130,7 @@ The recap is a **social artifact** — optimized for pride and shareability, not
 
 ## How Wodi Talks About Itself — never "log"
 
-Public address: **https://wodi.fit** (every canonical/og/sitemap URL uses it). Tagline: **"Your CrossFit training buddy."**
+Public address: **https://wodi.fit** (every canonical/og/sitemap URL uses it; `index.html` sends the old Firebase addresses there). Tagline: **"Your CrossFit training buddy."** Every poster signs off **"wodi.fit"** (the one `Wordmark` in `PosterComponents.tsx`) so a shared poster says where to find us. Public benchmark-WOD pages (`/wods/…`) and the ONE sitemap are generated at build from `site/` — add a workout in `site/benchmarkWods.ts`, never a hand-written page or a sitemap in `public/`.
 
 **Never use "log", "logging", "logbook" or "tracker" in anything a person reads about Wodi** — page title, meta/og descriptions, the sign-in/landing page, manifest, store listings, onboarding, Wodi's own lines, marketing copy, button labels ("Get started", not "Start logging").
 **Why (owner, 2026-11-22):** "log sounds like old logging apps. We are looking for something different." Wodi is a buddy that reads your board, remembers, cheers and makes your poster — say what it *does* for you: *snap, reads, remembers, keeps, poster, buddy*.

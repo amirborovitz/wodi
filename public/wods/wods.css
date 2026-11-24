@@ -1,0 +1,294 @@
+/* The public benchmark-WOD pages (site/wodPages.ts). Plain HTML, the app's look:
+   ink field, warm white text, one yellow, Barlow — see wodi-design-system.pdf. */
+
+:root {
+  --yellow: #f5c200;
+  --ink: #0b0c0e;
+  --ink-soft: #16181c;
+  --white: #f3f1ea;
+  --dim: #b4b4ae;
+  --line: rgba(243, 241, 234, 0.12);
+  --paper: #f1e7cf;
+  --paper-ink: #211d15;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--white);
+  font: 500 16px/1.5 'Barlow', sans-serif;
+}
+
+a { color: inherit; }
+
+.dot { color: var(--yellow); }
+
+.top,
+main,
+.foot {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 64px;
+}
+
+.wordmark {
+  font: 900 24px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.wordmark.small { font-size: 18px; }
+
+.topLink {
+  color: var(--dim);
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--dim);
+  font: 500 12px/1.2 'DM Mono', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.eyebrow.sub { margin-top: 20px; }
+
+h1 {
+  margin: 12px 0 0;
+  font: 400 clamp(64px, 18vw, 112px)/0.92 'Anton', sans-serif;
+  text-transform: uppercase;
+}
+
+.scheme {
+  margin: 8px 0 0;
+  color: var(--yellow);
+  font: 900 32px/1 'Barlow Condensed', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.about {
+  margin: 20px 0 0;
+  max-width: 560px;
+  color: var(--dim);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.card {
+  margin-top: 32px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--ink-soft);
+}
+
+.movements,
+.standards,
+.index,
+.chips,
+.posterRows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.movements { margin-top: 12px; }
+
+.movements li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font: 800 22px/1.2 'Barlow', sans-serif;
+}
+
+.movements li:last-child { border-bottom: none; }
+
+.standards { margin-top: 8px; }
+
+.standards li,
+.note {
+  margin: 8px 0 0;
+  font-weight: 700;
+}
+
+.frame { margin-top: 48px; }
+
+.frame h2 {
+  margin: 0;
+  font: 400 40px/0.95 'Anton', sans-serif;
+  text-transform: uppercase;
+}
+
+.frame > p {
+  margin: 12px 0 0;
+  color: var(--dim);
+}
+
+/* ─── Sample poster (paper skin): the result is the loudest thing on it ─── */
+
+.poster {
+  margin: 24px 0 0;
+  width: 280px;
+  max-width: 100%;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--paper-ink);
+  transform: rotate(-2deg);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6);
+  padding: 20px 20px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.posterHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip {
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font: 500 10px/1 'DM Mono', monospace;
+  letter-spacing: 0.14em;
+}
+
+.rule {
+  flex: 1;
+  height: 1px;
+  background: rgba(33, 29, 21, 0.25);
+}
+
+.posterName {
+  margin: 14px 0 0;
+  font: 400 22px/1 'Anton', sans-serif;
+}
+
+.posterScheme {
+  margin: 4px 0 0;
+  font: 700 13px/1 'Barlow Condensed', sans-serif;
+}
+
+.posterRows { margin-top: 10px; }
+
+.posterRows li {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(33, 29, 21, 0.13);
+  font: 700 14px/1.1 'Barlow Condensed', sans-serif;
+}
+
+.posterHero {
+  position: relative;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.disc {
+  position: absolute;
+  left: -8px;
+  bottom: -4px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+
+.posterLabel {
+  position: relative;
+  font: 500 10px/1 'DM Mono', monospace;
+  letter-spacing: 0.16em;
+}
+
+.posterResult {
+  position: relative;
+  margin-top: 4px;
+  font: 400 72px/1 'Anton', sans-serif;
+}
+
+.posterFoot {
+  margin: 16px -20px 0;
+  padding: 8px 14px;
+  text-align: right;
+  background: var(--paper-ink);
+  color: var(--paper);
+  font: 900 14px/1 'Barlow Condensed', sans-serif;
+}
+
+/* ─── Calls and links ─── */
+
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 32px;
+  min-height: 58px;
+  max-width: 420px;
+  border-radius: 14px;
+  background: var(--yellow);
+  color: var(--ink);
+  font: 800 17px/1 'Barlow', sans-serif;
+  text-decoration: none;
+}
+
+.more,
+.group { margin-top: 48px; }
+
+.chips {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chips a {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.index { margin-top: 12px; }
+
+.index a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+}
+
+.indexName { font: 400 32px/1 'Anton', sans-serif; text-transform: uppercase; }
+
+.indexLine { color: var(--dim); font-weight: 700; }
+
+.foot {
+  margin-top: 64px;
+  padding-bottom: 40px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.foot p { margin: 16px 0 0; }
+
+.foot .fine { font-size: 12px; }
+
+.wod { padding-top: 24px; }
