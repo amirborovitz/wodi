@@ -1,13 +1,9 @@
-import type { WeekPosterData } from '../../../hooks/useWeekPosterData';
+import type { WeekPage, WeekPosterData } from '../../../hooks/useWeekPosterData';
 
-/**
- * Which poster of the week to draw. The week is the main one; the body page shows what
- * the week worked. One skin draws both, so the two always share a surface.
- */
-export type WeekPage = 'week' | 'body';
+export type { WeekPage };
 
-/** Every week skin renders the same week, on one of its two pages, and takes nothing else. */
-export interface WeekSkinProps {
+/** The week poster renders the same week on either page, and takes nothing else. */
+export interface WeekPosterProps {
   week: WeekPosterData;
   page: WeekPage;
 }

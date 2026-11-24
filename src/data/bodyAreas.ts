@@ -121,6 +121,8 @@ export interface BodyTallyRow {
   label: string;
   /** Sessions, capped at three like the figure's brightness. */
   level: 1 | 2 | 3;
+  /** Sessions, uncapped — for a tally counted out of the week's sessions. */
+  sessions: number;
 }
 
 /**
@@ -132,7 +134,7 @@ export function bodyAreaTally(sessions: BodyAreaSessions, max: number): BodyTall
     .filter((area) => sessions[area] > 0)
     .sort((a, b) => sessions[b] - sessions[a])
     .slice(0, max)
-    .map((area) => ({ area, label: BODY_AREA_LABEL[area], level: bodyAreaLevel(sessions[area]) as 1 | 2 | 3 }));
+    .map((area) => ({ area, label: BODY_AREA_LABEL[area], level: bodyAreaLevel(sessions[area]) as 1 | 2 | 3, sessions: sessions[area] }));
 }
 
 /** True when nothing resolved to a body area — the figure has nothing to light. */

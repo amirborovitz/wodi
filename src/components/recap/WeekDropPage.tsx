@@ -4,11 +4,9 @@ import { fB } from '../celebration/faces/HandwrittenFace/brand';
 import { elementToCanvas, canvasToBlob, shareImage, downloadBlob } from '../../utils/shareUtils';
 import { track } from '../../services/analytics';
 import { useWeekPosterData } from '../../hooks/useWeekPosterData';
-import { useFavoriteSkin } from '../../hooks/useFavoriteSkin';
 import { useSwipeDeck } from '../../hooks/useSwipeDeck';
 import type { RecapData } from '../../hooks/useRecapData';
-import { WEEK_POSTER_WIDTH, WEEK_POSTER_HEIGHT } from './week/WeekPosterParts';
-import { weekSkinFor } from './week/weekSkinRegistry';
+import { WeekPoster, WEEK_POSTER_WIDTH, WEEK_POSTER_HEIGHT } from './week/WeekPoster';
 import type { WeekPage } from './week/types';
 import styles from './WeekDropPage.module.css';
 
@@ -27,14 +25,14 @@ function nextPaint(): Promise<void> {
 /** Space between the two posters while one is dragged over the other, in screen px. */
 const PAGE_GAP = 16;
 
-const PAGE_NAME: Record<WeekPage, string> = { week: 'The week', body: 'What you worked' };
+const PAGE_NAME: Record<WeekPage, string> = { week: 'The work', body: 'The body' };
 
 /**
  * The week, as posters.
  *
  * Deliberately not a short Wrapped: no card deck of stats, no goals, no comparison to
  * the week before. Two posters at most — the week, and the body it worked — swiped like
- * a WOD poster's parts, in the athlete's own poster style. Nothing to pick here: it
+ * a WOD poster's parts, always on the one week template. Nothing to pick here: it
  * arrives finished, and the one action is Share.
  *
  * The 1080×1920 canvas is authoritative and never re-flows for the phone: the stage
@@ -42,8 +40,7 @@ const PAGE_NAME: Record<WeekPage, string> = { week: 'The week', body: 'What you 
  */
 export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.Element {
   const week = useWeekPosterData(data);
-  const { Comp: Skin } = weekSkinFor(useFavoriteSkin().order);
-  const pages: WeekPage[] = week.body ? ['week', 'body'] : ['week'];
+  const { pages } = week;
 
   const stageRef = useRef<HTMLDivElement | null>(null);
   const posterRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -141,7 +138,7 @@ export function WeekDropPage({ data, onClose }: WeekDropPageProps): React.JSX.El
                   style={{ transform: sharing && i === page ? 'none' : `scale(${scale})` }}
                 >
                   <div ref={(el) => { posterRefs.current[i] = el; }}>
-                    <Skin week={week} page={p} />
+                    <WeekPoster week={week} page={p} />
                   </div>
                 </div>
               </div>
