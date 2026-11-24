@@ -6,14 +6,6 @@
   background: var(--wodi-card);
 }
 
-.format {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--wodi-yellow);
-}
-
 .title {
   margin: 2px 0 0;
   font-family: var(--font-display);
@@ -37,41 +29,12 @@
   color: var(--wodi-white);
 }
 
-.prescription {
-  margin: 2px 0 0;
-  font-size: 0.8125rem;
-  color: var(--wodi-dim);
-}
-
-.lines {
+/* The board's own lines, kept as lines. This is the workout itself, so it reads as body text, not a caption. */
+.text {
   margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
+  white-space: pre-line;
   font-family: var(--font-body);
   font-size: 0.9375rem;
+  line-height: 1.5;
   color: var(--wodi-white);
-}
-
-.role {
-  font-family: var(--font-display);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--wodi-dim);
-}
-
-.qty {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.name {
-  min-width: 0;
 }
