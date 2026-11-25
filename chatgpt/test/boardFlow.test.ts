@@ -47,9 +47,45 @@ test('the Nov 19 board, logged through ChatGPT, saves what the app saves', () =>
   assert.equal(document.userId, 'u1');
 });
 
+test("Wodi's answer card: every question at once, answered in ONE call, saves what the app saves", () => {
+  const state = startBoard(board, athlete);
+  const turn = boardTurn(state, athlete);
+  // The card shows them all: the deadlift's start → peak and the cleans' weight, as the app builds them.
+  assert.ok(turn.questions.length >= 2, `one question only: ${turn.questions.map((q) => q.text).join(' | ')}`);
+  assert.equal(turn.questions[0].text, turn.question?.text, 'the card and the typed path start on the same question');
+  assert.ok(turn.questions.every((q) => q.panel || q.chips.length || q.pick), 'every question has a control to tap');
+  // The card sends the answers its controls build (the app's panelAnswer), all in one call.
+  const cardAnswers = turn.questions.flatMap((q) => q.slotIds.map((id) => {
+    const deadlift = q.panel?.groups.some((g) => g.title.toLowerCase().includes('deadlift'));
+    return deadlift ? { id, weight: 90, weightEnd: 120 } : { id, weight: 45 };
+  }));
+  const out = answerBoard(deserializeBoard(serializeBoard(state)), [], athlete, cardAnswers as never);
+  assert.deepEqual(out.not_understood, []);
+  const after = boardTurn(out.state, athlete);
+  assert.ok(after.done, `still asking: ${after.question?.text}`);
+  const { totals } = finishBoard(out.state, athlete, { userId: 'u1', date: new Date() });
+  const moved = (name: string) => totals.breakdownFromResults.movements.find((m) => m.name.toLowerCase().includes(name));
+  assert.deepEqual([moved('deadlift')?.totalReps, moved('power clean')?.totalReps, moved('burpee')?.totalReps], [12, 40, 40]);
+  // A card answer for a question Wodi isn't asking is refused, never guessed onto another.
+  const stray = answerBoard(state, [], athlete, [{ id: 'made-up', weight: 45 }] as never);
+  assert.equal(stray.not_understood.length, 1);
+});
+
 test('saving refuses while Wodi still has a question', () => {
   const state = startBoard(board, athlete);
   assert.throws(() => finishBoard(state, athlete, { userId: 'u1', date: new Date() }), BoardNotFinished);
+});
+
+test('a sentence Wodi cannot read lands through the value ChatGPT read from it', () => {
+  const state = startBoard(board, athlete);
+  const question = boardTurn(state, athlete).question!;
+  const slot = question.slots[0];
+  const out = answerBoard(state, [{ slot_id: slot.slot_id, text: 'I went 90 then worked up to 120 on the deadlifts', weight: 90, weight_end: 120, unit: 'kg' }], athlete);
+  assert.deepEqual(out.not_understood, []);
+  assert.equal(out.understood.length, 1);
+  // An option that isn't one of Wodi's is just words: read like any other answer, not dropped.
+  const offList = answerBoard(state, [{ slot_id: slot.slot_id, option: '90 to 120' }], athlete);
+  assert.deepEqual(offList.not_understood, []);
 });
 
 test('an answer Wodi cannot read is said back, never guessed', () => {

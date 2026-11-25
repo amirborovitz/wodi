@@ -5,10 +5,11 @@ import type { WorkoutWithStats } from '../../src/hooks/useWorkouts';
 import type { ParsedWorkout, PosterSkinId, PersonalRecord, Workout } from '../../src/types/index';
 import { extractNewPRs } from '../../src/services/achievementDetection';
 import { swapHabits } from '../../src/services/wodiAgent/athleteHabits';
+import { buildLastLoadMap } from '../../src/utils/lastLoadHistory';
 import type { PosterRenderer } from './renderer';
 import {
   answerBoard, boardTurn, deserializeBoard, finishBoard, serializeBoard, startBoard, BoardNotFinished,
-  type AnswerInput, type BoardAthlete, type BoardTurn, type FinishedBoard,
+  type AnswerInput, type CardAnswer, type BoardAthlete, type BoardTurn, type FinishedBoard,
 } from './boardFlow';
 
 export class ToolError extends Error {}
@@ -39,7 +40,7 @@ export class WodiService {
     if (!profile.exists) throw new ToolError('Finish Wodi account setup first');
     const recent = await this.db.collection('workouts').where('userId', '==', uid).orderBy('date', 'desc').limit(HABIT_WORKOUTS).get();
     const workouts = recent.docs.map((doc) => ({ ...doc.data(), id: doc.id, date: doc.get('date').toDate() }) as Workout);
-    return { sex: profile.get('sex'), weightUnit: profile.get('weightUnit'), habits: swapHabits(workouts) };
+    return { sex: profile.get('sex'), weightUnit: profile.get('weightUnit'), habits: swapHabits(workouts), lastLoads: buildLastLoadMap(workouts) };
   }
 
   private async draft(uid: string, boardId: string): Promise<{ ref: DocumentReference; json: string }> {
@@ -75,10 +76,10 @@ export class WodiService {
   }
 
   /** The athlete's answers, laid on the board by the app's engine; Wodi's next question back. */
-  async answerBoard(uid: string, input: { board_id: string; answers: AnswerInput[] }): Promise<BoardTurnResult & { understood: string[]; not_understood: string[] }> {
+  async answerBoard(uid: string, input: { board_id: string; answers?: AnswerInput[]; card_answers?: CardAnswer[] }): Promise<BoardTurnResult & { understood: string[]; not_understood: string[] }> {
     const athlete = await this.athlete(uid);
     const { ref, json } = await this.draft(uid, input.board_id);
-    const out = answerBoard(deserializeBoard(json), input.answers, athlete);
+    const out = answerBoard(deserializeBoard(json), input.answers ?? [], athlete, input.card_answers ?? []);
     await ref.update({ sessionJson: serializeBoard(out.state) });
     return { board_id: input.board_id, ...boardTurn(out.state, athlete), understood: out.understood, not_understood: out.not_understood };
   }

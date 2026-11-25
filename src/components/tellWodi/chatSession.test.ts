@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ParsedExercise, ParsedMovement, ParsedWorkout } from '../../types';
-import { EMPTY_ANSWER, clarifySlots, openSlots, type SlotAnswer } from './chatQuestions';
+import { EMPTY_ANSWER, clarifySlots, nextQuestion, openSlots, type SlotAnswer } from './chatQuestions';
 import { boardResults } from './boardResults';
-import { answeredSlots, applySessionAnswers, reopenSlots, sessionSlots, startSession, type ChatSessionContext } from './chatSession';
+import { answeredSlots, applySessionAnswers, reopenSlots, sessionQuestions, sessionSlots, startSession, type ChatSessionContext } from './chatSession';
 
 // The real session of 2026-11-19, part B: every 3:00 × 4 — 200m run, into 2 rounds of
 // 5 T&G power cleans + 5 burpees (the recipe's fold: reps 10, recipeFold 2).
@@ -72,6 +72,31 @@ describe('chat session — the one engine behind Wodi\'s chat and the ChatGPT pl
     const again = applySessionAnswers(state, [answer(weight.id, { weight: 50 })], sessionSlots(state, ctx), ctx);
     expect(again.state.closed.has(weight.id)).toBe(true);
     expect(again.state.reopened.has(weight.id)).toBe(false);
+  });
+
+  it('all the questions at once are exactly the ones the chat asks one turn at a time', () => {
+    const start = startSession(workout(), ctx);
+    const all = sessionQuestions(start, ctx);
+    expect(all.length).toBeGreaterThan(0);
+    let state = start;
+    const oneByOne: string[] = [];
+    for (;;) {
+      const slots = sessionSlots(state, ctx);
+      const q = nextQuestion(slots, state.results);
+      if (!q) break;
+      oneByOne.push(q.text);
+      state = applySessionAnswers(state, q.slotIds.map((id) => answer(id, { skipped: true })), slots, ctx).state;
+    }
+    expect(all.map((q) => q.text)).toEqual(oneByOne);
+  });
+
+  it('the list stops at a board question — its answer can change everything after it', () => {
+    const clock = {
+      field: 'exercises[0].workDuration', reason: 'no length', kind: 'missing' as const,
+      question: 'How long was it?', answer: 'duration' as const,
+    };
+    const all = sessionQuestions(startSession(workout([clock]), ctx), ctx);
+    expect(all.map((q) => q.text)).toEqual(['How long was it?']);
   });
 
   it('settling a board question rewrites the board and keeps every answer already given', () => {

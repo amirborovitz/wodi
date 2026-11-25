@@ -1,11 +1,11 @@
 ---
 name: log-workout
-description: Log a completed workout to Wodi, retrieve the athlete's training history or records, and generate or display Wodi workout posters. Use for explicit Wodi logging and poster requests, not for hypothetical workouts or medical advice.
+description: Save a completed workout to Wodi from its board (Wodi reads it and asks the questions), retrieve the athlete's training history or records, and generate or display Wodi workout posters. Use for explicit Wodi logging and poster requests, not for hypothetical workouts or medical advice.
 ---
 
 Use the connected Wodi tools for the signed-in athlete. If authentication is required, let the host show Wodi's account connection flow; never ask the athlete to paste a password, code, or token into chat.
 
-For a first-time athlete, a vague “get started” request, or a new logging request, introduce the easiest way once, with a clickable link: “The easiest way is in [Wodi](https://www.wodi.fit): snap your board and answer a couple of questions. If you prefer, I can do it with you here.” Respect the athlete's choice and don't steer them away from chat again. Answer specific history and existing-poster requests directly.
+For a first-time athlete, a vague “get started” request, or a new workout, welcome them once, as in the `get-started` skill, with the link clickable: “Open [Wodi](https://www.wodi.fit) to upload your workout board and follow the guided flow. Prefer to stay here? Upload a photo of your board or paste the workout text, and I'll guide you one movement at a time.” Respect the athlete's choice and don't steer them away from chat again. Answer specific history and existing-poster requests directly. When talking to the athlete, call Wodi a training buddy, never a log or tracker.
 
 ## Logging a workout here: Wodi asks, you relay
 
@@ -13,10 +13,10 @@ Wodi runs the same conversation it runs in its own app. Wodi reads the board, Wo
 
 1. **Get the board.** Ask for a photo of the board or its text, unless it's already in the conversation.
 2. **`read_board`** with the board's words **exactly as written**, line by line, including the part letters, clocks, weights and notes. Copy from the photo; do not interpret, reorder, total, convert or correct anything. If part of the photo is unreadable, ask the athlete about that part only, then send what they say. Put anything the athlete said *about the board itself* (e.g. "we did it in pairs") in `athlete_note`.
-3. **Show the board back briefly** from the `board` Wodi returns, so the athlete can see what Wodi understood.
-4. **Ask Wodi's `question.text`, exactly one question at a time, in Wodi's order.** Mention `question.options` when there are some. Wait for the answer.
-5. **`answer_board`**: one entry per slot in `question.slots`, with the athlete's **own words** in `text` (for example "90 to 120", "18:30", "all 4"). If they picked an offered option, send it as `option`. If they don't want to answer, send `skipped: true`. Never fill in an answer they didn't give, and never use the board's prescribed numbers as their result.
-6. If Wodi returns `not_understood`, ask that question again in other words. Say back `understood` in a short line when helpful.
+3. **Wodi shows its answer card.** It lists every question with one-tap controls (chips, steppers, weights). The athlete answers there, and the card saves the workout and shows the poster itself. Say one short line pointing to the card. **Do not ask the card's questions in the chat**, and do not call `save_board` or `generate_poster` for a board the card is handling. When the card reports the workout saved, cheer it with something specific about it.
+4. **Only if the athlete types answers in the chat instead:** ask Wodi's `question.text`, one question at a time, in Wodi's order, mentioning `question.options` when there are some, and continue with steps 5–8.
+5. **`answer_board`**: one entry per slot in `question.slots`, with the athlete's **own words** in `text` (for example "90 to 120", "18:30", "all 4") **and** the values you read from them (`count`, `weight`, `weight_end`, `seconds`, …). For "12 reverse shrugs per set", send `text` plus `count: 12`. If they picked an offered option, send it as `option`. If they don't want to answer, send `skipped: true`. Never fill in an answer they didn't give, and never use the board's prescribed numbers as their result.
+6. If Wodi returns `not_understood` but the athlete's answer was clear, resend it yourself with the values. **Never ask the athlete to type a clear answer again.** Ask again, in other words, only when their answer was genuinely unclear. Say back `understood` in a short line when helpful.
 7. Repeat 4–6 until `done` is true, then **`save_board`** with a new `request_id`. Send `trained_at` **only** if the athlete said the workout was on another day; otherwise Wodi dates it today.
 8. **`generate_poster`** with the returned `workout_id` (the athlete's requested skin, or the default), then **`get_poster`** to show every page.
 
