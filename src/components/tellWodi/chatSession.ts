@@ -2,7 +2,8 @@ import type { ParsedWorkout } from '../../types';
 import type { StoryExerciseResult } from '../logging/story/types';
 import type { SwapHabit } from '../../services/wodiAgent/athleteHabits';
 import { answerUncertainty, uncertaintyValue } from '../../services/parseUncertainty';
-import { applyAnswer, clarifySlots, describeAnswer, openSlots, type ChatSlot, type SlotAnswer } from './chatQuestions';
+import type { LastLoad } from '../../utils/lastLoadHistory';
+import { applyAnswer, clarifySlots, describeAnswer, nextQuestion, openSlots, type ChatQuestion, type ChatSlot, type SlotAnswer } from './chatQuestions';
 
 /**
  * Logging a board by conversation, as plain state in and state out — the ONE engine behind
@@ -50,6 +51,30 @@ export function sessionSlots(state: ChatSessionState, ctx: ChatSessionContext): 
     ...clarifySlots(state.workout),
     ...openSlots(state.results, state.closed, ctx.habits, state.workout?.teamSize, state.reopened),
   ];
+}
+
+/**
+ * Every question still to ask, in the order the chat would ask them — for a surface that shows
+ * them all at once (the ChatGPT answer card) instead of one turn each. Built only from
+ * nextQuestion, so each is exactly the question, chips and panel the app's chat shows. Stops
+ * after a board question: its answer rewrites the board, and the questions after it with it.
+ */
+export function sessionQuestions(
+  state: ChatSessionState,
+  ctx: ChatSessionContext,
+  lastLoads?: ReadonlyMap<string, LastLoad>,
+): ChatQuestion[] {
+  const questions: ChatQuestion[] = [];
+  let slots = sessionSlots(state, ctx);
+  for (;;) {
+    const first = slots.find((s) => s.asked);
+    const question = first ? nextQuestion(slots, state.results, lastLoads) : null;
+    if (!first || !question) return questions;
+    questions.push(question);
+    if (first.kind === 'clarify') return questions;
+    const taken = new Set([first.id, ...question.slotIds]);
+    slots = slots.map((s) => (taken.has(s.id) ? { ...s, asked: false } : s));
+  }
 }
 
 /**

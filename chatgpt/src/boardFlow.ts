@@ -3,8 +3,9 @@ import type { LoadUnit } from '../../src/utils/loadUnits';
 import type { SwapHabit } from '../../src/services/wodiAgent/athleteHabits';
 import { boardResults } from '../../src/components/tellWodi/boardResults';
 import { buildBoardPreview, type BoardPreview } from '../../src/components/tellWodi/boardPreview';
-import { EMPTY_ANSWER, nextQuestion, readAnswerLocally, describeAnswer, type ChatSlot, type SlotAnswer } from '../../src/components/tellWodi/chatQuestions';
-import { applySessionAnswers, sessionSlots, startSession, type ChatSessionContext, type ChatSessionState } from '../../src/components/tellWodi/chatSession';
+import type { LastLoad } from '../../src/utils/lastLoadHistory';
+import { EMPTY_ANSWER, readAnswerLocally, describeAnswer, type ChatQuestion, type ChatSlot, type SlotAnswer } from '../../src/components/tellWodi/chatQuestions';
+import { applySessionAnswers, sessionQuestions, sessionSlots, startSession, type ChatSessionContext, type ChatSessionState } from '../../src/components/tellWodi/chatSession';
 import { buildSavedWorkoutTotals, buildWorkoutDocument, sessionPartnerScope, type SavedWorkoutTotals, type WorkoutDocument } from '../../src/services/savedWorkout';
 
 /**
@@ -18,6 +19,8 @@ export interface BoardAthlete {
   sex?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
   weightUnit?: LoadUnit;
   habits: ReadonlyMap<string, SwapHabit>;
+  /** Their own last load per lift (buildLastLoadMap) — where a weight starts, one tap, as in the app. */
+  lastLoads?: ReadonlyMap<string, LastLoad>;
 }
 
 /** One question, as Wodi's chat would ask it next. */
@@ -35,7 +38,15 @@ export interface BoardTurn {
   /** Nothing left that Wodi needs — the workout can be saved. */
   done: boolean;
   question: BoardQuestion | null;
+  /**
+   * Every question still open, exactly as the app's chat builds them — chips, panels, picks — for
+   * Wodi's answer card, which shows them all at once and answers with `card_answers`.
+   */
+  questions: ChatQuestion[];
 }
+
+/** An answer from Wodi's card: a chip's, panelAnswer's or pickAnswer's — the fields it gives; the rest are blank. */
+export type CardAnswer = Partial<SlotAnswer> & { id: string };
 
 /** An answer as ChatGPT sends it: the athlete's own words, a chosen option, or plain values. */
 export interface AnswerInput {
@@ -71,12 +82,15 @@ export function startBoard(workout: ParsedWorkout, athlete: BoardAthlete): ChatS
 /** Where the conversation stands: the board as Wodi read it, and the next thing Wodi asks. */
 export function boardTurn(state: ChatSessionState, athlete: BoardAthlete): BoardTurn {
   if (!state.workout) throw new Error('No board');
-  const slots = sessionSlots(state, context(athlete));
-  const asked = nextQuestion(slots, state.results);
+  const ctx = context(athlete);
+  const slots = sessionSlots(state, ctx);
+  const questions = sessionQuestions(state, ctx, athlete.lastLoads);
+  const asked = questions[0];
   const done = !slots.some((s) => s.asked);
   return {
     board: buildBoardPreview(state.workout),
     done,
+    questions: done ? [] : questions,
     question: done || !asked ? null : {
       text: asked.text,
       ...(asked.hint ? { hint: asked.hint } : {}),
@@ -97,13 +111,26 @@ export interface AnswersOutcome {
   not_understood: string[];
 }
 
-/** Lay ChatGPT's answers on the board through the app's engine. Nothing is guessed. */
-export function answerBoard(state: ChatSessionState, inputs: readonly AnswerInput[], athlete: BoardAthlete): AnswersOutcome {
+/**
+ * Lay answers on the board through the app's engine. Nothing is guessed. `inputs` are ChatGPT's
+ * (the athlete's words, read by the app first); `cardAnswers` come from Wodi's answer card, built
+ * by the app's own chips and panels — the exact answers a tap gives in the app.
+ */
+export function answerBoard(
+  state: ChatSessionState,
+  inputs: readonly AnswerInput[],
+  athlete: BoardAthlete,
+  cardAnswers: readonly CardAnswer[] = [],
+): AnswersOutcome {
   const ctx = context(athlete);
   const slots = sessionSlots(state, ctx);
-  const question = nextQuestion(slots, state.results);
+  const question = sessionQuestions(state, ctx, athlete.lastLoads)[0];
   const answers: SlotAnswer[] = [];
   const notUnderstood: string[] = [];
+  for (const card of cardAnswers) {
+    if (slots.some((s) => s.id === card.id)) answers.push({ ...EMPTY_ANSWER, ...card });
+    else notUnderstood.push(`${card.id}: not a question Wodi is asking`);
+  }
   for (const input of inputs) {
     const slot = slots.find((s) => s.id === input.slot_id);
     if (!slot) { notUnderstood.push(`${input.slot_id}: not a question Wodi is asking`); continue; }
@@ -123,12 +150,15 @@ export function answerBoard(state: ChatSessionState, inputs: readonly AnswerInpu
 function toSlotAnswer(slot: ChatSlot, input: AnswerInput, chips: readonly { label: string; answers: SlotAnswer[] }[]): SlotAnswer[] {
   if (input.option != null) {
     const chip = chips.find((c) => c.label.trim().toLowerCase() === input.option!.trim().toLowerCase());
-    return chip ? chip.answers.filter((a) => a.id === slot.id) : [];
+    if (chip) return chip.answers.filter((a) => a.id === slot.id);
   }
   if (input.skipped) return [{ id: slot.id, ...EMPTY_ANSWER, skipped: true }];
-  // The athlete's words are read by the app, never by the model (plain answers stay local).
-  if (input.text != null) {
-    const read = readAnswerLocally(slot, input.text);
+  // The athlete's words are read by the app first, exactly as the app's chat does ("12", "90 to
+  // 120"); an option that isn't one of Wodi's is just more words. Only when those aren't a plain
+  // answer do the values ChatGPT read from them count — ChatGPT is this surface's language reader,
+  // as readAthleteMessage is the app's.
+  for (const words of [input.text, input.option]) {
+    const read = words != null ? readAnswerLocally(slot, words) : null;
     if (read) return [read];
   }
   const values: Partial<SlotAnswer> = {
